@@ -1,10 +1,11 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 
-interface Tab {
+export interface Tab {
     id: string;
     title: string;
-    type: 'table' | 'query' | 'settings';
-    metadata?: any; // e.g. tableId, query content
+    type: 'table' | 'query' | 'settings' | 'insights' | 'dashboard' | 'visualize' | 'erd';
+    metadata?: any; // e.g. tableId, query content, ERD layout
     initialSql?: string; // For pre-filling query editor
 }
 
@@ -54,58 +55,36 @@ interface AppState {
     openTab: (tab: Tab) => void;
     closeTab: (tabId: string) => void;
     setActiveTab: (tabId: string) => void;
+    updateTabMetadata: (tabId: string, metadata: any) => void;
     openQueryTab: () => void;
+    openInsightsTab: (connectionId: string, database?: string) => void;
+    openVisualizeTab: () => void;
+    openErdTab: (connectionId: string, database?: string) => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
-    // Auth
-    isAuthenticated: localStorage.getItem('isAuthenticated') === 'true' && !!localStorage.getItem('accessToken'),
-    accessToken: localStorage.getItem('accessToken'),
-    login: (token, user) => {
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('accessToken', token);
-        localStorage.setItem('user', JSON.stringify(user));
-        set({
-            isAuthenticated: true,
-            accessToken: token,
-            user,
-            isConnectionDialogOpen: false // Ensure dialog is closed on login
-        });
-    },
-    logout: () => {
-        localStorage.removeItem('isAuthenticated');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('user');
-        set({ isAuthenticated: false, accessToken: null, user: null });
-    },
+export const useAppStore = create<AppState>()(
+    persist(
+        (set) => ({
+            // Sidebar
+            isSidebarOpen: true,
+            toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+            setSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
 
-    // User
-    user: (() => {
-        try {
-            const saved = localStorage.getItem('user');
-            if (!saved) return null;
-            const parsed = JSON.parse(saved);
-            return parsed && typeof parsed === 'object' ? parsed : null;
-        } catch (e) {
-            console.error('Failed to parse user', e);
-            return null;
-        }
-    })(),
-    updateUser: (user) => {
-        localStorage.setItem('user', JSON.stringify(user));
-        set({ user });
-    },
+            // Auth
+            isAuthenticated: false,
+            accessToken: null,
+            user: null,
+            login: (token, user) => set({
+                isAuthenticated: true,
+                accessToken: token,
+                user,
+                isConnectionDialogOpen: false
+            }),
+            logout: () => set({ isAuthenticated: false, accessToken: null, user: null }),
+            updateUser: (user) => set({ user }),
 
-    // Sidebar
-    isSidebarOpen: true,
-    toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
-    setSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
-
-    // Connection
-    connections: (() => {
-        try {
-            const saved = localStorage.getItem('connections');
-            if (!saved) return [
+            // Connection
+            connections: [
                 {
                     id: 'local-pg',
                     name: 'Local Postgres',
@@ -116,89 +95,145 @@ export const useAppStore = create<AppState>((set) => ({
                     password: '123',
                     database: 'postgres'
                 }
-            ];
-            const parsed = JSON.parse(saved);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (e) {
-            console.error('Failed to parse connections', e);
-            return [];
+            ],
+            activeConnectionId: null,
+            isConnectionDialogOpen: false,
+            openConnectionDialog: () => set({ isConnectionDialogOpen: true }),
+            closeConnectionDialog: () => set({ isConnectionDialogOpen: false }),
+
+            setActiveConnectionId: (id) => set({ activeConnectionId: id, isSidebarOpen: true }),
+
+            addConnection: (connection) => set((state) => ({
+                connections: [...state.connections, connection]
+            })),
+
+            updateConnection: (id, updatedFields) => set((state) => ({
+                connections: state.connections.map(c =>
+                    c.id === id ? { ...c, ...updatedFields } : c
+                )
+            })),
+
+            removeConnection: (id) => set((state) => {
+                const newConnections = state.connections.filter(c => c.id !== id);
+                const newActiveId = state.activeConnectionId === id ? null : state.activeConnectionId;
+                return { connections: newConnections, activeConnectionId: newActiveId };
+            }),
+
+            // Tabs
+            tabs: [],
+            activeTabId: null,
+
+            openTab: (newTab) => set((state) => {
+                const exists = state.tabs.find(t => t.id === newTab.id);
+                if (exists) return { activeTabId: newTab.id };
+                return {
+                    tabs: [...state.tabs, newTab],
+                    activeTabId: newTab.id
+                };
+            }),
+
+            closeTab: (tabId) => set((state) => {
+                const newTabs = state.tabs.filter(t => t.id !== tabId);
+                let newActiveId = state.activeTabId;
+                if (state.activeTabId === tabId) {
+                    newActiveId = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null;
+                }
+                return {
+                    tabs: newTabs,
+                    activeTabId: newActiveId
+                };
+            }),
+
+            setActiveTab: (tabId) => set({ activeTabId: tabId }),
+
+            updateTabMetadata: (tabId, metadata) => set((state) => ({
+                tabs: state.tabs.map(t =>
+                    t.id === tabId ? { ...t, metadata: { ...t.metadata, ...metadata } } : t
+                )
+            })),
+
+            openQueryTab: () => set((state) => {
+                const newTab: Tab = {
+                    id: `query-${Date.now()}`,
+                    title: 'New Query',
+                    type: 'query',
+                    metadata: {}
+                };
+                return {
+                    tabs: [...state.tabs, newTab],
+                    activeTabId: newTab.id
+                };
+            }),
+
+            openInsightsTab: (connectionId, database) => set((state) => {
+                const id = `insights-${connectionId}${database ? `-${database}` : ''}`;
+                const exists = state.tabs.find(t => t.id === id);
+                if (exists) return { activeTabId: id };
+
+                const conn = state.connections.find(c => c.id === connectionId);
+                const newTab: Tab = {
+                    id,
+                    title: `Insights: ${conn?.name || 'DB'}${database ? ` (${database})` : ''}`,
+                    type: 'insights',
+                    metadata: { connectionId, database }
+                };
+
+                return {
+                    tabs: [...state.tabs, newTab],
+                    activeTabId: id
+                };
+            }),
+
+            openVisualizeTab: () => set((state) => {
+                const id = 'visualize-hub';
+                const exists = state.tabs.find(t => t.id === id);
+                if (exists) return { activeTabId: id };
+
+                const newTab: Tab = {
+                    id,
+                    title: 'Visualizer Hub',
+                    type: 'visualize',
+                };
+
+                return {
+                    tabs: [...state.tabs, newTab],
+                    activeTabId: id
+                };
+            }),
+
+            openErdTab: (connectionId, database) => set((state) => {
+                const id = `erd-${connectionId}${database ? '-' + database : ''}`;
+                const exists = state.tabs.find(t => t.id === id);
+                if (exists) return { activeTabId: id };
+
+                const conn = state.connections.find(c => c.id === connectionId);
+                const newTab: Tab = {
+                    id,
+                    title: `ERD: ${conn?.name || 'Default'}${database ? ` (${database})` : ''}`,
+                    type: 'erd',
+                    metadata: { connectionId, database }
+                };
+
+                return {
+                    tabs: [...state.tabs, newTab],
+                    activeTabId: id
+                };
+            }),
+        }),
+        {
+            name: 'data-explorer-storage',
+            storage: createJSONStorage(() => localStorage),
+            // Only persist essential state
+            partialize: (state) => ({
+                connections: state.connections,
+                activeConnectionId: state.activeConnectionId,
+                isAuthenticated: state.isAuthenticated,
+                accessToken: state.accessToken,
+                user: state.user,
+                tabs: state.tabs,
+                activeTabId: state.activeTabId,
+                isSidebarOpen: state.isSidebarOpen,
+            }),
         }
-    })(),
-    activeConnectionId: localStorage.getItem('activeConnectionId') || null,
-
-    isConnectionDialogOpen: false,
-    openConnectionDialog: () => set({ isConnectionDialogOpen: true }),
-    closeConnectionDialog: () => set({ isConnectionDialogOpen: false }),
-
-    setActiveConnectionId: (id) => set({ activeConnectionId: id, isSidebarOpen: true }),
-
-    addConnection: (connection) => set((state) => {
-        const newConnections = [...state.connections, connection];
-        localStorage.setItem('connections', JSON.stringify(newConnections)); // Persist
-        return { connections: newConnections };
-    }),
-
-    updateConnection: (id, updatedFields) => set((state) => {
-        const newConnections = state.connections.map(c =>
-            c.id === id ? { ...c, ...updatedFields } : c
-        );
-        localStorage.setItem('connections', JSON.stringify(newConnections));
-        return { connections: newConnections };
-    }),
-
-    removeConnection: (id) => set((state) => {
-        const newConnections = state.connections.filter(c => c.id !== id);
-        localStorage.setItem('connections', JSON.stringify(newConnections));
-
-        // If active connection is removed, deselect it
-        const newActiveId = state.activeConnectionId === id ? null : state.activeConnectionId;
-
-        return { connections: newConnections, activeConnectionId: newActiveId };
-    }),
-
-    // Tabs
-    tabs: [],
-    activeTabId: null,
-
-    openTab: (newTab) => set((state) => {
-        // If tab already exists, just activate it
-        const exists = state.tabs.find(t => t.id === newTab.id);
-        if (exists) {
-            return { activeTabId: newTab.id };
-        }
-        return {
-            tabs: [...state.tabs, newTab],
-            activeTabId: newTab.id
-        };
-    }),
-
-    closeTab: (tabId) => set((state) => {
-        const newTabs = state.tabs.filter(t => t.id !== tabId);
-        let newActiveId = state.activeTabId;
-
-        // If closing active tab, switch to the last one
-        if (state.activeTabId === tabId) {
-            newActiveId = newTabs.length > 0 ? newTabs[newTabs.length - 1].id : null;
-        }
-
-        return {
-            tabs: newTabs,
-            activeTabId: newActiveId
-        };
-    }),
-
-    setActiveTab: (tabId) => set({ activeTabId: tabId }),
-
-    openQueryTab: () => set((state) => {
-        const newTab: Tab = {
-            id: `query-${Date.now()}`,
-            title: 'New Query',
-            type: 'query',
-            metadata: {}
-        };
-        return {
-            tabs: [...state.tabs, newTab],
-            activeTabId: newTab.id
-        };
-    }),
-}));
+    )
+);

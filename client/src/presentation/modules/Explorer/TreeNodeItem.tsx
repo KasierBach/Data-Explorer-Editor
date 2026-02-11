@@ -1,5 +1,18 @@
 import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, Database, Table, Folder, List } from 'lucide-react';
+import {
+    ChevronRight,
+    ChevronDown,
+    Database,
+    Table,
+    Folder,
+    FileCode,
+    Key,
+    Eye,
+    Zap,
+    Box,
+    Layers,
+    Binary
+} from 'lucide-react';
 import type { TreeNode } from '@/core/domain/entities';
 import { useDatabaseHierarchy } from '@/presentation/hooks/useDatabase';
 import { cn } from '@/lib/utils';
@@ -9,13 +22,26 @@ import { SidebarContextMenu } from './SidebarContextMenu';
 
 const FileIcon = ({ type, className }: { type: string, className?: string }) => {
     switch (type) {
-        case 'database': return <Database className={cn("w-4 h-4 text-blue-500", className)} />;
-        case 'schema': return <Folder className={cn("w-4 h-4 text-yellow-500", className)} />;
-        case 'folder': return <Folder className={cn("w-4 h-4 text-yellow-500/80", className)} />;
-        case 'table': return <Table className={cn("w-4 h-4 text-blue-400", className)} />;
-        case 'view': return <div className="w-4 h-4 flex items-center justify-center text-purple-500"><Table className="w-3 h-3" /></div>; // Eye icon better? using Table for now with color distinction
-        case 'function': return <div className="w-4 h-4 flex items-center justify-center text-orange-500"><List className="w-3 h-3" /></div>;
-        default: return <List className={cn("w-4 h-4 text-gray-400", className)} />;
+        case 'database':
+            return <Database className={cn("w-4 h-4 text-cyan-500 fill-cyan-500/10", className)} />;
+        case 'schema':
+            return <Layers className={cn("w-4 h-4 text-indigo-400", className)} />;
+        case 'folder':
+            return <Folder className={cn("w-4 h-4 text-amber-500 fill-amber-500/10", className)} />;
+        case 'table':
+            return <Table className={cn("w-4 h-4 text-blue-500", className)} />;
+        case 'view':
+            return <Eye className={cn("w-4 h-4 text-purple-400", className)} />;
+        case 'function':
+            return <Zap className={cn("w-4 h-4 text-yellow-500", className)} />;
+        case 'procedure':
+            return <FileCode className={cn("w-4 h-4 text-emerald-500", className)} />;
+        case 'column':
+            return <Binary className={cn("w-4 h-4 text-slate-400", className)} />;
+        case 'primary_key':
+            return <Key className={cn("w-4 h-4 text-amber-400 rotate-45", className)} />;
+        default:
+            return <Box className={cn("w-4 h-4 text-slate-400", className)} />;
     }
 };
 
@@ -49,39 +75,58 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
 
     return (
         <SidebarContextMenu type={node.type as any} onAction={(action) => {
-            // We need to pass this up or handle it via a custom hook/store action
-            // For now, let's dispatch a custom event or use a global handler if needed
-            // But cleaner: TreeNodeItem needs access to some context or props for actions
-            // Let's dispatch a window event for simplicity in this short term, or update props
-            // Actually, dispatching a custom event is decent for decoupling deep trees
             window.dispatchEvent(new CustomEvent('tree-node-action', {
                 detail: { action, nodeId: node.id, nodeType: node.type }
             }));
         }}>
             <div
                 className={cn(
-                    "flex items-center py-1 px-2 hover:bg-accent cursor-pointer select-none text-sm group",
-                    // Add some visual indicator for context menu availability?
+                    "flex items-center py-1.5 px-2 hover:bg-accent/50 cursor-pointer select-none text-sm group transition-all duration-200 border-l-2 border-transparent",
+                    isExpanded && node.hasChildren && "bg-accent/20",
+                    "hover:border-blue-500/50"
                 )}
-                style={{ paddingLeft: `${level * 12 + 8}px` }}
+                style={{ paddingLeft: `${level * 12 + 4}px` }}
                 onClick={handleToggle}
                 onDoubleClick={handleDoubleClick}
-                onContextMenu={() => {
-                    // console.log("Right clicked", node.name);
-                }}
             >
-                <span className="mr-1 w-4 h-4 flex items-center justify-center">
+                <span className="mr-0.5 w-4 h-4 flex items-center justify-center transition-transform duration-200 group-hover:scale-110">
                     {node.hasChildren && (
-                        isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />
+                        isExpanded ?
+                            <ChevronDown className="w-3 h-3 text-muted-foreground/70" /> :
+                            <ChevronRight className="w-3 h-3 text-muted-foreground/70" />
                     )}
                 </span>
-                <FileIcon type={node.type} className="mr-2" />
-                <span className="truncate flex-1">{node.name}</span>
+
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <FileIcon type={node.type} className="shrink-0 transition-all group-hover:drop-shadow-[0_0_3px_rgba(59,130,246,0.3)]" />
+                    <span className={cn(
+                        "truncate font-medium transition-colors",
+                        node.type === 'database' || node.type === 'schema' ? "text-foreground/90 font-semibold text-xs uppercase tracking-tight" : "text-foreground/80 group-hover:text-foreground"
+                    )}>
+                        {node.name}
+                    </span>
+
+                    {/* Optional indicator for child count if we had it, or just small deco */}
+                    {node.hasChildren && !isExpanded && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                </div>
             </div>
 
             {isExpanded && (
-                <div>
-                    {isLoading && <div className="pl-8 text-xs text-muted-foreground py-1">Loading...</div>}
+                <div className="relative">
+                    {/* Continuous vertical line for hierarchy depth */}
+                    <div
+                        className="absolute left-[13px] top-0 bottom-0 w-px bg-border/40"
+                        style={{ left: `${level * 12 + 11}px` }}
+                    />
+
+                    {isLoading && (
+                        <div className="pl-12 text-[10px] text-muted-foreground/60 py-1 flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full border border-blue-500/30 border-t-blue-500 animate-spin" />
+                            Loading...
+                        </div>
+                    )}
                     {children?.map(child => (
                         <TreeNodeItem key={child.id} node={child} level={level + 1} />
                     ))}

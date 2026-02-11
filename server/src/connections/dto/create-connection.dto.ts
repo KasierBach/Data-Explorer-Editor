@@ -28,4 +28,7 @@ export class CreateConnectionDto {
     @IsString()
     @IsOptional()
     database?: string;
+
+    @IsOptional()
+    showAllDatabases?: boolean;
 }

@@ -10,7 +10,7 @@ export class QueryService {
 
   async executeQuery(createQueryDto: CreateQueryDto) {
     const { connectionId, sql, database } = createQueryDto;
-    const connection = this.connectionsService.findOne(connectionId);
+    const connection = await this.connectionsService.findOne(connectionId);
 
     try {
       const pool = await this.connectionsService.getPool(connectionId, database);
@@ -45,7 +45,7 @@ export class QueryService {
 
   async updateRow(updateRowDto: any) {
     const { connectionId, database, schema, table, pkColumn, pkValue, updates } = updateRowDto;
-    const connection = this.connectionsService.findOne(connectionId);
+    const connection = await this.connectionsService.findOne(connectionId);
 
     const updateCols = Object.keys(updates);
     if (updateCols.length === 0) return { success: true, message: 'No changes' };
@@ -78,7 +78,7 @@ export class QueryService {
 
   async updateSchema(updateSchemaDto: any) {
     const { connectionId, database, schema, table, operations } = updateSchemaDto;
-    const connection = this.connectionsService.findOne(connectionId);
+    const connection = await this.connectionsService.findOne(connectionId);
     if (!connection) throw new BadRequestException('Invalid connection ID');
 
     const quotedTable = connection.type === 'postgres'

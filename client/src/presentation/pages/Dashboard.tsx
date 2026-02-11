@@ -1,14 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
-import { Plus, Database, Search, Clock, FileText } from 'lucide-react';
+import { Plus, Database, Search, Clock, FileText, BarChart3, ArrowLeft } from 'lucide-react';
+import { InsightsDashboard } from '../modules/Dashboard/InsightsDashboard';
 
 export const Dashboard: React.FC = () => {
-    const { connections, openQueryTab, setSidebarOpen, openConnectionDialog } = useAppStore();
+    const { connections, openQueryTab, setSidebarOpen, openConnectionDialog, activeConnectionId } = useAppStore();
+    const [view, setView] = useState<'welcome' | 'insights'>('welcome');
 
     // Mock stats for now
-    const queryCount = 12; // This would ideally come from a persistent store
+    const queryCount = 12;
     const tableCount = 45;
+
+    if (view === 'insights') {
+        return (
+            <div className="h-full w-full bg-background overflow-auto animate-in fade-in duration-300">
+                <div className="max-w-7xl mx-auto">
+                    <div className="p-4 border-b flex items-center justify-between bg-muted/20">
+                        <Button variant="ghost" size="sm" onClick={() => setView('welcome')} className="gap-2">
+                            <ArrowLeft className="h-4 w-4" /> Back to Welcome
+                        </Button>
+                        <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground mr-12">Database Intelligence</h2>
+                    </div>
+                    <InsightsDashboard />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="h-full w-full bg-background p-8 overflow-auto animate-in fade-in duration-300">
@@ -64,6 +82,28 @@ export const Dashboard: React.FC = () => {
                                 </p>
                             </div>
                         </div>
+                    </div>
+
+                    <div
+                        className={`group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer ${!activeConnectionId ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+                        onClick={() => activeConnectionId && setView('insights')}
+                    >
+                        <div className="p-6 flex flex-col gap-4">
+                            <div className="p-3 w-fit rounded-lg bg-purple-100 text-purple-600">
+                                <BarChart3 className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-lg">Database Insights</h3>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                    View metrics, storage usage, and trends.
+                                </p>
+                            </div>
+                        </div>
+                        {!activeConnectionId && (
+                            <div className="absolute inset-x-0 bottom-0 bg-purple-600 text-[10px] text-white text-center py-1 font-bold uppercase tracking-widest">
+                                Select a connection first
+                            </div>
+                        )}
                     </div>
                 </div>
 

@@ -2,14 +2,15 @@ import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { Connection } from './entities/connection.entity';
-import { v4 as uuidv4 } from 'uuid';
 import { Pool } from 'pg';
 import * as mysql from 'mysql2/promise';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ConnectionsService implements OnModuleDestroy {
-  private connections: Connection[] = [];
   private pools = new Map<string, any>();
+
+  constructor(private prisma: PrismaService) { }
 
   async onModuleDestroy() {
     for (const pool of this.pools.values()) {
@@ -17,30 +18,33 @@ export class ConnectionsService implements OnModuleDestroy {
     }
   }
 
-  create(createConnectionDto: CreateConnectionDto): Connection {
-    const newConnection: Connection = {
-      id: uuidv4(),
-      ...createConnectionDto,
-      createdAt: new Date(),
-    };
-    this.connections.push(newConnection);
-    return newConnection;
+  async create(createConnectionDto: CreateConnectionDto): Promise<Connection> {
+    const { name, ...rest } = createConnectionDto;
+    const connection = await this.prisma.connection.upsert({
+      where: { name } as any,
+      update: rest as any,
+      create: createConnectionDto as any,
+    });
+    return connection as unknown as Connection;
   }
 
-  findAll(): Connection[] {
-    return this.connections;
+  async findAll(): Promise<Connection[]> {
+    const connections = await this.prisma.connection.findMany();
+    return connections as unknown as Connection[];
   }
 
-  findOne(id: string): Connection {
-    const connection = this.connections.find(c => c.id === id);
+  async findOne(id: string): Promise<Connection> {
+    const connection = await this.prisma.connection.findUnique({
+      where: { id },
+    });
     if (!connection) {
       throw new NotFoundException(`Connection with ID ${id} not found`);
     }
-    return connection;
+    return connection as unknown as Connection;
   }
 
   async getPool(id: string, databaseOverride?: string) {
-    const connection = this.findOne(id);
+    const connection = await this.findOne(id);
     const poolKey = `${id}:${databaseOverride || connection.database}`;
 
     if (this.pools.has(poolKey)) {
@@ -76,43 +80,38 @@ export class ConnectionsService implements OnModuleDestroy {
     return pool;
   }
 
-  update(id: string, updateConnectionDto: UpdateConnectionDto): Connection {
-    const index = this.connections.findIndex(c => c.id === id);
-    if (index === -1) {
-      throw new NotFoundException(`Connection with ID ${id} not found`);
-    }
+  async update(id: string, updateConnectionDto: UpdateConnectionDto): Promise<Connection> {
+    await this.findOne(id);
 
     // Close existing pools for this connection if config changed
     for (const [key, pool] of this.pools.entries()) {
       if (key.startsWith(`${id}:`)) {
-        pool.end();
+        await pool.end();
         this.pools.delete(key);
       }
     }
 
-    const updatedConnection = {
-      ...this.connections[index],
-      ...updateConnectionDto,
-    };
+    const updatedConnection = await this.prisma.connection.update({
+      where: { id },
+      data: updateConnectionDto,
+    });
 
-    this.connections[index] = updatedConnection;
-    return updatedConnection;
+    return updatedConnection as unknown as Connection;
   }
 
-  remove(id: string): void {
-    const index = this.connections.findIndex(c => c.id === id);
-    if (index === -1) {
-      throw new NotFoundException(`Connection with ID ${id} not found`);
-    }
+  async remove(id: string): Promise<void> {
+    await this.findOne(id);
 
     // Close pools
     for (const [key, pool] of this.pools.entries()) {
       if (key.startsWith(`${id}:`)) {
-        pool.end();
+        await pool.end();
         this.pools.delete(key);
       }
     }
 
-    this.connections.splice(index, 1);
+    await this.prisma.connection.delete({
+      where: { id },
+    });
   }
 }

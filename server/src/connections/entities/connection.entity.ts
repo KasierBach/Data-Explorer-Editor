@@ -7,5 +7,6 @@ export class Connection {
     username?: string;
     password?: string;
     database?: string;
+    showAllDatabases: boolean;
     createdAt: Date;
 }

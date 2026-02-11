@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
 import { Play, Loader2, Eraser, AlignLeft, Info, Table as TableIcon } from 'lucide-react';
@@ -27,16 +27,36 @@ import {
 import type { QueryResult } from '@/core/domain/entities';
 
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
-    const { activeConnectionId, connections, tabs } = useAppStore();
+    const { activeConnectionId, connections, tabs, updateTabMetadata } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
 
     // Find options for this tab
     const tab = tabs.find(t => t.id === tabId);
+    const initialMetadata = tab?.metadata || {};
 
-    const [query, setQuery] = useState(tab?.initialSql || '');
+    const [query, setQuery] = useState(initialMetadata.sql || tab?.initialSql || '');
     const [executedQuery, setExecutedQuery] = useState<string | null>(null);
-    const [limit, setLimit] = useState("1000");
+    const [limit, setLimit] = useState(initialMetadata.limit || "1000");
     const [activeResultTab, setActiveResultTab] = useState("data");
+
+    const isFirstLoad = useRef(true);
+
+    // Persist SQL query to store
+    useEffect(() => {
+        if (isFirstLoad.current) {
+            isFirstLoad.current = false;
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            updateTabMetadata(tabId, {
+                sql: query,
+                limit: limit
+            });
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [query, limit, tabId, updateTabMetadata]);
 
     const { data: results, isLoading, error, refetch, dataUpdatedAt, isSuccess, isError } = useQuery<QueryResult | null, Error>({
         queryKey: ['query-execution', activeConnectionId, executedQuery, limit],

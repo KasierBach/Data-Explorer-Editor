@@ -3,13 +3,15 @@ import { useDatabaseHierarchy } from '@/presentation/hooks/useDatabase';
 import { TreeNodeItem } from './TreeNodeItem';
 import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, RefreshCw, Filter, Layers } from 'lucide-react';
 import { connectionService } from '@/core/services/ConnectionService';
 import { ConnectionSelector } from './ConnectionSelector';
 import { Input } from '@/presentation/components/ui/input';
 import { SidebarContextMenu } from './SidebarContextMenu';
 import { Database, ChevronDown } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
+import { parseNodeId, getFullyQualifiedTable } from '@/core/utils/id-parser';
 
 export const ExplorerSidebar: React.FC = () => {
     const connections = useAppStore(state => state.connections);
@@ -26,29 +28,31 @@ export const ExplorerSidebar: React.FC = () => {
 
         const handleTreeAction = (e: CustomEvent<{ action: string, nodeId: string, nodeType: string }>) => {
             const { action, nodeId, nodeType } = e.detail;
+            const activeConnection = useAppStore.getState().connections.find(c => c.id === activeConnectionId);
+            const dialect = activeConnection?.type === 'mysql' ? 'mysql' : 'postgres';
 
-            if (nodeType === 'table') {
+            if (nodeType === 'table' || nodeType === 'view') {
+                const { table: tableName } = parseNodeId(nodeId);
+                const qualifiedName = getFullyQualifiedTable(nodeId, dialect);
+
                 if (action === 'selectTop') {
-                    const tableName = nodeId.split(/[:.]/).pop();
                     useAppStore.getState().openTab({
                         id: `query-top-${nodeId}-${Date.now()}`,
-                        title: `Top 1000 ${tableName}`,
+                        title: `Top 1000 ${tableName || nodeId}`,
                         type: 'query',
-                        initialSql: `SELECT * FROM ${nodeId.includes('table:') ? nodeId.split('table:')[1] : nodeId} LIMIT 1000;`
+                        initialSql: `SELECT * FROM ${qualifiedName} LIMIT 1000;`
                     });
                 }
                 if (action === 'countRows') {
-                    const tableName = nodeId.split(/[:.]/).pop();
                     useAppStore.getState().openTab({
                         id: `query-count-${nodeId}-${Date.now()}`,
-                        title: `Count ${tableName}`,
+                        title: `Count ${tableName || nodeId}`,
                         type: 'query',
-                        initialSql: `SELECT COUNT(*) as total_rows FROM ${nodeId.includes('table:') ? nodeId.split('table:')[1] : nodeId};`
+                        initialSql: `SELECT COUNT(*) as total_rows FROM ${qualifiedName};`
                     });
                 }
                 if (action === 'copyName') {
-                    const name = nodeId.split(/[:.]/).pop();
-                    if (name) navigator.clipboard.writeText(name);
+                    if (tableName) navigator.clipboard.writeText(tableName);
                 }
             }
         };
@@ -60,7 +64,7 @@ export const ExplorerSidebar: React.FC = () => {
             window.removeEventListener('refresh-explorer', handleRefresh);
             window.removeEventListener('tree-node-action', handleTreeAction as EventListener);
         };
-    }, [queryClient]);
+    }, [queryClient, activeConnectionId]);
 
     React.useEffect(() => {
         if (!activeConnectionId && connections.length > 0) {
@@ -70,18 +74,14 @@ export const ExplorerSidebar: React.FC = () => {
 
     const activeConnection = useAppStore(state => state.connections.find(c => c.id === state.activeConnectionId));
 
-    // Update connection service when UI state changes
     React.useEffect(() => {
         if (activeConnection) {
             connectionService.setActiveConnection(activeConnection).catch(console.error);
         }
     }, [activeConnection]);
 
-
     const { data: rootNodes, isLoading } = useDatabaseHierarchy(null);
 
-    // Basic client-side filtering for root nodes (databases)
-    // In a real app, this might be server-side or recursive
     const filteredNodes = React.useMemo(() => {
         if (!rootNodes) return [];
         if (!searchTerm) return rootNodes;
@@ -90,91 +90,122 @@ export const ExplorerSidebar: React.FC = () => {
         );
     }, [rootNodes, searchTerm]);
 
+    const handleRefresh = () => {
+        window.dispatchEvent(new CustomEvent('refresh-explorer'));
+    };
+
     return (
-        <div className="h-full flex flex-col border-r bg-card">
-            <div className="p-2 border-b space-y-2">
-                <div className="flex items-center justify-between px-2">
-                    <h2 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mr-2">Explorer</h2>
-                    <Button variant="ghost" size="icon" className="h-6 w-6">
-                        <Plus className="h-3 w-3" />
-                    </Button>
+        <div className="h-full flex flex-col border-r bg-card/50 backdrop-blur-md overflow-hidden ring-1 ring-white/5">
+            {/* Premium Header */}
+            <div className="flex flex-col gap-3 p-4 bg-gradient-to-b from-muted/50 to-transparent border-b">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded bg-blue-500/10 flex items-center justify-center">
+                            <Layers className="w-3.5 h-3.5 text-blue-500" />
+                        </div>
+                        <h2 className="font-bold text-[11px] uppercase tracking-[0.2em] text-muted-foreground/80">Navigator</h2>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 rounded-lg hover:bg-accent/50"
+                            onClick={handleRefresh}
+                        >
+                            <RefreshCw className="h-3.5 h-3.5 text-muted-foreground/70" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-accent/50 text-muted-foreground/70">
+                            <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
                 </div>
 
-                <ConnectionSelector />
+                <div className="space-y-3">
+                    <ConnectionSelector />
 
-                <div className="px-2 relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                    <Input
-                        placeholder="Search..."
-                        className="h-7 text-xs pl-8 bg-muted/50"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                    <div className="relative group">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 transition-colors group-focus-within:text-blue-500" />
+                        <Input
+                            placeholder="Find entities..."
+                            className="h-9 text-xs pl-9 pr-8 bg-muted/40 border-none ring-1 ring-border/50 focus:ring-blue-500/30 transition-all rounded-xl placeholder:text-muted-foreground/30"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <Filter className="h-3 w-3 text-muted-foreground/30 hover:text-muted-foreground cursor-pointer" />
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-auto p-2">
-                {isLoading && <div className="text-xs p-2 text-muted-foreground">Loading...</div>}
+            {/* Tree Area */}
+            <div className="flex-1 overflow-auto custom-scrollbar pt-2">
+                {isLoading && (
+                    <div className="flex flex-col items-center justify-center h-20 gap-3 opacity-40">
+                        <div className="w-5 h-5 rounded-full border-2 border-blue-500/20 border-t-blue-500 animate-spin" />
+                        <span className="text-[10px] uppercase tracking-widest font-black">Scanning Node</span>
+                    </div>
+                )}
 
                 {!isLoading && (
-                    <>
-                        {/* Root Connection Node - Supports Right Click */}
-                        {/* Render Connection Node Manually to control children */}
+                    <div className="px-2">
                         <SidebarContextMenu
                             type="connection"
                             onAction={(action) => {
                                 if (action === 'toggleShowAll') {
-                                    // Toggle showAllDatabases
                                     const conn = useAppStore.getState().connections.find(c => c.id === activeConnectionId);
                                     if (conn) {
                                         useAppStore.getState().updateConnection(conn.id, {
                                             showAllDatabases: !conn.showAllDatabases
                                         });
-                                        // Trigger refresh or update
-                                        // The store update should trigger re-render if we subscribe to it
-                                        // But we need to make sure Adapter config is updated. 
-                                        // ExplorerSidebar useEffect handles adapter update.
-
-                                        // Force UI refresh/reload
-                                        // window.location.reload(); // Too aggressive?
-                                        // Ideally useDatabaseHierarchy refetches.
                                     }
                                 }
                                 if (action === 'refresh') {
-                                    // Invalidate queries?
-                                    // queryClient.invalidateQueries(['database-hierarchy']);
-                                    window.dispatchEvent(new CustomEvent('refresh-explorer'));
+                                    handleRefresh();
                                 }
                             }}
                         >
-                            <div className="flex items-center py-1 px-2 hover:bg-accent cursor-pointer select-none text-sm group font-semibold text-foreground/90">
-                                <span className="mr-1 w-4 h-4 flex items-center justify-center">
-                                    <ChevronDown className="w-3 h-3" />
+                            {/* Active Connection Root Node */}
+                            <div className={cn(
+                                "flex items-center py-2 px-3 rounded-xl mb-1 cursor-pointer select-none text-sm font-bold transition-all duration-300",
+                                "bg-blue-500/5 border border-blue-500/10 text-blue-600/90 shadow-sm shadow-blue-500/5",
+                                "hover:bg-blue-500/10 hover:border-blue-500/20"
+                            )}>
+                                <span className="mr-2 w-4 h-4 flex items-center justify-center">
+                                    <ChevronDown className="w-3.5 h-3.5" />
                                 </span>
-                                <Database className="w-4 h-4 mr-2 text-blue-600" />
-                                <span className="truncate">{useAppStore.getState().connections.find(c => c.id === activeConnectionId)?.name || 'Connection'}</span>
+                                <Database className="w-4 h-4 mr-2.5 text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.3)]" />
+                                <span className="truncate flex-1">{activeConnection?.name || 'Local Instance'}</span>
+                                <div className="px-1.5 py-0.5 rounded-full bg-blue-500/10 text-[9px] font-black uppercase tracking-tighter">
+                                    {activeConnection?.type || 'pg'}
+                                </div>
                             </div>
 
-                            {/* Children (The actual Tree) */}
-                            <div className="pl-4 border-l ml-3 border-border/40">
+                            {/* Tree Content */}
+                            <div className="space-y-0.5 animate-in fade-in slide-in-from-left-2 duration-500">
                                 {filteredNodes.length === 0 && !isLoading && (
-                                    <div className="text-xs p-2 text-muted-foreground">No databases found.</div>
+                                    <div className="flex flex-col items-center justify-center py-10 opacity-30 gap-2">
+                                        <Filter className="h-8 w-8" />
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-center px-4">No results for "{searchTerm}"</p>
+                                    </div>
                                 )}
                                 {filteredNodes.map(node => (
                                     <TreeNodeItem key={node.id} node={node} level={0} />
                                 ))}
                             </div>
                         </SidebarContextMenu>
-                    </>
+                    </div>
                 )}
+            </div>
+
+            {/* Optional Sidebar Footer/Status */}
+            <div className="p-3 border-t bg-muted/20 flex items-center justify-between opacity-50 text-[9px] font-bold uppercase tracking-widest">
+                <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Connected</span>
+                </div>
+                <span>v1.0.0-PRO</span>
             </div>
         </div>
     );
 };
-
-// Global event listener for tree node actions
-// Ideally moved to a hook or the Sidebar component itself, but due to recursive Item structure,
-// dispatching event is easier. We listen here in the Sidebar parent.
-// Wait, Sidebar parent is already listening to 'refresh-explorer'.
-// Let's add 'tree-node-action' listener.
-

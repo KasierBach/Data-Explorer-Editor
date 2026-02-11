@@ -16,22 +16,13 @@ import { Button } from '@/presentation/components/ui/button';
 import { RefreshCw, LayoutGrid, BarChart3, Download } from 'lucide-react';
 import { FilterPopover } from './FilterPopover';
 import { TableDesigner } from './TableDesigner';
-import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    LineChart,
-    Line,
-    Legend
-} from 'recharts';
+import { ResultVisualizer } from './ResultVisualizer';
 
 interface DataGridProps {
     tableId: string;
 }
+
+import { parseNodeId, getQuotedIdentifier } from '@/core/utils/id-parser';
 
 export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const { activeConnectionId, connections } = useAppStore();
@@ -41,7 +32,6 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'chart' | 'design'>('grid');
-    const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
 
     // Editing State
     const [isEditMode, setIsEditMode] = useState(false);
@@ -53,36 +43,8 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
 
     const isLargeDataset = tableId === 'large_dataset' || tableId === 'tbl-large';
 
-    // Helper to parse table ID
-    const parseTableId = (id: string) => {
-        let dbName: string | undefined;
-        let schema = 'public';
-        let table = id;
-
-        if (id.includes('db:')) {
-            const parts = id.split('.');
-            const dbPart = parts.find(p => p.startsWith('db:'));
-            const schemaPart = parts.find(p => p.startsWith('schema:'));
-            const tablePart = parts.find(p => p.startsWith('table:') || p.startsWith('view:'));
-
-            if (dbPart) dbName = dbPart.split(':')[1];
-            if (schemaPart) schema = schemaPart.split(':')[1];
-            if (tablePart) table = tablePart.split(':')[1];
-        } else if (id.startsWith('table:') || id.startsWith('view:')) {
-            const part = id.split(':')[1];
-            if (part.includes('.')) {
-                const pieces = part.split('.');
-                schema = pieces[0];
-                table = pieces[1];
-            } else {
-                table = part;
-            }
-        }
-
-        return { dbName, schema, table };
-    };
-
-    const { dbName, schema, table: cleanTableName } = parseTableId(tableId);
+    const { dbName, schema, table: cleanTableName } = parseNodeId(tableId);
+    const dialect = activeConnection?.type === 'mysql' ? 'mysql' : 'postgres';
 
     // 1. Fetch Metadata
     const { data: metadata, isLoading: isLoadingMeta } = useQuery({
@@ -104,11 +66,13 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
 
             // For large dataset demo, fetch ALL rows
             if (isLargeDataset) {
-                return adapter.executeQuery(`SELECT * FROM ${cleanTableName} -- large_dataset`, dbName ? { database: dbName } : undefined);
+                return adapter.executeQuery(`SELECT * FROM ${getQuotedIdentifier(cleanTableName || tableId, dialect)} -- large_dataset`, dbName ? { database: dbName } : undefined);
             }
 
             // Use fully qualified name if schema is known
-            const queryTable = schema ? `"${schema}"."${cleanTableName}"` : `"${cleanTableName}"`;
+            const qSchema = getQuotedIdentifier(schema, dialect);
+            const qTable = getQuotedIdentifier(cleanTableName || tableId, dialect);
+            const queryTable = `${qSchema}.${qTable}`;
 
             return adapter.executeQuery(
                 `SELECT * FROM ${queryTable} LIMIT ${pagination.pageSize} OFFSET ${pagination.pageIndex * pagination.pageSize}`,
@@ -209,26 +173,6 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         overscan: 20,
     });
 
-    // Chart Auto-Config
-    const chartConfig = useMemo(() => {
-        if (!queryResult?.rows || queryResult.rows.length === 0) return null;
-
-        // Find numeric columns for Y-axis
-        const firstRow = queryResult.rows[0];
-        const numericKeys = Object.keys(firstRow).filter(k =>
-            typeof firstRow[k] === 'number' || (!isNaN(parseFloat(firstRow[k])) && isFinite(firstRow[k]))
-        );
-
-        if (numericKeys.length === 0) return null;
-
-        // Find a string column for X-axis (preferably not too long)
-        const labelKey = Object.keys(firstRow).find(k =>
-            typeof firstRow[k] === 'string' && !numericKeys.includes(k)
-        ) || numericKeys[0];
-
-        return { xKey: labelKey, yKeys: numericKeys.slice(0, 3) }; // Show up to 3 numeric series
-    }, [queryResult]);
-
     const handleSaveData = async () => {
         if (!activeConnection) return;
         setIsSaving(true);
@@ -236,27 +180,18 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
             const pkField = metadata?.columns.find(c => c.isPrimaryKey)?.name;
             if (!pkField) throw new Error("Cannot save changes: Table has no primary key.");
 
-            // For now, we call the backend API directly via a generic helper if available,
-            // or we just use the adapter to execute the UPDATE.
-            // Since I added a specific PATCH /api/query/row, I should use that or make the adapter handle it.
-            // I'll call the API endpoint.
+            const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type as any);
 
             for (const rowId of Object.keys(pendingChanges)) {
                 const updates = pendingChanges[rowId];
 
-                // Construct the payload for our new backend endpoint
-                await fetch('http://localhost:3000/api/query/row', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        connectionId: activeConnection.id,
-                        database: dbName,
-                        schema: schema,
-                        table: cleanTableName,
-                        pkColumn: pkField,
-                        pkValue: isNaN(Number(rowId)) ? rowId : Number(rowId),
-                        updates
-                    })
+                await adapter.updateRow({
+                    database: dbName,
+                    schema: schema,
+                    table: cleanTableName || tableId,
+                    pkColumn: pkField,
+                    pkValue: isNaN(Number(rowId)) ? rowId : Number(rowId),
+                    updates
                 });
             }
 
@@ -274,20 +209,17 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         if (!activeConnection || !metadata) return;
         setIsSaving(true);
         try {
-            await fetch('http://localhost:3000/api/query/schema', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    connectionId: activeConnection.id,
-                    database: dbName,
-                    schema: schema,
-                    table: cleanTableName,
-                    operations
-                })
+            const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type as any);
+
+            await adapter.updateSchema({
+                database: dbName,
+                schema: schema,
+                table: cleanTableName || tableId,
+                operations
             });
 
             setViewMode('grid');
-            refetch(); // Refresh both data and metadata (react-query will handle if configured)
+            refetch(); // Refresh both data and metadata 
         } catch (e: any) {
             alert(e.message);
         } finally {
@@ -302,7 +234,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     if (viewMode === 'design' && metadata) {
         return (
             <TableDesigner
-                tableName={cleanTableName}
+                tableName={cleanTableName || tableId}
                 metadata={metadata}
                 onSave={handleSaveSchema}
                 onCancel={() => setViewMode('grid')}
@@ -328,7 +260,6 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                         size="sm"
                         onClick={() => setViewMode('chart')}
                         className="h-6 px-2 text-[11px] gap-1.5 rounded-sm"
-                        disabled={!chartConfig}
                     >
                         <BarChart3 className="w-3 h-3" /> Visualizer
                     </Button>
@@ -399,7 +330,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                     const url = URL.createObjectURL(blob);
                     const link = document.createElement('a');
                     link.href = url;
-                    link.download = `${cleanTableName}_export.csv`;
+                    link.download = `${cleanTableName || tableId}_export.csv`;
                     link.click();
                 }} className="h-7 text-[11px] gap-1 px-2">
                     <Download className="w-3 h-3" /> Export
@@ -502,83 +433,8 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                         </div>
                     </div>
                 ) : (
-                    <div className="h-full p-6 flex flex-col bg-muted/5">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="space-y-1">
-                                <h3 className="text-sm font-semibold flex items-center gap-2 uppercase tracking-tight">
-                                    <BarChart3 className="w-4 h-4 text-blue-500" />
-                                    Data Visualization
-                                </h3>
-                                <p className="text-[10px] text-muted-foreground">Automatically projecting numeric trends from the current dataset.</p>
-                            </div>
-                            <div className="flex bg-muted rounded p-0.5 border shadow-sm">
-                                <Button size="sm" variant={chartType === 'bar' ? 'secondary' : 'ghost'} className="h-6 px-3 text-[10px]" onClick={() => setChartType('bar')}>Bar</Button>
-                                <Button size="sm" variant={chartType === 'line' ? 'secondary' : 'ghost'} className="h-6 px-3 text-[10px]" onClick={() => setChartType('line')}>Line</Button>
-                            </div>
-                        </div>
-
-                        {chartConfig ? (
-                            <div className="flex-1 min-h-0 bg-background rounded-xl border p-6 shadow-sm">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    {chartType === 'bar' ? (
-                                        <BarChart data={queryResult?.rows || []} margin={{ top: 10, right: 30, left: 0, bottom: 30 }}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
-                                            <XAxis
-                                                dataKey={chartConfig.xKey}
-                                                fontSize={10}
-                                                tickLine={false}
-                                                axisLine={false}
-                                                tick={{ fill: 'currentColor', opacity: 0.5 }}
-                                            />
-                                            <YAxis
-                                                fontSize={10}
-                                                tickLine={false}
-                                                axisLine={false}
-                                                tickFormatter={(v) => v.toLocaleString()}
-                                                tick={{ fill: 'currentColor', opacity: 0.5 }}
-                                            />
-                                            <Tooltip
-                                                contentStyle={{ backgroundColor: 'var(--background)', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '11px' }}
-                                                cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
-                                            />
-                                            <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }} />
-                                            {chartConfig.yKeys.map((key, i) => (
-                                                <Bar
-                                                    key={key}
-                                                    dataKey={key}
-                                                    fill={['#3b82f6', '#10b981', '#f59e0b'][i % 3]}
-                                                    radius={[4, 4, 0, 0]}
-                                                    maxBarSize={40}
-                                                />
-                                            ))}
-                                        </BarChart>
-                                    ) : (
-                                        <LineChart data={queryResult?.rows || []} margin={{ top: 10, right: 30, left: 0, bottom: 30 }}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
-                                            <XAxis dataKey={chartConfig.xKey} fontSize={10} tickLine={false} axisLine={false} />
-                                            <YAxis fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => v.toLocaleString()} />
-                                            <Tooltip contentStyle={{ backgroundColor: 'var(--background)', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '11px' }} />
-                                            <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '10px' }} />
-                                            {chartConfig.yKeys.map((key, i) => (
-                                                <Line
-                                                    key={key}
-                                                    type="monotone"
-                                                    dataKey={key}
-                                                    stroke={['#3b82f6', '#10b981', '#f59e0b'][i % 3]}
-                                                    strokeWidth={2}
-                                                    dot={{ r: 3 }}
-                                                    activeDot={{ r: 5 }}
-                                                />
-                                            ))}
-                                        </LineChart>
-                                    )}
-                                </ResponsiveContainer>
-                            </div>
-                        ) : (
-                            <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm italic border-2 border-dashed rounded-xl">
-                                No numeric data found for visualization.
-                            </div>
-                        )}
+                    <div className="flex-1 min-h-0 bg-card overflow-hidden">
+                        <ResultVisualizer data={queryResult?.rows || []} />
                     </div>
                 )}
             </div>
@@ -627,7 +483,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                 </div>
 
                 <div className="flex items-center gap-4 opacity-60">
-                    <span>{cleanTableName}</span>
+                    <span>{cleanTableName || tableId}</span>
                     <span>{schema}</span>
                 </div>
             </div>

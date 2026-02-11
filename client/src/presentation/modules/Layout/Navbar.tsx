@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ModeToggle } from '@/presentation/components/mode-toggle';
-import { Database, Settings, User, LogOut, User as UserIcon, Github, LifeBuoy, Cloud, CreditCard, FileText, FolderOpen } from 'lucide-react';
+import { Database, Settings, User, LogOut, User as UserIcon, Github, LifeBuoy, Cloud, CreditCard, FileText, FolderOpen, BarChart3, PieChart, GitGraph } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import {
     DropdownMenu,
@@ -16,20 +16,56 @@ import { useAppStore } from '@/core/services/store';
 import { ProfileDialog } from './ProfileDialog';
 
 export const Navbar: React.FC = () => {
-    const { isSidebarOpen, setSidebarOpen, openQueryTab, user, logout } = useAppStore();
+    const { isSidebarOpen, setSidebarOpen, openQueryTab, openInsightsTab, openVisualizeTab, openErdTab, activeConnectionId, user, logout } = useAppStore();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
 
     return (
         <div className="h-14 border-b flex items-center px-4 bg-card justify-between select-none shrink-0">
             <ProfileDialog isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
 
-            <div className="flex items-center gap-2">
-                <div className="bg-primary/10 p-1.5 rounded-md">
-                    <Database className="w-5 h-5 text-primary" />
+            <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                    <div className="bg-primary/10 p-1.5 rounded-md">
+                        <Database className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                        <h1 className="font-semibold text-sm leading-none">Data Explorer</h1>
+                        <span className="text-[10px] text-muted-foreground">v0.1.0-beta</span>
+                    </div>
                 </div>
-                <div>
-                    <h1 className="font-semibold text-sm leading-none">Data Explorer</h1>
-                    <span className="text-[10px] text-muted-foreground">v0.1.0-beta</span>
+
+                <div className="flex items-center gap-1 ml-2">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
+                        onClick={() => activeConnectionId && openInsightsTab(activeConnectionId)}
+                        disabled={!activeConnectionId}
+                    >
+                        <BarChart3 className="w-4 h-4 text-purple-600" />
+                        <span className="font-semibold">Insights</span>
+                    </Button>
+
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
+                        onClick={() => openVisualizeTab()}
+                    >
+                        <PieChart className="w-4 h-4 text-emerald-500" />
+                        <span className="font-semibold">Visualize</span>
+                    </Button>
+
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
+                        onClick={() => activeConnectionId && openErdTab(activeConnectionId)}
+                        disabled={!activeConnectionId}
+                    >
+                        <GitGraph className="w-4 h-4 text-blue-500" />
+                        <span className="font-semibold">Diagram</span>
+                    </Button>
                 </div>
             </div>
 
