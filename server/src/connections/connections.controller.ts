@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { ConnectionsService } from './connections.service';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('connections')
+@UseGuards(JwtAuthGuard)
 export class ConnectionsController {
   constructor(private readonly connectionsService: ConnectionsService) { }
 

@@ -1,8 +1,11 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { LoginDto } from './dto/login.dto';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
+    constructor(private readonly jwtService: JwtService) { }
+
     // Hardcoded for V1
     private readonly validUser = {
         email: 'admin@example.com',
@@ -12,9 +15,9 @@ export class AuthService {
 
     async login(loginDto: LoginDto) {
         if (loginDto.email === this.validUser.email && loginDto.password === this.validUser.password) {
-            // Return user info (no JWT yet, just simple session simulation)
+            const payload = { email: this.validUser.email, sub: 'admin' };
             return {
-                success: true,
+                access_token: this.jwtService.sign(payload),
                 user: {
                     name: this.validUser.name,
                     email: this.validUser.email

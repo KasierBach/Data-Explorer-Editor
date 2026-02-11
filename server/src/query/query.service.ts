@@ -12,44 +12,24 @@ export class QueryService {
     const { connectionId, sql, database } = createQueryDto;
     const connection = this.connectionsService.findOne(connectionId);
 
-    if (!connection) {
-      throw new BadRequestException('Invalid connection ID');
-    }
-
     try {
+      const pool = await this.connectionsService.getPool(connectionId, database);
+
       if (connection.type === 'postgres') {
-        const client = new Client({
-          host: connection.host,
-          port: connection.port,
-          user: connection.username,
-          password: connection.password,
-          database: database || connection.database, // Override if provided
-          ssl: false // For local dev
-        });
-
-        await client.connect();
-        const result = await client.query(sql);
-        await client.end();
-
-        const queryResult = Array.isArray(result) ? result[result.length - 1] : result;
-
-        return {
-          rows: queryResult.rows || [],
-          columns: queryResult.fields ? queryResult.fields.map(f => f.name) : [],
-          rowCount: queryResult.rowCount
-        };
+        const client = await pool.connect();
+        try {
+          const result = await client.query(sql);
+          const queryResult = Array.isArray(result) ? result[result.length - 1] : result;
+          return {
+            rows: queryResult.rows || [],
+            columns: queryResult.fields ? queryResult.fields.map(f => f.name) : [],
+            rowCount: queryResult.rowCount
+          };
+        } finally {
+          client.release();
+        }
       } else if (connection.type === 'mysql') {
-        const conn = await mysql.createConnection({
-          host: connection.host,
-          user: connection.username,
-          password: connection.password,
-          database: database || connection.database,
-          port: connection.port,
-        });
-
-        const [rows, fields] = await conn.execute(sql);
-        await conn.end();
-
+        const [rows, fields] = await pool.execute(sql);
         return {
           rows,
           columns: (fields as any[]).map(f => f.name),
@@ -59,7 +39,6 @@ export class QueryService {
       }
     } catch (error) {
       console.error('Query Service Error:', error);
-      // @ts-ignore
       throw new InternalServerErrorException(`Query execution failed: ${error.message}`);
     }
   }
@@ -67,46 +46,28 @@ export class QueryService {
   async updateRow(updateRowDto: any) {
     const { connectionId, database, schema, table, pkColumn, pkValue, updates } = updateRowDto;
     const connection = this.connectionsService.findOne(connectionId);
-    if (!connection) throw new BadRequestException('Invalid connection ID');
 
     const updateCols = Object.keys(updates);
     if (updateCols.length === 0) return { success: true, message: 'No changes' };
 
-    const quotedTable = schema ? `"${schema}"."${table}"` : `"${table}"`;
+    const pool = await this.connectionsService.getPool(connectionId, database);
 
     try {
       if (connection.type === 'postgres') {
+        const quotedTable = schema ? `"${schema}"."${table}"` : `"${table}"`;
         const setClause = updateCols.map((col, i) => `"${col}" = $${i + 1}`).join(', ');
         const sql = `UPDATE ${quotedTable} SET ${setClause} WHERE "${pkColumn}" = $${updateCols.length + 1}`;
         const values = [...updateCols.map(c => updates[c]), pkValue];
 
-        const client = new Client({
-          host: connection.host,
-          port: connection.port,
-          user: connection.username,
-          password: connection.password,
-          database: database || connection.database,
-          ssl: false
-        });
-        await client.connect();
-        const res = await client.query(sql, values);
-        await client.end();
+        const res = await pool.query(sql, values);
         return { success: true, rowCount: res.rowCount };
       } else if (connection.type === 'mysql') {
-        const mysqlTable = `\`${table}\``; // MySQL backticks
+        const mysqlTable = `\`${table}\``;
         const setClause = updateCols.map(col => `\`${col}\` = ?`).join(', ');
         const sql = `UPDATE ${mysqlTable} SET ${setClause} WHERE \`${pkColumn}\` = ?`;
         const values = [...updateCols.map(c => updates[c]), pkValue];
 
-        const conn = await mysql.createConnection({
-          host: connection.host,
-          user: connection.username,
-          password: connection.password,
-          database: database || connection.database,
-          port: connection.port,
-        });
-        const [result] = await conn.execute(sql, values);
-        await conn.end();
+        const [result] = await pool.execute(sql, values);
         return { success: true, rowCount: (result as any).affectedRows };
       }
     } catch (error) {

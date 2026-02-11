@@ -11,14 +11,14 @@ interface ProfileDialogProps {
 
 export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose }) => {
     const { user, updateUser } = useAppStore();
-    const [name, setName] = useState(user.name);
-    const [email, setEmail] = useState(user.email);
+    const [name, setName] = useState(user?.name || '');
+    const [email, setEmail] = useState(user?.email || '');
 
     // Sync state when dialog opens or user changes
     useEffect(() => {
         if (isOpen) {
-            setName(user.name);
-            setEmail(user.email);
+            setName(user?.name || '');
+            setEmail(user?.email || '');
         }
     }, [isOpen, user]);
 

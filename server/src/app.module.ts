@@ -12,7 +12,6 @@ import { AuthModule } from './auth/auth.module';
       isGlobal: true,
     }),
     ConnectionsModule,
-    ConnectionsModule,
     QueryModule,
     AuthModule,
   ],

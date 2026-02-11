@@ -40,11 +40,12 @@ interface AppState {
 
     // Auth State
     isAuthenticated: boolean;
-    login: () => void;
+    accessToken: string | null;
+    login: (token: string, user: { name: string; email: string }) => void;
     logout: () => void;
 
     // User State
-    user: { name: string; email: string };
+    user: { name: string; email: string } | null;
     updateUser: (user: { name: string; email: string }) => void;
 
     // Tabs State
@@ -58,22 +59,42 @@ interface AppState {
 
 export const useAppStore = create<AppState>((set) => ({
     // Auth
-    isAuthenticated: localStorage.getItem('isAuthenticated') === 'true',
-    login: () => {
+    isAuthenticated: localStorage.getItem('isAuthenticated') === 'true' && !!localStorage.getItem('accessToken'),
+    accessToken: localStorage.getItem('accessToken'),
+    login: (token, user) => {
         localStorage.setItem('isAuthenticated', 'true');
-        set({ isAuthenticated: true });
+        localStorage.setItem('accessToken', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        set({
+            isAuthenticated: true,
+            accessToken: token,
+            user,
+            isConnectionDialogOpen: false // Ensure dialog is closed on login
+        });
     },
     logout: () => {
         localStorage.removeItem('isAuthenticated');
-        set({ isAuthenticated: false });
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('user');
+        set({ isAuthenticated: false, accessToken: null, user: null });
     },
 
     // User
-    user: {
-        name: 'Admin User',
-        email: 'admin@example.com'
+    user: (() => {
+        try {
+            const saved = localStorage.getItem('user');
+            if (!saved) return null;
+            const parsed = JSON.parse(saved);
+            return parsed && typeof parsed === 'object' ? parsed : null;
+        } catch (e) {
+            console.error('Failed to parse user', e);
+            return null;
+        }
+    })(),
+    updateUser: (user) => {
+        localStorage.setItem('user', JSON.stringify(user));
+        set({ user });
     },
-    updateUser: (user) => set({ user }),
 
     // Sidebar
     isSidebarOpen: true,
@@ -82,21 +103,28 @@ export const useAppStore = create<AppState>((set) => ({
 
     // Connection
     connections: (() => {
-        const saved = localStorage.getItem('connections');
-        return saved ? JSON.parse(saved) : [
-            {
-                id: 'local-pg',
-                name: 'Local Postgres',
-                type: 'postgres',
-                host: 'localhost',
-                port: 5432,
-                username: 'postgres',
-                password: '123',
-                database: 'postgres'
-            }
-        ];
+        try {
+            const saved = localStorage.getItem('connections');
+            if (!saved) return [
+                {
+                    id: 'local-pg',
+                    name: 'Local Postgres',
+                    type: 'postgres',
+                    host: 'localhost',
+                    port: 5432,
+                    username: 'postgres',
+                    password: '123',
+                    database: 'postgres'
+                }
+            ];
+            const parsed = JSON.parse(saved);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            console.error('Failed to parse connections', e);
+            return [];
+        }
     })(),
-    activeConnectionId: 'local-pg', // Default to local
+    activeConnectionId: localStorage.getItem('activeConnectionId') || null,
 
     isConnectionDialogOpen: false,
     openConnectionDialog: () => set({ isConnectionDialogOpen: true }),

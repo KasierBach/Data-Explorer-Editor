@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { QueryService } from './query.service';
 import { CreateQueryDto } from './dto/create-query.dto';
 import { UpdateQueryDto } from './dto/update-query.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('query')
+@UseGuards(JwtAuthGuard)
 export class QueryController {
   constructor(private readonly queryService: QueryService) { }
 

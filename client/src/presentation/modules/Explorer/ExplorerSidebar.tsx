@@ -12,7 +12,10 @@ import { Database, ChevronDown } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
 export const ExplorerSidebar: React.FC = () => {
-    const { activeConnectionId, setActiveConnectionId } = useAppStore();
+    const connections = useAppStore(state => state.connections);
+    const activeConnectionId = useAppStore(state => state.activeConnectionId);
+    const setActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
+
     const [searchTerm, setSearchTerm] = useState('');
     const queryClient = useQueryClient();
 
@@ -26,11 +29,7 @@ export const ExplorerSidebar: React.FC = () => {
 
             if (nodeType === 'table') {
                 if (action === 'selectTop') {
-                    // Extract table name from ID (simplified)
-                    // We need a better way to get the clean name, or TreeNodeItem should pass it.
-                    // For now, let's use the ID which might be "db:mydb.schema:public.table:users"
-                    // openTab can handle it if we pass type='query' and initialSQL
-                    const tableName = nodeId.split(/[:.]/).pop(); // Rough extraction
+                    const tableName = nodeId.split(/[:.]/).pop();
                     useAppStore.getState().openTab({
                         id: `query-top-${nodeId}-${Date.now()}`,
                         title: `Top 1000 ${tableName}`,
@@ -64,12 +63,10 @@ export const ExplorerSidebar: React.FC = () => {
     }, [queryClient]);
 
     React.useEffect(() => {
-        if (!activeConnectionId) {
-            // Auto-select first connection if none selected
-            // This logic moves to store initialization or here
-            setActiveConnectionId('conn-1');
+        if (!activeConnectionId && connections.length > 0) {
+            setActiveConnectionId(connections[0].id);
         }
-    }, [activeConnectionId, setActiveConnectionId]);
+    }, [activeConnectionId, connections, setActiveConnectionId]);
 
     const activeConnection = useAppStore(state => state.connections.find(c => c.id === state.activeConnectionId));
 

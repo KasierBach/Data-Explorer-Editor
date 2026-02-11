@@ -1,5 +1,6 @@
 import type { IDatabaseAdapter } from '../domain/database-adapter.interface';
 import type { TableMetadata, TreeNode, QueryResult } from '../domain/entities';
+import { useAppStore } from '../services/store';
 
 export class ApiDatabaseAdapter implements IDatabaseAdapter {
     private connectionId: string | null = null;
@@ -15,7 +16,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
 
         const response = await fetch(`${this.baseUrl}/connections`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this.getHeaders(),
             body: JSON.stringify(connectionConfig),
         });
 
@@ -229,6 +230,17 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         }));
     }
 
+    private getHeaders() {
+        const token = localStorage.getItem('accessToken');
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        return headers;
+    }
+
     async executeQuery(sql: string, context?: { database?: string }): Promise<QueryResult> {
         if (!this.connectionId) throw new Error('Not connected');
 
@@ -243,11 +255,17 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
 
         const response = await fetch(`${this.baseUrl}/query`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: this.getHeaders(),
             body: JSON.stringify(body),
         });
 
         if (!response.ok) {
+            if (response.status === 401) {
+                // Clear state on unauthorized using store logic
+                useAppStore.getState().logout();
+                window.location.reload();
+                throw new Error('Session expired. Please login again.');
+            }
             const errorText = await response.text();
             console.error('❌ API Error:', errorText);
             try {

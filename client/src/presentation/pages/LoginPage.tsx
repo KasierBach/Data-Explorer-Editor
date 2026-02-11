@@ -8,7 +8,7 @@ import { Database, Loader2 } from 'lucide-react';
 
 export const LoginPage = () => {
     const navigate = useNavigate();
-    const { login, updateUser } = useAppStore();
+    const { login } = useAppStore();
     const [email, setEmail] = useState('admin@example.com');
     const [password, setPassword] = useState('admin123');
     const [isLoading, setIsLoading] = useState(false);
@@ -32,9 +32,8 @@ export const LoginPage = () => {
 
             const data = await response.json();
 
-            // Updates store
-            updateUser(data.user);
-            login();
+            // Updates store with token and user info
+            login(data.access_token, data.user);
 
             navigate('/');
         } catch (err) {
