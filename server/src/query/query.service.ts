@@ -1,0 +1,231 @@
+import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { CreateQueryDto } from './dto/create-query.dto';
+import { ConnectionsService } from '../connections/connections.service';
+import { Client } from 'pg';
+import * as mysql from 'mysql2/promise';
+
+@Injectable()
+export class QueryService {
+  constructor(private readonly connectionsService: ConnectionsService) { }
+
+  async executeQuery(createQueryDto: CreateQueryDto) {
+    const { connectionId, sql, database } = createQueryDto;
+    const connection = this.connectionsService.findOne(connectionId);
+
+    if (!connection) {
+      throw new BadRequestException('Invalid connection ID');
+    }
+
+    try {
+      if (connection.type === 'postgres') {
+        const client = new Client({
+          host: connection.host,
+          port: connection.port,
+          user: connection.username,
+          password: connection.password,
+          database: database || connection.database, // Override if provided
+          ssl: false // For local dev
+        });
+
+        await client.connect();
+        const result = await client.query(sql);
+        await client.end();
+
+        const queryResult = Array.isArray(result) ? result[result.length - 1] : result;
+
+        return {
+          rows: queryResult.rows || [],
+          columns: queryResult.fields ? queryResult.fields.map(f => f.name) : [],
+          rowCount: queryResult.rowCount
+        };
+      } else if (connection.type === 'mysql') {
+        const conn = await mysql.createConnection({
+          host: connection.host,
+          user: connection.username,
+          password: connection.password,
+          database: database || connection.database,
+          port: connection.port,
+        });
+
+        const [rows, fields] = await conn.execute(sql);
+        await conn.end();
+
+        return {
+          rows,
+          columns: (fields as any[]).map(f => f.name),
+        };
+      } else {
+        throw new BadRequestException(`Unsupported connection type: ${connection.type}`);
+      }
+    } catch (error) {
+      console.error('Query Service Error:', error);
+      // @ts-ignore
+      throw new InternalServerErrorException(`Query execution failed: ${error.message}`);
+    }
+  }
+
+  async updateRow(updateRowDto: any) {
+    const { connectionId, database, schema, table, pkColumn, pkValue, updates } = updateRowDto;
+    const connection = this.connectionsService.findOne(connectionId);
+    if (!connection) throw new BadRequestException('Invalid connection ID');
+
+    const updateCols = Object.keys(updates);
+    if (updateCols.length === 0) return { success: true, message: 'No changes' };
+
+    const quotedTable = schema ? `"${schema}"."${table}"` : `"${table}"`;
+
+    try {
+      if (connection.type === 'postgres') {
+        const setClause = updateCols.map((col, i) => `"${col}" = $${i + 1}`).join(', ');
+        const sql = `UPDATE ${quotedTable} SET ${setClause} WHERE "${pkColumn}" = $${updateCols.length + 1}`;
+        const values = [...updateCols.map(c => updates[c]), pkValue];
+
+        const client = new Client({
+          host: connection.host,
+          port: connection.port,
+          user: connection.username,
+          password: connection.password,
+          database: database || connection.database,
+          ssl: false
+        });
+        await client.connect();
+        const res = await client.query(sql, values);
+        await client.end();
+        return { success: true, rowCount: res.rowCount };
+      } else if (connection.type === 'mysql') {
+        const mysqlTable = `\`${table}\``; // MySQL backticks
+        const setClause = updateCols.map(col => `\`${col}\` = ?`).join(', ');
+        const sql = `UPDATE ${mysqlTable} SET ${setClause} WHERE \`${pkColumn}\` = ?`;
+        const values = [...updateCols.map(c => updates[c]), pkValue];
+
+        const conn = await mysql.createConnection({
+          host: connection.host,
+          user: connection.username,
+          password: connection.password,
+          database: database || connection.database,
+          port: connection.port,
+        });
+        const [result] = await conn.execute(sql, values);
+        await conn.end();
+        return { success: true, rowCount: (result as any).affectedRows };
+      }
+    } catch (error) {
+      console.error('Update Row Error:', error);
+      throw new InternalServerErrorException(`Update failed: ${error.message}`);
+    }
+  }
+
+  async updateSchema(updateSchemaDto: any) {
+    const { connectionId, database, schema, table, operations } = updateSchemaDto;
+    const connection = this.connectionsService.findOne(connectionId);
+    if (!connection) throw new BadRequestException('Invalid connection ID');
+
+    const quotedTable = connection.type === 'postgres'
+      ? (schema ? `"${schema}"."${table}"` : `"${table}"`)
+      : `\`${table}\``;
+
+    const sqlStatements: string[] = [];
+
+    for (const op of operations) {
+      switch (op.type) {
+        case 'add_column':
+          sqlStatements.push(`ALTER TABLE ${quotedTable} ADD COLUMN ${connection.type === 'postgres' ? `"${op.name}"` : `\`${op.name}\``} ${op.dataType} ${op.isNullable === false ? 'NOT NULL' : ''}`);
+          break;
+        case 'drop_column':
+          sqlStatements.push(`ALTER TABLE ${quotedTable} DROP COLUMN ${connection.type === 'postgres' ? `"${op.name}"` : `\`${op.name}\``}`);
+          break;
+        case 'alter_column_type':
+          if (connection.type === 'postgres') {
+            sqlStatements.push(`ALTER TABLE ${quotedTable} ALTER COLUMN "${op.name}" TYPE ${op.newType}`);
+          } else {
+            sqlStatements.push(`ALTER TABLE ${quotedTable} MODIFY COLUMN \`${op.name}\` ${op.newType}`);
+          }
+          break;
+        case 'rename_column':
+          if (connection.type === 'postgres') {
+            sqlStatements.push(`ALTER TABLE ${quotedTable} RENAME COLUMN "${op.name}" TO "${op.newName}"`);
+          } else {
+            // MySQL RENAME COLUMN is supported in 8.0+
+            sqlStatements.push(`ALTER TABLE ${quotedTable} RENAME COLUMN \`${op.name}\` TO \`${op.newName}\``);
+          }
+          break;
+        case 'add_pk':
+          const pkCols = op.columns.map(c => connection.type === 'postgres' ? `"${c}"` : `\`${c}\``).join(', ');
+          sqlStatements.push(`ALTER TABLE ${quotedTable} ADD PRIMARY KEY (${pkCols})`);
+          break;
+        case 'drop_pk':
+          sqlStatements.push(`ALTER TABLE ${quotedTable} DROP PRIMARY KEY`);
+          break;
+        case 'add_fk':
+          const fkCols = op.columns.map(c => connection.type === 'postgres' ? `"${c}"` : `\`${c}\``).join(', ');
+          const refCols = op.refColumns.map(c => connection.type === 'postgres' ? `"${c}"` : `\`${c}\``).join(', ');
+          const refTable = connection.type === 'postgres' ? `"${op.refTable}"` : `\`${op.refTable}\``;
+          sqlStatements.push(`ALTER TABLE ${quotedTable} ADD CONSTRAINT ${op.name} FOREIGN KEY (${fkCols}) REFERENCES ${refTable} (${refCols})`);
+          break;
+        case 'drop_fk':
+          if (connection.type === 'postgres') {
+            sqlStatements.push(`ALTER TABLE ${quotedTable} DROP CONSTRAINT "${op.name}"`);
+          } else {
+            sqlStatements.push(`ALTER TABLE ${quotedTable} DROP FOREIGN KEY \`${op.name}\``);
+          }
+          break;
+      }
+    }
+
+    try {
+      const results: any[] = [];
+      for (const sql of sqlStatements) {
+        // We reuse executeQuery for simplicity, or we can run them in a transaction
+        results.push(await this.executeQuery({ connectionId, sql, database }));
+      }
+      return { success: true, results };
+    } catch (error) {
+      console.error('Update Schema Error:', error);
+      throw new InternalServerErrorException(`Schema update failed: ${error.message}`);
+    }
+  }
+
+  async seedData(connectionId: string) {
+    const sql = `
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100),
+        email VARCHAR(100) UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS products (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100),
+        price DECIMAL(10, 2),
+        stock INT
+      );
+
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id),
+        total DECIMAL(10, 2),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      INSERT INTO users (name, email) VALUES 
+      ('Alice Johnson', 'alice@example.com'),
+      ('Bob Smith', 'bob@example.com'),
+      ('Charlie Brown', 'charlie@example.com')
+      ON CONFLICT DO NOTHING;
+
+      INSERT INTO products (name, price, stock) VALUES 
+      ('Laptop', 999.99, 10),
+      ('Mouse', 25.50, 100),
+      ('Keyboard', 50.00, 50)
+      ON CONFLICT DO NOTHING;
+
+      INSERT INTO orders (user_id, total) VALUES 
+      (1, 1025.49),
+      (2, 25.50)
+      ON CONFLICT DO NOTHING;
+    `;
+
+    return this.executeQuery({ connectionId, sql });
+  }
+}
