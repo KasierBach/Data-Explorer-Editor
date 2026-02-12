@@ -31,6 +31,10 @@ export class MetadataService {
                 return this.getPostgresSchemas(pool);
             }
             if (connection.type === 'mysql') return this.getMysqlDatabases(pool);
+            if (connection.type === 'mssql') {
+                if (connection.showAllDatabases) return this.getMssqlDatabases(pool);
+                return this.getMssqlSchemas(pool);
+            }
             return [];
         }
 
@@ -60,6 +64,9 @@ export class MetadataService {
             if (connection.type === 'postgres') {
                 return this.getPostgresSchemas(dbPool, parsed.dbName);
             }
+            if (connection.type === 'mssql') {
+                return this.getMssqlSchemas(dbPool, parsed.dbName);
+            }
         }
 
         return [];
@@ -70,6 +77,9 @@ export class MetadataService {
         const pool = await this.connectionsService.getPool(connectionId);
         if (connection.type === 'postgres') {
             const res = await this.getPostgresDatabases(pool);
+            return res.map(r => r.name);
+        } else if (connection.type === 'mssql') {
+            const res = await this.getMssqlDatabases(pool);
             return res.map(r => r.name);
         } else {
             const [rows]: any[] = await pool.query('SHOW DATABASES');
@@ -100,6 +110,21 @@ export class MetadataService {
             `;
             const res = await pool.query(sql);
             return res.rows;
+        } else if (connection.type === 'mssql') {
+            const sql = `
+                SELECT 
+                    tp.name AS source_table,
+                    cp.name AS source_column,
+                    tr.name AS target_table,
+                    cr.name AS target_column
+                FROM sys.foreign_key_columns fkc
+                JOIN sys.tables tp ON fkc.parent_object_id = tp.object_id
+                JOIN sys.columns cp ON fkc.parent_object_id = cp.object_id AND fkc.parent_column_id = cp.column_id
+                JOIN sys.tables tr ON fkc.referenced_object_id = tr.object_id
+                JOIN sys.columns cr ON fkc.referenced_object_id = cr.object_id AND fkc.referenced_column_id = cr.column_id
+            `;
+            const result = await pool.request().query(sql);
+            return result.recordset;
         } else {
             const sql = `
                 SELECT 
@@ -161,6 +186,32 @@ export class MetadataService {
         }));
     }
 
+    private async getMssqlDatabases(pool: any) {
+        const result = await pool.request().query(
+            `SELECT name FROM sys.databases WHERE name NOT IN ('master','tempdb','model','msdb') ORDER BY name`
+        );
+        return result.recordset.map((row: any) => ({
+            id: `db:${row.name}`,
+            name: row.name,
+            type: 'database',
+            parentId: 'root',
+            hasChildren: true,
+        }));
+    }
+
+    private async getMssqlSchemas(pool: any, dbName?: string) {
+        const result = await pool.request().query(
+            `SELECT name FROM sys.schemas WHERE name NOT IN ('sys','INFORMATION_SCHEMA','guest','db_owner','db_accessadmin','db_securityadmin','db_ddladmin','db_backupoperator','db_datareader','db_datawriter','db_denydatareader','db_denydatawriter') ORDER BY name`
+        );
+        return result.recordset.map((row: any) => ({
+            id: dbName ? `db:${dbName}.schema:${row.name}` : `schema:${row.name}`,
+            name: row.name,
+            type: 'schema',
+            parentId: dbName ? `db:${dbName}` : 'root',
+            hasChildren: true,
+        }));
+    }
+
     private async getTables(pool: any, type: string, schema: string, dbName?: string) {
         if (type === 'postgres') {
             const sql = `
@@ -172,6 +223,17 @@ export class MetadataService {
             return result.rows.map((row: any) => ({
                 id: dbName ? `db:${dbName}.schema:${schema}.table:${row.table_name}` : `schema:${schema}.table:${row.table_name}`,
                 name: row.table_name,
+                type: 'table',
+                parentId: `schema:${schema}.folder:tables`,
+                hasChildren: false,
+            }));
+        } else if (type === 'mssql') {
+            const result = await pool.request().query(
+                `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '${schema}' AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME`
+            );
+            return result.recordset.map((row: any) => ({
+                id: dbName ? `db:${dbName}.schema:${schema}.table:${row.TABLE_NAME}` : `schema:${schema}.table:${row.TABLE_NAME}`,
+                name: row.TABLE_NAME,
                 type: 'table',
                 parentId: `schema:${schema}.folder:tables`,
                 hasChildren: false,
@@ -206,6 +268,17 @@ export class MetadataService {
                 parentId: `schema:${schema}.folder:views`,
                 hasChildren: false,
             }));
+        } else if (type === 'mssql') {
+            const result = await pool.request().query(
+                `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_SCHEMA = '${schema}' ORDER BY TABLE_NAME`
+            );
+            return result.recordset.map((row: any) => ({
+                id: dbName ? `db:${dbName}.schema:${schema}.view:${row.TABLE_NAME}` : `schema:${schema}.view:${row.TABLE_NAME}`,
+                name: row.TABLE_NAME,
+                type: 'view',
+                parentId: `schema:${schema}.folder:views`,
+                hasChildren: false,
+            }));
         }
         return [];
     }
@@ -225,6 +298,17 @@ export class MetadataService {
                 parentId: `schema:${schema}.folder:functions`,
                 hasChildren: false,
             }));
+        } else if (type === 'mssql') {
+            const result = await pool.request().query(
+                `SELECT name, type_desc FROM sys.objects WHERE schema_id = SCHEMA_ID('${schema}') AND type IN ('FN','IF','TF','P') ORDER BY name`
+            );
+            return result.recordset.map((row: any) => ({
+                id: dbName ? `db:${dbName}.schema:${schema}.func:${row.name}` : `schema:${schema}.func:${row.name}`,
+                name: row.name,
+                type: 'function',
+                parentId: `schema:${schema}.folder:functions`,
+                hasChildren: false,
+            }));
         }
         return [];
     }
@@ -233,7 +317,7 @@ export class MetadataService {
         const connection = await this.connectionsService.findOne(connectionId);
         const parsed = this.parseNodeId(tableId);
 
-        const schema = parsed.schemaName || 'public';
+        const schema = parsed.schemaName || (connection.type === 'mssql' ? 'dbo' : 'public');
         const table = parsed.tableName || tableId;
 
         const pool = await this.connectionsService.getPool(connectionId, parsed.dbName);
@@ -251,6 +335,19 @@ export class MetadataService {
                 type: row.data_type,
                 isNullable: row.is_nullable === 'YES',
                 defaultValue: row.column_default
+            }));
+        } else if (connection.type === 'mssql') {
+            const result = await pool.request().query(
+                `SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+                 FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_NAME = '${table}' AND TABLE_SCHEMA = '${schema}'
+                 ORDER BY ORDINAL_POSITION`
+            );
+            return result.recordset.map((row: any) => ({
+                name: row.COLUMN_NAME,
+                type: row.DATA_TYPE,
+                isNullable: row.IS_NULLABLE === 'YES',
+                defaultValue: row.COLUMN_DEFAULT
             }));
         } else {
             const [rows]: any[] = await pool.query(`DESCRIBE \`${schema}\`.\`${table}\``);
@@ -307,6 +404,52 @@ export class MetadataService {
                     sizeBytes: parseInt(r.size_bytes)
                 })),
                 tableTypes: typesRes.rows.map((r: any) => ({
+                    type: r.type,
+                    count: parseInt(r.count)
+                }))
+            };
+        } else if (connection.type === 'mssql') {
+            const statsSql = `
+                SELECT 
+                    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE') as table_count,
+                    (SELECT SUM(size) * 8 * 1024 FROM sys.database_files) as size_bytes,
+                    (SELECT COUNT(*) FROM sys.dm_exec_sessions WHERE database_id = DB_ID()) as active_connections
+            `;
+
+            const tablesSql = `
+                SELECT TOP 5
+                    t.name,
+                    SUM(a.total_pages) * 8 * 1024 as size_bytes
+                FROM sys.tables t
+                JOIN sys.indexes i ON t.object_id = i.object_id
+                JOIN sys.partitions p ON i.object_id = p.object_id AND i.index_id = p.index_id
+                JOIN sys.allocation_units a ON p.partition_id = a.container_id
+                GROUP BY t.name
+                ORDER BY SUM(a.total_pages) DESC
+            `;
+
+            const typesSql = `
+                SELECT TABLE_TYPE as type, COUNT(*) as count
+                FROM INFORMATION_SCHEMA.TABLES
+                GROUP BY TABLE_TYPE
+            `;
+
+            const [statsRes, tablesRes, typesRes] = await Promise.all([
+                pool.request().query(statsSql),
+                pool.request().query(tablesSql),
+                pool.request().query(typesSql)
+            ]);
+
+            const stats = statsRes.recordset[0];
+            return {
+                tableCount: parseInt(stats.table_count),
+                sizeBytes: parseInt(stats.size_bytes) || 0,
+                activeConnections: parseInt(stats.active_connections),
+                topTables: tablesRes.recordset.map((r: any) => ({
+                    name: r.name,
+                    sizeBytes: parseInt(r.size_bytes)
+                })),
+                tableTypes: typesRes.recordset.map((r: any) => ({
                     type: r.type,
                     count: parseInt(r.count)
                 }))

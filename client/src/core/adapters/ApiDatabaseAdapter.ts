@@ -48,7 +48,8 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
     }
 
     private getHeaders() {
-        const token = localStorage.getItem('accessToken');
+        // Read token from Zustand store (persisted in 'data-explorer-storage')
+        const token = useAppStore.getState().accessToken;
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
         };

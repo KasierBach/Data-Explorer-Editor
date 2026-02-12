@@ -17,6 +17,7 @@ export const ExplorerSidebar: React.FC = () => {
     const connections = useAppStore(state => state.connections);
     const activeConnectionId = useAppStore(state => state.activeConnectionId);
     const setActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
+    const activeDatabase = useAppStore(state => state.activeDatabase);
 
     const [searchTerm, setSearchTerm] = useState('');
     const queryClient = useQueryClient();
@@ -199,12 +200,18 @@ export const ExplorerSidebar: React.FC = () => {
             </div>
 
             {/* Optional Sidebar Footer/Status */}
-            <div className="p-3 border-t bg-muted/20 flex items-center justify-between opacity-50 text-[9px] font-bold uppercase tracking-widest">
-                <div className="flex items-center gap-1.5">
+            <div className="p-3 border-t bg-muted/20 flex items-center justify-between text-[9px] font-bold uppercase tracking-widest">
+                <div className="flex items-center gap-1.5 opacity-50">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span>Connected</span>
                 </div>
-                <span>v1.0.0-PRO</span>
+                {activeDatabase && (
+                    <div className="flex items-center gap-1 text-emerald-500/80 text-[8px]">
+                        <Database className="w-2.5 h-2.5" />
+                        <span className="truncate max-w-[100px]">{activeDatabase}</span>
+                    </div>
+                )}
+                <span className="opacity-50">v1.0.0-PRO</span>
             </div>
         </div>
     );

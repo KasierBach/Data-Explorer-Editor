@@ -34,6 +34,13 @@ export class QueryService {
           rows,
           columns: (fields as any[]).map(f => f.name),
         };
+      } else if (connection.type === 'mssql') {
+        const result = await pool.request().query(sql);
+        return {
+          rows: result.recordset || [],
+          columns: result.recordset?.columns ? Object.keys(result.recordset.columns) : [],
+          rowCount: result.rowsAffected?.[0] ?? 0,
+        };
       } else {
         throw new BadRequestException(`Unsupported connection type: ${connection.type}`);
       }
@@ -69,6 +76,15 @@ export class QueryService {
 
         const [result] = await pool.execute(sql, values);
         return { success: true, rowCount: (result as any).affectedRows };
+      } else if (connection.type === 'mssql') {
+        const mssqlTable = schema ? `[${schema}].[${table}]` : `[${table}]`;
+        const setClause = updateCols.map((col, i) => `[${col}] = @p${i}`).join(', ');
+        const sql = `UPDATE ${mssqlTable} SET ${setClause} WHERE [${pkColumn}] = @pk`;
+        const request = pool.request();
+        updateCols.forEach((col, i) => request.input(`p${i}`, updates[col]));
+        request.input('pk', pkValue);
+        const result = await request.query(sql);
+        return { success: true, rowCount: result.rowsAffected?.[0] ?? 0 };
       }
     } catch (error) {
       console.error('Update Row Error:', error);
@@ -83,21 +99,29 @@ export class QueryService {
 
     const quotedTable = connection.type === 'postgres'
       ? (schema ? `"${schema}"."${table}"` : `"${table}"`)
-      : `\`${table}\``;
+      : connection.type === 'mssql'
+        ? (schema ? `[${schema}].[${table}]` : `[${table}]`)
+        : `\`${table}\``;
 
     const sqlStatements: string[] = [];
 
     for (const op of operations) {
       switch (op.type) {
-        case 'add_column':
-          sqlStatements.push(`ALTER TABLE ${quotedTable} ADD COLUMN ${connection.type === 'postgres' ? `"${op.name}"` : `\`${op.name}\``} ${op.dataType} ${op.isNullable === false ? 'NOT NULL' : ''}`);
+        case 'add_column': {
+          const colQuote = connection.type === 'postgres' ? `"${op.name}"` : connection.type === 'mssql' ? `[${op.name}]` : `\`${op.name}\``;
+          sqlStatements.push(`ALTER TABLE ${quotedTable} ADD ${connection.type === 'mssql' ? '' : 'COLUMN '}${colQuote} ${op.dataType} ${op.isNullable === false ? 'NOT NULL' : ''}`);
           break;
-        case 'drop_column':
-          sqlStatements.push(`ALTER TABLE ${quotedTable} DROP COLUMN ${connection.type === 'postgres' ? `"${op.name}"` : `\`${op.name}\``}`);
+        }
+        case 'drop_column': {
+          const colQuote = connection.type === 'postgres' ? `"${op.name}"` : connection.type === 'mssql' ? `[${op.name}]` : `\`${op.name}\``;
+          sqlStatements.push(`ALTER TABLE ${quotedTable} DROP COLUMN ${colQuote}`);
           break;
+        }
         case 'alter_column_type':
           if (connection.type === 'postgres') {
             sqlStatements.push(`ALTER TABLE ${quotedTable} ALTER COLUMN "${op.name}" TYPE ${op.newType}`);
+          } else if (connection.type === 'mssql') {
+            sqlStatements.push(`ALTER TABLE ${quotedTable} ALTER COLUMN [${op.name}] ${op.newType}`);
           } else {
             sqlStatements.push(`ALTER TABLE ${quotedTable} MODIFY COLUMN \`${op.name}\` ${op.newType}`);
           }
@@ -105,27 +129,31 @@ export class QueryService {
         case 'rename_column':
           if (connection.type === 'postgres') {
             sqlStatements.push(`ALTER TABLE ${quotedTable} RENAME COLUMN "${op.name}" TO "${op.newName}"`);
+          } else if (connection.type === 'mssql') {
+            sqlStatements.push(`EXEC sp_rename '${schema ? schema + '.' : ''}${table}.${op.name}', '${op.newName}', 'COLUMN'`);
           } else {
-            // MySQL RENAME COLUMN is supported in 8.0+
             sqlStatements.push(`ALTER TABLE ${quotedTable} RENAME COLUMN \`${op.name}\` TO \`${op.newName}\``);
           }
           break;
-        case 'add_pk':
-          const pkCols = op.columns.map(c => connection.type === 'postgres' ? `"${c}"` : `\`${c}\``).join(', ');
+        case 'add_pk': {
+          const pkCols = op.columns.map(c => connection.type === 'postgres' ? `"${c}"` : connection.type === 'mssql' ? `[${c}]` : `\`${c}\``).join(', ');
           sqlStatements.push(`ALTER TABLE ${quotedTable} ADD PRIMARY KEY (${pkCols})`);
           break;
+        }
         case 'drop_pk':
           sqlStatements.push(`ALTER TABLE ${quotedTable} DROP PRIMARY KEY`);
           break;
-        case 'add_fk':
-          const fkCols = op.columns.map(c => connection.type === 'postgres' ? `"${c}"` : `\`${c}\``).join(', ');
-          const refCols = op.refColumns.map(c => connection.type === 'postgres' ? `"${c}"` : `\`${c}\``).join(', ');
-          const refTable = connection.type === 'postgres' ? `"${op.refTable}"` : `\`${op.refTable}\``;
+        case 'add_fk': {
+          const fkCols = op.columns.map(c => connection.type === 'postgres' ? `"${c}"` : connection.type === 'mssql' ? `[${c}]` : `\`${c}\``).join(', ');
+          const refCols = op.refColumns.map(c => connection.type === 'postgres' ? `"${c}"` : connection.type === 'mssql' ? `[${c}]` : `\`${c}\``).join(', ');
+          const refTable = connection.type === 'postgres' ? `"${op.refTable}"` : connection.type === 'mssql' ? `[${op.refTable}]` : `\`${op.refTable}\``;
           sqlStatements.push(`ALTER TABLE ${quotedTable} ADD CONSTRAINT ${op.name} FOREIGN KEY (${fkCols}) REFERENCES ${refTable} (${refCols})`);
           break;
+        }
         case 'drop_fk':
-          if (connection.type === 'postgres') {
-            sqlStatements.push(`ALTER TABLE ${quotedTable} DROP CONSTRAINT "${op.name}"`);
+          if (connection.type === 'postgres' || connection.type === 'mssql') {
+            const q = connection.type === 'postgres' ? `"${op.name}"` : `[${op.name}]`;
+            sqlStatements.push(`ALTER TABLE ${quotedTable} DROP CONSTRAINT ${q}`);
           } else {
             sqlStatements.push(`ALTER TABLE ${quotedTable} DROP FOREIGN KEY \`${op.name}\``);
           }

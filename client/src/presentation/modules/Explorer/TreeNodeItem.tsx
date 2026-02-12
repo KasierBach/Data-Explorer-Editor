@@ -54,11 +54,24 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const { data: children, isLoading } = useDatabaseHierarchy(isExpanded ? node.id : null);
     const openTab = useAppStore(state => state.openTab);
+    const activeDatabase = useAppStore(state => state.activeDatabase);
+    const setActiveDatabase = useAppStore(state => state.setActiveDatabase);
+
+    const isActiveDb = node.type === 'database' && activeDatabase === node.name;
 
     const handleToggle = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (node.hasChildren) {
-            setIsExpanded(!isExpanded);
+        if (node.type === 'database') {
+            // Database nodes: always expand (never collapse on click), set as active
+            if (!isExpanded && node.hasChildren) {
+                setIsExpanded(true);
+            }
+            setActiveDatabase(node.name);
+        } else {
+            // Other nodes: normal toggle
+            if (node.hasChildren) {
+                setIsExpanded(!isExpanded);
+            }
         }
     };
 
@@ -83,7 +96,8 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
                 className={cn(
                     "flex items-center py-1.5 px-2 hover:bg-accent/50 cursor-pointer select-none text-sm group transition-all duration-200 border-l-2 border-transparent",
                     isExpanded && node.hasChildren && "bg-accent/20",
-                    "hover:border-blue-500/50"
+                    isActiveDb && "border-l-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/15",
+                    !isActiveDb && "hover:border-blue-500/50"
                 )}
                 style={{ paddingLeft: `${level * 12 + 4}px` }}
                 onClick={handleToggle}
@@ -107,8 +121,13 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
                     </span>
 
                     {/* Optional indicator for child count if we had it, or just small deco */}
-                    {node.hasChildren && !isExpanded && (
+                    {node.hasChildren && !isExpanded && !isActiveDb && (
                         <div className="w-1.5 h-1.5 rounded-full bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                    {isActiveDb && (
+                        <div className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-500 text-[8px] font-black uppercase tracking-wider">
+                            ACTIVE
+                        </div>
                     )}
                 </div>
             </div>

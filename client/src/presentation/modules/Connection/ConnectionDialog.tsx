@@ -9,7 +9,7 @@ import { Label } from '@/presentation/components/ui/label';
 export const ConnectionDialog: React.FC = () => {
     const { isConnectionDialogOpen, closeConnectionDialog, addConnection } = useAppStore();
 
-    const [type, setType] = useState<'postgres' | 'mysql'>('postgres');
+    const [type, setType] = useState<'postgres' | 'mysql' | 'mssql'>('postgres');
     const [name, setName] = useState('');
     const [host, setHost] = useState('localhost');
     const [port, setPort] = useState('5432');
@@ -46,13 +46,19 @@ export const ConnectionDialog: React.FC = () => {
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="type" className="text-right">Type</Label>
-                        <Select value={type} onValueChange={(v: any) => setType(v)}>
+                        <Select value={type} onValueChange={(v: any) => {
+                            setType(v);
+                            if (v === 'postgres') { setPort('5432'); setUsername('postgres'); }
+                            else if (v === 'mysql') { setPort('3306'); setUsername('root'); }
+                            else if (v === 'mssql') { setPort('1433'); setUsername('sa'); }
+                        }}>
                             <SelectTrigger className="col-span-3">
                                 <SelectValue placeholder="Select Type" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="postgres">PostgreSQL</SelectItem>
                                 <SelectItem value="mysql">MySQL</SelectItem>
+                                <SelectItem value="mssql">SQL Server</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

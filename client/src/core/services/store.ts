@@ -12,7 +12,7 @@ export interface Tab {
 export interface Connection {
     id: string;
     name: string;
-    type: 'mysql' | 'postgres' | 'clickhouse' | 'mock';
+    type: 'mysql' | 'postgres' | 'mssql' | 'clickhouse' | 'mock';
     host?: string;
     port?: number;
     username?: string;
@@ -21,11 +21,22 @@ export interface Connection {
     showAllDatabases?: boolean;
 }
 
+export interface SavedQuery {
+    id: string;
+    name: string;
+    sql: string;
+    database?: string;
+    createdAt: number;
+    updatedAt: number;
+}
+
 interface AppState {
     // Sidebar State
     isSidebarOpen: boolean;
+    sidebarWidth: number;
     toggleSidebar: () => void;
     setSidebarOpen: (isOpen: boolean) => void;
+    setSidebarWidth: (width: number) => void;
 
     // Connection State
     connections: Connection[];
@@ -38,6 +49,10 @@ interface AppState {
     addConnection: (connection: Connection) => void;
     updateConnection: (id: string, connection: Partial<Connection>) => void;
     removeConnection: (id: string) => void;
+
+    // Active Database
+    activeDatabase: string | null;
+    setActiveDatabase: (db: string | null) => void;
 
     // Auth State
     isAuthenticated: boolean;
@@ -60,6 +75,12 @@ interface AppState {
     openInsightsTab: (connectionId: string, database?: string) => void;
     openVisualizeTab: () => void;
     openErdTab: (connectionId: string, database?: string) => void;
+
+    // Saved Queries
+    savedQueries: SavedQuery[];
+    saveQuery: (query: SavedQuery) => void;
+    updateSavedQuery: (id: string, updates: Partial<SavedQuery>) => void;
+    deleteSavedQuery: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -67,8 +88,10 @@ export const useAppStore = create<AppState>()(
         (set) => ({
             // Sidebar
             isSidebarOpen: true,
+            sidebarWidth: 20,
             toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
             setSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
+            setSidebarWidth: (width) => set({ sidebarWidth: width }),
 
             // Auth
             isAuthenticated: false,
@@ -97,11 +120,13 @@ export const useAppStore = create<AppState>()(
                 }
             ],
             activeConnectionId: null,
+            activeDatabase: null,
             isConnectionDialogOpen: false,
             openConnectionDialog: () => set({ isConnectionDialogOpen: true }),
             closeConnectionDialog: () => set({ isConnectionDialogOpen: false }),
 
-            setActiveConnectionId: (id) => set({ activeConnectionId: id, isSidebarOpen: true }),
+            setActiveConnectionId: (id) => set({ activeConnectionId: id, activeDatabase: null, isSidebarOpen: true }),
+            setActiveDatabase: (db) => set({ activeDatabase: db }),
 
             addConnection: (connection) => set((state) => ({
                 connections: [...state.connections, connection]
@@ -219,6 +244,20 @@ export const useAppStore = create<AppState>()(
                     activeTabId: id
                 };
             }),
+
+            // Saved Queries
+            savedQueries: [],
+            saveQuery: (query) => set((state) => ({
+                savedQueries: [...state.savedQueries, query]
+            })),
+            updateSavedQuery: (id, updates) => set((state) => ({
+                savedQueries: state.savedQueries.map(q =>
+                    q.id === id ? { ...q, ...updates, updatedAt: Date.now() } : q
+                )
+            })),
+            deleteSavedQuery: (id) => set((state) => ({
+                savedQueries: state.savedQueries.filter(q => q.id !== id)
+            })),
         }),
         {
             name: 'data-explorer-storage',
@@ -233,6 +272,8 @@ export const useAppStore = create<AppState>()(
                 tabs: state.tabs,
                 activeTabId: state.activeTabId,
                 isSidebarOpen: state.isSidebarOpen,
+                sidebarWidth: state.sidebarWidth,
+                savedQueries: state.savedQueries,
             }),
         }
     )

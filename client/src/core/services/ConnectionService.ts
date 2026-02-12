@@ -23,7 +23,7 @@ class ConnectionService {
     /**
      * Factory method to get or create an adapter for a connection.
      */
-    public getAdapter(connectionId: string, type: 'postgres' | 'mysql' | 'clickhouse' | 'mock'): IDatabaseAdapter {
+    public getAdapter(connectionId: string, type: 'postgres' | 'mysql' | 'mssql' | 'clickhouse' | 'mock'): IDatabaseAdapter {
         if (this.adapters.has(connectionId)) {
             return this.adapters.get(connectionId)!;
         }
@@ -35,7 +35,7 @@ class ConnectionService {
         return adapter;
     }
 
-    public async setActiveConnection(connection: { id: string, type: 'postgres' | 'mysql' | 'clickhouse' | 'mock' }): Promise<void> {
+    public async setActiveConnection(connection: { id: string, type: 'postgres' | 'mysql' | 'mssql' | 'clickhouse' | 'mock' }): Promise<void> {
         const adapter = this.getAdapter(connection.id, connection.type);
 
         // Always connect to ensure config is updated (e.g. showAllDatabases flag)

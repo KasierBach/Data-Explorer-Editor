@@ -4,6 +4,7 @@ import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { Connection } from './entities/connection.entity';
 import { Pool } from 'pg';
 import * as mysql from 'mysql2/promise';
+import * as mssql from 'mssql';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -14,7 +15,11 @@ export class ConnectionsService implements OnModuleDestroy {
 
   async onModuleDestroy() {
     for (const pool of this.pools.values()) {
-      await pool.end();
+      if (typeof pool.close === 'function') {
+        await pool.close(); // mssql
+      } else {
+        await pool.end(); // pg, mysql
+      }
     }
   }
 
@@ -74,6 +79,24 @@ export class ConnectionsService implements OnModuleDestroy {
         connectionLimit: 10,
         queueLimit: 0,
       });
+    } else if (connection.type === 'mssql') {
+      const config: mssql.config = {
+        server: connection.host || 'localhost',
+        port: connection.port || 1433,
+        user: connection.username,
+        password: connection.password,
+        database: databaseOverride || connection.database,
+        options: {
+          encrypt: false,
+          trustServerCertificate: true,
+        },
+        pool: {
+          max: 10,
+          min: 0,
+          idleTimeoutMillis: 30000,
+        },
+      };
+      pool = await new mssql.ConnectionPool(config).connect();
     }
 
     this.pools.set(poolKey, pool);
@@ -86,7 +109,11 @@ export class ConnectionsService implements OnModuleDestroy {
     // Close existing pools for this connection if config changed
     for (const [key, pool] of this.pools.entries()) {
       if (key.startsWith(`${id}:`)) {
-        await pool.end();
+        if (typeof pool.close === 'function') {
+          await pool.close();
+        } else {
+          await pool.end();
+        }
         this.pools.delete(key);
       }
     }
@@ -105,7 +132,11 @@ export class ConnectionsService implements OnModuleDestroy {
     // Close pools
     for (const [key, pool] of this.pools.entries()) {
       if (key.startsWith(`${id}:`)) {
-        await pool.end();
+        if (typeof pool.close === 'function') {
+          await pool.close();
+        } else {
+          await pool.end();
+        }
         this.pools.delete(key);
       }
     }

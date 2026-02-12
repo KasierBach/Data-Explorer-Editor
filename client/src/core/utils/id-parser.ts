@@ -56,14 +56,15 @@ export const parseNodeId = (id: string): ParsedId => {
 /**
  * Generates a quoted identifier for SQL queries based on the dialect.
  */
-export const getQuotedIdentifier = (name: string, type: 'postgres' | 'mysql'): string => {
+export const getQuotedIdentifier = (name: string, type: 'postgres' | 'mysql' | 'mssql'): string => {
+    if (type === 'mssql') return `[${name}]`;
     return type === 'postgres' ? `"${name}"` : `\`${name}\``;
 };
 
 /**
  * Generates a fully qualified table name.
  */
-export const getFullyQualifiedTable = (id: string, dialect: 'postgres' | 'mysql'): string => {
+export const getFullyQualifiedTable = (id: string, dialect: 'postgres' | 'mysql' | 'mssql'): string => {
     const { schema, table } = parseNodeId(id);
     if (!table) return id;
 

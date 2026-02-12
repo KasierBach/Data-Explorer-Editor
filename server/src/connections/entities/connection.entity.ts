@@ -1,7 +1,7 @@
 export class Connection {
     id: string;
     name: string;
-    type: 'postgres' | 'mysql' | 'sqlite';
+    type: 'postgres' | 'mysql' | 'mssql' | 'sqlite';
     host?: string;
     port?: number;
     username?: string;
