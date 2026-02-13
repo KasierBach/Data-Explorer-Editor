@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Handle, Position } from '@xyflow/react';
+import { Handle, Position, useStore } from '@xyflow/react';
 import { Table, Hash, Type, Key } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -13,7 +13,12 @@ export interface TableNodeData {
     }>;
 }
 
+const connectionNodeIdSelector = (state: any) => state.connectionNodeId ?? state.connection?.fromNodeId;
+
 const TableNode = ({ data }: { data: TableNodeData }) => {
+    const connectionNodeId = useStore(connectionNodeIdSelector);
+    const isConnecting = !!connectionNodeId;
+
     return (
         <div className="min-w-[240px] bg-card/90 backdrop-blur-2xl border-border/40 border rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/5 group transition-all hover:ring-primary/20 hover:border-primary/20">
             {/* Header */}
@@ -34,15 +39,42 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
                         key={`${data.tableName}-${col.name}`}
                         className="px-5 py-2 flex items-center justify-between gap-6 hover:bg-primary/5 transition-all relative group/row"
                     >
-                        {/* Target Handle (Input) - Left side */}
+                        {/* 
+                            INTERACTION LOGIC:
+                            - Source Handle (Right): active when NOT connecting. Covers full row.
+                            - Target Handle (Left): active when connecting. Covers full row.
+                        */}
+
+                        {/* Target Handle (Input) - Always present, lower z-index */}
                         <Handle
                             type="target"
                             position={Position.Left}
                             id={col.name}
-                            className="!w-3 !h-3 !-left-1.5 !bg-background !border-2 !border-primary !opacity-0 group-hover/row:!opacity-100 group-hover/row:!scale-125 transition-all !shadow-lg !shadow-primary/20 !z-50"
+                            className="!w-full !h-full !absolute !inset-0 !rounded-none !border-none !bg-transparent !z-40"
+                            style={{ opacity: 0 }}
+                            isConnectableStart={false} // Cannot start drag from target
                         />
 
-                        <div className="flex items-center gap-3 min-w-0">
+                        {/* Source Handle (Output) - Higher z-index, disabled during connection */}
+                        <Handle
+                            type="source"
+                            position={Position.Right}
+                            id={col.name}
+                            className={cn(
+                                "!w-full !h-full !absolute !inset-0 !rounded-none !border-none !bg-transparent !z-50",
+                                isConnecting && "pointer-events-none" // Critically important: hide source when connecting so target below is clickable
+                            )}
+                            style={{ opacity: 0 }}
+                            isConnectable={!isConnecting} // Disable interaction logic
+                        />
+
+
+                        {/* VISUALS ONLY */}
+
+                        {/* Visual Target Dot */}
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 bg-background border-2 border-primary rounded-full opacity-50 group-hover/row:opacity-100 group-hover/row:scale-125 transition-all shadow-lg shadow-primary/20 pointer-events-none" />
+
+                        <div className="flex items-center gap-3 min-w-0 pointer-events-none">
                             <div className="shrink-0 flex items-center justify-center w-4">
                                 {col.isPrimaryKey ? (
                                     <Key className="h-3.5 w-3.5 text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]" />
@@ -59,23 +91,20 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
 
                             <span className={cn(
                                 "text-[12px] truncate select-none tracking-tight",
-                                col.isPrimaryKey ? "font-black text-foreground" : "font-medium text-muted-foreground group-hover/row:text-foreground"
+                                "font-medium text-muted-foreground group-hover/row:text-foreground",
+                                col.isPrimaryKey && "font-black text-foreground",
+                                col.isForeignKey && "text-blue-400"
                             )}>
                                 {col.name}
                             </span>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0 pointer-events-none">
                             <span className="text-[9px] font-black uppercase opacity-20 tracking-tighter select-none">{col.type}</span>
-
-                            {/* Source Handle (Output) - Right side */}
-                            <Handle
-                                type="source"
-                                position={Position.Right}
-                                id={col.name}
-                                className="!w-3 !h-3 !-right-1.5 !bg-primary !border-2 !border-background !opacity-0 group-hover/row:!opacity-100 group-hover/row:!scale-125 transition-all !shadow-lg !shadow-primary/20 !z-50"
-                            />
                         </div>
+
+                        {/* Visual Source Dot */}
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-primary border-2 border-background rounded-full opacity-50 group-hover/row:opacity-100 group-hover/row:scale-125 transition-all shadow-lg shadow-primary/20 pointer-events-none" />
                     </div>
                 ))}
             </div>

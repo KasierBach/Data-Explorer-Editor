@@ -36,6 +36,7 @@ export const SidebarContextMenu: React.FC<SidebarContextMenuProps> = ({ children
                             Toggle "Show All DBs"
                         </ContextMenuItem>
                         <ContextMenuSeparator />
+                        <ContextMenuItem onSelect={() => onAction('createDatabase')}>Create Database</ContextMenuItem>
                         <ContextMenuItem onSelect={() => onAction('edit')}>Edit Connection</ContextMenuItem>
                         {/* <ContextMenuItem onSelect={() => onAction('disconnect')} className="text-red-600">Disconnect</ContextMenuItem> */}
                     </>
@@ -43,6 +44,13 @@ export const SidebarContextMenu: React.FC<SidebarContextMenuProps> = ({ children
                 {type === 'database' && (
                     <>
                         <ContextMenuItem onSelect={() => onAction('refresh')}>Refresh</ContextMenuItem>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                            onSelect={() => onAction('deleteDatabase')}
+                            className="text-red-600 focus:text-red-600 focus:bg-red-500/10"
+                        >
+                            Delete Database
+                        </ContextMenuItem>
                     </>
                 )}
                 {type === 'table' && (

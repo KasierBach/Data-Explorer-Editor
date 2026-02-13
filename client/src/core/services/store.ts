@@ -109,7 +109,7 @@ export const useAppStore = create<AppState>()(
             // Connection
             connections: [
                 {
-                    id: 'local-pg',
+                    id: 'b115ca80-e468-40bc-b5ae-e03cfab8ac7d',
                     name: 'Local Postgres',
                     type: 'postgres',
                     host: 'localhost',

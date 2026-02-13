@@ -60,7 +60,7 @@ export const Navbar: React.FC = () => {
                         variant="ghost"
                         size="sm"
                         className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
-                        onClick={() => activeConnectionId && openErdTab(activeConnectionId)}
+                        onClick={() => activeConnectionId && openErdTab(activeConnectionId, useAppStore.getState().activeDatabase || undefined)}
                         disabled={!activeConnectionId}
                     >
                         <GitGraph className="w-4 h-4 text-blue-500" />

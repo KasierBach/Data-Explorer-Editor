@@ -28,4 +28,14 @@ export class QueryController {
   async seedFailed(@Body() body: { connectionId: string }) {
     return this.queryService.seedData(body.connectionId);
   }
+
+  @Post('database')
+  async createDatabase(@Body() body: { connectionId: string; name: string }) {
+    return this.queryService.createDatabase(body.connectionId, body.name);
+  }
+
+  @Delete('database')
+  async dropDatabase(@Body() body: { connectionId: string; name: string }) {
+    return this.queryService.dropDatabase(body.connectionId, body.name);
+  }
 }

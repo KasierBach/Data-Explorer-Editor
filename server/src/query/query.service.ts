@@ -217,4 +217,78 @@ export class QueryService {
 
     return this.executeQuery({ connectionId, sql });
   }
+
+  async createDatabase(connectionId: string, databaseName: string) {
+    const connection = await this.connectionsService.findOne(connectionId);
+    if (!connection) throw new BadRequestException('Invalid connection ID');
+
+    // Basic validation to prevent SQL injection (alphanumeric + underscores/hyphens only)
+    if (!/^[a-zA-Z0-9_-]+$/.test(databaseName)) {
+      throw new BadRequestException('Invalid database name. Only alphanumeric characters, underscores, and hyphens are allowed.');
+    }
+
+    try {
+      // Connect to the default database for the connection to execute CREATE DATABASE
+      // We don't use the 'database' parameter in getPool because we might not want to connect to a specific DB yet,
+      // or we want to connect to the default one to create a NEW one.
+      const pool = await this.connectionsService.getPool(connectionId);
+
+      let sql = '';
+      if (connection.type === 'postgres') {
+        sql = `CREATE DATABASE "${databaseName}"`;
+        // Postgres cannot run CREATE DATABASE inside a transaction block, which executeQuery might imply if using a single client.
+        // However, our executeQuery uses a pool which gives a client. pool.query is fine.
+        await pool.query(sql);
+      } else if (connection.type === 'mysql') {
+        sql = `CREATE DATABASE \`${databaseName}\``;
+        await pool.execute(sql);
+      } else if (connection.type === 'mssql') {
+        sql = `CREATE DATABASE [${databaseName}]`;
+        await pool.request().query(sql);
+      } else {
+        throw new BadRequestException(`Unsupported connection type: ${connection.type}`);
+      }
+
+      return { success: true, message: `Database ${databaseName} created successfully.` };
+    } catch (error) {
+      console.error('Create Database Error:', error);
+      throw new InternalServerErrorException(`Failed to create database: ${error.message}`);
+    }
+  }
+
+  async dropDatabase(connectionId: string, databaseName: string) {
+    const connection = await this.connectionsService.findOne(connectionId);
+    if (!connection) throw new BadRequestException('Invalid connection ID');
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(databaseName)) {
+      throw new BadRequestException('Invalid database name.');
+    }
+
+    try {
+      const pool = await this.connectionsService.getPool(connectionId);
+
+      if (connection.type === 'postgres') {
+        // Terminate other connections first
+        await pool.query(`
+                SELECT pg_terminate_backend(pid) 
+                FROM pg_stat_activity 
+                WHERE datname = $1 AND pid <> pg_backend_pid()
+            `, [databaseName]);
+        await pool.query(`DROP DATABASE "${databaseName}"`);
+      } else if (connection.type === 'mysql') {
+        await pool.execute(`DROP DATABASE \`${databaseName}\``);
+      } else if (connection.type === 'mssql') {
+        // Set to single user to rollback other connections
+        await pool.request().query(`ALTER DATABASE [${databaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE`);
+        await pool.request().query(`DROP DATABASE [${databaseName}]`);
+      } else {
+        throw new BadRequestException(`Unsupported connection type: ${connection.type}`);
+      }
+
+      return { success: true, message: `Database ${databaseName} dropped successfully.` };
+    } catch (error) {
+      console.error('Drop Database Error:', error);
+      throw new InternalServerErrorException(`Failed to drop database: ${error.message}`);
+    }
+  }
 }

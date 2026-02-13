@@ -12,6 +12,8 @@ import { Database, ChevronDown } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { parseNodeId, getFullyQualifiedTable } from '@/core/utils/id-parser';
+import { CreateDatabaseDialog } from '@/presentation/components/Dialogs/CreateDatabaseDialog';
+import { DeleteDatabaseDialog } from '@/presentation/components/Dialogs/DeleteDatabaseDialog';
 
 export const ExplorerSidebar: React.FC = () => {
     const connections = useAppStore(state => state.connections);
@@ -20,6 +22,9 @@ export const ExplorerSidebar: React.FC = () => {
     const activeDatabase = useAppStore(state => state.activeDatabase);
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [isCreateDatabaseDialogOpen, setCreateDatabaseDialogOpen] = useState(false);
+    const [isDeleteDatabaseDialogOpen, setDeleteDatabaseDialogOpen] = useState(false);
+    const [databaseToDelete, setDatabaseToDelete] = useState<string | null>(null);
     const queryClient = useQueryClient();
 
     React.useEffect(() => {
@@ -31,6 +36,16 @@ export const ExplorerSidebar: React.FC = () => {
             const { action, nodeId, nodeType } = e.detail;
             const activeConnection = useAppStore.getState().connections.find(c => c.id === activeConnectionId);
             const dialect = activeConnection?.type === 'mysql' ? 'mysql' : 'postgres';
+
+            if (nodeType === 'database') {
+                const { dbName } = parseNodeId(nodeId);
+                const name = dbName || nodeId.replace('db:', '');
+
+                if (action === 'deleteDatabase') {
+                    setDatabaseToDelete(name);
+                    setDeleteDatabaseDialogOpen(true);
+                }
+            }
 
             if (nodeType === 'table' || nodeType === 'view') {
                 const { table: tableName } = parseNodeId(nodeId);
@@ -164,6 +179,9 @@ export const ExplorerSidebar: React.FC = () => {
                                 if (action === 'refresh') {
                                     handleRefresh();
                                 }
+                                if (action === 'createDatabase') {
+                                    setCreateDatabaseDialogOpen(true);
+                                }
                             }}
                         >
                             {/* Active Connection Root Node */}
@@ -213,6 +231,20 @@ export const ExplorerSidebar: React.FC = () => {
                 )}
                 <span className="opacity-50">v1.0.0-PRO</span>
             </div>
-        </div>
+            {/* Dialogs */}
+            <CreateDatabaseDialog
+                isOpen={isCreateDatabaseDialogOpen}
+                onClose={() => setCreateDatabaseDialogOpen(false)}
+                connectionId={activeConnectionId}
+                onSuccess={handleRefresh}
+            />
+            <DeleteDatabaseDialog
+                isOpen={isDeleteDatabaseDialogOpen}
+                onClose={() => setDeleteDatabaseDialogOpen(false)}
+                connectionId={activeConnectionId}
+                databaseName={databaseToDelete}
+                onSuccess={handleRefresh}
+            />
+        </div >
     );
 };

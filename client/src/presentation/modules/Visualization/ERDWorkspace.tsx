@@ -17,11 +17,22 @@ import dagre from 'dagre';
 import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
-import TableNode from './TableNode';
-import { GitGraph, RefreshCw, Table, Plus, X, Search, LayoutGrid } from 'lucide-react';
+import { GitGraph, RefreshCw, Table, Plus, X, Search, LayoutGrid, Database } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { cn } from '@/lib/utils';
+import TableNode from './TableNode';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/presentation/components/ui/select"
+import { ForeignKeyDialog } from './ForeignKeyDialog';
+import type { ForeignKeyData } from './ForeignKeyDialog';
+import { toast } from 'sonner';
+import { queryService } from '@/core/services/QueryService';
 
 const nodeTypes = {
     table: TableNode,
@@ -47,6 +58,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
     // Selection state
     const [visibleTableNames, setVisibleTableNames] = useState<Set<string>>(new Set(initialMetadata.visibleTables || []));
     const [searchTerm, setSearchTerm] = useState('');
+    const [pendingConnection, setPendingConnection] = useState<{ sourceTable: string; sourceColumn: string; targetTable: string; targetColumn: string } | null>(null);
 
     const isFirstLoad = useRef(true);
 
@@ -94,7 +106,8 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
             await crawl(database ? `db:${database}` : null);
             return results;
         },
-        enabled: !!connectionId
+        enabled: !!connectionId,
+        staleTime: 0
     });
 
     // 2. Fetch Relationships
@@ -105,7 +118,21 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
             const adapter = connectionService.getAdapter(connectionId, activeConnection?.type as any);
             return adapter.getRelationships(database);
         },
-        enabled: !!connectionId
+        enabled: !!connectionId,
+        staleTime: 0
+    });
+
+    // Fetch generic hierarchy (root) to get list of databases
+    const { data: allDatabases } = useQuery({
+        queryKey: ['erd-databases', connectionId],
+        queryFn: async () => {
+            if (!connectionId) return [];
+            const adapter = connectionService.getAdapter(connectionId, activeConnection?.type as any);
+            const nodes = await adapter.getHierarchy(null);
+            return nodes.filter((n: any) => n.type === 'database');
+        },
+        enabled: !!connectionId,
+        staleTime: 0
     });
 
     // 3. Fetch All Columns for visible tables
@@ -125,15 +152,94 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
             }));
             return results;
         },
-        enabled: visibleTableNames.size > 0 && !!hierarchy
+        enabled: visibleTableNames.size > 0 && !!hierarchy,
+        staleTime: 0
     });
 
     const isLoading = isLoadingHierarchy || isLoadingCols;
 
     const onConnect = useCallback(
-        (params: Connection) => setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: 'hsl(var(--primary))', strokeWidth: 2, strokeDasharray: 5 } }, eds)),
-        [setEdges]
+        (params: Connection) => {
+            // Instead of just drawing a line, we want to open the FK dialog
+            // params.source = Table Name (Node ID)
+            // params.sourceHandle = Column Name
+            // params.target = Table Name
+            // params.targetHandle = Column Name
+
+            if (params.source === params.target) return; // Self-referencing FKs are complex, maybe support later
+
+            setPendingConnection({
+                sourceTable: params.source,
+                sourceColumn: params.sourceHandle!,
+                targetTable: params.target,
+                targetColumn: params.targetHandle!
+            });
+        },
+        []
     );
+
+    const handleCreateForeignKey = async (data: ForeignKeyData) => {
+        try {
+            if (!connectionId || !database) return;
+
+            await queryService.updateSchema({
+                connectionId,
+                database,
+                table: data.sourceTable, // FK is added to the source (child) table
+                operations: [{
+                    type: 'add_fk',
+                    name: data.constraintName,
+                    columns: [data.sourceColumn],
+                    refTable: data.targetTable,
+                    refColumns: [data.targetColumn],
+                    onDelete: data.onDelete,
+                    onUpdate: data.onUpdate
+                }]
+            });
+
+            toast.success("Relationship Created", {
+                description: `Successfully linked ${data.sourceTable} to ${data.targetTable}.`,
+            });
+
+            // Refetch relationships to update the diagram visually
+            // In a real app we might want to optimistically update the edges
+            // But for now, a refetch is safer
+            // We rely on react-query invalidation or just manually refetch if we had access to the query client
+            // Since we don't have queryClient in props, we can just force a re-render or similar
+            // actually we can use `relationships` query refetch if we knew how to get it, 
+            // but the prop `relationships` comes from useQuery. 
+            // We will just let the user refresh manually or ... wait we have no refetch for relationships exposed.
+            // Let's rely on auto-refresh or a manual refresh button.
+            // Actually, let's just add the edge manually so it looks instant
+            setEdges((eds) => addEdge({
+                source: data.sourceTable,
+                target: data.targetTable,
+                sourceHandle: data.sourceColumn,
+                targetHandle: data.targetColumn,
+                animated: true,
+                type: ConnectionLineType.SmoothStep,
+                style: { stroke: 'hsl(var(--primary))', strokeWidth: 2, strokeDasharray: 5 }
+            }, eds));
+
+        } catch (error: any) {
+            let errorMessage = error.message || "Unknown error occurred";
+            try {
+                // Attempt to parse backend JSON error
+                const errObj = JSON.parse(errorMessage);
+                if (errObj.statusCode === 404 && errObj.message?.includes('Connection with ID')) {
+                    errorMessage = "Connection session expired. Please refresh the page.";
+                } else if (errObj.message) {
+                    errorMessage = errObj.message;
+                }
+            } catch {
+                // If parsing fails, use the raw message
+            }
+
+            toast.error("Failed to create relationship", {
+                description: errorMessage,
+            });
+        }
+    };
 
     const getLayoutedElements = useCallback((nodes: Node[], edges: Edge[], direction = 'LR') => {
         const dagreGraph = new dagre.graphlib.Graph();
@@ -273,6 +379,36 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                         </div>
                         <h2 className="font-black text-sm uppercase tracking-widest">Entities</h2>
                     </div>
+
+                    {/* Database Selector */}
+                    <div className="mb-4">
+                        <Select
+                            value={database}
+                            onValueChange={(val) => {
+                                updateTabMetadata(tabId, {
+                                    database: val,
+                                    visibleTables: [],
+                                    nodes: [],
+                                    edges: []
+                                });
+                                setVisibleTableNames(new Set());
+                                setNodes([]);
+                                setEdges([]);
+                            }}
+                        >
+                            <SelectTrigger className="h-8 text-xs bg-muted/20 border-border/20">
+                                <SelectValue placeholder="Select Database" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {allDatabases?.map(db => (
+                                    <SelectItem key={db.id} value={db.name} className="text-xs">
+                                        {db.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground opacity-40" />
                         <Input
@@ -332,6 +468,20 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     </div>
                 )}
 
+                {!database && !isLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+                        <div className="text-center">
+                            <div className="w-12 h-12 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce">
+                                <Database className="w-6 h-6 text-muted-foreground" />
+                            </div>
+                            <h3 className="font-bold text-lg mb-2">Select a Database</h3>
+                            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                                Choose a database from the sidebar to start visualizing your schema.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
                 <ReactFlow
                     nodes={nodes}
                     edges={edges}
@@ -340,11 +490,12 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     onConnect={onConnect}
                     nodeTypes={nodeTypes}
                     connectionLineType={ConnectionLineType.SmoothStep}
+                    connectionLineStyle={{ stroke: 'hsl(var(--primary))', strokeWidth: 2, strokeDasharray: '5,5' }}
                     fitView
                     minZoom={0.05}
                     maxZoom={2}
                     colorMode="system"
-                    connectionRadius={25}
+                    connectionRadius={30}
                     snapToGrid={true}
                     snapGrid={[15, 15]}
                 >
@@ -361,7 +512,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                                     <div>
                                         <h2 className="font-black text-lg tracking-tight leading-none uppercase">Database Diagram</h2>
                                         <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-black opacity-40 mt-1">
-                                            {activeConnection?.name} @ {database || 'Default'}
+                                            {activeConnection?.name} @ {database || '...'}
                                         </p>
                                     </div>
                                 </div>
@@ -416,6 +567,19 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     background: #fff;
                 }
             `}</style>
+
+            {pendingConnection && (
+                <ForeignKeyDialog
+                    isOpen={true}
+                    onClose={() => setPendingConnection(null)}
+                    onConfirm={handleCreateForeignKey}
+                    sourceTable={pendingConnection.sourceTable}
+                    sourceColumn={pendingConnection.sourceColumn}
+                    targetTable={pendingConnection.targetTable}
+                    targetColumn={pendingConnection.targetColumn}
+                    existingTables={Array.from(visibleTableNames)}
+                />
+            )}
         </div>
     );
 };
