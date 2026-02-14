@@ -24,7 +24,7 @@ export function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<RedirectIfAuth><LandingPage /></RedirectIfAuth>} />
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
 
             <Route

@@ -248,14 +248,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
 
             // Refetch relationships to update the diagram visually
             // In a real app we might want to optimistically update the edges
-            // But for now, a refetch is safer
-            // We rely on react-query invalidation or just manually refetch if we had access to the query client
-            // Since we don't have queryClient in props, we can just force a re-render or similar
-            // actually we can use `relationships` query refetch if we knew how to get it, 
-            // but the prop `relationships` comes from useQuery. 
-            // We will just let the user refresh manually or ... wait we have no refetch for relationships exposed.
-            // Let's rely on auto-refresh or a manual refresh button.
-            // Actually, let's just add the edge manually so it looks instant
+            // But for now, we just add the edge manually so it looks instant
             setEdges((eds) => addEdge({
                 source: data.sourceTable,
                 target: data.targetTable,
@@ -360,7 +353,6 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
     useEffect(() => {
         if (!hierarchy || !tableData || !relationships) return;
 
-        // Auto-generate edges for visible tables based on DB relationships
         // Auto-generate edges for visible tables based on DB relationships
         const dbEdges: Edge[] = relationships.map((rel, idx) => ({
             id: `db-e-${idx}`,

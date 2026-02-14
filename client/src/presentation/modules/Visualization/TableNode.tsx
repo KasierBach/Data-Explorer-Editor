@@ -24,9 +24,9 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
     const isConnecting = !!connectionNodeId;
 
     return (
-        <div className="min-w-[240px] bg-card/90 backdrop-blur-2xl border-border/40 border rounded-2xl shadow-2xl overflow-hidden ring-1 ring-white/5 group transition-all hover:ring-primary/20 hover:border-primary/20">
+        <div className="min-w-[240px] bg-card/90 backdrop-blur-2xl border-border/40 border rounded-2xl shadow-2xl ring-1 ring-white/5 group transition-all hover:ring-primary/20 hover:border-primary/20">
             {/* Header */}
-            <div className="bg-primary/10 px-4 py-3 border-b border-border/40 flex items-center gap-3">
+            <div className="bg-primary/10 px-4 py-3 border-b border-border/40 rounded-t-2xl flex items-center gap-3">
                 <div className="p-2 bg-primary/20 rounded-xl text-primary group-hover:scale-110 group-hover:bg-primary group-hover:text-white transition-all shadow-lg shadow-primary/5">
                     <Table className="h-4 w-4" />
                 </div>
@@ -49,43 +49,38 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
                             - Target Handle (Left): active when connecting. Covers full row.
                         */}
 
-                        {/* Target Handle (Input) - Always present, lower z-index */}
+                        {/* Target Handle (Left) - Visible only when connecting */}
                         <Handle
                             type="target"
                             position={Position.Left}
                             id={col.name}
-                            className="!w-2 !h-2 !absolute !left-0 !top-1/2 !-translate-y-1/2 !-translate-x-1/2 !rounded-full !border-none !bg-transparent !z-40"
-                            style={{ opacity: 0 }}
-                            isConnectableStart={false} // Cannot start drag from target
+                            className={cn(
+                                "!w-3.5 !h-3.5 !absolute !left-0 !top-1/2 !-translate-y-1/2 !-translate-x-1/2 !rounded-full !border-2 !border-primary !bg-background !z-50 transition-all duration-300",
+                                isConnecting ? "opacity-100 scale-100 ring-4 ring-primary/20 animate-pulse" : "opacity-0 scale-50 pointer-events-none"
+                            )}
+                            isConnectable={true}
                         />
 
-                        {/* Source Handle (Output) - Higher z-index, disabled during connection */}
+                        {/* Source Handle (Right) - Visible on row hover */}
                         <Handle
                             type="source"
                             position={Position.Right}
                             id={col.name}
                             className={cn(
-                                "!w-2 !h-2 !absolute !right-0 !top-1/2 !-translate-y-1/2 !translate-x-1/2 !rounded-full !border-none !bg-transparent !z-50",
-                                isConnecting && "pointer-events-none" // Critically important: hide source when connecting so target below is clickable
+                                "!w-3.5 !h-3.5 !absolute !right-0 !top-1/2 !-translate-y-1/2 !translate-x-1/2 !rounded-full !border-2 !border-background !bg-primary !z-50 !cursor-crosshair transition-all duration-200",
+                                !isConnecting && "group-hover/row:opacity-100 group-hover/row:scale-100", // Show on hover if NOT connecting
+                                isConnecting || "opacity-0 scale-50", // Hide if connecting OR not hovering
+                                isConnecting && "pointer-events-none" // Disable source when connecting
                             )}
-                            style={{ opacity: 0 }}
-                            isConnectable={!isConnecting} // Disable interaction logic
+                            isConnectable={!isConnecting}
                         />
 
-
-                        {/* VISUALS ONLY */}
-
-                        {/* Visual Target Dot */}
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 bg-background border-2 border-primary rounded-full opacity-50 group-hover/row:opacity-100 group-hover/row:scale-125 transition-all shadow-lg shadow-primary/20 pointer-events-none" />
-
-                        <div className="flex items-center gap-3 min-w-0 pointer-events-none">
+                        <div className="flex items-center gap-3 min-w-0 pointer-events-none ml-2 mr-2">
                             <div className="shrink-0 flex items-center justify-center w-4">
                                 {col.isPrimaryKey ? (
                                     <Key className="h-3.5 w-3.5 text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]" />
-                                ) : col.isForeignKey ? (
-                                    <div className="h-3.5 w-3.5 rounded-full bg-blue-500/20 flex items-center justify-center">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
-                                    </div>
+                                ) : col.fkConstraintName ? (
+                                    <Key className="h-3 w-3 text-blue-400 rotate-90" />
                                 ) : typeof col.type === 'string' && (col.type.toLowerCase().includes('int') || col.type.toLowerCase().includes('decimal') || col.type.toLowerCase().includes('numeric')) ? (
                                     <Hash className="h-3 w-3 text-muted-foreground/30" />
                                 ) : (
@@ -97,7 +92,7 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
                                 "text-[12px] truncate select-none tracking-tight",
                                 "font-medium text-muted-foreground group-hover/row:text-foreground",
                                 col.isPrimaryKey && "font-black text-foreground",
-                                col.isForeignKey && "text-blue-400"
+                                col.fkConstraintName && "text-blue-400"
                             )}>
                                 {col.name}
                             </span>
@@ -107,11 +102,8 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
                             <span className="text-[9px] font-black uppercase opacity-20 tracking-tighter select-none">{col.type}</span>
                         </div>
 
-                        {/* Visual Source Dot */}
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-primary border-2 border-background rounded-full opacity-50 group-hover/row:opacity-100 group-hover/row:scale-125 transition-all shadow-lg shadow-primary/20 pointer-events-none" />
-
-                        {/* Context Menu Wrapper */}
-                        <div className="absolute inset-0 z-30">
+                        {/* Context Menu Wrapper - Restrict width so it doesn't cover handles */}
+                        <div className="absolute top-0 bottom-0 left-4 right-4 z-30 pointer-events-auto">
                             <ContextMenu>
                                 <ContextMenuTrigger className="w-full h-full block" />
                                 <ContextMenuContent>

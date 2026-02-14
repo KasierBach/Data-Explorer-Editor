@@ -55,13 +55,6 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
 
     useEffect(() => {
         if (isOpen) {
-            // Generate a default constraint name
-            // Convention: FK_ChildTable_ParentTable
-            // Source is usually the Child (holding the FK), Target is the Parent (PK)
-            // Wait, in ReactFlow drag, usually you drag FROM source TO target.
-            // If I drag from Order.CustomerId to Customer.Id:
-            // Source: Order.CustomerId (FK)
-            // Target: Customer.Id (PK)
             setConstraintName(`FK_${sourceTable}_${targetTable}_${Math.floor(Math.random() * 1000)}`);
         }
     }, [isOpen, sourceTable, targetTable]);

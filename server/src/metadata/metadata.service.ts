@@ -353,7 +353,6 @@ export class MetadataService {
             }));
             return cols;
         } else if (connection.type === 'mssql') {
-            // Complex join for MSSQL to get PK constraint name
             const sql = `
                 SELECT 
                     c.COLUMN_NAME, 

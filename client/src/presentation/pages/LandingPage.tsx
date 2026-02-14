@@ -14,9 +14,11 @@ import {
     Twitter,
     Disc
 } from 'lucide-react';
+import { useAppStore } from '@/core/services/store';
 
 export const LandingPage: React.FC = () => {
     const navigate = useNavigate();
+    const { isAuthenticated, logout } = useAppStore();
 
     return (
         <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-blue-500/30 overflow-hidden relative">
@@ -45,12 +47,25 @@ export const LandingPage: React.FC = () => {
                     </nav>
 
                     <div className="flex items-center gap-4">
-                        <Button variant="ghost" onClick={() => navigate('/login')} className="hidden sm:flex hover:bg-blue-500/10 hover:text-blue-500">
-                            Log in
-                        </Button>
-                        <Button onClick={() => navigate('/login')} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 active:scale-95">
-                            Get Started
-                        </Button>
+                        {isAuthenticated ? (
+                            <div className="flex items-center gap-2">
+                                <Button variant="ghost" onClick={() => { logout(); navigate('/login'); }} className="hidden sm:flex hover:bg-red-500/10 hover:text-red-500">
+                                    Log out
+                                </Button>
+                                <Button onClick={() => navigate('/app')} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 active:scale-95">
+                                    Go to App
+                                </Button>
+                            </div>
+                        ) : (
+                            <>
+                                <Button variant="ghost" onClick={() => navigate('/login')} className="hidden sm:flex hover:bg-blue-500/10 hover:text-blue-500">
+                                    Log in
+                                </Button>
+                                <Button onClick={() => navigate('/login')} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 active:scale-95">
+                                    Get Started
+                                </Button>
+                            </>
+                        )}
                     </div>
                 </div>
             </header>
@@ -77,8 +92,8 @@ export const LandingPage: React.FC = () => {
                             Generate charts instantly. Secure, local, and incredibly fast.
                         </p>
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up [animation-delay:300ms]">
-                            <Button size="lg" onClick={() => navigate('/login')} className="h-14 px-8 text-base bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-500/20 w-full sm:w-auto rounded-full transition-all hover:-translate-y-1">
-                                Start Analyzing Free
+                            <Button size="lg" onClick={() => navigate(isAuthenticated ? '/app' : '/login')} className="h-14 px-8 text-base bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-500/20 w-full sm:w-auto rounded-full transition-all hover:-translate-y-1">
+                                {isAuthenticated ? 'Open Workspace' : 'Start Analyzing Free'}
                                 <ArrowRight className="w-4 h-4 ml-2" />
                             </Button>
                             <Button size="lg" variant="outline" className="h-14 px-8 text-base w-full sm:w-auto glass-panel hover:bg-white/10 rounded-full border-white/10">
