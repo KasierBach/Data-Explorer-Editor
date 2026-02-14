@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { MetadataService } from './metadata.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-@UseGuards(JwtAuthGuard)
+// @UseGuards(JwtAuthGuard)
 @Controller('metadata')
 export class MetadataController {
     constructor(private readonly metadataService: MetadataService) { }

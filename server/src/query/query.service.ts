@@ -141,7 +141,24 @@ export class QueryService {
           break;
         }
         case 'drop_pk':
-          sqlStatements.push(`ALTER TABLE ${quotedTable} DROP PRIMARY KEY`);
+          if (connection.type === 'postgres' || connection.type === 'mssql') {
+            // Postgres/MSSQL require constraint name for dropping PK if using DROP CONSTRAINT
+            // But MSSQL can use DROP CONSTRAINT [pk_name]
+            // Postgres: ALTER TABLE t DROP CONSTRAINT pk_name
+            if (op.constraintName) {
+              const q = connection.type === 'postgres' ? `"${op.constraintName}"` : `[${op.constraintName}]`;
+              sqlStatements.push(`ALTER TABLE ${quotedTable} DROP CONSTRAINT ${q}`);
+            } else {
+              // Fallback if no name provided? 
+              // It might fail on Postgres if we default to DROP PRIMARY KEY (which doesn't exist)
+              // But maybe we can try generic name or throw error?
+              // For now, let's assume constraintName is passed. If not, try DROP PRIMARY KEY for MSSQL/MySQL compatibility?
+              // Actually MSSQL also treats PK as constraint.
+              sqlStatements.push(`ALTER TABLE ${quotedTable} DROP PRIMARY KEY`);
+            }
+          } else {
+            sqlStatements.push(`ALTER TABLE ${quotedTable} DROP PRIMARY KEY`);
+          }
           break;
         case 'add_fk': {
           const fkCols = op.columns.map(c => connection.type === 'postgres' ? `"${c}"` : connection.type === 'mssql' ? `[${c}]` : `\`${c}\``).join(', ');

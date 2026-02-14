@@ -27,11 +27,12 @@ export const ExplorerSidebar: React.FC = () => {
     const [databaseToDelete, setDatabaseToDelete] = useState<string | null>(null);
     const queryClient = useQueryClient();
 
-    React.useEffect(() => {
-        const handleRefresh = () => {
-            queryClient.invalidateQueries({ queryKey: ['database-hierarchy'] });
-        };
+    const handleRefresh = async () => {
+        console.log("♻️ Sidebar triggering manual refresh");
+        await queryClient.resetQueries({ queryKey: ['hierarchy'] });
+    };
 
+    React.useEffect(() => {
         const handleTreeAction = (e: CustomEvent<{ action: string, nodeId: string, nodeType: string }>) => {
             const { action, nodeId, nodeType } = e.detail;
             const activeConnection = useAppStore.getState().connections.find(c => c.id === activeConnectionId);
@@ -44,6 +45,9 @@ export const ExplorerSidebar: React.FC = () => {
                 if (action === 'deleteDatabase') {
                     setDatabaseToDelete(name);
                     setDeleteDatabaseDialogOpen(true);
+                }
+                if (action === 'refresh') {
+                    handleRefresh();
                 }
             }
 
@@ -73,14 +77,12 @@ export const ExplorerSidebar: React.FC = () => {
             }
         };
 
-        window.addEventListener('refresh-explorer', handleRefresh);
         window.addEventListener('tree-node-action', handleTreeAction as EventListener);
 
         return () => {
-            window.removeEventListener('refresh-explorer', handleRefresh);
             window.removeEventListener('tree-node-action', handleTreeAction as EventListener);
         };
-    }, [queryClient, activeConnectionId]);
+    }, [activeConnectionId]);
 
     React.useEffect(() => {
         if (!activeConnectionId && connections.length > 0) {
@@ -106,9 +108,7 @@ export const ExplorerSidebar: React.FC = () => {
         );
     }, [rootNodes, searchTerm]);
 
-    const handleRefresh = () => {
-        window.dispatchEvent(new CustomEvent('refresh-explorer'));
-    };
+    const triggerRefresh = handleRefresh;
 
     return (
         <div className="h-full flex flex-col border-r bg-card/50 backdrop-blur-md overflow-hidden ring-1 ring-white/5">
@@ -126,7 +126,7 @@ export const ExplorerSidebar: React.FC = () => {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 rounded-lg hover:bg-accent/50"
-                            onClick={handleRefresh}
+                            onClick={triggerRefresh}
                         >
                             <RefreshCw className="h-3.5 h-3.5 text-muted-foreground/70" />
                         </Button>
@@ -177,7 +177,7 @@ export const ExplorerSidebar: React.FC = () => {
                                     }
                                 }
                                 if (action === 'refresh') {
-                                    handleRefresh();
+                                    triggerRefresh();
                                 }
                                 if (action === 'createDatabase') {
                                     setCreateDatabaseDialogOpen(true);
@@ -236,14 +236,14 @@ export const ExplorerSidebar: React.FC = () => {
                 isOpen={isCreateDatabaseDialogOpen}
                 onClose={() => setCreateDatabaseDialogOpen(false)}
                 connectionId={activeConnectionId}
-                onSuccess={handleRefresh}
+                onSuccess={triggerRefresh}
             />
             <DeleteDatabaseDialog
                 isOpen={isDeleteDatabaseDialogOpen}
                 onClose={() => setDeleteDatabaseDialogOpen(false)}
                 connectionId={activeConnectionId}
                 databaseName={databaseToDelete}
-                onSuccess={handleRefresh}
+                onSuccess={triggerRefresh}
             />
         </div >
     );

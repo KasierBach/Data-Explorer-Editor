@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Handle, Position, useStore } from '@xyflow/react';
 import { Table, Hash, Type, Key } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/presentation/components/ui/context-menu';
 
 export interface TableNodeData {
     tableName: string;
@@ -10,7 +11,10 @@ export interface TableNodeData {
         type: string;
         isPrimaryKey?: boolean;
         isForeignKey?: boolean;
+        pkConstraintName?: string | null;
+        fkConstraintName?: string | null;
     }>;
+    onRemoveConstraint?: (tableName: string, type: 'pk' | 'fk', constraintName: string) => void;
 }
 
 const connectionNodeIdSelector = (state: any) => state.connectionNodeId ?? state.connection?.fromNodeId;
@@ -50,7 +54,7 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
                             type="target"
                             position={Position.Left}
                             id={col.name}
-                            className="!w-full !h-full !absolute !inset-0 !rounded-none !border-none !bg-transparent !z-40"
+                            className="!w-2 !h-2 !absolute !left-0 !top-1/2 !-translate-y-1/2 !-translate-x-1/2 !rounded-full !border-none !bg-transparent !z-40"
                             style={{ opacity: 0 }}
                             isConnectableStart={false} // Cannot start drag from target
                         />
@@ -61,7 +65,7 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
                             position={Position.Right}
                             id={col.name}
                             className={cn(
-                                "!w-full !h-full !absolute !inset-0 !rounded-none !border-none !bg-transparent !z-50",
+                                "!w-2 !h-2 !absolute !right-0 !top-1/2 !-translate-y-1/2 !translate-x-1/2 !rounded-full !border-none !bg-transparent !z-50",
                                 isConnecting && "pointer-events-none" // Critically important: hide source when connecting so target below is clickable
                             )}
                             style={{ opacity: 0 }}
@@ -105,6 +109,39 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
 
                         {/* Visual Source Dot */}
                         <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3 h-3 bg-primary border-2 border-background rounded-full opacity-50 group-hover/row:opacity-100 group-hover/row:scale-125 transition-all shadow-lg shadow-primary/20 pointer-events-none" />
+
+                        {/* Context Menu Wrapper */}
+                        <div className="absolute inset-0 z-30">
+                            <ContextMenu>
+                                <ContextMenuTrigger className="w-full h-full block" />
+                                <ContextMenuContent>
+                                    <ContextMenuItem
+                                        disabled={!col.isPrimaryKey && !col.isForeignKey}
+                                        className="text-xs text-muted-foreground"
+                                    >
+                                        Column: <span className="text-foreground font-bold ml-1">{col.name}</span>
+                                    </ContextMenuItem>
+
+                                    {col.isPrimaryKey && data.onRemoveConstraint && col.pkConstraintName && (
+                                        <ContextMenuItem
+                                            className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
+                                            onSelect={() => data.onRemoveConstraint!(data.tableName, 'pk', col.pkConstraintName!)}
+                                        >
+                                            Remove Primary Key
+                                        </ContextMenuItem>
+                                    )}
+
+                                    {col.isForeignKey && data.onRemoveConstraint && col.fkConstraintName && (
+                                        <ContextMenuItem
+                                            className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
+                                            onSelect={() => data.onRemoveConstraint!(data.tableName, 'fk', col.fkConstraintName!)}
+                                        >
+                                            Remove Foreign Key
+                                        </ContextMenuItem>
+                                    )}
+                                </ContextMenuContent>
+                            </ContextMenu>
+                        </div>
                     </div>
                 ))}
             </div>

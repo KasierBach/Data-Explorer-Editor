@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
-import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore, type SavedQuery } from '@/core/services/store';
 import { format } from 'sql-formatter';
@@ -19,6 +19,7 @@ import { Panel, Group, Separator } from "react-resizable-panels";
 import { QueryResults } from './QueryResults';
 
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
+    const queryClient = useQueryClient();
     const { activeConnectionId, connections, tabs, updateTabMetadata, activeDatabase } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
 
@@ -34,6 +35,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const [currentSavedQueryId, setCurrentSavedQueryId] = useState<string | null>(initialMetadata.savedQueryId || null);
 
     const isFirstLoad = useRef(true);
+    const editorRef = useRef<any>(null);
 
     const { saveQuery, updateSavedQuery, openTab } = useAppStore();
 
@@ -83,8 +85,21 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     }, [isError]);
 
     const handleRun = () => {
-        if (!query.trim()) return;
-        setExecutedQuery(query);
+        let sqlToExecute = query;
+
+        // Check if there is a selection
+        if (editorRef.current) {
+            const selection = editorRef.current.getSelection();
+            if (selection && !selection.isEmpty()) {
+                const selectedText = editorRef.current.getModel()?.getValueInRange(selection);
+                if (selectedText && selectedText.trim()) {
+                    sqlToExecute = selectedText;
+                }
+            }
+        }
+
+        if (!sqlToExecute.trim()) return;
+        setExecutedQuery(sqlToExecute);
         setTimeout(() => refetch(), 0);
     };
 
@@ -140,6 +155,11 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         });
     }, [openTab]);
 
+    const handleRefreshSchema = async () => {
+        console.log("♻️ Triggering Hierarchy Refresh via QueryClient");
+        await queryClient.resetQueries({ queryKey: ['hierarchy'] });
+    };
+
     // Keyboard shortcuts
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -165,6 +185,13 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                         <Button size="sm" onClick={handleRun} disabled={isLoading} className="h-7 gap-1 px-3 bg-green-600 hover:bg-green-700 text-white border-none shadow-sm">
                             {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
                             <span className="font-semibold">Execute</span>
+                        </Button>
+
+                        <div className="h-4 w-[1px] bg-border mx-1" />
+
+                        <Button variant="ghost" size="sm" onClick={handleRefreshSchema} className="h-7 gap-1 px-2 text-xs" title="Refresh Sidebar">
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            Refresh
                         </Button>
 
                         <div className="h-4 w-[1px] bg-border mx-1" />
@@ -228,6 +255,9 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             value={query}
                             onChange={(val: string | undefined) => setQuery(val || '')}
                             height="100%"
+                            onMount={(editor) => {
+                                editorRef.current = editor;
+                            }}
                         />
                     </Panel>
 

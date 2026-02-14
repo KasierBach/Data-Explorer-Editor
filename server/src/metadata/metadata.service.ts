@@ -94,6 +94,7 @@ export class MetadataService {
         if (connection.type === 'postgres') {
             const sql = `
                 SELECT
+                    tc.constraint_name,
                     tc.table_name as source_table, 
                     kcu.column_name as source_column, 
                     ccu.table_name AS target_table,
@@ -113,11 +114,13 @@ export class MetadataService {
         } else if (connection.type === 'mssql') {
             const sql = `
                 SELECT 
+                    fk.name AS constraint_name,
                     tp.name AS source_table,
                     cp.name AS source_column,
                     tr.name AS target_table,
                     cr.name AS target_column
-                FROM sys.foreign_key_columns fkc
+                FROM sys.foreign_keys fk
+                JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
                 JOIN sys.tables tp ON fkc.parent_object_id = tp.object_id
                 JOIN sys.columns cp ON fkc.parent_object_id = cp.object_id AND fkc.parent_column_id = cp.column_id
                 JOIN sys.tables tr ON fkc.referenced_object_id = tr.object_id
@@ -128,6 +131,7 @@ export class MetadataService {
         } else {
             const sql = `
                 SELECT 
+                    CONSTRAINT_NAME as constraint_name,
                     TABLE_NAME as source_table, 
                     COLUMN_NAME as source_column, 
                     REFERENCED_TABLE_NAME as target_table, 
@@ -324,30 +328,56 @@ export class MetadataService {
 
         if (connection.type === 'postgres') {
             const sql = `
-        SELECT column_name, data_type, is_nullable, column_default
-        FROM information_schema.columns
-        WHERE table_name = '${table}' AND table_schema = '${schema}'
-        ORDER BY ordinal_position
-      `;
+                SELECT 
+                    c.column_name, 
+                    c.data_type, 
+                    c.is_nullable, 
+                    c.column_default,
+                    con.conname as pk_constraint_name
+                FROM information_schema.columns c
+                JOIN pg_class t ON t.relname = c.table_name
+                JOIN pg_namespace s ON s.oid = t.relnamespace AND s.nspname = c.table_schema
+                LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attname = c.column_name
+                LEFT JOIN pg_constraint con ON con.conrelid = t.oid AND con.contype = 'p' AND a.attnum = ANY(con.conkey)
+                WHERE c.table_name = '${table}' AND c.table_schema = '${schema}'
+                ORDER BY c.ordinal_position
+            `;
             const result = await pool.query(sql);
-            return result.rows.map((row: any) => ({
+            const cols = result.rows.map((row: any) => ({
                 name: row.column_name,
                 type: row.data_type,
                 isNullable: row.is_nullable === 'YES',
-                defaultValue: row.column_default
+                defaultValue: row.column_default,
+                isPrimaryKey: !!row.pk_constraint_name,
+                pkConstraintName: row.pk_constraint_name
             }));
+            return cols;
         } else if (connection.type === 'mssql') {
-            const result = await pool.request().query(
-                `SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
-                 FROM INFORMATION_SCHEMA.COLUMNS
-                 WHERE TABLE_NAME = '${table}' AND TABLE_SCHEMA = '${schema}'
-                 ORDER BY ORDINAL_POSITION`
-            );
+            // Complex join for MSSQL to get PK constraint name
+            const sql = `
+                SELECT 
+                    c.COLUMN_NAME, 
+                    c.DATA_TYPE, 
+                    c.IS_NULLABLE, 
+                    c.COLUMN_DEFAULT,
+                    kc.name as pk_constraint_name
+                FROM INFORMATION_SCHEMA.COLUMNS c
+                LEFT JOIN sys.tables t ON t.name = c.TABLE_NAME AND SCHEMA_NAME(t.schema_id) = c.TABLE_SCHEMA
+                LEFT JOIN sys.indexes i ON i.object_id = t.object_id AND i.is_primary_key = 1
+                LEFT JOIN sys.index_columns ic ON ic.object_id = t.object_id AND ic.index_id = i.index_id
+                LEFT JOIN sys.columns sc ON sc.object_id = t.object_id AND sc.column_id = ic.column_id AND sc.name = c.COLUMN_NAME
+                LEFT JOIN sys.key_constraints kc ON kc.parent_object_id = t.object_id AND kc.unique_index_id = i.index_id AND kc.type = 'PK'
+                WHERE c.TABLE_NAME = '${table}' AND c.TABLE_SCHEMA = '${schema}'
+                ORDER BY c.ORDINAL_POSITION
+            `;
+            const result = await pool.request().query(sql);
             return result.recordset.map((row: any) => ({
                 name: row.COLUMN_NAME,
                 type: row.DATA_TYPE,
                 isNullable: row.IS_NULLABLE === 'YES',
-                defaultValue: row.COLUMN_DEFAULT
+                defaultValue: row.COLUMN_DEFAULT,
+                isPrimaryKey: !!row.pk_constraint_name,
+                pkConstraintName: row.pk_constraint_name
             }));
         } else {
             const [rows]: any[] = await pool.query(`DESCRIBE \`${schema}\`.\`${table}\``);
@@ -355,7 +385,9 @@ export class MetadataService {
                 name: row.Field,
                 type: row.Type,
                 isNullable: row.Null === 'YES',
-                defaultValue: row.Default
+                defaultValue: row.Default,
+                isPrimaryKey: row.Key === 'PRI',
+                pkConstraintName: row.Key === 'PRI' ? 'PRIMARY' : null
             }));
         }
     }

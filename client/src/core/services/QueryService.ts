@@ -14,9 +14,9 @@ export type SchemaOperation =
     | { type: 'alter_column_type'; name: string; newType: string }
     | { type: 'rename_column'; name: string; newName: string }
     | { type: 'add_pk'; columns: string[] }
-    | { type: 'drop_pk' }
+    | { type: 'drop_pk'; name?: string; constraintName?: string }
     | { type: 'add_fk'; name: string; columns: string[]; refTable: string; refColumns: string[]; onDelete?: string; onUpdate?: string }
-    | { type: 'drop_fk'; name: string };
+    | { type: 'drop_fk'; name: string; constraintName?: string };
 
 const BASE_URL = 'http://localhost:3000/api';
 

@@ -5,9 +5,10 @@ interface SqlEditorProps {
     value: string;
     onChange: (value: string | undefined) => void;
     height?: string | number;
+    onMount?: (editor: any, monaco: any) => void;
 }
 
-export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = "300px" }) => {
+export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = "300px", onMount }) => {
     // We need to know the current theme (light/dark)
     // For now, let's assume we can detect it from the html class or a context
     // If using shadcn/ui next-themes, we might use useTheme
@@ -57,6 +58,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = 
                 padding: { top: 16, bottom: 16 },
                 wordWrap: 'on',
             }}
+            onMount={onMount}
         />
     );
 };

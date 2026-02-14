@@ -14,7 +14,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
 import { GitGraph, RefreshCw, Table, Plus, X, Search, LayoutGrid, Database } from 'lucide-react';
@@ -156,7 +156,52 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         staleTime: 0
     });
 
+
+
     const isLoading = isLoadingHierarchy || isLoadingCols;
+
+    const queryClient = useQueryClient(); // Need this to invalidate relationships
+
+    // Map of "table.column" -> constraintName for FKs
+    const fkConstraintMap = useMemo(() => {
+        const map = new Map<string, string>();
+        if (!relationships) return map;
+        relationships.forEach((rel: any) => {
+            if (rel.constraint_name) {
+                map.set(`${rel.source_table}.${rel.source_column}`, rel.constraint_name);
+            }
+        });
+        return map;
+    }, [relationships]);
+
+    const handleRemoveConstraint = useCallback(async (tableName: string, type: 'pk' | 'fk', constraintName: string) => {
+        // Confirmation is handled by UI toast or we could use confirm()
+        // For now, let's use global confirm or just do it (maybe dangerous without confirm)
+        // Ideally we use a dialog, but prompt is easiest
+        if (!window.confirm(`Are you sure you want to remove this ${type.toUpperCase()} (${constraintName})?`)) return;
+
+        try {
+            await queryService.updateSchema({
+                connectionId,
+                database,
+                table: tableName,
+                operations: [{
+                    type: type === 'pk' ? 'drop_pk' : 'drop_fk',
+                    name: constraintName,
+                    constraintName: constraintName
+                }]
+            });
+            toast.success(`${type.toUpperCase()} removed successfully`);
+
+            // Invalidate queries to refresh UI
+            queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
+            queryClient.invalidateQueries({ queryKey: ['erd-columns'] });
+        } catch (error: any) {
+            toast.error(`Failed to remove ${type.toUpperCase()}`, {
+                description: error.message
+            });
+        }
+    }, [connectionId, database, queryClient]);
 
     const onConnect = useCallback(
         (params: Connection) => {
@@ -316,6 +361,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         if (!hierarchy || !tableData || !relationships) return;
 
         // Auto-generate edges for visible tables based on DB relationships
+        // Auto-generate edges for visible tables based on DB relationships
         const dbEdges: Edge[] = relationships.map((rel, idx) => ({
             id: `db-e-${idx}`,
             source: rel.target_table,
@@ -328,25 +374,28 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         })).filter(e => visibleTableNames.has(e.source) && visibleTableNames.has(e.target));
 
         const baseNodes: Node[] = Array.from(visibleTableNames).map((name) => {
+            const cols = tableData[name] || [];
+            // Enrich columns with FK constraint info (PK info comes from metadata)
+            const enrichedCols = cols.map((c: any) => ({
+                ...c,
+                fkConstraintName: fkConstraintMap.get(`${name}.${c.name}`)
+            }));
+
+            const data = {
+                tableName: name,
+                columns: enrichedCols,
+                onRemoveConstraint: handleRemoveConstraint
+            };
+
             const existing = nodes.find(n => n.id === name);
             if (existing) {
-                // Ensure data is synced even if position is kept
-                return {
-                    ...existing,
-                    data: {
-                        tableName: name,
-                        columns: tableData[name] || []
-                    }
-                };
+                return { ...existing, data };
             }
 
             return {
                 id: name,
                 type: 'table',
-                data: {
-                    tableName: name,
-                    columns: tableData[name] || []
-                },
+                data,
                 position: { x: Math.random() * 400, y: Math.random() * 400 },
             };
         });
