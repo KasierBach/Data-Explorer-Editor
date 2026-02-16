@@ -1,63 +1,110 @@
-# Data Explorer
+# Data Explorer 🚀
 
-A modern, web-based database exploration tool built with React (Vite) and NestJS.
+**Data Explorer** is a modern, high-performance database management and visualization tool designed for developers and data teams. It provides a unified interface to explore, query, and visualize your data across multiple database engines including PostgreSQL, MySQL, SQL Server, and ClickHouse.
 
-## 🚀 How to Run the Project
+## ✨ Key Features
 
-This project consists of two parts: the **Client** (Frontend) and the **Server** (Backend). You need to run both for the application to work correctly.
+### 🔌 Multi-Database Support
+- **Universal Connectivity**: Seamlessly connect to PostgreSQL, MySQL, SQL Server, and ClickHouse.
+- **Unified Interface**: Manage all your connections in one sidebar.
+- **Metadata Inspection**: View table schemas, column types, and constraints at a glance.
 
-### 1. Start the Backend (Server)
+### 📊 Interactive ERD Visualization
+- **Auto-Layout**: Automatically generates Entity Relationship Diagrams (ERD) for your schema.
+- **Drag-and-Drop Relationships**: Create Foreign Key constraints intuitively by dragging connections between columns.
+- **Visual Feedback**: Distinct indicators for Primary Keys (🔑) and Foreign Keys (🗝️).
+- **Live Updates**: Changes to the schema are instantly reflected in the diagram.
 
-The backend runs on port `3000`.
+### 📝 Advanced SQL Editor
+- **Monaco Editor**: Powered by the same engine as VS Code for a familiar coding experience.
+- **IntelliSense**: Syntax highlighting, auto-completion, and error detection.
+- **Multi-Tab Workspace**: Work on multiple queries, generic tasks, and visualizations simultaneously.
+- **Result Visualization**: Instantly turn query results into charts (Bar, Line, Pie) without exporting data.
 
-1.  Open a terminal.
-2.  Navigate to the `server` directory:
-    ```bash
-    cd server
-    ```
-3.  Install dependencies (if you haven't already):
-    ```bash
-    npm install
-    ```
-4.  Start the server in development mode:
-    ```bash
-    npm run start:dev
-    ```
+### 🛡️ Secure & Local-First
+- **Local Processing**: Your data never leaves your network. All processing happens on your local machine / server.
+- **Direct Connections**: Uses direct TCP connections for maximum speed and security.
 
-### 2. Start the Frontend (Client)
+### 🎨 Modern UI/UX
+- **Dark Mode**: Sleek, dark-themed interface designed for long coding sessions.
+- **Responsive Design**: Built with Tailwind CSS and Shadcn UI for a polished look and feel.
+- **Command Palette**: Quick access to actions and navigation.
 
-The frontend runs on port `5173`.
+---
 
-1.  Open a **new** terminal window (keep the server running).
-2.  Navigate to the `client` directory:
-    ```bash
-    cd client
-    ```
-3.  Install dependencies (if you haven't already):
-    ```bash
-    npm install
-    ```
-4.  Start the development server:
-    ```bash
-    npm run dev
-    ```
+## 🛠️ Tech Stack
+
+### Frontend (Client)
+- **Framework**: React 18 (Vite)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Components**: Shadcn UI (Radix Primitives)
+- **State Management**: Zustand
+- **Data Fetching**: TanStack Query (React Query)
+- **Visualization**: React Flow (ERD), Recharts
+- **Editor**: Monaco Editor
+
+### Backend (Server)
+- **Framework**: NestJS
+- **Language**: TypeScript
+- **ORM**: Prisma / Raw SQL support
+- **Database Drivers**: `pg`, `mysql2`, `mssql`, `clickhouse`
+
+---
+
+## 🚀 Getting Started
+
+To run Data Explorer locally, you'll need to start both the backend server and the frontend client.
+
+### Prerequisites
+- Node.js (v18 or higher)
+- npm or pnpm
+
+### 1. Start the Backend Server
+The server handles database connections and query execution.
+
+```bash
+cd server
+npm install
+npm run start:dev
+```
+*Server runs on `http://localhost:3000`*
+
+### 2. Start the Frontend Client
+The client provides the web-based user interface.
+
+```bash
+# Open a new terminal
+cd client
+npm install
+npm run dev
+```
+*Client runs on `http://localhost:5173`*
 
 ### 3. Access the Application
+Open your browser and navigate to **[http://localhost:5173](http://localhost:5173)**.
 
-Open your browser and go to: http://localhost:5173
+---
 
-## 🛠️ Configuration
+## ⚙️ Configuration
 
--   **Database**: The backend connects to a database. Configure your credentials in `server/.env`.
--   **Default Local Connection**:
-    -   **Host**: `localhost`
-    -   **Port**: `5432`
-    -   **User**: `postgres`
-    -   **Password**: `123`
-    -   **Database**: `Data_Explorer_DB`
+### Environment Variables
+Create a `.env` file in the `server` directory to configure global settings if needed (though the app allows UI-based connection management).
 
-## ✨ Features
+```env
+# Example server/.env
+PORT=3000
+```
 
--   **Virtualization**: Efficiently render large datasets.
--   **Filtering**: Global search and column-based filtering.
--   **Multi-DB Support**: Connect to PostgreSQL and MySQL (via API).
+### Database Connections
+Connections are managed within the application. You can add, edit, and remove connections directly from the sidebar.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License.
