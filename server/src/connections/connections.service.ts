@@ -64,9 +64,9 @@ export class ConnectionsService implements OnModuleDestroy {
         user: connection.username,
         password: connection.password,
         database: databaseOverride || connection.database,
-        max: 10,
+        max: 20,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        connectionTimeoutMillis: 10000,
       });
     } else if (connection.type === 'mysql') {
       pool = mysql.createPool({
@@ -76,7 +76,7 @@ export class ConnectionsService implements OnModuleDestroy {
         password: connection.password,
         database: databaseOverride || connection.database,
         waitForConnections: true,
-        connectionLimit: 10,
+        connectionLimit: 20,
         queueLimit: 0,
       });
     } else if (connection.type === 'mssql') {
@@ -91,7 +91,7 @@ export class ConnectionsService implements OnModuleDestroy {
           trustServerCertificate: true,
         },
         pool: {
-          max: 10,
+          max: 20,
           min: 0,
           idleTimeoutMillis: 30000,
         },

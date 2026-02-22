@@ -5,7 +5,7 @@ import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('connections')
-// @UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard)
 export class ConnectionsController {
   constructor(private readonly connectionsService: ConnectionsService) { }
 

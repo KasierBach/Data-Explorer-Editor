@@ -62,9 +62,8 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
     const handleToggle = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (node.type === 'database') {
-            // Database nodes: always expand (never collapse on click), set as active
-            if (!isExpanded && node.hasChildren) {
-                setIsExpanded(true);
+            if (node.hasChildren) {
+                setIsExpanded(!isExpanded);
             }
             setActiveDatabase(node.name);
         } else {
