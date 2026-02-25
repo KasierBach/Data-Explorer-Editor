@@ -1,24 +1,23 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
+import { createSqlCompletionProvider, type SchemaInfo } from './sqlAutocomplete';
 
 interface SqlEditorProps {
     value: string;
     onChange: (value: string | undefined) => void;
     height?: string | number;
     onMount?: (editor: any, monaco: any) => void;
+    schemaInfo?: SchemaInfo;
 }
 
-export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = "300px", onMount }) => {
-    // We need to know the current theme (light/dark)
-    // For now, let's assume we can detect it from the html class or a context
-    // If using shadcn/ui next-themes, we might use useTheme
+export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = "300px", onMount, schemaInfo }) => {
     const [theme, setTheme] = React.useState<'vs-dark' | 'light'>('vs-dark');
+    const disposableRef = useRef<any>(null);
 
     useEffect(() => {
         const isDark = document.documentElement.classList.contains('dark');
         setTheme(isDark ? 'vs-dark' : 'light');
 
-        // Observer for theme changes if needed
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.attributeName === 'class') {
@@ -29,18 +28,32 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = 
         });
 
         observer.observe(document.documentElement, { attributes: true });
-
         return () => observer.disconnect();
     }, []);
 
     const monaco = useMonaco();
 
+    // Register/update completion provider when schema info changes
     useEffect(() => {
-        if (monaco) {
-            // Configure SQL formatting or other options here
-            // monaco.languages.registerCompletionItemProvider('sql', ...);
+        if (!monaco) return;
+
+        // Dispose previous provider if any
+        if (disposableRef.current) {
+            disposableRef.current.dispose();
+            disposableRef.current = null;
         }
-    }, [monaco]);
+
+        const info: SchemaInfo = schemaInfo || { tables: [] };
+        const provider = createSqlCompletionProvider(info, monaco);
+        disposableRef.current = monaco.languages.registerCompletionItemProvider('sql', provider);
+
+        return () => {
+            if (disposableRef.current) {
+                disposableRef.current.dispose();
+                disposableRef.current = null;
+            }
+        };
+    }, [monaco, schemaInfo]);
 
     return (
         <Editor
@@ -50,13 +63,21 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = 
             onChange={onChange}
             theme={theme}
             options={{
-                minimap: { enabled: false }, // Save space
+                minimap: { enabled: false },
                 fontSize: 14,
                 lineNumbers: 'on',
                 scrollBeyondLastLine: false,
                 automaticLayout: true,
                 padding: { top: 16, bottom: 16 },
                 wordWrap: 'on',
+                suggestOnTriggerCharacters: true,
+                quickSuggestions: true,
+                wordBasedSuggestions: 'off',
+                suggest: {
+                    showKeywords: false, // We provide our own
+                    preview: true,
+                    showIcons: true,
+                },
             }}
             onMount={onMount}
         />

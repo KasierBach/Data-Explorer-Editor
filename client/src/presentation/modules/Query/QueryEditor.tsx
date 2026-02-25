@@ -17,11 +17,13 @@ import {
 import type { QueryResult } from '@/core/domain/entities';
 import { Panel, Group, Separator } from "react-resizable-panels";
 import { QueryResults } from './QueryResults';
+import { useSchemaInfo } from '@/presentation/hooks/useSchemaInfo';
 
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const queryClient = useQueryClient();
     const { activeConnectionId, connections, tabs, updateTabMetadata, activeDatabase } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
+    const schemaInfo = useSchemaInfo();
 
     // Find options for this tab
     const tab = tabs.find(t => t.id === tabId);
@@ -258,6 +260,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             onMount={(editor) => {
                                 editorRef.current = editor;
                             }}
+                            schemaInfo={schemaInfo}
                         />
                     </Panel>
 
