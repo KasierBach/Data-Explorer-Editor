@@ -5,9 +5,10 @@ import {
     TabsList,
     TabsTrigger
 } from "@/presentation/components/ui/tabs";
-import { Info, Table as TableIcon, Loader2, Play } from 'lucide-react';
+import { Info, Table as TableIcon, Loader2, Play, GitBranch } from 'lucide-react';
 import type { QueryResult } from '@/core/domain/entities';
 import { ResultTable } from './ResultTable';
+import { QueryPlanVisualizer } from './QueryPlanVisualizer';
 
 interface QueryResultsProps {
     results: QueryResult | null;
@@ -17,6 +18,7 @@ interface QueryResultsProps {
     dataUpdatedAt: number;
     activeTab: string;
     onTabChange: (tab: string) => void;
+    explainPlan?: any;
 }
 
 export const QueryResults: React.FC<QueryResultsProps> = ({
@@ -26,7 +28,8 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
     executedQuery,
     dataUpdatedAt,
     activeTab,
-    onTabChange
+    onTabChange,
+    explainPlan
 }) => {
     // Determine content based on state
     const renderDataContent = () => {
@@ -82,6 +85,15 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                         <Info className="w-3 h-3" />
                         Messages
                     </TabsTrigger>
+                    {explainPlan && (
+                        <TabsTrigger
+                            value="plan"
+                            className="h-7 rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-transparent shadow-none px-1 text-[11px] flex gap-1.5 text-orange-500"
+                        >
+                            <GitBranch className="w-3 h-3" />
+                            Query Plan
+                        </TabsTrigger>
+                    )}
                 </TabsList>
 
                 <div className="text-[10px] text-muted-foreground font-mono flex gap-3">
@@ -132,6 +144,12 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                         <div className="text-muted-foreground italic">No messages to display.</div>
                     )}
                 </TabsContent>
+
+                {explainPlan && (
+                    <TabsContent value="plan" className="m-0 h-full overflow-auto">
+                        <QueryPlanVisualizer planData={explainPlan} />
+                    </TabsContent>
+                )}
             </div>
         </Tabs>
     );

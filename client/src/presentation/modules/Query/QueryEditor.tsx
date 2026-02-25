@@ -37,6 +37,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const [isSavedDialogOpen, setIsSavedDialogOpen] = useState(false);
     const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
     const [currentSavedQueryId, setCurrentSavedQueryId] = useState<string | null>(initialMetadata.savedQueryId || null);
+    const [explainPlan, setExplainPlan] = useState<any>(null);
 
     const isFirstLoad = useRef(true);
     const editorRef = useRef<any>(null);
@@ -126,7 +127,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         setTimeout(() => refetch(), 0);
     };
 
-    const handleExplain = () => {
+    const handleExplain = async () => {
         let sqlToExplain = query;
         if (editorRef.current) {
             const selection = editorRef.current.getSelection();
@@ -136,9 +137,43 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             }
         }
         if (!sqlToExplain.trim()) return;
-        const explainSql = `EXPLAIN ANALYZE ${sqlToExplain}`;
+
+        // Use FORMAT JSON for structured plan data
+        const explainSql = `EXPLAIN (ANALYZE, FORMAT JSON) ${sqlToExplain}`;
         setExecutedQuery(explainSql);
-        setTimeout(() => refetch(), 0);
+        setExplainPlan(null);
+
+        try {
+            // Execute explain query directly
+            const adapter = connectionService.getAdapter(activeConnection!.id, activeConnection!.type as any);
+            const result = await adapter.executeQuery(
+                explainSql,
+                activeDatabase ? { database: activeDatabase } : undefined
+            );
+            setExplainPlan(result.rows);
+            setActiveResultTab('plan');
+
+            addQueryHistory({
+                id: `history-${Date.now()}`,
+                sql: explainSql,
+                database: activeDatabase || undefined,
+                connectionName: activeConnection?.name,
+                executedAt: Date.now(),
+                durationMs: result.durationMs,
+                status: 'success',
+            });
+        } catch (e: any) {
+            setActiveResultTab('messages');
+            addQueryHistory({
+                id: `history-${Date.now()}`,
+                sql: explainSql,
+                database: activeDatabase || undefined,
+                connectionName: activeConnection?.name,
+                executedAt: Date.now(),
+                status: 'error',
+                errorMessage: e.message,
+            });
+        }
     };
 
     const handleFormat = () => {
@@ -327,6 +362,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             dataUpdatedAt={dataUpdatedAt}
                             activeTab={activeResultTab}
                             onTabChange={setActiveResultTab}
+                            explainPlan={explainPlan}
                         />
                     </Panel>
                 </Group>
