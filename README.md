@@ -1,80 +1,123 @@
 # Data Explorer 🚀
 
-**Data Explorer** is a modern, high-performance database management and visualization tool designed for developers and data teams. It provides a unified interface to explore, query, and visualize your data across multiple database engines including PostgreSQL, MySQL, SQL Server, and ClickHouse.
+**Data Explorer** is a modern, high-performance database management and visualization tool designed for developers and data teams. It provides a unified interface to explore, query, and visualize your data across multiple database engines — all powered by an intelligent AI assistant.
+
+---
 
 ## ✨ Key Features
 
+### 🤖 AI Assistant (Gemini-powered)
+- **General-Purpose Chat**: Ask anything — SQL, coding, math, general knowledge, or just have a conversation.
+- **Smart SQL Generation**: Describe what you need in natural language; AI generates SQL from your actual database schema.
+- **Multi-Session Chat**: Create unlimited chat sessions, each with its own history — persisted across page reloads.
+- **Context Attachments**: Attach context to your messages:
+  - 📷 **Image Upload** — Send screenshots or diagrams for AI analysis (Gemini Vision)
+  - 📋 **SQL from Editor** — Attach the SQL query currently open in your editor
+  - 📊 **Database Context** — Include current connection and database info
+- **Global Panel**: Access AI from anywhere — resizable right sidebar that works on every page.
+- **Model Fallback**: Automatically falls back through multiple Gemini models (`gemini-2.5-flash-lite` → `gemini-2.5-flash` → `gemini-3-flash`) for maximum reliability.
+
 ### 🔌 Multi-Database Support
-- **Universal Connectivity**: Seamlessly connect to PostgreSQL, MySQL, SQL Server, and ClickHouse.
-- **Unified Interface**: Manage all your connections in one sidebar.
-- **Metadata Inspection**: View table schemas, column types, and constraints at a glance.
+- **Universal Connectivity**: Connect to PostgreSQL, MySQL, SQL Server, and ClickHouse.
+- **Connection Manager**: Add, edit, and remove connections from the sidebar with UUID-based synchronization.
+- **Metadata Inspection**: View schemas, tables, columns, types, constraints, and foreign keys at a glance.
+- **Multi-Database Browsing**: Switch between databases within a single connection.
 
 ### 📊 Interactive ERD Visualization
-- **Auto-Layout**: Automatically generates Entity Relationship Diagrams (ERD) for your schema.
-- **Drag-and-Drop Relationships**: Create Foreign Key constraints intuitively by dragging connections between columns.
-- **Visual Feedback**: Distinct indicators for Primary Keys (🔑) and Foreign Keys (🗝️).
-- **Live Updates**: Changes to the schema are instantly reflected in the diagram.
+- **Auto-Layout**: Automatically generates Entity Relationship Diagrams for your schema.
+- **Drag-and-Drop**: Create Foreign Key constraints intuitively by dragging between columns.
+- **Visual Indicators**: Primary Keys (🔑) and Foreign Keys (🗝️) are clearly marked.
+- **Live Updates**: Schema changes are instantly reflected in the diagram.
 
 ### 📝 Advanced SQL Editor
-- **Monaco Editor**: Powered by the same engine as VS Code for a familiar coding experience.
-- **IntelliSense**: Syntax highlighting, auto-completion, and error detection.
-- **Multi-Tab Workspace**: Work on multiple queries, generic tasks, and visualizations simultaneously.
-- **Result Visualization**: Instantly turn query results into charts (Bar, Line, Pie) without exporting data.
+- **Monaco Editor**: Same engine as VS Code — syntax highlighting, auto-completion, error detection.
+- **Schema-Aware IntelliSense**: Autocomplete for table names, column names, and SQL keywords from your actual schema.
+- **Multi-Tab Workspace**: Work on multiple queries and tasks simultaneously.
+- **Execute & Explain**: Run queries and view EXPLAIN ANALYZE plans in structured format.
+- **Query History**: Track all executed queries with status, duration, and error details.
+- **Saved Queries**: Save, name, and reopen frequently used queries.
+- **SQL Formatting**: Auto-format SQL with proper indentation and keyword casing.
 
-### 🛡️ Secure & Local-First
-- **Local Processing**: Your data never leaves your network. All processing happens on your local machine / server.
-- **Direct Connections**: Uses direct TCP connections for maximum speed and security.
+### 📈 Insights Dashboard
+- **Database Overview**: Connection stats, table counts, row counts, and database size.
+- **Schema Analytics**: Identify largest tables, column distributions, and indexing opportunities.
+- **Visual Charts**: Bar, line, and pie charts powered by Recharts.
+
+### 🔐 Authentication & Security
+- **JWT Authentication**: Secure login/logout with token-based authentication.
+- **User Profiles**: Manage user name and email from the profile dialog.
+- **Local-First**: Your data never leaves your network — all processing happens locally.
 
 ### 🎨 Modern UI/UX
-- **Dark Mode**: Sleek, dark-themed interface designed for long coding sessions.
-- **Responsive Design**: Built with Tailwind CSS and Shadcn UI for a polished look and feel.
-- **Command Palette**: Quick access to actions and navigation.
+- **Dark Mode**: Sleek, dark-themed interface designed for long sessions.
+- **Resizable Panels**: Drag-to-resize sidebar, AI panel, and editor/result panes.
+- **Responsive Design**: Built with Tailwind CSS and Shadcn UI (Radix Primitives).
+- **Smooth Animations**: Transitions, hover effects, and loading states throughout.
 
 ---
 
 ## 🛠️ Tech Stack
 
 ### Frontend (Client)
-- **Framework**: React 18 (Vite)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **Components**: Shadcn UI (Radix Primitives)
-- **State Management**: Zustand
-- **Data Fetching**: TanStack Query (React Query)
-- **Visualization**: React Flow (ERD), Recharts
-- **Editor**: Monaco Editor
+| Technology | Purpose |
+|---|---|
+| React 18 (Vite) | UI Framework |
+| TypeScript | Language |
+| Tailwind CSS | Styling |
+| Shadcn UI (Radix) | Component Library |
+| Zustand | State Management (with localStorage persistence) |
+| TanStack Query | Data Fetching & Caching |
+| Monaco Editor | SQL Code Editor |
+| React Flow | ERD Visualization |
+| Recharts | Charts & Data Visualization |
 
 ### Backend (Server)
-- **Framework**: NestJS
-- **Language**: TypeScript
-- **ORM**: Prisma / Raw SQL support
-- **Database Drivers**: `pg`, `mysql2`, `mssql`, `clickhouse`
+| Technology | Purpose |
+|---|---|
+| NestJS | API Framework |
+| TypeScript | Language |
+| Prisma | ORM & Database Management |
+| Google Generative AI | AI Assistant (Gemini API) |
+| `pg`, `mysql2`, `mssql`, `clickhouse` | Database Drivers |
+| JWT (Passport) | Authentication |
 
 ---
 
 ## 🚀 Getting Started
 
-To run Data Explorer locally, you'll need to start both the backend server and the frontend client.
-
 ### Prerequisites
-- Node.js (v18 or higher)
+- Node.js v18+
 - npm or pnpm
+- A Google Gemini API key (for AI features)
 
 ### 1. Start the Backend Server
-The server handles database connections and query execution.
 
 ```bash
 cd server
 npm install
+
+# Create .env file
+cp .env.example .env
+# Edit .env and add your GEMINI_API_KEY
+```
+
+Configure `server/.env`:
+```env
+DATABASE_URL="file:./dev.db"
+JWT_SECRET="your-jwt-secret"
+GEMINI_API_KEY="your-gemini-api-key"
+```
+
+```bash
+npx prisma generate
+npx prisma db push
 npm run start:dev
 ```
 *Server runs on `http://localhost:3000`*
 
 ### 2. Start the Frontend Client
-The client provides the web-based user interface.
 
 ```bash
-# Open a new terminal
 cd client
 npm install
 npm run dev
@@ -82,22 +125,61 @@ npm run dev
 *Client runs on `http://localhost:5173`*
 
 ### 3. Access the Application
-Open your browser and navigate to **[http://localhost:5173](http://localhost:5173)**.
+Open **[http://localhost:5173](http://localhost:5173)** in your browser.
+
+---
+
+## 📁 Project Structure
+
+```
+Data Explorer/
+├── client/                    # Frontend (React + Vite)
+│   ├── src/
+│   │   ├── core/              # Business logic, adapters, services, store
+│   │   ├── presentation/      # UI components and modules
+│   │   │   ├── components/    # Reusable UI components (Shadcn)
+│   │   │   ├── modules/       # Feature modules
+│   │   │   │   ├── Connection/    # Connection dialog
+│   │   │   │   ├── Dashboard/     # Insights dashboard
+│   │   │   │   ├── DataGrid/      # Table data grid
+│   │   │   │   ├── Explorer/      # Sidebar tree explorer
+│   │   │   │   ├── Layout/        # AppShell, Navbar, Tabs
+│   │   │   │   ├── Query/         # SQL Editor, AI Assistant, Results
+│   │   │   │   └── Visualization/ # ERD, Charts
+│   │   │   └── pages/         # Top-level pages
+│   │   └── lib/               # Utilities
+│   └── public/
+├── server/                    # Backend (NestJS)
+│   ├── src/
+│   │   ├── ai/                # AI module (controller, service, DTO)
+│   │   ├── auth/              # Authentication (JWT)
+│   │   ├── connections/       # Connection management
+│   │   ├── database-strategies/  # Multi-DB strategy pattern
+│   │   ├── metadata/          # Schema metadata APIs
+│   │   ├── prisma/            # Prisma ORM service
+│   │   └── query/             # Query execution
+│   └── prisma/                # Database schema & migrations
+└── README.md
+```
 
 ---
 
 ## ⚙️ Configuration
 
-### Environment Variables
-Create a `.env` file in the `server` directory to configure global settings if needed (though the app allows UI-based connection management).
+### Environment Variables (`server/.env`)
 
-```env
-# Example server/.env
-PORT=3000
-```
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | ✅ | Prisma database URL (SQLite, PostgreSQL, etc.) |
+| `JWT_SECRET` | ✅ | Secret key for JWT token signing |
+| `GEMINI_API_KEY` | ✅ | Google Gemini API key for AI features |
+| `PORT` | ❌ | Server port (default: 3000) |
 
-### Database Connections
-Connections are managed within the application. You can add, edit, and remove connections directly from the sidebar.
+### Getting a Gemini API Key
+1. Go to [Google AI Studio](https://aistudio.google.com/)
+2. Click **Get API Key**
+3. Create a key for a new or existing project
+4. Copy the key to your `server/.env` file
 
 ---
 
