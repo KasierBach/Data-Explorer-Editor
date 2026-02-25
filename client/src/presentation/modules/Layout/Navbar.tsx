@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ModeToggle } from '@/presentation/components/mode-toggle';
-import { Database, Settings, User, LogOut, User as UserIcon, Github, LifeBuoy, Cloud, CreditCard, FileText, FolderOpen, BarChart3, PieChart, GitGraph } from 'lucide-react';
+import { Database, Settings, User, LogOut, User as UserIcon, Github, LifeBuoy, Cloud, CreditCard, FileText, FolderOpen, BarChart3, PieChart, GitGraph, Sparkles } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import {
     DropdownMenu,
@@ -16,7 +16,7 @@ import { useAppStore } from '@/core/services/store';
 import { ProfileDialog } from './ProfileDialog';
 
 export const Navbar: React.FC = () => {
-    const { isSidebarOpen, setSidebarOpen, openQueryTab, openInsightsTab, openVisualizeTab, openErdTab, activeConnectionId, user, logout } = useAppStore();
+    const { isSidebarOpen, setSidebarOpen, openQueryTab, openInsightsTab, openVisualizeTab, openErdTab, activeConnectionId, user, logout, isAiPanelOpen, toggleAiPanel } = useAppStore();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
 
     return (
@@ -149,6 +149,16 @@ export const Navbar: React.FC = () => {
                 <div className="h-4 w-px bg-border mx-1" />
 
                 <ModeToggle />
+
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-8 w-8 ${isAiPanelOpen ? 'text-violet-500 bg-violet-500/10' : 'text-muted-foreground hover:text-violet-500'}`}
+                    onClick={toggleAiPanel}
+                    title="AI Assistant (Ctrl+I)"
+                >
+                    <Sparkles className="w-4 h-4" />
+                </Button>
 
                 <div className="h-4 w-px bg-border mx-1" />
 

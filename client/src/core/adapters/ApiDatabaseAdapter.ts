@@ -22,6 +22,19 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
 
         const connection = await response.json();
         this.connectionId = connection.id;
+
+        // Sync: if backend returned a different UUID, update the store
+        if (id && connection.id !== id) {
+            const store = useAppStore.getState();
+            // Replace the old connection entry with updated ID
+            const oldConn = store.connections.find(c => c.id === id);
+            if (oldConn) {
+                store.updateConnection(id, { ...oldConn, id: connection.id } as any);
+                if (store.activeConnectionId === id) {
+                    store.setActiveConnectionId(connection.id);
+                }
+            }
+        }
     }
 
     async disconnect(): Promise<void> {

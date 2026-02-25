@@ -42,6 +42,24 @@ export interface QueryHistoryEntry {
     errorMessage?: string;
 }
 
+export interface AiMessage {
+    id: string;
+    role: 'user' | 'ai';
+    content: string;
+    sql?: string;
+    explanation?: string;
+    error?: boolean;
+    timestamp: number;
+}
+
+export interface AiChat {
+    id: string;
+    title: string;
+    messages: AiMessage[];
+    createdAt: number;
+    updatedAt: number;
+}
+
 interface AppState {
     // Sidebar State
     isSidebarOpen: boolean;
@@ -49,6 +67,21 @@ interface AppState {
     toggleSidebar: () => void;
     setSidebarOpen: (isOpen: boolean) => void;
     setSidebarWidth: (width: number) => void;
+
+    // AI Panel State
+    isAiPanelOpen: boolean;
+    toggleAiPanel: () => void;
+    setAiPanelOpen: (isOpen: boolean) => void;
+
+    // AI Chat State
+    aiChats: AiChat[];
+    activeAiChatId: string | null;
+    createAiChat: () => string;
+    deleteAiChat: (id: string) => void;
+    setActiveAiChat: (id: string) => void;
+    addAiMessage: (chatId: string, message: AiMessage) => void;
+    updateAiChatTitle: (chatId: string, title: string) => void;
+    clearAiChats: () => void;
 
     // Connection State
     connections: Connection[];
@@ -110,6 +143,66 @@ export const useAppStore = create<AppState>()(
             setSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
             setSidebarWidth: (width) => set({ sidebarWidth: width }),
 
+            // AI Panel
+            isAiPanelOpen: false,
+            toggleAiPanel: () => set((state) => ({ isAiPanelOpen: !state.isAiPanelOpen })),
+            setAiPanelOpen: (isOpen) => set({ isAiPanelOpen: isOpen }),
+
+            // AI Chats
+            aiChats: [],
+            activeAiChatId: null,
+            createAiChat: () => {
+                const id = `chat-${Date.now()}`;
+                const newChat: AiChat = {
+                    id,
+                    title: 'Cuộc trò chuyện mới',
+                    messages: [{
+                        id: 'welcome',
+                        role: 'ai',
+                        content: 'Xin chào! Tôi là AI Assistant — bạn có thể hỏi tôi bất cứ điều gì: SQL, coding, kiến thức chung, hay chỉ đơn giản là trò chuyện. Khi cần truy vấn database, tôi sẽ tự động sinh SQL dựa trên schema của bạn.',
+                        timestamp: Date.now(),
+                    }],
+                    createdAt: Date.now(),
+                    updatedAt: Date.now(),
+                };
+                set((state) => ({
+                    aiChats: [newChat, ...state.aiChats],
+                    activeAiChatId: id,
+                }));
+                return id;
+            },
+            deleteAiChat: (id) => set((state) => {
+                const remaining = state.aiChats.filter(c => c.id !== id);
+                return {
+                    aiChats: remaining,
+                    activeAiChatId: state.activeAiChatId === id
+                        ? (remaining[0]?.id || null)
+                        : state.activeAiChatId,
+                };
+            }),
+            setActiveAiChat: (id) => set({ activeAiChatId: id }),
+            addAiMessage: (chatId, message) => set((state) => ({
+                aiChats: state.aiChats.map(chat =>
+                    chat.id === chatId
+                        ? {
+                            ...chat,
+                            messages: [...chat.messages, message],
+                            updatedAt: Date.now(),
+                            // Auto-title from first user message
+                            title: chat.messages.length <= 1 && message.role === 'user'
+                                ? message.content.slice(0, 40) + (message.content.length > 40 ? '...' : '')
+                                : chat.title,
+                        }
+                        : chat
+                ),
+            })),
+            updateAiChatTitle: (chatId, title) => set((state) => ({
+                aiChats: state.aiChats.map(chat =>
+                    chat.id === chatId ? { ...chat, title } : chat
+                ),
+            })),
+            clearAiChats: () => set({ aiChats: [], activeAiChatId: null }),
+
             // Auth
             isAuthenticated: false,
             accessToken: null,
@@ -152,7 +245,11 @@ export const useAppStore = create<AppState>()(
             updateConnection: (id, updatedFields) => set((state) => ({
                 connections: state.connections.map(c =>
                     c.id === id ? { ...c, ...updatedFields } : c
-                )
+                ),
+                // If the ID itself changed, update activeConnectionId too
+                activeConnectionId: (updatedFields as any).id && state.activeConnectionId === id
+                    ? (updatedFields as any).id
+                    : state.activeConnectionId
             })),
 
             removeConnection: (id) => set((state) => {
@@ -299,6 +396,8 @@ export const useAppStore = create<AppState>()(
                 sidebarWidth: state.sidebarWidth,
                 savedQueries: state.savedQueries,
                 queryHistory: state.queryHistory,
+                aiChats: state.aiChats,
+                activeAiChatId: state.activeAiChatId,
             }),
         }
     )

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/presentation/components/ui/label';
 
 export const ConnectionDialog: React.FC = () => {
-    const { isConnectionDialogOpen, closeConnectionDialog, addConnection } = useAppStore();
+    const { isConnectionDialogOpen, closeConnectionDialog, addConnection, accessToken } = useAppStore();
 
     const [type, setType] = useState<'postgres' | 'mysql' | 'mssql'>('postgres');
     const [name, setName] = useState('');
@@ -17,10 +17,14 @@ export const ConnectionDialog: React.FC = () => {
     const [password, setPassword] = useState('');
     const [database, setDatabase] = useState('');
     const [showAllDatabases, setShowAllDatabases] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const handleSave = () => {
-        const newConnection: Connection = {
-            id: `conn-${Date.now()}`,
+    const handleSave = async () => {
+        setIsSaving(true);
+        setError(null);
+
+        const connectionData = {
             name: name || `${type}@${host}`,
             type,
             host,
@@ -30,11 +34,48 @@ export const ConnectionDialog: React.FC = () => {
             database,
             showAllDatabases
         };
-        addConnection(newConnection);
-        closeConnectionDialog();
-        // Reset form
-        setName('');
-        setPassword('');
+
+        try {
+            // Call backend API first to register and get UUID
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+            const response = await fetch('http://localhost:3000/api/connections', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(connectionData),
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(errText || response.statusText);
+            }
+
+            const savedConnection = await response.json();
+
+            // Use backend UUID as the connection ID in store
+            const newConnection: Connection = {
+                id: savedConnection.id,
+                name: savedConnection.name,
+                type: savedConnection.type,
+                host: savedConnection.host,
+                port: savedConnection.port,
+                username: savedConnection.username,
+                password: savedConnection.password,
+                database: savedConnection.database,
+                showAllDatabases: savedConnection.showAllDatabases,
+            };
+            addConnection(newConnection);
+            closeConnectionDialog();
+            // Reset form
+            setName('');
+            setPassword('');
+            setError(null);
+        } catch (err: any) {
+            setError(err.message || 'Failed to save connection');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -100,9 +141,14 @@ export const ConnectionDialog: React.FC = () => {
                         </div>
                     </div>
                 </div>
+                {error && (
+                    <div className="text-xs text-red-500 px-1">{error}</div>
+                )}
                 <DialogFooter>
-                    <Button variant="outline" onClick={closeConnectionDialog}>Cancel</Button>
-                    <Button onClick={handleSave}>Save Connection</Button>
+                    <Button variant="outline" onClick={closeConnectionDialog} disabled={isSaving}>Cancel</Button>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                        {isSaving ? 'Saving...' : 'Save Connection'}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

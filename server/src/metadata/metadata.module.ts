@@ -7,5 +7,6 @@ import { ConnectionsModule } from '../connections/connections.module';
     imports: [ConnectionsModule],
     controllers: [MetadataController],
     providers: [MetadataService],
+    exports: [MetadataService],
 })
 export class MetadataModule { }

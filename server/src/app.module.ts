@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { MetadataModule } from './metadata/metadata.module';
 import { DatabaseStrategiesModule } from './database-strategies';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { DatabaseStrategiesModule } from './database-strategies';
     QueryModule,
     AuthModule,
     MetadataModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
