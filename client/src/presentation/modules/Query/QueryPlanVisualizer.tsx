@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     ArrowDown,
     ScanLine,
@@ -11,7 +11,10 @@ import {
     Zap,
     AlertTriangle,
     Clock,
-    Hash
+    Hash,
+    Info,
+    ChevronDown,
+    ChevronRight
 } from 'lucide-react';
 
 // ─── Types ───
@@ -100,6 +103,137 @@ const getWarnings = (node: PlanNode): string[] => {
     return warnings;
 };
 
+// ─── Node explanations ───
+const getNodeExplanation = (node: PlanNode): { description: string; tip: string; performance: 'good' | 'neutral' | 'warning' | 'bad' } => {
+    const t = node['Node Type'].toLowerCase();
+    const rows = node['Actual Rows'] ?? node['Plan Rows'];
+
+    if (t.includes('seq scan') || t === 'seq scan') {
+        const perf = rows > 10000 ? 'bad' : rows > 1000 ? 'warning' : 'neutral';
+        return {
+            description: `Sequential Scan đọc toàn bộ bảng "${node['Relation Name'] || '?'}" từ đầu đến cuối, kiểm tra từng hàng một. Trả về ${rows.toLocaleString()} hàng.${node['Filter'] ? ` Lọc theo điều kiện: ${node['Filter']}.` : ''}`,
+            tip: rows > 1000
+                ? `⚡ Bảng có ${rows.toLocaleString()} hàng — nên tạo INDEX trên cột được dùng trong WHERE/JOIN để tránh quét toàn bộ bảng.`
+                : `✅ Bảng nhỏ (${rows.toLocaleString()} hàng) — Seq Scan là đủ hiệu quả, không cần tối ưu thêm.`,
+            performance: perf
+        };
+    }
+
+    if (t.includes('index scan')) {
+        return {
+            description: `Index Scan sử dụng index "${node['Index Name'] || ''}" để tìm nhanh các hàng phù hợp trong bảng "${node['Relation Name'] || ''}", sau đó đọc dữ liệu từ bảng. Trả về ${rows.toLocaleString()} hàng.`,
+            tip: '✅ Sử dụng index — đây là cách truy vấn hiệu quả. Nếu chỉ cần các cột trong index, xem xét dùng Index Only Scan.',
+            performance: 'good'
+        };
+    }
+
+    if (t.includes('index only scan')) {
+        return {
+            description: `Index Only Scan đọc dữ liệu trực tiếp từ index "${node['Index Name'] || ''}" mà KHÔNG cần truy cập bảng gốc. Đây là phương pháp nhanh nhất.`,
+            tip: '🚀 Tuyệt vời! Tất cả dữ liệu cần thiết đều nằm trong index — không cần đọc bảng.',
+            performance: 'good'
+        };
+    }
+
+    if (t.includes('bitmap')) {
+        return {
+            description: `Bitmap Scan tạo bitmap (bản đồ bit) từ index, sau đó quét bảng theo thứ tự vật lý. Hiệu quả khi cần đọc nhiều hàng rải rác.`,
+            tip: '👍 Tốt cho truy vấn trả về nhiều hàng từ index. Hiệu quả hơn Index Scan khi tỷ lệ selectivity trung bình.',
+            performance: 'good'
+        };
+    }
+
+    if (t.includes('hash join')) {
+        return {
+            description: `Hash Join tạo bảng hash từ tập dữ liệu nhỏ hơn (inner), sau đó duyệt tập lớn hơn (outer) và so khớp qua hash.${node['Hash Cond'] ? ` Điều kiện JOIN: ${node['Hash Cond']}` : ''}`,
+            tip: '📊 Hash Join hiệu quả cho JOIN giữa 2 tập dữ liệu lớn. Nếu tốn nhiều memory, hãy kiểm tra work_mem setting.',
+            performance: 'neutral'
+        };
+    }
+
+    if (t.includes('merge join')) {
+        return {
+            description: `Merge Join sắp xếp cả 2 tập dữ liệu rồi merge chúng lại. Rất hiệu quả khi dữ liệu đã được sắp xếp sẵn (ví dụ: từ index).${node['Merge Cond'] ? ` Điều kiện: ${node['Merge Cond']}` : ''}`,
+            tip: '✅ Merge Join rất hiệu quả nếu dữ liệu đã sorted. Nếu thấy Sort node phía dưới, có thể index sẽ giúp loại bỏ bước sort.',
+            performance: 'good'
+        };
+    }
+
+    if (t.includes('nested loop')) {
+        return {
+            description: `Nested Loop lặp qua từng hàng của tập ngoài (outer), cho mỗi hàng tìm kiếm hàng khớp trong tập trong (inner). Tổng iterations = outer_rows × inner_lookups.`,
+            tip: rows > 1000
+                ? '⚠️ Nested Loop với nhiều hàng có thể chậm. Kiểm tra xem inner table có sử dụng index không.'
+                : '✅ Nested Loop ổn với tập dữ liệu nhỏ, nhất là khi inner side dùng index.',
+            performance: rows > 1000 ? 'warning' : 'good'
+        };
+    }
+
+    if (t.includes('sort')) {
+        return {
+            description: `Sort sắp xếp dữ liệu theo${node['Sort Key'] ? ': ' + node['Sort Key'].join(', ') : ' cột được chỉ định'}. ${node['Sort Method'] ? `Phương pháp: ${node['Sort Method']}.` : ''}`,
+            tip: rows > 10000
+                ? '⚠️ Sort trên tập dữ liệu lớn tốn memory/CPU. Tạo INDEX phù hợp để tránh sort.'
+                : '✅ Sort trên tập nhỏ — ảnh hưởng không đáng kể.',
+            performance: rows > 10000 ? 'warning' : 'neutral'
+        };
+    }
+
+    if (t.includes('aggregate') || t.includes('group')) {
+        return {
+            description: `Aggregate nhóm và tính toán dữ liệu (COUNT, SUM, AVG, MAX, MIN...).${node['Strategy'] ? ` Strategy: ${node['Strategy']}.` : ''} ${node['Group Key'] ? `Nhóm theo: ${node['Group Key'].join(', ')}.` : ''}`,
+            tip: '📊 Nếu aggregate chậm, kiểm tra xem input data đã được lọc đủ chưa — WHERE clause hẹp hơn sẽ giảm số hàng cần aggregate.',
+            performance: 'neutral'
+        };
+    }
+
+    if (t.includes('limit')) {
+        return {
+            description: `Limit giới hạn số hàng trả về. PostgreSQL sẽ dừng xử lý ngay khi đủ số hàng cần thiết.`,
+            tip: '✅ LIMIT giúp giảm lượng dữ liệu cần xử lý — nhất là khi kết hợp với ORDER BY.',
+            performance: 'good'
+        };
+    }
+
+    if (t.includes('hash')) {
+        return {
+            description: `Hash node tạo bảng hash từ dữ liệu input — được sử dụng bởi Hash Join ở node cha.`,
+            tip: '📦 Là bước chuẩn bị cho Hash Join. Nếu tốn nhiều memory, kiểm tra work_mem.',
+            performance: 'neutral'
+        };
+    }
+
+    if (t.includes('materialize')) {
+        return {
+            description: `Materialize lưu kết quả của subquery vào memory/disk để có thể đọc lại nhiều lần mà không cần tính toán lại.`,
+            tip: '📦 Thường xuất hiện khi subquery được tham chiếu nhiều lần. Nếu tập dữ liệu lớn, có thể tốn memory.',
+            performance: 'neutral'
+        };
+    }
+
+    if (t.includes('append')) {
+        return {
+            description: `Append nối kết quả từ nhiều nguồn lại với nhau (thường gặp trong UNION hoặc table inheritance).`,
+            tip: '✅ Là thao tác bình thường cho UNION/UNION ALL queries.',
+            performance: 'neutral'
+        };
+    }
+
+    if (t.includes('result')) {
+        return {
+            description: `Result node trả về kết quả được tính toán mà không cần đọc từ bảng (ví dụ: SELECT 1+1, hoặc values list).`,
+            tip: '✅ Không truy cập bảng — rất nhanh.',
+            performance: 'good'
+        };
+    }
+
+    return {
+        description: `Node "${node['Node Type']}" xử lý ${rows.toLocaleString()} hàng với chi phí ${node['Total Cost'].toFixed(2)}.`,
+        tip: '💡 Xem thêm PostgreSQL documentation để hiểu rõ node type này.',
+        performance: 'neutral'
+    };
+};
+
 // ─── Format helpers ───
 const fmtTime = (ms?: number) => ms !== undefined ? (ms < 1 ? `${(ms * 1000).toFixed(0)}µs` : ms < 1000 ? `${ms.toFixed(2)}ms` : `${(ms / 1000).toFixed(2)}s`) : '-';
 const fmtRows = (n?: number) => n !== undefined ? n.toLocaleString() : '-';
@@ -111,11 +245,13 @@ const PlanNodeView: React.FC<{
     maxCost: number;
     depth: number;
 }> = ({ node, maxCost, depth }) => {
+    const [showExplanation, setShowExplanation] = useState(depth === 0);
     const costPct = maxCost > 0 ? (node['Total Cost'] / maxCost) * 100 : 0;
     const timePct = node['Actual Total Time'] && maxCost > 0
         ? Math.min(100, (node['Actual Total Time'] / (maxCost * 0.1 + 1)) * 10)
         : costPct;
     const warnings = getWarnings(node);
+    const explanation = getNodeExplanation(node);
     const nodeColor = getNodeColor(node['Node Type']);
 
     const relation = node['Relation Name']
@@ -151,6 +287,15 @@ const PlanNodeView: React.FC<{
                             {relation}
                         </span>
                     )}
+
+                    {/* Expand explanation toggle */}
+                    <button
+                        onClick={() => setShowExplanation(!showExplanation)}
+                        className="ml-auto flex items-center gap-0.5 text-[9px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted/30"
+                    >
+                        <Info className="w-3 h-3" />
+                        {showExplanation ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />}
+                    </button>
                 </div>
 
                 {/* Cost bar */}
@@ -222,6 +367,26 @@ const PlanNodeView: React.FC<{
                         {w}
                     </div>
                 ))}
+
+                {/* Explanation section */}
+                {showExplanation && (
+                    <div className={`mt-2 pt-2 border-t border-border/20 text-[10px] space-y-1.5 rounded-md p-2 ${explanation.performance === 'good' ? 'bg-green-500/5' :
+                            explanation.performance === 'bad' ? 'bg-red-500/5' :
+                                explanation.performance === 'warning' ? 'bg-yellow-500/5' :
+                                    'bg-muted/10'
+                        }`}>
+                        <div className="text-foreground/80 leading-relaxed">
+                            {explanation.description}
+                        </div>
+                        <div className={`font-medium ${explanation.performance === 'good' ? 'text-green-400' :
+                                explanation.performance === 'bad' ? 'text-red-400' :
+                                    explanation.performance === 'warning' ? 'text-yellow-400' :
+                                        'text-blue-400'
+                            }`}>
+                            {explanation.tip}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Children */}
