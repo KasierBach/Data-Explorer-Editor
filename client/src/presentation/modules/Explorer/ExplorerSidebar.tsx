@@ -51,15 +51,12 @@ export const ExplorerSidebar: React.FC = () => {
                 }
                 if (action === 'refresh') handleRefresh();
                 if (action === 'createSchema') {
-                    const schemaName = prompt('Enter new schema name:');
-                    if (schemaName) {
-                        store.openTab({
-                            id: `query-createschema-${Date.now()}`,
-                            title: `Create Schema`,
-                            type: 'query',
-                            initialSql: `CREATE SCHEMA ${q(schemaName)};`
-                        });
-                    }
+                    store.openTab({
+                        id: `query-createschema-${Date.now()}`,
+                        title: `Create Schema`,
+                        type: 'query',
+                        initialSql: `-- Create a new schema in ${name}\nCREATE SCHEMA "new_schema_name";\n\n-- Optionally set the owner:\n-- ALTER SCHEMA "new_schema_name" OWNER TO your_user;`
+                    });
                 }
             }
 
