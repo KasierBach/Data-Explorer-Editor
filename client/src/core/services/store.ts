@@ -30,6 +30,18 @@ export interface SavedQuery {
     updatedAt: number;
 }
 
+export interface QueryHistoryEntry {
+    id: string;
+    sql: string;
+    database?: string;
+    connectionName?: string;
+    executedAt: number;
+    durationMs?: number;
+    rowCount?: number;
+    status: 'success' | 'error';
+    errorMessage?: string;
+}
+
 interface AppState {
     // Sidebar State
     isSidebarOpen: boolean;
@@ -81,6 +93,11 @@ interface AppState {
     saveQuery: (query: SavedQuery) => void;
     updateSavedQuery: (id: string, updates: Partial<SavedQuery>) => void;
     deleteSavedQuery: (id: string) => void;
+
+    // Query History
+    queryHistory: QueryHistoryEntry[];
+    addQueryHistory: (entry: QueryHistoryEntry) => void;
+    clearQueryHistory: () => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -258,6 +275,13 @@ export const useAppStore = create<AppState>()(
             deleteSavedQuery: (id) => set((state) => ({
                 savedQueries: state.savedQueries.filter(q => q.id !== id)
             })),
+
+            // Query History
+            queryHistory: [],
+            addQueryHistory: (entry) => set((state) => ({
+                queryHistory: [entry, ...state.queryHistory].slice(0, 100) // Keep max 100
+            })),
+            clearQueryHistory: () => set({ queryHistory: [] }),
         }),
         {
             name: 'data-explorer-storage',
@@ -274,6 +298,7 @@ export const useAppStore = create<AppState>()(
                 isSidebarOpen: state.isSidebarOpen,
                 sidebarWidth: state.sidebarWidth,
                 savedQueries: state.savedQueries,
+                queryHistory: state.queryHistory,
             }),
         }
     )

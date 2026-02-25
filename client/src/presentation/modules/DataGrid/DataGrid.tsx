@@ -13,10 +13,17 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
-import { RefreshCw, LayoutGrid, BarChart3, Download } from 'lucide-react';
+import { RefreshCw, LayoutGrid, BarChart3, Download, Plus, Trash2, FileJson, FileText, FileCode, Check, X } from 'lucide-react';
 import { FilterPopover } from './FilterPopover';
 import { TableDesigner } from './TableDesigner';
 import { ResultVisualizer } from './ResultVisualizer';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/presentation/components/ui/dropdown-menu";
+import { toast } from 'sonner';
 
 interface DataGridProps {
     tableId: string;
@@ -37,6 +44,9 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const [isEditMode, setIsEditMode] = useState(false);
     const [pendingChanges, setPendingChanges] = useState<Record<string, Record<string, any>>>({});
     const [isSaving, setIsSaving] = useState(false);
+    const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+    const [isInserting, setIsInserting] = useState(false);
+    const [newRowData, setNewRowData] = useState<Record<string, string>>({});
 
     // Parent ref for virtualization
     const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -219,12 +229,146 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
             });
 
             setViewMode('grid');
-            refetch(); // Refresh both data and metadata 
+            refetch();
         } catch (e: any) {
-            alert(e.message);
+            toast.error(e.message);
         } finally {
             setIsSaving(false);
         }
+    };
+
+    // ─── Delete selected rows ───
+    const handleDeleteRows = async () => {
+        if (!activeConnection || !metadata || selectedRows.size === 0) return;
+        const pkField = metadata.columns.find(c => c.isPrimaryKey)?.name;
+        if (!pkField) { toast.error('Cannot delete: table has no primary key'); return; }
+
+        if (!confirm(`Delete ${selectedRows.size} row(s)? This cannot be undone.`)) return;
+
+        setIsSaving(true);
+        try {
+            const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type as any);
+            const qSchema = getQuotedIdentifier(schema, dialect);
+            const qTable = getQuotedIdentifier(cleanTableName || tableId, dialect);
+            const qPk = getQuotedIdentifier(pkField, dialect);
+
+            const pkValues = [...selectedRows].map(v => isNaN(Number(v)) ? `'${v}'` : v).join(', ');
+            const sql = `DELETE FROM ${qSchema}.${qTable} WHERE ${qPk} IN (${pkValues});`;
+
+            await adapter.executeQuery(sql, dbName ? { database: dbName } : undefined);
+            setSelectedRows(new Set());
+            toast.success(`${selectedRows.size} row(s) deleted`);
+            refetch();
+        } catch (e: any) {
+            toast.error(e.message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // ─── Insert new row ───
+    const handleInsertRow = async () => {
+        if (!activeConnection || !metadata) return;
+        const nonEmptyCols = Object.entries(newRowData).filter(([, v]) => v.trim() !== '');
+        if (nonEmptyCols.length === 0) { toast.error('Enter at least one value'); return; }
+
+        setIsSaving(true);
+        try {
+            const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type as any);
+            const qSchema = getQuotedIdentifier(schema, dialect);
+            const qTable = getQuotedIdentifier(cleanTableName || tableId, dialect);
+            const colNames = nonEmptyCols.map(([col]) => getQuotedIdentifier(col, dialect)).join(', ');
+            const values = nonEmptyCols.map(([, v]) => {
+                if (v.toLowerCase() === 'null') return 'NULL';
+                if (v.toLowerCase() === 'true') return 'TRUE';
+                if (v.toLowerCase() === 'false') return 'FALSE';
+                if (!isNaN(Number(v))) return v;
+                return `'${v.replace(/'/g, "''")}'`;
+            }).join(', ');
+
+            const sql = `INSERT INTO ${qSchema}.${qTable} (${colNames}) VALUES (${values});`;
+            await adapter.executeQuery(sql, dbName ? { database: dbName } : undefined);
+
+            setNewRowData({});
+            setIsInserting(false);
+            toast.success('Row inserted successfully');
+            refetch();
+        } catch (e: any) {
+            toast.error(e.message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // ─── Export helpers ───
+    const exportCSV = () => {
+        if (!rows.length || !metadata?.columns) return;
+        const csvHeaders = metadata.columns.map(c => c.name).join(',');
+        const csvRows = rows.map(row => {
+            return metadata.columns.map(col => {
+                const val = row.getValue(col.name);
+                if (val === null || val === undefined) return '';
+                const str = String(val);
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            }).join(',');
+        }).join('\n');
+        downloadFile(`${csvHeaders}\n${csvRows}`, `${cleanTableName}_export.csv`, 'text/csv');
+    };
+
+    const exportJSON = () => {
+        if (!rows.length || !metadata?.columns) return;
+        const data = rows.map(row => {
+            const obj: Record<string, any> = {};
+            metadata.columns.forEach(col => { obj[col.name] = row.getValue(col.name); });
+            return obj;
+        });
+        downloadFile(JSON.stringify(data, null, 2), `${cleanTableName}_export.json`, 'application/json');
+    };
+
+    const exportSQL = () => {
+        if (!rows.length || !metadata?.columns) return;
+        const qSchema = getQuotedIdentifier(schema, dialect);
+        const qTable = getQuotedIdentifier(cleanTableName || tableId, dialect);
+        const cols = metadata.columns.map(c => getQuotedIdentifier(c.name, dialect)).join(', ');
+        const inserts = rows.map(row => {
+            const vals = metadata.columns.map(col => {
+                const v = row.getValue(col.name);
+                if (v === null || v === undefined) return 'NULL';
+                if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+                return `'${String(v).replace(/'/g, "''")}'`;
+            }).join(', ');
+            return `INSERT INTO ${qSchema}.${qTable} (${cols}) VALUES (${vals});`;
+        }).join('\n');
+        downloadFile(inserts, `${cleanTableName}_export.sql`, 'text/sql');
+    };
+
+    const downloadFile = (content: string, filename: string, type: string) => {
+        const blob = new Blob([content], { type: `${type};charset=utf-8;` });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const copyRowAsSQL = (rowData: any) => {
+        if (!metadata?.columns) return;
+        const qSchema = getQuotedIdentifier(schema, dialect);
+        const qTable = getQuotedIdentifier(cleanTableName || tableId, dialect);
+        const cols = metadata.columns.map(c => getQuotedIdentifier(c.name, dialect)).join(', ');
+        const vals = metadata.columns.map(col => {
+            const v = rowData[col.name];
+            if (v === null || v === undefined) return 'NULL';
+            if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+            return `'${String(v).replace(/'/g, "''")}'`;
+        }).join(', ');
+        const sql = `INSERT INTO ${qSchema}.${qTable} (${cols}) VALUES (${vals});`;
+        navigator.clipboard.writeText(sql);
+        toast.success('INSERT statement copied');
     };
 
     if (isLoadingMeta) return <div className="p-4 text-xs text-muted-foreground italic flex items-center gap-2">
@@ -312,29 +456,47 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                     <RefreshCw className="w-3 h-3" /> Refresh
                 </Button>
 
-                <Button variant="ghost" size="sm" onClick={() => {
-                    if (!rows.length || !metadata?.columns) return;
-                    const csvHeaders = metadata.columns.map(c => c.name).join(',');
-                    const csvRows = rows.map(row => {
-                        return metadata.columns.map(col => {
-                            const val = row.getValue(col.name);
-                            if (val === null || val === undefined) return '';
-                            const str = String(val);
-                            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-                                return `"${str.replace(/"/g, '""')}"`;
-                            }
-                            return str;
-                        }).join(',');
-                    }).join('\n');
-                    const blob = new Blob([`${csvHeaders}\n${csvRows}`], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `${cleanTableName || tableId}_export.csv`;
-                    link.click();
-                }} className="h-7 text-[11px] gap-1 px-2">
-                    <Download className="w-3 h-3" /> Export
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 text-[11px] gap-1 px-2">
+                            <Download className="w-3 h-3" /> Export
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuItem onClick={exportCSV} className="gap-2 text-xs">
+                            <FileText className="w-3 h-3" /> CSV
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={exportJSON} className="gap-2 text-xs">
+                            <FileJson className="w-3 h-3" /> JSON
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={exportSQL} className="gap-2 text-xs">
+                            <FileCode className="w-3 h-3" /> SQL (INSERT)
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+
+                <div className="h-4 w-[1px] bg-border mx-1" />
+
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setIsInserting(!isInserting); setNewRowData({}); }}
+                    className={`h-7 text-[11px] gap-1 px-2 ${isInserting ? 'text-green-500' : ''}`}
+                >
+                    <Plus className="w-3 h-3" /> Insert Row
                 </Button>
+
+                {selectedRows.size > 0 && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDeleteRows}
+                        disabled={isSaving}
+                        className="h-7 text-[11px] gap-1 px-2 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                    >
+                        <Trash2 className="w-3 h-3" /> Delete ({selectedRows.size})
+                    </Button>
+                )}
 
                 <div className="h-4 w-[1px] bg-border mx-1" />
 
@@ -400,18 +562,37 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                         rowVirtualizer.getVirtualItems().map(virtualRow => {
                                             const row = rows[virtualRow.index];
                                             if (!row) return null;
+                                            const pkField = metadata?.columns.find(c => c.isPrimaryKey)?.name;
+                                            const pkValue = pkField ? String(row.original[pkField]) : row.id;
+                                            const isSelected = selectedRows.has(pkValue);
                                             return (
                                                 <tr
                                                     key={row.id}
-                                                    className="hover:bg-blue-500/5 h-[28px] group transition-colors odd:bg-background even:bg-muted/5 border-b border-border/20"
+                                                    className={`hover:bg-blue-500/5 h-[28px] group transition-colors border-b border-border/20 ${isSelected ? 'bg-blue-500/10' : 'odd:bg-background even:bg-muted/5'}`}
+                                                    onContextMenu={(e) => {
+                                                        e.preventDefault();
+                                                        copyRowAsSQL(row.original);
+                                                    }}
                                                 >
-                                                    {row.getVisibleCells().map(cell => (
+                                                    {row.getVisibleCells().map((cell, cellIdx) => (
                                                         <td
                                                             key={cell.id}
                                                             className={`px-3 py-0.5 border-r border-border/30 whitespace-nowrap scrollbar-hide last:border-r-0 text-foreground/90 font-mono text-[11px] ${!isEditMode ? 'truncate max-w-[300px]' : ''}`}
                                                             style={{ width: cell.column.getSize() }}
+                                                            onClick={cellIdx === 0 ? () => {
+                                                                setSelectedRows(prev => {
+                                                                    const next = new Set(prev);
+                                                                    if (next.has(pkValue)) next.delete(pkValue);
+                                                                    else next.add(pkValue);
+                                                                    return next;
+                                                                });
+                                                            } : undefined}
                                                         >
-                                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                            {cellIdx === 0 ? (
+                                                                <span className={`cursor-pointer ${isSelected ? 'text-blue-500 font-bold' : ''}`}>
+                                                                    {isSelected ? '☑' : ''} {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                                </span>
+                                                            ) : flexRender(cell.column.columnDef.cell, cell.getContext())}
                                                         </td>
                                                     ))}
                                                 </tr>
@@ -429,6 +610,36 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                         )
                                     )}
                                 </tbody>
+                                {isInserting && metadata?.columns && (
+                                    <tfoot className="border-t-2 border-green-500/30">
+                                        <tr className="bg-green-500/5">
+                                            <td className="px-2 py-1 border-r text-[10px] text-green-500 font-bold">NEW</td>
+                                            {metadata.columns.map(col => (
+                                                <td key={col.name} className="px-1 py-0.5 border-r">
+                                                    <input
+                                                        className="w-full bg-transparent border-none outline-none text-xs font-mono px-1 py-0.5 h-6 focus:ring-1 focus:ring-green-500 rounded placeholder:text-muted-foreground/30"
+                                                        placeholder={col.isPrimaryKey ? '(auto)' : col.type}
+                                                        value={newRowData[col.name] || ''}
+                                                        onChange={(e) => setNewRowData(prev => ({ ...prev, [col.name]: e.target.value }))}
+                                                        disabled={col.isPrimaryKey}
+                                                    />
+                                                </td>
+                                            ))}
+                                        </tr>
+                                        <tr>
+                                            <td colSpan={metadata.columns.length + 1} className="px-2 py-1">
+                                                <div className="flex items-center gap-1">
+                                                    <Button size="sm" onClick={handleInsertRow} disabled={isSaving} className="h-6 px-3 text-[10px] bg-green-600 hover:bg-green-700 text-white gap-1">
+                                                        <Check className="w-3 h-3" /> Insert
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => { setIsInserting(false); setNewRowData({}); }} className="h-6 px-2 text-[10px] gap-1">
+                                                        <X className="w-3 h-3" /> Cancel
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                )}
                             </table>
                         </div>
                     </div>

@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
-import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw } from 'lucide-react';
+import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw, History, Zap } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore, type SavedQuery } from '@/core/services/store';
 import { format } from 'sql-formatter';
 import { SavedQueriesDialog } from './SavedQueriesDialog';
+import { QueryHistoryDialog } from './QueryHistoryDialog';
 import {
     Select,
     SelectContent,
@@ -34,12 +35,13 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const [limit, setLimit] = useState(initialMetadata.limit || "1000");
     const [activeResultTab, setActiveResultTab] = useState("data");
     const [isSavedDialogOpen, setIsSavedDialogOpen] = useState(false);
+    const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
     const [currentSavedQueryId, setCurrentSavedQueryId] = useState<string | null>(initialMetadata.savedQueryId || null);
 
     const isFirstLoad = useRef(true);
     const editorRef = useRef<any>(null);
 
-    const { saveQuery, updateSavedQuery, openTab } = useAppStore();
+    const { saveQuery, updateSavedQuery, openTab, addQueryHistory } = useAppStore();
 
     // Persist SQL query to store
     useEffect(() => {
@@ -73,24 +75,43 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         retry: false
     });
 
-    // Handle tab switching after execution
+    // Record history on success/error
     useEffect(() => {
-        if (isSuccess && results) {
+        if (isSuccess && results && executedQuery) {
             setActiveResultTab("data");
+            addQueryHistory({
+                id: `history-${Date.now()}`,
+                sql: executedQuery,
+                database: activeDatabase || undefined,
+                connectionName: activeConnection?.name,
+                executedAt: Date.now(),
+                durationMs: results.durationMs,
+                rowCount: results.rowCount ?? results.rows?.length,
+                status: 'success',
+            });
         }
     }, [isSuccess, results]);
 
     useEffect(() => {
-        if (isError) {
+        if (isError && executedQuery) {
             setActiveResultTab("messages");
+            addQueryHistory({
+                id: `history-${Date.now()}`,
+                sql: executedQuery,
+                database: activeDatabase || undefined,
+                connectionName: activeConnection?.name,
+                executedAt: Date.now(),
+                status: 'error',
+                errorMessage: (error as Error)?.message,
+            });
         }
     }, [isError]);
 
-    const handleRun = () => {
-        let sqlToExecute = query;
+    const handleRun = (overrideSql?: string) => {
+        let sqlToExecute = overrideSql || query;
 
         // Check if there is a selection
-        if (editorRef.current) {
+        if (!overrideSql && editorRef.current) {
             const selection = editorRef.current.getSelection();
             if (selection && !selection.isEmpty()) {
                 const selectedText = editorRef.current.getModel()?.getValueInRange(selection);
@@ -102,6 +123,21 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
         if (!sqlToExecute.trim()) return;
         setExecutedQuery(sqlToExecute);
+        setTimeout(() => refetch(), 0);
+    };
+
+    const handleExplain = () => {
+        let sqlToExplain = query;
+        if (editorRef.current) {
+            const selection = editorRef.current.getSelection();
+            if (selection && !selection.isEmpty()) {
+                const selectedText = editorRef.current.getModel()?.getValueInRange(selection);
+                if (selectedText && selectedText.trim()) sqlToExplain = selectedText;
+            }
+        }
+        if (!sqlToExplain.trim()) return;
+        const explainSql = `EXPLAIN ANALYZE ${sqlToExplain}`;
+        setExecutedQuery(explainSql);
         setTimeout(() => refetch(), 0);
     };
 
@@ -173,6 +209,10 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 e.preventDefault();
                 setIsSavedDialogOpen(true);
             }
+            if (e.ctrlKey && e.key === 'h') {
+                e.preventDefault();
+                setIsHistoryDialogOpen(true);
+            }
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
@@ -184,7 +224,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 {/* Toolbar */}
                 <div className="p-1 px-2 border-b flex items-center justify-between bg-muted/30">
                     <div className="flex items-center gap-1">
-                        <Button size="sm" onClick={handleRun} disabled={isLoading} className="h-7 gap-1 px-3 bg-green-600 hover:bg-green-700 text-white border-none shadow-sm">
+                        <Button size="sm" onClick={() => handleRun()} disabled={isLoading} className="h-7 gap-1 px-3 bg-green-600 hover:bg-green-700 text-white border-none shadow-sm">
                             {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
                             <span className="font-semibold">Execute</span>
                         </Button>
@@ -219,7 +259,16 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             <FolderOpen className="w-3.5 h-3.5" />
                             Open
                         </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setIsHistoryDialogOpen(true)} className="h-7 gap-1 px-2 text-xs" title="Ctrl+H">
+                            <History className="w-3.5 h-3.5" />
+                            History
+                        </Button>
                         <div className="h-4 w-[1px] bg-border mx-1" />
+
+                        <Button variant="ghost" size="sm" onClick={handleExplain} disabled={isLoading} className="h-7 gap-1 px-2 text-xs text-orange-500 hover:text-orange-600" title="EXPLAIN ANALYZE">
+                            <Zap className="w-3.5 h-3.5" />
+                            Explain
+                        </Button>
 
                         <div className="flex items-center gap-2 px-2">
                             <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Limit</span>
@@ -287,6 +336,14 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 open={isSavedDialogOpen}
                 onOpenChange={setIsSavedDialogOpen}
                 onOpenQuery={handleOpenSavedQuery}
+            />
+            <QueryHistoryDialog
+                open={isHistoryDialogOpen}
+                onOpenChange={setIsHistoryDialogOpen}
+                onRunQuery={(sql) => {
+                    setQuery(sql);
+                    handleRun(sql);
+                }}
             />
         </>
     );
