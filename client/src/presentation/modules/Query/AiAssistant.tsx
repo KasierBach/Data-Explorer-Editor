@@ -8,6 +8,10 @@ import {
 } from 'lucide-react';
 import { useAppStore, type AiMessage } from '@/core/services/store';
 import { cn } from '@/lib/utils';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface Attachment {
     type: 'image' | 'sql' | 'table';
@@ -379,13 +383,43 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
                 {messages.map(msg => (
                     <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[90%] rounded-lg p-2.5 text-xs leading-relaxed ${msg.role === 'user'
+                        <div className={`max-w-[90%] rounded-lg p-2.5 text-xs leading-relaxed select-text cursor-text ${msg.role === 'user'
                             ? 'bg-violet-500/20 text-foreground ml-4'
                             : msg.error
                                 ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                                 : 'bg-muted/30 text-foreground/80 border border-border/30'
                             }`}>
-                            <div className="whitespace-pre-wrap">{msg.content}</div>
+                            {msg.role === 'user' ? (
+                                <div className="whitespace-pre-wrap">{msg.content}</div>
+                            ) : (
+                                <div className="prose prose-sm prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-pre:m-0 prose-td:border prose-th:border prose-table:border-collapse prose-table:w-full prose-th:bg-muted/50 prose-th:p-2 prose-td:p-2 prose-a:text-violet-400 select-text">
+                                    <ReactMarkdown
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                            code({ node, inline, className, children, ...props }: any) {
+                                                const match = /language-(\w+)/.exec(className || '');
+                                                return !inline && match ? (
+                                                    <SyntaxHighlighter
+                                                        {...props}
+                                                        style={vscDarkPlus as any}
+                                                        language={match[1]}
+                                                        PreTag="div"
+                                                        className="rounded-md my-2"
+                                                    >
+                                                        {String(children).replace(/\n$/, '')}
+                                                    </SyntaxHighlighter>
+                                                ) : (
+                                                    <code className={className} {...props}>
+                                                        {children}
+                                                    </code>
+                                                );
+                                            }
+                                        }}
+                                    >
+                                        {msg.content}
+                                    </ReactMarkdown>
+                                </div>
+                            )}
 
                             {msg.sql && (
                                 <div className="mt-2 rounded-md overflow-hidden border border-border/50 bg-background/50">

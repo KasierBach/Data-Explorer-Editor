@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
-import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw, History, Zap, Sparkles } from 'lucide-react';
+import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw, History, Zap } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore, type SavedQuery } from '@/core/services/store';
@@ -38,7 +38,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
     const [currentSavedQueryId, setCurrentSavedQueryId] = useState<string | null>(initialMetadata.savedQueryId || null);
     const [explainPlan, setExplainPlan] = useState<any>(null);
-    const { isAiPanelOpen, toggleAiPanel } = useAppStore();
 
     const isFirstLoad = useRef(true);
     const editorRef = useRef<any>(null);
@@ -304,17 +303,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                         <Button variant="ghost" size="sm" onClick={handleExplain} disabled={isLoading} className="h-7 gap-1 px-2 text-xs text-orange-500 hover:text-orange-600" title="EXPLAIN ANALYZE">
                             <Zap className="w-3.5 h-3.5" />
                             Explain
-                        </Button>
-
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={toggleAiPanel}
-                            className={`h-7 gap-1 px-2 text-xs ${isAiPanelOpen ? 'text-violet-500 bg-violet-500/10' : 'text-violet-400 hover:text-violet-500'}`}
-                            title="AI Assistant"
-                        >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            AI
                         </Button>
 
                         <div className="flex items-center gap-2 px-2">

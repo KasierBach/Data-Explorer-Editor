@@ -18,10 +18,11 @@ import { ProfileDialog } from './ProfileDialog';
 export const Navbar: React.FC = () => {
     const { isSidebarOpen, setSidebarOpen, openQueryTab, openInsightsTab, openVisualizeTab, openErdTab, activeConnectionId, user, logout, isAiPanelOpen, toggleAiPanel } = useAppStore();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [activeProfileTab, setActiveProfileTab] = useState('profile');
 
     return (
         <div className="h-14 border-b flex items-center px-4 bg-card justify-between select-none shrink-0">
-            <ProfileDialog isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
+            <ProfileDialog isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} initialTab={activeProfileTab} />
 
             <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2">
@@ -183,17 +184,17 @@ export const Navbar: React.FC = () => {
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
-                            <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
+                            <DropdownMenuItem onClick={() => { setActiveProfileTab('profile'); setIsProfileOpen(true); }}>
                                 <UserIcon className="mr-2 h-4 w-4" />
                                 <span>Profile</span>
                                 <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setActiveProfileTab('billing'); setIsProfileOpen(true); }}>
                                 <CreditCard className="mr-2 h-4 w-4" />
                                 <span>Billing</span>
                                 <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setActiveProfileTab('advanced'); setIsProfileOpen(true); }}>
                                 <Settings className="mr-2 h-4 w-4" />
                                 <span>Settings</span>
                                 <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
