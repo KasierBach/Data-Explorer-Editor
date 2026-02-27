@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React from 'react';
 import { ExplorerSidebar } from "../Explorer/ExplorerSidebar"
 import { MainContent } from "./MainContent"
 import { useAppStore } from "@/core/services/store"
@@ -6,6 +6,7 @@ import { Navbar } from './Navbar';
 import { ConnectionDialog } from '@/presentation/modules/Connection/ConnectionDialog';
 import { AiAssistant } from '@/presentation/modules/Query/AiAssistant';
 import { cn } from "@/lib/utils";
+import { useResizablePanel } from '@/presentation/hooks/useResizablePanel';
 
 export function AppShell() {
     const isSidebarOpen = useAppStore(state => state.isSidebarOpen);
@@ -15,87 +16,30 @@ export function AppShell() {
     const setAiPanelOpen = useAppStore(state => state.setAiPanelOpen);
 
     // Left sidebar drag state
-    const [isDragging, setIsDragging] = useState(false);
-    const initialWidth = (sidebarWidth && sidebarWidth > 100) ? sidebarWidth : 300;
-    const [currentWidth, setCurrentWidth] = useState(initialWidth);
+    const leftPanel = useResizablePanel({
+        initialWidth: (sidebarWidth && sidebarWidth > 100) ? sidebarWidth : 300,
+        minWidth: 250,
+        maxWidth: 0.45, // 45vw
+        direction: 'left',
+        onWidthChange: setSidebarWidth
+    });
 
     // Right AI panel drag state
-    const [isAiDragging, setIsAiDragging] = useState(false);
-    const [aiPanelWidth, setAiPanelWidth] = useState(380);
+    const rightPanel = useResizablePanel({
+        initialWidth: 380,
+        minWidth: 300,
+        maxWidth: 0.5, // 50vw
+        direction: 'right'
+    });
 
-    // --- Left sidebar resize ---
-    const startResizing = useCallback((e: React.MouseEvent) => {
-        setIsDragging(true);
-        e.preventDefault();
-        document.body.style.cursor = 'col-resize';
-    }, []);
-
-    const stopResizing = useCallback(() => {
-        setIsDragging(false);
-        document.body.style.cursor = 'default';
-    }, []);
-
-    const resize = useCallback((e: MouseEvent) => {
-        if (isDragging) {
-            const newWidth = Math.max(250, Math.min(e.clientX, window.innerWidth * 0.45));
-            setCurrentWidth(newWidth);
+    // Sync external sidebar width changes (e.g. from store reset)
+    React.useEffect(() => {
+        if (!leftPanel.isDragging && sidebarWidth !== leftPanel.width && sidebarWidth > 0) {
+            leftPanel.setWidth(sidebarWidth);
         }
-    }, [isDragging]);
+    }, [sidebarWidth, leftPanel]);
 
-    useEffect(() => {
-        if (isDragging) {
-            window.addEventListener('mousemove', resize);
-            window.addEventListener('mouseup', stopResizing);
-        } else {
-            window.removeEventListener('mousemove', resize);
-            window.removeEventListener('mouseup', stopResizing);
-        }
-        return () => {
-            window.removeEventListener('mousemove', resize);
-            window.removeEventListener('mouseup', stopResizing);
-        };
-    }, [isDragging, resize, stopResizing]);
-
-    useEffect(() => {
-        if (!isDragging && currentWidth !== sidebarWidth) {
-            setSidebarWidth(currentWidth);
-        }
-    }, [isDragging, currentWidth, setSidebarWidth, sidebarWidth]);
-
-    // --- Right AI panel resize ---
-    const startAiResizing = useCallback((e: React.MouseEvent) => {
-        setIsAiDragging(true);
-        e.preventDefault();
-        document.body.style.cursor = 'col-resize';
-    }, []);
-
-    const stopAiResizing = useCallback(() => {
-        setIsAiDragging(false);
-        document.body.style.cursor = 'default';
-    }, []);
-
-    const resizeAi = useCallback((e: MouseEvent) => {
-        if (isAiDragging) {
-            const newWidth = Math.max(300, Math.min(window.innerWidth - e.clientX, window.innerWidth * 0.5));
-            setAiPanelWidth(newWidth);
-        }
-    }, [isAiDragging]);
-
-    useEffect(() => {
-        if (isAiDragging) {
-            window.addEventListener('mousemove', resizeAi);
-            window.addEventListener('mouseup', stopAiResizing);
-        } else {
-            window.removeEventListener('mousemove', resizeAi);
-            window.removeEventListener('mouseup', stopAiResizing);
-        }
-        return () => {
-            window.removeEventListener('mousemove', resizeAi);
-            window.removeEventListener('mouseup', stopAiResizing);
-        };
-    }, [isAiDragging, resizeAi, stopAiResizing]);
-
-    const anyDragging = isDragging || isAiDragging;
+    const anyDragging = leftPanel.isDragging || rightPanel.isDragging;
 
     return (
         <div className="h-screen w-full bg-background overflow-hidden flex flex-col">
@@ -104,14 +48,14 @@ export function AppShell() {
             <div className="flex-1 flex overflow-hidden relative select-none">
                 {/* Left Sidebar */}
                 <aside
-                    style={{ width: isSidebarOpen ? `${currentWidth}px` : '0px' }}
+                    style={{ width: isSidebarOpen ? `${leftPanel.width}px` : '0px' }}
                     className={cn(
                         "h-full border-r bg-card relative flex-shrink-0 overflow-hidden",
                         !isSidebarOpen && "border-none",
-                        isDragging ? "" : "transition-[width] duration-300 ease-in-out"
+                        leftPanel.isDragging ? "" : "transition-[width] duration-300 ease-in-out"
                     )}
                 >
-                    <div style={{ width: `${currentWidth}px` }} className="h-full">
+                    <div style={{ width: `${leftPanel.width}px` }} className="h-full">
                         <ExplorerSidebar />
                     </div>
                 </aside>
@@ -119,18 +63,18 @@ export function AppShell() {
                 {/* Left Sidebar Resize Handle */}
                 {isSidebarOpen && (
                     <div
-                        onMouseDown={startResizing}
+                        onMouseDown={leftPanel.startResizing}
                         className={cn(
                             "absolute top-0 bottom-0 w-3 cursor-col-resize z-50 transition-colors group",
                             "hover:bg-blue-500/20 active:bg-blue-500/40",
-                            isDragging && "bg-blue-500/30"
+                            leftPanel.isDragging && "bg-blue-500/30"
                         )}
-                        style={{ left: `${currentWidth - 6}px` }}
+                        style={{ left: `${leftPanel.width - 6}px` }}
                     >
                         <div className={cn(
                             "absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-0.5 bg-border transition-colors",
                             "group-hover:bg-blue-500/50 group-active:bg-blue-500",
-                            isDragging && "bg-blue-500"
+                            leftPanel.isDragging && "bg-blue-500"
                         )} />
                     </div>
                 )}
@@ -144,18 +88,18 @@ export function AppShell() {
                 {/* AI Panel Resize Handle */}
                 {isAiPanelOpen && (
                     <div
-                        onMouseDown={startAiResizing}
+                        onMouseDown={rightPanel.startResizing}
                         className={cn(
                             "absolute top-0 bottom-0 w-3 cursor-col-resize z-50 transition-colors group",
                             "hover:bg-violet-500/20 active:bg-violet-500/40",
-                            isAiDragging && "bg-violet-500/30"
+                            rightPanel.isDragging && "bg-violet-500/30"
                         )}
-                        style={{ right: `${aiPanelWidth - 6}px` }}
+                        style={{ right: `${rightPanel.width - 6}px` }}
                     >
                         <div className={cn(
                             "absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-0.5 bg-border transition-colors",
                             "group-hover:bg-violet-500/50 group-active:bg-violet-500",
-                            isAiDragging && "bg-violet-500"
+                            rightPanel.isDragging && "bg-violet-500"
                         )} />
                     </div>
                 )}
@@ -165,11 +109,11 @@ export function AppShell() {
                     className={cn(
                         "h-full border-l bg-card flex-shrink-0 overflow-hidden",
                         !isAiPanelOpen && "border-none",
-                        isAiDragging ? "" : "transition-[width] duration-300 ease-in-out"
+                        rightPanel.isDragging ? "" : "transition-[width] duration-300 ease-in-out"
                     )}
-                    style={{ width: isAiPanelOpen ? `${aiPanelWidth}px` : '0px' }}
+                    style={{ width: isAiPanelOpen ? `${rightPanel.width}px` : '0px' }}
                 >
-                    <div style={{ width: `${aiPanelWidth}px` }} className="h-full">
+                    <div style={{ width: `${rightPanel.width}px` }} className="h-full">
                         <AiAssistant
                             onInsertSql={(sql) => {
                                 const store = useAppStore.getState();

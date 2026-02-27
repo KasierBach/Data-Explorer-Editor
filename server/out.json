@@ -1,0 +1,26 @@
+[
+  {
+    "id": "b115ca80-e468-40bc-b5ae-e03cfab8ac7d",
+    "name": "Local Postgres",
+    "type": "postgres",
+    "host": "localhost",
+    "port": 5432,
+    "username": "postgres",
+    "password": "123",
+    "database": "postgres",
+    "showAllDatabases": true,
+    "createdAt": "2026-02-13T11:30:05.633Z"
+  },
+  {
+    "id": "e6eb5120-1bf6-4d80-a2ea-14abaf614cdc",
+    "name": "postgres @ aws-1-ap-south-1.pooler.supabase.com",
+    "type": "postgres",
+    "host": "aws-1-ap-south-1.pooler.supabase.com",
+    "port": 6543,
+    "username": "postgres.lpashsckbrlnnpnrjtps",
+    "password": "0Comrade_Bach69",
+    "database": "postgres",
+    "showAllDatabases": false,
+    "createdAt": "2026-02-27T18:38:55.739Z"
+  }
+]

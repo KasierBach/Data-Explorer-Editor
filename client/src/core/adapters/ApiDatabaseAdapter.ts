@@ -237,4 +237,24 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
 
         return await response.json();
     }
+
+    async generateSql(params: {
+        database?: string;
+        prompt: string;
+        image?: string;
+        context?: string;
+        model: string;
+        mode: string;
+    }): Promise<Response> {
+        if (!this.connectionId) throw new Error('Not connected');
+
+        return fetch(`${this.baseUrl}/ai/generate-sql`, {
+            method: 'POST',
+            headers: this.getHeaders(),
+            body: JSON.stringify({
+                ...params,
+                connectionId: this.connectionId
+            }),
+        });
+    }
 }

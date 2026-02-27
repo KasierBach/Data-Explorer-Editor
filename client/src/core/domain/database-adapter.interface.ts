@@ -63,4 +63,16 @@ export interface IDatabaseAdapter {
      * Gets table relationships (foreign keys) for the database.
      */
     getRelationships(database?: string): Promise<any[]>;
+
+    /**
+     * Generates SQL using the AI Assistant
+     */
+    generateSql?(params: {
+        database?: string;
+        prompt: string;
+        image?: string;
+        context?: string;
+        model: string;
+        mode: string;
+    }): Promise<Response>;
 }

@@ -7,8 +7,28 @@ import type {
     DatabaseMetrics,
     UpdateRowParams,
 } from './database-strategy.interface';
+import * as mysql from 'mysql2/promise';
 
 export class MysqlStrategy implements IDatabaseStrategy {
+
+    // ─── Connection Management ───
+
+    createPool(connectionConfig: any, databaseOverride?: string): any {
+        return mysql.createPool({
+            host: connectionConfig.host,
+            port: connectionConfig.port,
+            user: connectionConfig.username,
+            password: connectionConfig.password || undefined,
+            database: databaseOverride || connectionConfig.database,
+            waitForConnections: true,
+            connectionLimit: 20,
+            queueLimit: 0,
+        });
+    }
+
+    async closePool(pool: any): Promise<void> {
+        await pool.end();
+    }
 
     // ─── Identifier Quoting ───
 

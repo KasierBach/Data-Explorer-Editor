@@ -183,6 +183,49 @@ ${schemaContext}` : '\nNo database schema context available right now.'}`;
         throw new Error(`AI generation failed: ${lastError?.message}`);
     }
 
+    async gatherSchemaContext(pool: any, strategy: any, database?: string): Promise<string> {
+        let schemaContext = '';
+        try {
+            const schemas = await strategy.getSchemas(pool, database);
+            const allTables: any[] = [];
+            const columnMap = new Map<string, any[]>();
+            const skipSchemas = ['pg_catalog', 'information_schema', 'pg_toast'];
+
+            for (const schema of schemas) {
+                const schemaName = typeof schema === 'string' ? schema : (schema as any).name;
+                if (!schemaName || skipSchemas.includes(schemaName)) continue;
+
+                try {
+                    const tables = await strategy.getTables(pool, schemaName, database);
+                    for (const table of tables) {
+                        const tableName = typeof table === 'string' ? table : (table as any).name;
+                        if (!tableName) continue;
+                        allTables.push({ name: tableName, schema: schemaName });
+
+                        try {
+                            const cols = await strategy.getColumns(pool, schemaName, tableName);
+                            columnMap.set(`${schemaName}.${tableName}`, cols);
+                        } catch { /* skip columns we can't read */ }
+                    }
+                } catch { /* skip schemas we can't read */ }
+            }
+
+            // Get relationships
+            let relationships: any[] = [];
+            try {
+                relationships = await strategy.getRelationships(pool);
+            } catch { /* no relationships available */ }
+
+            schemaContext = this.buildSchemaContext(allTables, columnMap, relationships);
+            console.log(`[AiService] Schema context built: ${allTables.length} tables found`);
+        } catch (error: any) {
+            console.error(`[AiService] Schema gathering failed:`, error.message);
+            // Continue with empty context rather than failing completely
+            schemaContext = '(Could not load schema information)';
+        }
+        return schemaContext;
+    }
+
     buildSchemaContext(tables: any[], columns: Map<string, any[]>, relationships: any[]): string {
         let context = '';
 

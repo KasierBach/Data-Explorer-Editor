@@ -52,6 +52,10 @@ export interface UpdateRowParams {
 }
 
 export interface IDatabaseStrategy {
+    // ─── Connection Management ───
+    createPool(connectionConfig: any, databaseOverride?: string): Promise<any> | any;
+    closePool(pool: any): Promise<void>;
+
     // ─── Query Operations ───
     executeQuery(pool: any, sql: string): Promise<QueryResult>;
     updateRow(pool: any, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }>;

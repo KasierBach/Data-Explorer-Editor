@@ -7,8 +7,30 @@ import type {
     DatabaseMetrics,
     UpdateRowParams,
 } from './database-strategy.interface';
+import { Pool } from 'pg';
 
 export class PostgresStrategy implements IDatabaseStrategy {
+
+    // ─── Connection Management ───
+
+    createPool(connectionConfig: any, databaseOverride?: string): any {
+        const isLocalhost = connectionConfig.host === 'localhost' || connectionConfig.host === '127.0.0.1';
+        return new Pool({
+            host: connectionConfig.host,
+            port: connectionConfig.port,
+            user: connectionConfig.username,
+            password: connectionConfig.password || undefined,
+            database: databaseOverride || connectionConfig.database,
+            ssl: isLocalhost ? false : { rejectUnauthorized: false },
+            max: 20,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 10000,
+        });
+    }
+
+    async closePool(pool: any): Promise<void> {
+        await pool.end();
+    }
 
     // ─── Identifier Quoting ───
 
@@ -108,7 +130,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
     }
 
     async getSchemas(pool: any, dbName?: string): Promise<TreeNodeResult[]> {
-        const sql = `SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema', 'pg_catalog')`;
+        const sql = `SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema', 'pg_catalog') AND schema_name NOT LIKE 'pg_temp_%' AND schema_name NOT LIKE 'pg_toast%'`;
         const result = await pool.query(sql);
         return result.rows.map((row: any) => ({
             id: dbName ? `db:${dbName}.schema:${row.schema_name}` : `schema:${row.schema_name}`,

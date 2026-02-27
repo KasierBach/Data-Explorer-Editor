@@ -10,10 +10,9 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/presentation/components/ui/button';
-import { RefreshCw, LayoutGrid, BarChart3, Download, Plus, Trash2, FileJson, FileText, FileCode, Check, X } from 'lucide-react';
+import { RefreshCw, LayoutGrid, Download, Plus, Trash2, FileJson, FileText, FileCode, Check, X } from 'lucide-react';
 import { FilterPopover } from './FilterPopover';
 import { TableDesigner } from './TableDesigner';
-import { ResultVisualizer } from './ResultVisualizer';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -31,7 +30,7 @@ interface DataGridProps {
 export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
-    const [viewMode, setViewMode] = useState<'grid' | 'chart' | 'design'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'design'>('grid');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 100 });
     const tableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -155,9 +154,6 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                     <Button variant={viewMode === 'grid' ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode('grid')} className="h-6 px-2 text-[11px] gap-1.5 rounded-sm">
                         <LayoutGrid className="w-3 h-3" /> Grid
                     </Button>
-                    <Button variant={viewMode === 'chart' ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode('chart')} className="h-6 px-2 text-[11px] gap-1.5 rounded-sm">
-                        <BarChart3 className="w-3 h-3" /> Visualizer
-                    </Button>
                     <Button variant={viewMode === 'design' ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode('design')} className="h-6 px-2 text-[11px] gap-1.5 rounded-sm">
                         <LayoutGrid className="w-3 h-3" /> Design
                     </Button>
@@ -234,7 +230,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
 
             {/* Main Content */}
             <div className="flex-1 relative overflow-hidden bg-background">
-                {viewMode === 'grid' ? (
+                {viewMode === 'grid' && (
                     <div ref={tableContainerRef} className="h-full overflow-auto relative scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
                         <div style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
                             <table className="w-full text-xs text-left border-collapse">
@@ -330,10 +326,6 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                 )}
                             </table>
                         </div>
-                    </div>
-                ) : (
-                    <div className="flex-1 min-h-0 bg-card overflow-hidden">
-                        <ResultVisualizer data={queryResult?.rows || []} />
                     </div>
                 )}
             </div>

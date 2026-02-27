@@ -2,23 +2,25 @@ import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { Connection } from './entities/connection.entity';
-import { Pool } from 'pg';
-import * as mysql from 'mysql2/promise';
-import * as mssql from 'mssql';
 import { PrismaService } from '../prisma/prisma.service';
+import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
 
 @Injectable()
 export class ConnectionsService implements OnModuleDestroy {
   private pools = new Map<string, any>();
 
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private strategyFactory: DatabaseStrategyFactory,
+  ) { }
 
   async onModuleDestroy() {
-    for (const pool of this.pools.values()) {
-      if (typeof pool.close === 'function') {
-        await pool.close(); // mssql
-      } else {
-        await pool.end(); // pg, mysql
+    for (const [key, pool] of this.pools.entries()) {
+      const id = key.split(':')[0];
+      const connection = await this.prisma.connection.findUnique({ where: { id } });
+      if (connection) {
+        const strategy = this.strategyFactory.getStrategy(connection.type);
+        await strategy.closePool(pool);
       }
     }
   }
@@ -56,66 +58,21 @@ export class ConnectionsService implements OnModuleDestroy {
       return this.pools.get(poolKey);
     }
 
-    let pool: any;
-    if (connection.type === 'postgres') {
-      const isLocalhost = connection.host === 'localhost' || connection.host === '127.0.0.1';
-      pool = new Pool({
-        host: connection.host,
-        port: connection.port,
-        user: connection.username,
-        password: connection.password,
-        database: databaseOverride || connection.database,
-        ssl: isLocalhost ? false : { rejectUnauthorized: false },
-        max: 20,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000,
-      });
-    } else if (connection.type === 'mysql') {
-      pool = mysql.createPool({
-        host: connection.host,
-        port: connection.port,
-        user: connection.username,
-        password: connection.password,
-        database: databaseOverride || connection.database,
-        waitForConnections: true,
-        connectionLimit: 20,
-        queueLimit: 0,
-      });
-    } else if (connection.type === 'mssql') {
-      const config: mssql.config = {
-        server: connection.host || 'localhost',
-        port: connection.port || 1433,
-        user: connection.username,
-        password: connection.password,
-        database: databaseOverride || connection.database,
-        options: {
-          encrypt: false,
-          trustServerCertificate: true,
-        },
-        pool: {
-          max: 20,
-          min: 0,
-          idleTimeoutMillis: 30000,
-        },
-      };
-      pool = await new mssql.ConnectionPool(config).connect();
-    }
+    const strategy = this.strategyFactory.getStrategy(connection.type);
+    const pool = await strategy.createPool(connection, databaseOverride);
 
     this.pools.set(poolKey, pool);
     return pool;
   }
 
   async update(id: string, updateConnectionDto: UpdateConnectionDto): Promise<Connection> {
-    await this.findOne(id);
+    const connection = await this.findOne(id);
+    const strategy = this.strategyFactory.getStrategy(connection.type);
 
     // Close existing pools for this connection if config changed
     for (const [key, pool] of this.pools.entries()) {
       if (key.startsWith(`${id}:`)) {
-        if (typeof pool.close === 'function') {
-          await pool.close();
-        } else {
-          await pool.end();
-        }
+        await strategy.closePool(pool);
         this.pools.delete(key);
       }
     }
@@ -129,16 +86,13 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   async remove(id: string): Promise<void> {
-    await this.findOne(id);
+    const connection = await this.findOne(id);
+    const strategy = this.strategyFactory.getStrategy(connection.type);
 
     // Close pools
     for (const [key, pool] of this.pools.entries()) {
       if (key.startsWith(`${id}:`)) {
-        if (typeof pool.close === 'function') {
-          await pool.close();
-        } else {
-          await pool.end();
-        }
+        await strategy.closePool(pool);
         this.pools.delete(key);
       }
     }

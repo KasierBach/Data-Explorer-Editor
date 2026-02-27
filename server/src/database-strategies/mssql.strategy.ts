@@ -7,8 +7,35 @@ import type {
     DatabaseMetrics,
     UpdateRowParams,
 } from './database-strategy.interface';
+import * as mssql from 'mssql';
 
 export class MssqlStrategy implements IDatabaseStrategy {
+
+    // ─── Connection Management ───
+
+    async createPool(connectionConfig: any, databaseOverride?: string): Promise<any> {
+        const config: mssql.config = {
+            server: connectionConfig.host || 'localhost',
+            port: connectionConfig.port || 1433,
+            user: connectionConfig.username,
+            password: connectionConfig.password || undefined,
+            database: databaseOverride || connectionConfig.database,
+            options: {
+                encrypt: false,
+                trustServerCertificate: true,
+            },
+            pool: {
+                max: 20,
+                min: 0,
+                idleTimeoutMillis: 30000,
+            },
+        };
+        return await new mssql.ConnectionPool(config).connect();
+    }
+
+    async closePool(pool: any): Promise<void> {
+        await pool.close();
+    }
 
     // ─── Identifier Quoting ───
 
