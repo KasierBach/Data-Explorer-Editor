@@ -58,12 +58,14 @@ export class ConnectionsService implements OnModuleDestroy {
 
     let pool: any;
     if (connection.type === 'postgres') {
+      const isLocalhost = connection.host === 'localhost' || connection.host === '127.0.0.1';
       pool = new Pool({
         host: connection.host,
         port: connection.port,
         user: connection.username,
         password: connection.password,
         database: databaseOverride || connection.database,
+        ssl: isLocalhost ? false : { rejectUnauthorized: false },
         max: 20,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 10000,

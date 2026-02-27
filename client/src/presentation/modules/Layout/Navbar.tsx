@@ -14,6 +14,7 @@ import {
 } from "@/presentation/components/ui/dropdown-menu"
 import { useAppStore } from '@/core/services/store';
 import { ProfileDialog } from './ProfileDialog';
+import { TokenTimer } from '@/presentation/components/TokenTimer';
 
 export const Navbar: React.FC = () => {
     const { isSidebarOpen, setSidebarOpen, openQueryTab, openInsightsTab, openVisualizeTab, openErdTab, activeConnectionId, user, logout, isAiPanelOpen, toggleAiPanel } = useAppStore();
@@ -162,6 +163,8 @@ export const Navbar: React.FC = () => {
                 </Button>
 
                 <div className="h-4 w-px bg-border mx-1" />
+
+                <TokenTimer />
 
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                     <Settings className="w-4 h-4 text-muted-foreground" />

@@ -1,3 +1,4 @@
+import { useState } from "react"
 import {
     Select,
     SelectContent,
@@ -8,10 +9,42 @@ import {
     SelectValue,
 } from "../../components/ui/select"
 import { useAppStore } from "@/core/services/store"
-import { PlusCircle, Server, Globe } from "lucide-react"
+import { PlusCircle, Server, Globe, Trash, Loader2 } from "lucide-react"
 
 export function ConnectionSelector() {
-    const { connections, activeConnectionId, setActiveConnectionId, openConnectionDialog } = useAppStore()
+    const { connections, activeConnectionId, setActiveConnectionId, openConnectionDialog, removeConnection, accessToken, logout } = useAppStore()
+    const [isDeleting, setIsDeleting] = useState<string | null>(null)
+
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm('Are you sure you want to delete this connection?')) return;
+
+        setIsDeleting(id);
+        try {
+            const headers: Record<string, string> = {};
+            if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+            const response = await fetch(`http://localhost:3000/api/connections/${id}`, {
+                method: 'DELETE',
+                headers
+            });
+            if (response.ok) {
+                removeConnection(id);
+            } else if (response.status === 401) {
+                logout();
+                window.location.href = '/login';
+            } else {
+                const errText = await response.text();
+                alert(`Failed to delete connection. Status: ${response.status}\n\nDetails: ${errText}`);
+            }
+        } catch (error) {
+            console.error('Error deleting connection:', error);
+            alert('Error deleting connection');
+        } finally {
+            setIsDeleting(null);
+        }
+    }
 
     return (
         <div className="px-0">
@@ -26,17 +59,25 @@ export function ConnectionSelector() {
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-none shadow-2xl ring-1 ring-black/5 backdrop-blur-xl bg-card/95">
                     <SelectGroup>
-                        <SelectLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/50 px-4 py-2">Available Instances</SelectLabel>
+                        <SelectLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/70 px-4 py-2">Available Instances</SelectLabel>
                         {connections.map((conn) => (
-                            <SelectItem key={conn.id} value={conn.id} className="cursor-pointer focus:bg-blue-500/10 focus:text-blue-600 rounded-lg mx-1">
-                                <div className="flex flex-col text-left py-0.5">
-                                    <span className="font-bold text-sm">{conn.name}</span>
-                                    <div className="flex items-center gap-1.5 opacity-60">
-                                        <Globe className="w-3 h-3" />
-                                        <span className="text-[10px] truncate">{conn.host || 'localhost'}</span>
+                            <div key={conn.id} className="group relative flex items-center pr-2">
+                                <SelectItem value={conn.id} className="cursor-pointer focus:bg-blue-500/10 focus:text-blue-600 rounded-lg mx-1 flex-1 pr-8">
+                                    <div className="flex flex-col text-left py-0.5">
+                                        <span className="font-bold text-sm">{conn.name}</span>
+                                        <div className="flex items-center gap-1.5 opacity-60">
+                                            <Globe className="w-3 h-3" />
+                                            <span className="text-[10px] truncate">{conn.host || 'localhost'}</span>
+                                        </div>
                                     </div>
+                                </SelectItem>
+                                <div
+                                    className="absolute right-2 p-1.5 rounded-md hover:bg-red-500/20 text-muted-foreground hover:text-red-500 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                    onPointerDown={(e) => handleDelete(e, conn.id)}
+                                >
+                                    {isDeleting === conn.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash className="w-3.5 h-3.5" />}
                                 </div>
-                            </SelectItem>
+                            </div>
                         ))}
                     </SelectGroup>
                     <div className="p-2 border-t border-border/10 mt-2 bg-muted/10">

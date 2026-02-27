@@ -26,7 +26,13 @@ export class AiService {
         const { model: requestedModel, mode = 'planning', prompt, schemaContext, databaseType, image, context } = params;
 
         // Try multiple models in order of preference, or use specific model if requested
-        const models = requestedModel ? [requestedModel] : ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3-flash'];
+        const legacyMap: Record<string, string> = {
+            'gemini-3-flash': 'gemini-3-flash-preview',
+            'gemini-3-pro': 'gemini-3-pro-preview',
+            'gemini-3.1-pro': 'gemini-3.1-pro-preview'
+        };
+        const actualModel = requestedModel ? (legacyMap[requestedModel] || requestedModel) : null;
+        const models = actualModel ? [actualModel] : ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3-flash-preview'];
 
         const hasDbContext = schemaContext && schemaContext.trim().length > 0 && !schemaContext.includes('Could not load');
 

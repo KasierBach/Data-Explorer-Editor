@@ -36,7 +36,7 @@ export interface AiChatSlice {
 export const createAiChatSlice: StateCreator<AiChatSlice> = (set) => ({
     aiChats: [],
     activeAiChatId: null,
-    aiModel: 'gemini-3-flash',
+    aiModel: 'gemini-3-flash-preview',
     aiMode: 'planning',
     createAiChat: () => {
         const id = `chat-${Date.now()}`;

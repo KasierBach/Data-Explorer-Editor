@@ -53,9 +53,9 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     ];
 
     const MODELS: Array<{ id: string; label: string; isNew?: boolean; warning?: boolean }> = [
-        { id: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro (Reasoning)', isNew: true },
-        { id: 'gemini-3-pro', label: 'Gemini 3 Pro (High)', isNew: true },
-        { id: 'gemini-3-flash', label: 'Gemini 3 Flash (Fast)', isNew: true },
+        { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Reasoning)', isNew: true },
+        { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro (High)', isNew: true },
+        { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (Fast)', isNew: true },
         { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Balanced)' },
         { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Balanced)' },
         { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (Fast)' },
@@ -458,7 +458,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
             {/* Active chat title bar */}
             {activeChat && aiChats.length > 1 && (
                 <div className="px-3 py-1 border-b bg-muted/10 flex items-center gap-2">
-                    <MessageSquare className="w-3 h-3 text-muted-foreground/50" />
+                    <MessageSquare className="w-3 h-3 text-muted-foreground/70" />
                     <span className="text-[10px] text-muted-foreground truncate flex-1">{activeChat.title}</span>
                     <span className="text-[9px] text-muted-foreground/40">{aiChats.length} chats</span>
                 </div>
@@ -477,7 +477,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                             {msg.role === 'user' ? (
                                 <div className="whitespace-pre-wrap">{msg.content}</div>
                             ) : (
-                                <div className="prose prose-sm prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-pre:m-0 prose-td:border prose-th:border prose-table:border-collapse prose-table:w-full prose-th:bg-muted/50 prose-th:p-2 prose-td:p-2 prose-a:text-violet-400 select-text">
+                                <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-pre:m-0 prose-td:border prose-th:border prose-table:border-collapse prose-table:w-full prose-th:bg-muted/50 prose-th:p-2 prose-td:p-2 prose-a:text-violet-400 select-text">
                                     <ReactMarkdown
                                         remarkPlugins={[remarkGfm]}
                                         rehypePlugins={[rehypeRaw]}
@@ -719,7 +719,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                 </div>
 
                 <div className="flex items-center justify-center mt-2 px-1">
-                    <span className="text-[9px] text-muted-foreground/50">
+                    <span className="text-[9px] text-muted-foreground/70">
                         AI có thể trả lời KHÔNG CHÍNH XÁC — hãy kiểm tra lại trước khi chạy </span>
                 </div>
             </div>

@@ -38,6 +38,7 @@ export const useAppStore = create<AppState>()(
                 activeConnectionId: state.activeConnectionId,
                 isAuthenticated: state.isAuthenticated,
                 accessToken: state.accessToken,
+                tokenExp: state.tokenExp,
                 user: state.user,
                 tabs: state.tabs,
                 activeTabId: state.activeTabId,

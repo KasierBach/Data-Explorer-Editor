@@ -79,7 +79,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                     );
                 }
 
-                if (displayVal === null) return <span className="text-muted-foreground/50 italic">NULL</span>;
+                if (displayVal === null) return <span className="text-muted-foreground/70 italic">NULL</span>;
                 if (typeof displayVal === 'boolean') return displayVal ? 'true' : 'false';
                 if (typeof displayVal === 'object') return <span className="text-[10px] text-blue-400">JSON</span>;
                 return <span className={isEdited ? 'text-blue-500 font-bold' : ''}>{String(displayVal)}</span>;
@@ -305,7 +305,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                             {metadata.columns.map(col => (
                                                 <td key={col.name} className="px-1 py-0.5 border-r">
                                                     <input
-                                                        className="w-full bg-transparent border-none outline-none text-xs font-mono px-1 py-0.5 h-6 focus:ring-1 focus:ring-green-500 rounded placeholder:text-muted-foreground/30"
+                                                        className="w-full bg-transparent border-none outline-none text-xs font-mono px-1 py-0.5 h-6 focus:ring-1 focus:ring-green-500 rounded placeholder:text-muted-foreground/60"
                                                         placeholder={col.isPrimaryKey ? '(auto)' : col.type}
                                                         value={editing.newRowData[col.name] || ''}
                                                         onChange={(e) => editing.setNewRowData(prev => ({ ...prev, [col.name]: e.target.value }))}

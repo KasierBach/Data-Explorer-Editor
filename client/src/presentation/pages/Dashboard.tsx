@@ -1,12 +1,43 @@
 import React, { useState } from 'react';
 import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
-import { Plus, Database, Search, Clock, FileText, BarChart3, ArrowLeft } from 'lucide-react';
+import { Plus, Database, Search, Clock, FileText, BarChart3, ArrowLeft, Trash, Loader2 } from 'lucide-react';
 import { InsightsDashboard } from '../modules/Dashboard/InsightsDashboard';
 
 export const Dashboard: React.FC = () => {
-    const { connections, openQueryTab, setSidebarOpen, openConnectionDialog, activeConnectionId } = useAppStore();
+    const { connections, openQueryTab, setSidebarOpen, openConnectionDialog, activeConnectionId, removeConnection, setActiveConnectionId, accessToken, logout } = useAppStore();
     const [view, setView] = useState<'welcome' | 'insights'>('welcome');
+    const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (!confirm('Are you sure you want to delete this connection?')) return;
+
+        setIsDeleting(id);
+        try {
+            const headers: Record<string, string> = {};
+            if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+            const response = await fetch(`http://localhost:3000/api/connections/${id}`, {
+                method: 'DELETE',
+                headers
+            });
+            if (response.ok) {
+                removeConnection(id);
+            } else if (response.status === 401) {
+                logout();
+                window.location.href = '/login';
+            } else {
+                const errText = await response.text();
+                alert(`Failed to delete connection. Status: ${response.status}\n\nDetails: ${errText}`);
+            }
+        } catch (error) {
+            console.error('Error deleting connection:', error);
+            alert('Error deleting connection');
+        } finally {
+            setIsDeleting(null);
+        }
+    };
 
     // Mock stats for now
     const queryCount = 12;
@@ -133,9 +164,20 @@ export const Dashboard: React.FC = () => {
                                                     </p>
                                                 </div>
                                             </div>
-                                            <Button variant="outline" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                                Connect
-                                            </Button>
+                                            <div className="flex items-center gap-2">
+                                                <Button variant="outline" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setActiveConnectionId(conn.id); setSidebarOpen(true); }}>
+                                                    Connect
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8 w-8"
+                                                    onClick={(e) => handleDelete(e, conn.id)}
+                                                    disabled={isDeleting === conn.id}
+                                                >
+                                                    {isDeleting === conn.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash className="w-4 h-4" />}
+                                                </Button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
