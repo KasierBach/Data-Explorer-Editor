@@ -4,12 +4,13 @@ import { Input } from '@/presentation/components/ui/input';
 import {
     Sparkles, Send, Loader2, Copy, Play, ChevronDown, X, Plus,
     MessageSquare, Trash2, Clock, ChevronLeft, Image, FileCode2,
-    Table2, Paperclip
+    Table2, Edit2, Check, ChevronUp, TriangleAlert
 } from 'lucide-react';
 import { useAppStore, type AiMessage } from '@/core/services/store';
 import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
@@ -36,15 +37,42 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     const [showHistory, setShowHistory] = useState(false);
     const [showContextMenu, setShowContextMenu] = useState(false);
     const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [editingChatId, setEditingChatId] = useState<string | null>(null);
+    const [editingTitle, setEditingTitle] = useState('');
+    const [showModeMenu, setShowModeMenu] = useState(false);
+    const [showModelMenu, setShowModelMenu] = useState(false);
+
+    const {
+        aiModel, setAiModel,
+        aiMode, setAiMode
+    } = useAppStore();
+
+    const MODES = [
+        { id: 'planning', label: 'Planning', description: 'Agent can plan before executing tasks. Use for deep research, complex tasks, or collaborative work' },
+        { id: 'fast', label: 'Fast', description: 'Agent will execute tasks directly. Use for simple tasks that can be completed faster' }
+    ];
+
+    const MODELS: Array<{ id: string; label: string; isNew?: boolean; warning?: boolean }> = [
+        { id: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro (Reasoning)', isNew: true },
+        { id: 'gemini-3-pro', label: 'Gemini 3 Pro (High)', isNew: true },
+        { id: 'gemini-3-flash', label: 'Gemini 3 Flash (Fast)', isNew: true },
+        { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Balanced)' },
+        { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Balanced)' },
+        { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (Fast)' },
+        { id: 'gemma-3-27b', label: 'Gemma 3 27B (Local-like)', warning: true },
+    ];
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const contextMenuRef = useRef<HTMLDivElement>(null);
+    const modeMenuRef = useRef<HTMLDivElement>(null);
+    const modelMenuRef = useRef<HTMLDivElement>(null);
 
     const {
         activeConnectionId, connections, activeDatabase, accessToken,
         aiChats, activeAiChatId, createAiChat, deleteAiChat,
-        setActiveAiChat, addAiMessage, tabs, activeTabId,
+        setActiveAiChat, addAiMessage, updateAiChatTitle, tabs, activeTabId,
     } = useAppStore();
 
     const activeConnection = connections.find(c => c.id === activeConnectionId);
@@ -69,18 +97,17 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         if (!showHistory) inputRef.current?.focus();
     }, [showHistory, activeAiChatId]);
 
-    // Close context menu on click outside
+    // Close context menus on click outside
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
-            if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
-                setShowContextMenu(false);
-            }
+            const target = e.target as Node;
+            if (contextMenuRef.current && !contextMenuRef.current.contains(target)) setShowContextMenu(false);
+            if (modeMenuRef.current && !modeMenuRef.current.contains(target)) setShowModeMenu(false);
+            if (modelMenuRef.current && !modelMenuRef.current.contains(target)) setShowModelMenu(false);
         };
-        if (showContextMenu) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
+        document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showContextMenu]);
+    }, []);
 
     const handleNewChat = () => {
         createAiChat();
@@ -96,6 +123,29 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     const handleDeleteChat = (e: React.MouseEvent, chatId: string) => {
         e.stopPropagation();
         deleteAiChat(chatId);
+    };
+
+    const handleStartRename = (e: React.MouseEvent, chatId: string, currentTitle: string) => {
+        e.stopPropagation();
+        setEditingChatId(chatId);
+        setEditingTitle(currentTitle);
+    };
+
+    const handleSaveRename = (e?: React.MouseEvent, chatId?: string) => {
+        if (e) e.stopPropagation();
+        const idToSave = chatId || editingChatId;
+        if (idToSave && editingTitle.trim()) {
+            updateAiChatTitle(idToSave, editingTitle.trim());
+        }
+        setEditingChatId(null);
+    };
+
+    const handleRenameKeyDown = (e: React.KeyboardEvent, chatId: string) => {
+        if (e.key === 'Enter') {
+            handleSaveRename(undefined, chatId);
+        } else if (e.key === 'Escape') {
+            setEditingChatId(null);
+        }
     };
 
     // --- Attachment handlers ---
@@ -219,6 +269,8 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                     prompt: input || '(xem hình/context đính kèm)',
                     image: imageData,
                     context: contextStr,
+                    model: aiModel,
+                    mode: aiMode,
                 }),
             });
 
@@ -313,22 +365,55 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                                     )}
                                 >
                                     <MessageSquare className="w-3.5 h-3.5 shrink-0 opacity-50" />
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-xs font-medium truncate">{chat.title}</div>
+                                    <div className="flex-1 min-w-0 py-1">
+                                        {editingChatId === chat.id ? (
+                                            <Input
+                                                value={editingTitle}
+                                                onChange={(e) => setEditingTitle(e.target.value)}
+                                                onKeyDown={(e) => handleRenameKeyDown(e, chat.id)}
+                                                onBlur={() => handleSaveRename(undefined, chat.id)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                autoFocus
+                                                className="h-6 text-xs px-1 py-0 mb-0.5"
+                                            />
+                                        ) : (
+                                            <div className="text-xs font-medium truncate pb-0.5">{chat.title}</div>
+                                        )}
                                         <div className="text-[9px] text-muted-foreground/60 flex items-center gap-1">
                                             <Clock className="w-2.5 h-2.5" />
                                             {formatTime(chat.updatedAt)}
                                             <span className="ml-1">• {chat.messages.length - 1} tin nhắn</span>
                                         </div>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-5 w-5 opacity-0 group-hover:opacity-100 hover:text-red-400 hover:bg-red-500/10 shrink-0"
-                                        onClick={(e) => handleDeleteChat(e, chat.id)}
-                                    >
-                                        <Trash2 className="w-2.5 h-2.5" />
-                                    </Button>
+                                    <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                        {editingChatId === chat.id ? (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-5 w-5 text-green-500 hover:text-green-400 hover:bg-green-500/10"
+                                                onClick={(e) => handleSaveRename(e, chat.id)}
+                                            >
+                                                <Check className="w-3 h-3" />
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-5 w-5 hover:text-blue-400 hover:bg-blue-500/10"
+                                                onClick={(e) => handleStartRename(e, chat.id, chat.title)}
+                                            >
+                                                <Edit2 className="w-2.5 h-2.5" />
+                                            </Button>
+                                        )}
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-5 w-5 hover:text-red-400 hover:bg-red-500/10"
+                                            onClick={(e) => handleDeleteChat(e, chat.id)}
+                                        >
+                                            <Trash2 className="w-2.5 h-2.5" />
+                                        </Button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -395,7 +480,9 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                                 <div className="prose prose-sm prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-pre:m-0 prose-td:border prose-th:border prose-table:border-collapse prose-table:w-full prose-th:bg-muted/50 prose-th:p-2 prose-td:p-2 prose-a:text-violet-400 select-text">
                                     <ReactMarkdown
                                         remarkPlugins={[remarkGfm]}
+                                        rehypePlugins={[rehypeRaw]}
                                         components={{
+                                            a: ({ node, className, ...props }: any) => <a className={className || "text-violet-400 hover:underline"} {...props} target="_blank" rel="noopener noreferrer" />,
                                             code({ node, inline, className, children, ...props }: any) {
                                                 const match = /language-(\w+)/.exec(className || '');
                                                 return !inline && match ? (
@@ -456,127 +543,184 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Attachments preview */}
-            {attachments.length > 0 && (
-                <div className="px-2 pt-1.5 pb-0.5 border-t bg-muted/5 flex flex-wrap gap-1.5">
-                    {attachments.map((att, i) => (
-                        <div
-                            key={i}
-                            className={cn(
-                                "flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium group",
-                                att.type === 'image' && "bg-pink-500/10 text-pink-400 border border-pink-500/20",
-                                att.type === 'sql' && "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20",
-                                att.type === 'table' && "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-                            )}
-                        >
-                            {att.type === 'image' && (
-                                <>
-                                    {att.preview && <img src={att.preview} className="w-5 h-5 rounded object-cover" alt="" />}
-                                    <Image className="w-3 h-3" />
-                                </>
-                            )}
-                            {att.type === 'sql' && <FileCode2 className="w-3 h-3" />}
-                            {att.type === 'table' && <Table2 className="w-3 h-3" />}
-                            <span className="max-w-[120px] truncate">{att.label}</span>
-                            <button
-                                onClick={() => removeAttachment(i)}
-                                className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity"
-                            >
-                                <X className="w-2.5 h-2.5" />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-            )}
-
             {/* Input area */}
-            <div className="p-2 border-t bg-muted/5">
-                <div className="flex items-center gap-1.5">
-                    {/* Context menu trigger */}
-                    <div className="relative" ref={contextMenuRef}>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0 text-muted-foreground hover:text-violet-400 hover:bg-violet-500/10"
-                            onClick={() => setShowContextMenu(!showContextMenu)}
-                            title="Đính kèm context"
-                        >
-                            <Paperclip className="w-3.5 h-3.5" />
-                        </Button>
+            <div className="p-3 border-t bg-background">
+                <div className="bg-muted/30 border border-border/50 rounded-xl focus-within:ring-1 focus-within:ring-violet-500/30 focus-within:border-violet-500/50 transition-all flex flex-col">
 
-                        {/* Context popup menu */}
-                        {showContextMenu && (
-                            <div className="absolute bottom-full left-0 mb-1 w-52 bg-popover border border-border rounded-lg shadow-xl py-1 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
-                                <div className="px-2 py-1">
-                                    <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Đính kèm context</span>
+                    {/* Attachments preview inside the box */}
+                    {attachments.length > 0 && (
+                        <div className="px-3 pt-3 pb-1 flex flex-wrap gap-1.5">
+                            {attachments.map((att, i) => (
+                                <div
+                                    key={i}
+                                    className={cn(
+                                        "flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium group",
+                                        att.type === 'image' && "bg-pink-500/10 text-pink-400 border border-pink-500/20",
+                                        att.type === 'sql' && "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20",
+                                        att.type === 'table' && "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+                                    )}
+                                >
+                                    {att.type === 'image' && (
+                                        <>
+                                            {att.preview && <img src={att.preview} className="w-5 h-5 rounded object-cover" alt="" />}
+                                            <Image className="w-3 h-3" />
+                                        </>
+                                    )}
+                                    {att.type === 'sql' && <FileCode2 className="w-3 h-3" />}
+                                    {att.type === 'table' && <Table2 className="w-3 h-3" />}
+                                    <span className="max-w-[120px] truncate">{att.label}</span>
+                                    <button
+                                        onClick={() => removeAttachment(i)}
+                                        className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity"
+                                    >
+                                        <X className="w-2.5 h-2.5" />
+                                    </button>
                                 </div>
+                            ))}
+                        </div>
+                    )}
 
-                                <button
-                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left"
-                                    onClick={handleAddImage}
-                                >
-                                    <Image className="w-4 h-4 text-pink-400" />
-                                    <div>
-                                        <div className="font-medium">Hình ảnh</div>
-                                        <div className="text-[9px] text-muted-foreground">Upload ảnh để AI phân tích</div>
-                                    </div>
-                                </button>
-
-                                <button
-                                    className={cn(
-                                        "w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left",
-                                        (!activeTab || activeTab.type !== 'query' || !activeTab.metadata?.sql) && "opacity-40 pointer-events-none"
-                                    )}
-                                    onClick={handlePasteSql}
-                                >
-                                    <FileCode2 className="w-4 h-4 text-cyan-400" />
-                                    <div>
-                                        <div className="font-medium">SQL từ Editor</div>
-                                        <div className="text-[9px] text-muted-foreground">Đính kèm SQL đang mở</div>
-                                    </div>
-                                </button>
-
-                                <button
-                                    className={cn(
-                                        "w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left",
-                                        (!activeConnection || !activeDatabase) && "opacity-40 pointer-events-none"
-                                    )}
-                                    onClick={handleMentionTable}
-                                >
-                                    <Table2 className="w-4 h-4 text-emerald-400" />
-                                    <div>
-                                        <div className="font-medium">Database Context</div>
-                                        <div className="text-[9px] text-muted-foreground">Thêm thông tin DB đang kết nối</div>
-                                    </div>
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    <Input
-                        ref={inputRef}
+                    <textarea
+                        ref={inputRef as any}
                         value={input}
                         onChange={e => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder={activeConnection
-                            ? "Hỏi bất cứ điều gì... (Enter để gửi)"
-                            : "Kết nối database trước..."}
+                        placeholder={activeConnection ? "Hỏi bất cứ điều gì..." : "Kết nối database trước..."}
                         disabled={isLoading || !activeConnection}
-                        className="text-xs h-8 bg-background/50 border-border/30 focus-visible:ring-violet-500/30"
+                        className="w-full bg-transparent border-none text-xs p-3 resize-none focus:outline-none min-h-[60px] max-h-[200px]"
+                        rows={1}
+                        style={{ fieldSizing: "content" } as any}
                     />
-                    <Button
-                        size="icon"
-                        className="h-8 w-8 bg-violet-500 hover:bg-violet-600 shrink-0"
-                        onClick={handleSend}
-                        disabled={isLoading || (!input.trim() && attachments.length === 0) || !activeConnection}
-                    >
-                        {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
-                    </Button>
+
+                    {/* Toolbar */}
+                    <div className="flex items-center justify-between p-2 pt-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            {/* Paperclip */}
+                            <div className="relative" ref={contextMenuRef}>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground shrink-0"
+                                    onClick={() => setShowContextMenu(!showContextMenu)}
+                                    title="Đính kèm context"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </Button>
+                                {/* Context popup menu */}
+                                {showContextMenu && (
+                                    <div className="absolute bottom-[calc(100%+8px)] left-0 w-52 bg-popover border border-border rounded-lg shadow-xl py-1 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-150">
+                                        <div className="px-2 py-1">
+                                            <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Đính kèm context</span>
+                                        </div>
+                                        <button className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left" onClick={handleAddImage}>
+                                            <Image className="w-4 h-4 text-pink-400" />
+                                            <div>
+                                                <div className="font-medium">Hình ảnh</div>
+                                                <div className="text-[9px] text-muted-foreground">Upload ảnh để AI phân tích</div>
+                                            </div>
+                                        </button>
+                                        <button className={cn("w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left", (!activeTab || activeTab.type !== 'query' || !activeTab.metadata?.sql) && "opacity-40 pointer-events-none")} onClick={handlePasteSql}>
+                                            <FileCode2 className="w-4 h-4 text-cyan-400" />
+                                            <div>
+                                                <div className="font-medium">SQL từ Editor</div>
+                                                <div className="text-[9px] text-muted-foreground">Đính kèm SQL đang mở</div>
+                                            </div>
+                                        </button>
+                                        <button className={cn("w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left", (!activeConnection || !activeDatabase) && "opacity-40 pointer-events-none")} onClick={handleMentionTable}>
+                                            <Table2 className="w-4 h-4 text-emerald-400" />
+                                            <div>
+                                                <div className="font-medium">Database Context</div>
+                                                <div className="text-[9px] text-muted-foreground">Thêm thông tin DB đang kết nối</div>
+                                            </div>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Mode Selector */}
+                            <div className="relative" ref={modeMenuRef}>
+                                <button
+                                    onClick={() => {
+                                        setShowModeMenu(!showModeMenu);
+                                        setShowModelMenu(false);
+                                        setShowContextMenu(false);
+                                    }}
+                                    className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                                >
+                                    <ChevronUp className="w-3 h-3 opacity-50" />
+                                    {MODES.find(m => m.id === aiMode)?.label}
+                                </button>
+                                {showModeMenu && (
+                                    <div className="absolute bottom-[calc(100%+8px)] left-[-1rem] w-[17rem] max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border border-border/10 rounded-xl shadow-2xl p-1.5 z-[99999] text-foreground animate-in fade-in slide-in-from-bottom-2 duration-150">
+                                        <div className="px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground mb-1">Conversation mode</div>
+                                        <div className="flex flex-col gap-0.5">
+                                            {MODES.map(m => (
+                                                <button
+                                                    key={m.id}
+                                                    className={cn("w-full flex flex-col items-start px-2.5 py-2 hover:bg-white/5 rounded-lg transition-colors text-left", aiMode === m.id && "bg-white/5")}
+                                                    onClick={() => { setAiMode(m.id); setShowModeMenu(false); }}
+                                                >
+                                                    <span className="text-xs font-semibold mb-0.5">{m.label}</span>
+                                                    <span className="text-[10px] text-muted-foreground leading-relaxed">{m.description}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Model Selector */}
+                            <div className="relative" ref={modelMenuRef}>
+                                <button
+                                    onClick={() => {
+                                        setShowModelMenu(!showModelMenu);
+                                        setShowModeMenu(false);
+                                        setShowContextMenu(false);
+                                    }}
+                                    className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                                >
+                                    <ChevronUp className="w-3 h-3 opacity-50" />
+                                    {MODELS.find(m => m.id === aiModel)?.label}
+                                </button>
+                                {showModelMenu && (
+                                    <div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-64 max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border border-border/10 rounded-xl shadow-2xl p-1.5 z-[99999] text-foreground animate-in fade-in slide-in-from-bottom-2 duration-150">
+                                        <div className="px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground mb-1">Model</div>
+                                        <div className="flex flex-col gap-0.5">
+                                            {MODELS.map(m => (
+                                                <button
+                                                    key={m.id}
+                                                    className="w-full flex items-center justify-between px-2.5 py-2 text-xs hover:bg-white/5 rounded-lg transition-colors text-left"
+                                                    onClick={() => { setAiModel(m.id); setShowModelMenu(false); }}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={aiModel === m.id ? "font-semibold" : "font-medium"}>{m.label}</span>
+                                                        {m.warning && <TriangleAlert className="w-3.5 h-3.5 text-yellow-500" />}
+                                                    </div>
+                                                    {m.isNew && <span className="bg-white/10 text-muted-foreground font-semibold text-[9px] px-2 py-0.5 rounded-full">New</span>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                                size="icon"
+                                className="h-7 w-7 rounded-full bg-blue-500 hover:bg-blue-600 shrink-0 text-white"
+                                onClick={handleSend}
+                                disabled={isLoading || (!input.trim() && attachments.length === 0) || !activeConnection}
+                            >
+                                {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5 ml-0.5" />}
+                            </Button>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex items-center gap-1.5 mt-1 px-1">
-                    <span className="text-[8px] text-muted-foreground/50">
-                        Powered by Google Gemini • AI có thể sinh SQL không chính xác — hãy kiểm tra trước khi chạy
-                    </span>
+
+                <div className="flex items-center justify-center mt-2 px-1">
+                    <span className="text-[9px] text-muted-foreground/50">
+                        AI có thể trả lời KHÔNG CHÍNH XÁC — hãy kiểm tra lại trước khi chạy </span>
                 </div>
             </div>
         </div>

@@ -21,17 +21,23 @@ export interface AiChat {
 export interface AiChatSlice {
     aiChats: AiChat[];
     activeAiChatId: string | null;
+    aiModel: string;
+    aiMode: string;
     createAiChat: () => string;
     deleteAiChat: (id: string) => void;
     setActiveAiChat: (id: string) => void;
     addAiMessage: (chatId: string, message: AiMessage) => void;
     updateAiChatTitle: (chatId: string, title: string) => void;
     clearAiChats: () => void;
+    setAiModel: (model: string) => void;
+    setAiMode: (mode: string) => void;
 }
 
 export const createAiChatSlice: StateCreator<AiChatSlice> = (set) => ({
     aiChats: [],
     activeAiChatId: null,
+    aiModel: 'gemini-3-flash',
+    aiMode: 'planning',
     createAiChat: () => {
         const id = `chat-${Date.now()}`;
         const newChat: AiChat = {
@@ -82,4 +88,6 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set) => ({
         ),
     })),
     clearAiChats: () => set({ aiChats: [], activeAiChatId: null }),
+    setAiModel: (model) => set({ aiModel: model }),
+    setAiMode: (mode) => set({ aiMode: mode }),
 });

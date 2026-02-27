@@ -20,4 +20,12 @@ export class GenerateSqlDto {
     @IsOptional()
     @IsString()
     context?: string; // additional context (SQL, table schema, etc.)
+
+    @IsOptional()
+    @IsString()
+    model?: string; // Specific AI model to use
+
+    @IsOptional()
+    @IsString()
+    mode?: string; // e.g. 'planning' or 'fast'
 }

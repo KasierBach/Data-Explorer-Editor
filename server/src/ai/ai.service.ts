@@ -15,39 +15,66 @@ export class AiService {
     }
 
     async chat(params: {
+        model?: string;
+        mode?: string;
         prompt: string;
         schemaContext?: string;
         databaseType?: string;
         image?: string;
         context?: string;
     }): Promise<{ message: string; sql?: string; explanation?: string }> {
-        const { prompt, schemaContext, databaseType, image, context } = params;
+        const { model: requestedModel, mode = 'planning', prompt, schemaContext, databaseType, image, context } = params;
 
-        // Try multiple models in order of preference (use models with available free-tier quota)
-        const models = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3-flash'];
+        // Try multiple models in order of preference, or use specific model if requested
+        const models = requestedModel ? [requestedModel] : ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3-flash'];
 
         const hasDbContext = schemaContext && schemaContext.trim().length > 0 && !schemaContext.includes('Could not load');
 
-        const systemPrompt = `You are an intelligent, friendly, and highly capable AI assistant built directly into "Data Explorer" — a professional database management tool.
-Your persona is similar to an expert software engineer pair-programming with the user: you are proactive, helpful, and take the time to explain your reasoning clearly and thoroughly.
+        let systemPrompt = `You are an intelligent, senior-level AI pair programmer built directly into "Data Explorer".
+Your mission is to assist the user with software engineering, database management, architecture design, debugging, and general technical guidance.
+HOWEVER, you are also a versatile assistant capable of answering ANY questions the user asks, including general knowledge, everyday topics, life advice, and casual conversation.
 
-You can help with ANYTHING the user asks: general knowledge, coding, math, advice, conversation, and especially SQL/database topics.
+CORE OBJECTIVE:
+- Provide accurate, practical, and highly optimized technical solutions.
+- Be proactive in pointing out potential edge cases, security risks (like SQL injection), and performance improvements.
+- You can converse in any language, but you MUST MATCH the language the user is speaking (e.g., if they ask in Vietnamese, respond in Vietnamese).
 
-RESPONSE FORMAT — always reply in JSON strictly matching this structure:
+RESPONSE FORMAT — you MUST reply with a JSON object strictly matching this schema:
 {
-  "message": "Your conversational response. THIS MUST BE IN THE SAME LANGUAGE AS THE USER'S PROMPT (Vietnamese if they speak Vietnamese, English if English). Use GitHub-flavored Markdown for rich formatting.",
-  "sql": "SQL query if applicable (DO NOT wrap in markdown blocks, just raw SQL), or omit this field",
-  "explanation": "Brief explanation of the SQL if provided, or omit this field"
+  "message": "Your conversational or explanatory response in Markdown format. Use tables, bolding, lists, and code blocks (\`\`\`) to make it easily readable.",
+  "sql": "Raw SQL query if specifically asked to generate one. Omit this field if the user is asking about general code or concepts.",
+  "explanation": "Brief explanation of the SQL script if one is provided. Omit this field otherwise."
 }
 
-GUIDELINES & PERSONA:
-1. **Be Friendly and Expert**: Act like a knowledgeable, encouraging senior engineer pairing with the user. Use a conversational, helpful tone.
-2. **Comprehensive Answers**: DO NOT be brief. Give detailed, thorough, comprehensive responses. Explain things from start to finish with examples, context, and depth.
-3. **Rich Formatting**: Use Markdown heavily in the "message" field. Use **Markdown tables** to present structured data, use bullet points/numbered lists for steps, use bold text for emphasis, and ALWAYS use **Markdown code blocks (\`\`\`) with syntax highlighting** whenever you write SQL, code, or scripts within the message.
-4. **Context Aware**: If the user asks about databases, SQL, or their data — and schema context is available — write highly accurate SQL tailored specifically to their exact schema.
-5. **Exact Identifiers**: For SQL, always use the exact table/column names provided in the schema context. 
-6. **Non-SQL Answers**: If the user just wants to chat or ask general questions, respond fully in the "message" field and completely omit the "sql" and "explanation" fields.
-7. **JSON Rules**: Do NOT wrap the entire JSON output in markdown blocks (no json code blocks without the json property). Return raw valid stringified JSON.
+CRITICAL RULES:
+1. **JSON Only**: Do NOT wrap the JSON output in markdown blocks (e.g., no \`\`\`json). Return a valid, parseable JSON string.
+2. **Context-Aware Database Queries**: If the user asks for SQL and schema context is provided, YOU MUST use the EXACT table names and column names from the schema. Never guess column names.
+3. **General Coding & Chat**: If the user asks about frontend React code, backend Node.js, Python scripts, or general conversations, put your entire rich response inside the \`message\` field. Do NOT try to stuff general code into the \`sql\` field.
+4. **Citations & Sources**: If you use Google Search to find information or provide facts, naturally cite your sources if helpful. We will automatically append the direct URLs to your message, so you do not need to manually print raw URLs unless explicitly asked.
+
+`;
+
+        if (mode === 'fast') {
+            systemPrompt += `CURRENT MODE: [FAST EXECUTION]
+Behavior Directives:
+- YOU MUST BE EXTREMELY CONCISE.
+- Skip all pleasantries, greetings, and filler words ("Here is the code", "Sure, I can help").
+- Directly provide the code, SQL, or exact answer requested.
+- Limit explanations to 1-2 sentences highlighting only the crucial logic or potential gotchas.
+- Focus purely on delivering the solution instantly.`;
+        } else {
+            systemPrompt += `CURRENT MODE: [PLANNING / DEEP DIVE]
+Behavior Directives:
+- YOU MUST BE THOROUGH AND EXPLANATORY.
+- Act as a mentor. Explain the "Why" behind the "How".
+- When proposing architectures or refactoring, break it down step-by-step.
+- Provide comprehensive code examples with inline comments.
+- Before committing to a massive code block, consider outlining your implementation plan first if the task is complex.
+- Anticipate follow-up questions and proactively address them.`;
+        }
+
+        systemPrompt += `
+
 ${hasDbContext ? `
 DATABASE TYPE: ${databaseType || 'postgres'}
 
@@ -59,7 +86,10 @@ ${schemaContext}` : '\nNo database schema context available right now.'}`;
         for (const modelName of models) {
             try {
                 console.log(`[AiService] Trying model: ${modelName}`);
-                const model = this.genAI.getGenerativeModel({ model: modelName });
+                const model = this.genAI.getGenerativeModel({
+                    model: modelName,
+                    tools: [{ googleSearch: {} } as any]
+                });
 
                 // Build user message parts
                 const userText = context
@@ -89,22 +119,48 @@ ${schemaContext}` : '\nNo database schema context available right now.'}`;
                     generationConfig: {
                         temperature: 0.7,
                         maxOutputTokens: 8192,
-                        responseMimeType: 'application/json',
                     },
                 });
 
                 const responseText = result.response.text();
 
+                // Extract citations
+                let sourcesSuffix = '';
+                const candidate = result.response.candidates?.[0];
+                if (candidate?.groundingMetadata?.groundingChunks) {
+                    const chunks = candidate.groundingMetadata.groundingChunks;
+                    const urls = chunks
+                        .filter((c: any) => c.web?.uri && c.web?.title)
+                        .map((c: any) => {
+                            const title = c.web.title || c.web.uri.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+                            return `[${title}](${c.web.uri})`;
+                        });
+
+                    const uniqueUrls = [...new Set(urls)];
+                    if (uniqueUrls.length > 0) {
+                        sourcesSuffix = '\n\n---\n<div class="not-prose mt-4 pt-4 border-t border-border/50">\n<p class="text-[11px] font-semibold text-muted-foreground mb-3 flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Nguồn tham khảo</p>\n<div class="flex flex-wrap gap-2">' + uniqueUrls.map(u => {
+                            const linkText = u.match(/\[(.*?)\]/)?.[1] || 'Link';
+                            const linkHref = u.match(/\((.*?)\)/)?.[1] || '#';
+                            return `<a title="Chuyển đến: ${linkHref}" class="inline-flex items-center rounded-md border border-border/50 bg-muted/30 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted/80 no-underline cursor-pointer" href="${linkHref}" target="_blank" rel="noopener noreferrer">${linkText}</a>`;
+                        }).join('') + '</div>\n</div>';
+                    }
+                }
+
                 try {
-                    const parsed = JSON.parse(responseText);
+                    // Extract JSON object ignoring any markdown wrappers
+                    const match = responseText.match(/\{[\s\S]*\}/);
+                    const cleanJsonStr = match ? match[0] : responseText;
+                    const parsed = JSON.parse(cleanJsonStr);
+
                     return {
-                        message: parsed.message || '',
+                        message: (parsed.message || '') + sourcesSuffix,
                         sql: parsed.sql || undefined,
                         explanation: parsed.explanation || undefined,
                     };
-                } catch {
+                } catch (e) {
+                    console.error('[AiService] Failed to parse JSON:', e, 'Raw:', responseText);
                     // If JSON parse fails, return raw text as message
-                    return { message: responseText };
+                    return { message: responseText + sourcesSuffix };
                 }
             } catch (error) {
                 lastError = error;

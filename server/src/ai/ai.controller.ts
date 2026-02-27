@@ -16,7 +16,7 @@ export class AiController {
 
     @Post('generate-sql')
     async generateSql(@Body() body: GenerateSqlDto) {
-        const { connectionId, database, prompt, image, context } = body;
+        const { connectionId, database, prompt, image, context, model, mode } = body;
 
         console.log(`[AI] generate-sql request: connectionId=${connectionId}, database=${database}, prompt="${prompt}"`);
 
@@ -86,6 +86,8 @@ export class AiController {
         // Step 4: Call AI (chat - can handle both SQL and general questions)
         try {
             const result = await this.aiService.chat({
+                model,
+                mode,
                 prompt,
                 schemaContext,
                 databaseType: connection.type,
