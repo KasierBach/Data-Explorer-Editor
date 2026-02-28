@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
     ChevronRight,
     ChevronDown,
@@ -27,6 +27,9 @@ const FileIcon = ({ type, className }: { type: string, className?: string }) => 
         case 'schema':
             return <Layers className={cn("w-4 h-4 text-indigo-400", className)} />;
         case 'folder':
+            if (className?.includes('Tables')) return <Table className={cn("w-4 h-4 text-amber-500", className.replace('Tables', ''))} />;
+            if (className?.includes('Views')) return <Eye className={cn("w-4 h-4 text-amber-500", className.replace('Views', ''))} />;
+            if (className?.includes('Functions')) return <Zap className={cn("w-4 h-4 text-amber-500", className.replace('Functions', ''))} />;
             return <Folder className={cn("w-4 h-4 text-amber-500 fill-amber-500/10", className)} />;
         case 'table':
             return <Table className={cn("w-4 h-4 text-blue-500", className)} />;
@@ -51,7 +54,9 @@ interface TreeNodeProps {
 }
 
 export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
+    const isExpanded = useAppStore(state => state.expandedNodes.includes(node.id));
+    const toggleExpansion = useAppStore(state => state.toggleNodeExpansion);
+
     const { data: children, isLoading } = useDatabaseHierarchy(isExpanded ? node.id : null);
     const openTab = useAppStore(state => state.openTab);
     const activeDatabase = useAppStore(state => state.activeDatabase);
@@ -63,13 +68,13 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
         e.stopPropagation();
         if (node.type === 'database') {
             if (node.hasChildren) {
-                setIsExpanded(!isExpanded);
+                toggleExpansion(node.id);
             }
             setActiveDatabase(node.name);
         } else {
             // Other nodes: normal toggle
             if (node.hasChildren) {
-                setIsExpanded(!isExpanded);
+                toggleExpansion(node.id);
             }
         }
     };
@@ -111,7 +116,7 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
                 </span>
 
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <FileIcon type={node.type} className="shrink-0 transition-all group-hover:drop-shadow-[0_0_3px_rgba(59,130,246,0.3)]" />
+                    <FileIcon type={node.type} className={cn("shrink-0 transition-all group-hover:drop-shadow-[0_0_3px_rgba(59,130,246,0.3)]", node.type === 'folder' ? node.name : '')} />
                     <span className={cn(
                         "truncate font-medium transition-colors",
                         node.type === 'database' || node.type === 'schema' ? "text-foreground/90 font-semibold text-xs uppercase tracking-tight" : "text-foreground/80 group-hover:text-foreground"

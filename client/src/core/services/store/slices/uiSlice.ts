@@ -9,6 +9,8 @@ export interface UISlice {
     isAiPanelOpen: boolean;
     toggleAiPanel: () => void;
     setAiPanelOpen: (isOpen: boolean) => void;
+    expandedNodes: string[];
+    toggleNodeExpansion: (nodeId: string) => void;
 }
 
 export const createUISlice: StateCreator<UISlice> = (set) => ({
@@ -20,4 +22,10 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
     isAiPanelOpen: false,
     toggleAiPanel: () => set((state) => ({ isAiPanelOpen: !state.isAiPanelOpen })),
     setAiPanelOpen: (isOpen) => set({ isAiPanelOpen: isOpen }),
+    expandedNodes: [],
+    toggleNodeExpansion: (nodeId) => set((state) => ({
+        expandedNodes: state.expandedNodes.includes(nodeId)
+            ? state.expandedNodes.filter(id => id !== nodeId)
+            : [...state.expandedNodes, nodeId]
+    })),
 });

@@ -117,16 +117,16 @@ export class MysqlStrategy implements IDatabaseStrategy {
         return [];
     }
 
-    async getTables(pool: any, schema: string, _dbName?: string): Promise<TreeNodeResult[]> {
+    async getTables(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
         const [rows]: any[] = await pool.query(`SHOW TABLES FROM \`${schema}\``);
         return rows.map((row: any) => {
             const tableName = Object.values(row)[0] as string;
             return {
-                id: `schema:${schema}.table:${tableName}`,
+                id: dbName ? `db:${dbName}.schema:${schema}.table:${tableName}` : `schema:${schema}.table:${tableName}`,
                 name: tableName,
                 type: 'table',
-                parentId: `schema:${schema}.folder:tables`,
-                hasChildren: false,
+                parentId: dbName ? `db:${dbName}.schema:${schema}.folder:tables` : `schema:${schema}.folder:tables`,
+                hasChildren: true,
             };
         });
     }
@@ -136,6 +136,10 @@ export class MysqlStrategy implements IDatabaseStrategy {
     }
 
     async getFunctions(_pool: any, _schema: string, _dbName?: string): Promise<TreeNodeResult[]> {
+        return [];
+    }
+
+    async getFunctionParameters(_pool: any, _schema: string, _func: string): Promise<ColumnInfo[]> {
         return [];
     }
 

@@ -60,7 +60,7 @@ export class MetadataService {
         }
 
         // 3. Schema Level → List Folders
-        if (parentId.includes('schema:') && !parentId.includes('.table:') && !parentId.includes('.view:')) {
+        if (parentId.includes('schema:') && !parentId.includes('.table:') && !parentId.includes('.view:') && !parentId.includes('.func:')) {
             return [
                 { id: `${parentId}.folder:tables`, name: 'Tables', type: 'folder', parentId, hasChildren: true },
                 { id: `${parentId}.folder:views`, name: 'Views', type: 'folder', parentId, hasChildren: true },
@@ -72,6 +72,42 @@ export class MetadataService {
         if (parentId.startsWith('db:') && !parentId.includes('.schema:')) {
             const dbPool = await this.connectionsService.getPool(connectionId, parsed.dbName);
             return strategy.getSchemas(dbPool, parsed.dbName);
+        }
+
+        // 5. Table/View Level → Get Columns
+        if (parentId.includes('.table:') || parentId.includes('.view:')) {
+            const columns = await this.getColumns(connectionId, parentId);
+            return columns.map(col => ({
+                id: `${parentId}.column:${col.name}`,
+                name: col.name,
+                type: col.isPrimaryKey ? 'primary_key' : 'column',
+                parentId,
+                hasChildren: false,
+                metadata: {
+                    dataType: col.type,
+                    isNullable: col.isNullable
+                }
+            }));
+        }
+
+        // 6. Function Level → Get Parameters
+        if (parentId.includes('.func:')) {
+            const funcName = parentId.split('.func:')[1];
+            const schema = parsed.schemaName || (connection.type === 'mssql' ? 'dbo' : 'public');
+            const dbPool = await this.connectionsService.getPool(connectionId, parsed.dbName);
+            const params = await strategy.getFunctionParameters(dbPool, schema, funcName);
+
+            return params.map(col => ({
+                id: `${parentId}.param:${col.name}`,
+                name: col.name,
+                type: 'column',
+                parentId,
+                hasChildren: false,
+                metadata: {
+                    dataType: col.type,
+                    isNullable: col.isNullable
+                }
+            }));
         }
 
         return [];

@@ -148,8 +148,8 @@ export class PostgresStrategy implements IDatabaseStrategy {
             id: dbName ? `db:${dbName}.schema:${schema}.table:${row.table_name}` : `schema:${schema}.table:${row.table_name}`,
             name: row.table_name,
             type: 'table',
-            parentId: `schema:${schema}.folder:tables`,
-            hasChildren: false,
+            parentId: dbName ? `db:${dbName}.schema:${schema}.folder:tables` : `schema:${schema}.folder:tables`,
+            hasChildren: true,
         }));
     }
 
@@ -160,8 +160,8 @@ export class PostgresStrategy implements IDatabaseStrategy {
             id: dbName ? `db:${dbName}.schema:${schema}.view:${row.table_name}` : `schema:${schema}.view:${row.table_name}`,
             name: row.table_name,
             type: 'view',
-            parentId: `schema:${schema}.folder:views`,
-            hasChildren: false,
+            parentId: dbName ? `db:${dbName}.schema:${schema}.folder:views` : `schema:${schema}.folder:views`,
+            hasChildren: true,
         }));
     }
 
@@ -172,8 +172,27 @@ export class PostgresStrategy implements IDatabaseStrategy {
             id: dbName ? `db:${dbName}.schema:${schema}.func:${row.routine_name}` : `schema:${schema}.func:${row.routine_name}`,
             name: row.routine_name,
             type: 'function',
-            parentId: `schema:${schema}.folder:functions`,
-            hasChildren: false,
+            parentId: dbName ? `db:${dbName}.schema:${schema}.folder:functions` : `schema:${schema}.folder:functions`,
+            hasChildren: true,
+        }));
+    }
+
+    async getFunctionParameters(pool: any, schema: string, func: string): Promise<ColumnInfo[]> {
+        const sql = `
+            SELECT p.parameter_name, p.data_type, p.parameter_mode 
+            FROM information_schema.parameters p
+            JOIN information_schema.routines r ON p.specific_name = r.specific_name
+            WHERE r.routine_schema = '${schema}' AND r.routine_name = '${func}'
+            ORDER BY p.ordinal_position
+        `;
+        const result = await pool.query(sql);
+        return result.rows.map((row: any) => ({
+            name: row.parameter_name || '(unnamed)',
+            type: `${row.parameter_mode || 'IN'} ${row.data_type}`,
+            isNullable: true,
+            defaultValue: null,
+            isPrimaryKey: false,
+            pkConstraintName: null,
         }));
     }
 

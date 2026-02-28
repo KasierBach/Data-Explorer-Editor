@@ -75,6 +75,7 @@ export interface IDatabaseStrategy {
     getTables(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
     getViews(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
     getFunctions(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
+    getFunctionParameters(pool: any, schema: string, func: string): Promise<ColumnInfo[]>;
     getColumns(pool: any, schema: string, table: string): Promise<ColumnInfo[]>;
     getRelationships(pool: any): Promise<Relationship[]>;
     getDatabaseMetrics(pool: any): Promise<DatabaseMetrics>;

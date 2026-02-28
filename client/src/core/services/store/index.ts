@@ -49,6 +49,7 @@ export const useAppStore = create<AppState>()(
                 aiChats: state.aiChats,
                 activeAiChatId: state.activeAiChatId,
                 isAiPanelOpen: state.isAiPanelOpen,
+                expandedNodes: state.expandedNodes,
             }),
         }
     )

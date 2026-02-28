@@ -151,8 +151,8 @@ export class MssqlStrategy implements IDatabaseStrategy {
             id: dbName ? `db:${dbName}.schema:${schema}.table:${row.TABLE_NAME}` : `schema:${schema}.table:${row.TABLE_NAME}`,
             name: row.TABLE_NAME,
             type: 'table',
-            parentId: `schema:${schema}.folder:tables`,
-            hasChildren: false,
+            parentId: dbName ? `db:${dbName}.schema:${schema}.folder:tables` : `schema:${schema}.folder:tables`,
+            hasChildren: true,
         }));
     }
 
@@ -164,8 +164,8 @@ export class MssqlStrategy implements IDatabaseStrategy {
             id: dbName ? `db:${dbName}.schema:${schema}.view:${row.TABLE_NAME}` : `schema:${schema}.view:${row.TABLE_NAME}`,
             name: row.TABLE_NAME,
             type: 'view',
-            parentId: `schema:${schema}.folder:views`,
-            hasChildren: false,
+            parentId: dbName ? `db:${dbName}.schema:${schema}.folder:views` : `schema:${schema}.folder:views`,
+            hasChildren: true,
         }));
     }
 
@@ -177,9 +177,13 @@ export class MssqlStrategy implements IDatabaseStrategy {
             id: dbName ? `db:${dbName}.schema:${schema}.func:${row.name}` : `schema:${schema}.func:${row.name}`,
             name: row.name,
             type: 'function',
-            parentId: `schema:${schema}.folder:functions`,
+            parentId: dbName ? `db:${dbName}.schema:${schema}.folder:functions` : `schema:${schema}.folder:functions`,
             hasChildren: false,
         }));
+    }
+
+    async getFunctionParameters(_pool: any, _schema: string, _func: string): Promise<ColumnInfo[]> {
+        return [];
     }
 
     async getColumns(pool: any, schema: string, table: string): Promise<ColumnInfo[]> {
