@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from '@/presentation/modules/Layout/AppShell'
 import { LoginPage } from '@/presentation/pages/LoginPage'
 import { LandingPage } from '@/presentation/pages/LandingPage'
+import { DocumentationPage } from '@/presentation/pages/DocumentationPage'
 import { RequireAuth } from '@/presentation/components/RequireAuth'
 import { ThemeProvider } from '@/presentation/components/theme-provider'
 import { useAppStore } from '@/core/services/store'
@@ -26,6 +27,7 @@ export function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
+            <Route path="/docs" element={<DocumentationPage />} />
 
             <Route
               path="/app/*"

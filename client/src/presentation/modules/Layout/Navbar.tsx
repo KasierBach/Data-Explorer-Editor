@@ -131,11 +131,11 @@ export const Navbar: React.FC = () => {
                             <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">Help</Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="w-56">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => window.open('/docs', '_blank')}>
                                 <LifeBuoy className="mr-2 h-4 w-4" />
                                 <span>Documentation</span>
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => window.open('https://github.com/KasierBach/Data-Explorer-Editor.git', '_blank')}>
                                 <Github className="mr-2 h-4 w-4" />
                                 <span>GitHub</span>
                             </DropdownMenuItem>
