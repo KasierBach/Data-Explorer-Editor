@@ -1,0 +1,13 @@
+{
+  "name": "data-explorer",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n SERVER,CLIENT -c blue,green \"npm run start:dev --prefix server\" \"npm run dev --prefix client\"",
+    "server": "npm run start:dev --prefix server",
+    "client": "npm run dev --prefix client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
