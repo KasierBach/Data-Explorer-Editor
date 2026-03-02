@@ -226,6 +226,59 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         }
     }, [connectionId, selectedDatabase, queryClient]);
 
+    const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
+        const removals = changes.filter(c => c.type === 'remove');
+        const others = changes.filter(c => c.type !== 'remove');
+
+        if (others.length > 0) {
+            onEdgesChange(others);
+        }
+
+        removals.forEach(async (change) => {
+            if (change.type !== 'remove') return;
+            const edge = edges.find(e => e.id === change.id);
+            if (!edge) {
+                onEdgesChange([change]);
+                return;
+            }
+
+            // Only DB-backed edges representing foreign keys
+            if (edge.id.startsWith('db-e-')) {
+                const constraintName = fkConstraintMap.get(`${edge.source}.${edge.sourceHandle}`);
+                if (!constraintName) {
+                    toast.info("Cannot remove: unknown constraint name for this relationship.");
+                    // Still remove visually if it's glitched out
+                    onEdgesChange([change]);
+                    return;
+                }
+
+                if (window.confirm(`Are you sure you want to drop the foreign key constraint (${constraintName})?`)) {
+                    try {
+                        await queryService.updateSchema({
+                            connectionId: connectionId!,
+                            database: selectedDatabase,
+                            table: edge.source,
+                            operations: [{
+                                type: 'drop_fk',
+                                name: constraintName,
+                                constraintName: constraintName
+                            }]
+                        });
+                        toast.success("Relationship removed successfully");
+                        queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
+                        queryClient.invalidateQueries({ queryKey: ['erd-columns'] });
+                        onEdgesChange([change]);
+                    } catch (error: any) {
+                        toast.error("Failed to remove relationship", { description: error.message });
+                    }
+                }
+            } else {
+                // Manual visual edge, remove immediately
+                onEdgesChange([change]);
+            }
+        });
+    }, [edges, onEdgesChange, fkConstraintMap, connectionId, selectedDatabase, queryClient]);
+
     const onConnect = useCallback(
         (params: Connection) => {
             if (params.source === params.target) return;
@@ -682,7 +735,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     nodes={nodes}
                     edges={edges}
                     onNodesChange={onNodesChange}
-                    onEdgesChange={onEdgesChange}
+                    onEdgesChange={handleEdgesChange}
                     onConnect={onConnect}
                     nodeTypes={nodeTypes}
                     connectionLineType={ConnectionLineType.SmoothStep}

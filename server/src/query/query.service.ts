@@ -17,7 +17,7 @@ export class QueryService {
     try {
       const pool = await this.connectionsService.getPool(connectionId, database);
       const strategy = this.strategyFactory.getStrategy(connection.type);
-      return strategy.executeQuery(pool, sql);
+      return await strategy.executeQuery(pool, sql);
     } catch (error) {
       console.error('Query Service Error:', error);
       throw new InternalServerErrorException(`Query execution failed: ${error.message}`);
@@ -42,7 +42,7 @@ export class QueryService {
     try {
       const pool = await this.connectionsService.getPool(connectionId, database);
       const strategy = this.strategyFactory.getStrategy(connection.type);
-      return strategy.updateRow(pool, { schema, table, pkColumn, pkValue, updates });
+      return await strategy.updateRow(pool, { schema, table, pkColumn, pkValue, updates });
     } catch (error) {
       console.error('Update Row Error:', error);
       throw new InternalServerErrorException(`Update failed: ${error.message}`);
