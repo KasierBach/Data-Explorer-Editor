@@ -55,7 +55,7 @@ interface ERDWorkspaceProps {
 type DetailLevel = 'all' | 'keys' | 'name';
 
 export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId, database: databaseProp }) => {
-    const { connections, tabs, updateTabMetadata } = useAppStore();
+    const { connections, tabs, updateTabMetadata, pageStates, setPageState } = useAppStore();
     const activeConnection = connections.find(c => c.id === connectionId);
 
     // Manage database selection locally so it works in both tab and standalone page modes
@@ -66,9 +66,10 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         if (databaseProp) setSelectedDatabase(databaseProp);
     }, [databaseProp]);
 
-    // Get initial state from tab metadata
+    // Get initial state from either tab metadata (if in a tab) or pageStates (if standalone)
+    const isStandalone = tabId.startsWith('erd-page-');
     const tab = tabs.find(t => t.id === tabId);
-    const initialMetadata = tab?.metadata || {};
+    const initialMetadata = isStandalone ? (pageStates[tabId] || {}) : (tab?.metadata || {});
 
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialMetadata.nodes || []);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialMetadata.edges || []);
@@ -79,11 +80,11 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
     const [pendingConnection, setPendingConnection] = useState<{ sourceTable: string; sourceColumn: string; targetTable: string; targetColumn: string } | null>(null);
 
     // New UI state
-    const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [detailLevel, setDetailLevel] = useState<DetailLevel>('all');
-    const [schemaFilter, setSchemaFilter] = useState<string>('all');
-    const [showMinimap, setShowMinimap] = useState(true);
-    const [collapsedTables, setCollapsedTables] = useState<Set<string>>(new Set());
+    const [isSidebarCollapsed, setSidebarCollapsed] = useState(initialMetadata.isSidebarCollapsed || false);
+    const [detailLevel, setDetailLevel] = useState<DetailLevel>(initialMetadata.detailLevel || 'all');
+    const [schemaFilter, setSchemaFilter] = useState<string>(initialMetadata.schemaFilter || 'all');
+    const [showMinimap, setShowMinimap] = useState(initialMetadata.showMinimap ?? true);
+    const [collapsedTables, setCollapsedTables] = useState<Set<string>>(new Set(initialMetadata.collapsedTables || []));
 
     const isFirstLoad = useRef(true);
     const reactFlowRef = useRef<any>(null);
@@ -97,12 +98,23 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
 
         // Debounce metadata updates to avoid store spam
         const timer = setTimeout(() => {
-            updateTabMetadata(tabId, {
+            const stateToSave = {
                 visibleTables: Array.from(visibleTableNames),
                 nodes: nodes,
                 // Only save manual edges, DB edges are re-calculated
-                edges: edges.filter(e => !e.id.startsWith('db-e-'))
-            });
+                edges: edges.filter(e => !e.id.startsWith('db-e-')),
+                isSidebarCollapsed,
+                detailLevel,
+                schemaFilter,
+                showMinimap,
+                collapsedTables: Array.from(collapsedTables)
+            };
+
+            if (isStandalone) {
+                setPageState(tabId, stateToSave);
+            } else {
+                updateTabMetadata(tabId, stateToSave);
+            }
         }, 500);
 
         return () => clearTimeout(timer);

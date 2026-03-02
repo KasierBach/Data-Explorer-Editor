@@ -11,6 +11,8 @@ export interface UISlice {
     setAiPanelOpen: (isOpen: boolean) => void;
     expandedNodes: string[];
     toggleNodeExpansion: (nodeId: string) => void;
+    pageStates: Record<string, any>;
+    setPageState: (pageId: string, pageState: any) => void;
 }
 
 export const createUISlice: StateCreator<UISlice> = (set) => ({
@@ -27,5 +29,12 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
         expandedNodes: state.expandedNodes.includes(nodeId)
             ? state.expandedNodes.filter(id => id !== nodeId)
             : [...state.expandedNodes, nodeId]
+    })),
+    pageStates: {},
+    setPageState: (pageId, pageState) => set((state) => ({
+        pageStates: {
+            ...state.pageStates,
+            [pageId]: { ...(state.pageStates[pageId] || {}), ...pageState }
+        }
     })),
 });

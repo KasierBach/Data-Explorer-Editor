@@ -51,38 +51,59 @@ type DataMode = 'table' | 'sql';
 
 // ──────────────────── Main Component ────────────────────
 export const VisualizeWorkplace: React.FC = () => {
-    const { activeConnectionId, connections, activeDatabase } = useAppStore();
+    const { activeConnectionId, connections, activeDatabase, pageStates, setPageState } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
 
+    const pageId = `visualize-page-${activeConnectionId || 'default'}`;
+    const savedState = pageStates[pageId] || {};
+
     // ─── Data Source State ───
-    const [dataMode, setDataMode] = useState<DataMode>('table');
-    const [selectedTable, setSelectedTable] = useState<string>('');
-    const [customSql, setCustomSql] = useState<string>('SELECT * FROM ');
-    const [dataLimit, setDataLimit] = useState<number>(200);
-    const [sortColumn, setSortColumn] = useState<string>('');
-    const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>('ASC');
-    const [searchTable, setSearchTable] = useState('');
+    const [dataMode, setDataMode] = useState<DataMode>(savedState.dataMode || 'table');
+    const [selectedTable, setSelectedTable] = useState<string>(savedState.selectedTable || '');
+    const [customSql, setCustomSql] = useState<string>(savedState.customSql || 'SELECT * FROM ');
+    const [dataLimit, setDataLimit] = useState<number>(savedState.dataLimit || 200);
+    const [sortColumn, setSortColumn] = useState<string>(savedState.sortColumn || '');
+    const [sortDir, setSortDir] = useState<'ASC' | 'DESC'>(savedState.sortDir || 'ASC');
+    const [searchTable, setSearchTable] = useState(savedState.searchTable || '');
 
     // ─── Chart Config State ───
-    const [chartType, setChartType] = useState<string>('bar');
-    const [xAxis, setXAxis] = useState<string>('');
-    const [yAxis, setYAxis] = useState<string[]>([]);
-    const [paletteIdx, setPaletteIdx] = useState(0);
-    const [title, setTitle] = useState('New Visualization');
+    const [chartType, setChartType] = useState<string>(savedState.chartType || 'bar');
+    const [xAxis, setXAxis] = useState<string>(savedState.xAxis || '');
+    const [yAxis, setYAxis] = useState<string[]>(savedState.yAxis || []);
+    const [paletteIdx, setPaletteIdx] = useState(savedState.paletteIdx || 0);
+    const [title, setTitle] = useState(savedState.title || 'New Visualization');
 
     // ─── Customization State ───
-    const [showGrid, setShowGrid] = useState(true);
-    const [showLegend, setShowLegend] = useState(true);
-    const [showBrush, setShowBrush] = useState(false);
-    const [curveType, setCurveType] = useState<typeof CURVE_TYPES[number]>('monotone');
-    const [animationEnabled, setAnimationEnabled] = useState(true);
-    const [labelVisible, setLabelVisible] = useState(false);
+    const [showGrid, setShowGrid] = useState(savedState.showGrid ?? true);
+    const [showLegend, setShowLegend] = useState(savedState.showLegend ?? true);
+    const [showBrush, setShowBrush] = useState(savedState.showBrush ?? false);
+    const [curveType, setCurveType] = useState<typeof CURVE_TYPES[number]>(savedState.curveType || 'monotone');
+    const [animationEnabled, setAnimationEnabled] = useState(savedState.animationEnabled ?? true);
+    const [labelVisible, setLabelVisible] = useState(savedState.labelVisible ?? false);
 
     // ─── UI State ───
-    const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [isSidebarCollapsed, setSidebarCollapsed] = useState(savedState.isSidebarCollapsed || false);
     const [error, setError] = useState<string | null>(null);
-    const [activeSection, setActiveSection] = useState<string>('source');
+    const [activeSection, setActiveSection] = useState<string>(savedState.activeSection || 'source');
     const chartRef = useRef<HTMLDivElement>(null);
+
+    // ─── Save State ───
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setPageState(pageId, {
+                dataMode, selectedTable, customSql, dataLimit, sortColumn, sortDir, searchTable,
+                chartType, xAxis, yAxis, paletteIdx, title,
+                showGrid, showLegend, showBrush, curveType, animationEnabled, labelVisible,
+                isSidebarCollapsed, activeSection
+            });
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [
+        dataMode, selectedTable, customSql, dataLimit, sortColumn, sortDir, searchTable,
+        chartType, xAxis, yAxis, paletteIdx, title,
+        showGrid, showLegend, showBrush, curveType, animationEnabled, labelVisible,
+        isSidebarCollapsed, activeSection, pageId, setPageState
+    ]);
 
     const activePalette = COLOR_PALETTES[paletteIdx].colors;
 
