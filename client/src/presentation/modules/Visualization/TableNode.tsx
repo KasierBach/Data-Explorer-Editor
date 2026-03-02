@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Handle, Position, useStore } from '@xyflow/react';
+import { Handle, Position, useConnection } from '@xyflow/react';
 import { Table, Hash, Type, Key, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/presentation/components/ui/context-menu';
@@ -21,11 +21,10 @@ export interface TableNodeData {
     detailLevel?: 'all' | 'keys' | 'name';
 }
 
-const connectionNodeIdSelector = (state: any) => state.connectionNodeId ?? state.connection?.fromNodeId;
-
 const TableNode = ({ data }: { data: TableNodeData }) => {
-    const connectionNodeId = useStore(connectionNodeIdSelector);
-    const isConnecting = !!connectionNodeId;
+    // v12 compatible: use useConnection hook to detect active connection
+    const connection = useConnection();
+    const isConnecting = !!connection.inProgress;
     const isCollapsed = data.isCollapsed;
     const columnCount = data.columns?.length || 0;
 
@@ -60,33 +59,46 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
                             key={`${data.tableName}-${col.name}`}
                             className="px-5 py-1.5 flex items-center justify-between gap-4 hover:bg-primary/5 transition-all relative group/row"
                         >
-                            {/* Target Handle (Left) - Visible only when connecting */}
-                            <Handle
-                                type="target"
-                                position={Position.Left}
-                                id={col.name}
-                                className={cn(
-                                    "!w-3.5 !h-3.5 !absolute !left-0 !top-1/2 !-translate-y-1/2 !-translate-x-1/2 !rounded-full !border-2 !border-primary !bg-background !z-50 transition-all duration-300",
-                                    isConnecting ? "opacity-100 scale-100 ring-4 ring-primary/20 animate-pulse" : "opacity-0 scale-50 pointer-events-none"
-                                )}
-                                isConnectable={true}
-                            />
-
-                            {/* Source Handle (Right) - Visible on row hover */}
+                            {/* Source Handle — covers ENTIRE row, invisible, always draggable */}
                             <Handle
                                 type="source"
                                 position={Position.Right}
                                 id={col.name}
                                 className={cn(
-                                    "!w-3.5 !h-3.5 !absolute !right-0 !top-1/2 !-translate-y-1/2 !translate-x-1/2 !rounded-full !border-2 !border-background !bg-primary !z-50 !cursor-crosshair transition-all duration-200",
-                                    !isConnecting && "group-hover/row:opacity-100 group-hover/row:scale-100",
-                                    isConnecting || "opacity-0 scale-50",
-                                    isConnecting && "pointer-events-none"
+                                    "!absolute !inset-0 !w-full !h-full !rounded-none !border-0 !bg-transparent !transform-none !z-[55] !cursor-crosshair !opacity-0",
+                                    isConnecting && "!pointer-events-none"
                                 )}
                                 isConnectable={!isConnecting}
                             />
 
-                            <div className="flex items-center gap-2.5 min-w-0 pointer-events-none ml-1.5 mr-1.5">
+                            {/* Target Handle — covers ENTIRE row when connecting, easy drop */}
+                            <Handle
+                                type="target"
+                                position={Position.Left}
+                                id={col.name}
+                                className={cn(
+                                    "!absolute !inset-0 !w-full !h-full !rounded-none !border-0 !transform-none !z-[55] transition-colors duration-200",
+                                    isConnecting
+                                        ? "!bg-primary/10 hover:!bg-primary/25 !opacity-100 !pointer-events-auto !cursor-cell"
+                                        : "!bg-transparent !opacity-0 !pointer-events-none"
+                                )}
+                                isConnectable={isConnecting}
+                            />
+
+                            {/* Visual dot indicator (right edge) — decorative only */}
+                            <div className={cn(
+                                "absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 rounded-full border-2 border-background bg-primary z-[50] transition-all duration-200 pointer-events-none",
+                                isConnecting
+                                    ? "w-0 h-0 opacity-0"
+                                    : "w-2 h-2 opacity-20 group-hover/row:w-3.5 group-hover/row:h-3.5 group-hover/row:opacity-100"
+                            )} />
+
+                            {/* Visual target dot (left edge) — visible during connection */}
+                            {isConnecting && (
+                                <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full border-2 border-primary bg-background z-[50] pointer-events-none ring-4 ring-primary/20 animate-pulse" />
+                            )}
+
+                            <div className="flex items-center gap-2.5 min-w-0 pointer-events-none ml-1.5 mr-1.5 relative z-[40]">
                                 <div className="shrink-0 flex items-center justify-center w-4">
                                     {col.isPrimaryKey ? (
                                         <Key className="h-3.5 w-3.5 text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.4)]" />
@@ -116,38 +128,40 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
                                 <span className="text-[9px] font-bold uppercase opacity-20 tracking-tighter select-none">{col.type}</span>
                             </div>
 
-                            {/* Context Menu Wrapper */}
-                            <div className="absolute top-0 bottom-0 left-4 right-4 z-30 pointer-events-auto">
-                                <ContextMenu>
-                                    <ContextMenuTrigger className="w-full h-full block" />
-                                    <ContextMenuContent>
-                                        <ContextMenuItem
-                                            disabled={!col.isPrimaryKey && !col.isForeignKey}
-                                            className="text-xs text-muted-foreground"
-                                        >
-                                            Column: <span className="text-foreground font-bold ml-1">{col.name}</span>
-                                        </ContextMenuItem>
-
-                                        {col.isPrimaryKey && data.onRemoveConstraint && col.pkConstraintName && (
+                            {/* Context Menu — disabled during connections to avoid blocking handles */}
+                            {!isConnecting && (
+                                <div className="absolute top-0 bottom-0 left-8 right-8 z-30 pointer-events-auto">
+                                    <ContextMenu>
+                                        <ContextMenuTrigger className="w-full h-full block" />
+                                        <ContextMenuContent>
                                             <ContextMenuItem
-                                                className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
-                                                onSelect={() => data.onRemoveConstraint!(data.tableName, 'pk', col.pkConstraintName!)}
+                                                disabled={!col.isPrimaryKey && !col.isForeignKey}
+                                                className="text-xs text-muted-foreground"
                                             >
-                                                Remove Primary Key
+                                                Column: <span className="text-foreground font-bold ml-1">{col.name}</span>
                                             </ContextMenuItem>
-                                        )}
 
-                                        {col.isForeignKey && data.onRemoveConstraint && col.fkConstraintName && (
-                                            <ContextMenuItem
-                                                className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
-                                                onSelect={() => data.onRemoveConstraint!(data.tableName, 'fk', col.fkConstraintName!)}
-                                            >
-                                                Remove Foreign Key
-                                            </ContextMenuItem>
-                                        )}
-                                    </ContextMenuContent>
-                                </ContextMenu>
-                            </div>
+                                            {col.isPrimaryKey && data.onRemoveConstraint && col.pkConstraintName && (
+                                                <ContextMenuItem
+                                                    className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
+                                                    onSelect={() => data.onRemoveConstraint!(data.tableName, 'pk', col.pkConstraintName!)}
+                                                >
+                                                    Remove Primary Key
+                                                </ContextMenuItem>
+                                            )}
+
+                                            {col.isForeignKey && data.onRemoveConstraint && col.fkConstraintName && (
+                                                <ContextMenuItem
+                                                    className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
+                                                    onSelect={() => data.onRemoveConstraint!(data.tableName, 'fk', col.fkConstraintName!)}
+                                                >
+                                                    Remove Foreign Key
+                                                </ContextMenuItem>
+                                            )}
+                                        </ContextMenuContent>
+                                    </ContextMenu>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
