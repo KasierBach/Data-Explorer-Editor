@@ -10,6 +10,7 @@ import {
 } from "../../components/ui/select"
 import { useAppStore } from "@/core/services/store"
 import { PlusCircle, Server, Globe, Trash, Loader2 } from "lucide-react"
+import { API_BASE_URL } from '@/core/config/env'
 
 export function ConnectionSelector() {
     const { connections, activeConnectionId, setActiveConnectionId, openConnectionDialog, removeConnection, accessToken, logout } = useAppStore()
@@ -25,7 +26,7 @@ export function ConnectionSelector() {
             const headers: Record<string, string> = {};
             if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-            const response = await fetch(`http://localhost:3000/api/connections/${id}`, {
+            const response = await fetch(`${API_BASE_URL}/connections/${id}`, {
                 method: 'DELETE',
                 headers
             });

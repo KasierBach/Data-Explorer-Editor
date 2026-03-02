@@ -11,7 +11,16 @@ async function bootstrap() {
   app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
   // Enable CORS for frontend
-  app.enableCors();
+  const allowedOrigins = [
+    'http://localhost:5173',  // Vite dev server
+    'http://localhost:4173',  // Vite preview
+    process.env.FRONTEND_URL, // Production Vercel URL
+  ].filter(Boolean) as string[];
+
+  app.enableCors({
+    origin: allowedOrigins,
+    credentials: true,
+  });
 
   // Global Prefix
   app.setGlobalPrefix('api');
@@ -23,7 +32,8 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
   }));
 
-  await app.listen(3000);
-  console.log(`Application is running on: ${await app.getUrl()}`);
+  const port = process.env.PORT || 3000;
+  await app.listen(port, '0.0.0.0');
+  console.log(`Application is running on port ${port}`);
 }
 bootstrap();

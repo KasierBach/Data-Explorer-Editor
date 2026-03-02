@@ -1,10 +1,11 @@
 import type { IDatabaseAdapter } from '../domain/database-adapter.interface';
 import type { TableMetadata, TreeNode, QueryResult } from '../domain/entities';
 import { useAppStore } from '../services/store';
+import { API_BASE_URL } from '../config/env';
 
 export class ApiDatabaseAdapter implements IDatabaseAdapter {
     private connectionId: string | null = null;
-    private baseUrl = 'http://localhost:3000/api';
+    private baseUrl = API_BASE_URL;
 
     async connect(config: any): Promise<void> {
         // Register the connection with the backend

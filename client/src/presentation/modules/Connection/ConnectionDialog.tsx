@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/presentation/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/presentation/components/ui/tabs';
 import { Server, ShieldAlert, Key, Zap, CheckCircle2, HelpCircle, Database, Lock, Globe, Wand2 } from 'lucide-react';
+import { API_BASE_URL } from '@/core/config/env';
 
 export const ConnectionDialog: React.FC = () => {
     const { isConnectionDialogOpen, closeConnectionDialog, addConnection, accessToken } = useAppStore();
@@ -96,7 +97,7 @@ export const ConnectionDialog: React.FC = () => {
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
             if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-            const response = await fetch('http://localhost:3000/api/connections', {
+            const response = await fetch(`${API_BASE_URL}/connections`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify(connectionData),

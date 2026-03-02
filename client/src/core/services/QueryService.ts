@@ -1,4 +1,5 @@
 import { useAppStore } from './store';
+import { API_BASE_URL } from '../config/env';
 
 export interface UpdateSchemaDto {
     connectionId: string;
@@ -18,7 +19,7 @@ export type SchemaOperation =
     | { type: 'add_fk'; name: string; columns: string[]; refTable: string; refColumns: string[]; onDelete?: string; onUpdate?: string }
     | { type: 'drop_fk'; name: string; constraintName?: string };
 
-const BASE_URL = 'http://localhost:3000/api';
+const BASE_URL = API_BASE_URL;
 
 const getHeaders = () => {
     const token = useAppStore.getState().accessToken;
