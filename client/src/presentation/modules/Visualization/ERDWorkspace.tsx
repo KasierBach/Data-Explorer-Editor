@@ -11,7 +11,8 @@ import {
     addEdge,
     type Edge,
     type Node,
-    type Connection
+    type Connection,
+    type EdgeChange
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
