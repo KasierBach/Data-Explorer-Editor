@@ -208,7 +208,9 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         if (!relationships) return map;
         relationships.forEach((rel: any) => {
             if (rel.constraint_name) {
-                map.set(`${rel.source_table}.${rel.source_column}`, rel.constraint_name);
+                // Remove schema prefix if present, because edge.source is usually just the bare table name
+                const sourceTable = rel.source_table?.split('.').pop() || rel.source_table;
+                map.set(`${sourceTable}.${rel.source_column}`, rel.constraint_name);
             }
         });
         return map;
@@ -500,16 +502,21 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
     useEffect(() => {
         if (!hierarchy || !tableData || !relationships) return;
 
-        const dbEdges: Edge[] = relationships.map((rel: any, idx: number) => ({
-            id: `db-e-${idx}`,
-            source: rel.target_table,
-            target: rel.source_table,
-            sourceHandle: rel.target_column,
-            targetHandle: rel.source_column,
-            type: ConnectionLineType.SmoothStep,
-            animated: true,
-            style: { stroke: 'hsl(var(--primary))', strokeWidth: 2, opacity: 0.5 },
-        })).filter((e: Edge) => visibleTableNames.has(e.source) && visibleTableNames.has(e.target));
+        const dbEdges: Edge[] = relationships.map((rel: any, idx: number) => {
+            const targetTable = rel.target_table?.split('.').pop() || rel.target_table;
+            const sourceTable = rel.source_table?.split('.').pop() || rel.source_table;
+
+            return {
+                id: `db-e-${idx}`,
+                source: targetTable,
+                target: sourceTable,
+                sourceHandle: rel.target_column,
+                targetHandle: rel.source_column,
+                type: ConnectionLineType.SmoothStep,
+                animated: true,
+                style: { stroke: 'hsl(var(--primary))', strokeWidth: 2, opacity: 0.5 },
+            };
+        }).filter((e: Edge) => visibleTableNames.has(e.source) && visibleTableNames.has(e.target));
 
         const baseNodes: Node[] = Array.from(visibleTableNames).map((name) => {
             const cols = tableData[name] || [];
