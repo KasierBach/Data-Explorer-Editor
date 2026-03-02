@@ -10,7 +10,6 @@ export function VisualizePage() {
     const navigate = useNavigate();
     const activeConnectionId = useAppStore(state => state.activeConnectionId);
     const connections = useAppStore(state => state.connections);
-    const activeConnection = connections.find(c => c.id === activeConnectionId);
     const setActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
     const openConnectionDialog = useAppStore(state => state.openConnectionDialog);
 

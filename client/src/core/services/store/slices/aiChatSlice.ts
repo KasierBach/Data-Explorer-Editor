@@ -27,6 +27,7 @@ export interface AiChatSlice {
     deleteAiChat: (id: string) => void;
     setActiveAiChat: (id: string) => void;
     addAiMessage: (chatId: string, message: AiMessage) => void;
+    updateAiMessage: (chatId: string, messageId: string, updates: Partial<AiMessage>) => void;
     updateAiChatTitle: (chatId: string, title: string) => void;
     clearAiChats: () => void;
     setAiModel: (model: string) => void;
@@ -78,6 +79,19 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set) => ({
                     title: chat.messages.length <= 1 && message.role === 'user'
                         ? message.content.slice(0, 40) + (message.content.length > 40 ? '...' : '')
                         : chat.title,
+                }
+                : chat
+        ),
+    })),
+    updateAiMessage: (chatId, messageId, updates) => set((state) => ({
+        aiChats: state.aiChats.map(chat =>
+            chat.id === chatId
+                ? {
+                    ...chat,
+                    messages: chat.messages.map(msg =>
+                        msg.id === messageId ? { ...msg, ...updates } : msg
+                    ),
+                    updatedAt: Date.now(),
                 }
                 : chat
         ),

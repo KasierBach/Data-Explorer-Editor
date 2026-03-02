@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/core/services/store';
 import { ERDWorkspace } from '@/presentation/modules/Visualization/ERDWorkspace';
-import { Database, ArrowLeft, ChevronDown, Plus, Wifi } from 'lucide-react';
+import { Database, ArrowLeft, Plus, Wifi } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/presentation/components/ui/select';
 import { ConnectionDialog } from '@/presentation/modules/Connection/ConnectionDialog';
@@ -10,7 +10,6 @@ export function ERDPage() {
     const navigate = useNavigate();
     const activeConnectionId = useAppStore(state => state.activeConnectionId);
     const connections = useAppStore(state => state.connections);
-    const activeConnection = connections.find(c => c.id === activeConnectionId);
     const activeDatabase = useAppStore(state => state.activeDatabase);
     const setActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
     const openConnectionDialog = useAppStore(state => state.openConnectionDialog);
