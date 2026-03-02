@@ -18,13 +18,26 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({ msg, onInsertS
     return (
         <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[90%] rounded-lg p-2.5 text-xs leading-relaxed select-text cursor-text ${msg.role === 'user'
-                    ? 'bg-violet-500/20 text-foreground ml-4'
-                    : msg.error
-                        ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                        : 'bg-muted/30 text-foreground/80 border border-border/30'
+                ? 'bg-violet-500/20 text-foreground ml-4'
+                : msg.error
+                    ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    : 'bg-muted/30 text-foreground/80 border border-border/30'
                 }`}>
                 {msg.role === 'user' ? (
-                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                    <div className="flex flex-col gap-2">
+                        {/* Render Images if present */}
+                        {msg.attachments?.filter(a => a.type === 'image' && a.preview).length ? (
+                            <div className="flex flex-wrap gap-2">
+                                {msg.attachments.filter(a => a.type === 'image' && a.preview).map((img, i) => (
+                                    <div key={i} className="relative rounded-md overflow-hidden border border-border/10">
+                                        <img src={img.preview} alt={img.label} className="max-w-[240px] max-h-[160px] object-cover" />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
+
+                        {msg.content && <div className="whitespace-pre-wrap">{msg.content}</div>}
+                    </div>
                 ) : (
                     <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-pre:m-0 prose-td:border prose-th:border prose-table:border-collapse prose-table:w-full prose-th:bg-muted/50 prose-th:p-2 prose-td:p-2 prose-a:text-violet-400 select-text">
                         <ReactMarkdown

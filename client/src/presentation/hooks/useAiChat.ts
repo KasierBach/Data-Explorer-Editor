@@ -235,7 +235,7 @@ export function useAiChat() {
 
         // Build display content for user message
         const attachmentLabels = attachments.map(a => {
-            if (a.type === 'image') return `📷 ${a.label}`;
+            if (a.type === 'image') return ''; // We will render the image itself, so don't add text
             if (a.type === 'sql') return `📋 SQL đính kèm`;
             if (a.type === 'table') return `📊 ${a.label}`;
             if (a.type === 'file') return a.label; // already has emoji
@@ -251,6 +251,11 @@ export function useAiChat() {
             role: 'user',
             content: displayContent,
             timestamp: Date.now(),
+            attachments: attachments.map(a => ({
+                type: a.type,
+                label: a.label,
+                preview: a.preview
+            }))
         };
         addAiMessage(activeAiChatId, userMsg);
 

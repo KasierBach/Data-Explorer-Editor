@@ -8,6 +8,7 @@ export interface AiMessage {
     explanation?: string;
     error?: boolean;
     timestamp: number;
+    attachments?: { type: string; label: string; preview?: string }[];
 }
 
 export interface AiChat {
