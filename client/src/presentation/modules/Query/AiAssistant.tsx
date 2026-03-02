@@ -114,11 +114,11 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     // --- Main Chat View ---
     return (
         <div className="flex flex-col h-full bg-card border-l border-border">
-            {/* Hidden file input for image upload */}
+            {/* Hidden file input for file upload */}
             <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,.pdf,.csv,.tsv,.xlsx,.xls,.ods,.json,.xml,.yaml,.yml,.txt,.md,.log,.sql,.py,.js,.ts,.tsx,.jsx,.html,.css,.go,.rs,.java,.cpp,.c,.h,.php,.rb,.sh,.toml,.ini,.env"
                 className="hidden"
                 onChange={handleFileSelected}
             />
@@ -190,6 +190,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                                         att.type === 'image' && "bg-pink-500/10 text-pink-400 border border-pink-500/20",
                                         att.type === 'sql' && "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20",
                                         att.type === 'table' && "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+                                        att.type === 'file' && "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20",
                                     )}
                                 >
                                     {att.type === 'image' && (
@@ -198,9 +199,10 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                                             <Image className="w-3 h-3" />
                                         </>
                                     )}
-                                    {att.type === 'sql' && <FileCode2 className="w-3 h-3" />}
-                                    {att.type === 'table' && <Table2 className="w-3 h-3" />}
-                                    <span className="max-w-[120px] truncate">{att.label}</span>
+                                    {att.type === 'sql' && <FileCode2 className="w-3 h-3 min-w-3" />}
+                                    {att.type === 'table' && <Table2 className="w-3 h-3 min-w-3" />}
+                                    {/* For 'file', the emoji is already in the label, so no extra icon needed, or we can use a generic File icon if we strip it. But let's just show the label with emoji. */}
+                                    <span className="max-w-[150px] truncate" title={att.preview || att.label}>{att.label}</span>
                                     <button
                                         onClick={() => removeAttachment(i)}
                                         className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity"
@@ -247,8 +249,8 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                                         <button className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left" onClick={() => { setShowContextMenu(false); fileInputRef.current?.click(); }}>
                                             <Image className="w-4 h-4 text-pink-400" />
                                             <div>
-                                                <div className="font-medium">Hình ảnh</div>
-                                                <div className="text-[9px] text-muted-foreground">Upload ảnh để AI phân tích</div>
+                                                <div className="font-medium">Tệp / Hình ảnh</div>
+                                                <div className="text-[9px] text-muted-foreground">PDF, Excel, CSV, code, ảnh...</div>
                                             </div>
                                         </button>
                                         <button className={cn("w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left", (!activeTab || activeTab.type !== 'query' || !activeTab.metadata?.sql) && "opacity-40 pointer-events-none")} onClick={() => { setShowContextMenu(false); handlePasteSql(); }}>
