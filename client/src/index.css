@@ -105,6 +105,13 @@
     @apply border-border;
   }
 
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
   body,
   html,
   #root {
@@ -113,6 +120,63 @@
     height: 100%;
     margin: 0;
     padding: 0;
+  }
+
+  /* GPU-accelerated transitions on all interactive elements */
+  button,
+  a,
+  [role="button"],
+  select,
+  input,
+  textarea,
+  [data-state] {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform, opacity;
+  }
+
+  /* Smooth focus rings */
+  *:focus-visible {
+    outline: none;
+    transition: box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Custom Scrollbar — thin & smooth */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.15);
+    border-radius: 10px;
+    transition: background 0.3s;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.3);
+  }
+
+  /* Global scrollbar for all overflow areas */
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.1);
+    border-radius: 10px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.25);
   }
 }
 
@@ -177,5 +241,66 @@
     100% {
       transform: translateY(0px);
     }
+  }
+
+  /* Page entrance — fade + slide */
+  .page-enter {
+    animation: pageEnter 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  @keyframes pageEnter {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Smooth sidebar collapse/expand */
+  .sidebar-transition {
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.2s ease,
+      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Button press effect */
+  button:active:not(:disabled),
+  [role="button"]:active:not(:disabled) {
+    transform: scale(0.97);
+    transition-duration: 0.1s;
+  }
+
+  /* Smooth tooltips and popover entrance */
+  [data-state="open"] {
+    animation: popoverIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @keyframes popoverIn {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(-2px);
+    }
+
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+}
+
+/* Reduced motion — respect user preference */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -36,6 +36,7 @@ export const useAppStore = create<AppState>()(
             partialize: (state) => ({
                 connections: state.connections,
                 activeConnectionId: state.activeConnectionId,
+                activeDatabase: state.activeDatabase,
                 isAuthenticated: state.isAuthenticated,
                 accessToken: state.accessToken,
                 tokenExp: state.tokenExp,

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ModeToggle } from '@/presentation/components/mode-toggle';
 import { Database, Settings, User, LogOut, User as UserIcon, Github, LifeBuoy, Cloud, CreditCard, FileText, FolderOpen, BarChart3, PieChart, GitGraph, Sparkles } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
@@ -17,7 +18,8 @@ import { ProfileDialog } from './ProfileDialog';
 import { TokenTimer } from '@/presentation/components/TokenTimer';
 
 export const Navbar: React.FC = () => {
-    const { isSidebarOpen, setSidebarOpen, openQueryTab, openInsightsTab, openVisualizeTab, openErdTab, activeConnectionId, user, logout, isAiPanelOpen, toggleAiPanel } = useAppStore();
+    const { isSidebarOpen, setSidebarOpen, openQueryTab, openInsightsTab, activeConnectionId, user, logout, isAiPanelOpen, toggleAiPanel } = useAppStore();
+    const navigate = useNavigate();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [activeProfileTab, setActiveProfileTab] = useState('profile');
 
@@ -52,7 +54,7 @@ export const Navbar: React.FC = () => {
                         variant="ghost"
                         size="sm"
                         className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
-                        onClick={() => openVisualizeTab()}
+                        onClick={() => navigate('/app/visualize')}
                     >
                         <PieChart className="w-4 h-4 text-emerald-500" />
                         <span className="font-semibold">Visualize</span>
@@ -62,7 +64,7 @@ export const Navbar: React.FC = () => {
                         variant="ghost"
                         size="sm"
                         className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
-                        onClick={() => activeConnectionId && openErdTab(activeConnectionId, useAppStore.getState().activeDatabase || undefined)}
+                        onClick={() => activeConnectionId && navigate('/app/erd')}
                         disabled={!activeConnectionId}
                     >
                         <GitGraph className="w-4 h-4 text-blue-500" />

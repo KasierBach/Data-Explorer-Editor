@@ -3,6 +3,7 @@ import {
     ReactFlow,
     Controls,
     Background,
+    MiniMap,
     useNodesState,
     useEdgesState,
     ConnectionLineType,
@@ -17,7 +18,7 @@ import dagre from 'dagre';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
-import { GitGraph, RefreshCw, Table, Plus, X, Search, LayoutGrid, Database } from 'lucide-react';
+import { GitGraph, RefreshCw, Table, Plus, X, Search, LayoutGrid, Database, Download, FileCode, PanelLeftClose, PanelLeft, CheckSquare, Square, Eye, Maximize2, Layers } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,13 @@ import { ForeignKeyDialog } from './ForeignKeyDialog';
 import type { ForeignKeyData } from './ForeignKeyDialog';
 import { toast } from 'sonner';
 import { queryService } from '@/core/services/QueryService';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/presentation/components/ui/dropdown-menu"
 
 const nodeTypes = {
     table: TableNode,
@@ -44,9 +52,19 @@ interface ERDWorkspaceProps {
     database?: string;
 }
 
-export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId, database }) => {
+type DetailLevel = 'all' | 'keys' | 'name';
+
+export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId, database: databaseProp }) => {
     const { connections, tabs, updateTabMetadata } = useAppStore();
     const activeConnection = connections.find(c => c.id === connectionId);
+
+    // Manage database selection locally so it works in both tab and standalone page modes
+    const [selectedDatabase, setSelectedDatabase] = useState<string | undefined>(databaseProp);
+
+    // Sync if prop changes externally
+    useEffect(() => {
+        if (databaseProp) setSelectedDatabase(databaseProp);
+    }, [databaseProp]);
 
     // Get initial state from tab metadata
     const tab = tabs.find(t => t.id === tabId);
@@ -60,7 +78,15 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
     const [searchTerm, setSearchTerm] = useState('');
     const [pendingConnection, setPendingConnection] = useState<{ sourceTable: string; sourceColumn: string; targetTable: string; targetColumn: string } | null>(null);
 
+    // New UI state
+    const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [detailLevel, setDetailLevel] = useState<DetailLevel>('all');
+    const [schemaFilter, setSchemaFilter] = useState<string>('all');
+    const [showMinimap, setShowMinimap] = useState(true);
+    const [collapsedTables, setCollapsedTables] = useState<Set<string>>(new Set());
+
     const isFirstLoad = useRef(true);
+    const reactFlowRef = useRef<any>(null);
 
     // Persist changes to Store
     useEffect(() => {
@@ -84,7 +110,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
 
     // 1. Fetch Hierarchy to get all tables
     const { data: hierarchy, isLoading: isLoadingHierarchy } = useQuery({
-        queryKey: ['erd-hierarchy', connectionId, database],
+        queryKey: ['erd-hierarchy', connectionId, selectedDatabase],
         queryFn: async () => {
             if (!connectionId) return [];
             const adapter = connectionService.getAdapter(connectionId, activeConnection?.type as any);
@@ -95,7 +121,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     if (node.type === 'table' || node.type === 'view') {
                         results.push(node);
                     } else if (node.type === 'database') {
-                        if (!database || node.name === database || node.id.includes(database)) {
+                        if (!selectedDatabase || node.name === selectedDatabase || node.id.includes(selectedDatabase)) {
                             await crawl(node.id);
                         }
                     } else if (node.type === 'schema' || node.type === 'folder') {
@@ -103,7 +129,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     }
                 }
             };
-            await crawl(database ? `db:${database}` : null);
+            await crawl(selectedDatabase ? `db:${selectedDatabase}` : null);
             return results;
         },
         enabled: !!connectionId,
@@ -112,11 +138,11 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
 
     // 2. Fetch Relationships
     const { data: relationships } = useQuery({
-        queryKey: ['erd-rels', connectionId, database],
+        queryKey: ['erd-rels', connectionId, selectedDatabase],
         queryFn: async () => {
             if (!connectionId) return [];
             const adapter = connectionService.getAdapter(connectionId, activeConnection?.type as any);
-            return adapter.getRelationships(database);
+            return adapter.getRelationships(selectedDatabase);
         },
         enabled: !!connectionId,
         staleTime: 0
@@ -134,6 +160,10 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         enabled: !!connectionId,
         staleTime: 0
     });
+
+    // Auto-select database for connections that don't list databases (e.g. Supabase)
+    const hasDatabases = allDatabases && allDatabases.length > 0;
+    const effectiveDatabase = selectedDatabase || (hasDatabases ? undefined : '__schema_only__');
 
     // 3. Fetch All Columns for visible tables
     const { data: tableData, isLoading: isLoadingCols, refetch: refetchCols } = useQuery({
@@ -156,11 +186,9 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         staleTime: 0
     });
 
-
-
     const isLoading = isLoadingHierarchy || isLoadingCols;
 
-    const queryClient = useQueryClient(); // Need this to invalidate relationships
+    const queryClient = useQueryClient();
 
     // Map of "table.column" -> constraintName for FKs
     const fkConstraintMap = useMemo(() => {
@@ -175,15 +203,12 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
     }, [relationships]);
 
     const handleRemoveConstraint = useCallback(async (tableName: string, type: 'pk' | 'fk', constraintName: string) => {
-        // Confirmation is handled by UI toast or we could use confirm()
-        // For now, let's use global confirm or just do it (maybe dangerous without confirm)
-        // Ideally we use a dialog, but prompt is easiest
         if (!window.confirm(`Are you sure you want to remove this ${type.toUpperCase()} (${constraintName})?`)) return;
 
         try {
             await queryService.updateSchema({
                 connectionId,
-                database,
+                database: selectedDatabase,
                 table: tableName,
                 operations: [{
                     type: type === 'pk' ? 'drop_pk' : 'drop_fk',
@@ -192,8 +217,6 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 }]
             });
             toast.success(`${type.toUpperCase()} removed successfully`);
-
-            // Invalidate queries to refresh UI
             queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
             queryClient.invalidateQueries({ queryKey: ['erd-columns'] });
         } catch (error: any) {
@@ -201,18 +224,11 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 description: error.message
             });
         }
-    }, [connectionId, database, queryClient]);
+    }, [connectionId, selectedDatabase, queryClient]);
 
     const onConnect = useCallback(
         (params: Connection) => {
-            // Instead of just drawing a line, we want to open the FK dialog
-            // params.source = Table Name (Node ID)
-            // params.sourceHandle = Column Name
-            // params.target = Table Name
-            // params.targetHandle = Column Name
-
-            if (params.source === params.target) return; // Self-referencing FKs are complex, maybe support later
-
+            if (params.source === params.target) return;
             setPendingConnection({
                 sourceTable: params.source,
                 sourceColumn: params.sourceHandle!,
@@ -225,12 +241,12 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
 
     const handleCreateForeignKey = async (data: ForeignKeyData) => {
         try {
-            if (!connectionId || !database) return;
+            if (!connectionId || !selectedDatabase) return;
 
             await queryService.updateSchema({
                 connectionId,
-                database,
-                table: data.sourceTable, // FK is added to the source (child) table
+                database: selectedDatabase,
+                table: data.sourceTable,
                 operations: [{
                     type: 'add_fk',
                     name: data.constraintName,
@@ -246,9 +262,6 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 description: `Successfully linked ${data.sourceTable} to ${data.targetTable}.`,
             });
 
-            // Refetch relationships to update the diagram visually
-            // In a real app we might want to optimistically update the edges
-            // But for now, we just add the edge manually so it looks instant
             setEdges((eds) => addEdge({
                 source: data.sourceTable,
                 target: data.targetTable,
@@ -262,7 +275,6 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         } catch (error: any) {
             let errorMessage = error.message || "Unknown error occurred";
             try {
-                // Attempt to parse backend JSON error
                 const errObj = JSON.parse(errorMessage);
                 if (errObj.statusCode === 404 && errObj.message?.includes('Connection with ID')) {
                     errorMessage = "Connection session expired. Please refresh the page.";
@@ -272,10 +284,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
             } catch {
                 // If parsing fails, use the raw message
             }
-
-            toast.error("Failed to create relationship", {
-                description: errorMessage,
-            });
+            toast.error("Failed to create relationship", { description: errorMessage });
         }
     };
 
@@ -285,7 +294,6 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         const isHorizontal = direction === 'LR';
         dagreGraph.setGraph({ rankdir: direction, nodesep: 100, ranksep: 200 });
 
-        // Divide nodes into connected and disconnected
         const connectedNodeIds = new Set<string>();
         edges.forEach(e => {
             connectedNodeIds.add(e.source);
@@ -295,7 +303,6 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         const connectedNodes = nodes.filter(n => connectedNodeIds.has(n.id));
         const standaloneNodes = nodes.filter(n => !connectedNodeIds.has(n.id));
 
-        // Layout connected nodes using Dagre
         connectedNodes.forEach((node) => {
             const columnCount = (node.data as any).columns?.length || 5;
             dagreGraph.setNode(node.id, { width: 300, height: 100 + columnCount * 30 });
@@ -320,12 +327,11 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     },
                 };
             } else {
-                // Positon standalone nodes in a separate grid or column
                 const index = standaloneNodes.indexOf(node);
                 return {
                     ...node,
                     position: {
-                        x: -500, // Left side for standalone
+                        x: -500,
                         y: index * 400
                     }
                 };
@@ -350,11 +356,86 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         setEdges([...layoutedEdges]);
     };
 
+    const handleSelectAll = () => {
+        if (!filteredHierarchy) return;
+        const allNames = new Set(filteredHierarchy.map(h => h.name));
+        setVisibleTableNames(allNames);
+    };
+
+    const handleDeselectAll = () => {
+        setVisibleTableNames(new Set());
+        setNodes([]);
+        setEdges([]);
+    };
+
+    const handleToggleCollapse = (name: string) => {
+        setCollapsedTables(prev => {
+            const next = new Set(prev);
+            if (next.has(name)) next.delete(name);
+            else next.add(name);
+            return next;
+        });
+    };
+
+    // Export as PNG
+    const handleExportPNG = useCallback(() => {
+        const svgEl = document.querySelector('.react-flow__viewport');
+        if (!svgEl) return;
+
+        import('html-to-image').then(({ toPng }) => {
+            const el = document.querySelector('.react-flow') as HTMLElement;
+            if (!el) return;
+            toPng(el, {
+                backgroundColor: '#0a0a0b',
+                quality: 1,
+                pixelRatio: 2,
+            }).then((dataUrl) => {
+                const link = document.createElement('a');
+                link.download = `erd-${selectedDatabase || 'diagram'}-${Date.now()}.png`;
+                link.href = dataUrl;
+                link.click();
+                toast.success('Exported as PNG');
+            }).catch(() => {
+                toast.error('Failed to export. Try zooming out first.');
+            });
+        });
+    }, [selectedDatabase]);
+
+    // Export as SQL DDL
+    const handleExportSQL = useCallback(() => {
+        if (!tableData || visibleTableNames.size === 0) return;
+
+        let sql = `-- Generated by Data Explorer ERD\n-- Database: ${selectedDatabase || 'unknown'}\n-- Date: ${new Date().toISOString()}\n\n`;
+
+        Array.from(visibleTableNames).forEach(tableName => {
+            const cols = tableData[tableName];
+            if (!cols || cols.length === 0) return;
+
+            sql += `CREATE TABLE "${tableName}" (\n`;
+            const colDefs = cols.map((c: any) => {
+                let def = `    "${c.name}" ${c.type}`;
+                if (c.isPrimaryKey) def += ' PRIMARY KEY';
+                if (c.nullable === false) def += ' NOT NULL';
+                return def;
+            });
+            sql += colDefs.join(',\n');
+            sql += `\n);\n\n`;
+        });
+
+        const blob = new Blob([sql], { type: 'text/sql' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `erd-${selectedDatabase || 'schema'}-${Date.now()}.sql`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+        toast.success('Exported as SQL');
+    }, [tableData, visibleTableNames, selectedDatabase]);
+
     useEffect(() => {
         if (!hierarchy || !tableData || !relationships) return;
 
-        // Auto-generate edges for visible tables based on DB relationships
-        const dbEdges: Edge[] = relationships.map((rel, idx) => ({
+        const dbEdges: Edge[] = relationships.map((rel: any, idx: number) => ({
             id: `db-e-${idx}`,
             source: rel.target_table,
             target: rel.source_table,
@@ -363,12 +444,21 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
             type: ConnectionLineType.SmoothStep,
             animated: true,
             style: { stroke: 'hsl(var(--primary))', strokeWidth: 2, opacity: 0.5 },
-        })).filter(e => visibleTableNames.has(e.source) && visibleTableNames.has(e.target));
+        })).filter((e: Edge) => visibleTableNames.has(e.source) && visibleTableNames.has(e.target));
 
         const baseNodes: Node[] = Array.from(visibleTableNames).map((name) => {
             const cols = tableData[name] || [];
-            // Enrich columns with FK constraint info (PK info comes from metadata)
-            const enrichedCols = cols.map((c: any) => ({
+            const isCollapsed = collapsedTables.has(name);
+
+            // Filter columns based on detail level
+            let filteredCols = cols;
+            if (detailLevel === 'keys') {
+                filteredCols = cols.filter((c: any) => c.isPrimaryKey || c.isForeignKey || fkConstraintMap.has(`${name}.${c.name}`));
+            } else if (detailLevel === 'name') {
+                filteredCols = [];
+            }
+
+            const enrichedCols = (isCollapsed ? [] : filteredCols).map((c: any) => ({
                 ...c,
                 fkConstraintName: fkConstraintMap.get(`${name}.${c.name}`)
             }));
@@ -376,7 +466,10 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
             const data = {
                 tableName: name,
                 columns: enrichedCols,
-                onRemoveConstraint: handleRemoveConstraint
+                onRemoveConstraint: handleRemoveConstraint,
+                isCollapsed,
+                onToggleCollapse: () => handleToggleCollapse(name),
+                detailLevel,
             };
 
             const existing = nodes.find(n => n.id === name);
@@ -392,63 +485,112 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
             };
         });
 
-        // Filter out nodes/edges that are no longer visible
         const finalNodes = baseNodes.filter(n => visibleTableNames.has(n.id));
         const manualEdges = edges.filter(e => !e.id.startsWith('db-e-') && visibleTableNames.has(e.source) && visibleTableNames.has(e.target));
 
-        // Use functional updates to avoid dependency cycles if possible, 
-        // but here we need to merge carefully.
         setNodes(finalNodes);
         setEdges([...dbEdges, ...manualEdges]);
 
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [visibleTableNames, tableData, relationships, hierarchy]);
+    }, [visibleTableNames, tableData, relationships, hierarchy, detailLevel, collapsedTables]);
+
+    // Extract unique schemas from hierarchy
+    const schemas = useMemo(() => {
+        if (!hierarchy) return [];
+        const schemaSet = new Set<string>();
+        hierarchy.forEach(h => {
+            // Extract schema from id like "db:postgres.schema:public.folder:tables"
+            const match = h.id?.match(/schema:([^.]+)/);
+            if (match) schemaSet.add(match[1]);
+        });
+        return Array.from(schemaSet).sort();
+    }, [hierarchy]);
 
     const filteredHierarchy = useMemo(() => {
         if (!hierarchy) return [];
-        return hierarchy.filter(h => h.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    }, [hierarchy, searchTerm]);
+        let filtered = hierarchy;
+
+        // Filter by schema
+        if (schemaFilter !== 'all') {
+            filtered = filtered.filter(h => h.id?.includes(`schema:${schemaFilter}`));
+        }
+
+        // Filter by search
+        if (searchTerm) {
+            filtered = filtered.filter(h => h.name.toLowerCase().includes(searchTerm.toLowerCase()));
+        }
+
+        return filtered;
+    }, [hierarchy, searchTerm, schemaFilter]);
 
     return (
         <div className="h-full w-full bg-background relative flex overflow-hidden">
             {/* Sidebar for table selection */}
-            <div className="w-72 border-r bg-card/30 backdrop-blur-3xl flex flex-col shrink-0 custom-scrollbar">
-                <div className="p-6 border-b bg-muted/5">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-blue-500 rounded-xl text-white shadow-lg shadow-blue-500/10">
-                            <Table className="h-4 w-4" />
+            <div className={cn(
+                "border-r bg-card/30 backdrop-blur-3xl flex flex-col shrink-0 custom-scrollbar transition-all duration-300",
+                isSidebarCollapsed ? "w-0 opacity-0 overflow-hidden" : "w-80"
+            )}>
+                <div className="p-5 border-b bg-muted/5">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-500 rounded-xl text-white shadow-lg shadow-blue-500/10">
+                                <Table className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <h2 className="font-black text-sm uppercase tracking-widest">Entities</h2>
+                                <span className="text-[9px] text-muted-foreground">
+                                    {visibleTableNames.size}/{hierarchy?.length || 0} selected
+                                </span>
+                            </div>
                         </div>
-                        <h2 className="font-black text-sm uppercase tracking-widest">Entities</h2>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSidebarCollapsed(true)}>
+                            <PanelLeftClose className="h-4 w-4" />
+                        </Button>
                     </div>
 
-                    {/* Database Selector */}
-                    <div className="mb-4">
-                        <Select
-                            value={database}
-                            onValueChange={(val) => {
-                                updateTabMetadata(tabId, {
-                                    database: val,
-                                    visibleTables: [],
-                                    nodes: [],
-                                    edges: []
-                                });
-                                setVisibleTableNames(new Set());
-                                setNodes([]);
-                                setEdges([]);
-                            }}
-                        >
-                            <SelectTrigger className="h-8 text-xs bg-muted/20 border-border/20">
-                                <SelectValue placeholder="Select Database" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {allDatabases?.map(db => (
-                                    <SelectItem key={db.id} value={db.name} className="text-xs">
-                                        {db.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    {/* Database Selector - only show if connection has multiple databases */}
+                    {hasDatabases && (
+                        <div className="mb-3">
+                            <Select
+                                value={selectedDatabase}
+                                onValueChange={(val) => {
+                                    setSelectedDatabase(val);
+                                    setVisibleTableNames(new Set());
+                                    setNodes([]);
+                                    setEdges([]);
+                                }}
+                            >
+                                <SelectTrigger className="h-8 text-xs bg-muted/20 border-border/20">
+                                    <SelectValue placeholder="Select Database" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {allDatabases.map((db: any) => (
+                                        <SelectItem key={db.id} value={db.name} className="text-xs">
+                                            {db.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+
+                    {/* Schema Filter */}
+                    {schemas.length > 1 && (
+                        <div className="mb-3">
+                            <Select value={schemaFilter} onValueChange={setSchemaFilter}>
+                                <SelectTrigger className="h-8 text-xs bg-muted/20 border-border/20">
+                                    <Layers className="w-3 h-3 mr-1" />
+                                    <SelectValue placeholder="All Schemas" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all" className="text-xs">All Schemas</SelectItem>
+                                    {schemas.map(s => (
+                                        <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
 
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground opacity-40" />
@@ -458,6 +600,18 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
+                    </div>
+
+                    {/* Bulk actions */}
+                    <div className="flex gap-2 mt-3">
+                        <Button variant="outline" size="sm" className="flex-1 h-7 text-[9px] font-bold uppercase tracking-wider gap-1" onClick={handleSelectAll}>
+                            <CheckSquare className="h-3 w-3" />
+                            All
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1 h-7 text-[9px] font-bold uppercase tracking-wider gap-1" onClick={handleDeselectAll}>
+                            <Square className="h-3 w-3" />
+                            None
+                        </Button>
                     </div>
                 </div>
 
@@ -493,7 +647,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                         variant="outline"
                         size="sm"
                         className="w-full text-[10px] font-black uppercase tracking-widest gap-2 rounded-xl"
-                        onClick={() => setVisibleTableNames(new Set())}
+                        onClick={handleDeselectAll}
                     >
                         Clear Canvas
                     </Button>
@@ -509,7 +663,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     </div>
                 )}
 
-                {!database && !isLoading && (
+                {!effectiveDatabase && !isLoading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
                         <div className="text-center">
                             <div className="w-12 h-12 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce">
@@ -524,6 +678,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 )}
 
                 <ReactFlow
+                    ref={reactFlowRef}
                     nodes={nodes}
                     edges={edges}
                     onNodesChange={onNodesChange}
@@ -543,43 +698,115 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     <Background color="hsl(var(--muted-foreground))" gap={20} style={{ opacity: 0.05 }} />
                     <Controls className="bg-card border-border/40 shadow-2xl rounded-xl overflow-hidden" />
 
-                    <Panel position="top-left" className="m-6">
-                        <div className="flex flex-col gap-4">
-                            <div className="bg-card/80 backdrop-blur-xl border border-border/40 p-5 rounded-[24px] shadow-2xl ring-1 ring-white/5">
-                                <div className="flex items-center gap-4 mb-3">
-                                    <div className="p-2.5 bg-blue-500 rounded-2xl text-white shadow-lg shadow-blue-500/20">
-                                        <GitGraph className="h-5 w-5" />
+                    {showMinimap && (
+                        <MiniMap
+                            className="bg-card/80 border border-border/40 rounded-xl overflow-hidden !shadow-2xl"
+                            maskColor="rgba(0,0,0,0.2)"
+                            nodeColor="hsl(var(--primary))"
+                            pannable
+                            zoomable
+                        />
+                    )}
+
+                    {/* Top-left: Title + Toolbar */}
+                    <Panel position="top-left" className="m-4">
+                        <div className="flex flex-col gap-3">
+                            <div className="bg-card/80 backdrop-blur-xl border border-border/40 p-4 rounded-2xl shadow-2xl ring-1 ring-white/5">
+                                <div className="flex items-center gap-3 mb-3">
+                                    {isSidebarCollapsed && (
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 mr-1" onClick={() => setSidebarCollapsed(false)}>
+                                            <PanelLeft className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                    <div className="p-2 bg-blue-500 rounded-xl text-white shadow-lg shadow-blue-500/20">
+                                        <GitGraph className="h-4 w-4" />
                                     </div>
                                     <div>
-                                        <h2 className="font-black text-lg tracking-tight leading-none uppercase">Database Diagram</h2>
-                                        <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-black opacity-40 mt-1">
-                                            {activeConnection?.name} @ {database || '...'}
+                                        <h2 className="font-black text-base tracking-tight leading-none uppercase">Database Diagram</h2>
+                                        <p className="text-[9px] text-muted-foreground uppercase tracking-[0.15em] font-bold opacity-40 mt-0.5">
+                                            {activeConnection?.name} • {selectedDatabase || 'Schema'}
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="flex gap-2">
-                                    <Button variant="outline" size="sm" className="h-8 rounded-full bg-muted/20 border-border/40 text-[10px] font-bold uppercase tracking-widest gap-2" onClick={() => refetchCols()}>
+                                <div className="flex gap-1.5 flex-wrap">
+                                    <Button variant="outline" size="sm" className="h-7 rounded-full bg-muted/20 border-border/40 text-[9px] font-bold uppercase tracking-wider gap-1.5" onClick={() => refetchCols()}>
                                         <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
                                         Refresh
                                     </Button>
-                                    <Button variant="outline" size="sm" className="h-8 rounded-full bg-primary/10 border-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest gap-2" onClick={handleAutoLayout}>
+                                    <Button variant="outline" size="sm" className="h-7 rounded-full bg-primary/10 border-primary/20 text-primary text-[9px] font-bold uppercase tracking-wider gap-1.5" onClick={handleAutoLayout}>
                                         <LayoutGrid className="h-3 w-3" />
                                         Auto Layout
+                                    </Button>
+
+                                    {/* Detail Level */}
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" size="sm" className="h-7 rounded-full bg-muted/20 border-border/40 text-[9px] font-bold uppercase tracking-wider gap-1.5">
+                                                <Eye className="h-3 w-3" />
+                                                {detailLevel === 'all' ? 'All Cols' : detailLevel === 'keys' ? 'Keys Only' : 'Names'}
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="w-44">
+                                            <DropdownMenuItem onClick={() => setDetailLevel('all')} className={cn(detailLevel === 'all' && "bg-primary/10 text-primary")}>
+                                                All Columns
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setDetailLevel('keys')} className={cn(detailLevel === 'keys' && "bg-primary/10 text-primary")}>
+                                                Keys Only (PK/FK)
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setDetailLevel('name')} className={cn(detailLevel === 'name' && "bg-primary/10 text-primary")}>
+                                                Table Names Only
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+
+                                    {/* Export */}
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" size="sm" className="h-7 rounded-full bg-muted/20 border-border/40 text-[9px] font-bold uppercase tracking-wider gap-1.5">
+                                                <Download className="h-3 w-3" />
+                                                Export
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="w-48">
+                                            <DropdownMenuItem onClick={handleExportPNG} className="gap-2">
+                                                <Download className="h-3.5 w-3.5" />
+                                                Export as PNG
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={handleExportSQL} className="gap-2">
+                                                <FileCode className="h-3.5 w-3.5" />
+                                                Export as SQL DDL
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+
+                                    {/* Toggle Minimap */}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className={cn("h-7 rounded-full text-[9px] font-bold uppercase tracking-wider gap-1.5",
+                                            showMinimap ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-muted/20 border-border/40"
+                                        )}
+                                        onClick={() => setShowMinimap(!showMinimap)}
+                                    >
+                                        <Maximize2 className="h-3 w-3" />
+                                        Minimap
                                     </Button>
                                 </div>
                             </div>
                         </div>
                     </Panel>
 
-                    <Panel position="top-right" className="m-6">
-                        <div className="bg-card/80 backdrop-blur-xl border border-border/40 p-4 rounded-3xl shadow-2xl flex flex-col gap-1 items-end">
-                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-500">
+                    {/* Top-right: Status */}
+                    <Panel position="top-right" className="m-4">
+                        <div className="bg-card/80 backdrop-blur-xl border border-border/40 p-3 rounded-2xl shadow-2xl flex flex-col gap-1 items-end">
+                            <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-emerald-500">
                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                 Live Designer Mode
                             </div>
-                            <div className="text-[9px] text-muted-foreground opacity-40 font-bold">
-                                Drag from handles to create manual links
+                            <div className="text-[8px] text-muted-foreground opacity-40 font-bold">
+                                Drag from handles to create FK links
                             </div>
                         </div>
                     </Panel>
@@ -606,6 +833,9 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 .react-flow__handle:hover {
                     transform: scale(1.5);
                     background: #fff;
+                }
+                .react-flow__minimap {
+                    border-radius: 12px !important;
                 }
             `}</style>
 
