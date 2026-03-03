@@ -7,23 +7,15 @@ import { DocContent } from '@/presentation/components/docs/DocContent';
 import { DocBreadcrumbs } from '@/presentation/components/docs/DocBreadcrumbs';
 import { DocNavigation } from '@/presentation/components/docs/DocNavigation';
 import { cn } from '@/lib/utils';
+import { useAppStore } from '@/core/services/store';
+import { LanguageSwitcher } from '@/presentation/components/shared/LanguageSwitcher';
 
 export function DocumentationPage() {
     const navigate = useNavigate();
+    const { lang } = useAppStore();
     const [activeSection, setActiveSection] = useState('introduction');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [headings, setHeadings] = useState<{ id: string, text: string, level: number }[]>([]);
-
-    // Language management
-    const [lang, setLang] = useState<'vi' | 'en'>(() => {
-        const saved = localStorage.getItem('docs-lang');
-        return (saved === 'en' || saved === 'vi') ? saved : 'vi';
-    });
-
-    const toggleLang = (newLang: 'vi' | 'en') => {
-        setLang(newLang);
-        localStorage.setItem('docs-lang', newLang);
-    };
 
     // Compute navigation metadata
     const navInfo = useMemo(() => {
@@ -94,30 +86,12 @@ export function DocumentationPage() {
                             <Database className="w-5 h-5 text-primary" />
                         </div>
                         <h1 className="font-bold text-sm tracking-tight hidden sm:block truncate max-w-[150px] lg:max-w-none">
-                            Data Explorer <span className="text-muted-foreground font-normal ml-1">Docs</span>
+                            Data Explorer <span className="text-muted-foreground font-normal ml-1">{lang === 'vi' ? 'Tài liệu' : 'Docs'}</span>
                         </h1>
                     </div>
 
-                    {/* Language Switcher */}
-                    <div className="hidden sm:flex items-center bg-muted/30 rounded-full p-1 border border-border/40">
-                        <button
-                            onClick={() => toggleLang('vi')}
-                            className={cn(
-                                "px-3 py-1 rounded-full text-[10px] font-bold transition-all",
-                                lang === 'vi' ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground"
-                            )}
-                        >
-                            VN
-                        </button>
-                        <button
-                            onClick={() => toggleLang('en')}
-                            className={cn(
-                                "px-3 py-1 rounded-full text-[10px] font-bold transition-all",
-                                lang === 'en' ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground"
-                            )}
-                        >
-                            EN
-                        </button>
+                    <div className="hidden sm:block">
+                        <LanguageSwitcher />
                     </div>
                 </div>
 
@@ -131,15 +105,9 @@ export function DocumentationPage() {
                         />
                     </div>
 
-                    {/* Compact Mobile Switcher */}
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="sm:hidden text-[10px] h-7 px-2 font-bold"
-                        onClick={() => toggleLang(lang === 'vi' ? 'en' : 'vi')}
-                    >
-                        {lang.toUpperCase()}
-                    </Button>
+                    <div className="sm:hidden">
+                        <LanguageSwitcher />
+                    </div>
 
                     <Button variant="ghost" size="sm" onClick={() => navigate('/app')} className="text-xs h-8">
                         {lang === 'vi' ? 'Mở Ứng dụng' : 'Launch App'}

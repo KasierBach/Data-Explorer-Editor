@@ -8,7 +8,7 @@ import { API_BASE_URL } from '@/core/config/env';
 
 export const LoginPage = () => {
     const navigate = useNavigate();
-    const { login } = useAppStore();
+    const { login, lang } = useAppStore();
     const [isRegister, setIsRegister] = useState(false);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -35,14 +35,14 @@ export const LoginPage = () => {
 
             if (!response.ok) {
                 const data = await response.json().catch(() => ({}));
-                throw new Error(data.message || 'Something went wrong');
+                throw new Error(data.message || (lang === 'vi' ? 'Đã có lỗi xảy ra' : 'Something went wrong'));
             }
 
             const data = await response.json();
             login(data.access_token, data.user);
             navigate('/');
         } catch (err: any) {
-            setError(err.message || 'Invalid credentials');
+            setError(err.message || (lang === 'vi' ? 'Thông tin đăng nhập không hợp lệ' : 'Invalid credentials'));
         } finally {
             setIsLoading(false);
         }
@@ -56,10 +56,14 @@ export const LoginPage = () => {
                         <Database className="w-8 h-8 text-primary" />
                     </div>
                     <h1 className="text-2xl font-semibold tracking-tight">
-                        {isRegister ? 'Create Account' : 'Welcome back'}
+                        {isRegister
+                            ? (lang === 'vi' ? 'Tạo Tài khoản' : 'Create Account')
+                            : (lang === 'vi' ? 'Chào mừng trở lại' : 'Welcome back')}
                     </h1>
                     <p className="text-sm text-muted-foreground">
-                        {isRegister ? 'Register a new account to get started' : 'Sign in to your account to continue'}
+                        {isRegister
+                            ? (lang === 'vi' ? 'Đăng ký tài khoản mới để bắt đầu' : 'Register a new account to get started')
+                            : (lang === 'vi' ? 'Đăng nhập vào tài khoản để tiếp tục' : 'Sign in to your account to continue')}
                     </p>
                 </div>
 
@@ -114,7 +118,9 @@ export const LoginPage = () => {
                         ) : (
                             <LogIn className="h-4 w-4" />
                         )}
-                        {isRegister ? 'Create Account' : 'Sign In'}
+                        {isRegister
+                            ? (lang === 'vi' ? 'Tạo Tài khoản' : 'Create Account')
+                            : (lang === 'vi' ? 'Đăng Nhập' : 'Sign In')}
                     </Button>
                 </form>
 

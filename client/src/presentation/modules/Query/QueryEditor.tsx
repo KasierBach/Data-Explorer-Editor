@@ -32,7 +32,7 @@ import { ChevronDown } from 'lucide-react';
 
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const queryClient = useQueryClient();
-    const { activeConnectionId, connections, tabs, updateTabMetadata, activeDatabase } = useAppStore();
+    const { activeConnectionId, connections, tabs, updateTabMetadata, activeDatabase, lang } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const schemaInfo = useSchemaInfo();
 
@@ -209,7 +209,9 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             updateSavedQuery(currentSavedQueryId, { sql: query });
         } else {
             // New: prompt for name
-            const name = prompt('Save Query As:', `Query ${new Date().toLocaleString('vi-VN')}`);
+            const promptTitle = lang === 'vi' ? 'Lưu truy vấn thành:' : 'Save Query As:';
+            const defaultName = lang === 'vi' ? `Truy vấn ${new Date().toLocaleString('vi-VN')}` : `Query ${new Date().toLocaleString('en-US')}`;
+            const name = prompt(promptTitle, defaultName);
             if (!name) return;
 
             const id = `saved-${Date.now()}`;
@@ -282,15 +284,17 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             )}
                         >
                             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
-                            <span className="font-bold">{isMobile ? "Run" : "Execute"}</span>
+                            <span className="font-bold">
+                                {isMobile ? (lang === 'vi' ? "Chạy" : "Run") : (lang === 'vi' ? "Thực thi" : "Execute")}
+                            </span>
                         </Button>
 
                         {!isMobile && (
                             <>
                                 <div className="h-4 w-[1px] bg-border mx-1" />
-                                <Button variant="ghost" size="sm" onClick={handleRefreshSchema} className="h-7 gap-1 px-2 text-xs" title="Refresh Sidebar">
+                                <Button variant="ghost" size="sm" onClick={handleRefreshSchema} className="h-7 gap-1 px-2 text-xs" title={lang === 'vi' ? "Tải lại thanh bên" : "Refresh Sidebar"}>
                                     <RefreshCw className="w-3.5 h-3.5" />
-                                    Refresh
+                                    {lang === 'vi' ? 'Tải lại' : 'Refresh'}
                                 </Button>
                                 <div className="h-4 w-[1px] bg-border mx-1" />
                             </>
@@ -300,29 +304,29 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             <>
                                 <Button variant="ghost" size="sm" onClick={handleFormat} className="h-7 gap-1 px-2 text-xs">
                                     <AlignLeft className="w-3.5 h-3.5" />
-                                    Format
+                                    {lang === 'vi' ? 'Định dạng' : 'Format'}
                                 </Button>
                                 <Button variant="ghost" size="sm" onClick={handleClear} className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive">
                                     <Eraser className="w-3.5 h-3.5" />
-                                    Clear
+                                    {lang === 'vi' ? 'Xóa' : 'Clear'}
                                 </Button>
                                 <div className="h-4 w-[1px] bg-border mx-1" />
                                 <Button variant="ghost" size="sm" onClick={handleSave} className="h-7 gap-1 px-2 text-xs" title="Ctrl+S">
                                     <Save className="w-3.5 h-3.5" />
-                                    Save
+                                    {lang === 'vi' ? 'Lưu' : 'Save'}
                                 </Button>
                                 <Button variant="ghost" size="sm" onClick={() => setIsSavedDialogOpen(true)} className="h-7 gap-1 px-2 text-xs" title="Ctrl+O">
                                     <FolderOpen className="w-3.5 h-3.5" />
-                                    Open
+                                    {lang === 'vi' ? 'Mở' : 'Open'}
                                 </Button>
                                 <Button variant="ghost" size="sm" onClick={() => setIsHistoryDialogOpen(true)} className="h-7 gap-1 px-2 text-xs" title="Ctrl+H">
                                     <History className="w-3.5 h-3.5" />
-                                    History
+                                    {lang === 'vi' ? 'Lịch sử' : 'History'}
                                 </Button>
                                 <div className="h-4 w-[1px] bg-border mx-1" />
                                 <Button variant="ghost" size="sm" onClick={handleExplain} disabled={isLoading} className="h-7 gap-1 px-2 text-xs text-orange-500 hover:text-orange-600" title="EXPLAIN ANALYZE">
                                     <Zap className="w-3.5 h-3.5" />
-                                    Explain
+                                    {lang === 'vi' ? 'Giải thích' : 'Explain'}
                                 </Button>
                             </>
                         ) : (
@@ -330,53 +334,53 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs">
                                         <History className="w-4 h-4" />
-                                        Actions
+                                        {lang === 'vi' ? 'Hành động' : 'Actions'}
                                         <ChevronDown className="w-3 h-3 opacity-50" />
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="start" className="w-48">
                                     <DropdownMenuItem onClick={handleFormat}>
                                         <AlignLeft className="mr-2 h-4 w-4" />
-                                        <span>Format SQL</span>
+                                        <span>{lang === 'vi' ? 'Định dạng SQL' : 'Format SQL'}</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={handleSave}>
                                         <Save className="mr-2 h-4 w-4" />
-                                        <span>Save Query</span>
+                                        <span>{lang === 'vi' ? 'Lưu truy vấn' : 'Save Query'}</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => setIsSavedDialogOpen(true)}>
                                         <FolderOpen className="mr-2 h-4 w-4" />
-                                        <span>Open Saved</span>
+                                        <span>{lang === 'vi' ? 'Mở đã lưu' : 'Open Saved'}</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => setIsHistoryDialogOpen(true)}>
                                         <History className="mr-2 h-4 w-4" />
-                                        <span>History</span>
+                                        <span>{lang === 'vi' ? 'Lịch sử' : 'History'}</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={handleExplain} className="text-orange-500">
                                         <Zap className="mr-2 h-4 w-4" />
-                                        <span>Explain Plan</span>
+                                        <span>{lang === 'vi' ? 'Giải thích thực thi' : 'Explain Plan'}</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem onClick={handleClear} className="text-red-600">
                                         <Eraser className="mr-2 h-4 w-4" />
-                                        <span>Clear All</span>
+                                        <span>{lang === 'vi' ? 'Xóa tất cả' : 'Clear All'}</span>
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )}
 
                         <div className="flex items-center gap-1.5 px-2">
-                            {!isMobile && <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Limit</span>}
+                            {!isMobile && <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{lang === 'vi' ? 'Giới hạn' : 'Limit'}</span>}
                             <Select value={limit} onValueChange={setLimit}>
                                 <SelectTrigger className="h-7 w-[80px] text-[10px] py-0 border-none bg-muted hover:bg-muted/80 focus:ring-0 shadow-none">
-                                    <SelectValue placeholder="Limit" />
+                                    <SelectValue placeholder={lang === 'vi' ? 'Giới hạn' : 'Limit'} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="100">100</SelectItem>
                                     <SelectItem value="500">500</SelectItem>
                                     <SelectItem value="1000">1000</SelectItem>
                                     <SelectItem value="5000">5000</SelectItem>
-                                    <SelectItem value="all">No Limit</SelectItem>
+                                    <SelectItem value="all">{lang === 'vi' ? 'Không' : 'No Limit'}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

@@ -56,7 +56,7 @@ interface ERDWorkspaceProps {
 type DetailLevel = 'all' | 'keys' | 'name';
 
 export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId, database: databaseProp }) => {
-    const { connections, tabs, updateTabMetadata, pageStates, setPageState } = useAppStore();
+    const { connections, tabs, updateTabMetadata, pageStates, setPageState, lang } = useAppStore();
     const activeConnection = connections.find(c => c.id === connectionId);
 
     // Manage database selection locally so it works in both tab and standalone page modes
@@ -218,7 +218,10 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
     }, [relationships]);
 
     const handleRemoveConstraint = useCallback(async (tableName: string, type: 'pk' | 'fk', constraintName: string) => {
-        if (!window.confirm(`Are you sure you want to remove this ${type.toUpperCase()} (${constraintName})?`)) return;
+        const confirmMsg = lang === 'vi'
+            ? `Bạn có chắc muốn xóa ${type.toUpperCase()} (${constraintName}) này không?`
+            : `Are you sure you want to remove this ${type.toUpperCase()} (${constraintName})?`;
+        if (!window.confirm(confirmMsg)) return;
 
         try {
             await queryService.updateSchema({
@@ -231,15 +234,15 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     constraintName: constraintName
                 }]
             });
-            toast.success(`${type.toUpperCase()} removed successfully`);
+            toast.success(lang === 'vi' ? `${type.toUpperCase()} đã được xóa thành công` : `${type.toUpperCase()} removed successfully`);
             queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
             queryClient.invalidateQueries({ queryKey: ['erd-columns'] });
         } catch (error: any) {
-            toast.error(`Failed to remove ${type.toUpperCase()}`, {
+            toast.error(lang === 'vi' ? `Không thể xóa ${type.toUpperCase()}` : `Failed to remove ${type.toUpperCase()}`, {
                 description: error.message
             });
         }
-    }, [connectionId, selectedDatabase, queryClient]);
+    }, [connectionId, selectedDatabase, queryClient, lang]);
 
     const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
         const removals = changes.filter(c => c.type === 'remove');
@@ -261,13 +264,13 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
             if (edge.id.startsWith('db-e-')) {
                 const constraintName = fkConstraintMap.get(`${edge.source}.${edge.sourceHandle}`);
                 if (!constraintName) {
-                    toast.info("Cannot remove: unknown constraint name for this relationship.");
+                    toast.info(lang === 'vi' ? "Không thể xóa: không tìm thấy tên ràng buộc cho liên kết này." : "Cannot remove: unknown constraint name for this relationship.");
                     // Still remove visually if it's glitched out
                     onEdgesChange([change]);
                     return;
                 }
 
-                if (window.confirm(`Are you sure you want to drop the foreign key constraint (${constraintName})?`)) {
+                if (window.confirm(lang === 'vi' ? `Bạn có chắc muốn xóa ràng buộc khóa ngoại (${constraintName}) này không?` : `Are you sure you want to drop the foreign key constraint (${constraintName})?`)) {
                     try {
                         await queryService.updateSchema({
                             connectionId: connectionId!,
@@ -279,12 +282,12 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                                 constraintName: constraintName
                             }]
                         });
-                        toast.success("Relationship removed successfully");
+                        toast.success(lang === 'vi' ? "Đã xóa liên kết thành công" : "Relationship removed successfully");
                         queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
                         queryClient.invalidateQueries({ queryKey: ['erd-columns'] });
                         onEdgesChange([change]);
                     } catch (error: any) {
-                        toast.error("Failed to remove relationship", { description: error.message });
+                        toast.error(lang === 'vi' ? "Không thể xóa liên kết" : "Failed to remove relationship", { description: error.message });
                     }
                 }
             } else {
@@ -292,7 +295,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 onEdgesChange([change]);
             }
         });
-    }, [edges, onEdgesChange, fkConstraintMap, connectionId, selectedDatabase, queryClient]);
+    }, [edges, onEdgesChange, fkConstraintMap, connectionId, selectedDatabase, queryClient, lang]);
 
     const onConnect = useCallback(
         (params: Connection) => {
@@ -326,8 +329,8 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 }]
             });
 
-            toast.success("Relationship Created", {
-                description: `Successfully linked ${data.sourceTable} to ${data.targetTable}.`,
+            toast.success(lang === 'vi' ? "Đã tạo liên kết" : "Relationship Created", {
+                description: lang === 'vi' ? `Đã liên kết thành công ${data.sourceTable} với ${data.targetTable}.` : `Successfully linked ${data.sourceTable} to ${data.targetTable}.`,
             });
 
             setEdges((eds) => addEdge({
@@ -345,14 +348,14 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
             try {
                 const errObj = JSON.parse(errorMessage);
                 if (errObj.statusCode === 404 && errObj.message?.includes('Connection with ID')) {
-                    errorMessage = "Connection session expired. Please refresh the page.";
+                    errorMessage = lang === 'vi' ? "Phiên kết nối đã hết hạn. Vui lòng tải lại trang." : "Connection session expired. Please refresh the page.";
                 } else if (errObj.message) {
                     errorMessage = errObj.message;
                 }
             } catch {
                 // If parsing fails, use the raw message
             }
-            toast.error("Failed to create relationship", { description: errorMessage });
+            toast.error(lang === 'vi' ? "Không thể tạo liên kết" : "Failed to create relationship", { description: errorMessage });
         }
     };
 
@@ -462,12 +465,12 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 link.download = `erd-${selectedDatabase || 'diagram'}-${Date.now()}.png`;
                 link.href = dataUrl;
                 link.click();
-                toast.success('Exported as PNG');
+                toast.success(lang === 'vi' ? 'Đã xuất thành PNG' : 'Exported as PNG');
             }).catch(() => {
-                toast.error('Failed to export. Try zooming out first.');
+                toast.error(lang === 'vi' ? 'Không thể xuất. Hãy thử thu nhỏ sơ đồ trước.' : 'Failed to export. Try zooming out first.');
             });
         });
-    }, [selectedDatabase]);
+    }, [selectedDatabase, lang]);
 
     // Export as SQL DDL
     const handleExportSQL = useCallback(() => {
@@ -497,8 +500,8 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
         link.href = url;
         link.click();
         URL.revokeObjectURL(url);
-        toast.success('Exported as SQL');
-    }, [tableData, visibleTableNames, selectedDatabase]);
+        toast.success(lang === 'vi' ? 'Đã xuất thành SQL' : 'Exported as SQL');
+    }, [tableData, visibleTableNames, selectedDatabase, lang]);
 
     useEffect(() => {
         if (!hierarchy || !tableData || !relationships) return;
@@ -610,9 +613,9 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                                 <Table className="h-4 w-4" />
                             </div>
                             <div>
-                                <h2 className="font-black text-sm uppercase tracking-widest">Entities</h2>
+                                <h2 className="font-black text-sm uppercase tracking-widest">{lang === 'vi' ? 'Thực thể' : 'Entities'}</h2>
                                 <span className="text-[9px] text-muted-foreground">
-                                    {visibleTableNames.size}/{hierarchy?.length || 0} selected
+                                    {visibleTableNames.size}/{hierarchy?.length || 0} {lang === 'vi' ? 'đã chọn' : 'selected'}
                                 </span>
                             </div>
                         </div>
@@ -634,7 +637,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                                 }}
                             >
                                 <SelectTrigger className="h-8 text-xs bg-muted/20 border-border/20">
-                                    <SelectValue placeholder="Select Database" />
+                                    <SelectValue placeholder={lang === 'vi' ? 'Chọn Cơ sở dữ liệu' : 'Select Database'} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {allDatabases.map((db: any) => (
@@ -653,10 +656,10 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                             <Select value={schemaFilter} onValueChange={setSchemaFilter}>
                                 <SelectTrigger className="h-8 text-xs bg-muted/20 border-border/20">
                                     <Layers className="w-3 h-3 mr-1" />
-                                    <SelectValue placeholder="All Schemas" />
+                                    <SelectValue placeholder={lang === 'vi' ? 'Tất cả Schema' : 'All Schemas'} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all" className="text-xs">All Schemas</SelectItem>
+                                    <SelectItem value="all" className="text-xs">{lang === 'vi' ? 'Tất cả Schema' : 'All Schemas'}</SelectItem>
                                     {schemas.map(s => (
                                         <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
                                     ))}
@@ -668,7 +671,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground opacity-40" />
                         <Input
-                            placeholder="Filter tables..."
+                            placeholder={lang === 'vi' ? "Lọc bảng..." : "Filter tables..."}
                             className="pl-8 bg-muted/20 border-border/20 h-8 text-[11px] rounded-lg"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -679,11 +682,11 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     <div className="flex gap-2 mt-3">
                         <Button variant="outline" size="sm" className="flex-1 h-7 text-[9px] font-bold uppercase tracking-wider gap-1" onClick={handleSelectAll}>
                             <CheckSquare className="h-3 w-3" />
-                            All
+                            {lang === 'vi' ? 'Tất cả' : 'All'}
                         </Button>
                         <Button variant="outline" size="sm" className="flex-1 h-7 text-[9px] font-bold uppercase tracking-wider gap-1" onClick={handleDeselectAll}>
                             <Square className="h-3 w-3" />
-                            None
+                            {lang === 'vi' ? 'Bỏ chọn' : 'None'}
                         </Button>
                     </div>
                 </div>
@@ -722,7 +725,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                         className="w-full text-[10px] font-black uppercase tracking-widest gap-2 rounded-xl"
                         onClick={handleDeselectAll}
                     >
-                        Clear Canvas
+                        {lang === 'vi' ? 'XÓA SƠ ĐỒ' : 'Clear Canvas'}
                     </Button>
                 </div>
             </div>
@@ -742,9 +745,9 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                             <div className="w-12 h-12 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce">
                                 <Database className="w-6 h-6 text-muted-foreground" />
                             </div>
-                            <h3 className="font-bold text-lg mb-2">Select a Database</h3>
+                            <h3 className="font-bold text-lg mb-2">{lang === 'vi' ? 'Chọn Cơ sở dữ liệu' : 'Select a Database'}</h3>
                             <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                                Choose a database from the sidebar to start visualizing your schema.
+                                {lang === 'vi' ? 'Chọn một cơ sở dữ liệu từ thanh bên để bắt đầu trực quan hóa sơ đồ.' : 'Choose a database from the sidebar to start visualizing your schema.'}
                             </p>
                         </div>
                     </div>
@@ -795,9 +798,9 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                                         <GitGraph className="h-4 w-4" />
                                     </div>
                                     <div>
-                                        <h2 className="font-black text-base tracking-tight leading-none uppercase">Database Diagram</h2>
+                                        <h2 className="font-black text-base tracking-tight leading-none uppercase">{lang === 'vi' ? 'Sơ đồ CSDL' : 'Database Diagram'}</h2>
                                         <p className="text-[9px] text-muted-foreground uppercase tracking-[0.15em] font-bold opacity-40 mt-0.5">
-                                            {activeConnection?.name} • {selectedDatabase || 'Schema'}
+                                            {activeConnection?.name} • {selectedDatabase || (lang === 'vi' ? 'Sơ đồ' : 'Schema')}
                                         </p>
                                     </div>
                                 </div>
@@ -805,11 +808,11 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                                 <div className="flex gap-1.5 flex-wrap">
                                     <Button variant="outline" size="sm" className="h-7 rounded-full bg-muted/20 border-border/40 text-[9px] font-bold uppercase tracking-wider gap-1.5" onClick={() => refetchCols()}>
                                         <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
-                                        Refresh
+                                        {lang === 'vi' ? 'Tải lại' : 'Refresh'}
                                     </Button>
                                     <Button variant="outline" size="sm" className="h-7 rounded-full bg-primary/10 border-primary/20 text-primary text-[9px] font-bold uppercase tracking-wider gap-1.5" onClick={handleAutoLayout}>
                                         <LayoutGrid className="h-3 w-3" />
-                                        Auto Layout
+                                        {lang === 'vi' ? 'Tự động sắp xếp' : 'Auto Layout'}
                                     </Button>
 
                                     {/* Detail Level */}
@@ -817,18 +820,18 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                                         <DropdownMenuTrigger asChild>
                                             <Button variant="outline" size="sm" className="h-7 rounded-full bg-muted/20 border-border/40 text-[9px] font-bold uppercase tracking-wider gap-1.5">
                                                 <Eye className="h-3 w-3" />
-                                                {detailLevel === 'all' ? 'All Cols' : detailLevel === 'keys' ? 'Keys Only' : 'Names'}
+                                                {detailLevel === 'all' ? (lang === 'vi' ? 'Tất cả cột' : 'All Cols') : detailLevel === 'keys' ? (lang === 'vi' ? 'Chỉ khóa' : 'Keys Only') : (lang === 'vi' ? 'Tên bảng' : 'Names')}
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent className="w-44">
                                             <DropdownMenuItem onClick={() => setDetailLevel('all')} className={cn(detailLevel === 'all' && "bg-primary/10 text-primary")}>
-                                                All Columns
+                                                {lang === 'vi' ? 'Tất cả các cột' : 'All Columns'}
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => setDetailLevel('keys')} className={cn(detailLevel === 'keys' && "bg-primary/10 text-primary")}>
-                                                Keys Only (PK/FK)
+                                                {lang === 'vi' ? 'Chỉ khóa (PK/FK)' : 'Keys Only (PK/FK)'}
                                             </DropdownMenuItem>
                                             <DropdownMenuItem onClick={() => setDetailLevel('name')} className={cn(detailLevel === 'name' && "bg-primary/10 text-primary")}>
-                                                Table Names Only
+                                                {lang === 'vi' ? 'Chỉ tên bảng' : 'Table Names Only'}
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -838,18 +841,18 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                                         <DropdownMenuTrigger asChild>
                                             <Button variant="outline" size="sm" className="h-7 rounded-full bg-muted/20 border-border/40 text-[9px] font-bold uppercase tracking-wider gap-1.5">
                                                 <Download className="h-3 w-3" />
-                                                Export
+                                                {lang === 'vi' ? 'Xuất' : 'Export'}
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent className="w-48">
                                             <DropdownMenuItem onClick={handleExportPNG} className="gap-2">
                                                 <Download className="h-3.5 w-3.5" />
-                                                Export as PNG
+                                                {lang === 'vi' ? 'Xuất PNG' : 'Export as PNG'}
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem onClick={handleExportSQL} className="gap-2">
                                                 <FileCode className="h-3.5 w-3.5" />
-                                                Export as SQL DDL
+                                                {lang === 'vi' ? 'Xuất SQL DDL' : 'Export as SQL DDL'}
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
@@ -864,7 +867,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                                         onClick={() => setShowMinimap(!showMinimap)}
                                     >
                                         <Maximize2 className="h-3 w-3" />
-                                        Minimap
+                                        {lang === 'vi' ? 'Bản đồ nhỏ' : 'Minimap'}
                                     </Button>
                                 </div>
                             </div>
@@ -879,7 +882,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                                 Live Designer Mode
                             </div>
                             <div className="text-[8px] text-muted-foreground opacity-40 font-bold">
-                                Drag from handles to create FK links
+                                {lang === 'vi' ? 'Kéo từ các nút để tạo liên kết FK' : 'Drag from handles to create FK links'}
                             </div>
                         </div>
                     </Panel>

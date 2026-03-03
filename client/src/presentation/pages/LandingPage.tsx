@@ -23,10 +23,11 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '@/core/services/store';
 import { cn } from '@/lib/utils';
+import { LanguageSwitcher } from '@/presentation/components/shared/LanguageSwitcher';
 
 export const LandingPage: React.FC = () => {
     const navigate = useNavigate();
-    const { isAuthenticated, logout } = useAppStore();
+    const { isAuthenticated, logout, lang } = useAppStore();
     const revealRefs = useRef<HTMLDivElement[]>([]);
 
     useEffect(() => {
@@ -74,13 +75,22 @@ export const LandingPage: React.FC = () => {
                     </div>
 
                     <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
-                        <a href="#features" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">Features</a>
-                        <a href="#demo" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">Live Demo</a>
-                        <button onClick={() => navigate('/docs')} className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">Docs</button>
-                        <a href="#pricing" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">Pricing</a>
+                        <a href="#features" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                            {lang === 'vi' ? 'Tính năng' : 'Features'}
+                        </a>
+                        <a href="#demo" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                            {lang === 'vi' ? 'Bản demo' : 'Live Demo'}
+                        </a>
+                        <button onClick={() => navigate('/docs')} className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                            {lang === 'vi' ? 'Tài liệu' : 'Docs'}
+                        </button>
+                        <a href="#pricing" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                            {lang === 'vi' ? 'Giá cả' : 'Pricing'}
+                        </a>
                     </nav>
 
                     <div className="flex items-center gap-4">
+                        <LanguageSwitcher />
                         {isAuthenticated ? (
                             <div className="flex items-center gap-2">
                                 <Button variant="ghost" size="sm" onClick={() => { logout(); navigate('/login'); }} className="hidden sm:flex hover:bg-red-500/10 hover:text-red-500 text-xs uppercase tracking-wider">
@@ -93,10 +103,10 @@ export const LandingPage: React.FC = () => {
                         ) : (
                             <>
                                 <Button variant="ghost" size="sm" onClick={() => navigate('/login')} className="hidden sm:flex hover:bg-blue-500/10 hover:text-blue-500 text-xs uppercase tracking-wider">
-                                    Login
+                                    {lang === 'vi' ? 'Đăng nhập' : 'Login'}
                                 </Button>
                                 <Button size="sm" onClick={() => navigate('/login')} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-widest font-bold px-5">
-                                    Start Analysis
+                                    {lang === 'vi' ? 'Bắt đầu' : 'Start Analysis'}
                                 </Button>
                             </>
                         )}
@@ -113,20 +123,24 @@ export const LandingPage: React.FC = () => {
                             <span>v2.1: Cloud Sync & AI Insights</span>
                         </div>
                         <h1 className="text-4xl md:text-7xl font-black tracking-tighter mb-4 md:mb-5 bg-gradient-to-b from-white via-white to-white/40 bg-clip-text text-transparent max-w-5xl mx-auto leading-[0.9] animate-fade-in-up [animation-delay:100ms]">
-                            VISUALIZE YOUR <br />
-                            <span className="text-blue-500 inline-block">DATA INTELLIGENCE</span>
+                            {lang === 'vi' ? (
+                                <>TRỰC QUAN HÓA <br /> <span className="text-blue-500 inline-block">DỮ LIỆU THÔNG MINH</span></>
+                            ) : (
+                                <>VISUALIZE YOUR <br /> <span className="text-blue-500 inline-block">DATA INTELLIGENCE</span></>
+                            )}
                         </h1>
                         <p className="text-lg md:text-xl text-muted-foreground/80 max-w-2xl mx-auto mb-6 md:mb-8 leading-relaxed animate-fade-in-up [animation-delay:200ms] font-medium">
-                            The professional SQL client that turns raw queries into actionable insights.
-                            Fully responsive, secure, and powered by Gemini AI.
+                            {lang === 'vi'
+                                ? 'Trình quản lý SQL chuyên nghiệp biến các truy vấn thô thành thông tin hữu ích. Phản hồi nhanh, bảo mật và hỗ trợ bởi Gemini AI.'
+                                : 'The professional SQL client that turns raw queries into actionable insights. Fully responsive, secure, and powered by Gemini AI.'}
                         </p>
                         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up [animation-delay:300ms]">
                             <Button size="lg" onClick={() => navigate(isAuthenticated ? '/app' : '/login')} className="h-12 px-8 text-xs font-black uppercase tracking-[0.2em] bg-blue-600 hover:bg-blue-700 text-white shadow-2xl shadow-blue-500/40 w-full sm:w-auto rounded-xl transition-all hover:-translate-y-1">
-                                {isAuthenticated ? 'Open Workspace' : 'Claim Your Access'}
+                                {isAuthenticated ? (lang === 'vi' ? 'Vào Workspace' : 'Open Workspace') : (lang === 'vi' ? 'Nhận quyền truy cập' : 'Claim Your Access')}
                                 <ArrowRight className="w-4 h-4 ml-2" />
                             </Button>
                             <Button size="lg" variant="outline" onClick={() => window.open('/docs', '_blank')} className="h-12 px-8 text-xs font-black uppercase tracking-[0.2em] w-full sm:w-auto glass-panel hover:bg-white/10 rounded-xl border-white/10">
-                                Documentation
+                                {lang === 'vi' ? 'Tài liệu hướng dẫn' : 'Documentation'}
                             </Button>
                         </div>
                     </div>
@@ -251,9 +265,13 @@ export const LandingPage: React.FC = () => {
                 <section id="features" className="py-12 md:py-16 relative">
                     <div className="container mx-auto px-6 relative z-10">
                         <div ref={addToRevealRefs} className="reveal text-center mb-10 md:mb-16 max-w-3xl mx-auto">
-                            <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 md:mb-6 uppercase">Unified Intelligence</h2>
+                            <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 md:mb-6 uppercase">
+                                {lang === 'vi' ? 'Trí tuệ hợp nhất' : 'Unified Intelligence'}
+                            </h2>
                             <p className="text-muted-foreground text-base md:text-lg font-medium leading-relaxed">
-                                Not just an editor. A command center for your data, built with modern craftsmanship.
+                                {lang === 'vi'
+                                    ? 'Không chỉ là một trình chỉnh sửa. Đó là trung tâm chỉ huy cho dữ liệu của bạn, được xây dựng với sự tinh xảo hiện đại.'
+                                    : 'Not just an editor. A command center for your data, built with modern craftsmanship.'}
                             </p>
                         </div>
 
@@ -261,33 +279,33 @@ export const LandingPage: React.FC = () => {
                             {[
                                 {
                                     icon: <Terminal className="w-6 h-6 text-blue-400" />,
-                                    title: "Monaco Engine",
-                                    desc: "Experience VS Code's editor in your data workflow. Full Intellisense, multi-cursor, and ultra-fast performance."
+                                    title: lang === 'vi' ? "Công cụ Monaco" : "Monaco Engine",
+                                    desc: lang === 'vi' ? "Trải nghiệm trình chỉnh sửa của VS Code trong luồng công việc dữ liệu của bạn. Đầy đủ Intellisense, đa con trỏ và hiệu suất cực nhanh." : "Experience VS Code's editor in your data workflow. Full Intellisense, multi-cursor, and ultra-fast performance."
                                 },
                                 {
                                     icon: <Zap className="w-6 h-6 text-yellow-400" />,
-                                    title: "Generative AI",
-                                    desc: "Natural language to SQL translations powered by Google Gemini. Optimized for complex architectural patterns."
+                                    title: lang === 'vi' ? "AI Tạo hình" : "Generative AI",
+                                    desc: lang === 'vi' ? "Dịch ngôn ngữ tự nhiên sang SQL được hỗ trợ bởi Google Gemini. Được tối ưu hóa cho các mô hình kiến trúc phức tạp." : "Natural language to SQL translations powered by Google Gemini. Optimized for complex architectural patterns."
                                 },
                                 {
                                     icon: <BarChart3 className="w-6 h-6 text-emerald-400" />,
-                                    title: "Smart Insights",
-                                    desc: "Automated analysis of table sizes, active sessions, and relationship mapping with zero configuration."
+                                    title: lang === 'vi' ? "Thông tin Thông minh" : "Smart Insights",
+                                    desc: lang === 'vi' ? "Tự động phân tích kích thước bảng, các phiên hoạt động và lập bản đồ mối quan hệ với cấu hình bằng không." : "Automated analysis of table sizes, active sessions, and relationship mapping with zero configuration."
                                 },
                                 {
                                     icon: <GitGraph className="w-6 h-6 text-purple-400" />,
-                                    title: "Dynamic ERD",
-                                    desc: "Live, interactive relationship diagrams that reflect your schema changes in real-time. Export and design on the fly."
+                                    title: lang === 'vi' ? "ERD Động" : "Dynamic ERD",
+                                    desc: lang === 'vi' ? "Sơ đồ mối quan hệ trực tiếp, tương tác phản ánh các thay đổi lược đồ của bạn trong thời gian thực. Xuất và thiết kế nhanh chóng." : "Live, interactive relationship diagrams that reflect your schema changes in real-time. Export and design on the fly."
                                 },
                                 {
                                     icon: <PieChart className="w-6 h-6 text-cyan-400" />,
-                                    title: "Instant Charts",
-                                    desc: "Transform any result set into a beautiful chart with one click. 15+ modern chart types supported."
+                                    title: lang === 'vi' ? "Biểu đồ Tức thì" : "Instant Charts",
+                                    desc: lang === 'vi' ? "Biến bất kỳ tập kết quả nào thành biểu đồ đẹp mắt chỉ với một cú nhấp chuột. Hỗ trợ hơn 15 loại biểu đồ hiện đại." : "Transform any result set into a beautiful chart with one click. 15+ modern chart types supported."
                                 },
                                 {
                                     icon: <Lock className="w-6 h-6 text-amber-500" />,
-                                    title: "Cloud & Local",
-                                    desc: "Securely connect to Neon, Supabase, or your local Docker instance. Your credentials never leave your screen."
+                                    title: lang === 'vi' ? "Đám mây & Cục bộ" : "Cloud & Local",
+                                    desc: lang === 'vi' ? "Kết nối an toàn với Neon, Supabase hoặc thực thể Docker cục bộ của bạn. Thông tin xác thực của bạn không bao giờ rời khỏi màn hình." : "Securely connect to Neon, Supabase, or your local Docker instance. Your credentials never leave your screen."
                                 }
                             ].map((feature, idx) => (
                                 <div
@@ -318,17 +336,23 @@ export const LandingPage: React.FC = () => {
                     <div className="container mx-auto px-6">
                         <div ref={addToRevealRefs} className="reveal bg-gradient-to-br from-blue-600/10 to-purple-600/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-12 border border-white/10 relative overflow-hidden flex flex-col lg:flex-row items-center gap-8 md:gap-12">
                             <div className="flex-1 text-center lg:text-left">
-                                <Badge className="mb-4 md:mb-6 bg-purple-500/20 text-purple-400 border-purple-500/30 font-black tracking-[0.2em] px-4 py-1">AI DOMAIN</Badge>
-                                <h1 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 md:mb-8 uppercase leading-none">Your Database, <br /> Artificially Intelligent.</h1>
+                                <Badge className="mb-4 md:mb-6 bg-purple-500/20 text-purple-400 border-purple-500/30 font-black tracking-[0.2em] px-4 py-1">
+                                    {lang === 'vi' ? 'MIỀN AI' : 'AI DOMAIN'}
+                                </Badge>
+                                <h1 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 md:mb-8 uppercase leading-none">
+                                    {lang === 'vi' ? <>Cơ sở dữ liệu, <br /> Thông minh Nhân tạo.</> : <>Your Database, <br /> Artificially Intelligent.</>}
+                                </h1>
                                 <p className="text-lg text-muted-foreground/80 mb-10 max-w-xl font-medium">
-                                    Our context-aware AI doesn't just write SQL. It understands your entire schema, optimizes foreign keys, and suggests better architectural patterns.
+                                    {lang === 'vi'
+                                        ? 'AI nhận biết ngữ cảnh của chúng tôi không chỉ viết SQL. Nó hiểu toàn bộ lược đồ của bạn, tối ưu hóa khóa ngoại và gợi ý các mô hình kiến trúc tốt hơn.'
+                                        : "Our context-aware AI doesn't just write SQL. It understands your entire schema, optimizes foreign keys, and suggests better architectural patterns."}
                                 </p>
                                 <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
                                     <Button size="lg" onClick={() => navigate('/app')} className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8">
-                                        Talk to Assistant
+                                        {lang === 'vi' ? 'Trò chuyện với Trợ lý' : 'Talk to Assistant'}
                                     </Button>
                                     <Button size="lg" variant="ghost" onClick={() => navigate('/docs')} className="text-xs font-bold text-muted-foreground hover:text-white uppercase tracking-widest">
-                                        Learn how it works
+                                        {lang === 'vi' ? 'Tìm hiểu cách hoạt động' : 'Learn how it works'}
                                     </Button>
                                 </div>
                             </div>
@@ -373,36 +397,46 @@ export const LandingPage: React.FC = () => {
                 <section id="pricing" className="py-20 relative">
                     <div className="container mx-auto px-6">
                         <div ref={addToRevealRefs} className="reveal text-center mb-16 max-w-2xl mx-auto">
-                            <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 uppercase">Transparent Pricing</h2>
+                            <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 uppercase">
+                                {lang === 'vi' ? 'Bảng giá Minh bạch' : 'Transparent Pricing'}
+                            </h2>
                             <p className="text-muted-foreground text-lg font-medium opacity-70">
-                                Start for free, scale when you're ready. No hidden fees, just raw power.
+                                {lang === 'vi'
+                                    ? 'Bắt đầu miễn phí, mở rộng khi bạn sẵn sàng. Không phí ẩn, chỉ có sức mạnh thuần túy.'
+                                    : "Start for free, scale when you're ready. No hidden fees, just raw power."}
                             </p>
                         </div>
 
                         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
                             {[
                                 {
-                                    tier: "Community",
+                                    tier: lang === 'vi' ? "Cộng đồng" : "Community",
                                     price: "$0",
-                                    desc: "Perfect for independent developers and students.",
-                                    features: ["Local DB Connections", "Basic AI (Gemini Flash)", "Standard Charting", "SQLite & DuckDB support"],
-                                    cta: "Get Started",
+                                    desc: lang === 'vi' ? "Hoàn hảo cho các nhà phát triển độc lập và sinh viên." : "Perfect for independent developers and students.",
+                                    features: lang === 'vi'
+                                        ? ["Kết nối DB cục bộ", "AI Cơ bản (Gemini Flash)", "Biểu đồ tiêu chuẩn", "Hỗ trợ SQLite & DuckDB"]
+                                        : ["Local DB Connections", "Basic AI (Gemini Flash)", "Standard Charting", "SQLite & DuckDB support"],
+                                    cta: lang === 'vi' ? "Bắt đầu ngay" : "Get Started",
                                     popular: false
                                 },
                                 {
                                     tier: "Pro",
                                     price: "$19",
-                                    desc: "Advanced tools for data professionals and teams.",
-                                    features: ["Cloud DB Syncing", "Advanced AI (Gemini Pro)", "Interactive ER Diagrams", "Priority SSE Streaming", "Commercial License"],
-                                    cta: "Buy Now",
+                                    desc: lang === 'vi' ? "Công cụ nâng cao cho các chuyên gia dữ liệu và nhóm." : "Advanced tools for data professionals and teams.",
+                                    features: lang === 'vi'
+                                        ? ["Đồng bộ Cloud DB", "AI Nâng cao (Gemini Pro)", "Sơ đồ ER tương tác", "Truyền phát SSE ưu tiên", "Giấy phép thương mại"]
+                                        : ["Cloud DB Syncing", "Advanced AI (Gemini Pro)", "Interactive ER Diagrams", "Priority SSE Streaming", "Commercial License"],
+                                    cta: lang === 'vi' ? "Mua ngay" : "Buy Now",
                                     popular: true
                                 },
                                 {
-                                    tier: "Enterprise",
-                                    price: "Custom",
-                                    desc: "Dedicated infrastructure for security-first organizations.",
-                                    features: ["Dedicated AI Instance", "SSO & SAML Auth", "Audit Logging", "White-labeling", "Dedicated Account Manager"],
-                                    cta: "Contact Sales",
+                                    tier: lang === 'vi' ? "Doanh nghiệp" : "Enterprise",
+                                    price: lang === 'vi' ? "Liên hệ" : "Custom",
+                                    desc: lang === 'vi' ? "Hạ tầng dành riêng cho các tổ chức ưu tiên bảo mật." : "Dedicated infrastructure for security-first organizations.",
+                                    features: lang === 'vi'
+                                        ? ["Thực thể AI riêng biệt", "Xác thực SSO & SAML", "Nhật ký kiểm tra", "Gắn nhãn trắng", "Quản lý tài khoản riêng"]
+                                        : ["Dedicated AI Instance", "SSO & SAML Auth", "Audit Logging", "White-labeling", "Dedicated Account Manager"],
+                                    cta: lang === 'vi' ? "Liên hệ Sales" : "Contact Sales",
                                     popular: false
                                 }
                             ].map((pkg, i) => (
@@ -447,23 +481,29 @@ export const LandingPage: React.FC = () => {
                     <div className="container mx-auto px-6">
                         <div ref={addToRevealRefs} className="reveal glass-panel p-8 md:p-12 rounded-[2.5rem] border-white/5 bg-gradient-to-r from-background to-muted/20 flex flex-col md:flex-row items-center justify-between gap-10">
                             <div className="max-w-xl space-y-6">
-                                <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase leading-none">Ready to dive deeper?</h2>
+                                <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase leading-none">
+                                    {lang === 'vi' ? 'Bạn đã sẵn sàng đi sâu hơn?' : 'Ready to dive deeper?'}
+                                </h2>
                                 <p className="text-lg text-muted-foreground/80 font-medium">
-                                    Our comprehensive documentation covers everything from initial setup to advanced AI prompt engineering.
+                                    {lang === 'vi'
+                                        ? 'Tài liệu toàn diện của chúng tôi bao gồm mọi thứ từ thiết lập ban đầu đến kỹ thuật AI nâng cao.'
+                                        : 'Our comprehensive documentation covers everything from initial setup to advanced AI prompt engineering.'}
                                 </p>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5">
                                         <BookOpen className="w-5 h-5 text-blue-400" />
-                                        <span className="text-xs font-bold">API Reference</span>
+                                        <span className="text-xs font-bold">{lang === 'vi' ? 'Tham chiếu API' : 'API Reference'}</span>
                                     </div>
                                     <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5">
                                         <Layers className="w-5 h-5 text-purple-400" />
-                                        <span className="text-xs font-bold">Architecture</span>
+                                        <span className="text-xs font-bold">{lang === 'vi' ? 'Kiến trúc' : 'Architecture'}</span>
                                     </div>
                                 </div>
                             </div>
                             <Button size="lg" onClick={() => navigate('/docs')} className="h-16 px-12 rounded-2xl bg-white text-black hover:bg-gray-200 shadow-2xl transition-all hover:scale-105 active:scale-95 flex items-center gap-3">
-                                <span className="text-xs font-black uppercase tracking-[0.2em]">Open Documentation</span>
+                                <span className="text-xs font-black uppercase tracking-[0.2em]">
+                                    {lang === 'vi' ? 'Mở Tài liệu' : 'Open Documentation'}
+                                </span>
                                 <ExternalLink className="w-5 h-5" />
                             </Button>
                         </div>
@@ -498,9 +538,9 @@ export const LandingPage: React.FC = () => {
                             </div>
 
                             {[
-                                { title: 'Product', links: ['Features', 'AI Insights', 'Diagrams', 'Changelog'] },
-                                { title: 'Resources', links: ['Documentation', 'API Reference', 'Cloud Sync', 'Status'] },
-                                { title: 'Legal', links: ['Privacy', 'Terms', 'Security', 'Compliance'] }
+                                { title: lang === 'vi' ? 'Sản phẩm' : 'Product', links: lang === 'vi' ? ['Tính năng', 'AI Insights', 'Sơ đồ', 'Nhật ký thay đổi'] : ['Features', 'AI Insights', 'Diagrams', 'Changelog'] },
+                                { title: lang === 'vi' ? 'Tài nguyên' : 'Resources', links: lang === 'vi' ? ['Tài liệu', 'Tham chiếu API', 'Đồng bộ Cloud', 'Trạng thái'] : ['Documentation', 'API Reference', 'Cloud Sync', 'Status'] },
+                                { title: lang === 'vi' ? 'Pháp lý' : 'Legal', links: lang === 'vi' ? ['Quyền riêng tư', 'Điều khoản', 'Bảo mật', 'Tuân thủ'] : ['Privacy', 'Terms', 'Security', 'Compliance'] }
                             ].map((col, i) => (
                                 <div key={i}>
                                     <h4 className="font-black mb-6 text-xs tracking-[0.2em] uppercase text-foreground/80">{col.title}</h4>
@@ -515,15 +555,19 @@ export const LandingPage: React.FC = () => {
 
                         <div className="border-t border-white/5 pt-10 flex flex-col md:flex-row items-center justify-between gap-6">
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
-                                © 2026 ANTIGRAVITY ENGINE. ALL SYSTEMS ENCRYPTED.
+                                © 2026 ANTIGRAVITY ENGINE. {lang === 'vi' ? 'TẤT CẢ HỆ THỐNG ĐÃ ĐƯỢC MÃ HÓA.' : 'ALL SYSTEMS ENCRYPTED.'}
                             </p>
                             <div className="flex items-center gap-6">
                                 <div className="flex items-center gap-2">
                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
-                                    <span className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em]">Live Status: Nominal</span>
+                                    <span className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em]">
+                                        {lang === 'vi' ? 'Trạng thái: Hoạt động' : 'Live Status: Nominal'}
+                                    </span>
                                 </div>
                                 <div className="flex items-center gap-2 group cursor-pointer">
-                                    <span className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em] group-hover:text-white transition-colors">English (US)</span>
+                                    <span className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em] group-hover:text-white transition-colors">
+                                        {lang === 'vi' ? 'Tiếng Việt' : 'English (US)'}
+                                    </span>
                                 </div>
                             </div>
                         </div>

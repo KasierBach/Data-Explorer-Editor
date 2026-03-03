@@ -18,6 +18,7 @@ import {
     SelectValue,
 } from "@/presentation/components/ui/select";
 import { Check, Link, AlertTriangle } from 'lucide-react';
+import { useAppStore } from '@/core/services/store';
 
 interface ForeignKeyDialogProps {
     isOpen: boolean;
@@ -49,6 +50,7 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
     targetTable,
     targetColumn
 }) => {
+    const { lang } = useAppStore();
     const [constraintName, setConstraintName] = useState('');
     const [onDelete, setOnDelete] = useState<'NO ACTION' | 'CASCADE' | 'SET NULL' | 'RESTRICT'>('NO ACTION');
     const [onUpdate, setOnUpdate] = useState<'NO ACTION' | 'CASCADE' | 'SET NULL' | 'RESTRICT'>('NO ACTION');
@@ -80,16 +82,20 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                         <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
                             <Link className="h-5 w-5" />
                         </div>
-                        <DialogTitle className="text-xl">Create Foreign Key Relationship</DialogTitle>
+                        <DialogTitle className="text-xl">{lang === 'vi' ? 'Tạo Liên kết Khóa ngoại' : 'Create Foreign Key Relationship'}</DialogTitle>
                     </div>
                     <DialogDescription>
-                        Define the relationship between <span className="font-bold text-foreground">{sourceTable}</span> and <span className="font-bold text-foreground">{targetTable}</span>.
+                        {lang === 'vi' ? (
+                            <>Xác định mối quan hệ giữa <span className="font-bold text-foreground">{sourceTable}</span> và <span className="font-bold text-foreground">{targetTable}</span>.</>
+                        ) : (
+                            <>Define the relationship between <span className="font-bold text-foreground">{sourceTable}</span> and <span className="font-bold text-foreground">{targetTable}</span>.</>
+                        )}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="grid gap-6 py-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="constraintName" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Constraint Name</Label>
+                        <Label htmlFor="constraintName" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{lang === 'vi' ? 'Tên ràng buộc' : 'Constraint Name'}</Label>
                         <Input
                             id="constraintName"
                             value={constraintName}
@@ -101,14 +107,14 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                     <div className="grid grid-cols-2 gap-8 p-4 rounded-xl bg-muted/20 border border-white/5">
                         <div className="space-y-4">
                             <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
-                                <span>Foreign Key Table (Child)</span>
+                                <span>{lang === 'vi' ? 'Bảng Khóa ngoại (Con)' : 'Foreign Key Table (Child)'}</span>
                             </div>
                             <div className="p-3 bg-background/50 rounded-lg border border-white/5">
-                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">Table</div>
+                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{lang === 'vi' ? 'Bảng' : 'Table'}</div>
                                 <div className="font-bold text-sm truncate" title={sourceTable}>{sourceTable}</div>
                             </div>
                             <div className="p-3 bg-background/50 rounded-lg border border-white/5">
-                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">Column</div>
+                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{lang === 'vi' ? 'Cột' : 'Column'}</div>
                                 <div className="font-mono text-sm truncate" title={sourceColumn}>{sourceColumn}</div>
                             </div>
                         </div>
@@ -116,18 +122,18 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                         <div className="space-y-4 relative">
                             <div className="absolute top-1/2 -left-4 -translate-y-1/2 -translate-x-1/2 z-10 flex flex-col items-center justify-center text-muted-foreground/30">
                                 <div className="w-8 h-px bg-current"></div>
-                                <div className="text-[10px] font-black uppercase bg-card px-1">Refs</div>
+                                <div className="text-[10px] font-black uppercase bg-card px-1">{lang === 'vi' ? 'Tham chiếu' : 'Refs'}</div>
                             </div>
 
                             <div className="flex items-center gap-2 text-sm font-semibold text-amber-500">
-                                <span>Primary Key Table (Parent)</span>
+                                <span>{lang === 'vi' ? 'Bảng Khóa chính (Cha)' : 'Primary Key Table (Parent)'}</span>
                             </div>
                             <div className="p-3 bg-background/50 rounded-lg border border-white/5">
-                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">Table</div>
+                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{lang === 'vi' ? 'Bảng' : 'Table'}</div>
                                 <div className="font-bold text-sm truncate" title={targetTable}>{targetTable}</div>
                             </div>
                             <div className="p-3 bg-background/50 rounded-lg border border-white/5">
-                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">Column</div>
+                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{lang === 'vi' ? 'Cột' : 'Column'}</div>
                                 <div className="font-mono text-sm truncate" title={targetColumn}>{targetColumn}</div>
                             </div>
                         </div>
@@ -135,7 +141,7 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">On Delete</Label>
+                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{lang === 'vi' ? 'Khi xóa' : 'On Delete'}</Label>
                             <Select value={onDelete} onValueChange={(v: any) => setOnDelete(v)}>
                                 <SelectTrigger className="bg-muted/30">
                                     <SelectValue />
@@ -149,7 +155,7 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                             </Select>
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">On Update</Label>
+                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{lang === 'vi' ? 'Khi cập nhật' : 'On Update'}</Label>
                             <Select value={onUpdate} onValueChange={(v: any) => setOnUpdate(v)}>
                                 <SelectTrigger className="bg-muted/30">
                                     <SelectValue />
@@ -167,16 +173,16 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                     <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex items-start gap-3">
                         <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
                         <div className="text-xs text-yellow-200/80 leading-relaxed">
-                            Creating this relationship will modify your database schema. Ensure that existing data does not violate this new constraint, or the operation will fail.
+                            {lang === 'vi' ? 'Việc tạo mối quan hệ này sẽ thay đổi cấu trúc cơ sở dữ liệu của bạn. Hãy đảm bảo rằng dữ liệu hiện tại không vi phạm ràng buộc mới này, nếu không thao tác sẽ thất bại.' : 'Creating this relationship will modify your database schema. Ensure that existing data does not violate this new constraint, or the operation will fail.'}
                         </div>
                     </div>
                 </div>
 
                 <DialogFooter>
-                    <Button variant="ghost" onClick={onClose}>Cancel</Button>
+                    <Button variant="ghost" onClick={onClose}>{lang === 'vi' ? 'Hủy' : 'Cancel'}</Button>
                     <Button onClick={handleConfirm} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
                         <Check className="w-4 h-4" />
-                        Create Relationship
+                        {lang === 'vi' ? 'Tạo Liên kết' : 'Create Relationship'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

@@ -19,6 +19,7 @@ export const ExplorerSidebar: React.FC = () => {
     const activeConnectionId = useAppStore(state => state.activeConnectionId);
     const setActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
     const activeDatabase = useAppStore(state => state.activeDatabase);
+    const lang = useAppStore(state => state.lang);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [isCreateDatabaseDialogOpen, setCreateDatabaseDialogOpen] = useState(false);
@@ -80,7 +81,9 @@ export const ExplorerSidebar: React.FC = () => {
                         <div className="w-6 h-6 rounded bg-blue-500/10 flex items-center justify-center">
                             <Layers className="w-3.5 h-3.5 text-blue-500" />
                         </div>
-                        <h2 className="font-bold text-[11px] uppercase tracking-[0.2em] text-muted-foreground/80">Navigator</h2>
+                        <h2 className="font-bold text-[11px] uppercase tracking-[0.2em] text-muted-foreground/80">
+                            {lang === 'vi' ? 'Điều hướng' : 'Navigator'}
+                        </h2>
                     </div>
                     <div className="flex items-center gap-1">
                         <Button
@@ -103,7 +106,7 @@ export const ExplorerSidebar: React.FC = () => {
                     <div className="relative group">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70 transition-colors group-focus-within:text-blue-500" />
                         <Input
-                            placeholder="Find entities..."
+                            placeholder={lang === 'vi' ? "Tìm thực thể..." : "Find entities..."}
                             className="h-9 text-xs pl-9 pr-8 bg-muted/40 border-none ring-1 ring-border/50 focus:ring-blue-500/30 transition-all rounded-xl placeholder:text-muted-foreground/50"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -120,7 +123,9 @@ export const ExplorerSidebar: React.FC = () => {
                 {isLoading && (
                     <div className="flex flex-col items-center justify-center h-20 gap-3 opacity-40">
                         <div className="w-5 h-5 rounded-full border-2 border-blue-500/20 border-t-blue-500 animate-spin" />
-                        <span className="text-[10px] uppercase tracking-widest font-black">Scanning Node</span>
+                        <span className="text-[10px] uppercase tracking-widest font-black">
+                            {lang === 'vi' ? 'Đang quét dữ liệu' : 'Scanning Node'}
+                        </span>
                     </div>
                 )}
 
@@ -166,7 +171,9 @@ export const ExplorerSidebar: React.FC = () => {
                                 {filteredNodes.length === 0 && !isLoading && (
                                     <div className="flex flex-col items-center justify-center py-10 opacity-30 gap-2">
                                         <Filter className="h-8 w-8" />
-                                        <p className="text-[10px] font-bold uppercase tracking-widest text-center px-4">No results for "{searchTerm}"</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-center px-4">
+                                            {lang === 'vi' ? `Không tìm thấy kết quả cho "${searchTerm}"` : `No results for "${searchTerm}"`}
+                                        </p>
                                     </div>
                                 )}
                                 {filteredNodes.map(node => (
@@ -182,7 +189,7 @@ export const ExplorerSidebar: React.FC = () => {
             <div className="p-3 border-t bg-muted/20 flex items-center justify-between text-[9px] font-bold uppercase tracking-widest">
                 <div className="flex items-center gap-1.5 opacity-50">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Connected</span>
+                    <span>{lang === 'vi' ? 'Đang kết nối' : 'Connected'}</span>
                 </div>
                 {activeDatabase && (
                     <div className="flex items-center gap-1 text-emerald-500/80 text-[8px]">

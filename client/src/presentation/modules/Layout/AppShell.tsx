@@ -16,6 +16,7 @@ export function AppShell() {
     const setSidebarWidth = useAppStore(state => state.setSidebarWidth);
     const isAiPanelOpen = useAppStore(state => state.isAiPanelOpen);
     const setAiPanelOpen = useAppStore(state => state.setAiPanelOpen);
+    const lang = useAppStore(state => state.lang);
 
     const isMobile = useMediaQuery('(max-width: 768px)');
 
@@ -178,7 +179,7 @@ export function AppShell() {
             </div>
 
             <div className="h-6 border-t bg-muted/40 text-xs flex items-center px-4 text-muted-foreground shrink-0">
-                Ready
+                {lang === 'vi' ? 'Sẵn sàng' : 'Ready'}
             </div>
             <ConnectionDialog />
         </div>

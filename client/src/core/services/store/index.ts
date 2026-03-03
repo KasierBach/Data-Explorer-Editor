@@ -52,6 +52,7 @@ export const useAppStore = create<AppState>()(
                 isAiPanelOpen: state.isAiPanelOpen,
                 expandedNodes: state.expandedNodes,
                 pageStates: state.pageStates,
+                lang: state.lang,
             }),
         }
     )

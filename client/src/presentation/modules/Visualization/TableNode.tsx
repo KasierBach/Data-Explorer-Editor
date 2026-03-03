@@ -3,6 +3,7 @@ import { Handle, Position, useConnection } from '@xyflow/react';
 import { Table, Hash, Type, Key, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/presentation/components/ui/context-menu';
+import { useAppStore } from '@/core/services/store';
 
 export interface TableNodeData {
     tableName: string;
@@ -22,11 +23,11 @@ export interface TableNodeData {
 }
 
 const TableNode = ({ data }: { data: TableNodeData }) => {
-    // v12 compatible: use useConnection hook to detect active connection
     const connection = useConnection();
     const isConnecting = !!connection.inProgress;
     const isCollapsed = data.isCollapsed;
     const columnCount = data.columns?.length || 0;
+    const { lang } = useAppStore();
 
     return (
         <div className="min-w-[260px] max-w-[340px] bg-card/90 backdrop-blur-2xl border-border/40 border rounded-2xl shadow-2xl ring-1 ring-white/5 group transition-all hover:ring-primary/20 hover:border-primary/20">
@@ -41,7 +42,7 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
                 <div className="flex flex-col min-w-0 flex-1">
                     <h3 className="font-black text-[11px] uppercase tracking-widest text-foreground truncate">{data.tableName}</h3>
                     <span className="text-[8px] text-muted-foreground uppercase tracking-tighter opacity-40 font-bold">
-                        {columnCount} columns
+                        {columnCount} {lang === 'vi' ? 'cột' : 'columns'}
                     </span>
                 </div>
                 {data.onToggleCollapse && (
@@ -146,7 +147,7 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
                                                     className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
                                                     onSelect={() => data.onRemoveConstraint!(data.tableName, 'pk', col.pkConstraintName!)}
                                                 >
-                                                    Remove Primary Key
+                                                    {lang === 'vi' ? 'Xóa Khóa chính' : 'Remove Primary Key'}
                                                 </ContextMenuItem>
                                             )}
 
@@ -155,7 +156,7 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
                                                     className="text-red-500 focus:text-red-500 focus:bg-red-500/10"
                                                     onSelect={() => data.onRemoveConstraint!(data.tableName, 'fk', col.fkConstraintName!)}
                                                 >
-                                                    Remove Foreign Key
+                                                    {lang === 'vi' ? 'Xóa Khóa ngoại' : 'Remove Foreign Key'}
                                                 </ContextMenuItem>
                                             )}
                                         </ContextMenuContent>
@@ -170,7 +171,7 @@ const TableNode = ({ data }: { data: TableNodeData }) => {
             {/* Collapsed footer */}
             {isCollapsed && (
                 <div className="px-4 py-2 text-[9px] text-muted-foreground/40 font-bold uppercase tracking-widest text-center">
-                    {columnCount} columns hidden
+                    {columnCount} {lang === 'vi' ? 'cột đã ẩn' : 'columns hidden'}
                 </div>
             )}
         </div>

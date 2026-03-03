@@ -13,6 +13,8 @@ export interface UISlice {
     toggleNodeExpansion: (nodeId: string) => void;
     pageStates: Record<string, any>;
     setPageState: (pageId: string, pageState: any) => void;
+    lang: 'vi' | 'en';
+    setLang: (lang: 'vi' | 'en') => void;
 }
 
 export const createUISlice: StateCreator<UISlice> = (set) => ({
@@ -37,4 +39,9 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
             [pageId]: { ...(state.pageStates[pageId] || {}), ...pageState }
         }
     })),
+    lang: (localStorage.getItem('lang') as any) || 'vi',
+    setLang: (lang) => {
+        localStorage.setItem('lang', lang);
+        set({ lang });
+    },
 });

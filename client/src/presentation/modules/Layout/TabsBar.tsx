@@ -12,7 +12,7 @@ import { Button } from '@/presentation/components/ui/button';
 import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
 
 export const TabsBar: React.FC = () => {
-    const { tabs, activeTabId, setActiveTab, closeTab } = useAppStore();
+    const { tabs, activeTabId, setActiveTab, closeTab, lang } = useAppStore();
     const isMobile = useMediaQuery('(max-width: 768px)');
 
     if (tabs.length === 0) return null;
@@ -33,7 +33,11 @@ export const TabsBar: React.FC = () => {
                         onClick={() => setActiveTab(tab.id)}
                     >
                         <Database className="w-3 h-3 text-blue-500 opacity-70 shrink-0" />
-                        <span className="truncate flex-1">{tab.title}</span>
+                        <span className="truncate flex-1">
+                            {tab.type === 'query' && tab.title === 'New Query' ? (lang === 'vi' ? 'Truy vấn mới' : 'New Query') :
+                                tab.type === 'visualize' && tab.title === 'Visualizer Hub' ? (lang === 'vi' ? 'Trạm trực quan' : 'Visualizer Hub') :
+                                    tab.title}
+                        </span>
                         <button
                             className={cn(
                                 "p-0.5 hover:bg-muted rounded text-muted-foreground transition-opacity",
@@ -64,7 +68,11 @@ export const TabsBar: React.FC = () => {
                             className={cn(activeTabId === tab.id && "bg-muted font-medium")}
                         >
                             <Database className="w-3.5 h-3.5 mr-2 text-blue-500" />
-                            <span className="truncate flex-1">{tab.title}</span>
+                            <span className="truncate flex-1">
+                                {tab.type === 'query' && tab.title === 'New Query' ? (lang === 'vi' ? 'Truy vấn mới' : 'New Query') :
+                                    tab.type === 'visualize' && tab.title === 'Visualizer Hub' ? (lang === 'vi' ? 'Trạm trực quan' : 'Visualizer Hub') :
+                                        tab.title}
+                            </span>
                         </DropdownMenuItem>
                     ))}
                 </DropdownMenuContent>

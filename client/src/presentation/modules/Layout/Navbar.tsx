@@ -20,7 +20,7 @@ import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
 import { cn } from '@/lib/utils';
 
 export const Navbar: React.FC = () => {
-    const { isSidebarOpen, setSidebarOpen, openQueryTab, openInsightsTab, activeConnectionId, user, logout, isAiPanelOpen, toggleAiPanel } = useAppStore();
+    const { isSidebarOpen, setSidebarOpen, openQueryTab, openInsightsTab, activeConnectionId, user, logout, isAiPanelOpen, toggleAiPanel, lang } = useAppStore();
     const navigate = useNavigate();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [activeProfileTab, setActiveProfileTab] = useState('profile');
@@ -65,7 +65,7 @@ export const Navbar: React.FC = () => {
                             disabled={!activeConnectionId}
                         >
                             <BarChart3 className="w-4 h-4 text-purple-600" />
-                            <span className="font-semibold">Insights</span>
+                            <span className="font-semibold">{lang === 'vi' ? 'Chi tiết' : 'Insights'}</span>
                         </Button>
 
                         <Button
@@ -75,7 +75,7 @@ export const Navbar: React.FC = () => {
                             onClick={() => navigate('/app/visualize')}
                         >
                             <PieChart className="w-4 h-4 text-emerald-500" />
-                            <span className="font-semibold">Visualize</span>
+                            <span className="font-semibold">{lang === 'vi' ? 'Trực quan' : 'Visualize'}</span>
                         </Button>
 
                         <Button
@@ -86,7 +86,7 @@ export const Navbar: React.FC = () => {
                             disabled={!activeConnectionId}
                         >
                             <GitGraph className="w-4 h-4 text-blue-500" />
-                            <span className="font-semibold">Diagram</span>
+                            <span className="font-semibold">{lang === 'vi' ? 'Sơ đồ' : 'Diagram'}</span>
                         </Button>
                     </div>
                 )}
@@ -97,65 +97,73 @@ export const Navbar: React.FC = () => {
                     <nav className="flex items-center gap-1">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">File</Button>
+                                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">
+                                    {lang === 'vi' ? 'Tệp' : 'File'}
+                                </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-56">
-                                <DropdownMenuLabel>File Operations</DropdownMenuLabel>
+                                <DropdownMenuLabel>{lang === 'vi' ? 'Thao tác Tệp' : 'File Operations'}</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => openQueryTab()}>
                                     <FileText className="mr-2 h-4 w-4" />
-                                    <span>New Query</span>
+                                    <span>{lang === 'vi' ? 'Truy vấn mới' : 'New Query'}</span>
                                     <DropdownMenuShortcut>Ctrl+N</DropdownMenuShortcut>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem>
                                     <FolderOpen className="mr-2 h-4 w-4" />
-                                    <span>Open Connection...</span>
+                                    <span>{lang === 'vi' ? 'Mở kết nối...' : 'Open Connection...'}</span>
                                     <DropdownMenuShortcut>Ctrl+O</DropdownMenuShortcut>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem>
                                     <LogOut className="mr-2 h-4 w-4" />
-                                    <span>Exit</span>
+                                    <span>{lang === 'vi' ? 'Thoát' : 'Exit'}</span>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">Edit</Button>
+                                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">
+                                    {lang === 'vi' ? 'Sửa' : 'Edit'}
+                                </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-56">
-                                <DropdownMenuItem>Undo <DropdownMenuShortcut>Ctrl+Z</DropdownMenuShortcut></DropdownMenuItem>
-                                <DropdownMenuItem>Redo <DropdownMenuShortcut>Ctrl+Y</DropdownMenuShortcut></DropdownMenuItem>
+                                <DropdownMenuItem>{lang === 'vi' ? 'Hoàn tác' : 'Undo'} <DropdownMenuShortcut>Ctrl+Z</DropdownMenuShortcut></DropdownMenuItem>
+                                <DropdownMenuItem>{lang === 'vi' ? 'Lấy lại' : 'Redo'} <DropdownMenuShortcut>Ctrl+Y</DropdownMenuShortcut></DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem>Cut <DropdownMenuShortcut>Ctrl+X</DropdownMenuShortcut></DropdownMenuItem>
-                                <DropdownMenuItem>Copy <DropdownMenuShortcut>Ctrl+C</DropdownMenuShortcut></DropdownMenuItem>
-                                <DropdownMenuItem>Paste <DropdownMenuShortcut>Ctrl+V</DropdownMenuShortcut></DropdownMenuItem>
+                                <DropdownMenuItem>{lang === 'vi' ? 'Cắt' : 'Cut'} <DropdownMenuShortcut>Ctrl+X</DropdownMenuShortcut></DropdownMenuItem>
+                                <DropdownMenuItem>{lang === 'vi' ? 'Sao chép' : 'Copy'} <DropdownMenuShortcut>Ctrl+C</DropdownMenuShortcut></DropdownMenuItem>
+                                <DropdownMenuItem>{lang === 'vi' ? 'Dán' : 'Paste'} <DropdownMenuShortcut>Ctrl+V</DropdownMenuShortcut></DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">View</Button>
+                                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">
+                                    {lang === 'vi' ? 'Xem' : 'View'}
+                                </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-56">
                                 <DropdownMenuItem onClick={() => setSidebarOpen(!isSidebarOpen)}>
-                                    {isSidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+                                    {isSidebarOpen ? (lang === 'vi' ? "Ẩn thanh bên" : "Hide Sidebar") : (lang === 'vi' ? "Hiện thanh bên" : "Show Sidebar")}
                                     <DropdownMenuShortcut>Ctrl+B</DropdownMenuShortcut>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem>Toggle Full Screen <DropdownMenuShortcut>F11</DropdownMenuShortcut></DropdownMenuItem>
+                                <DropdownMenuItem>{lang === 'vi' ? 'Cửa sổ toàn màn hình' : 'Toggle Full Screen'} <DropdownMenuShortcut>F11</DropdownMenuShortcut></DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">Help</Button>
+                                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">
+                                    {lang === 'vi' ? 'Trợ giúp' : 'Help'}
+                                </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-56">
                                 <DropdownMenuItem className="cursor-pointer" onClick={() => window.open('/docs', '_blank')}>
                                     <LifeBuoy className="mr-2 h-4 w-4" />
-                                    <span>Documentation</span>
+                                    <span>{lang === 'vi' ? 'Tài liệu hướng dẫn' : 'Documentation'}</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem className="cursor-pointer" onClick={() => window.open('https://github.com/KasierBach/Data-Explorer-Editor.git', '_blank')}>
                                     <Github className="mr-2 h-4 w-4" />
@@ -164,7 +172,7 @@ export const Navbar: React.FC = () => {
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem disabled>
                                     <Cloud className="mr-2 h-4 w-4" />
-                                    <span>Check for Updates...</span>
+                                    <span>{lang === 'vi' ? 'Kiểm tra cập nhật...' : 'Check for Updates...'}</span>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -218,24 +226,24 @@ export const Navbar: React.FC = () => {
                             <DropdownMenuGroup>
                                 <DropdownMenuItem onClick={() => { setActiveProfileTab('profile'); setIsProfileOpen(true); }}>
                                     <UserIcon className="mr-2 h-4 w-4" />
-                                    <span>Profile</span>
+                                    <span>{lang === 'vi' ? 'Hồ sơ' : 'Profile'}</span>
                                     {!isMobile && <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => { setActiveProfileTab('billing'); setIsProfileOpen(true); }}>
                                     <CreditCard className="mr-2 h-4 w-4" />
-                                    <span>Billing</span>
+                                    <span>{lang === 'vi' ? 'Gói cước' : 'Billing'}</span>
                                     {!isMobile && <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => { setActiveProfileTab('advanced'); setIsProfileOpen(true); }}>
                                     <Settings className="mr-2 h-4 w-4" />
-                                    <span>Settings</span>
+                                    <span>{lang === 'vi' ? 'Cài đặt' : 'Settings'}</span>
                                     {!isMobile && <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>}
                                 </DropdownMenuItem>
                             </DropdownMenuGroup>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-600 focus:text-red-600">
                                 <LogOut className="mr-2 h-4 w-4" />
-                                <span>Log out</span>
+                                <span>{lang === 'vi' ? 'Đăng xuất' : 'Log out'}</span>
                                 {!isMobile && <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>}
                             </DropdownMenuItem>
                         </DropdownMenuContent>
