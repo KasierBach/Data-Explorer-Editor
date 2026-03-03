@@ -4,6 +4,7 @@ import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { useAppStore } from '@/core/services/store';
 import { Database, Loader2, UserPlus, LogIn } from 'lucide-react';
+import { API_BASE_URL } from '@/core/config/env';
 
 export const LoginPage = () => {
     const navigate = useNavigate();
@@ -21,7 +22,7 @@ export const LoginPage = () => {
         setError('');
 
         try {
-            const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+            const endpoint = isRegister ? `${API_BASE_URL}/auth/register` : `${API_BASE_URL}/auth/login`;
             const body = isRegister
                 ? JSON.stringify({ name, email, password })
                 : JSON.stringify({ email, password });
