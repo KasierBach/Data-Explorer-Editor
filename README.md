@@ -1,170 +1,163 @@
 # Data Explorer 🚀
 
-**Data Explorer** is a modern, high-performance database management and visualization tool designed for developers and data teams. It provides a unified interface to explore, query, and visualize your data across multiple database engines — all powered by an intelligent AI assistant.
+**Data Explorer** is a high-fidelity, high-performance database management and visualization IDE. It provides a unified, intelligent interface for developers and data engineers to explore, query, and visualize multi-engine databases — all supercharged by a context-aware AI.
 
 ---
 
 ## ✨ Key Features
 
 ### 🤖 AI Assistant (Gemini-powered)
-- **General-Purpose Chat**: Ask anything — SQL, coding, math, general knowledge, or just have a conversation.
-- **Smart SQL Generation**: Describe what you need in natural language; AI generates SQL from your actual database schema.
-- **Multi-Session Chat**: Create unlimited chat sessions, each with its own history — persisted across page reloads.
-- **Context Attachments**: Attach context to your messages:
-  - 📷 **Image Upload** — Send screenshots or diagrams for AI analysis (Gemini Vision)
-  - 📋 **SQL from Editor** — Attach the SQL query currently open in your editor
-  - 📊 **Database Context** — Include current connection and database info
-- **Global Panel**: Access AI from anywhere — resizable right sidebar that works on every page.
-- **Model Fallback**: Automatically falls back through multiple Gemini models (`gemini-2.5-flash-lite` → `gemini-2.5-flash` → `gemini-3-flash`) for maximum reliability.
+- **Context-Aware SQL Generation**: Describe complex data needs in natural language; AI generates optimized SQL based on your live schema and foreign key relationships.
+- **Vision Integration**: Upload screenshots of DB diagrams or whiteboards for AI-powered schema reconstruction (Gemini Vision).
+- **Global Assistant Panel**: A resizable, togglable sidebar available across all modules with real-time SSE (Server-Sent Events) streaming.
+- **Intelligent Multi-Model Fallback**: Reliable execution using a tiered model strategy (`Gemini 2.0 Flash` -> `Gemini 1.5 Pro`) for optimal speed and reasoning balance.
+- **Chat persistence**: Unlimited sessions and history safely stored in local state.
 
-### 🔌 Multi-Database Support
-- **Universal Connectivity**: Connect to PostgreSQL, MySQL, SQL Server, and ClickHouse.
-- **Connection Manager**: Add, edit, and remove connections from the sidebar with UUID-based synchronization.
-- **Metadata Inspection**: View schemas, tables, columns, types, constraints, and foreign keys at a glance.
-- **Multi-Database Browsing**: Switch between databases within a single connection.
+### 🔌 Multi-Database Strategy
+- **Unified Engine Architecture**: Connect seamlessly to **PostgreSQL, MySQL, SQL Server, and ClickHouse** using a flexible strategy pattern.
+- **Real-time Discovery**: High-performance metadata inspection for schemas, views, and complex constraints.
+- **Cross-DB Browsing**: Effortlessly jump between multiple databases and schemas within a single connection.
 
-### 📊 Interactive ERD Visualization
-- **Auto-Layout**: Automatically generates Entity Relationship Diagrams for your schema.
-- **Drag-and-Drop**: Create Foreign Key constraints intuitively by dragging between columns.
-- **Visual Indicators**: Primary Keys (🔑) and Foreign Keys (🗝️) are clearly marked.
-- **Live Updates**: Schema changes are instantly reflected in the diagram.
+### 📊 Entity Relationship Diagrams (ERD)
+- **Intelligent Auto-Layout**: Dynamic graph generation using React Flow with automatic node positioning.
+- **Direct Schema Mutation**: Create or modify Foreign Key constraints intuitively by dragging lines between table nodes.
+- **Visual Intelligence**: Highlighted 🔑 Primary Keys and 🗝️ Foreign Keys for instant architectural clarity.
 
-### 📝 Advanced SQL Editor
-- **Monaco Editor**: Same engine as VS Code — syntax highlighting, auto-completion, error detection.
-- **Schema-Aware IntelliSense**: Autocomplete for table names, column names, and SQL keywords from your actual schema.
-- **Multi-Tab Workspace**: Work on multiple queries and tasks simultaneously.
-- **Execute & Explain**: Run queries and view EXPLAIN ANALYZE plans in structured format.
-- **Query History**: Track all executed queries with status, duration, and error details.
-- **Saved Queries**: Save, name, and reopen frequently used queries.
-- **SQL Formatting**: Auto-format SQL with proper indentation and keyword casing.
+### 📈 Analytics & Insights
+- **Heuristic Dashboard**: Real-time stats for connection health, storage distribution, and table usage.
+- **Visual Intelligence**: Interactive charts (Bar, Line, Pie) powered by Recharts for data-driven decision making.
+- **Table Distribution**: Heatmaps and row-count analytics to identify potential bottlenecks.
 
-### 📈 Insights Dashboard
-- **Database Overview**: Connection stats, table counts, row counts, and database size.
-- **Schema Analytics**: Identify largest tables, column distributions, and indexing opportunities.
-- **Visual Charts**: Bar, line, and pie charts powered by Recharts.
+### 📝 Pro SQL Workspace
+- **Monaco Engine**: VS Code-grade editing experience with advanced syntax highlighting and multi-cursor support.
+- **Schema-Aware IntelliSense**: Deep autocompletion that understands your tables, columns, and custom types.
+- **Execution Analytics**: Detailed performance metrics and EXPLAIN plan visualization for query optimization.
+- **Tabbed Results**: Multiple output panes for Data, Messages, and Query Plans.
+- **Export Capabilities**: Clean data export to **CSV and Excel** formats.
 
-### 🔐 Authentication & Security
-- **JWT Authentication**: Secure login/logout with token-based authentication.
-- **User Profiles**: Manage user name and email from the profile dialog.
-- **Local-First**: Your data never leaves your network — all processing happens locally.
-
-### 🎨 Modern UI & Responsive UX
-- **Mobile-First Design**: Optimized for devices of all sizes.
-  - **Overlay Sidebars**: Seamless mobile navigation with responsive overlays and dismissible backdrops for Explorer and AI Assistant.
-  - **Horizontal Tab Scrolling**: Manage unlimited query tabs effortlessly on small screens.
-- **High-Density Desktop Layout**: Minimal whitespace and optimized spacing for professional large-monitor usage.
-- **Premium Landing Page**: Professional landing page with transparent pricing, integrated documentation entry points, and smooth section transitions.
-- **Dark Mode & Glassmorphism**: Sleek, dark-themed interface with glass-panel effects and premium animations.
-- **Resizable Panels**: Fully resizable sidebar, AI assistant, and editor/result panes.
-- **Smooth Animations**: Staggered reveals, glow effects, and micro-interactions powered by CSS and Intersection Observers.
+### 🎨 Premium UI & Responsive Experience
+- **Mobile-Adaptive Interface**:
+  - **Overlay Navigation**: Dismissible mobile drawers for explorer and assistant modules.
+  - **Compact Toolbars**: Condensing UI actions into smart "More" menus on small screens.
+  - **Horizontal Tab Management**: Fluid scrolling for heavy multi-tab workflows.
+- **High-Density Desktop Mode**: Optimized for productivity with minimal whitespace and high information density.
+- **Glassmorphism Design**: Sleek dark-mode aesthetic with backdrop-blur effects and subtle micro-animations.
+- **Framer-style Interactions**: Staggered reveals and intersection-based entry animations for a polished, premium feel.
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Tech Stack & Ecosystem
 
-### Frontend (Client)
-| Technology | Purpose |
+### Frontend (Client-Side)
+| Layer | Technologies |
 |---|---|
-| React 18 (Vite) | UI Framework |
-| TypeScript | Language |
-| Tailwind CSS | Styling |
-| Shadcn UI (Radix) | Component Library |
-| Zustand | State Management (with localStorage persistence) |
-| TanStack Query | Data Fetching & Caching |
-| Monaco Editor | SQL Code Editor |
-| React Flow | ERD Visualization |
-| Recharts | Charts & Data Visualization |
+| **Core Framework** | React 18, Vite, TypeScript |
+| **State Management** | **Zustand** (Local Persistence), TanStack Query v5 |
+| **UI Components** | **Radix UI**, **Shadcn UI**, Tailwind CSS |
+| **Visualizations** | **React Flow** (ERD), **Recharts** (Insights), Lucide Icons |
+| **Editor** | **Monaco Editor** (VS Code Engine) |
+| **Animations** | Framer Motion, CSS Keyframes, Intersection Observer |
 
-### Backend (Server)
-| Technology | Purpose |
+### Backend (Server-Side)
+| Layer | Technologies |
 |---|---|
-| NestJS | API Framework |
-| TypeScript | Language |
-| Prisma | ORM & Database Management |
-| Google Generative AI | AI Assistant (Gemini API) |
-| `pg`, `mysql2`, `mssql`, `clickhouse` | Database Drivers |
-| JWT (Passport) | Authentication |
+| **Architecture** | **NestJS** (Modular API) |
+| **ORM / Persistence** | **Prisma** (SQLite for local storage) |
+| **AI Engine** | **Google Generative AI** (Gemini API), SSE Streaming |
+| **Engines Support** | `pg`, `mysql2`, `tedious` (MSSQL), `@clickhouse/client` |
+| **Security** | JWT (JSON Web Token), Passport.js |
 
 ---
 
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js v18+
-- npm or pnpm
-- A Google Gemini API key (for AI features)
-
-### 1. Start the Backend Server
+## 🏗️ Project Architecture & Structure
 
 ```bash
-cd server
-npm install
-
-# Create .env file
-cp .env.example .env
-# Edit .env and add your GEMINI_API_KEY
-```
-
-Configure `server/.env`:
-```env
-DATABASE_URL="file:./dev.db"
-JWT_SECRET="your-jwt-secret"
-GEMINI_API_KEY="your-gemini-api-key"
-```
-
-```bash
-npx prisma generate
-npx prisma db push
-npm run start:dev
-```
-*Server runs on `http://localhost:3000`*
-
-### 2. Start the Frontend Client
-
-```bash
-cd client
-npm install
-npm run dev
-```
-*Client runs on `http://localhost:5173`*
-
-### 3. Access the Application
-Open **[http://localhost:5173](http://localhost:5173)** in your browser.
-
----
-
-## 📁 Project Structure
-
-```
 Data Explorer/
-├── client/                    # Frontend (React + Vite)
+├── client/                     # High-fidelity Frontend
 │   ├── src/
-│   │   ├── core/              # Business logic, adapters, services, store
-│   │   ├── presentation/      # UI components and modules
-│   │   │   ├── components/    # Reusable UI components (Shadcn)
-│   │   │   ├── modules/       # Feature modules
-│   │   │   │   ├── Connection/    # Connection dialog
-│   │   │   │   ├── Dashboard/     # Insights dashboard
-│   │   │   │   ├── DataGrid/      # Table data grid
-│   │   │   │   ├── Explorer/      # Sidebar tree explorer
-│   │   │   │   ├── Layout/        # AppShell, Navbar, Tabs
-│   │   │   │   ├── Query/         # SQL Editor, AI Assistant, Results
-│   │   │   │   └── Visualization/ # ERD, Charts
-│   │   │   └── pages/         # Top-level pages
-│   │   └── lib/               # Utilities
-│   └── public/
-├── server/                    # Backend (NestJS)
+│   │   ├── core/               # Domain Logic & State Management
+│   │   │   ├── services/       # API Adapters & Global Store (Zustand)
+│   │   │   └── types/          # Unified TypeScript Interfaces
+│   │   ├── presentation/       # UI Layer
+│   │   │   ├── components/     # Atomic Shadcn/UI Components
+│   │   │   ├── hooks/          # useMediaQuery, useReveal (Animations)
+│   │   │   ├── modules/        # Feature-driven Modules
+│   │   │   │   ├── Connection/ # Multi-DB Connection Management
+│   │   │   │   ├── Dashboard/  # Visualization & Metrics Grid
+│   │   │   │   ├── ERD/        # Interactive Graph Schema (React Flow)
+│   │   │   │   ├── Layout/     # AppShell, Navbar, Mobile Sidebars
+│   │   │   │   └── Query/      # AI Chatbot, SQL Editor, Results Grid
+│   │   │   └── pages/          # Entry Points (Landing, Docs, App)
+│   │   └── lib/                # Tailwind Utilities (cn)
+├── server/                     # Modular NestJS Backend
 │   ├── src/
-│   │   ├── ai/                # AI module (controller, service, DTO)
-│   │   ├── auth/              # Authentication (JWT)
-│   │   ├── connections/       # Connection management
-│   │   ├── database-strategies/  # Multi-DB strategy pattern
-│   │   ├── metadata/          # Schema metadata APIs
-│   │   ├── prisma/            # Prisma ORM service
-│   │   └── query/             # Query execution
-│   └── prisma/                # Database schema & migrations
+│   │   ├── ai/                 # Gemini Integration & SSE Logic
+│   │   ├── auth/               # Secure JWT Auth Layer
+│   │   ├── connections/        # Connection Lifecycle Management
+│   │   ├── database-strategies/# Pattern: Strategy (Adapter) for SQL Engines
+│   │   ├── metadata/           # DB Schema Discovery Engine
+│   │   └── query/              # High-concurrency SQL Runner
+│   └── prisma/                 # SQLite Persistence Schema
 └── README.md
 ```
+
+---
+
+## 📖 Comprehensive User Guide
+
+### 1. Connection Management
+- **Universal Drivers**: Click the "+" in the Explorer sidebar to add a new connection. Select from **PostgreSQL, MySQL, SQLite, or SQL Server**.
+- **Metadata Sync**: Once connected, the app will automatically crawl your schema (tables, views, indexes) and populate the tree view.
+- **Switching Context**: Hover over any table to see row counts and column types instantly.
+
+### 2. Pro SQL Workspace
+- **Multi-Tab Editing**: Open multiple SQL tabs for different tasks. Use **Ctrl/Cmd + Enter** to execute.
+- **Smart Intellisense**: Typing `SELECT * FROM ` will trigger schema-aware suggestions for your tables.
+- **Explain & Analyze**: Switch the result tab to "Query Plan" to see how the database is executing your query.
+
+### 3. Using the AI Assistant
+- **Contextual Knowledge**: Click the AI Sidebar. The assistant already knows about your active connection and schema.
+- **Vision Features**: Drag and drop a screenshot of a whiteboard diagram or a table into the chat; the AI will attempt to generate the SQL schema for you.
+- **Prompt Engineering**: Ask: *"Summarize the relationship between orders and customers"* or *"Find the top 5 customers with high churn risk based on transaction volume."*
+
+### 4. Interactive Visualizations
+- **ERD Exploration**: Navigate to the ERD module to see your database geography. Drag columns to create relationships (visual only) or explore complex joins.
+- **Insights Dashboard**: View table size distributions, connection latency, and row-count heatmaps to monitor database health.
+
+---
+
+## 🚀 Installation & Local Development
+
+### Requirements
+- **Node.js** v20.x+
+- **Google Gemini API Key** (Free tier available at [Google AI Studio](https://aistudio.google.com/))
+
+### Initial Setup
+1. **Clone & Install**:
+   ```bash
+   git clone https://github.com/KasierBach/Data-Explorer-Editor.git
+   cd Data-Explorer-Editor
+   ```
+
+2. **Backend Configuration**:
+   ```bash
+   cd server
+   npm install
+   cp .env.example .env # Update with your GEMINI_API_KEY and JWT_SECRET
+   npx prisma generate
+   npx prisma db push
+   npm run start:dev
+   ```
+
+3. **Frontend Configuration**:
+   ```bash
+   cd ../client
+   npm install
+   npm run dev
+   ```
+
+4. **Launch**:
+   Visit **[http://localhost:5173](http://localhost:5173)** to start exploring.
 
 ---
 
@@ -179,18 +172,13 @@ Data Explorer/
 | `GEMINI_API_KEY` | ✅ | Google Gemini API key for AI features |
 | `PORT` | ❌ | Server port (default: 3000) |
 
-### Getting a Gemini API Key
-1. Go to [Google AI Studio](https://aistudio.google.com/)
-2. Click **Get API Key**
-3. Create a key for a new or existing project
-4. Copy the key to your `server/.env` file
-
 ---
 
-## 🤝 Contributing
+## 🤝 Contributing & Support
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+- **Bug Reports**: Open an issue on our [GitHub Repo](https://github.com/KasierBach/Data-Explorer-Editor/issues).
+- **Custom Adapters**: New database engine support (e.g., Clickhouse, MongoDB) can be added via the `database-strategies` module.
 
 ## 📄 License
 
-This project is licensed under the MIT License.
+This project is licensed under the **MIT License**. Created with ❤️ by the community.
