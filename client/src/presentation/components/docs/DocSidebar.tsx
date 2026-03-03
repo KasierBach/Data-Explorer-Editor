@@ -8,7 +8,6 @@ import {
     Layers,
     BookOpen,
     Activity,
-    Settings,
     HelpCircle
 } from 'lucide-react';
 
