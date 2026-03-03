@@ -48,11 +48,15 @@
 - **User Profiles**: Manage user name and email from the profile dialog.
 - **Local-First**: Your data never leaves your network — all processing happens locally.
 
-### 🎨 Modern UI/UX
-- **Dark Mode**: Sleek, dark-themed interface designed for long sessions.
-- **Resizable Panels**: Drag-to-resize sidebar, AI panel, and editor/result panes.
-- **Responsive Design**: Built with Tailwind CSS and Shadcn UI (Radix Primitives).
-- **Smooth Animations**: Transitions, hover effects, and loading states throughout.
+### 🎨 Modern UI & Responsive UX
+- **Mobile-First Design**: Optimized for devices of all sizes.
+  - **Overlay Sidebars**: Seamless mobile navigation with responsive overlays and dismissible backdrops for Explorer and AI Assistant.
+  - **Horizontal Tab Scrolling**: Manage unlimited query tabs effortlessly on small screens.
+- **High-Density Desktop Layout**: Minimal whitespace and optimized spacing for professional large-monitor usage.
+- **Premium Landing Page**: Professional landing page with transparent pricing, integrated documentation entry points, and smooth section transitions.
+- **Dark Mode & Glassmorphism**: Sleek, dark-themed interface with glass-panel effects and premium animations.
+- **Resizable Panels**: Fully resizable sidebar, AI assistant, and editor/result panes.
+- **Smooth Animations**: Staggered reveals, glow effects, and micro-interactions powered by CSS and Intersection Observers.
 
 ---
 
