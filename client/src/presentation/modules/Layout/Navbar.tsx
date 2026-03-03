@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ModeToggle } from '@/presentation/components/mode-toggle';
-import { Database, Settings, User, LogOut, User as UserIcon, Github, LifeBuoy, Cloud, CreditCard, FileText, FolderOpen, BarChart3, PieChart, GitGraph, Sparkles } from 'lucide-react';
+import { Database, Settings, User, LogOut, User as UserIcon, Github, LifeBuoy, Cloud, CreditCard, FileText, FolderOpen, BarChart3, PieChart, GitGraph, Sparkles, Menu, X } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import {
     DropdownMenu,
@@ -16,203 +16,231 @@ import {
 import { useAppStore } from '@/core/services/store';
 import { ProfileDialog } from './ProfileDialog';
 import { TokenTimer } from '@/presentation/components/TokenTimer';
+import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
+import { cn } from '@/lib/utils';
 
 export const Navbar: React.FC = () => {
     const { isSidebarOpen, setSidebarOpen, openQueryTab, openInsightsTab, activeConnectionId, user, logout, isAiPanelOpen, toggleAiPanel } = useAppStore();
     const navigate = useNavigate();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [activeProfileTab, setActiveProfileTab] = useState('profile');
+    const isMobile = useMediaQuery('(max-width: 768px)');
+    const isSmallMobile = useMediaQuery('(max-width: 480px)');
 
     return (
-        <div className="h-14 border-b flex items-center px-4 bg-card justify-between select-none shrink-0">
+        <div className="h-14 border-b flex items-center px-4 bg-card justify-between select-none shrink-0 sticky top-0 z-[60]">
             <ProfileDialog isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} initialTab={activeProfileTab} />
 
-            <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 md:gap-6">
+                {isMobile && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() => setSidebarOpen(!isSidebarOpen)}
+                    >
+                        {isSidebarOpen ? <X className="w-5 h-5 text-primary" /> : <Menu className="w-5 h-5" />}
+                    </Button>
+                )}
+
+                <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
                     <div className="bg-primary/10 p-1.5 rounded-md">
                         <Database className="w-5 h-5 text-primary" />
                     </div>
-                    <div>
-                        <h1 className="font-semibold text-sm leading-none">Data Explorer</h1>
-                        <span className="text-[10px] text-muted-foreground">v0.1.0-beta</span>
+                    {!isSmallMobile && (
+                        <div>
+                            <h1 className="font-semibold text-sm leading-none">Data Explorer</h1>
+                            <span className="text-[10px] text-muted-foreground">v0.1.0-beta</span>
+                        </div>
+                    )}
+                </div>
+
+                {!isMobile && (
+                    <div className="flex items-center gap-1 ml-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
+                            onClick={() => activeConnectionId && openInsightsTab(activeConnectionId)}
+                            disabled={!activeConnectionId}
+                        >
+                            <BarChart3 className="w-4 h-4 text-purple-600" />
+                            <span className="font-semibold">Insights</span>
+                        </Button>
+
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
+                            onClick={() => navigate('/app/visualize')}
+                        >
+                            <PieChart className="w-4 h-4 text-emerald-500" />
+                            <span className="font-semibold">Visualize</span>
+                        </Button>
+
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
+                            onClick={() => activeConnectionId && navigate('/app/erd')}
+                            disabled={!activeConnectionId}
+                        >
+                            <GitGraph className="w-4 h-4 text-blue-500" />
+                            <span className="font-semibold">Diagram</span>
+                        </Button>
                     </div>
-                </div>
-
-                <div className="flex items-center gap-1 ml-2">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
-                        onClick={() => activeConnectionId && openInsightsTab(activeConnectionId)}
-                        disabled={!activeConnectionId}
-                    >
-                        <BarChart3 className="w-4 h-4 text-purple-600" />
-                        <span className="font-semibold">Insights</span>
-                    </Button>
-
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
-                        onClick={() => navigate('/app/visualize')}
-                    >
-                        <PieChart className="w-4 h-4 text-emerald-500" />
-                        <span className="font-semibold">Visualize</span>
-                    </Button>
-
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
-                        onClick={() => activeConnectionId && navigate('/app/erd')}
-                        disabled={!activeConnectionId}
-                    >
-                        <GitGraph className="w-4 h-4 text-blue-500" />
-                        <span className="font-semibold">Diagram</span>
-                    </Button>
-                </div>
+                )}
             </div>
 
-            <div className="flex items-center gap-3">
-                <nav className="flex items-center gap-1">
+            <div className="flex items-center gap-2 md:gap-3">
+                {!isMobile && (
+                    <nav className="flex items-center gap-1">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">File</Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56">
+                                <DropdownMenuLabel>File Operations</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => openQueryTab()}>
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    <span>New Query</span>
+                                    <DropdownMenuShortcut>Ctrl+N</DropdownMenuShortcut>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem>
+                                    <FolderOpen className="mr-2 h-4 w-4" />
+                                    <span>Open Connection...</span>
+                                    <DropdownMenuShortcut>Ctrl+O</DropdownMenuShortcut>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem>
+                                    <LogOut className="mr-2 h-4 w-4" />
+                                    <span>Exit</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">Edit</Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56">
+                                <DropdownMenuItem>Undo <DropdownMenuShortcut>Ctrl+Z</DropdownMenuShortcut></DropdownMenuItem>
+                                <DropdownMenuItem>Redo <DropdownMenuShortcut>Ctrl+Y</DropdownMenuShortcut></DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem>Cut <DropdownMenuShortcut>Ctrl+X</DropdownMenuShortcut></DropdownMenuItem>
+                                <DropdownMenuItem>Copy <DropdownMenuShortcut>Ctrl+C</DropdownMenuShortcut></DropdownMenuItem>
+                                <DropdownMenuItem>Paste <DropdownMenuShortcut>Ctrl+V</DropdownMenuShortcut></DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">View</Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56">
+                                <DropdownMenuItem onClick={() => setSidebarOpen(!isSidebarOpen)}>
+                                    {isSidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+                                    <DropdownMenuShortcut>Ctrl+B</DropdownMenuShortcut>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem>Toggle Full Screen <DropdownMenuShortcut>F11</DropdownMenuShortcut></DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">Help</Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56">
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => window.open('/docs', '_blank')}>
+                                    <LifeBuoy className="mr-2 h-4 w-4" />
+                                    <span>Documentation</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => window.open('https://github.com/KasierBach/Data-Explorer-Editor.git', '_blank')}>
+                                    <Github className="mr-2 h-4 w-4" />
+                                    <span>GitHub</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem disabled>
+                                    <Cloud className="mr-2 h-4 w-4" />
+                                    <span>Check for Updates...</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </nav>
+                )}
+
+                <div className={cn("flex items-center gap-1 md:gap-2", isMobile && "pl-2")}>
+                    {!isSmallMobile && <div className="h-4 w-px bg-border mx-1" />}
+
+                    <ModeToggle />
+
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                            "h-8 w-8 transition-colors",
+                            isAiPanelOpen ? 'text-violet-500 bg-violet-500/10' : 'text-muted-foreground hover:text-violet-500'
+                        )}
+                        onClick={toggleAiPanel}
+                        title="AI Assistant (Ctrl+I)"
+                    >
+                        <Sparkles className="w-4 h-4" />
+                    </Button>
+
+                    {!isSmallMobile && (
+                        <>
+                            <div className="h-4 w-px bg-border mx-1" />
+                            <TokenTimer />
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Settings className="w-4 h-4 text-muted-foreground" />
+                            </Button>
+                        </>
+                    )}
+
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">File</Button>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-8 md:w-8 rounded-full bg-muted shadow-sm">
+                                <User className="w-4 h-4" />
+                            </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56">
-                            <DropdownMenuLabel>File Operations</DropdownMenuLabel>
+                        <DropdownMenuContent className="w-56" align="end" forceMount>
+                            <DropdownMenuLabel className="font-normal">
+                                <div className="flex flex-col space-y-1">
+                                    <p className="text-sm font-medium leading-none">{user?.name}</p>
+                                    <p className="text-xs leading-none text-muted-foreground">
+                                        {user?.email}
+                                    </p>
+                                </div>
+                            </DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => openQueryTab()}>
-                                <FileText className="mr-2 h-4 w-4" />
-                                <span>New Query</span>
-                                <DropdownMenuShortcut>Ctrl+N</DropdownMenuShortcut>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <FolderOpen className="mr-2 h-4 w-4" />
-                                <span>Open Connection...</span>
-                                <DropdownMenuShortcut>Ctrl+O</DropdownMenuShortcut>
-                            </DropdownMenuItem>
+                            <DropdownMenuGroup>
+                                <DropdownMenuItem onClick={() => { setActiveProfileTab('profile'); setIsProfileOpen(true); }}>
+                                    <UserIcon className="mr-2 h-4 w-4" />
+                                    <span>Profile</span>
+                                    {!isMobile && <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setActiveProfileTab('billing'); setIsProfileOpen(true); }}>
+                                    <CreditCard className="mr-2 h-4 w-4" />
+                                    <span>Billing</span>
+                                    {!isMobile && <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setActiveProfileTab('advanced'); setIsProfileOpen(true); }}>
+                                    <Settings className="mr-2 h-4 w-4" />
+                                    <span>Settings</span>
+                                    {!isMobile && <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>}
+                                </DropdownMenuItem>
+                            </DropdownMenuGroup>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-600 focus:text-red-600">
                                 <LogOut className="mr-2 h-4 w-4" />
-                                <span>Exit</span>
+                                <span>Log out</span>
+                                {!isMobile && <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>}
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
-
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">Edit</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56">
-                            <DropdownMenuItem>Undo <DropdownMenuShortcut>Ctrl+Z</DropdownMenuShortcut></DropdownMenuItem>
-                            <DropdownMenuItem>Redo <DropdownMenuShortcut>Ctrl+Y</DropdownMenuShortcut></DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>Cut <DropdownMenuShortcut>Ctrl+X</DropdownMenuShortcut></DropdownMenuItem>
-                            <DropdownMenuItem>Copy <DropdownMenuShortcut>Ctrl+C</DropdownMenuShortcut></DropdownMenuItem>
-                            <DropdownMenuItem>Paste <DropdownMenuShortcut>Ctrl+V</DropdownMenuShortcut></DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">View</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56">
-                            <DropdownMenuItem onClick={() => setSidebarOpen(!isSidebarOpen)}>
-                                {isSidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
-                                <DropdownMenuShortcut>Ctrl+B</DropdownMenuShortcut>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>Toggle Full Screen <DropdownMenuShortcut>F11</DropdownMenuShortcut></DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">Help</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56">
-                            <DropdownMenuItem className="cursor-pointer" onClick={() => window.open('/docs', '_blank')}>
-                                <LifeBuoy className="mr-2 h-4 w-4" />
-                                <span>Documentation</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer" onClick={() => window.open('https://github.com/KasierBach/Data-Explorer-Editor.git', '_blank')}>
-                                <Github className="mr-2 h-4 w-4" />
-                                <span>GitHub</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem disabled>
-                                <Cloud className="mr-2 h-4 w-4" />
-                                <span>Check for Updates...</span>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </nav>
-
-                <div className="h-4 w-px bg-border mx-1" />
-
-                <ModeToggle />
-
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className={`h-8 w-8 ${isAiPanelOpen ? 'text-violet-500 bg-violet-500/10' : 'text-muted-foreground hover:text-violet-500'}`}
-                    onClick={toggleAiPanel}
-                    title="AI Assistant (Ctrl+I)"
-                >
-                    <Sparkles className="w-4 h-4" />
-                </Button>
-
-                <div className="h-4 w-px bg-border mx-1" />
-
-                <TokenTimer />
-
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Settings className="w-4 h-4 text-muted-foreground" />
-                </Button>
-
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-muted">
-                            <User className="w-4 h-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-56" align="end" forceMount>
-                        <DropdownMenuLabel className="font-normal">
-                            <div className="flex flex-col space-y-1">
-                                <p className="text-sm font-medium leading-none">{user?.name}</p>
-                                <p className="text-xs leading-none text-muted-foreground">
-                                    {user?.email}
-                                </p>
-                            </div>
-                        </DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuGroup>
-                            <DropdownMenuItem onClick={() => { setActiveProfileTab('profile'); setIsProfileOpen(true); }}>
-                                <UserIcon className="mr-2 h-4 w-4" />
-                                <span>Profile</span>
-                                <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setActiveProfileTab('billing'); setIsProfileOpen(true); }}>
-                                <CreditCard className="mr-2 h-4 w-4" />
-                                <span>Billing</span>
-                                <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setActiveProfileTab('advanced'); setIsProfileOpen(true); }}>
-                                <Settings className="mr-2 h-4 w-4" />
-                                <span>Settings</span>
-                                <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-                            </DropdownMenuItem>
-                        </DropdownMenuGroup>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-600 focus:text-red-600">
-                            <LogOut className="mr-2 h-4 w-4" />
-                            <span>Log out</span>
-                            <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                </div>
             </div>
         </div>
     );

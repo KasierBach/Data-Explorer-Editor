@@ -92,15 +92,15 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
 
     return (
         <div className="h-full w-full overflow-auto">
-            <div className="p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto pb-20">
+            <div className="p-4 md:p-8 space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-7xl mx-auto pb-20">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-purple-100 rounded-lg text-purple-600">
-                            <BarChart3 className="h-6 w-6" />
+                        <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
+                            <BarChart3 className="h-5 w-5 md:h-6 md:h-6" />
                         </div>
-                        <div>
-                            <h2 className="text-2xl font-bold tracking-tight">Intelligence Dashboard</h2>
-                            <p className="text-muted-foreground text-sm">Real-time metrics for <span className="text-foreground font-medium">{activeConnection?.name}</span></p>
+                        <div className="min-w-0">
+                            <h2 className="text-xl md:text-2xl font-bold tracking-tight truncate">Intelligence Dashboard</h2>
+                            <p className="text-muted-foreground text-xs md:text-sm truncate">Real-time metrics for <span className="text-foreground font-medium">{activeConnection?.name}</span></p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3 bg-card p-1.5 rounded-xl border shadow-sm">
@@ -258,28 +258,28 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
                     </CardHeader>
                     <CardContent className="p-0">
                         {relationships && relationships.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 divide-x divide-y divide-border/30">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 md:divide-x divide-y divide-border/30">
                                 {relationships.map((rel: any, i: number) => (
-                                    <div key={i} className="p-5 group hover:bg-muted/30 transition-all duration-300">
+                                    <div key={i} className="p-4 md:p-5 group hover:bg-muted/30 transition-all duration-300">
                                         <div className="flex items-center justify-between mb-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Source</span>
-                                                <span className="text-sm font-black text-blue-600 truncate max-w-[120px]">{rel.source_table}</span>
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-[8px] md:text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Source</span>
+                                                <span className="text-xs md:text-sm font-black text-blue-600 truncate max-w-[80px] md:max-w-[120px]">{rel.source_table}</span>
                                             </div>
-                                            <div className="flex items-center px-3">
-                                                <div className="h-[2px] w-8 bg-gradient-to-r from-blue-400 to-emerald-400 opacity-40 group-hover:opacity-100 transition-opacity" />
+                                            <div className="flex items-center px-1 md:px-3 shrink-0">
+                                                <div className="h-[2px] w-6 md:w-8 bg-gradient-to-r from-blue-400 to-emerald-400 opacity-40 group-hover:opacity-100 transition-opacity" />
                                             </div>
-                                            <div className="flex flex-col text-right">
-                                                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Target</span>
-                                                <span className="text-sm font-black text-emerald-600 truncate max-w-[120px]">{rel.target_table}</span>
+                                            <div className="flex flex-col text-right min-w-0">
+                                                <span className="text-[8px] md:text-[10px] text-muted-foreground uppercase font-bold tracking-tighter">Target</span>
+                                                <span className="text-xs md:text-sm font-black text-emerald-600 truncate max-w-[80px] md:max-w-[120px]">{rel.target_table}</span>
                                             </div>
                                         </div>
-                                        <div className="flex items-center justify-between text-[10px] font-mono bg-muted/50 p-2 rounded-md border text-muted-foreground">
+                                        <div className="flex items-center justify-between text-[9px] md:text-[10px] font-mono bg-muted/50 p-1.5 md:p-2 rounded-md border text-muted-foreground">
                                             <div className="flex items-center gap-1.5 overflow-hidden">
-                                                <GitBranch className="h-3 w-3 shrink-0" />
+                                                <GitBranch className="h-2.5 w-2.5 md:h-3 md:w-3 shrink-0" />
                                                 <span className="truncate">{rel.source_column}</span>
                                             </div>
-                                            <ArrowRight className="h-2.5 w-2.5 mx-2 shrink-0 opacity-30" />
+                                            <ArrowRight className="h-2 w-2 md:h-2.5 md:w-2.5 mx-1 md:mx-2 shrink-0 opacity-30" />
                                             <span className="truncate">{rel.target_column}</span>
                                         </div>
                                     </div>

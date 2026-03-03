@@ -7,13 +7,17 @@ import { ConnectionDialog } from '@/presentation/modules/Connection/ConnectionDi
 import { AiAssistant } from '@/presentation/modules/Query/AiAssistant';
 import { cn } from "@/lib/utils";
 import { useResizablePanel } from '@/presentation/hooks/useResizablePanel';
+import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
 
 export function AppShell() {
     const isSidebarOpen = useAppStore(state => state.isSidebarOpen);
+    const setSidebarOpen = useAppStore(state => state.setSidebarOpen);
     const sidebarWidth = useAppStore(state => state.sidebarWidth);
     const setSidebarWidth = useAppStore(state => state.setSidebarWidth);
     const isAiPanelOpen = useAppStore(state => state.isAiPanelOpen);
     const setAiPanelOpen = useAppStore(state => state.setAiPanelOpen);
+
+    const isMobile = useMediaQuery('(max-width: 768px)');
 
     // Left sidebar drag state
     const leftPanel = useResizablePanel({
@@ -46,22 +50,35 @@ export function AppShell() {
             <Navbar />
 
             <div className="flex-1 flex overflow-hidden relative select-none">
+                {/* Mobile Backdrop - Left Sidebar */}
+                {isMobile && isSidebarOpen && (
+                    <div
+                        className="absolute inset-0 bg-black/50 z-40 backdrop-blur-sm transition-opacity"
+                        onClick={() => setSidebarOpen(false)}
+                    />
+                )}
+
                 {/* Left Sidebar */}
                 <aside
-                    style={{ width: isSidebarOpen ? `${leftPanel.width}px` : '0px' }}
+                    style={{
+                        width: isSidebarOpen ? (isMobile ? '85vw' : `${leftPanel.width}px`) : '0px',
+                        zIndex: isMobile ? 50 : 10
+                    }}
                     className={cn(
-                        "h-full border-r bg-card relative flex-shrink-0 overflow-hidden",
+                        "h-full border-r bg-card flex-shrink-0 overflow-hidden",
+                        isMobile ? "absolute left-0 shadow-2xl" : "relative",
                         !isSidebarOpen && "border-none",
-                        leftPanel.isDragging ? "" : "transition-[width] duration-300 ease-in-out"
+                        leftPanel.isDragging ? "" : "transition-[width,transform] duration-300 ease-in-out",
+                        isMobile && !isSidebarOpen && "-translate-x-full"
                     )}
                 >
-                    <div style={{ width: `${leftPanel.width}px` }} className="h-full">
+                    <div style={{ width: isMobile ? '85vw' : `${leftPanel.width}px` }} className="h-full">
                         <ExplorerSidebar />
                     </div>
                 </aside>
 
-                {/* Left Sidebar Resize Handle */}
-                {isSidebarOpen && (
+                {/* Left Sidebar Resize Handle - Hidden on Mobile */}
+                {isSidebarOpen && !isMobile && (
                     <div
                         onMouseDown={leftPanel.startResizing}
                         className={cn(
@@ -85,8 +102,16 @@ export function AppShell() {
                     {anyDragging && <div className="absolute inset-0 z-20" />}
                 </main>
 
-                {/* AI Panel Resize Handle */}
-                {isAiPanelOpen && (
+                {/* Mobile Backdrop - AI Panel */}
+                {isMobile && isAiPanelOpen && (
+                    <div
+                        className="absolute inset-0 bg-black/50 z-40 backdrop-blur-sm transition-opacity"
+                        onClick={() => setAiPanelOpen(false)}
+                    />
+                )}
+
+                {/* AI Panel Resize Handle - Hidden on Mobile */}
+                {isAiPanelOpen && !isMobile && (
                     <div
                         onMouseDown={rightPanel.startResizing}
                         className={cn(
@@ -108,12 +133,17 @@ export function AppShell() {
                 <aside
                     className={cn(
                         "h-full border-l bg-card flex-shrink-0 overflow-hidden",
+                        isMobile ? "absolute right-0 shadow-2xl" : "relative",
                         !isAiPanelOpen && "border-none",
-                        rightPanel.isDragging ? "" : "transition-[width] duration-300 ease-in-out"
+                        rightPanel.isDragging ? "" : "transition-[width,transform] duration-300 ease-in-out",
+                        isMobile && !isAiPanelOpen && "translate-x-full",
+                        isMobile ? "z-50" : "z-10"
                     )}
-                    style={{ width: isAiPanelOpen ? `${rightPanel.width}px` : '0px' }}
+                    style={{
+                        width: isAiPanelOpen ? (isMobile ? '90vw' : `${rightPanel.width}px`) : '0px'
+                    }}
                 >
-                    <div style={{ width: `${rightPanel.width}px` }} className="h-full">
+                    <div style={{ width: isMobile ? '90vw' : `${rightPanel.width}px` }} className="h-full">
                         <AiAssistant
                             onInsertSql={(sql) => {
                                 const store = useAppStore.getState();

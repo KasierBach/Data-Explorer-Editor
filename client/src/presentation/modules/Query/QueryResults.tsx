@@ -9,6 +9,8 @@ import { Info, Table as TableIcon, Loader2, Play, GitBranch } from 'lucide-react
 import type { QueryResult } from '@/core/domain/entities';
 import { ResultTable } from './ResultTable';
 import { QueryPlanVisualizer } from './QueryPlanVisualizer';
+import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
+import { cn } from '@/lib/utils';
 
 interface QueryResultsProps {
     results: QueryResult | null;
@@ -31,6 +33,9 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
     onTabChange,
     explainPlan
 }) => {
+    const isMobile = useMediaQuery('(max-width: 768px)');
+    const isSmallMobile = useMediaQuery('(max-width: 480px)');
+
     // Determine content based on state
     const renderDataContent = () => {
         if (isError) {
@@ -69,41 +74,43 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
 
     return (
         <Tabs value={activeTab} onValueChange={onTabChange} className="h-full flex flex-col">
-            <div className="px-2 border-b bg-muted/10 flex items-center justify-between h-8 flex-shrink-0">
-                <TabsList className="h-7 bg-transparent p-0 gap-4">
+            <div className="px-2 border-b bg-muted/10 flex items-center justify-between h-9 md:h-8 flex-shrink-0 flex-wrap overflow-hidden">
+                <TabsList className="h-full bg-transparent p-0 gap-2 md:gap-4">
                     <TabsTrigger
                         value="data"
-                        className="h-7 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-1 text-[11px] flex gap-1.5"
+                        className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-1 text-[10px] md:text-[11px] flex gap-1.5"
                     >
                         <TableIcon className="w-3 h-3" />
-                        Data Output
+                        {isMobile ? "Data" : "Data Output"}
                     </TabsTrigger>
                     <TabsTrigger
                         value="messages"
-                        className="h-7 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-1 text-[11px] flex gap-1.5"
+                        className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-1 text-[10px] md:text-[11px] flex gap-1.5"
                     >
                         <Info className="w-3 h-3" />
-                        Messages
+                        {isMobile ? "Msgs" : "Messages"}
                     </TabsTrigger>
                     {explainPlan && (
                         <TabsTrigger
                             value="plan"
-                            className="h-7 rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-transparent shadow-none px-1 text-[11px] flex gap-1.5 text-orange-500"
+                            className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-transparent shadow-none px-1 text-[10px] md:text-[11px] flex gap-1.5 text-orange-500"
                         >
                             <GitBranch className="w-3 h-3" />
-                            Query Plan
+                            {isMobile ? "Plan" : "Query Plan"}
                         </TabsTrigger>
                     )}
                 </TabsList>
 
-                <div className="text-[10px] text-muted-foreground font-mono flex gap-3">
-                    {results?.durationMs !== undefined && (
-                        <span>Execution time: {results.durationMs}ms</span>
-                    )}
-                    {dataUpdatedAt > 0 && (
-                        <span>Finished: {new Date(dataUpdatedAt).toLocaleTimeString()}</span>
-                    )}
-                </div>
+                {!isSmallMobile && (
+                    <div className="text-[9px] md:text-[10px] text-muted-foreground font-mono flex gap-2 md:gap-3 items-center">
+                        {results?.durationMs !== undefined && (
+                            <span>{isMobile ? "" : "Time: "}{results.durationMs}ms</span>
+                        )}
+                        {dataUpdatedAt > 0 && (
+                            <span className={cn(isMobile && "hidden")}>{new Date(dataUpdatedAt).toLocaleTimeString()}</span>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div className="flex-1 relative overflow-hidden bg-card">

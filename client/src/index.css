@@ -243,51 +243,67 @@
     }
   }
 
-  /* Page entrance — fade + slide */
-  .page-enter {
-    animation: pageEnter 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  /* Reveal animation — for scroll-triggered entry */
+  .reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
-  @keyframes pageEnter {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+  .reveal.active {
+    opacity: 1;
+    transform: translateY(0);
   }
 
-  /* Smooth sidebar collapse/expand */
-  .sidebar-transition {
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-      opacity 0.2s ease,
-      transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  .stagger-1 {
+    transition-delay: 100ms;
   }
 
-  /* Button press effect */
-  button:active:not(:disabled),
-  [role="button"]:active:not(:disabled) {
-    transform: scale(0.97);
-    transition-duration: 0.1s;
+  .stagger-2 {
+    transition-delay: 200ms;
   }
 
-  /* Smooth tooltips and popover entrance */
-  [data-state="open"] {
-    animation: popoverIn 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  .stagger-3 {
+    transition-delay: 300ms;
   }
 
-  @keyframes popoverIn {
-    from {
-      opacity: 0;
-      transform: scale(0.96) translateY(-2px);
-    }
+  .stagger-4 {
+    transition-delay: 400ms;
+  }
 
-    to {
-      opacity: 1;
-      transform: scale(1) translateY(0);
+  /* Premium Focus Glow */
+  .glow-blue {
+    box-shadow: 0 0 20px -5px rgba(59, 130, 246, 0.5);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 20px -5px rgba(139, 92, 246, 0.5);
+  }
+
+  /* Shimmer effect for "Real" components */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(to right,
+        transparent,
+        rgba(255, 255, 255, 0.05),
+        transparent);
+    transform: translateX(-100%);
+    animation: shimmer 3s infinite;
+  }
+
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
     }
   }
 }
