@@ -10,6 +10,7 @@ import { VisualizePage } from '@/presentation/pages/VisualizePage'
 import { RequireAuth } from '@/presentation/components/RequireAuth'
 import { ThemeProvider } from '@/presentation/components/theme-provider'
 import { useAppStore } from '@/core/services/store'
+import { Analytics } from '@vercel/analytics/react'
 
 import { Toaster } from 'sonner';
 
@@ -46,6 +47,7 @@ export function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           <Toaster richColors position="top-center" />
+          <Analytics />
         </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>
