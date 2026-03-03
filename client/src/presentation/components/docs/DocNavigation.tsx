@@ -1,12 +1,13 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface DocNavigationProps {
-    prev?: { id: string; title: string };
-    next?: { id: string; title: string };
+    prev?: { id: string; title: string, titleEn?: string };
+    next?: { id: string; title: string, titleEn?: string };
     onNavigate: (id: string) => void;
+    lang: 'vi' | 'en';
 }
 
-export function DocNavigation({ prev, next, onNavigate }: DocNavigationProps) {
+export function DocNavigation({ prev, next, onNavigate, lang }: DocNavigationProps) {
     return (
         <div className="grid grid-cols-2 gap-4 mt-16 pt-8 border-t border-border/50">
             {prev ? (
@@ -15,9 +16,11 @@ export function DocNavigation({ prev, next, onNavigate }: DocNavigationProps) {
                     className="flex flex-col items-start p-4 rounded-2xl border bg-card/50 hover:bg-muted/50 transition-all text-left group"
                 >
                     <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1">
-                        <ChevronLeft className="w-3 h-3" /> Previous
+                        <ChevronLeft className="w-3 h-3" /> {lang === 'vi' ? 'Trước đó' : 'Previous'}
                     </span>
-                    <span className="text-sm font-bold group-hover:text-primary transition-colors">{prev.title}</span>
+                    <span className="text-sm font-bold group-hover:text-primary transition-colors">
+                        {lang === 'vi' ? prev.title : (prev.titleEn || prev.title)}
+                    </span>
                 </button>
             ) : <div />}
 
@@ -27,9 +30,11 @@ export function DocNavigation({ prev, next, onNavigate }: DocNavigationProps) {
                     className="flex flex-col items-end p-4 rounded-2xl border bg-card/50 hover:bg-muted/50 transition-all text-right group"
                 >
                     <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-1">
-                        Next <ChevronRight className="w-3 h-3" />
+                        {lang === 'vi' ? 'Tiếp theo' : 'Next'} <ChevronRight className="w-3 h-3" />
                     </span>
-                    <span className="text-sm font-bold group-hover:text-primary transition-colors">{next.title}</span>
+                    <span className="text-sm font-bold group-hover:text-primary transition-colors">
+                        {lang === 'vi' ? next.title : (next.titleEn || next.title)}
+                    </span>
                 </button>
             ) : <div />}
         </div>

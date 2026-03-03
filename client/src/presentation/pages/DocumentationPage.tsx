@@ -14,6 +14,17 @@ export function DocumentationPage() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [headings, setHeadings] = useState<{ id: string, text: string, level: number }[]>([]);
 
+    // Language management
+    const [lang, setLang] = useState<'vi' | 'en'>(() => {
+        const saved = localStorage.getItem('docs-lang');
+        return (saved === 'en' || saved === 'vi') ? saved : 'vi';
+    });
+
+    const toggleLang = (newLang: 'vi' | 'en') => {
+        setLang(newLang);
+        localStorage.setItem('docs-lang', newLang);
+    };
+
     // Compute navigation metadata
     const navInfo = useMemo(() => {
         let currentItem = null;
@@ -23,7 +34,10 @@ export function DocumentationPage() {
         for (const section of DOCS_STRUCTURE) {
             if (section.items) {
                 for (const item of section.items) {
-                    const itemData = { ...item, sectionTitle: section.title };
+                    const itemData = {
+                        ...item,
+                        sectionTitle: lang === 'vi' ? section.title : (section.titleEn || section.title)
+                    };
                     flatItems.push(itemData);
                     if (item.id === activeSection) {
                         currentItem = itemData;
@@ -38,7 +52,7 @@ export function DocumentationPage() {
         const next = currentIndex < flatItems.length - 1 ? flatItems[currentIndex + 1] : undefined;
 
         return { currentItem, currentSection, prev, next };
-    }, [activeSection]);
+    }, [activeSection, lang]);
 
     // Scan for headings whenever activeSection or content changes
     useMemo(() => {
@@ -58,7 +72,7 @@ export function DocumentationPage() {
                 setHeadings(foundHeadings);
             }
         }, 100);
-    }, [activeSection]);
+    }, [activeSection, lang]);
 
     const scrollToHeading = (id: string) => {
         const element = document.getElementById(id);
@@ -79,7 +93,31 @@ export function DocumentationPage() {
                         <div className="bg-primary/10 p-1.5 rounded-lg border border-primary/20">
                             <Database className="w-5 h-5 text-primary" />
                         </div>
-                        <h1 className="font-bold text-sm tracking-tight hidden sm:block">Data Explorer <span className="text-muted-foreground font-normal ml-1">Docs</span></h1>
+                        <h1 className="font-bold text-sm tracking-tight hidden sm:block truncate max-w-[150px] lg:max-w-none">
+                            Data Explorer <span className="text-muted-foreground font-normal ml-1">Docs</span>
+                        </h1>
+                    </div>
+
+                    {/* Language Switcher */}
+                    <div className="hidden sm:flex items-center bg-muted/30 rounded-full p-1 border border-border/40">
+                        <button
+                            onClick={() => toggleLang('vi')}
+                            className={cn(
+                                "px-3 py-1 rounded-full text-[10px] font-bold transition-all",
+                                lang === 'vi' ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground"
+                            )}
+                        >
+                            VN
+                        </button>
+                        <button
+                            onClick={() => toggleLang('en')}
+                            className={cn(
+                                "px-3 py-1 rounded-full text-[10px] font-bold transition-all",
+                                lang === 'en' ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground"
+                            )}
+                        >
+                            EN
+                        </button>
                     </div>
                 </div>
 
@@ -88,12 +126,23 @@ export function DocumentationPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" />
                         <input
                             type="text"
-                            placeholder="Tìm nhanh tài liệu..."
-                            className="bg-muted/50 border rounded-full pl-9 pr-4 py-1.5 text-xs w-64 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+                            placeholder={lang === 'vi' ? "Tìm nhanh tài liệu..." : "Quick search docs..."}
+                            className="bg-muted/50 border rounded-full pl-9 pr-4 py-1.5 text-xs w-48 lg:w-64 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
                         />
                     </div>
+
+                    {/* Compact Mobile Switcher */}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="sm:hidden text-[10px] h-7 px-2 font-bold"
+                        onClick={() => toggleLang(lang === 'vi' ? 'en' : 'vi')}
+                    >
+                        {lang.toUpperCase()}
+                    </Button>
+
                     <Button variant="ghost" size="sm" onClick={() => navigate('/app')} className="text-xs h-8">
-                        Mở Ứng dụng
+                        {lang === 'vi' ? 'Mở Ứng dụng' : 'Launch App'}
                     </Button>
                     <Button
                         variant="ghost"
@@ -111,6 +160,7 @@ export function DocumentationPage() {
                 <DocSidebar
                     activeId={activeSection}
                     onSelect={(id) => setActiveSection(id)}
+                    lang={lang}
                     className="hidden md:flex"
                 />
 
@@ -129,6 +179,7 @@ export function DocumentationPage() {
                         setActiveSection(id);
                         setIsMobileMenuOpen(false);
                     }}
+                    lang={lang}
                     className={cn(
                         "fixed inset-y-0 left-0 w-72 z-50 md:hidden transition-transform duration-300 ease-in-out border-r pt-14",
                         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -143,13 +194,14 @@ export function DocumentationPage() {
                     <div className="relative z-10 flex flex-col min-h-full">
                         <div className="max-w-3xl mx-auto w-full py-12 px-6">
                             <DocBreadcrumbs
-                                sectionTitle={navInfo.currentSection?.title || ''}
-                                itemTitle={navInfo.currentItem?.title || ''}
+                                sectionTitle={lang === 'vi' ? navInfo.currentSection?.title || '' : (navInfo.currentSection?.titleEn || navInfo.currentSection?.title || '')}
+                                itemTitle={lang === 'vi' ? navInfo.currentItem?.title || '' : (navInfo.currentItem?.titleEn || navInfo.currentItem?.title || '')}
                                 onHomeClick={() => setActiveSection('introduction')}
+                                lang={lang}
                             />
 
                             <div className="min-h-[60vh]">
-                                <DocContent sectionId={activeSection} />
+                                <DocContent sectionId={activeSection} lang={lang} />
                             </div>
 
                             <DocNavigation
@@ -159,6 +211,7 @@ export function DocumentationPage() {
                                     setActiveSection(id);
                                     document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
                                 }}
+                                lang={lang}
                             />
 
                             <footer className="mt-24 pt-8 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-6 group">
@@ -167,16 +220,19 @@ export function DocumentationPage() {
                                         className="hover:text-foreground transition-all flex items-center gap-2 group/btn"
                                         onClick={() => window.open('https://github.com/KasierBach/Data-Explorer-Editor.git', '_blank')}
                                     >
-                                        <Github className="w-4 h-4 transition-transform group-hover/btn:scale-110" /> Chỉnh sửa trang này
+                                        <Github className="w-4 h-4 transition-transform group-hover/btn:scale-110" />
+                                        {lang === 'vi' ? 'Chỉnh sửa trang này' : 'Edit this page'}
                                     </button>
                                     <span className="opacity-30 hidden sm:block">|</span>
-                                    <span className="text-xs">v1.2.0 • March 2026</span>
+                                    <span className="text-xs">v1.2.0 • {lang === 'vi' ? 'Tháng 3 2026' : 'March 2026'}</span>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <span className="text-xs text-muted-foreground font-medium">Tài liệu này hữu ích chứ?</span>
+                                    <span className="text-xs text-muted-foreground font-medium">
+                                        {lang === 'vi' ? 'Tài liệu này hữu ích chứ?' : 'Was this helpful?'}
+                                    </span>
                                     <div className="flex gap-1">
                                         <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors">👍</Button>
-                                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-red-500/10 hover:text-red-500 transition-colors">👎</Button>
+                                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-rose-500/10 hover:text-rose-500 transition-colors">👎</Button>
                                     </div>
                                 </div>
                             </footer>
@@ -184,16 +240,20 @@ export function DocumentationPage() {
 
                         {/* Global CTA Strip */}
                         <div className="mt-auto border-t bg-muted/10 p-12 text-center space-y-4">
-                            <h3 className="text-xl font-bold">Sẵn sàng khám phá dữ liệu?</h3>
+                            <h3 className="text-xl font-bold">
+                                {lang === 'vi' ? 'Sẵn sàng khám phá dữ liệu?' : 'Ready to explore data?'}
+                            </h3>
                             <p className="text-muted-foreground max-w-md mx-auto text-sm leading-relaxed">
-                                Tham gia cộng đồng trên GitHub để đóng góp cho IDE cơ sở dữ liệu địa phương thông minh nhất.
+                                {lang === 'vi'
+                                    ? 'Tham gia cộng đồng trên GitHub để đóng góp cho IDE cơ sở dữ liệu địa phương thông minh nhất.'
+                                    : 'Join the community on GitHub to contribute to the smartest local database IDE.'}
                             </p>
                             <div className="flex items-center justify-center gap-3">
                                 <Button variant="outline" size="sm" onClick={() => window.open('https://github.com/KasierBach/Data-Explorer-Editor.git', '_blank')}>
                                     <Github className="w-4 h-4 mr-2" /> GitHub
                                 </Button>
                                 <Button variant="default" size="sm" onClick={() => navigate('/app')}>
-                                    Mở Ứng dụng
+                                    {lang === 'vi' ? 'Mở Ứng dụng' : 'Launch App'}
                                 </Button>
                             </div>
                         </div>
@@ -202,7 +262,9 @@ export function DocumentationPage() {
 
                 {/* Right Sidebar - On Page TOC (Desktop only) */}
                 <aside className="hidden lg:block w-64 border-l bg-card/10 p-6 overflow-y-auto custom-scrollbar">
-                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-6">Mục lục</h4>
+                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-6">
+                        {lang === 'vi' ? 'Mục lục' : 'Table of Contents'}
+                    </h4>
                     <div className="space-y-1">
                         {headings.length > 0 ? (
                             headings.map((heading) => (
@@ -218,7 +280,9 @@ export function DocumentationPage() {
                                 </button>
                             ))
                         ) : (
-                            <p className="text-[10px] text-muted-foreground italic">Không có đề mục nào</p>
+                            <p className="text-[10px] text-muted-foreground italic">
+                                {lang === 'vi' ? 'Không có đề mục nào' : 'No headings found'}
+                            </p>
                         )}
                     </div>
                 </aside>

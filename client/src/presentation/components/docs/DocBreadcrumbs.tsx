@@ -4,9 +4,10 @@ interface DocBreadcrumbsProps {
     sectionTitle: string;
     itemTitle: string;
     onHomeClick: () => void;
+    lang: 'vi' | 'en';
 }
 
-export function DocBreadcrumbs({ sectionTitle, itemTitle, onHomeClick }: DocBreadcrumbsProps) {
+export function DocBreadcrumbs({ sectionTitle, itemTitle, onHomeClick, lang }: DocBreadcrumbsProps) {
     return (
         <nav className="flex items-center gap-2 text-xs text-muted-foreground mb-6 overflow-x-auto whitespace-nowrap py-1">
             <button
@@ -14,7 +15,7 @@ export function DocBreadcrumbs({ sectionTitle, itemTitle, onHomeClick }: DocBrea
                 className="hover:text-foreground transition-colors flex items-center gap-1"
             >
                 <Home className="w-3 h-3" />
-                Docs
+                {lang === 'vi' ? 'Tài liệu' : 'Docs'}
             </button>
             <ChevronRight className="w-3 h-3 shrink-0" />
             <span className="font-medium text-muted-foreground/60">{sectionTitle}</span>
