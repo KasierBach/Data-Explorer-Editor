@@ -26,6 +26,7 @@
     "@tanstack/react-virtual": "^3.13.18",
     "@types/dagre": "^0.7.53",
     "@types/react-syntax-highlighter": "^15.5.13",
+    "@vercel/analytics": "^1.6.1",
     "@xyflow/react": "^12.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
