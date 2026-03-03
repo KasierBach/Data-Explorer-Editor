@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/presentation/components/ui/dialog';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
-import { Label } from '@/presentation/components/ui/label';
 import { Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { queryService } from '@/core/services/QueryService';
