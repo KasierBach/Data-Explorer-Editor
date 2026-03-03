@@ -322,11 +322,11 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                         {activeConnection && (
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-100 dark:border-blue-900/50">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                                <span className="text-[10px] font-medium text-blue-700 dark:text-blue-400">
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-100 dark:border-blue-900/50 min-w-0">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                                <span className="text-[10px] font-medium text-blue-700 dark:text-blue-400 truncate max-w-[200px]">
                                     {activeConnection.name}
                                 </span>
                             </div>

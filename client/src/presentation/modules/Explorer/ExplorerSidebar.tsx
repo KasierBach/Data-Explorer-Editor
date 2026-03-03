@@ -147,7 +147,7 @@ export const ExplorerSidebar: React.FC = () => {
                         >
                             {/* Active Connection Root Node */}
                             <div className={cn(
-                                "flex items-center py-2 px-3 rounded-xl mb-1 cursor-pointer select-none text-sm font-bold transition-all duration-300",
+                                "flex items-center py-2 px-3 rounded-xl mb-1 cursor-pointer select-none text-sm font-bold transition-all duration-300 min-w-0",
                                 "bg-blue-500/5 border border-blue-500/10 text-blue-600/90 shadow-sm shadow-blue-500/5",
                                 "hover:bg-blue-500/10 hover:border-blue-500/20"
                             )}>
