@@ -12,27 +12,32 @@ import {
     HelpCircle
 } from 'lucide-react';
 
-interface DocSection {
+export interface DocItem {
+    id: string;
+    title: string;
+}
+
+export interface DocSection {
     id: string;
     title: string;
     icon?: React.ReactNode;
-    items?: { id: string; title: string }[];
+    items?: DocItem[];
 }
 
-const DOCS_STRUCTURE: DocSection[] = [
+export const DOCS_STRUCTURE: DocSection[] = [
     {
         id: 'getting-started',
-        title: 'Getting Started',
+        title: 'Bắt đầu',
         icon: <Terminal className="w-4 h-4" />,
         items: [
-            { id: 'introduction', title: 'Introduction' },
-            { id: 'installation', title: 'Installation' },
-            { id: 'prerequisites', title: 'Prerequisites' },
+            { id: 'introduction', title: 'Giới thiệu' },
+            { id: 'installation', title: 'Cài đặt' },
+            { id: 'prerequisites', title: 'Điều kiện tiên quyết' },
         ]
     },
     {
         id: 'connections',
-        title: 'Connections',
+        title: 'Kết nối',
         icon: <Database className="w-4 h-4" />,
         items: [
             { id: 'postgres', title: 'PostgreSQL' },
@@ -43,33 +48,44 @@ const DOCS_STRUCTURE: DocSection[] = [
     },
     {
         id: 'sql-workspace',
-        title: 'SQL Workspace',
+        title: 'Không gian SQL',
         icon: <Code className="w-4 h-4" />,
         items: [
-            { id: 'editor', title: 'Monaco Editor' },
-            { id: 'tabs', title: 'Tab Management' },
-            { id: 'results', title: 'Result Grids' },
-            { id: 'export', title: 'Exporting Data' },
+            { id: 'editor', title: 'Trình soạn thảo Monaco' },
+            { id: 'tabs', title: 'Quản lý Tab' },
+            { id: 'results', title: 'Lưới kết quả' },
+            { id: 'export', title: 'Xuất dữ liệu' },
         ]
     },
     {
         id: 'ai-assistant',
-        title: 'AI Assistant',
+        title: 'Trí tuệ nhân tạo (AI)',
         icon: <BookOpen className="w-4 h-4" />,
         items: [
-            { id: 'sql-generation', title: 'SQL Generation' },
-            { id: 'vision', title: 'Gemini Vision' },
-            { id: 'streaming', title: 'SSE Streaming' },
+            { id: 'sql-generation', title: 'Tạo mã SQL' },
+            { id: 'vision', title: 'Thị giác Gemini' },
+            { id: 'explain', title: 'Giải thích truy vấn' },
         ]
     },
     {
         id: 'visualization',
-        title: 'Visualization',
+        title: 'Trực quan hóa',
         icon: <Layers className="w-4 h-4" />,
         items: [
-            { id: 'erd', title: 'ER Diagrams' },
-            { id: 'charts', title: 'Interactive Charts' },
-            { id: 'dashboards', title: 'Insights' },
+            { id: 'erd', title: 'Sơ đồ ERD' },
+            { id: 'charts', title: 'Biểu đồ tương tác' },
+        ]
+    },
+    {
+        id: 'architecture-tech',
+        title: 'Kiến trúc & Công nghệ',
+        icon: <Activity className="w-4 h-4" />,
+        items: [
+            { id: 'architecture', title: 'Kiến trúc hệ thống' },
+            { id: 'tech-stack', title: 'Danh sách công nghệ' },
+            { id: 'security', title: 'Bảo mật & Quyền riêng tư' },
+            { id: 'lifecycle', title: 'Quy trình phát triển' },
+            { id: 'faq', title: 'FAQ & Khắc phục lỗi' },
         ]
     }
 ];
@@ -82,16 +98,18 @@ interface DocSidebarProps {
 
 export function DocSidebar({ activeId, onSelect, className }: DocSidebarProps) {
     return (
-        <aside className={cn("w-64 border-r bg-card/30 backdrop-blur-md flex flex-col h-full", className)}>
-            <div className="p-6">
-                <div className="flex items-center gap-2 mb-8">
-                    <div className="bg-primary/10 p-1.5 rounded-lg">
-                        <BookOpen className="w-5 h-5 text-primary" />
+        <aside className={cn("w-64 border-r bg-card/30 backdrop-blur-md flex flex-col h-full overflow-hidden", className)}>
+            <div className="flex-1 flex flex-col min-h-0">
+                <div className="p-6 pb-0">
+                    <div className="flex items-center gap-2 mb-8">
+                        <div className="bg-primary/10 p-1.5 rounded-lg">
+                            <BookOpen className="w-5 h-5 text-primary" />
+                        </div>
+                        <span className="font-bold text-lg tracking-tight">Documentation</span>
                     </div>
-                    <span className="font-bold text-lg tracking-tight">Documentation</span>
                 </div>
 
-                <nav className="space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+                <nav className="flex-1 overflow-y-auto px-6 py-2 custom-scrollbar space-y-6">
                     {DOCS_STRUCTURE.map((section) => (
                         <div key={section.id} className="space-y-2">
                             <h4 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2">

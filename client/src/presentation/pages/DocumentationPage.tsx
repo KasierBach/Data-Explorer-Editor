@@ -1,15 +1,71 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Database, Search, Menu, X, Github } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { DocSidebar } from '@/presentation/components/docs/DocSidebar';
+import { DocSidebar, DOCS_STRUCTURE } from '@/presentation/components/docs/DocSidebar';
 import { DocContent } from '@/presentation/components/docs/DocContent';
+import { DocBreadcrumbs } from '@/presentation/components/docs/DocBreadcrumbs';
+import { DocNavigation } from '@/presentation/components/docs/DocNavigation';
 import { cn } from '@/lib/utils';
 
 export function DocumentationPage() {
     const navigate = useNavigate();
     const [activeSection, setActiveSection] = useState('introduction');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [headings, setHeadings] = useState<{ id: string, text: string, level: number }[]>([]);
+
+    // Compute navigation metadata
+    const navInfo = useMemo(() => {
+        let currentItem = null;
+        let currentSection = null;
+        const flatItems = [];
+
+        for (const section of DOCS_STRUCTURE) {
+            if (section.items) {
+                for (const item of section.items) {
+                    const itemData = { ...item, sectionTitle: section.title };
+                    flatItems.push(itemData);
+                    if (item.id === activeSection) {
+                        currentItem = itemData;
+                        currentSection = section;
+                    }
+                }
+            }
+        }
+
+        const currentIndex = flatItems.findIndex(i => i.id === activeSection);
+        const prev = currentIndex > 0 ? flatItems[currentIndex - 1] : undefined;
+        const next = currentIndex < flatItems.length - 1 ? flatItems[currentIndex + 1] : undefined;
+
+        return { currentItem, currentSection, prev, next };
+    }, [activeSection]);
+
+    // Scan for headings whenever activeSection or content changes
+    useMemo(() => {
+        setTimeout(() => {
+            const contentElement = document.querySelector('main');
+            if (contentElement) {
+                const foundHeadings = Array.from(contentElement.querySelectorAll('h2, h3')).map((heading, index) => {
+                    if (!heading.id) {
+                        heading.id = `heading-${index}`;
+                    }
+                    return {
+                        id: heading.id,
+                        text: heading.textContent || '',
+                        level: heading.tagName === 'H2' ? 2 : 3
+                    };
+                });
+                setHeadings(foundHeadings);
+            }
+        }, 100);
+    }, [activeSection]);
+
+    const scrollToHeading = (id: string) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
 
     return (
         <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
@@ -28,16 +84,16 @@ export function DocumentationPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <div className="relative hidden md:block">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <div className="relative hidden md:block text-slate-500">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" />
                         <input
                             type="text"
-                            placeholder="Quick search..."
+                            placeholder="Tìm nhanh tài liệu..."
                             className="bg-muted/50 border rounded-full pl-9 pr-4 py-1.5 text-xs w-64 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
                         />
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => navigate('/app')} className="text-xs h-8">
-                        Launch App
+                        Mở Ứng dụng
                     </Button>
                     <Button
                         variant="ghost"
@@ -80,25 +136,64 @@ export function DocumentationPage() {
                 />
 
                 {/* Main Content Area */}
-                <main className="flex-1 overflow-y-auto bg-background/50 selection:bg-primary/20 custom-scrollbar relative">
+                <main className="flex-1 overflow-y-auto bg-background/50 selection:bg-primary/20 custom-scrollbar relative scroll-smooth">
                     {/* Decorative Background Elements */}
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-64 bg-primary/5 blur-[120px] pointer-events-none rounded-full" />
 
                     <div className="relative z-10 flex flex-col min-h-full">
-                        <DocContent sectionId={activeSection} />
+                        <div className="max-w-3xl mx-auto w-full py-12 px-6">
+                            <DocBreadcrumbs
+                                sectionTitle={navInfo.currentSection?.title || ''}
+                                itemTitle={navInfo.currentItem?.title || ''}
+                                onHomeClick={() => setActiveSection('introduction')}
+                            />
 
-                        {/* Global Docs Footer */}
+                            <div className="min-h-[60vh]">
+                                <DocContent sectionId={activeSection} />
+                            </div>
+
+                            <DocNavigation
+                                prev={navInfo.prev}
+                                next={navInfo.next}
+                                onNavigate={(id) => {
+                                    setActiveSection(id);
+                                    document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                            />
+
+                            <footer className="mt-24 pt-8 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-6 group">
+                                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                    <button
+                                        className="hover:text-foreground transition-all flex items-center gap-2 group/btn"
+                                        onClick={() => window.open('https://github.com/KasierBach/Data-Explorer-Editor.git', '_blank')}
+                                    >
+                                        <Github className="w-4 h-4 transition-transform group-hover/btn:scale-110" /> Chỉnh sửa trang này
+                                    </button>
+                                    <span className="opacity-30 hidden sm:block">|</span>
+                                    <span className="text-xs">v1.2.0 • March 2026</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xs text-muted-foreground font-medium">Tài liệu này hữu ích chứ?</span>
+                                    <div className="flex gap-1">
+                                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors">👍</Button>
+                                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-red-500/10 hover:text-red-500 transition-colors">👎</Button>
+                                    </div>
+                                </div>
+                            </footer>
+                        </div>
+
+                        {/* Global CTA Strip */}
                         <div className="mt-auto border-t bg-muted/10 p-12 text-center space-y-4">
-                            <h3 className="text-xl font-bold">Comprehensive Multi-Engine Tool</h3>
+                            <h3 className="text-xl font-bold">Sẵn sàng khám phá dữ liệu?</h3>
                             <p className="text-muted-foreground max-w-md mx-auto text-sm leading-relaxed">
-                                Join our community on GitHub to contribute to the most intelligent local database IDE.
+                                Tham gia cộng đồng trên GitHub để đóng góp cho IDE cơ sở dữ liệu địa phương thông minh nhất.
                             </p>
                             <div className="flex items-center justify-center gap-3">
                                 <Button variant="outline" size="sm" onClick={() => window.open('https://github.com/KasierBach/Data-Explorer-Editor.git', '_blank')}>
-                                    <Github className="w-4 h-4 mr-2" /> Star on GitHub
+                                    <Github className="w-4 h-4 mr-2" /> GitHub
                                 </Button>
                                 <Button variant="default" size="sm" onClick={() => navigate('/app')}>
-                                    Try it now
+                                    Mở Ứng dụng
                                 </Button>
                             </div>
                         </div>
@@ -106,12 +201,25 @@ export function DocumentationPage() {
                 </main>
 
                 {/* Right Sidebar - On Page TOC (Desktop only) */}
-                <aside className="hidden lg:block w-64 border-l bg-card/10 p-6">
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">On this page</h4>
-                    <div className="space-y-3">
-                        <div className="text-xs text-primary font-medium border-l-2 border-primary pl-3 py-0.5">Overview</div>
-                        <div className="text-xs text-muted-foreground hover:text-foreground transition-colors pl-4 py-0.5 cursor-pointer">Architecture</div>
-                        <div className="text-xs text-muted-foreground hover:text-foreground transition-colors pl-4 py-0.5 cursor-pointer">Security</div>
+                <aside className="hidden lg:block w-64 border-l bg-card/10 p-6 overflow-y-auto custom-scrollbar">
+                    <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-6">Mục lục</h4>
+                    <div className="space-y-1">
+                        {headings.length > 0 ? (
+                            headings.map((heading) => (
+                                <button
+                                    key={heading.id}
+                                    onClick={() => scrollToHeading(heading.id)}
+                                    className={cn(
+                                        "w-full text-left text-xs transition-all py-1.5 block hover:text-primary",
+                                        heading.level === 2 ? "font-semibold text-muted-foreground" : "pl-4 text-muted-foreground/70"
+                                    )}
+                                >
+                                    {heading.text}
+                                </button>
+                            ))
+                        ) : (
+                            <p className="text-[10px] text-muted-foreground italic">Không có đề mục nào</p>
+                        )}
                     </div>
                 </aside>
             </div>
