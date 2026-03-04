@@ -1,5 +1,5 @@
 import { Cpu, Database, AlertCircle } from 'lucide-react';
-import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, Callout, CodeBlock, CodeComment, CodeLine } from '../primitives';
+import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, CodeBlock, CodeComment, CodeLine } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 

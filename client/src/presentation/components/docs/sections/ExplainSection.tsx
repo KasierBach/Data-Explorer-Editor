@@ -1,5 +1,5 @@
 import { HelpCircle } from 'lucide-react';
-import { DocPageLayout, DocSection, Prose, CodeBlock, CodeComment, CodeLine, Callout } from '../primitives';
+import { DocPageLayout, DocSection, Prose, CodeBlock, CodeLine } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 

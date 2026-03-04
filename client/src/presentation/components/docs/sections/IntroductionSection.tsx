@@ -1,4 +1,4 @@
-import { Database, BookOpen, Zap, Shield, BarChart3, Terminal } from 'lucide-react';
+import { Database, BookOpen } from 'lucide-react';
 import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, Callout, CodeBlock, CodeComment, CodeLine } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }

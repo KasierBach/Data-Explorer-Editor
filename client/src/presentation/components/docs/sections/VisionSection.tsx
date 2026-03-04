@@ -1,6 +1,5 @@
 import { Eye } from 'lucide-react';
-import { Button } from '@/presentation/components/ui/button';
-import { DocPageLayout, DocSection, Prose, Callout } from '../primitives';
+import { DocPageLayout, DocSection, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 

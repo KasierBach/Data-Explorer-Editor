@@ -1,5 +1,5 @@
-import { Shield, Lock, Eye } from 'lucide-react';
-import { DocPageLayout, DocSection, Prose, CodeBlock, CodeComment, CodeLine, Callout, InfoCard, FeatureGrid } from '../primitives';
+import { Shield, Lock } from 'lucide-react';
+import { DocPageLayout, DocSection, Prose, CodeBlock, CodeComment, CodeLine, InfoCard, FeatureGrid } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 

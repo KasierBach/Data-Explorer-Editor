@@ -1,4 +1,4 @@
-import { DocPageLayout, DocSection, Prose, CodeBlock, CodeComment, CodeLine } from '../primitives';
+import { DocPageLayout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
