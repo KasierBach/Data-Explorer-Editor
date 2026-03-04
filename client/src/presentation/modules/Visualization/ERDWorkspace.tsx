@@ -262,7 +262,9 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
 
             // Only DB-backed edges representing foreign keys
             if (edge.id.startsWith('db-e-')) {
-                const constraintName = fkConstraintMap.get(`${edge.source}.${edge.sourceHandle}`);
+                // edge.source is Parent table, edge.target is Child table 
+                // The constraint lives on the Child table.
+                const constraintName = fkConstraintMap.get(`${edge.target}.${edge.targetHandle}`);
                 if (!constraintName) {
                     toast.info(lang === 'vi' ? "Không thể xóa: không tìm thấy tên ràng buộc cho liên kết này." : "Cannot remove: unknown constraint name for this relationship.");
                     // Still remove visually if it's glitched out
@@ -275,7 +277,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                         await queryService.updateSchema({
                             connectionId: connectionId!,
                             database: selectedDatabase,
-                            table: edge.source,
+                            table: edge.target, // Constraint is on the 'target' (Child) table
                             operations: [{
                                 type: 'drop_fk',
                                 name: constraintName,
