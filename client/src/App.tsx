@@ -7,6 +7,7 @@ import { LandingPage } from '@/presentation/pages/LandingPage'
 import { DocumentationPage } from '@/presentation/pages/DocumentationPage'
 import { ERDPage } from '@/presentation/pages/ERDPage'
 import { VisualizePage } from '@/presentation/pages/VisualizePage'
+import { AdminDashboardPage } from '@/presentation/pages/Admin/AdminDashboardPage'
 import { RequireAuth } from '@/presentation/components/RequireAuth'
 import { ThemeProvider } from '@/presentation/components/theme-provider'
 import { useAppStore } from '@/core/services/store'
@@ -30,6 +31,9 @@ export function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
             <Route path="/docs" element={<DocumentationPage />} />
+
+            <Route path="/admin" element={<RequireAuth requireAdmin={true}><AdminDashboardPage /></RequireAuth>} />
+
             <Route path="/app/erd" element={<RequireAuth><ERDPage /></RequireAuth>} />
             <Route path="/app/visualize" element={<RequireAuth><VisualizePage /></RequireAuth>} />
 

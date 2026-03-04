@@ -24,6 +24,7 @@ export interface ConnectionSlice {
     addConnection: (connection: Connection) => void;
     updateConnection: (id: string, updatedFields: Partial<Connection>) => void;
     removeConnection: (id: string) => void;
+    setConnections: (connections: Connection[]) => void;
 }
 
 export const createConnectionSlice: StateCreator<ConnectionSlice> = (set) => ({
@@ -62,4 +63,5 @@ export const createConnectionSlice: StateCreator<ConnectionSlice> = (set) => ({
         const newActiveId = state.activeConnectionId === id ? null : state.activeConnectionId;
         return { connections: newConnections, activeConnectionId: newActiveId };
     }),
+    setConnections: (connections: Connection[]) => set({ connections }),
 });

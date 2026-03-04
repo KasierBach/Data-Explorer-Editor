@@ -81,16 +81,23 @@ export const ConnectionDialog: React.FC = () => {
         setIsSaving(true);
         setError(null);
 
-        const connectionData = {
+        const connectionData: any = {
             name: name || `${type}@${host}`,
             type,
             host,
-            port: parseInt(port),
             username,
             password,
-            database,
             showAllDatabases
         };
+
+        const parsedPort = parseInt(port);
+        if (!isNaN(parsedPort)) {
+            connectionData.port = parsedPort;
+        }
+
+        if (database && database.trim() !== '') {
+            connectionData.database = database.trim();
+        }
 
         try {
             // Call backend API first to register and get UUID

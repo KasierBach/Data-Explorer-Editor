@@ -4,10 +4,10 @@ export interface AuthSlice {
     isAuthenticated: boolean;
     accessToken: string | null;
     tokenExp: number | null;
-    user: { name: string; email: string } | null;
-    login: (token: string, user: { name: string; email: string }) => void;
+    user: { name: string; email: string; role?: string } | null;
+    login: (token: string, user: { name: string; email: string; role?: string }) => void;
     logout: () => void;
-    updateUser: (user: { name: string; email: string }) => void;
+    updateUser: (user: { name: string; email: string; role?: string }) => void;
 }
 
 export const createAuthSlice: StateCreator<AuthSlice> = (set) => ({
@@ -17,20 +17,23 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set) => ({
     user: null,
     login: (token, user) => {
         let tokenExp: number | null = null;
+        let role = user.role;
+
         try {
             const base64Url = token.split('.')[1];
             const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
             const payload = JSON.parse(window.atob(base64));
             if (payload.exp) tokenExp = payload.exp;
+            if (!role && payload.role) role = payload.role;
         } catch (e) {
-            console.error('Failed to parse JWT exp', e);
+            console.error('Failed to parse JWT', e);
         }
 
         set({
             isAuthenticated: true,
             accessToken: token,
             tokenExp,
-            user,
+            user: { ...user, role },
             isConnectionDialogOpen: false,
             // Clear previous user's data to prevent cross-account leaking
             connections: [],

@@ -40,6 +40,20 @@ export const LoginPage = () => {
 
             const data = await response.json();
             login(data.access_token, data.user);
+
+            // Fetch global connections from backend and inject to store
+            try {
+                const connRes = await fetch(`${API_BASE_URL}/connections`, {
+                    headers: { 'Authorization': `Bearer ${data.access_token}` },
+                });
+                if (connRes.ok) {
+                    const connections = await connRes.json();
+                    useAppStore.getState().setConnections(connections);
+                }
+            } catch (ignored) {
+                console.warn('Failed to fetch connections upon login');
+            }
+
             navigate('/');
         } catch (err: any) {
             setError(err.message || (lang === 'vi' ? 'Thông tin đăng nhập không hợp lệ' : 'Invalid credentials'));

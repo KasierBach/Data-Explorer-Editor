@@ -18,7 +18,8 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to connect: ${response.statusText}`);
+            const errorText = await response.text();
+            throw new Error(`Failed to connect: ${response.statusText}. Details: ${errorText}`);
         }
 
         const connection = await response.json();

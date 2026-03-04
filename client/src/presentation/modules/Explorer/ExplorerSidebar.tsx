@@ -13,6 +13,7 @@ import { SidebarContextMenu } from './SidebarContextMenu';
 import { CreateDatabaseDialog } from '@/presentation/components/Dialogs/CreateDatabaseDialog';
 import { DeleteDatabaseDialog } from '@/presentation/components/Dialogs/DeleteDatabaseDialog';
 import { handleTreeAction as importedHandleTreeAction } from './treeActions';
+import { API_BASE_URL } from '@/core/config/env';
 
 export const ExplorerSidebar: React.FC = () => {
     const connections = useAppStore(state => state.connections);
@@ -137,9 +138,26 @@ export const ExplorerSidebar: React.FC = () => {
                                 if (action === 'toggleShowAll') {
                                     const conn = useAppStore.getState().connections.find(c => c.id === activeConnectionId);
                                     if (conn) {
+                                        const newValue = !conn.showAllDatabases;
+                                        // Update local store immediately for UI responsiveness
                                         useAppStore.getState().updateConnection(conn.id, {
-                                            showAllDatabases: !conn.showAllDatabases
+                                            showAllDatabases: newValue
                                         });
+
+                                        // Update backend connection setting so next fetch returns all databases
+                                        const accessToken = useAppStore.getState().accessToken;
+                                        fetch(`${API_BASE_URL}/connections/${conn.id}`, {
+                                            method: 'PATCH',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+                                            },
+                                            body: JSON.stringify({ showAllDatabases: newValue })
+                                        }).then(async () => {
+                                            // Ensure backend pool connects with new settings and invalidate cache
+                                            await connectionService.setActiveConnection({ ...conn, showAllDatabases: newValue } as any);
+                                            triggerRefresh();
+                                        }).catch(console.error);
                                     }
                                 }
                                 if (action === 'refresh') {

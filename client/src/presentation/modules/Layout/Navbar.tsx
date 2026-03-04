@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ModeToggle } from '@/presentation/components/mode-toggle';
-import { Database, Settings, User, LogOut, User as UserIcon, Github, LifeBuoy, Cloud, CreditCard, FileText, FolderOpen, BarChart3, PieChart, GitGraph, Sparkles, Menu, X } from 'lucide-react';
+import { Database, Settings, User, LogOut, User as UserIcon, Github, LifeBuoy, Cloud, CreditCard, FileText, FolderOpen, BarChart3, PieChart, GitGraph, Sparkles, Menu, X, Shield } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import {
     DropdownMenu,
@@ -240,6 +240,17 @@ export const Navbar: React.FC = () => {
                                     {!isMobile && <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>}
                                 </DropdownMenuItem>
                             </DropdownMenuGroup>
+
+                            {user?.role === 'admin' && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => navigate('/admin')}>
+                                        <Shield className="mr-2 h-4 w-4 text-primary" />
+                                        <span className="text-primary font-medium">{lang === 'vi' ? 'Quản trị viên' : 'Admin Panel'}</span>
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-600 focus:text-red-600">
                                 <LogOut className="mr-2 h-4 w-4" />

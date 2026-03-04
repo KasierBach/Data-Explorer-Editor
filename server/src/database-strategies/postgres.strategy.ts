@@ -118,7 +118,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
     // ─── Metadata Operations ───
 
     async getDatabases(pool: any): Promise<TreeNodeResult[]> {
-        const sql = `SELECT datname FROM pg_database WHERE datistemplate = false AND datname != 'postgres'`;
+        const sql = `SELECT datname FROM pg_database WHERE datistemplate = false`;
         const result = await pool.query(sql);
         return result.rows.map((row: any) => ({
             id: `db:${row.datname}`,
