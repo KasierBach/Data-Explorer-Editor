@@ -32,6 +32,15 @@ export const useAppStore = create<AppState>()(
         {
             name: 'data-explorer-storage',
             storage: createJSONStorage(() => localStorage),
+            // Sanitize persisted state on rehydration to fix corrupt data
+            merge: (persistedState, currentState) => {
+                const persisted = (persistedState as Record<string, any>) || {};
+                // Fix: expandedNodes may have been saved as {} instead of []
+                if (persisted.expandedNodes && !Array.isArray(persisted.expandedNodes)) {
+                    persisted.expandedNodes = [];
+                }
+                return { ...currentState, ...persisted } as AppState;
+            },
             // Only persist essential state
             partialize: (state) => ({
                 connections: state.connections,
