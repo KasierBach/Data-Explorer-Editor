@@ -42,7 +42,7 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set) => ({
             activeAiChatId: null,
             savedQueries: [],
             queryHistory: [],
-            expandedNodes: {},
+            expandedNodes: [],
         } as any);
     },
     logout: () => set({
