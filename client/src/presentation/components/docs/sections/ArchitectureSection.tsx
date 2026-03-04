@@ -1,4 +1,4 @@
-import { Layers, Database, Cpu, ArrowRight } from 'lucide-react';
+import { Layers, ArrowRight } from 'lucide-react';
 import { DocPageLayout, DocSection, Prose, CodeBlock, CodeComment, CodeLine, Callout, InfoCard, FeatureGrid } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }

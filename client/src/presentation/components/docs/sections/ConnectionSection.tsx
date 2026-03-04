@@ -1,5 +1,5 @@
 import { Shield, Database } from 'lucide-react';
-import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment, CodeLine, Callout } from '../primitives';
+import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment, CodeLine } from '../primitives';
 
 interface Props {
     lang: 'vi' | 'en';

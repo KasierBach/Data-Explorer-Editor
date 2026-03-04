@@ -1,5 +1,5 @@
 import { Activity, PieChart, Layers, Zap } from 'lucide-react';
-import { DocPageLayout, DocSection, Prose, Callout, CodeBlock, CodeComment, CodeLine } from '../primitives';
+import { DocPageLayout, DocSection, Prose, CodeBlock, CodeLine } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 

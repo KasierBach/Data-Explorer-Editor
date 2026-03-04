@@ -1,5 +1,5 @@
 import { Layout, Database, Activity } from 'lucide-react';
-import { DocPageLayout, DocSection, Prose, Callout, CodeBlock, CodeComment, CodeLine } from '../primitives';
+import { DocPageLayout, DocSection, Prose } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
