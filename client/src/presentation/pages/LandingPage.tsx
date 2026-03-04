@@ -74,7 +74,7 @@ export const LandingPage: React.FC = () => {
                         <span className="bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">Data<span className="text-blue-500">Explorer</span></span>
                     </div>
 
-                    <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
+                    <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground absolute left-1/2 -translate-x-1/2">
                         <a href="#features" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
                             {lang === 'vi' ? 'Tính năng' : 'Features'}
                         </a>
