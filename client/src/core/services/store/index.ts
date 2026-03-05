@@ -41,9 +41,12 @@ export const useAppStore = create<AppState>()(
                 }
                 return { ...currentState, ...persisted } as AppState;
             },
-            // Only persist essential state
+            // Only persist essential state AND sanitize passwords
             partialize: (state) => ({
-                connections: state.connections,
+                connections: state.connections.map(c => {
+                    const { password, ...safeConnection } = c;
+                    return safeConnection;
+                }),
                 activeConnectionId: state.activeConnectionId,
                 activeDatabase: state.activeDatabase,
                 isAuthenticated: state.isAuthenticated,

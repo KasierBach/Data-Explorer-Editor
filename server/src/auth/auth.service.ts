@@ -75,16 +75,18 @@ export class AuthService implements OnModuleInit {
     private async seedAdmin() {
         const userCount = await this.prisma.user.count();
         if (userCount === 0) {
-            const hashedPassword = await bcrypt.hash('admin123', this.SALT_ROUNDS);
+            const adminEmail = process.env.ADMIN_EMAIL || 'admin@dataexplorer.com';
+            const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+            const hashedPassword = await bcrypt.hash(adminPassword, this.SALT_ROUNDS);
             await this.prisma.user.create({
                 data: {
                     name: 'Admin',
-                    email: 'admin@dataexplorer.com',
+                    email: adminEmail,
                     password: hashedPassword,
                     role: 'admin',
                 },
             });
-            console.log('[Auth] Default admin seeded: admin@dataexplorer.com / admin123');
+            console.log(`[Auth] Default admin seeded: ${adminEmail} (password: ***)`);
         }
     }
 }

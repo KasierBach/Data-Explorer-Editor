@@ -9,7 +9,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
 
     async connect(config: any): Promise<void> {
         // Register the connection with the backend
-        const { id, ...connectionConfig } = config;
+        const { id, createdAt, ...connectionConfig } = config;
 
         const response = await fetch(`${this.baseUrl}/connections`, {
             method: 'POST',

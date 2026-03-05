@@ -25,6 +25,8 @@ export class PostgresStrategy implements IDatabaseStrategy {
             max: 20,
             idleTimeoutMillis: 30000,
             connectionTimeoutMillis: 10000,
+            statement_timeout: 30000, // 30 seconds
+            query_timeout: 30000, // 30 seconds
         });
     }
 
@@ -45,9 +47,15 @@ export class PostgresStrategy implements IDatabaseStrategy {
     // ─── Query Operations ───
 
     async executeQuery(pool: any, sql: string): Promise<QueryResult> {
+        let safeSql = sql;
+        // Naive protection: append limit to top-level select if missing to prevent OOM
+        if (/^\s*SELECT/i.test(safeSql) && !/\bLIMIT\b/i.test(safeSql)) {
+            safeSql = `${safeSql.trim().replace(/;$/, '')} LIMIT 10000;`;
+        }
+
         const client = await pool.connect();
         try {
-            const result = await client.query(sql);
+            const result = await client.query(safeSql);
             const queryResult = Array.isArray(result) ? result[result.length - 1] : result;
             return {
                 rows: queryResult.rows || [],
@@ -142,8 +150,8 @@ export class PostgresStrategy implements IDatabaseStrategy {
     }
 
     async getTables(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
-        const sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = '${schema}' AND table_type = 'BASE TABLE'`;
-        const result = await pool.query(sql);
+        const sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = $1 AND table_type = 'BASE TABLE'`;
+        const result = await pool.query(sql, [schema]);
         return result.rows.map((row: any) => ({
             id: dbName ? `db:${dbName}.schema:${schema}.table:${row.table_name}` : `schema:${schema}.table:${row.table_name}`,
             name: row.table_name,
@@ -154,8 +162,8 @@ export class PostgresStrategy implements IDatabaseStrategy {
     }
 
     async getViews(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
-        const sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = '${schema}' AND table_type = 'VIEW'`;
-        const result = await pool.query(sql);
+        const sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = $1 AND table_type = 'VIEW'`;
+        const result = await pool.query(sql, [schema]);
         return result.rows.map((row: any) => ({
             id: dbName ? `db:${dbName}.schema:${schema}.view:${row.table_name}` : `schema:${schema}.view:${row.table_name}`,
             name: row.table_name,
@@ -166,8 +174,8 @@ export class PostgresStrategy implements IDatabaseStrategy {
     }
 
     async getFunctions(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
-        const sql = `SELECT routine_name FROM information_schema.routines WHERE routine_schema = '${schema}'`;
-        const result = await pool.query(sql);
+        const sql = `SELECT routine_name FROM information_schema.routines WHERE routine_schema = $1`;
+        const result = await pool.query(sql, [schema]);
         return result.rows.map((row: any) => ({
             id: dbName ? `db:${dbName}.schema:${schema}.func:${row.routine_name}` : `schema:${schema}.func:${row.routine_name}`,
             name: row.routine_name,
@@ -182,10 +190,10 @@ export class PostgresStrategy implements IDatabaseStrategy {
             SELECT p.parameter_name, p.data_type, p.parameter_mode 
             FROM information_schema.parameters p
             JOIN information_schema.routines r ON p.specific_name = r.specific_name
-            WHERE r.routine_schema = '${schema}' AND r.routine_name = '${func}'
+            WHERE r.routine_schema = $1 AND r.routine_name = $2
             ORDER BY p.ordinal_position
         `;
-        const result = await pool.query(sql);
+        const result = await pool.query(sql, [schema, func]);
         return result.rows.map((row: any) => ({
             name: row.parameter_name || '(unnamed)',
             type: `${row.parameter_mode || 'IN'} ${row.data_type}`,
@@ -206,10 +214,10 @@ export class PostgresStrategy implements IDatabaseStrategy {
             JOIN pg_namespace s ON s.oid = t.relnamespace AND s.nspname = c.table_schema
             LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attname = c.column_name
             LEFT JOIN pg_constraint con ON con.conrelid = t.oid AND con.contype = 'p' AND a.attnum = ANY(con.conkey)
-            WHERE c.table_name = '${table}' AND c.table_schema = '${schema}'
+            WHERE c.table_name = $1 AND c.table_schema = $2
             ORDER BY c.ordinal_position
         `;
-        const result = await pool.query(sql);
+        const result = await pool.query(sql, [table, schema]);
         return result.rows.map((row: any) => ({
             name: row.column_name,
             type: row.data_type,

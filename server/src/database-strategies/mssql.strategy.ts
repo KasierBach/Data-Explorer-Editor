@@ -144,9 +144,9 @@ export class MssqlStrategy implements IDatabaseStrategy {
     }
 
     async getTables(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
-        const result = await pool.request().query(
-            `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '${schema}' AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME`,
-        );
+        const result = await pool.request()
+            .input('schema', mssql.NVarChar, schema)
+            .query(`SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = @schema AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME`);
         return result.recordset.map((row: any) => ({
             id: dbName ? `db:${dbName}.schema:${schema}.table:${row.TABLE_NAME}` : `schema:${schema}.table:${row.TABLE_NAME}`,
             name: row.TABLE_NAME,
@@ -157,9 +157,9 @@ export class MssqlStrategy implements IDatabaseStrategy {
     }
 
     async getViews(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
-        const result = await pool.request().query(
-            `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_SCHEMA = '${schema}' ORDER BY TABLE_NAME`,
-        );
+        const result = await pool.request()
+            .input('schema', mssql.NVarChar, schema)
+            .query(`SELECT TABLE_NAME FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_SCHEMA = @schema ORDER BY TABLE_NAME`);
         return result.recordset.map((row: any) => ({
             id: dbName ? `db:${dbName}.schema:${schema}.view:${row.TABLE_NAME}` : `schema:${schema}.view:${row.TABLE_NAME}`,
             name: row.TABLE_NAME,
@@ -170,9 +170,9 @@ export class MssqlStrategy implements IDatabaseStrategy {
     }
 
     async getFunctions(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
-        const result = await pool.request().query(
-            `SELECT name, type_desc FROM sys.objects WHERE schema_id = SCHEMA_ID('${schema}') AND type IN ('FN','IF','TF','P') ORDER BY name`,
-        );
+        const result = await pool.request()
+            .input('schema', mssql.NVarChar, schema)
+            .query(`SELECT name, type_desc FROM sys.objects WHERE schema_id = SCHEMA_ID(@schema) AND type IN ('FN','IF','TF','P') ORDER BY name`);
         return result.recordset.map((row: any) => ({
             id: dbName ? `db:${dbName}.schema:${schema}.func:${row.name}` : `schema:${schema}.func:${row.name}`,
             name: row.name,
@@ -197,10 +197,13 @@ export class MssqlStrategy implements IDatabaseStrategy {
             LEFT JOIN sys.index_columns ic ON ic.object_id = t.object_id AND ic.index_id = i.index_id
             LEFT JOIN sys.columns sc ON sc.object_id = t.object_id AND sc.column_id = ic.column_id AND sc.name = c.COLUMN_NAME
             LEFT JOIN sys.key_constraints kc ON kc.parent_object_id = t.object_id AND kc.unique_index_id = i.index_id AND kc.type = 'PK'
-            WHERE c.TABLE_NAME = '${table}' AND c.TABLE_SCHEMA = '${schema}'
+            WHERE c.TABLE_NAME = @table AND c.TABLE_SCHEMA = @schema
             ORDER BY c.ORDINAL_POSITION
         `;
-        const result = await pool.request().query(sql);
+        const result = await pool.request()
+            .input('table', mssql.NVarChar, table)
+            .input('schema', mssql.NVarChar, schema)
+            .query(sql);
         return result.recordset.map((row: any) => ({
             name: row.COLUMN_NAME,
             type: row.DATA_TYPE,

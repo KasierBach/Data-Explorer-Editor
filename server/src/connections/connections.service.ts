@@ -4,6 +4,7 @@ import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { Connection } from './entities/connection.entity';
 import { PrismaService } from '../prisma/prisma.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
+import { encryptAttribute, decryptAttribute } from '../utils/crypto.util';
 
 @Injectable()
 export class ConnectionsService implements OnModuleDestroy {
@@ -26,47 +27,62 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   async create(createConnectionDto: CreateConnectionDto): Promise<Connection> {
-    const { name, ...rest } = createConnectionDto;
+    const { name, password, ...rest } = createConnectionDto;
+    const encryptedPassword = password ? encryptAttribute(password) : undefined;
+
     const connection = await this.prisma.connection.upsert({
       where: { name } as any,
-      update: rest as any,
-      create: createConnectionDto as any,
+      update: { ...rest, password: encryptedPassword } as any,
+      create: { ...createConnectionDto, password: encryptedPassword } as any,
     });
-    return connection as unknown as Connection;
+    const { password: _, ...safeConnection } = connection;
+    return safeConnection as unknown as Connection;
   }
 
   async findAll(): Promise<Connection[]> {
     const connections = await this.prisma.connection.findMany();
-    return connections as unknown as Connection[];
+    return connections.map(c => {
+      const { password: _, ...safe } = c;
+      return safe;
+    }) as unknown as Connection[];
   }
 
-  async findOne(id: string): Promise<Connection> {
+  private async findRawOne(id: string) {
     const connection = await this.prisma.connection.findUnique({
       where: { id },
     });
     if (!connection) {
       throw new NotFoundException(`Connection with ID ${id} not found`);
     }
-    return connection as unknown as Connection;
+    return connection;
+  }
+
+  async findOne(id: string): Promise<Connection> {
+    const connection = await this.findRawOne(id);
+    const { password: _, ...safeConnection } = connection;
+    return safeConnection as unknown as Connection;
   }
 
   async getPool(id: string, databaseOverride?: string) {
-    const connection = await this.findOne(id);
+    const connection = await this.findRawOne(id);
     const poolKey = `${id}:${databaseOverride || connection.database}`;
 
     if (this.pools.has(poolKey)) {
       return this.pools.get(poolKey);
     }
 
+    const decryptedPassword = connection.password ? decryptAttribute(connection.password) : undefined;
+    const connectionWithDecryptedPassword = { ...connection, password: decryptedPassword };
+
     const strategy = this.strategyFactory.getStrategy(connection.type);
-    const pool = await strategy.createPool(connection, databaseOverride);
+    const pool = await strategy.createPool(connectionWithDecryptedPassword, databaseOverride);
 
     this.pools.set(poolKey, pool);
     return pool;
   }
 
   async update(id: string, updateConnectionDto: UpdateConnectionDto): Promise<Connection> {
-    const connection = await this.findOne(id);
+    const connection = await this.findRawOne(id);
     const strategy = this.strategyFactory.getStrategy(connection.type);
 
     // Close existing pools for this connection if config changed
@@ -77,16 +93,21 @@ export class ConnectionsService implements OnModuleDestroy {
       }
     }
 
+    const { password, ...rest } = updateConnectionDto;
+    const encryptedPassword = password !== undefined && password !== null ? encryptAttribute(password) : undefined;
+    const dataToUpdate = password !== undefined && password !== null ? { ...rest, password: encryptedPassword } : rest;
+
     const updatedConnection = await this.prisma.connection.update({
       where: { id },
-      data: updateConnectionDto,
+      data: dataToUpdate,
     });
 
-    return updatedConnection as unknown as Connection;
+    const { password: _, ...safeConnection } = updatedConnection;
+    return safeConnection as unknown as Connection;
   }
 
   async remove(id: string): Promise<void> {
-    const connection = await this.findOne(id);
+    const connection = await this.findRawOne(id);
     const strategy = this.strategyFactory.getStrategy(connection.type);
 
     // Close pools

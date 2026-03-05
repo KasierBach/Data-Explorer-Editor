@@ -126,9 +126,10 @@ export class MysqlStrategy implements IDatabaseStrategy {
     }
 
     async getTables(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
-        const [rows]: any[] = await pool.query(`SHOW TABLES FROM \`${schema}\``);
+        const sql = `SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE'`;
+        const [rows]: any[] = await pool.query(sql, [schema]);
         return rows.map((row: any) => {
-            const tableName = Object.values(row)[0] as string;
+            const tableName = row.TABLE_NAME;
             return {
                 id: dbName ? `db:${dbName}.schema:${schema}.table:${tableName}` : `schema:${schema}.table:${tableName}`,
                 name: tableName,
@@ -152,7 +153,14 @@ export class MysqlStrategy implements IDatabaseStrategy {
     }
 
     async getColumns(pool: any, schema: string, table: string): Promise<ColumnInfo[]> {
-        const [rows]: any[] = await pool.query(`DESCRIBE \`${schema}\`.\`${table}\``);
+        const sql = `
+            SELECT COLUMN_NAME as Field, COLUMN_TYPE as Type, IS_NULLABLE as \`Null\`, 
+                   COLUMN_DEFAULT as \`Default\`, COLUMN_KEY as \`Key\` 
+            FROM information_schema.columns 
+            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+            ORDER BY ORDINAL_POSITION
+        `;
+        const [rows]: any[] = await pool.query(sql, [schema, table]);
         return rows.map((row: any) => ({
             name: row.Field,
             type: row.Type,
