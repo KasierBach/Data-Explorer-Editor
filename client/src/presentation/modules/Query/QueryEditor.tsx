@@ -200,6 +200,12 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
     const handleClear = () => setQuery('');
 
+    const handleClearResults = () => {
+        setExecutedQuery(null);
+        setExplainPlan(null);
+        queryClient.removeQueries({ queryKey: ['query-execution', activeConnectionId] });
+    };
+
     // Save query
     const handleSave = useCallback(() => {
         if (!query.trim()) return;
@@ -428,6 +434,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             activeTab={activeResultTab}
                             onTabChange={setActiveResultTab}
                             explainPlan={explainPlan}
+                            onClearResults={handleClearResults}
                         />
                     </Panel>
                 </Group>

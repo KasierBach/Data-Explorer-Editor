@@ -5,7 +5,7 @@ import {
     TabsList,
     TabsTrigger
 } from "@/presentation/components/ui/tabs";
-import { Info, Table as TableIcon, Loader2, Play, GitBranch } from 'lucide-react';
+import { Info, Table as TableIcon, Loader2, Play, GitBranch, X } from 'lucide-react';
 import type { QueryResult } from '@/core/domain/entities';
 import { ResultTable } from './ResultTable';
 import { QueryPlanVisualizer } from './QueryPlanVisualizer';
@@ -22,6 +22,7 @@ interface QueryResultsProps {
     activeTab: string;
     onTabChange: (tab: string) => void;
     explainPlan?: any;
+    onClearResults?: () => void;
 }
 
 export const QueryResults: React.FC<QueryResultsProps> = ({
@@ -32,7 +33,8 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
     dataUpdatedAt,
     activeTab,
     onTabChange,
-    explainPlan
+    explainPlan,
+    onClearResults
 }) => {
     const { lang } = useAppStore();
     const isMobile = useMediaQuery('(max-width: 768px)');
@@ -105,16 +107,27 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                     )}
                 </TabsList>
 
-                {!isSmallMobile && (
-                    <div className="text-[9px] md:text-[10px] text-muted-foreground font-mono flex gap-2 md:gap-3 items-center">
-                        {results?.durationMs !== undefined && (
-                            <span>{isMobile ? "" : (lang === 'vi' ? "Thời gian: " : "Time: ")}{results.durationMs}ms</span>
-                        )}
-                        {dataUpdatedAt > 0 && (
-                            <span className={cn(isMobile && "hidden")}>{new Date(dataUpdatedAt).toLocaleTimeString()}</span>
-                        )}
-                    </div>
-                )}
+                <div className="flex items-center gap-2">
+                    {!isSmallMobile && (
+                        <div className="text-[9px] md:text-[10px] text-muted-foreground font-mono flex gap-2 md:gap-3 items-center">
+                            {results?.durationMs !== undefined && (
+                                <span>{isMobile ? "" : (lang === 'vi' ? "Thời gian: " : "Time: ")}{results.durationMs}ms</span>
+                            )}
+                            {dataUpdatedAt > 0 && (
+                                <span className={cn(isMobile && "hidden")}>{new Date(dataUpdatedAt).toLocaleTimeString()}</span>
+                            )}
+                        </div>
+                    )}
+                    {(error || results) && onClearResults && (
+                        <button
+                            onClick={onClearResults}
+                            className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors"
+                            title={lang === 'vi' ? 'Xóa kết quả' : 'Clear results'}
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="flex-1 relative overflow-hidden bg-card">
