@@ -57,45 +57,50 @@ export class ConnectionsService implements OnModuleDestroy {
     }
   }
 
-  async create(createConnectionDto: CreateConnectionDto): Promise<Connection> {
+  async create(createConnectionDto: CreateConnectionDto, userId: string): Promise<Connection> {
     const { name, password, ...rest } = createConnectionDto;
     const encryptedPassword = password ? encryptAttribute(password) : undefined;
 
-    const connection = await this.prisma.connection.upsert({
-      where: { name } as any,
-      update: { ...rest, password: encryptedPassword } as any,
-      create: { ...createConnectionDto, password: encryptedPassword } as any,
+    const connection = await this.prisma.connection.create({
+      data: { ...createConnectionDto, password: encryptedPassword, userId } as any,
     });
     const { password: _, ...safeConnection } = connection;
     return safeConnection as unknown as Connection;
   }
 
-  async findAll(): Promise<Connection[]> {
-    const connections = await this.prisma.connection.findMany();
+  async findAll(userId: string): Promise<Connection[]> {
+    const connections = await this.prisma.connection.findMany({ where: { userId } });
     return connections.map(c => {
       const { password: _, ...safe } = c;
       return safe;
     }) as unknown as Connection[];
   }
 
-  private async findRawOne(id: string) {
-    const connection = await this.prisma.connection.findUnique({
-      where: { id },
+  private async findRawOne(id: string, userId: string) {
+    const connection = await this.prisma.connection.findFirst({
+      where: { id, userId },
     });
     if (!connection) {
-      throw new NotFoundException(`Connection with ID ${id} not found`);
+      throw new NotFoundException(`Connection with ID ${id} not found or you don't have permission`);
     }
     return connection;
   }
 
-  async findOne(id: string): Promise<Connection> {
-    const connection = await this.findRawOne(id);
+  async findOne(id: string, userId: string): Promise<Connection> {
+    const connection = await this.findRawOne(id, userId);
     const { password: _, ...safeConnection } = connection;
     return safeConnection as unknown as Connection;
   }
 
-  async getPool(id: string, databaseOverride?: string) {
-    const connection = await this.findRawOne(id);
+  async getPool(id: string, databaseOverride?: string, userId?: string) {
+    if (!userId) {
+      // if userId isn't provided (e.g from legacy code), fallback to system fetch
+      const sysConnection = await this.prisma.connection.findUnique({ where: { id } });
+      if (!sysConnection) throw new NotFoundException(`Connection ${id} not found`);
+      var connection = sysConnection;
+    } else {
+      var connection = await this.findRawOne(id, userId);
+    }
     const poolKey = `${id}:${databaseOverride || connection.database}`;
 
     if (this.pools.has(poolKey)) {
@@ -116,8 +121,8 @@ export class ConnectionsService implements OnModuleDestroy {
     return pool;
   }
 
-  async update(id: string, updateConnectionDto: UpdateConnectionDto): Promise<Connection> {
-    const connection = await this.findRawOne(id);
+  async update(id: string, updateConnectionDto: UpdateConnectionDto, userId: string): Promise<Connection> {
+    const connection = await this.findRawOne(id, userId);
     const strategy = this.strategyFactory.getStrategy(connection.type);
 
     // Close existing pools for this connection if config changed
@@ -141,8 +146,8 @@ export class ConnectionsService implements OnModuleDestroy {
     return safeConnection as unknown as Connection;
   }
 
-  async remove(id: string): Promise<void> {
-    const connection = await this.findRawOne(id);
+  async remove(id: string, userId: string): Promise<void> {
+    const connection = await this.findRawOne(id, userId);
     const strategy = this.strategyFactory.getStrategy(connection.type);
 
     // Close pools
@@ -158,14 +163,19 @@ export class ConnectionsService implements OnModuleDestroy {
     });
   }
 
-  async removePool(poolKey: string): Promise<void> {
+  async removePool(poolKey: string, userId?: string): Promise<void> {
     const poolData = this.pools.get(poolKey);
     if (poolData) {
       const id = poolKey.split(':')[0];
       try {
-        const connection = await this.findRawOne(id);
-        const strategy = this.strategyFactory.getStrategy(connection.type);
-        await strategy.closePool(poolData.pool);
+        const connection = await this.prisma.connection.findUnique({ where: { id } });
+        if (connection) {
+          const strategy = this.strategyFactory.getStrategy(connection.type);
+          await strategy.closePool(poolData.pool);
+        } else {
+          if (typeof poolData.pool.end === 'function') await poolData.pool.end();
+          if (typeof poolData.pool.close === 'function') await poolData.pool.close();
+        }
       } catch (err) {
         // generic fallback close if connection doesn't exist anymore
         if (typeof poolData.pool.end === 'function') await poolData.pool.end();

@@ -12,7 +12,7 @@ datasource db {
 
 model Connection {
   id               String   @id @default(uuid())
-  name             String   @unique
+  name             String
   type             String // 'postgres' or 'mysql'
   host             String?
   port             Int?
@@ -21,6 +21,11 @@ model Connection {
   database         String?
   showAllDatabases Boolean  @default(false)
   createdAt        DateTime @default(now())
+
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([name, userId])
 }
 
 model User {
@@ -29,8 +34,9 @@ model User {
   email     String     @unique
   password  String
   role      String     @default("user")
-  createdAt DateTime   @default(now())
-  auditLogs AuditLog[]
+  createdAt   DateTime     @default(now())
+  auditLogs   AuditLog[]
+  connections Connection[]
 }
 
 model AuditLog {

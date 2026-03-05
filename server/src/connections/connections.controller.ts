@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
 import { ConnectionsService } from './connections.service';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
@@ -10,27 +10,27 @@ export class ConnectionsController {
   constructor(private readonly connectionsService: ConnectionsService) { }
 
   @Post()
-  create(@Body() createConnectionDto: CreateConnectionDto) {
-    return this.connectionsService.create(createConnectionDto);
+  create(@Body() createConnectionDto: CreateConnectionDto, @Req() req: any) {
+    return this.connectionsService.create(createConnectionDto, req.user.id);
   }
 
   @Get()
-  findAll() {
-    return this.connectionsService.findAll();
+  findAll(@Req() req: any) {
+    return this.connectionsService.findAll(req.user.id);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.connectionsService.findOne(id);
+  findOne(@Param('id') id: string, @Req() req: any) {
+    return this.connectionsService.findOne(id, req.user.id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateConnectionDto: UpdateConnectionDto) {
-    return this.connectionsService.update(id, updateConnectionDto);
+  update(@Param('id') id: string, @Body() updateConnectionDto: UpdateConnectionDto, @Req() req: any) {
+    return this.connectionsService.update(id, updateConnectionDto, req.user.id);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.connectionsService.remove(id);
+  remove(@Param('id') id: string, @Req() req: any) {
+    return this.connectionsService.remove(id, req.user.id);
   }
 }

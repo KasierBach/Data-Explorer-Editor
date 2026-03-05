@@ -10,12 +10,12 @@ export class QueryService {
     private readonly strategyFactory: DatabaseStrategyFactory,
   ) { }
 
-  async executeQuery(createQueryDto: CreateQueryDto) {
+  async executeQuery(createQueryDto: CreateQueryDto, userId: string) {
     const { connectionId, sql, database } = createQueryDto;
-    const connection = await this.connectionsService.findOne(connectionId);
+    const connection = await this.connectionsService.findOne(connectionId, userId);
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId, database);
+      const pool = await this.connectionsService.getPool(connectionId, database, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
       return await strategy.executeQuery(pool, sql);
     } catch (error) {
@@ -24,23 +24,15 @@ export class QueryService {
     }
   }
 
-  async updateRow(updateRowDto: {
-    connectionId: string;
-    database?: string;
-    schema: string;
-    table: string;
-    pkColumn: string;
-    pkValue: any;
-    updates: Record<string, any>;
-  }) {
+  async updateRow(updateRowDto: any, userId: string) {
     const { connectionId, database, schema, table, pkColumn, pkValue, updates } = updateRowDto;
-    const connection = await this.connectionsService.findOne(connectionId);
+    const connection = await this.connectionsService.findOne(connectionId, userId);
 
     const updateCols = Object.keys(updates);
     if (updateCols.length === 0) return { success: true, message: 'No changes' };
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId, database);
+      const pool = await this.connectionsService.getPool(connectionId, database, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
       return await strategy.updateRow(pool, { schema, table, pkColumn, pkValue, updates });
     } catch (error) {
@@ -49,15 +41,9 @@ export class QueryService {
     }
   }
 
-  async updateSchema(updateSchemaDto: {
-    connectionId: string;
-    database?: string;
-    schema: string;
-    table: string;
-    operations: any[];
-  }) {
+  async updateSchema(updateSchemaDto: any, userId: string) {
     const { connectionId, database, schema, table, operations } = updateSchemaDto;
-    const connection = await this.connectionsService.findOne(connectionId);
+    const connection = await this.connectionsService.findOne(connectionId, userId);
     if (!connection) throw new BadRequestException('Invalid connection ID');
 
     const strategy = this.strategyFactory.getStrategy(connection.type);
@@ -72,7 +58,7 @@ export class QueryService {
     try {
       const results: any[] = [];
       for (const sql of sqlStatements) {
-        results.push(await this.executeQuery({ connectionId, sql, database }));
+        results.push(await this.executeQuery({ connectionId, sql, database }, userId));
       }
       return { success: true, results };
     } catch (error) {
@@ -81,7 +67,7 @@ export class QueryService {
     }
   }
 
-  async seedData(connectionId: string) {
+  async seedData(connectionId: string, userId: string) {
     const sql = `
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -116,11 +102,11 @@ export class QueryService {
             (2, 25.50)
             ON CONFLICT DO NOTHING;
         `;
-    return this.executeQuery({ connectionId, sql });
+    return this.executeQuery({ connectionId, sql } as any, userId);
   }
 
-  async createDatabase(connectionId: string, databaseName: string) {
-    const connection = await this.connectionsService.findOne(connectionId);
+  async createDatabase(connectionId: string, databaseName: string, userId: string) {
+    const connection = await this.connectionsService.findOne(connectionId, userId);
     if (!connection) throw new BadRequestException('Invalid connection ID');
 
     if (!/^[a-zA-Z0-9_-]+$/.test(databaseName)) {
@@ -128,7 +114,7 @@ export class QueryService {
     }
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId);
+      const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
       await strategy.createDatabase(pool, databaseName);
       return { success: true, message: `Database ${databaseName} created successfully.` };
@@ -138,8 +124,8 @@ export class QueryService {
     }
   }
 
-  async dropDatabase(connectionId: string, databaseName: string) {
-    const connection = await this.connectionsService.findOne(connectionId);
+  async dropDatabase(connectionId: string, databaseName: string, userId: string) {
+    const connection = await this.connectionsService.findOne(connectionId, userId);
     if (!connection) throw new BadRequestException('Invalid connection ID');
 
     if (!/^[a-zA-Z0-9_-]+$/.test(databaseName)) {
@@ -157,13 +143,13 @@ export class QueryService {
     }
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId, adminDb);
+      const pool = await this.connectionsService.getPool(connectionId, adminDb, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
       await strategy.dropDatabase(pool, databaseName);
 
       // Clean up any cached pool for the dropped database
       const droppedPoolKey = `${connectionId}:${databaseName}`;
-      await this.connectionsService.removePool(droppedPoolKey);
+      await this.connectionsService.removePool(droppedPoolKey, userId);
 
       return { success: true, message: `Database ${databaseName} dropped successfully.` };
     } catch (error) {

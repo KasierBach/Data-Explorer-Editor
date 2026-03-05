@@ -24,23 +24,23 @@ export class MetadataService {
         return { dbName, schemaName, tableName };
     }
 
-    async getHierarchy(connectionId: string, parentId: string | null) {
-        const connection = await this.connectionsService.findOne(connectionId);
+    async getHierarchy(connectionId: string, parentId: string | null, userId: string) {
+        const connection = await this.connectionsService.findOne(connectionId, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
         // 1. Root Level
         if (!parentId) {
             if (connection.type === 'postgres') {
-                const pool = await this.connectionsService.getPool(connectionId);
+                const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
                 if (connection.showAllDatabases) return strategy.getDatabases(pool);
                 return strategy.getSchemas(pool);
             }
             if (connection.type === 'mysql') {
-                const pool = await this.connectionsService.getPool(connectionId);
+                const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
                 return strategy.getDatabases(pool);
             }
             if (connection.type === 'mssql') {
-                const pool = await this.connectionsService.getPool(connectionId);
+                const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
                 if (connection.showAllDatabases) return strategy.getDatabases(pool);
                 return strategy.getSchemas(pool);
             }
@@ -51,7 +51,7 @@ export class MetadataService {
 
         // 2. Folder Level → delegate to strategy
         if (parentId.includes('.folder:')) {
-            const dbPool = await this.connectionsService.getPool(connectionId, parsed.dbName);
+            const dbPool = await this.connectionsService.getPool(connectionId, parsed.dbName, userId);
             const schema = parsed.schemaName || 'public';
 
             if (parentId.endsWith('folder:tables')) return strategy.getTables(dbPool, schema, parsed.dbName);
@@ -70,13 +70,13 @@ export class MetadataService {
 
         // 4. Database Level → Get Schemas
         if (parentId.startsWith('db:') && !parentId.includes('.schema:')) {
-            const dbPool = await this.connectionsService.getPool(connectionId, parsed.dbName);
+            const dbPool = await this.connectionsService.getPool(connectionId, parsed.dbName, userId);
             return strategy.getSchemas(dbPool, parsed.dbName);
         }
 
         // 5. Table/View Level → Get Columns
         if (parentId.includes('.table:') || parentId.includes('.view:')) {
-            const columns = await this.getColumns(connectionId, parentId);
+            const columns = await this.getColumns(connectionId, parentId, userId);
             return columns.map(col => ({
                 id: `${parentId}.column:${col.name}`,
                 name: col.name,
@@ -94,7 +94,7 @@ export class MetadataService {
         if (parentId.includes('.func:')) {
             const funcName = parentId.split('.func:')[1];
             const schema = parsed.schemaName || (connection.type === 'mssql' ? 'dbo' : 'public');
-            const dbPool = await this.connectionsService.getPool(connectionId, parsed.dbName);
+            const dbPool = await this.connectionsService.getPool(connectionId, parsed.dbName, userId);
             const params = await strategy.getFunctionParameters(dbPool, schema, funcName);
 
             return params.map(col => ({
@@ -113,39 +113,39 @@ export class MetadataService {
         return [];
     }
 
-    async getDatabases(connectionId: string) {
-        const connection = await this.connectionsService.findOne(connectionId);
-        const pool = await this.connectionsService.getPool(connectionId);
+    async getDatabases(connectionId: string, userId: string) {
+        const connection = await this.connectionsService.findOne(connectionId, userId);
+        const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
         const nodes = await strategy.getDatabases(pool);
         return nodes.map(n => n.name);
     }
 
-    async getRelationships(connectionId: string, database?: string) {
-        const connection = await this.connectionsService.findOne(connectionId);
-        const pool = await this.connectionsService.getPool(connectionId, database);
+    async getRelationships(connectionId: string, userId: string, database?: string) {
+        const connection = await this.connectionsService.findOne(connectionId, userId);
+        const pool = await this.connectionsService.getPool(connectionId, database, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
         return strategy.getRelationships(pool);
     }
 
-    async getColumns(connectionId: string, tableId: string) {
-        const connection = await this.connectionsService.findOne(connectionId);
+    async getColumns(connectionId: string, tableId: string, userId: string) {
+        const connection = await this.connectionsService.findOne(connectionId, userId);
         const parsed = this.parseNodeId(tableId);
 
         const schema = parsed.schemaName || (connection.type === 'mssql' ? 'dbo' : 'public');
         const table = parsed.tableName || tableId;
 
-        const pool = await this.connectionsService.getPool(connectionId, parsed.dbName);
+        const pool = await this.connectionsService.getPool(connectionId, parsed.dbName, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
         return strategy.getColumns(pool, schema, table);
     }
 
-    async getDatabaseMetrics(connectionId: string, database?: string) {
-        const connection = await this.connectionsService.findOne(connectionId);
-        const pool = await this.connectionsService.getPool(connectionId, database);
+    async getDatabaseMetrics(connectionId: string, userId: string, database?: string) {
+        const connection = await this.connectionsService.findOne(connectionId, userId);
+        const pool = await this.connectionsService.getPool(connectionId, database, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
         return strategy.getDatabaseMetrics(pool);

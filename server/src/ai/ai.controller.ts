@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, BadRequestException, InternalServerErrorException, Res } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, BadRequestException, InternalServerErrorException, Res, Req } from '@nestjs/common';
 import type { Response } from 'express';
 import { AiService } from './ai.service';
 import { ConnectionsService } from '../connections/connections.service';
@@ -16,7 +16,7 @@ export class AiController {
     ) { }
 
     @Post('generate-sql')
-    async generateSql(@Body() body: GenerateSqlDto) {
+    async generateSql(@Body() body: GenerateSqlDto, @Req() req: any) {
         const { connectionId, database, prompt, image, context, model, mode } = body;
 
         console.log(`[AI] generate-sql request: connectionId=${connectionId}, database=${database}, prompt="${prompt}"`);
@@ -24,7 +24,7 @@ export class AiController {
         // Step 1: Get connection info
         let connection: any;
         try {
-            connection = await this.connectionsService.findOne(connectionId);
+            connection = await this.connectionsService.findOne(connectionId, req.user.id);
             console.log(`[AI] Found connection: ${connection.name} (${connection.type})`);
         } catch (error) {
             console.error(`[AI] Connection lookup failed for ID "${connectionId}":`, error.message);
@@ -34,7 +34,7 @@ export class AiController {
         // Step 2: Get database pool
         let pool: any;
         try {
-            pool = await this.connectionsService.getPool(connectionId, database);
+            pool = await this.connectionsService.getPool(connectionId, database, req.user.id);
             console.log(`[AI] Pool acquired for database: ${database || connection.database}`);
         } catch (error) {
             console.error(`[AI] Failed to get pool:`, error.message);
@@ -66,7 +66,7 @@ export class AiController {
     }
 
     @Post('generate-sql-stream')
-    async generateSqlStream(@Body() body: GenerateSqlDto, @Res() res: Response) {
+    async generateSqlStream(@Body() body: GenerateSqlDto, @Res() res: Response, @Req() req: any) {
         const { connectionId, database, prompt, image, context, model, mode } = body;
 
         console.log(`[AI:Stream] generate-sql-stream request: prompt="${prompt}"`);
@@ -80,7 +80,7 @@ export class AiController {
 
         let connection: any;
         try {
-            connection = await this.connectionsService.findOne(connectionId);
+            connection = await this.connectionsService.findOne(connectionId, req.user.id);
         } catch (error) {
             res.write(`data: ${JSON.stringify({ type: 'error', text: `Connection not found: ${error.message}` })}\n\n`);
             res.write('data: [DONE]\n\n');
@@ -90,7 +90,7 @@ export class AiController {
 
         let pool: any;
         try {
-            pool = await this.connectionsService.getPool(connectionId, database);
+            pool = await this.connectionsService.getPool(connectionId, database, req.user.id);
         } catch (error) {
             res.write(`data: ${JSON.stringify({ type: 'error', text: `Cannot connect: ${error.message}` })}\n\n`);
             res.write('data: [DONE]\n\n');
