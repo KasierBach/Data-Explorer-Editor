@@ -8,20 +8,51 @@ import { encryptAttribute, decryptAttribute } from '../utils/crypto.util';
 
 @Injectable()
 export class ConnectionsService implements OnModuleDestroy {
-  private pools = new Map<string, any>();
+  private pools = new Map<string, { pool: any; lastAccessed: number }>();
+  private readonly POOL_TTL = 15 * 60 * 1000; // 15 mins
+  private readonly cleanupInterval: NodeJS.Timeout;
 
   constructor(
     private prisma: PrismaService,
     private strategyFactory: DatabaseStrategyFactory,
-  ) { }
+  ) {
+    // Run cleanup every minute
+    this.cleanupInterval = setInterval(() => this.cleanupPools(), 60000);
+  }
+
+  private async cleanupPools() {
+    const now = Date.now();
+    for (const [key, { pool, lastAccessed }] of this.pools.entries()) {
+      if (now - lastAccessed > this.POOL_TTL) {
+        try {
+          const id = key.split(':')[0];
+          const connection = await this.prisma.connection.findUnique({ where: { id } });
+          if (connection) {
+            const strategy = this.strategyFactory.getStrategy(connection.type);
+            await strategy.closePool(pool);
+          } else {
+            // fallback generic close
+            if (typeof pool.end === 'function') await pool.end();
+            if (typeof pool.close === 'function') await pool.close();
+          }
+        } catch (err) {
+          console.error(`Error closing idle pool ${key}:`, err);
+        } finally {
+          this.pools.delete(key);
+          console.log(`Cleaned up idle pool: ${key}`);
+        }
+      }
+    }
+  }
 
   async onModuleDestroy() {
-    for (const [key, pool] of this.pools.entries()) {
+    clearInterval(this.cleanupInterval);
+    for (const [key, poolData] of this.pools.entries()) {
       const id = key.split(':')[0];
       const connection = await this.prisma.connection.findUnique({ where: { id } });
       if (connection) {
         const strategy = this.strategyFactory.getStrategy(connection.type);
-        await strategy.closePool(pool);
+        await strategy.closePool(poolData.pool);
       }
     }
   }
@@ -68,7 +99,11 @@ export class ConnectionsService implements OnModuleDestroy {
     const poolKey = `${id}:${databaseOverride || connection.database}`;
 
     if (this.pools.has(poolKey)) {
-      return this.pools.get(poolKey);
+      const poolData = this.pools.get(poolKey);
+      if (poolData) {
+        poolData.lastAccessed = Date.now();
+        return poolData.pool;
+      }
     }
 
     const decryptedPassword = connection.password ? decryptAttribute(connection.password) : undefined;
@@ -77,7 +112,7 @@ export class ConnectionsService implements OnModuleDestroy {
     const strategy = this.strategyFactory.getStrategy(connection.type);
     const pool = await strategy.createPool(connectionWithDecryptedPassword, databaseOverride);
 
-    this.pools.set(poolKey, pool);
+    this.pools.set(poolKey, { pool, lastAccessed: Date.now() });
     return pool;
   }
 
@@ -86,9 +121,9 @@ export class ConnectionsService implements OnModuleDestroy {
     const strategy = this.strategyFactory.getStrategy(connection.type);
 
     // Close existing pools for this connection if config changed
-    for (const [key, pool] of this.pools.entries()) {
+    for (const [key, poolData] of this.pools.entries()) {
       if (key.startsWith(`${id}:`)) {
-        await strategy.closePool(pool);
+        await strategy.closePool(poolData.pool);
         this.pools.delete(key);
       }
     }
@@ -111,9 +146,9 @@ export class ConnectionsService implements OnModuleDestroy {
     const strategy = this.strategyFactory.getStrategy(connection.type);
 
     // Close pools
-    for (const [key, pool] of this.pools.entries()) {
+    for (const [key, poolData] of this.pools.entries()) {
       if (key.startsWith(`${id}:`)) {
-        await strategy.closePool(pool);
+        await strategy.closePool(poolData.pool);
         this.pools.delete(key);
       }
     }
@@ -121,5 +156,23 @@ export class ConnectionsService implements OnModuleDestroy {
     await this.prisma.connection.delete({
       where: { id },
     });
+  }
+
+  async removePool(poolKey: string): Promise<void> {
+    const poolData = this.pools.get(poolKey);
+    if (poolData) {
+      const id = poolKey.split(':')[0];
+      try {
+        const connection = await this.findRawOne(id);
+        const strategy = this.strategyFactory.getStrategy(connection.type);
+        await strategy.closePool(poolData.pool);
+      } catch (err) {
+        // generic fallback close if connection doesn't exist anymore
+        if (typeof poolData.pool.end === 'function') await poolData.pool.end();
+        if (typeof poolData.pool.close === 'function') await poolData.pool.close();
+      } finally {
+        this.pools.delete(poolKey);
+      }
+    }
   }
 }

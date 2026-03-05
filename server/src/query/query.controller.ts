@@ -2,6 +2,8 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@n
 import { QueryService } from './query.service';
 import { CreateQueryDto } from './dto/create-query.dto';
 import { UpdateQueryDto } from './dto/update-query.dto';
+import { UpdateRowDto } from './dto/update-row.dto';
+import { UpdateSchemaDto } from './dto/update-schema.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('query')
@@ -15,12 +17,12 @@ export class QueryController {
   }
 
   @Patch('row')
-  updateRow(@Body() updateRowDto: any) {
+  updateRow(@Body() updateRowDto: UpdateRowDto) {
     return this.queryService.updateRow(updateRowDto);
   }
 
   @Post('schema')
-  updateSchema(@Body() updateSchemaDto: any) {
+  updateSchema(@Body() updateSchemaDto: UpdateSchemaDto) {
     return this.queryService.updateSchema(updateSchemaDto);
   }
 

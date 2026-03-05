@@ -163,12 +163,7 @@ export class QueryService {
 
       // Clean up any cached pool for the dropped database
       const droppedPoolKey = `${connectionId}:${databaseName}`;
-      const pools = (this.connectionsService as any).pools;
-      if (pools && pools.has(droppedPoolKey)) {
-        const droppedPool = pools.get(droppedPoolKey);
-        try { await droppedPool?.end?.(); } catch { /* ignore */ }
-        pools.delete(droppedPoolKey);
-      }
+      await this.connectionsService.removePool(droppedPoolKey);
 
       return { success: true, message: `Database ${databaseName} dropped successfully.` };
     } catch (error) {
