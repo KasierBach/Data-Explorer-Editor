@@ -21,12 +21,15 @@ class AdminService {
                 console.error(`Admin access denied: ${response.status}`);
             }
             const errorText = await response.text();
+            let errorMessage = `Operation failed: ${response.statusText}`;
             try {
                 const errorJson = JSON.parse(errorText);
-                throw new Error(errorJson.message || 'Admin operation failed');
+                errorMessage = errorJson.message || errorMessage;
             } catch (e) {
-                throw new Error(`Operation failed: ${response.statusText} - ${errorText}`);
+                // Not JSON, just append the raw text if available
+                if (errorText) errorMessage += ` - ${errorText}`;
             }
+            throw new Error(errorMessage);
         }
         return await response.json();
     }
