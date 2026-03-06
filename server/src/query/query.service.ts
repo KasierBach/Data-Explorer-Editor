@@ -1,5 +1,7 @@
 import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { CreateQueryDto } from './dto/create-query.dto';
+import { UpdateRowDto } from './dto/update-row.dto';
+import { UpdateSchemaDto } from './dto/update-schema.dto';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 
@@ -24,7 +26,7 @@ export class QueryService {
     }
   }
 
-  async updateRow(updateRowDto: any, userId: string) {
+  async updateRow(updateRowDto: UpdateRowDto, userId: string) {
     const { connectionId, database, schema, table, pkColumn, pkValue, updates } = updateRowDto;
     const connection = await this.connectionsService.findOne(connectionId, userId);
 
@@ -41,7 +43,7 @@ export class QueryService {
     }
   }
 
-  async updateSchema(updateSchemaDto: any, userId: string) {
+  async updateSchema(updateSchemaDto: UpdateSchemaDto, userId: string) {
     const { connectionId, database, schema, table, operations } = updateSchemaDto;
     const connection = await this.connectionsService.findOne(connectionId, userId);
     if (!connection) throw new BadRequestException('Invalid connection ID');
