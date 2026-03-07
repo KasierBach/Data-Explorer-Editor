@@ -254,25 +254,39 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const isMobile = useMediaQuery('(max-width: 768px)');
     const isSmallMobile = useMediaQuery('(max-width: 480px)');
 
+    const handleRunRef = useRef(handleRun);
+    handleRunRef.current = handleRun;
+
+    const handleSaveRef = useRef(handleSave);
+    handleSaveRef.current = handleSave;
+
     // Keyboard shortcuts
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
-            if (e.ctrlKey && e.key === 's') {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
                 e.preventDefault();
-                handleSave();
+                e.stopPropagation();
+                handleSaveRef.current();
             }
-            if (e.ctrlKey && e.key === 'o') {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
                 e.preventDefault();
+                e.stopPropagation();
                 setIsSavedDialogOpen(true);
             }
-            if (e.ctrlKey && e.key === 'h') {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h') {
                 e.preventDefault();
+                e.stopPropagation();
                 setIsHistoryDialogOpen(true);
             }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                e.stopPropagation();
+                handleRunRef.current();
+            }
         };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [handleSave]);
+        window.addEventListener('keydown', handler, { capture: true });
+        return () => window.removeEventListener('keydown', handler, { capture: true });
+    }, []);
 
     return (
         <>
