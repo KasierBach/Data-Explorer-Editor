@@ -8,35 +8,10 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
     private baseUrl = API_BASE_URL;
 
     async connect(config: any): Promise<void> {
-        // Register the connection with the backend
-        const { id, createdAt, ...connectionConfig } = config;
-
-        const response = await fetch(`${this.baseUrl}/connections`, {
-            method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify(connectionConfig),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to connect: ${response.statusText}. Details: ${errorText}`);
+        if (!config.id) {
+            throw new Error('Connection configuration is missing an ID');
         }
-
-        const connection = await response.json();
-        this.connectionId = connection.id;
-
-        // Sync: if backend returned a different UUID, update the store
-        if (id && connection.id !== id) {
-            const store = useAppStore.getState();
-            // Replace the old connection entry with updated ID
-            const oldConn = store.connections.find(c => c.id === id);
-            if (oldConn) {
-                store.updateConnection(id, { ...oldConn, id: connection.id } as any);
-                if (store.activeConnectionId === id) {
-                    store.setActiveConnectionId(connection.id);
-                }
-            }
-        }
+        this.connectionId = config.id;
     }
 
     async disconnect(): Promise<void> {
