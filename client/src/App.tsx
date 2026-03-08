@@ -11,6 +11,7 @@ import { AdminDashboardPage } from '@/presentation/pages/Admin/AdminDashboardPag
 import { RequireAuth } from '@/presentation/components/RequireAuth'
 import { ThemeProvider } from '@/presentation/components/theme-provider'
 import { useAppStore } from '@/core/services/store'
+import { useSyncConnections } from '@/presentation/hooks/useSyncConnections'
 
 import { Toaster } from 'sonner';
 
@@ -22,6 +23,9 @@ export function App() {
       },
     },
   }))
+
+  // Auto-fetch connections from backend whenever user is authenticated
+  useSyncConnections();
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
