@@ -15,7 +15,9 @@
 
 ### 🔌 Multi-Database Strategy
 - **Unified Engine Architecture**: Connect seamlessly to **PostgreSQL, MySQL, SQL Server, and ClickHouse** using a flexible strategy pattern.
-- **Real-time Discovery**: High-performance metadata inspection for schemas, views, and complex constraints.
+- **Enterprise-Grade Security**: All saved database connection credentials and passwords are encrypted in the central database using **AES-256-GCM**, guaranteeing prevention of plain-text exposure even in local persistence.
+- **Centralized Persistence**: Migrated from ephemeral local storage to a persistent **PostgreSQL (Supabase)** infrastructure to natively support cloud deployment and team collaboration without data loss across redeployments.
+- **Real-time Discovery**: High-performance metadata inspection for schemas, views, and complex constraints protected against SQL Injection interpolation attacks.
 - **Cross-DB Browsing**: Effortlessly jump between multiple databases and schemas within a single connection.
 
 ### 📊 Entity Relationship Diagrams (ERD)
@@ -31,6 +33,8 @@
 ### 📝 Pro SQL Workspace
 - **Monaco Engine**: VS Code-grade editing experience with advanced syntax highlighting and multi-cursor support.
 - **Schema-Aware IntelliSense**: Deep autocompletion that understands your tables, columns, and custom types.
+- **Smart Safeguards & Optimization**: Automatic default `LIMIT 10000` wrappers and 30-second server execution timeouts (`statement_timeout`) to protect the server from out-of-memory crashes on expensive queries.
+- **Keyboard Shortcuts**: Fluent developer workflow using `Ctrl+Enter` to run, `Ctrl+S` to save, and `Ctrl+H` to access history.
 - **Execution Analytics**: Detailed performance metrics and EXPLAIN plan visualization for query optimization.
 - **Tabbed Results**: Multiple output panes for Data, Messages, and Query Plans.
 - **Export Capabilities**: Clean data export to **CSV and Excel** formats.
@@ -62,10 +66,10 @@
 | Layer | Technologies |
 |---|---|
 | **Architecture** | **NestJS** (Modular API) |
-| **ORM / Persistence** | **Prisma** (SQLite for local storage) |
+| **ORM / Persistence** | **Prisma** (PostgreSQL/Supabase natively supported) |
 | **AI Engine** | **Google Generative AI** (Gemini API), SSE Streaming |
 | **Engines Support** | `pg`, `mysql2`, `tedious` (MSSQL), `@clickhouse/client` |
-| **Security** | JWT (JSON Web Token), Passport.js |
+| **Security** | JWT (JSON Web Token), Passport.js, **AES-256-GCM Encryption** |
 
 ---
 
@@ -73,31 +77,34 @@
 
 ```bash
 Data Explorer/
-├── client/                     # High-fidelity Frontend
+├── client/                      # High-fidelity Frontend
 │   ├── src/
-│   │   ├── core/               # Domain Logic & State Management
-│   │   │   ├── services/       # API Adapters & Global Store (Zustand)
-│   │   │   └── types/          # Unified TypeScript Interfaces
-│   │   ├── presentation/       # UI Layer
-│   │   │   ├── components/     # Atomic Shadcn/UI Components
-│   │   │   ├── hooks/          # useMediaQuery, useReveal (Animations)
-│   │   │   ├── modules/        # Feature-driven Modules
-│   │   │   │   ├── Connection/ # Multi-DB Connection Management
-│   │   │   │   ├── Dashboard/  # Visualization & Metrics Grid
-│   │   │   │   ├── ERD/        # Interactive Graph Schema (React Flow)
-│   │   │   │   ├── Layout/     # AppShell, Navbar, Mobile Sidebars
-│   │   │   │   └── Query/      # AI Chatbot, SQL Editor, Results Grid
-│   │   │   └── pages/          # Entry Points (Landing, Docs, App)
-│   │   └── lib/                # Tailwind Utilities (cn)
-├── server/                     # Modular NestJS Backend
+│   │   ├── core/                # Domain Logic & State Management
+│   │   │   ├── config/          # Environment Variables Loader
+│   │   │   ├── services/        # Store (Zustand), API Adapters
+│   │   │   └── types/           # Unified TypeScript Interfaces
+│   │   ├── presentation/        # UI Layer
+│   │   │   ├── components/      # Atomic Shadcn/UI Components
+│   │   │   ├── hooks/           # useSyncConnections, useMediaQuery
+│   │   │   ├── modules/         # Feature-driven Modules
+│   │   │   │   ├── Connection/  # Multi-DB Connection Management
+│   │   │   │   ├── Dashboard/   # Visualization & Metrics Grid
+│   │   │   │   ├── ERD/         # Interactive Graph Schema (React Flow)
+│   │   │   │   ├── Layout/      # AppShell, Navbar, Mobile Sidebars
+│   │   │   │   └── Query/       # AI Chatbot, SQL Editor, Results Grid
+│   │   │   └── pages/           # Entry Points (Landing, Docs, Admin, App)
+│   │   └── lib/                 # Tailwind Utilities (cn)
+├── server/                      # Modular NestJS Backend
 │   ├── src/
-│   │   ├── ai/                 # Gemini Integration & SSE Logic
-│   │   ├── auth/               # Secure JWT Auth Layer
-│   │   ├── connections/        # Connection Lifecycle Management
-│   │   ├── database-strategies/# Pattern: Strategy (Adapter) for SQL Engines
-│   │   ├── metadata/           # DB Schema Discovery Engine
-│   │   └── query/              # High-concurrency SQL Runner
-│   └── prisma/                 # SQLite Persistence Schema
+│   │   ├── ai/                  # Gemini Integration & SSE Logic
+│   │   ├── auth/                # Secure JWT Auth Layer, Guards
+│   │   ├── connections/         # Connection Lifecycle Management
+│   │   ├── database-strategies/ # Adapter Pattern for SQL Engines
+│   │   ├── metadata/            # DB Schema Discovery Engine
+│   │   ├── query/               # High-concurrency SQL Runner
+│   │   ├── users/               # RBAC Identities & User Management
+│   │   └── utils/               # Crypto (AES-256) & Application Hooks
+│   └── prisma/                  # PostgreSQL Persistent Schema
 └── README.md
 ```
 
@@ -106,7 +113,7 @@ Data Explorer/
 ## 📖 Comprehensive User Guide
 
 ### 1. Connection Management
-- **Universal Drivers**: Click the "+" in the Explorer sidebar to add a new connection. Select from **PostgreSQL, MySQL, SQLite, or SQL Server**.
+- **Universal Drivers**: Click the "+" in the Explorer sidebar to add a new connection. Select from **PostgreSQL, MySQL, SQL Server, or ClickHouse**.
 - **Metadata Sync**: Once connected, the app will automatically crawl your schema (tables, views, indexes) and populate the tree view.
 - **Switching Context**: Hover over any table to see row counts and column types instantly.
 
@@ -167,9 +174,11 @@ Data Explorer/
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | ✅ | Prisma database URL (SQLite, PostgreSQL, etc.) |
+| `DATABASE_URL` | ✅ | Primary persistence database (e.g., `postgresql://user:pass@host:5432/db`) |
 | `JWT_SECRET` | ✅ | Secret key for JWT token signing |
 | `GEMINI_API_KEY` | ✅ | Google Gemini API key for AI features |
+| `ENCRYPTION_KEY` | ✅ | 32-character hex key (AES-256) used for securing saved DB passwords |
+| `ADMIN_EMAIL` | ❌ | Email to bootstrap the initial admin account (`AdminDashboard`) |
 | `PORT` | ❌ | Server port (default: 3000) |
 
 ---
