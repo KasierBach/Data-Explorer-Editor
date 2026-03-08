@@ -28,18 +28,7 @@ export interface ConnectionSlice {
 }
 
 export const createConnectionSlice: StateCreator<ConnectionSlice> = (set) => ({
-    connections: [
-        {
-            id: 'b115ca80-e468-40bc-b5ae-e03cfab8ac7d',
-            name: 'Local Postgres',
-            type: 'postgres',
-            host: 'localhost',
-            port: 5432,
-            username: 'postgres',
-            password: '123',
-            database: 'postgres',
-        }
-    ],
+    connections: [],
     activeConnectionId: null,
     activeDatabase: null,
     isConnectionDialogOpen: false,
