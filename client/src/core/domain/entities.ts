@@ -1,4 +1,4 @@
-export type ConnectionType = 'postgres' | 'mysql' | 'mssql' | 'sqlite';
+export type ConnectionType = 'postgres' | 'mysql' | 'mssql';
 
 export interface Connection {
     id: string;

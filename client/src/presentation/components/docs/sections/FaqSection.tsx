@@ -8,7 +8,7 @@ export function FaqSection({ lang }: Props) {
     const faqs = [
         {
             q: t ? 'Tôi có cần cài đặt database trước khi dùng Data Explorer không?' : 'Do I need to install a database before using Data Explorer?',
-            a: t ? 'Có — bạn cần có ít nhất một instance database đang chạy (PostgreSQL, MySQL, SQL Server hoặc ClickHouse) để kết nối. Data Explorer là công cụ quản lý, không phải database server. Tuy nhiên, bạn có thể nhanh chóng tạo một container Docker cho mục đích thử nghiệm (xem phần Installation).' : 'Yes — you need at least one running database instance (PostgreSQL, MySQL, SQL Server, or ClickHouse) to connect to. Data Explorer is a management tool, not a database server. However, you can quickly spin up a Docker container for testing purposes (see Installation section).'
+            a: t ? 'Có — bạn cần có ít nhất một instance database đang chạy (PostgreSQL, MySQL hoặc SQL Server) để kết nối. Data Explorer là công cụ quản lý, không phải database server. Tuy nhiên, bạn có thể nhanh chóng tạo một container Docker cho mục đích thử nghiệm (xem phần Installation).' : 'Yes — you need at least one running database instance (PostgreSQL, MySQL, or SQL Server) to connect to. Data Explorer is a management tool, not a database server. However, you can quickly spin up a Docker container for testing purposes (see Installation section).'
         },
         {
             q: t ? 'Dữ liệu của tôi có bị gửi lên cloud không?' : 'Is my data sent to the cloud?',

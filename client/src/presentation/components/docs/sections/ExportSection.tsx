@@ -65,7 +65,7 @@ export function ExportSection({ lang }: Props) {
                 <div className="space-y-3">
                     {[
                         { step: '1', desc: t ? 'Nhìn vào góc trên bên phải của Result Grid — tìm icon Export (biểu tượng tải xuống ↓).' : 'Look at the top-right corner of the Result Grid — find the Export icon (download ↓ symbol).' },
-                        { step: '2', desc: t ? 'Click vào icon Export — một dropdown menu hiện ra với các tùy chọn: CSV, JSON, hoặc SQL INSERT.' : 'Click the Export icon — a dropdown menu appears with options: CSV, JSON, or SQL INSERT.' },
+                        { step: '2', desc: t ? 'Click vào icon Export — một dropdown menu hiện ra với các tùy chọn: CSV, Excel (XLSX), JSON, hoặc SQL INSERT.' : 'Click the Export icon — a dropdown menu appears with options: CSV, Excel (XLSX), JSON, or SQL INSERT.' },
                         { step: '3', desc: t ? 'Chọn định dạng mong muốn — file sẽ được tải xuống tự động với tên mặc định dựa trên tên tab hiện tại.' : 'Select your desired format — the file downloads automatically with a default name based on the current tab name.' },
                     ].map((item, i) => (
                         <div key={i} className="flex gap-4 items-start p-4 border rounded-xl bg-muted/20">

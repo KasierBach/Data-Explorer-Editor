@@ -18,7 +18,8 @@ import {
     TechStackSection,
     SecuritySection,
     LifecycleSection,
-    FaqSection
+    FaqSection,
+    AiServiceSection
 } from './sections';
 
 interface DocContentProps {
@@ -39,7 +40,6 @@ export function DocContent({ sectionId, lang }: DocContentProps) {
         'postgres': <ConnectionSection lang={lang} engine="postgres" />,
         'mysql': <ConnectionSection lang={lang} engine="mysql" />,
         'mssql': <ConnectionSection lang={lang} engine="mssql" />,
-        'clickhouse': <ConnectionSection lang={lang} engine="clickhouse" />,
 
         // SQL Workspace
         'editor': <EditorSection lang={lang} />,
@@ -49,6 +49,7 @@ export function DocContent({ sectionId, lang }: DocContentProps) {
 
         // AI Assistant
         'sql-generation': <SqlGenerationSection lang={lang} />,
+        'ai-service': <AiServiceSection lang={lang} />,
         'vision': <VisionSection lang={lang} />,
         'explain': <ExplainSection lang={lang} />,
 

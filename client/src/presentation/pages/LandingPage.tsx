@@ -414,8 +414,8 @@ export const LandingPage: React.FC = () => {
                                     price: "$0",
                                     desc: lang === 'vi' ? "Hoàn hảo cho các nhà phát triển độc lập và sinh viên." : "Perfect for independent developers and students.",
                                     features: lang === 'vi'
-                                        ? ["Kết nối DB cục bộ", "AI Cơ bản (Gemini Flash)", "Biểu đồ tiêu chuẩn", "Hỗ trợ SQLite & DuckDB"]
-                                        : ["Local DB Connections", "Basic AI (Gemini Flash)", "Standard Charting", "SQLite & DuckDB support"],
+                                        ? ["Kết nối DB cục bộ", "AI Cơ bản (Gemini Flash)", "Biểu đồ tiêu chuẩn", "Lược đồ tự động"]
+                                        : ["Local DB Connections", "Basic AI (Gemini Flash)", "Standard Charting", "Auto-schema detection"],
                                     cta: lang === 'vi' ? "Bắt đầu ngay" : "Get Started",
                                     popular: false
                                 },

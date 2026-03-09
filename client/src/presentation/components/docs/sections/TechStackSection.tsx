@@ -61,12 +61,12 @@ export function TechStackSection({ lang }: Props) {
                         <tbody className="divide-y">
                             {[
                                 { tech: 'NestJS', ver: '10.x', role: t ? 'Enterprise Node.js framework với dependency injection và modular architecture' : 'Enterprise Node.js framework with dependency injection and modular architecture' },
-                                { tech: 'Prisma ORM', ver: '5.x', role: t ? 'Type-safe ORM cho database SQLite nội bộ (quản lý users & connections)' : 'Type-safe ORM for internal SQLite database (manages users & connections)' },
+                                { tech: 'Prisma ORM', ver: '5.x', role: t ? 'Type-safe ORM kết nối với PostgreSQL/Supabase (quản lý users & connections bền vững)' : 'Type-safe ORM for PostgreSQL/Supabase database (persistently manages users & connections)' },
                                 { tech: 'Passport.js', ver: '0.7+', role: t ? 'Xác thực người dùng với chiến lược JWT (JSON Web Token)' : 'User authentication with JWT (JSON Web Token) strategy' },
                                 { tech: 'pg (node-postgres)', ver: '8.x', role: t ? 'Driver PostgreSQL native cho Node.js' : 'Native PostgreSQL driver for Node.js' },
                                 { tech: 'mysql2', ver: '3.x', role: t ? 'Driver MySQL/MariaDB with promise support' : 'MySQL/MariaDB driver with promise support' },
                                 { tech: 'mssql (tedious)', ver: '10.x', role: t ? 'Driver SQL Server chính thức cho Node.js' : 'Official SQL Server driver for Node.js' },
-                                { tech: '@clickhouse/client', ver: '0.2+', role: t ? 'Client HTTP chính thức từ ClickHouse Inc.' : 'Official HTTP client from ClickHouse Inc.' },
+
                                 { tech: 'RxJS', ver: '7.x', role: t ? 'Reactive programming cho SSE streaming và event handling' : 'Reactive programming for SSE streaming and event handling' },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/20 transition-colors">

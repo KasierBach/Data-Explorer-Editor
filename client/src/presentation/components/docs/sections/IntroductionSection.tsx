@@ -1,4 +1,5 @@
-import { Database, BookOpen } from 'lucide-react';
+import { Zap, Database, BookOpen, Layers, MousePointer2 } from 'lucide-react';
+import { Badge } from '@/presentation/components/ui/badge';
 import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, Callout, CodeBlock, CodeComment, CodeLine } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
@@ -17,8 +18,8 @@ export function IntroductionSection({ lang }: Props) {
             <FeatureGrid>
                 <InfoCard icon={<Database className="w-6 h-6 text-blue-500" />} title={t ? 'Hỗ trợ Đa Engine' : 'Multi-Engine Support'} color="blue">
                     <p>{t
-                        ? 'Kết nối bản địa tới PostgreSQL, MySQL, SQL Server và ClickHouse thông qua một giao diện thống nhất. Mỗi engine sử dụng driver riêng biệt được tối ưu hóa cho hiệu suất tốt nhất — không chỉ là một wrapper chung chung.'
-                        : 'Native connections to PostgreSQL, MySQL, SQL Server, and ClickHouse through a unified interface. Each engine uses its own optimized driver for maximum performance — not just a generic wrapper.'}</p>
+                        ? 'Kết nối bản địa tới PostgreSQL, MySQL và SQL Server thông qua một giao diện thống nhất. Mỗi engine sử dụng driver riêng biệt được tối ưu hóa cho hiệu suất tốt nhất — không chỉ là một wrapper chung chung.'
+                        : 'Native connections to PostgreSQL, MySQL and SQL Server through a unified interface. Each engine uses its own optimized driver for maximum performance — not just a generic wrapper.'}</p>
                 </InfoCard>
                 <InfoCard icon={<BookOpen className="w-6 h-6 text-purple-500" />} title={t ? 'Trợ lý AI Gemini' : 'Gemini AI Assistant'} color="purple">
                     <p>{t
@@ -88,8 +89,8 @@ export function IntroductionSection({ lang }: Props) {
                         {
                             title: t ? "Bảo mật tuyệt đối" : "Absolute Security",
                             desc: t
-                                ? "Kiến trúc Local-First đảm bảo mọi thông tin kết nối chỉ lưu trên server của bạn. Mật khẩu được mã hóa AES-256 trước khi lưu. JWT tokens sử dụng HttpOnly cookies để ngăn chặn XSS."
-                                : "Local-First architecture ensures all connection data stays on your server. Passwords are AES-256 encrypted before storage. JWT tokens use HttpOnly cookies to prevent XSS attacks."
+                                ? "Kiến trúc Multi-Tier đảm bảo thông tin kết nối chỉ lưu trên server PostgreSQL của bạn. Mật khẩu được mã hóa AES-256-GCM trước khi lưu. JWT tokens sử dụng HttpOnly cookies để ngăn chặn XSS."
+                                : "Multi-Tier architecture ensures all connection data stays on your PostgreSQL server. Passwords are AES-256-GCM encrypted before storage. JWT tokens use HttpOnly cookies to prevent XSS attacks."
                         },
                         {
                             title: t ? "Trải nghiệm lập trình viên" : "Developer Experience",
@@ -133,19 +134,88 @@ export function IntroductionSection({ lang }: Props) {
                                 { feature: 'AI SQL Generation', desc: t ? 'Gemini Flash + Vision API' : 'Gemini Flash + Vision API', status: '✅' },
                                 { feature: t ? 'Sơ đồ ERD' : 'ERD Diagrams', desc: t ? 'Tương tác, auto-layout, xuất SQL' : 'Interactive, auto-layout, SQL export', status: '✅' },
                                 { feature: t ? 'Biểu đồ tương tác' : 'Interactive Charts', desc: t ? '15+ loại biểu đồ từ kết quả truy vấn' : '15+ chart types from query results', status: '✅' },
-                                { feature: t ? 'Xuất dữ liệu' : 'Data Export', desc: 'CSV, JSON, SQL INSERT', status: '✅' },
+                                { feature: t ? 'Xuất dữ liệu' : 'Data Export', desc: 'CSV, Excel (XLSX), JSON, SQL INSERT', status: '✅' },
                                 { feature: t ? 'Xác thực JWT' : 'JWT Authentication', desc: t ? 'HttpOnly cookies, AES-256 encryption' : 'HttpOnly cookies, AES-256 encryption', status: '✅' },
                                 { feature: t ? 'Chế độ tối/sáng' : 'Dark/Light Mode', desc: t ? 'Tự động theo hệ thống hoặc thủ công' : 'Auto-detect system or manual toggle', status: '✅' },
                                 { feature: t ? 'Đa ngôn ngữ' : 'Internationalization', desc: t ? 'Tiếng Việt và Tiếng Anh' : 'Vietnamese and English', status: '✅' },
                             ].map((row, i) => (
-                                <tr key={i} className="hover:bg-muted/20 transition-colors">
-                                    <td className="p-4 font-medium">{row.feature}</td>
-                                    <td className="p-4 text-muted-foreground">{row.desc}</td>
-                                    <td className="p-4 text-center">{row.status}</td>
+                                <tr key={i} className="hover:bg-muted/10 transition-colors">
+                                    <td className="py-3 px-2 font-medium text-xs text-foreground/80">{row.feature}</td>
+                                    <td className="py-3 px-2 text-xs text-muted-foreground">{row.desc}</td>
+                                    <td className="py-3 px-2 text-center">{row.status}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+                </div>
+            </DocSection>
+
+            {/* Mission & Vision */}
+            <DocSection title={t ? 'Sứ mệnh & Tầm nhìn' : 'Mission & Vision'}>
+                <div className="grid md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                        <h4 className="font-bold text-sm flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-blue-500" />
+                            {t ? 'Sứ mệnh' : 'Mission'}
+                        </h4>
+                        <Prose>
+                            {t
+                                ? 'Chúng tôi tin rằng việc tương tác với dữ liệu không nên là một cực hình kỹ thuật. Sứ mệnh của Data Explorer là dân chủ hóa quyền truy cập dữ liệu thông qua AI, giúp các kỹ sư và nhà phân tích tập trung vào "Tại sao" thay vì "Làm thế nào" khi viết SQL.'
+                                : 'We believe that interacting with data should not be a technical ordeal. Data Explorer\'s mission is to democratize data access through AI, helping engineers and analysts focus on the "Why" rather than the "How" when writing SQL.'}
+                        </Prose>
+                    </div>
+                    <div className="space-y-4">
+                        <h4 className="font-bold text-sm flex items-center gap-2">
+                            <Database className="w-4 h-4 text-purple-500" />
+                            {t ? 'Tầm nhìn' : 'Vision'}
+                        </h4>
+                        <Prose>
+                            {t
+                                ? 'Trở thành trung tâm chỉ huy dữ liệu (Data Command Center) mã nguồn mở hàng đầu, nơi AI không chỉ tạo query mà còn hiểu được bối cảnh kinh doanh, dự báo xu hướng và tự động hóa các tác vụ bảo trì database phức tạp.'
+                                : 'To become the leading open-source Data Command Center, where AI not only generates queries but also understands business context, predicts trends, and automates complex database maintenance tasks.'}
+                        </Prose>
+                    </div>
+                </div>
+            </DocSection>
+
+            {/* Product Roadmap */}
+            <DocSection title={t ? 'Lộ trình Phát triển (Roadmap)' : 'Product Roadmap'}>
+                <div className="space-y-6">
+                    <Prose>
+                        {t
+                            ? 'Chúng tôi không ngừng cải tiến Data Explorer. Dưới đây là những gì chúng tôi đang phát triển cho các phiên bản tiếp theo:'
+                            : 'We are constantly improving Data Explorer. Here is what we are building for the upcoming versions:'}
+                    </Prose>
+
+                    <div className="grid gap-4">
+                        {[
+                            {
+                                quarter: 'Q2 2026',
+                                title: t ? 'Tìm kiếm Toàn cục (Global Search)' : 'Global Search (Ctrl+P)',
+                                desc: t ? 'Truy cập nhanh vào bảng, file, lịch sử và câu lệnh AI từ một thanh bar duy nhất.' : 'Instant access to tables, files, history, and AI commands from a single command palette.'
+                            },
+                            {
+                                quarter: 'Q3 2026',
+                                title: t ? 'Thống kê Hiệu năng (Performance Profiler)' : 'Performance Profiler',
+                                desc: t ? 'Phân tích trực quan EXPLAIN ANALYZE và gợi ý index tự động dựa trên tần suất truy vấn.' : 'Visual breakdown of EXPLAIN ANALYZE and automated index suggestions based on query frequency.'
+                            },
+                            {
+                                quarter: 'Q4 2026',
+                                title: t ? 'Cộng tác Nhóm (Team Collaboration)' : 'Team Collaboration',
+                                desc: t ? 'Chia sẻ query, dashboard và sơ đồ ERD trực tiếp trong không gian làm việc chung.' : 'Share queries, dashboards, and ERD diagrams directly within a shared workspace.'
+                            }
+                        ].map((item, i) => (
+                            <div key={i} className="flex gap-4 p-4 rounded-xl border bg-muted/20 border-border/50">
+                                <Badge variant="outline" className="h-fit py-1 px-3 bg-blue-500/5 text-blue-500 border-blue-500/20 font-black text-[10px] shrink-0">
+                                    {item.quarter}
+                                </Badge>
+                                <div className="space-y-1">
+                                    <h5 className="font-bold text-sm">{item.title}</h5>
+                                    <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </DocSection>
         </DocPageLayout>

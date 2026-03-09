@@ -29,8 +29,8 @@ export function ArchitectureSection({ lang }: Props) {
             {/* Strategy Pattern */}
             <DocSection title={t ? 'Strategy Pattern cho Đa Engine' : 'Strategy Pattern for Multi-Engine'}>
                 <Prose>{t
-                    ? 'Để hỗ trợ 4 database engines (PostgreSQL, MySQL, SQL Server, ClickHouse) mà không lặp code, chúng tôi sử dụng Strategy Pattern. Mỗi engine là một "chiến lược" (strategy) triển khai chung một interface DatabaseAdapter.'
-                    : 'To support 4 database engines (PostgreSQL, MySQL, SQL Server, ClickHouse) without code duplication, we use the Strategy Pattern. Each engine is a "strategy" implementing a common DatabaseAdapter interface.'}</Prose>
+                    ? 'Để hỗ trợ 3 database engines (PostgreSQL, MySQL, SQL Server) mà không lặp code, chúng tôi sử dụng Strategy Pattern. Mỗi engine là một "chiến lược" (strategy) triển khai chung một interface DatabaseAdapter.'
+                    : 'To support 3 database engines (PostgreSQL, MySQL, SQL Server) without code duplication, we use the Strategy Pattern. Each engine is a "strategy" implementing a common DatabaseAdapter interface.'}</Prose>
                 <CodeBlock title={t ? 'Interface Adapter (TypeScript)' : 'Adapter Interface (TypeScript)'}>
                     <CodeComment>{t ? 'Interface chung cho mọi database engine' : 'Common interface for all database engines'}</CodeComment>
                     <CodeLine>{'interface IDatabaseAdapter {'}</CodeLine>
@@ -49,7 +49,6 @@ export function ArchitectureSection({ lang }: Props) {
                     <CodeLine>{"      case 'postgres':    return new PostgresAdapter();"}</CodeLine>
                     <CodeLine>{"      case 'mysql':       return new MySQLAdapter();"}</CodeLine>
                     <CodeLine>{"      case 'mssql':       return new MSSQLAdapter();"}</CodeLine>
-                    <CodeLine>{"      case 'clickhouse':  return new ClickHouseAdapter();"}</CodeLine>
                     <CodeLine>{'    }'}</CodeLine>
                     <CodeLine>{'  }'}</CodeLine>
                     <CodeLine>{'}'}</CodeLine>
@@ -105,9 +104,65 @@ export function ArchitectureSection({ lang }: Props) {
                     <CodeLine>{'│   │   ├── adapters/        # Database engine adapters'}</CodeLine>
                     <CodeLine>{'│   │   ├── guards/          # Auth guards (JWT)'}</CodeLine>
                     <CodeLine>{'│   │   └── services/        # Business logic services'}</CodeLine>
-                    <CodeLine>{'│   └── prisma/              # Prisma schema & migrations'}</CodeLine>
+                    <CodeLine>{'│   └── prisma/              # Prisma schema (PostgreSQL) & migrations'}</CodeLine>
                     <CodeLine>{'└── package.json             # Root workspace config'}</CodeLine>
                 </CodeBlock>
+
+                <div className="mt-8 space-y-4">
+                    <h4 className="font-bold text-sm text-blue-500">{t ? 'Lợi ích của Strategy Pattern trong Data Explorer' : 'Benefits of Strategy Pattern in Data Explorer'}</h4>
+                    <ul className="grid md:grid-cols-2 gap-4">
+                        {[
+                            {
+                                title: t ? 'Tính Đóng gói (Encapsulation)' : 'Encapsulation',
+                                desc: t ? 'Logic truy vấn của từng database (ví dụ: cách lấy danh sách table trong MSSQL khác MySQL) được đóng gói hoàn toàn trong Adapter tương ứng.' : 'Specific database query logic (e.g., fetching table lists) is fully encapsulated within its corresponding adapter.'
+                            },
+                            {
+                                title: t ? 'Nguyên tắc Mở/Đóng (Open/Closed)' : 'Open/Closed Principle',
+                                desc: t ? 'Chúng ta có thể thêm hỗ trợ cho DuckDB hoặc Oracle chỉ bằng cách thêm file mới, không cần sửa đổi logic cốt lõi.' : 'Support for DuckDB or Oracle can be added by simply creating a new file, without modifying core logic.'
+                            },
+                            {
+                                title: t ? 'Dễ dàng Kiểm thử (Testability)' : 'Testability',
+                                desc: t ? 'Mỗi Adapter được unit test riêng biệt với database engine thật mà không làm ảnh hưởng đến luồng giao diện.' : 'Each adapter is unit-tested independently against real database engines without affecting the UI layer.'
+                            },
+                            {
+                                title: t ? 'Hoán đổi linh hoạt (Swappability)' : 'Swappability',
+                                desc: t ? 'Hệ thống có thể chuyển đổi giữa các engine khác nhau trong thời gian thực dựa trên cấu hình kết nối của người dùng.' : 'The system can switch between different engines in real-time based on the user\'s connection configuration.'
+                            }
+                        ].map((item, i) => (
+                            <li key={i} className="p-4 rounded-xl border border-border/50 bg-muted/5 space-y-2">
+                                <span className="text-xs font-black uppercase tracking-widest text-foreground/70">{item.title}</span>
+                                <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            </DocSection>
+
+            {/* Design Philosophy */}
+            <DocSection title={t ? 'Triết lý Thiết kế: Clean Architecture' : 'Design Philosophy: Clean Architecture'}>
+                <Prose>
+                    {t
+                        ? 'Data Explorer được xây dựng trên nền tảng của Sự rõ ràng (Clarity) và Sự bền vững (Sustainability). Chúng tôi áp dụng kiến trúc Hexagonal (Ports & Adapters) để giải quyết các vấn đề phổ biến trong phát triển phần mềm.'
+                        : 'Data Explorer is built on the pillars of Clarity and Sustainability. We apply Hexagonal Architecture (Ports & Adapters) to solve common software development challenges.'}
+                </Prose>
+
+                <div className="mt-6 p-6 rounded-2xl bg-blue-500/5 border border-blue-500/10 border-l-4 border-l-blue-500">
+                    <h5 className="font-bold text-sm mb-3">{t ? '1. Độc lập với Framework' : '1. Framework Independence'}</h5>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                        {t
+                            ? 'Lớp Domain và Application không phụ thuộc vào React hay NestJS. Điều này đảm bảo rằng nếu chúng ta muốn chuyển từ React sang Vue, hoặc NestJS sang Go, logic nghiệp vụ vẫn được giữ nguyên.'
+                            : 'The Domain and Application layers do not depend on React or NestJS. This ensures that if we want to switch from React to Vue, or NestJS to Go, the business logic remains intact.'}
+                    </p>
+                </div>
+
+                <div className="mt-4 p-6 rounded-2xl bg-purple-500/5 border border-purple-500/10 border-l-4 border-l-purple-500">
+                    <h5 className="font-bold text-sm mb-3">{t ? '2. Separations of Concerns (SoC)' : '2. Separations of Concerns (SoC)'}</h5>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                        {t
+                            ? 'Mỗi module có một trách nhiệm duy nhất (SRP). Module "Query" chỉ lo về việc thực thi lệnh SQL, trong khi module "Visualization" chỉ lo về việc vẽ biểu đồ. Chúng giao tiếp với nhau qua các interface và event.'
+                            : 'Each module has a single responsibility (SRP). The "Query" module only handles SQL execution, while the "Visualization" module only handles charting. They communicate via interfaces and events.'}
+                    </p>
+                </div>
             </DocSection>
         </DocPageLayout>
     );

@@ -1,12 +1,12 @@
-import { Shield, Database } from 'lucide-react';
+import { Shield, Database, Zap, Lock } from 'lucide-react';
 import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment, CodeLine } from '../primitives';
 
 interface Props {
     lang: 'vi' | 'en';
-    engine: 'postgres' | 'mysql' | 'mssql' | 'clickhouse';
+    engine: 'postgres' | 'mysql' | 'mssql';
 }
 
-const ENGINE_CONFIG = {
+const ENGINE_CONFIG: Record<string, any> = {
     postgres: {
         name: 'PostgreSQL',
         port: '5432',
@@ -82,35 +82,12 @@ FROM sys.tables t
 JOIN sys.columns c ON t.object_id = c.object_id
 JOIN sys.types ty ON c.system_type_id = ty.system_type_id
 ORDER BY t.name, c.column_id;`,
-    },
-    clickhouse: {
-        name: 'ClickHouse',
-        port: '8123',
-        icon: '⚡',
-        uriScheme: 'clickhouse',
-        uriExample: 'http://localhost:8123?user=default&password=&database=default',
-        dockerImage: 'clickhouse/clickhouse-server:latest',
-        dockerEnv: [
-            '-e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1',
-        ],
-        features: {
-            en: ['system.tables and system.columns introspection', 'MergeTree engine family detection', 'Partition key analysis', 'Data compression ratio display', 'Materialized view listing', 'Distributed table topology', 'Query performance profiling'],
-            vi: ['Phân tích qua system.tables và system.columns', 'Phát hiện engine family MergeTree', 'Phân tích partition keys', 'Hiển thị tỷ lệ nén dữ liệu', 'Liệt kê materialized views', 'Topology bảng phân tán', 'Profiling hiệu năng truy vấn'],
-        },
-        sslNote: {
-            en: 'ClickHouse Cloud requires HTTPS on port 8443. Use the connection details from your cloud dashboard.',
-            vi: 'ClickHouse Cloud yêu cầu HTTPS trên cổng 8443. Sử dụng thông tin kết nối từ cloud dashboard.',
-        },
-        introspectQuery: `SELECT table, name, type, default_kind
-FROM system.columns
-WHERE database = currentDatabase()
-ORDER BY table, position;`,
-    },
+    }
 };
 
 export function ConnectionSection({ lang, engine }: Props) {
     const t = lang === 'vi';
-    const cfg = ENGINE_CONFIG[engine];
+    const cfg = ENGINE_CONFIG[engine] || ENGINE_CONFIG.postgres;
 
     return (
         <DocPageLayout
@@ -120,23 +97,23 @@ export function ConnectionSection({ lang, engine }: Props) {
                 : `Detailed guide for connecting ${cfg.name} to Data Explorer, including SSL configuration, Docker setup, and common troubleshooting.`}
         >
             {/* Quick Reference */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div className="p-5 border rounded-2xl bg-muted/20 text-center">
                     <span className="text-3xl block mb-1">{cfg.icon}</span>
-                    <span className="text-xs font-bold uppercase text-muted-foreground">Engine</span>
+                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Engine</span>
                     <p className="font-bold text-primary">{cfg.name}</p>
                 </div>
                 <div className="p-5 border rounded-2xl bg-muted/20 text-center">
-                    <span className="text-xs font-bold uppercase text-muted-foreground">{t ? 'Cổng mặc định' : 'Default Port'}</span>
+                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">{t ? 'Cổng mặc định' : 'Default Port'}</span>
                     <p className="font-mono text-primary font-bold text-xl">{cfg.port}</p>
                 </div>
                 <div className="p-5 border rounded-2xl bg-muted/20 text-center">
-                    <span className="text-xs font-bold uppercase text-muted-foreground">{t ? 'Giao thức' : 'Protocol'}</span>
+                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">{t ? 'Giao thức' : 'Protocol'}</span>
                     <p className="font-mono text-primary font-bold">{cfg.uriScheme}://</p>
                 </div>
                 <div className="p-5 border rounded-2xl bg-muted/20 text-center">
-                    <span className="text-xs font-bold uppercase text-muted-foreground">{t ? 'Chiến lược' : 'Strategy'}</span>
-                    <p className="font-mono text-primary font-bold text-sm">Pooled Adapter</p>
+                    <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">{t ? 'Chiến lược' : 'Strategy'}</span>
+                    <p className="font-mono text-primary font-bold">Pooled Adapter</p>
                 </div>
             </div>
 
@@ -160,17 +137,16 @@ export function ConnectionSection({ lang, engine }: Props) {
                     <Prose>{t
                         ? `Mở sidebar Connection Explorer (thanh bên trái), nhấn biểu tượng dấu cộng (+), chọn ${cfg.name}. Điền các trường sau:`
                         : `Open the Connection Explorer sidebar (left panel), click the plus (+) icon, select ${cfg.name}. Fill in the following fields:`}</Prose>
-                    <div className="space-y-2">
+                    <div className="space-y-2 mt-4">
                         {[
                             { field: 'Host', example: 'localhost', desc: t ? 'Địa chỉ IP hoặc hostname của server database' : 'IP address or hostname of the database server' },
                             { field: 'Port', example: cfg.port, desc: t ? `Cổng mặc định: ${cfg.port}` : `Default port: ${cfg.port}` },
                             { field: 'Username', example: engine === 'postgres' ? 'admin' : engine === 'mssql' ? 'sa' : 'root', desc: t ? 'Tên đăng nhập với quyền truy cập database' : 'Login user with database access' },
                             { field: 'Password', example: '••••••', desc: t ? 'Mật khẩu (được mã hóa AES-256 trước khi lưu)' : 'Password (AES-256 encrypted before storage)' },
                             { field: 'Database', example: 'mydb', desc: t ? 'Tên database bạn muốn khám phá' : 'Database name you want to explore' },
-                            { field: 'SSL', example: t ? 'Bật/Tắt' : 'On/Off', desc: t ? 'Bật nếu kết nối qua cloud hoặc mạng công cộng' : 'Enable for cloud or public network connections' },
                         ].map((item, i) => (
                             <div key={i} className="flex items-center gap-4 p-3 border rounded-xl hover:bg-muted/50 transition-colors">
-                                <code className="bg-primary/10 text-primary px-3 py-1 rounded text-xs font-mono font-bold min-w-[100px] text-center">{item.field}</code>
+                                <code className="bg-primary/10 text-primary px-3 py-1 rounded text-[10px] font-mono font-bold min-w-[100px] text-center">{item.field}</code>
                                 <code className="text-xs text-muted-foreground font-mono min-w-[100px]">{item.example}</code>
                                 <span className="text-xs text-muted-foreground">{item.desc}</span>
                             </div>
@@ -184,10 +160,10 @@ export function ConnectionSection({ lang, engine }: Props) {
                 <Prose>{t
                     ? `Dưới đây là danh sách đầy đủ các tính năng introspection mà Data Explorer hỗ trợ cho ${cfg.name}:`
                     : `Here is the complete list of introspection features Data Explorer supports for ${cfg.name}:`}</Prose>
-                <ul className="grid sm:grid-cols-2 gap-2">
-                    {cfg.features[lang].map((feat, i) => (
+                <ul className="grid sm:grid-cols-2 gap-3 mt-6">
+                    {cfg.features[lang].map((feat: string, i: number) => (
                         <li key={i} className="flex items-center gap-3 p-3 border rounded-xl hover:bg-muted/30 transition-colors">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                             <span className="text-sm">{feat}</span>
                         </li>
                     ))}
@@ -201,7 +177,7 @@ export function ConnectionSection({ lang, engine }: Props) {
                     : `When you successfully connect, Data Explorer automatically runs introspection queries to analyze the database structure. Here's the basic query the system runs behind the scenes for ${cfg.name}:`}</Prose>
                 <CodeBlock title={`${cfg.name} Introspection`}>
                     <CodeComment>{t ? 'Truy vấn phân tích cấu trúc bảng' : 'Table structure analysis query'}</CodeComment>
-                    {cfg.introspectQuery.split('\n').map((line, i) => (
+                    {cfg.introspectQuery.split('\n').map((line: string, i: number) => (
                         <CodeLine key={i}>{line}</CodeLine>
                     ))}
                 </CodeBlock>
@@ -216,7 +192,7 @@ export function ConnectionSection({ lang, engine }: Props) {
                     <CodeComment>{t ? `Khởi tạo ${cfg.name} container` : `Start ${cfg.name} container`}</CodeComment>
                     <CodeLine>docker run -d \</CodeLine>
                     <CodeLine>{`  --name data-explorer-${engine} \\`}</CodeLine>
-                    {cfg.dockerEnv.map((env, i) => (
+                    {cfg.dockerEnv.map((env: string, i: number) => (
                         <CodeLine key={i}>{`  ${env} \\`}</CodeLine>
                     ))}
                     <CodeLine>{`  -p ${cfg.port}:${cfg.port} \\`}</CodeLine>
@@ -224,53 +200,44 @@ export function ConnectionSection({ lang, engine }: Props) {
                 </CodeBlock>
             </DocSection>
 
+            {/* Advanced Tuning */}
+            <DocSection title={t ? 'Cấu hình Nâng cao (Advanced Tuning)' : 'Advanced Tuning'}>
+                <div className="grid md:grid-cols-2 gap-6">
+                    <div className="p-6 rounded-2xl bg-blue-500/5 border border-blue-500/10 border-l-4 border-l-blue-500 space-y-3">
+                        <h4 className="text-sm font-bold flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-blue-500" />
+                            Connection Pooling
+                        </h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            {t
+                                ? 'Mặc định, hệ thống duy trì bộ đệm kết nối để tối ưu tốc độ phản hồi. Đối với các database có giới hạn session (như Supabase Free Tier), hãy cân nhắc giảm thời gian chờ timeout để giải phóng kết nối nhanh hơn.'
+                                : 'By default, the system maintains a connection pool to optimize response speed. For databases with limited sessions (like Supabase Free Tier), consider reducing the timeout to free up connections faster.'}
+                        </p>
+                    </div>
+                    <div className="p-6 rounded-2xl bg-purple-500/5 border border-purple-500/10 border-l-4 border-l-purple-500 space-y-3">
+                        <h4 className="text-sm font-bold flex items-center gap-2">
+                            <Lock className="w-4 h-4 text-purple-500" />
+                            SSL/TLS Handshake
+                        </h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            {t
+                                ? 'Hệ thống hỗ trợ SSL Mode "prefer" và "require". Đối với các kết nối yêu cầu chứng chỉ CA tùy chỉnh, bạn cần mount file certificate vào thư mục /certs của backend server.'
+                                : 'The system supports SSL Modes "prefer" and "require". For connections requiring custom CA certificates, you need to mount the certificate file into the /certs directory of the backend server.'}
+                        </p>
+                    </div>
+                </div>
+            </DocSection>
+
             {/* SSL Note */}
-            <div className="p-8 rounded-3xl bg-blue-500/5 border border-blue-500/20 space-y-3 shadow-sm">
-                <h4 className="font-bold flex items-center gap-2 text-blue-600 uppercase text-xs tracking-widest">
-                    <Shield className="w-4 h-4" /> {t ? 'Ghi chú Bảo mật & SSL' : 'Security & SSL Note'}
+            <div className="mt-8 p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 space-y-2">
+                <h4 className="font-bold flex items-center gap-2 text-emerald-600 uppercase text-[10px] tracking-widest">
+                    <Shield className="w-4 h-4" /> {t ? 'Ghi chú Bảo mật' : 'Security Note'}
                 </h4>
-                <p className="text-sm text-muted-foreground leading-relaxed">
+                <p className="text-xs text-muted-foreground leading-relaxed">
                     {cfg.sslNote[lang]}
-                </p>
-                <p className="text-sm text-muted-foreground leading-relaxed italic">
-                    {t
-                        ? 'Mọi thông tin xác thực kết nối của bạn đều được mã hóa AES-256 và lưu trữ nội bộ trong SQLite. Chúng tôi cam kết không bao giờ gửi mật khẩu thô ra ngoài hệ thống.'
-                        : 'All your connection credentials are AES-256 encrypted and stored internally in SQLite. We guarantee your raw passwords are never transmitted outside the system.'}
                 </p>
             </div>
 
-            {/* Troubleshooting */}
-            <DocSection title={t ? 'Khắc phục lỗi thường gặp' : 'Common Troubleshooting'}>
-                <div className="space-y-3">
-                    {[
-                        {
-                            q: t ? `Không thể kết nối tới ${cfg.name} trên localhost` : `Cannot connect to ${cfg.name} on localhost`,
-                            a: t
-                                ? `Kiểm tra xem ${cfg.name} có đang chạy không (systemctl status hoặc docker ps). Đảm bảo port ${cfg.port} đang mở và chấp nhận kết nối từ 127.0.0.1.`
-                                : `Check if ${cfg.name} is running (systemctl status or docker ps). Ensure port ${cfg.port} is open and accepting connections from 127.0.0.1.`
-                        },
-                        {
-                            q: t ? 'Lỗi "Connection refused" hoặc "Timeout"' : '"Connection refused" or "Timeout" error',
-                            a: t
-                                ? 'Kiểm tra firewall, security groups (nếu dùng cloud), và cấu hình listen_addresses trong config file của database. Đảm bảo không có VPN nào chặn kết nối.'
-                                : 'Check firewall rules, security groups (for cloud), and listen_addresses in the database config file. Ensure no VPN is blocking the connection.'
-                        },
-                        {
-                            q: t ? 'Lỗi "Authentication failed"' : '"Authentication failed" error',
-                            a: t
-                                ? 'Xác nhận username và password chính xác. Với PostgreSQL, kiểm tra file pg_hba.conf cho phương thức xác thực. Với MySQL, đảm bảo user có quyền truy cập từ host hiện tại.'
-                                : 'Verify the username and password are correct. For PostgreSQL, check pg_hba.conf for authentication methods. For MySQL, ensure the user has access from the current host.'
-                        },
-                    ].map((item, i) => (
-                        <div key={i} className="p-5 border rounded-2xl bg-card space-y-2">
-                            <h4 className="font-bold flex items-center gap-2 text-sm">
-                                <Database className="w-4 h-4 text-primary" /> {item.q}
-                            </h4>
-                            <p className="text-sm text-muted-foreground leading-relaxed border-l-2 border-muted pl-4 italic">{item.a}</p>
-                        </div>
-                    ))}
-                </div>
-            </DocSection>
         </DocPageLayout>
     );
 }

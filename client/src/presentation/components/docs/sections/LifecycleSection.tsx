@@ -30,7 +30,7 @@ export function LifecycleSection({ lang }: Props) {
                                 { script: 'npm run start:dev', dir: 'server/', desc: t ? 'Khởi động NestJS ở chế độ watch (tự restart khi thay đổi code)' : 'Start NestJS in watch mode (auto-restart on code changes)' },
                                 { script: 'npm run build', dir: 'server/', desc: t ? 'Biên dịch TypeScript sang JavaScript (output: dist/)' : 'Compile TypeScript to JavaScript (output: dist/)' },
                                 { script: 'npm run start:prod', dir: 'server/', desc: t ? 'Chạy bản build production' : 'Run production build' },
-                                { script: 'npx prisma studio', dir: 'server/', desc: t ? 'Mở GUI để duyệt database SQLite nội bộ' : 'Open GUI to browse internal SQLite database' },
+                                { script: 'npx prisma studio', dir: 'server/', desc: t ? 'Mở GUI để duyệt database PostgreSQL hệ thống' : 'Open GUI to browse internal PostgreSQL database' },
                                 { script: 'npx prisma db push', dir: 'server/', desc: t ? 'Đồng bộ schema Prisma với database' : 'Sync Prisma schema with database' },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/20 transition-colors">
@@ -53,7 +53,7 @@ export function LifecycleSection({ lang }: Props) {
                     <CodeComment>{t ? 'Bước 1: Tạo branch mới từ main' : 'Step 1: Create new branch from main'}</CodeComment>
                     <CodeLine>git checkout main</CodeLine>
                     <CodeLine>git pull origin main</CodeLine>
-                    <CodeLine>git checkout -b feature/add-sqlite-adapter</CodeLine>
+                    <CodeLine>git checkout -b feature/add-postgres-adapter</CodeLine>
                     <p className="mt-3" />
                     <CodeComment>{t ? 'Bước 2: Phát triển tính năng' : 'Step 2: Develop the feature'}</CodeComment>
                     <CodeLine>{'# ... viết code, test ...'}</CodeLine>
@@ -63,7 +63,7 @@ export function LifecycleSection({ lang }: Props) {
                     <CodeLine>git commit -m "feat(adapter): add SQLite adapter with introspection"</CodeLine>
                     <p className="mt-3" />
                     <CodeComment>{t ? 'Bước 4: Push và tạo Pull Request' : 'Step 4: Push and create Pull Request'}</CodeComment>
-                    <CodeLine>git push origin feature/add-sqlite-adapter</CodeLine>
+                    <CodeLine>git push origin feature/add-postgres-adapter</CodeLine>
                 </CodeBlock>
             </DocSection>
 

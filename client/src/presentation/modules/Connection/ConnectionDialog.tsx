@@ -6,11 +6,12 @@ import { Input } from '@/presentation/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/presentation/components/ui/select';
 import { Label } from '@/presentation/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/presentation/components/ui/tabs';
-import { Server, ShieldAlert, Key, Zap, CheckCircle2, HelpCircle, Database, Lock, Globe, Wand2 } from 'lucide-react';
+import { Server, ShieldAlert, Key, Zap, HelpCircle, Database, Lock, Globe, Wand2, ShieldCheck } from 'lucide-react';
 import { API_BASE_URL } from '@/core/config/env';
 
 export const ConnectionDialog: React.FC = () => {
-    const { isConnectionDialogOpen, closeConnectionDialog, addConnection, accessToken } = useAppStore();
+    const { isConnectionDialogOpen, closeConnectionDialog, addConnection, accessToken, lang } = useAppStore();
+    const t = lang === 'vi';
 
     const [type, setType] = useState<'postgres' | 'mysql' | 'mssql'>('postgres');
     const [name, setName] = useState('');
@@ -19,7 +20,7 @@ export const ConnectionDialog: React.FC = () => {
     const [username, setUsername] = useState('postgres');
     const [password, setPassword] = useState('');
     const [database, setDatabase] = useState('');
-    const [showAllDatabases, setShowAllDatabases] = useState(false);
+    const [showAllDatabases] = useState(false);
     const [connectionString, setConnectionString] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -27,16 +28,10 @@ export const ConnectionDialog: React.FC = () => {
     const parseConnectionString = () => {
         try {
             if (!connectionString.trim()) return;
+            const url = new URL(connectionString.trim());
 
-            // Handle common prefixes
-            let uri = connectionString.trim();
-            // Optional: convert standard jdbc/odbc formats if needed, for now just handle standard URIs
-
-            const url = new URL(uri);
-
-            // Determine type
             let parsedType: 'postgres' | 'mysql' | 'mssql' = 'postgres';
-            if (url.protocol.includes('postgres') || url.protocol.includes('postgresql')) {
+            if (url.protocol.includes('postgres')) {
                 parsedType = 'postgres';
                 setType('postgres');
             } else if (url.protocol.includes('mysql')) {
@@ -48,11 +43,9 @@ export const ConnectionDialog: React.FC = () => {
             }
 
             if (url.hostname) setHost(url.hostname);
-
             if (url.port) {
                 setPort(url.port);
             } else {
-                // Set default ports if none provided
                 if (parsedType === 'postgres') setPort('5432');
                 if (parsedType === 'mysql') setPort('3306');
                 if (parsedType === 'mssql') setPort('1433');
@@ -60,20 +53,13 @@ export const ConnectionDialog: React.FC = () => {
 
             if (url.username) setUsername(decodeURIComponent(url.username));
             if (url.password) setPassword(decodeURIComponent(url.password));
-
-            // DB name is the pathname without the leading slash
             if (url.pathname && url.pathname.length > 1) {
                 setDatabase(decodeURIComponent(url.pathname.substring(1)));
             }
-
-            // Auto-generate a name if empty
-            if (!name) {
-                setName(`${parsedType} @ ${url.hostname}`);
-            }
-
+            if (!name) setName(`${parsedType} @ ${url.hostname}`);
             setError(null);
         } catch (err) {
-            setError("Invalid Connection String format. Example: postgresql://user:pass@localhost:5432/mydb");
+            setError(t ? "Sai định dạng Connection String. VD: postgresql://user:pass@localhost:5432/mydb" : "Invalid Connection String format. Example: postgresql://user:pass@localhost:5432/mydb");
         }
     };
 
@@ -91,16 +77,10 @@ export const ConnectionDialog: React.FC = () => {
         };
 
         const parsedPort = parseInt(port);
-        if (!isNaN(parsedPort)) {
-            connectionData.port = parsedPort;
-        }
-
-        if (database && database.trim() !== '') {
-            connectionData.database = database.trim();
-        }
+        if (!isNaN(parsedPort)) connectionData.port = parsedPort;
+        if (database && database.trim() !== '') connectionData.database = database.trim();
 
         try {
-            // Call backend API first to register and get UUID
             const headers: Record<string, string> = { 'Content-Type': 'application/json' };
             if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
@@ -116,8 +96,6 @@ export const ConnectionDialog: React.FC = () => {
             }
 
             const savedConnection = await response.json();
-
-            // Use backend UUID as the connection ID in store
             const newConnection: Connection = {
                 id: savedConnection.id,
                 name: savedConnection.name,
@@ -131,7 +109,6 @@ export const ConnectionDialog: React.FC = () => {
             };
             addConnection(newConnection);
             closeConnectionDialog();
-            // Reset form
             setName('');
             setPassword('');
             setError(null);
@@ -151,16 +128,16 @@ export const ConnectionDialog: React.FC = () => {
                         <div className="mb-4 shrink-0">
                             <h2 className="text-2xl font-bold tracking-tight mb-1 flex items-center gap-2">
                                 <Database className="w-6 h-6 text-violet-500" />
-                                Add New Connection
+                                {t ? 'Thêm kết nối mới' : 'Add New Connection'}
                             </h2>
-                            <p className="text-sm text-muted-foreground">Configure the credentials to access your database.</p>
+                            <p className="text-sm text-muted-foreground">{t ? 'Cấu hình thông tin để truy cập database của bạn.' : 'Configure the credentials to access your database.'}</p>
                         </div>
 
                         {error && (
                             <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-3">
                                 <ShieldAlert className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
                                 <div className="text-sm text-red-600 dark:text-red-400">
-                                    <span className="font-semibold block mb-0.5">Connection Failed</span>
+                                    <span className="font-semibold block mb-0.5">{t ? 'Lỗi kết nối' : 'Connection Failed'}</span>
                                     {error}
                                 </div>
                             </div>
@@ -168,13 +145,13 @@ export const ConnectionDialog: React.FC = () => {
 
                         <Tabs defaultValue="form" className="w-full flex-1 flex flex-col">
                             <TabsList className="grid w-full grid-cols-2 mb-6">
-                                <TabsTrigger value="form">Standard Form</TabsTrigger>
-                                <TabsTrigger value="string">Connection String</TabsTrigger>
+                                <TabsTrigger value="form">{t ? 'Form Chuẩn' : 'Standard Form'}</TabsTrigger>
+                                <TabsTrigger value="string">{t ? 'Chuỗi kết nối' : 'Connection String'}</TabsTrigger>
                             </TabsList>
 
                             <TabsContent value="string" className="space-y-4 flex-1">
                                 <div className="space-y-2">
-                                    <Label htmlFor="connectionString" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Paste URI / Connection String</Label>
+                                    <Label htmlFor="connectionString" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Dán URI / Connection String' : 'Paste URI / Connection String'}</Label>
                                     <textarea
                                         id="connectionString"
                                         className="w-full h-32 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono whitespace-pre-wrap"
@@ -183,28 +160,17 @@ export const ConnectionDialog: React.FC = () => {
                                         onChange={(e) => setConnectionString(e.target.value)}
                                     />
                                 </div>
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    className="w-full font-medium"
-                                    onClick={parseConnectionString}
-                                >
+                                <Button type="button" variant="secondary" className="w-full font-medium" onClick={parseConnectionString}>
                                     <Wand2 className="w-4 h-4 mr-2 text-violet-500" />
-                                    Parse & Fill Form
+                                    {t ? 'Tự động điền Form' : 'Parse & Fill Form'}
                                 </Button>
-                                <div className="p-4 bg-muted/50 rounded-lg border mt-4">
-                                    <p className="text-xs text-muted-foreground text-center">
-                                        Parsing will automatically populate the Standard Form fields. You can review them before saving.
-                                    </p>
-                                </div>
                             </TabsContent>
 
                             <TabsContent value="form" className="space-y-6 flex-1 m-0">
-                                {/* General */}
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <Label htmlFor="type" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Database Type</Label>
+                                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Loại Database' : 'Database Type'}</Label>
                                             <Select value={type} onValueChange={(v: any) => {
                                                 setType(v);
                                                 if (v === 'postgres') { setPort('5432'); setUsername('postgres'); }
@@ -212,155 +178,98 @@ export const ConnectionDialog: React.FC = () => {
                                                 else if (v === 'mssql') { setPort('1433'); setUsername('sa'); }
                                             }}>
                                                 <SelectTrigger className="h-10">
-                                                    <SelectValue placeholder="Select Type" />
+                                                    <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="postgres">
-                                                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500"></div>PostgreSQL</div>
-                                                    </SelectItem>
-                                                    <SelectItem value="mysql">
-                                                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500"></div>MySQL</div>
-                                                    </SelectItem>
-                                                    <SelectItem value="mssql">
-                                                        <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-red-500"></div>SQL Server</div>
-                                                    </SelectItem>
+                                                    <SelectItem value="postgres"><div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-500" />PostgreSQL</div></SelectItem>
+                                                    <SelectItem value="mysql"><div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-orange-500" />MySQL</div></SelectItem>
+                                                    <SelectItem value="mssql"><div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-red-500" />SQL Server</div></SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
                                         <div className="space-y-1.5">
-                                            <Label htmlFor="name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Display Name</Label>
-                                            <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Production DB" className="h-10" />
+                                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Tên hiển thị' : 'Display Name'}</Label>
+                                            <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Production DB" className="h-10" />
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="h-px bg-border/50 w-full" />
 
-                                {/* Network */}
                                 <div className="space-y-4">
-                                    <div className="flex items-center gap-2 text-sm font-medium">
-                                        <Globe className="w-4 h-4 text-muted-foreground" /> Connection Details
-                                    </div>
+                                    <div className="flex items-center gap-2 text-sm font-medium"><Globe className="w-4 h-4 text-muted-foreground" /> {t ? 'Chi tiết mạng' : 'Network Details'}</div>
                                     <div className="grid grid-cols-3 gap-4">
                                         <div className="col-span-2 space-y-1.5">
-                                            <Label htmlFor="host" className="text-xs text-muted-foreground">Host</Label>
-                                            <Input id="host" value={host} onChange={e => setHost(e.target.value)} placeholder="localhost or cloud URI" className="h-10 font-mono text-sm" />
+                                            <Label className="text-xs text-muted-foreground">Host</Label>
+                                            <Input value={host} onChange={e => setHost(e.target.value)} placeholder="localhost" className="h-10 font-mono text-sm" />
                                         </div>
                                         <div className="col-span-1 space-y-1.5">
-                                            <Label htmlFor="port" className="text-xs text-muted-foreground">Port</Label>
-                                            <Input id="port" value={port} onChange={e => setPort(e.target.value)} className="h-10 font-mono text-sm" />
+                                            <Label className="text-xs text-muted-foreground">Port</Label>
+                                            <Input value={port} onChange={e => setPort(e.target.value)} className="h-10 font-mono text-sm" />
                                         </div>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="database" className="text-xs text-muted-foreground">Target Database (Optional)</Label>
-                                        <Input id="database" value={database} onChange={e => setDatabase(e.target.value)} placeholder="Default DB if left blank" className="h-10 font-mono text-sm" />
+                                    <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+                                        <h5 className="text-[10px] font-black uppercase text-blue-600 mb-1">Pro Tip: Port Mapping</h5>
+                                        <p className="text-[10px] text-muted-foreground leading-relaxed">
+                                            {t ? 'Nếu dùng Docker, hãy đảm bảo Port đã được mapped ra máy host.' : 'If using Docker, ensure Port is mapped to host machine.'}
+                                        </p>
                                     </div>
                                 </div>
 
-                                <div className="h-px bg-border/50 w-full" />
-
-                                {/* Auth */}
                                 <div className="space-y-4">
-                                    <div className="flex items-center gap-2 text-sm font-medium">
-                                        <Lock className="w-4 h-4 text-muted-foreground" /> Authentication
-                                    </div>
+                                    <div className="flex items-center gap-2 text-sm font-medium"><Lock className="w-4 h-4 text-muted-foreground" /> {t ? 'Xác thực & Bảo mật' : 'Authentication & Security'}</div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <Label htmlFor="username" className="text-xs text-muted-foreground">Username</Label>
-                                            <Input id="username" value={username} onChange={e => setUsername(e.target.value)} className="h-10 font-mono text-sm" />
+                                            <Label className="text-xs text-muted-foreground">{t ? 'Tên đăng nhập' : 'Username'}</Label>
+                                            <Input value={username} onChange={e => setUsername(e.target.value)} className="h-10 text-sm" />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <Label htmlFor="password" className="text-xs text-muted-foreground">Password</Label>
-                                            <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} className="h-10 font-mono text-sm" placeholder="••••••••" />
+                                            <Label className="text-xs text-muted-foreground">{t ? 'Mật khẩu' : 'Password'}</Label>
+                                            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} className="h-10" />
                                         </div>
                                     </div>
-                                </div>
-
-                                {/* Options */}
-                                <div className="pt-2 pb-2">
-                                    <label className="flex items-center space-x-3 cursor-pointer group w-fit">
-                                        <div className="relative flex items-center justify-center">
-                                            <input
-                                                type="checkbox"
-                                                checked={showAllDatabases}
-                                                onChange={e => setShowAllDatabases(e.target.checked)}
-                                                className="peer sr-only"
-                                            />
-                                            <div className="w-5 h-5 border-2 rounded border-muted-foreground peer-checked:bg-violet-500 peer-checked:border-violet-500 transition-colors"></div>
-                                            <CheckCircle2 className="w-3.5 h-3.5 text-white absolute opacity-0 peer-checked:opacity-100 transition-opacity" />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-medium group-hover:text-foreground transition-colors">Show all databases on server</span>
-                                        </div>
-                                    </label>
+                                    <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/30">
+                                        <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                                        <span className="text-[11px] font-medium text-muted-foreground">
+                                            {t ? 'Tự động bật SSL Mode (Prefer) cho kết nối' : 'Automatic SSL Mode (Prefer) enabled'}
+                                        </span>
+                                    </div>
                                 </div>
                             </TabsContent>
                         </Tabs>
 
                         <div className="mt-6 pt-4 border-t border-border flex justify-end gap-3 shrink-0">
-                            <Button variant="ghost" onClick={closeConnectionDialog} disabled={isSaving}>Cancel</Button>
+                            <Button variant="ghost" onClick={closeConnectionDialog} disabled={isSaving}>{t ? 'Hủy' : 'Cancel'}</Button>
                             <Button onClick={handleSave} disabled={isSaving} className="bg-violet-600 hover:bg-violet-700 text-white min-w-[140px]">
-                                {isSaving ? 'Connecting...' : 'Save & Connect'}
+                                {isSaving ? (t ? 'Đang kết nối...' : 'Connecting...') : (t ? 'Lưu & Kết nối' : 'Save & Connect')}
                             </Button>
                         </div>
                     </div>
 
                     {/* Right Info Panel */}
                     <div className="w-[45%] bg-muted/30 border-l p-6 flex flex-col relative overflow-y-auto">
-                        {/* Decorative background shapes */}
-                        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl"></div>
-                        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl"></div>
-
+                        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl" />
                         <div className="relative z-10">
                             <h3 className="text-lg font-semibold flex items-center gap-2 mb-6">
                                 <HelpCircle className="w-5 h-5 text-violet-500" />
-                                Connection Guide
+                                {t ? 'Hướng dẫn kết nối' : 'Connection Guide'}
                             </h3>
-
-                            <div className="space-y-6">
-                                <div className="bg-background/80 backdrop-blur-sm border rounded-lg p-4 shadow-sm">
-                                    <h4 className="text-sm font-bold flex items-center gap-2 mb-2">
-                                        <Server className="w-4 h-4 text-blue-500" />
-                                        Connecting to Cloud DBs
-                                    </h4>
-                                    <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                                        Data Explorer can connect directly to cloud databases like <strong>AWS RDS, Supabase, Neon, or PlanetScale</strong>. Just paste the Endpoint/Host URI into the Host field.
-                                    </p>
-                                    <div className="bg-blue-500/10 border border-blue-500/20 rounded p-2 text-[11px] text-blue-600 dark:text-blue-400 font-medium flex items-start gap-2">
-                                        <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                                        <span><strong>Crucial Step:</strong> Ensure you have whitelisted your current IP address (Inbound Rules) in your Cloud Provider's firewall settings, otherwise the connection will timeout.</span>
+                            <div className="space-y-4 text-xs">
+                                <div className="p-4 bg-background/80 border rounded-lg shadow-sm">
+                                    <h4 className="font-bold flex items-center gap-2 mb-2"><Server className="w-4 h-4 text-blue-500" /> Cloud Databases</h4>
+                                    <p className="text-muted-foreground leading-relaxed">{t ? 'Whitelist địa chỉ IP của server này trong cấu hình Firewall của Cloud Provider (AWS, Supabase, Neon).' : 'Whitelist this server\'s IP in your Cloud Provider\'s Firewall (AWS, Supabase, Neon).'}</p>
+                                </div>
+                                <div className="p-4 bg-background/80 border rounded-lg shadow-sm">
+                                    <h4 className="font-bold flex items-center gap-2 mb-2"><Zap className="w-4 h-4 text-orange-500" /> Default Ports</h4>
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between"><span>Postgres</span><strong>5432</strong></div>
+                                        <div className="flex justify-between"><span>MySQL</span><strong>3306</strong></div>
+                                        <div className="flex justify-between"><span>SQL Server</span><strong>1433</strong></div>
                                     </div>
                                 </div>
-
-                                <div className="bg-background/80 backdrop-blur-sm border rounded-lg p-4 shadow-sm">
-                                    <h4 className="text-sm font-bold flex items-center gap-2 mb-3">
-                                        <Zap className="w-4 h-4 text-orange-500" />
-                                        Common Default Ports
-                                    </h4>
-                                    <ul className="space-y-2 text-xs">
-                                        <li className="flex justify-between items-center bg-muted/50 px-2 py-1.5 rounded">
-                                            <span className="font-medium">PostgreSQL</span>
-                                            <code className="bg-background px-1.5 py-0.5 rounded border text-muted-foreground">5432</code>
-                                        </li>
-                                        <li className="flex justify-between items-center bg-muted/50 px-2 py-1.5 rounded">
-                                            <span className="font-medium">MySQL</span>
-                                            <code className="bg-background px-1.5 py-0.5 rounded border text-muted-foreground">3306</code>
-                                        </li>
-                                        <li className="flex justify-between items-center bg-muted/50 px-2 py-1.5 rounded">
-                                            <span className="font-medium">SQL Server</span>
-                                            <code className="bg-background px-1.5 py-0.5 rounded border text-muted-foreground">1433</code>
-                                        </li>
-                                    </ul>
-                                </div>
-
-                                <div className="bg-background/80 backdrop-blur-sm border rounded-lg p-4 shadow-sm">
-                                    <h4 className="text-sm font-bold flex items-center gap-2 mb-2">
-                                        <Key className="w-4 h-4 text-green-500" />
-                                        Security Notice
-                                    </h4>
-                                    <p className="text-xs text-muted-foreground leading-relaxed">
-                                        Your credentials are encrypted before being stored for the session. Data Explorer establishes a direct, secure TCP pipeline to your database.
-                                    </p>
+                                <div className="p-4 bg-background/80 border rounded-lg shadow-sm">
+                                    <h4 className="font-bold flex items-center gap-2 mb-2"><Key className="w-4 h-4 text-green-500" /> {t ? 'Mã hóa an toàn' : 'Secure Encryption'}</h4>
+                                    <p className="text-muted-foreground leading-relaxed">{t ? 'Thông tin đăng nhập của bạn được mã hóa AES-256-GCM trước khi lưu trữ.' : 'Your credentials are AES-256-GCM encrypted before storage.'}</p>
                                 </div>
                             </div>
                         </div>

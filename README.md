@@ -14,7 +14,10 @@
 - **Chat persistence**: Unlimited sessions and history safely stored in local state.
 
 ### 🔌 Multi-Database Strategy
-- **Unified Engine Architecture**: Connect seamlessly to **PostgreSQL, MySQL, SQL Server, and ClickHouse** using a flexible strategy pattern.
+- **Unified Engine Architecture**: Connect seamlessly to multiple database engines using a flexible strategy pattern:
+    - **PostgreSQL** (Neon, Supabase, RDS, Local)
+    - **MySQL** (PlanetScale, Local, TiDB)
+    - **SQL Server** (Azure SQL, Local MSSQL)
 - **Enterprise-Grade Security**: All saved database connection credentials and passwords are encrypted in the central database using **AES-256-GCM**, guaranteeing prevention of plain-text exposure even in local persistence.
 - **Centralized Persistence**: Migrated from ephemeral local storage to a persistent **PostgreSQL (Supabase)** infrastructure to natively support cloud deployment and team collaboration without data loss across redeployments.
 - **Real-time Discovery**: High-performance metadata inspection for schemas, views, and complex constraints protected against SQL Injection interpolation attacks.

@@ -46,7 +46,6 @@ export const DOCS_STRUCTURE: DocSection[] = [
             { id: 'postgres', title: 'PostgreSQL', titleEn: 'PostgreSQL' },
             { id: 'mysql', title: 'MySQL', titleEn: 'MySQL' },
             { id: 'mssql', title: 'SQL Server', titleEn: 'SQL Server' },
-            { id: 'clickhouse', title: 'ClickHouse', titleEn: 'ClickHouse' },
         ]
     },
     {
@@ -67,6 +66,7 @@ export const DOCS_STRUCTURE: DocSection[] = [
         titleEn: 'AI Assistant',
         icon: <BookOpen className="w-4 h-4" />,
         items: [
+            { id: 'ai-service', title: 'Dịch vụ AI Gemini', titleEn: 'Gemini AI Service' },
             { id: 'sql-generation', title: 'Tạo mã SQL', titleEn: 'SQL Generation' },
             { id: 'vision', title: 'Thị giác Gemini', titleEn: 'Gemini Vision' },
             { id: 'explain', title: 'Giải thích truy vấn', titleEn: 'Query Explanation' },
