@@ -1,5 +1,5 @@
-import { Layout, Database, Activity } from 'lucide-react';
-import { DocPageLayout, DocSection, Prose } from '../primitives';
+import { Layout, Share2, Search, Zap, MousePointer2 } from 'lucide-react';
+import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
@@ -9,102 +9,89 @@ export function ErdSection({ lang }: Props) {
         <DocPageLayout
             title={t ? 'Sơ đồ Thực thể Quan hệ (ERD)' : 'Entity Relationship Diagram (ERD)'}
             subtitle={t
-                ? 'Quan sát, phân tích và chỉnh sửa cấu trúc database thông qua đồ thị tương tác mạnh mẽ — với auto-layout thông minh và khả năng thao tác schema trực tiếp.'
-                : 'Visualize, analyze, and modify database structure through powerful interactive graphs — with smart auto-layout and direct schema manipulation.'}
+                ? 'Công cụ thiết kế và trực quan hóa database mạnh mẽ, giúp bạn hiểu sâu cấu trúc hệ thống phức tạp thông qua đồ thị tương tác.'
+                : 'A powerful database design and visualization tool, helping you gain deep insights into complex system structures through interactive graphs.'}
         >
-            {/* Feature Cards */}
-            <div className="grid md:grid-cols-2 gap-6">
-                <div className="p-8 border rounded-3xl bg-card space-y-4 hover:shadow-xl transition-all group">
-                    <div className="bg-emerald-500/10 w-fit p-3 rounded-2xl text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                        <Layout className="w-6 h-6" />
+            <Callout type="tip">
+                <p className="font-bold">{t ? '💡 Reverse Engineering thông minh' : '💡 Intelligent Reverse Engineering'}</p>
+                <p className="mt-1 text-muted-foreground italic">
+                    {t
+                        ? 'Data Explorer tự động quét "information_schema" để phát hiện các ràng buộc Foreign Key thực tế, giúp bạn tái hiện chính xác kiến trúc database hiện hữu mà không cần vẽ thủ công.'
+                        : 'Data Explorer automatically scans "information_schema" to detect actual Foreign Key constraints, helping you accurately reproduce existing database architecture without manual drawing.'}
+                </p>
+            </Callout>
+
+            {/* Core Capabilities */}
+            <FeatureGrid>
+                <InfoCard icon={<Layout className="w-6 h-6 text-emerald-500" />} title={t ? 'Auto-Layout (Dagre Engine)' : 'Auto-Layout (Dagre Engine)'} color="emerald">
+                    <p>{t
+                        ? 'Sử dụng thuật toán Dagre để tự động sắp xếp hàng trăm bảng một cách tối ưu. Giảm thiểu các đường chéo chồng chéo và tối ưu hóa luồng dữ liệu (Data Flow) theo kiến trúc hình cây hoặc phân tầng.'
+                        : 'Uses the Dagre algorithm to automatically arrange hundreds of tables optimally. Minimizes overlapping lines and optimizes data flow according to tree or hierarchical architectures.'}</p>
+                </InfoCard>
+                <InfoCard icon={<Zap className="w-6 h-6 text-blue-500" />} title={t ? 'Phản hồi Real-time' : 'Real-time Feedback'} color="blue">
+                    <p>{t
+                        ? 'Mọi thay đổi trên sơ đồ (như kéo nối khóa ngoại) đều được đồng bộ tức thì với SQL Script. Bạn có thể xem trước lệnh ALTER TABLE trước khi áp dụng trực tiếp vào database.'
+                        : 'Every change on the diagram (like dragging foreign key connectors) is instantly synced with the SQL Script. You can preview ALTER TABLE commands before applying them directly to the database.'}</p>
+                </InfoCard>
+            </FeatureGrid>
+
+            {/* Technical Deep Dive */}
+            <DocSection title={t ? 'Kiến trúc Đồ thị (React Flow)' : 'Graph Architecture (React Flow)'}>
+                <Prose>
+                    {t
+                        ? 'ERD Engine được xây dựng trên nền tảng React Flow, cung cấp khả năng render vector (SVG) mượt mà ngay cả khi làm việc với các Schema khổng lồ (vàng nghìn bảng). Hệ thống sử dụng cơ chế "Zoom-to-Content" và "Viewport Virtualization" để đảm bảo hiệu năng tối đa trên trình duyệt.'
+                        : 'The ERD Engine is built on React Flow, providing smooth vector (SVG) rendering even when working with massive schemas (thousands of tables). The system uses "Zoom-to-Content" and "Viewport Virtualization" mechanisms to ensure maximum browser performance.'}
+                </Prose>
+                <div className="grid md:grid-cols-2 gap-4 mt-8">
+                    <div className="p-6 border rounded-3xl bg-muted/10 relative group">
+                        <Search className="w-8 h-8 text-primary mb-4 opacity-50 group-hover:opacity-100 transition-opacity" />
+                        <h5 className="font-bold mb-2">{t ? 'Global Search & Focus' : 'Global Search & Focus'}</h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{t ? 'Tìm kiếm nhanh bất kỳ bảng hoặc cột nào trong sơ đồ. Hệ thống sẽ tự động điều hướng (pan) và zoom vào vị trí đó.' : 'Quickly search for any table or column in the diagram. The system will automatically pan and zoom to that location.'}</p>
                     </div>
-                    <h4 className="font-bold text-xl">Auto-Layout</h4>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{t
-                        ? 'Tự động sắp xếp các bảng dựa trên mối liên hệ khóa ngoại bằng engine Dagre. Thuật toán phân tích dependency graph và tối ưu vị trí để giảm thiểu số đường giao nhau (edge crossings). Bạn cũng có thể chọn giữa layout ngang (left-to-right) hoặc dọc (top-to-bottom).'
-                        : 'Automatically arrange tables based on foreign key relationships using the Dagre engine. The algorithm analyzes the dependency graph and optimizes positions to minimize edge crossings. You can also choose between horizontal (left-to-right) or vertical (top-to-bottom) layout.'}</p>
-                </div>
-                <div className="p-8 border rounded-3xl bg-card space-y-4 hover:shadow-xl transition-all group">
-                    <div className="bg-blue-500/10 w-fit p-3 rounded-2xl text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                        <Database className="w-6 h-6" />
+                    <div className="p-6 border rounded-3xl bg-muted/10 relative group">
+                        <Share2 className="w-8 h-8 text-indigo-500 mb-4 opacity-50 group-hover:opacity-100 transition-opacity" />
+                        <h5 className="font-bold mb-2">{t ? 'Exporter Chuyên nghiệp' : 'Professional Exporter'}</h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{t ? 'Xuất sơ đồ ra PNG mật độ điểm ảnh cao (for presentation) hoặc SVG (for documentation) với đầy đủ metadata về kiểu dữ liệu.' : 'Export diagrams to high-DPI PNG (for presentations) or SVG (for documentation) with complete data type metadata.'}</p>
                     </div>
-                    <h4 className="font-bold text-xl">{t ? 'Thao tác Schema trực tiếp' : 'Direct Schema Mutations'}</h4>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{t
-                        ? 'ERD không chỉ để xem — bạn có thể thao tác trực tiếp trên đồ thị. Kéo đường nối giữa hai bảng để tạo khóa ngoại mới (ALTER TABLE ... ADD CONSTRAINT). Click vào đường nối và bấm Delete để xóa ràng buộc (DROP CONSTRAINT). Tất cả thay đổi đều tạo SQL tương ứng.'
-                        : 'ERD is not just for viewing — you can manipulate directly on the graph. Drag a connector between two tables to create a new foreign key (ALTER TABLE ... ADD CONSTRAINT). Click a connector and press Delete to remove the constraint (DROP CONSTRAINT). All changes generate corresponding SQL.'}</p>
                 </div>
-            </div>
+            </DocSection>
 
             {/* Interaction Guide */}
-            <DocSection title={t ? 'Hướng dẫn Tương tác' : 'Interaction Guide'}>
-                <div className="space-y-6 p-8 bg-muted/20 border rounded-3xl shadow-inner">
-                    <div className="flex items-center gap-3">
-                        <Activity className="w-5 h-5" />
-                        <h3 className="font-bold text-xl">{t ? 'Các thao tác chuột & bàn phím' : 'Mouse & Keyboard Interactions'}</h3>
-                    </div>
-                    <ul className="space-y-4 text-sm text-muted-foreground">
-                        {[
-                            { key: t ? 'Chuột trái + Click bảng' : 'Left Click Table', desc: t ? 'Chọn bảng để xem chi tiết: danh sách cột, kiểu dữ liệu, primary key, indexes và constraints.' : 'Select a table to view details: column list, data types, primary key, indexes, and constraints.' },
-                            { key: t ? 'Chuột trái + Kéo bảng' : 'Left Click + Drag Table', desc: t ? 'Di chuyển vị trí bảng trên canvas. Vị trí mới được lưu tạm thời trong phiên làm việc.' : 'Move table position on canvas. New position is temporarily saved in the current session.' },
-                            { key: t ? 'Chuột phải bảng' : 'Right Click Table', desc: t ? 'Menu ngữ cảnh: Copy tên bảng, Copy CREATE TABLE SQL, xem trong Query Editor, hoặc xóa khỏi canvas.' : 'Context menu: Copy table name, Copy CREATE TABLE SQL, view in Query Editor, or remove from canvas.' },
-                            { key: t ? 'Click đường nối (Edge)' : 'Click Edge (Connector)', desc: t ? 'Chọn relationship để xem chi tiết foreign key: bảng nguồn, bảng đích, cột tham chiếu, và loại ON DELETE/ON UPDATE action.' : 'Select a relationship to view FK details: source table, target table, referenced columns, and ON DELETE/ON UPDATE actions.' },
-                            { key: t ? 'Nút + (Thêm bảng)' : 'Plus Button (+)', desc: t ? 'Thêm bảng từ danh sách sidebar vào canvas ERD. Bạn có thể tìm kiếm bảng theo tên.' : 'Add tables from the sidebar list to the ERD canvas. You can search tables by name.' },
-                            { key: t ? 'Scroll (Zoom)' : 'Scroll Wheel (Zoom)', desc: t ? 'Phóng to/thu nhỏ canvas. Giữ Ctrl + Scroll để zoom chính xác hơn. Double-click vùng trống để reset zoom.' : 'Zoom in/out on canvas. Hold Ctrl + Scroll for precise zooming. Double-click empty area to reset zoom.' },
-                            { key: t ? 'Minimap' : 'Minimap', desc: t ? 'Bản đồ thu nhỏ ở góc dưới bên phải giúp điều hướng nhanh khi có nhiều bảng trên canvas.' : 'Miniature map in the bottom-right corner for quick navigation when many tables are on canvas.' },
-                        ].map((item, i) => (
-                            <li key={i} className="flex items-center gap-4">
-                                <kbd className="bg-background border-2 border-muted-foreground/20 rounded-lg px-3 py-1.5 text-[10px] font-bold shadow-sm whitespace-nowrap min-w-[180px] text-center">{item.key}</kbd>
-                                <span>{item.desc}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            </DocSection>
-
-            {/* Relationship Types */}
-            <DocSection title={t ? 'Loại quan hệ được hỗ trợ' : 'Supported Relationship Types'}>
-                <div className="border rounded-2xl overflow-hidden">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="bg-muted/50">
-                                <th className="text-left p-4 font-bold">{t ? 'Loại' : 'Type'}</th>
-                                <th className="text-left p-4 font-bold">{t ? 'Ký hiệu' : 'Notation'}</th>
-                                <th className="text-left p-4 font-bold">{t ? 'Mô tả' : 'Description'}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                            {[
-                                { type: 'One-to-One', notation: '1 — 1', desc: t ? 'Một bản ghi trong bảng A liên kết với chính xác một bản ghi trong bảng B (UNIQUE FK).' : 'One record in table A links to exactly one record in table B (UNIQUE FK).' },
-                                { type: 'One-to-Many', notation: '1 — *', desc: t ? 'Một bản ghi trong bảng A liên kết với nhiều bản ghi trong bảng B. Đây là loại phổ biến nhất.' : 'One record in table A links to many records in table B. This is the most common type.' },
-                                { type: 'Many-to-Many', notation: '* — *', desc: t ? 'Thể hiện qua junction table (bảng trung gian) với hai FK. ERD hiển thị cả ba bảng và hai edges.' : 'Represented through a junction table (intermediate table) with two FKs. ERD shows all three tables and two edges.' },
-                            ].map((row, i) => (
-                                <tr key={i} className="hover:bg-muted/20 transition-colors">
-                                    <td className="p-4 font-bold">{row.type}</td>
-                                    <td className="p-4 font-mono text-primary font-bold">{row.notation}</td>
-                                    <td className="p-4 text-muted-foreground">{row.desc}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </DocSection>
-
-            {/* Export Options */}
-            <DocSection title={t ? 'Xuất sơ đồ ERD' : 'ERD Export Options'}>
-                <Prose>{t
-                    ? 'Bạn có thể xuất sơ đồ ERD dưới nhiều định dạng để đính kèm vào tài liệu, báo cáo hoặc chia sẻ với team:'
-                    : 'You can export ERD diagrams in multiple formats for attaching to documents, reports, or sharing with your team:'}</Prose>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <DocSection title={t ? 'Cẩm nang điều khiển' : 'Control Guide'}>
+                <div className="space-y-4">
                     {[
-                        { format: 'PNG', desc: t ? 'Hình ảnh chất lượng cao' : 'High quality image' },
-                        { format: 'SVG', desc: t ? 'Vector, co giãn không vỡ' : 'Scalable vector' },
-                        { format: 'SQL DDL', desc: t ? 'CREATE TABLE scripts' : 'CREATE TABLE scripts' },
-                        { format: 'JSON', desc: t ? 'Schema metadata' : 'Schema metadata' },
+                        { k: <><MousePointer2 className="w-3 h-3 inline" /> Left Click</>, d: t ? 'Chọn bảng / xem chi tiết Index & Constraints' : 'Select table / view Index & Constraints details' },
+                        { k: 'Space + Drag', d: t ? 'Di chuyển canvas (Panning) nhanh chóng' : 'Quickly pan the canvas' },
+                        { k: 'Ctrl + Scroll', d: t ? 'Phóng to/thu nhỏ tập trung vào con trỏ' : 'Zoom in/out focused on cursor' },
+                        { k: 'Double Click', d: t ? 'Reset zoom và căn giữa sơ đồ' : 'Reset zoom and center diagram' },
                     ].map((item, i) => (
-                        <div key={i} className="p-4 border rounded-xl text-center bg-muted/10 hover:border-primary/50 transition-colors">
-                            <span className="font-mono text-primary font-bold block">{item.format}</span>
-                            <span className="text-[10px] text-muted-foreground">{item.desc}</span>
+                        <div key={i} className="flex items-center justify-between p-4 border rounded-2xl bg-card hover:border-primary/30 transition-colors">
+                            <span className="text-xs font-black uppercase tracking-widest text-primary">{item.k}</span>
+                            <span className="text-xs text-muted-foreground font-medium">{item.d}</span>
                         </div>
                     ))}
+                </div>
+            </DocSection>
+
+            {/* DB Architect Pro-tips */}
+            <DocSection title={t ? 'Mẹo cho Database Architect' : 'Pro-tips for Database Architects'}>
+                <div className="p-10 rounded-[40px] bg-indigo-600 text-white relative overflow-hidden group">
+                    <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all" />
+                    <h4 className="text-2xl font-bold mb-6 tracking-tight">{t ? 'Thiết kế Schema tối ưu' : 'Optimal Schema Design'}</h4>
+                    <ul className="space-y-4 text-sm text-indigo-100">
+                        <li className="flex gap-3">
+                            <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0 text-[10px] font-bold">1</div>
+                            <p>{t ? 'Sử dụng màu sắc để phân nhóm các bảng theo Module logic (Ví dụ: Đỏ cho Finance, Xanh cho User).' : 'Use colors to group tables by logical modules (e.g., Red for Finance, Blue for User).'}</p>
+                        </li>
+                        <li className="flex gap-3">
+                            <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0 text-[10px] font-bold">2</div>
+                            <p>{t ? 'Tận dụng ERD để phát hiện các thiếu sót về Index trên các cột Foreign Key — một nguyên nhân gây chậm join.' : 'Leverage ERD to detect missing indexes on Foreign Key columns — a common cause of slow joins.'}</p>
+                        </li>
+                        <li className="flex gap-3">
+                            <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0 text-[10px] font-bold">3</div>
+                            <p>{t ? 'Xuất SQL DDL trực tiếp từ giao diện thiết kế để đảm bảo Version Control (Git) luôn cập nhật.' : 'Export SQL DDL directly from the design interface to ensure Version Control (Git) is always up to date.'}</p>
+                        </li>
+                    </ul>
                 </div>
             </DocSection>
         </DocPageLayout>
