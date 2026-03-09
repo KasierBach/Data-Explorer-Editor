@@ -15,6 +15,7 @@ export interface TabSlice {
     closeTab: (tabId: string) => void;
     setActiveTab: (tabId: string) => void;
     updateTabMetadata: (tabId: string, metadata: any) => void;
+    reorderTabs: (fromIndex: number, toIndex: number) => void;
     openQueryTab: () => void;
     openInsightsTab: (connectionId: string, database?: string) => void;
     openVisualizeTab: () => void;
@@ -53,10 +54,24 @@ export const createTabSlice: StateCreator<TabSlice & ConnectionLookup, [], [], T
         ),
     })),
 
+    reorderTabs: (fromIndex, toIndex) => set((state) => {
+        const newTabs = [...state.tabs];
+        const [moved] = newTabs.splice(fromIndex, 1);
+        newTabs.splice(toIndex, 0, moved);
+        return { tabs: newTabs };
+    }),
+
     openQueryTab: () => set((state) => {
+        const existingQueryNumbers = state.tabs
+            .filter(t => t.type === 'query')
+            .map(t => {
+                const match = t.title.match(/^Query (\d+)$/);
+                return match ? parseInt(match[1], 10) : 0;
+            });
+        const nextNumber = existingQueryNumbers.length > 0 ? Math.max(...existingQueryNumbers) + 1 : 1;
         const newTab: Tab = {
             id: `query-${Date.now()}`,
-            title: 'New Query',
+            title: `Query ${nextNumber}`,
             type: 'query',
             metadata: {},
         };
