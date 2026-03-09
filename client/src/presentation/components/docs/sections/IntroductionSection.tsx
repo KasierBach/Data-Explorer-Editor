@@ -1,4 +1,4 @@
-import { Zap, Database, BookOpen, Layers, MousePointer2 } from 'lucide-react';
+import { Zap, Database, BookOpen } from 'lucide-react';
 import { Badge } from '@/presentation/components/ui/badge';
 import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, Callout, CodeBlock, CodeComment, CodeLine } from '../primitives';
 

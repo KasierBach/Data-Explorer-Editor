@@ -1,5 +1,5 @@
 import { Cpu, Layout, Globe, Terminal, Box } from 'lucide-react';
-import { DocPageLayout, DocSection, DocSubSection, Prose, StepBlock, CodeBlock, CodeComment, CodeLine, CodeWarning, Callout } from '../primitives';
+import { DocPageLayout, DocSection, Prose, StepBlock, CodeBlock, CodeComment, CodeLine, CodeWarning } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 

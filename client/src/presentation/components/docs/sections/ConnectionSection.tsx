@@ -1,4 +1,4 @@
-import { Shield, Database, Zap, Lock } from 'lucide-react';
+import { Shield, Zap, Lock } from 'lucide-react';
 import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment, CodeLine } from '../primitives';
 
 interface Props {
