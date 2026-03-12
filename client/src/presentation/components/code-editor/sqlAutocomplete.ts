@@ -300,3 +300,124 @@ export function createSqlCompletionProvider(
         },
     };
 }
+
+// ─── AI Inline Completion (Ghost Text) ───
+
+let autocompleteTimeout: ReturnType<typeof setTimeout> | null = null;
+let currentRequestId = 0;
+
+export function createAiInlineCompletionProvider(
+    activeConnectionId: string | null,
+    activeDatabase: string | undefined,
+    aiService: any,
+): languages.InlineCompletionsProvider {
+    return {
+        provideInlineCompletions: async (model, position, _context, token) => {
+            if (!activeConnectionId) return { items: [] };
+
+            const lineContent = model.getLineContent(position.lineNumber);
+            if (lineContent.trim().length < 3) return { items: [] };
+
+            // Only suppress Ghost Text when cursor is RIGHT AFTER "keyword " (keyword + space)
+            // This lets the standard popup show table/column names instead.
+            // But if user is mid-typing (no trailing space), let everything work normally.
+            const textBeforeCursor = lineContent.substring(0, position.column - 1);
+            const endsWithSpace = textBeforeCursor.endsWith(' ');
+            
+            if (endsWithSpace) {
+                const trimmed = textBeforeCursor.trimEnd().toUpperCase();
+                const lastWord = trimmed.split(/\s+/).pop() || '';
+                const popupKeywords = [
+                    'SELECT', 'FROM', 'WHERE', 'JOIN', 'UPDATE', 'INSERT', 'INTO',
+                    'SET', 'DELETE', 'ORDER', 'GROUP', 'AND', 'OR', 'ON', 'BY',
+                    'LEFT', 'RIGHT', 'INNER', 'OUTER', 'CROSS', 'HAVING', 'AS',
+                    'TABLE', 'IN', 'VALUES', 'LIKE', 'BETWEEN', 'NOT', 'IS',
+                ];
+                if (popupKeywords.includes(lastWord)) {
+                    return { items: [] };
+                }
+            }
+
+            // 1. Clear the previous timeout if user is still typing
+            if (autocompleteTimeout) {
+                clearTimeout(autocompleteTimeout);
+            }
+
+            // Generate a unique ID for this request
+            currentRequestId++;
+            const requestId = currentRequestId;
+
+            // 2. Wrap the API call in a Promise that resolves after a delay (Debounce)
+            return new Promise<{ items: any[] }>((resolve) => {
+                autocompleteTimeout = setTimeout(async () => {
+                    // If this request is no longer the latest one or was cancelled, abort
+                    if (requestId !== currentRequestId || token.isCancellationRequested) {
+                        resolve({ items: [] });
+                        return;
+                    }
+
+                    const beforeCursor = model.getValueInRange({
+                        startLineNumber: 1,
+                        startColumn: 1,
+                        endLineNumber: position.lineNumber,
+                        endColumn: position.column,
+                    });
+
+                    const afterCursor = model.getValueInRange({
+                        startLineNumber: position.lineNumber,
+                        startColumn: position.column,
+                        endLineNumber: model.getLineCount(),
+                        endColumn: model.getLineMaxColumn(model.getLineCount()),
+                    });
+
+                    console.log(`[AI Autocomplete] Requesting for: "${beforeCursor.slice(-50)}"`);
+
+                    try {
+                        const completion = await aiService.getAutocomplete({
+                            connectionId: activeConnectionId,
+                            database: activeDatabase,
+                            beforeCursor,
+                            afterCursor,
+                        });
+
+                        // Double check after await, to make sure it's still relevant
+                        if (requestId !== currentRequestId || token.isCancellationRequested) {
+                            resolve({ items: [] });
+                            return;
+                        }
+
+                        if (!completion) {
+                            console.log('[AI Autocomplete] No completion received from server.');
+                            resolve({ items: [] });
+                            return;
+                        }
+
+                        console.log(`[AI Autocomplete] Got prediction: "${completion}"`);
+
+                        resolve({
+                            items: [
+                                {
+                                    insertText: completion,
+                                    range: {
+                                        startLineNumber: position.lineNumber,
+                                        startColumn: position.column,
+                                        endLineNumber: position.lineNumber,
+                                        endColumn: position.column,
+                                    },
+                                },
+                            ],
+                        });
+                    } catch (err) {
+                        console.error('[AI Autocomplete] Fetch error:', err);
+                        resolve({ items: [] });
+                    }
+                }, 800); // 800ms delay — give popup time to appear first
+            });
+        },
+        disposeInlineCompletions: () => {
+            if (autocompleteTimeout) {
+                clearTimeout(autocompleteTimeout);
+            }
+        },
+    };
+}

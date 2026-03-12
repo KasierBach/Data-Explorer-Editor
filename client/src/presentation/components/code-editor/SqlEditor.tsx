@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { createSqlCompletionProvider, type SchemaInfo } from './sqlAutocomplete';
+import { useAppStore } from '@/core/services/store';
+import { useAiGhostText } from './useAiGhostText';
 
 interface SqlEditorProps {
     value: string;
@@ -12,7 +14,10 @@ interface SqlEditorProps {
 
 export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = "300px", onMount, schemaInfo }) => {
     const [theme, setTheme] = React.useState<'vs-dark' | 'light'>('vs-dark');
+    const { activeConnectionId, activeDatabase } = useAppStore();
     const disposableRef = useRef<any>(null);
+    const editorRef = useRef<any>(null);
+    const monacoInstanceRef = useRef<any>(null);
 
     useEffect(() => {
         const isDark = document.documentElement.classList.contains('dark');
@@ -33,11 +38,10 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = 
 
     const monaco = useMonaco();
 
-    // Register/update completion provider when schema info changes
+    // Register standard SQL completion provider
     useEffect(() => {
         if (!monaco) return;
 
-        // Dispose previous provider if any
         if (disposableRef.current) {
             disposableRef.current.dispose();
             disposableRef.current = null;
@@ -54,6 +58,15 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = 
             }
         };
     }, [monaco, schemaInfo]);
+
+    // AI Ghost Text (uses ContentWidget API instead of InlineCompletionsProvider)
+    useAiGhostText(editorRef, monacoInstanceRef, activeConnectionId, activeDatabase || undefined);
+
+    const handleEditorMount = (editor: any, monacoInstance: any) => {
+        editorRef.current = editor;
+        monacoInstanceRef.current = monacoInstance;
+        onMount?.(editor, monacoInstance);
+    };
 
     return (
         <Editor
@@ -74,12 +87,12 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = 
                 quickSuggestions: true,
                 wordBasedSuggestions: 'off',
                 suggest: {
-                    showKeywords: false, // We provide our own
+                    showKeywords: false,
                     preview: true,
                     showIcons: true,
                 },
             }}
-            onMount={onMount}
+            onMount={handleEditorMount}
         />
     );
 };

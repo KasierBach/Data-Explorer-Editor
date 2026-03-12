@@ -6,6 +6,6 @@ import { ConnectionsModule } from '../connections/connections.module';
 @Module({
     imports: [ConnectionsModule],
     controllers: [AiController],
-    providers: [AiService],
+    providers: [AiService], 
 })
 export class AiModule { }

@@ -5,6 +5,7 @@ import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GenerateSqlDto } from './dto/generate-sql.dto';
+import { AutocompleteDto } from './dto/autocomplete.dto';
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard)
@@ -122,5 +123,42 @@ export class AiController {
 
         res.write('data: [DONE]\n\n');
         res.end();
+    }
+
+    @Post('autocomplete')
+    async autocomplete(@Body() body: AutocompleteDto, @Req() req: any) {
+        const { connectionId, database, beforeCursor, afterCursor } = body;
+
+        console.log(`[AI:Autocomplete] Request received. Text ending with: "${beforeCursor.slice(-15)}"`);
+
+        let connection: any;
+        try {
+            connection = await this.connectionsService.findOne(connectionId, req.user.id);
+        } catch (error) {
+            console.error(`[AI:Autocomplete] Connection lookup failed for ID "${connectionId}"`);
+            throw new BadRequestException(`Connection not found`);
+        }
+
+
+        let pool: any;
+        try {
+            pool = await this.connectionsService.getPool(connectionId, database, req.user.id);
+        } catch (error) {
+            throw new InternalServerErrorException(`Cannot connect to database`);
+        }
+
+        const strategy = this.strategyFactory.getStrategy(connection.type);
+        const schemaContext = await this.aiService.gatherSchemaContext(pool, strategy, database);
+
+        const completion = await this.aiService.autocomplete({
+            beforeCursor,
+            afterCursor,
+            schemaContext,
+            databaseType: connection.type,
+        });
+
+        console.log(`[AI:Autocomplete] Completion result: "${completion?.slice(0, 80) || '(empty)'}"`);
+
+        return { completion };
     }
 }

@@ -546,4 +546,53 @@ ${dbContextSection}
 
         return context;
     }
+
+    async autocomplete(params: {
+        beforeCursor: string;
+        afterCursor?: string;
+        schemaContext?: string;
+        databaseType?: string;
+    }): Promise<string> {
+        const { beforeCursor, afterCursor = '', schemaContext, databaseType = 'postgres' } = params;
+
+        const systemPrompt = `You are a SQL autocomplete engine.
+Your task is to predict ONLY the NEXT continuation of a SQL query based on the text BEFORE the cursor.
+- **DO NOT repeat the text before the cursor**. ONLY output the exact characters that should be inserted directly at the cursor.
+- **ONLY return the prediction string**. Do NOT include explanations, markdown, or greetings.
+- Be concise. Only provide what would naturally follow.
+- Use the provided SCHEMA CONTEXT to suggest real table and column names.
+- Database engine: ${databaseType}.
+
+SCHEMA CONTEXT:
+${schemaContext || '(No schema context)'}
+
+TEXT BEFORE CURSOR:
+${beforeCursor}
+
+TEXT AFTER CURSOR:
+${afterCursor}
+
+---
+PREDICTION (Pure text only):`;
+
+        try {
+            // Use Gemini 3 Flash Preview (correct model ID from Google API docs)
+            const model = this.genAI.getGenerativeModel({
+                model: 'gemini-3-flash-preview',
+                generationConfig: {
+                    temperature: 0.1,
+                    maxOutputTokens: 256,
+                }
+            });
+
+            const result = await model.generateContent(systemPrompt);
+            const responseText = result.response.text().trim();
+
+            // Clean up: remove any accidental markdown backticks or prefixes
+            return responseText.replace(/^```sql\n?|```$/g, '').replace(/^SQL\s+/i, '').trim();
+        } catch (error) {
+            console.warn('[AiService] Autocomplete failed:', (error as any).message);
+            return '';
+        }
+    }
 }
