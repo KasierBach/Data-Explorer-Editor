@@ -7,6 +7,8 @@ const ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY || '12345678901234
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 
+const DEFAULT_KEY_FALLBACK = Buffer.from('12345678901234567890123456789012', 'utf-8');
+
 /**
  * Encrypts a plain text string using AES-256-GCM.
  * @param text The plain text to encrypt.
@@ -56,10 +58,25 @@ export function decryptAttribute(encryptedPayload: string): string {
         const decipher = crypto.createDecipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
         decipher.setAuthTag(authTag);
 
-        let decrypted = decipher.update(encryptedText, undefined, 'utf8');
-        decrypted += decipher.final('utf8');
-
-        return decrypted;
+        try {
+            let decrypted = decipher.update(encryptedText, undefined, 'utf8');
+            decrypted += decipher.final('utf8');
+            return decrypted;
+        } catch (error) {
+            // If main key fails, try the default fallback key (for legacy items)
+            if (ENCRYPTION_KEY.toString() !== DEFAULT_KEY_FALLBACK.toString()) {
+                try {
+                    const fallbackDecipher = crypto.createDecipheriv(ALGORITHM, DEFAULT_KEY_FALLBACK, iv);
+                    fallbackDecipher.setAuthTag(authTag);
+                    let decrypted = fallbackDecipher.update(encryptedText, undefined, 'utf8');
+                    decrypted += fallbackDecipher.final('utf8');
+                    return decrypted;
+                } catch (fallbackError) {
+                    throw error; // throw original error if fallback also fails
+                }
+            }
+            throw error;
+        }
     } catch (error) {
         console.error('Decryption failed for payload:', error);
         throw new Error('Failed to decrypt database credentials.');
