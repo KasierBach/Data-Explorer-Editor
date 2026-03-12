@@ -25,6 +25,22 @@ export const ConnectionDialog: React.FC = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Reset form states when dialog opens
+    React.useEffect(() => {
+        if (isConnectionDialogOpen) {
+            setType('postgres');
+            setName('');
+            setHost('localhost');
+            setPort('5432');
+            setUsername('postgres');
+            setPassword('');
+            setDatabase('');
+            setConnectionString('');
+            setError(null);
+            setIsSaving(false);
+        }
+    }, [isConnectionDialogOpen]);
+
     const parseConnectionString = () => {
         try {
             if (!connectionString.trim()) return;
