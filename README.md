@@ -11,6 +11,8 @@
 - **Vision Integration**: Upload screenshots of DB diagrams or whiteboards for AI-powered schema reconstruction (Gemini Vision).
 - **Global Assistant Panel**: A resizable, togglable sidebar available across all modules with real-time SSE (Server-Sent Events) streaming.
 - **Intelligent Multi-Model Fallback**: Reliable execution using a tiered model strategy (`Gemini 2.0 Flash` -> `Gemini 1.5 Pro`) for optimal speed and reasoning balance.
+- **Surgical Precision Autocomplete**: Inline AI suggestions that prioritize exact SQL syntax completion without hallucinating unnecessary explanations or repeating existing code.
+- **Chain Tabbing (Continuous Autocomplete)**: Seamlessly accept multi-line AI suggestions one token/line at a time using the `Tab` key, allowing for rapid, uninterrupted coding momentum.
 - **Chat persistence**: Unlimited sessions and history safely stored in local state.
 
 ### 🔌 Multi-Database Strategy
@@ -43,10 +45,12 @@
 - **Export Capabilities**: Clean data export to **CSV and Excel** formats.
 
 ### 🎨 Premium UI & Responsive Experience
+- **Fully Responsive Architecture**: Flawless cross-device experience from 320px mobile screens to 4K desktop displays.
 - **Mobile-Adaptive Interface**:
+  - **Animated Hamburger Menu**: Smooth transition to mobile navigation drawers with backdrop-blur effects.
+  - **Touch-Friendly Controls**: Optimized hit areas and `touch-action` support for interactive elements like connection selectors and query buttons.
   - **Overlay Navigation**: Dismissible mobile drawers for explorer and assistant modules.
-  - **Compact Toolbars**: Condensing UI actions into smart "More" menus on small screens.
-  - **Horizontal Tab Management**: Fluid scrolling for heavy multi-tab workflows.
+  - **Horizontal Tab Management**: Fluid scrolling for heavy multi-tab workflows with native iOS momentum scrolling support.
 - **High-Density Desktop Mode**: Optimized for productivity with minimal whitespace and high information density.
 - **Glassmorphism Design**: Sleek dark-mode aesthetic with backdrop-blur effects and subtle micro-animations.
 - **Framer-style Interactions**: Staggered reveals and intersection-based entry animations for a polished, premium feel.
