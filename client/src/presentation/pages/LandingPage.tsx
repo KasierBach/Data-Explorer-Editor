@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/presentation/components/ui/button';
 import { Badge } from '@/presentation/components/ui/badge';
@@ -29,6 +29,7 @@ export const LandingPage: React.FC = () => {
     const navigate = useNavigate();
     const { isAuthenticated, logout, lang } = useAppStore();
     const revealRefs = useRef<HTMLDivElement[]>([]);
+    const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
     useEffect(() => {
         const observer = new IntersectionObserver(
@@ -66,7 +67,7 @@ export const LandingPage: React.FC = () => {
 
             {/* Sticky Header with Glassmorphism */}
             <header className="fixed top-0 w-full z-50 bg-background/60 backdrop-blur-xl border-b border-white/5 supports-[backdrop-filter]:bg-background/60">
-                <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+                <div className="container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-2 font-bold text-xl tracking-tight cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
                             <Database className="w-4 h-4 text-white" />
@@ -89,7 +90,7 @@ export const LandingPage: React.FC = () => {
                         </a>
                     </nav>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4">
                         <LanguageSwitcher />
                         {isAuthenticated ? (
                             <div className="flex items-center gap-2">
@@ -105,19 +106,51 @@ export const LandingPage: React.FC = () => {
                                 <Button variant="ghost" size="sm" onClick={() => navigate('/login')} className="hidden sm:flex hover:bg-blue-500/10 hover:text-blue-500 text-xs uppercase tracking-wider">
                                     {lang === 'vi' ? 'Đăng nhập' : 'Login'}
                                 </Button>
-                                <Button size="sm" onClick={() => navigate('/login')} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-widest font-bold px-5">
+                                <Button size="sm" onClick={() => navigate('/login')} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-widest font-bold px-3 sm:px-5">
                                     {lang === 'vi' ? 'Bắt đầu' : 'Start Analysis'}
                                 </Button>
                             </>
                         )}
+                        {/* Mobile hamburger button */}
+                        <button
+                            className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
+                            onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+                            aria-label="Toggle menu"
+                        >
+                            <div className="w-5 flex flex-col gap-1">
+                                <span className={cn("h-0.5 bg-foreground rounded transition-all", isMobileNavOpen && "rotate-45 translate-y-1.5")} />
+                                <span className={cn("h-0.5 bg-foreground rounded transition-all", isMobileNavOpen && "opacity-0")} />
+                                <span className={cn("h-0.5 bg-foreground rounded transition-all", isMobileNavOpen && "-rotate-45 -translate-y-1.5")} />
+                            </div>
+                        </button>
                     </div>
                 </div>
+
+                {/* Mobile Navigation Drawer */}
+                {isMobileNavOpen && (
+                    <div className="md:hidden border-t border-white/5 bg-background/95 backdrop-blur-xl animate-in slide-in-from-top duration-200">
+                        <nav className="container mx-auto px-4 py-4 flex flex-col gap-3">
+                            <a href="#features" onClick={() => setIsMobileNavOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5">
+                                {lang === 'vi' ? 'Tính năng' : 'Features'}
+                            </a>
+                            <a href="#demo" onClick={() => setIsMobileNavOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5">
+                                {lang === 'vi' ? 'Bản demo' : 'Live Demo'}
+                            </a>
+                            <button onClick={() => { navigate('/docs'); setIsMobileNavOpen(false); }} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5 text-left">
+                                {lang === 'vi' ? 'Tài liệu' : 'Docs'}
+                            </button>
+                            <a href="#pricing" onClick={() => setIsMobileNavOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2">
+                                {lang === 'vi' ? 'Giá cả' : 'Pricing'}
+                            </a>
+                        </nav>
+                    </div>
+                )}
             </header>
 
             <main className="flex-1 flex flex-col relative z-10">
                 {/* Hero Section */}
                 <section className="relative pt-16 pb-12 md:pt-24 md:pb-16 overflow-hidden">
-                    <div className="container mx-auto px-6 text-center">
+                    <div className="container mx-auto px-4 sm:px-6 text-center">
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold mb-4 md:mb-6 animate-fade-in-up backdrop-blur-sm uppercase tracking-widest">
                             <Sparkles className="w-3 h-3" />
                             <span>v2.1: Cloud Sync & AI Insights</span>
@@ -146,7 +179,7 @@ export const LandingPage: React.FC = () => {
                     </div>
 
                     {/* High-Fidelity Mockup Section */}
-                    <div id="demo" ref={addToRevealRefs} className="reveal container mx-auto px-6 mt-10 md:mt-16 max-w-6xl">
+                    <div id="demo" ref={addToRevealRefs} className="reveal container mx-auto px-4 sm:px-6 mt-10 md:mt-16 max-w-6xl">
                         <div className="relative group">
                             {/* Decorative Glows */}
                             <div className="absolute -top-20 -left-20 w-64 h-64 bg-blue-500/20 rounded-full blur-[100px] animate-pulse" />
@@ -263,7 +296,7 @@ export const LandingPage: React.FC = () => {
 
                 {/* Features Section - Staggered Reveal */}
                 <section id="features" className="py-12 md:py-16 relative">
-                    <div className="container mx-auto px-6 relative z-10">
+                    <div className="container mx-auto px-4 sm:px-6 relative z-10">
                         <div ref={addToRevealRefs} className="reveal text-center mb-10 md:mb-16 max-w-3xl mx-auto">
                             <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 md:mb-6 uppercase">
                                 {lang === 'vi' ? 'Trí tuệ hợp nhất' : 'Unified Intelligence'}
@@ -395,7 +428,7 @@ export const LandingPage: React.FC = () => {
 
                 {/* Pricing Section */}
                 <section id="pricing" className="py-20 relative">
-                    <div className="container mx-auto px-6">
+                    <div className="container mx-auto px-4 sm:px-6">
                         <div ref={addToRevealRefs} className="reveal text-center mb-16 max-w-2xl mx-auto">
                             <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 uppercase">
                                 {lang === 'vi' ? 'Bảng giá Minh bạch' : 'Transparent Pricing'}
@@ -441,8 +474,8 @@ export const LandingPage: React.FC = () => {
                                 }
                             ].map((pkg, i) => (
                                 <div key={i} ref={addToRevealRefs} className={cn(
-                                    "reveal glass-panel p-8 rounded-3xl border flex flex-col items-start gap-6 relative group transition-all duration-500",
-                                    pkg.popular ? "border-blue-500/40 bg-blue-500/5 ring-1 ring-blue-500/20 scale-105" : "border-white/5",
+                                    "reveal glass-panel p-6 md:p-8 rounded-3xl border flex flex-col items-start gap-6 relative group transition-all duration-500",
+                                    pkg.popular ? "border-blue-500/40 bg-blue-500/5 ring-1 ring-blue-500/20 lg:scale-105" : "border-white/5",
                                     `stagger-${i + 1}`
                                 )}>
                                     {pkg.popular && (
@@ -478,7 +511,7 @@ export const LandingPage: React.FC = () => {
 
                 {/* Documentation CTA Section */}
                 <section id="docs" className="pb-32 relative">
-                    <div className="container mx-auto px-6">
+                    <div className="container mx-auto px-4 sm:px-6">
                         <div ref={addToRevealRefs} className="reveal glass-panel p-8 md:p-12 rounded-[2.5rem] border-white/5 bg-gradient-to-r from-background to-muted/20 flex flex-col md:flex-row items-center justify-between gap-10">
                             <div className="max-w-xl space-y-6">
                                 <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase leading-none">
@@ -512,7 +545,7 @@ export const LandingPage: React.FC = () => {
 
                 {/* Footer */}
                 <footer className="border-t border-white/5 bg-background/50 backdrop-blur-xl pt-12 md:pt-16 pb-12">
-                    <div className="container mx-auto px-6">
+                    <div className="container mx-auto px-4 sm:px-6">
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 md:gap-12 mb-12 md:mb-20">
                             <div className="col-span-2 lg:col-span-2">
                                 <div className="flex items-center gap-3 font-black text-2xl mb-6 tracking-tighter uppercase">

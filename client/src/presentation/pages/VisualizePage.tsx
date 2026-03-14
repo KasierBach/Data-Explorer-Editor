@@ -65,22 +65,22 @@ export function VisualizePage() {
     return (
         <div className="h-screen w-full bg-background flex flex-col overflow-hidden page-enter">
             {/* Header with connection selector */}
-            <header className="h-12 border-b bg-card flex items-center px-4 justify-between shrink-0 select-none">
-                <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/app')}>
+            <header className="h-12 border-b bg-card flex items-center px-3 md:px-4 justify-between shrink-0 select-none">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/app')}>
                         <ArrowLeft className="w-4 h-4" />
                     </Button>
-                    <div className="h-4 w-px bg-border" />
-                    <div className="flex items-center gap-2">
+                    <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
+                    <div className="flex items-center gap-2 shrink-0">
                         <div className="bg-emerald-500/10 p-1.5 rounded-lg">
                             <PieChart className="w-4 h-4 text-emerald-500" />
                         </div>
-                        <span className="text-sm font-bold">Chart Studio</span>
+                        <span className="text-sm font-bold hidden sm:inline">Chart Studio</span>
                     </div>
-                    <div className="h-4 w-px bg-border" />
+                    <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
                     {/* Connection Selector */}
                     <Select value={activeConnectionId} onValueChange={(id) => setActiveConnectionId(id)}>
-                        <SelectTrigger className="h-8 w-auto min-w-[140px] bg-muted/10 border-border/20 text-xs rounded-lg gap-1 pr-2">
+                        <SelectTrigger className="h-8 w-auto min-w-[100px] sm:min-w-[140px] bg-muted/10 border-border/20 text-xs rounded-lg gap-1 pr-2">
                             <div className="flex items-center gap-1.5">
                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
                                 <SelectValue />

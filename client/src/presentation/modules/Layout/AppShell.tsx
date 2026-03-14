@@ -42,7 +42,8 @@ export function AppShell() {
         if (!leftPanel.isDragging && sidebarWidth !== leftPanel.width && sidebarWidth > 0) {
             leftPanel.setWidth(sidebarWidth);
         }
-    }, [sidebarWidth, leftPanel]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sidebarWidth]);
 
     const anyDragging = leftPanel.isDragging || rightPanel.isDragging;
 

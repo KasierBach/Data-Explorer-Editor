@@ -67,18 +67,18 @@ export const Dashboard: React.FC = () => {
     }
 
     return (
-        <div className="h-full w-full bg-background p-8 overflow-auto animate-in fade-in duration-300">
+        <div className="h-full w-full bg-background p-4 md:p-8 overflow-auto animate-in fade-in duration-300">
             <div className="max-w-5xl mx-auto space-y-8">
 
                 {/* Header / Welcome Banner */}
                 <div className="flex flex-col gap-2 relative">
                     <div className="flex items-center justify-between">
-                        <h1 className="text-3xl font-bold tracking-tight">
+                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
                             {lang === 'vi' ? 'Chào mừng bạn đến với Data Explorer' : 'Welcome to Data Explorer'}
                         </h1>
                         <LanguageSwitcher />
                     </div>
-                    <p className="text-muted-foreground text-lg">
+                    <p className="text-muted-foreground text-base md:text-lg">
                         {lang === 'vi'
                             ? 'Quản lý cơ sở dữ liệu, thực hiện truy vấn và trực quan hóa dữ liệu một cách dễ dàng.'
                             : 'Manage your databases, execute queries, and visualize data with ease.'}
@@ -86,15 +86,15 @@ export const Dashboard: React.FC = () => {
                 </div>
 
                 {/* Quick Actions */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
                     <div className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer" onClick={() => openQueryTab()}>
-                        <div className="p-6 flex flex-col gap-4">
-                            <div className="p-3 w-fit rounded-lg bg-blue-100 text-blue-600">
+                        <div className="p-4 md:p-6 flex flex-col gap-3 md:gap-4">
+                            <div className="p-2 md:p-3 w-fit rounded-lg bg-blue-100 text-blue-600">
                                 <FileText className="h-6 w-6" />
                             </div>
                             <div>
-                                <h3 className="font-semibold text-lg">{lang === 'vi' ? 'Truy vấn mới' : 'New Query'}</h3>
-                                <p className="text-sm text-muted-foreground mt-1">
+                                <h3 className="font-semibold text-base md:text-lg">{lang === 'vi' ? 'Truy vấn mới' : 'New Query'}</h3>
+                                <p className="text-xs md:text-sm text-muted-foreground mt-1 hidden sm:block">
                                     {lang === 'vi' ? 'Mở trình chỉnh sửa SQL để chạy các truy vấn tùy ý.' : 'Open a SQL editor to run arbitrary queries.'}
                                 </p>
                             </div>
@@ -102,13 +102,13 @@ export const Dashboard: React.FC = () => {
                     </div>
 
                     <div className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer" onClick={() => openConnectionDialog()}>
-                        <div className="p-6 flex flex-col gap-4">
-                            <div className="p-3 w-fit rounded-lg bg-green-100 text-green-600">
+                        <div className="p-4 md:p-6 flex flex-col gap-3 md:gap-4">
+                            <div className="p-2 md:p-3 w-fit rounded-lg bg-green-100 text-green-600">
                                 <Plus className="h-6 w-6" />
                             </div>
                             <div>
-                                <h3 className="font-semibold text-lg">{lang === 'vi' ? 'Kết nối mới' : 'New Connection'}</h3>
-                                <p className="text-sm text-muted-foreground mt-1">
+                                <h3 className="font-semibold text-base md:text-lg">{lang === 'vi' ? 'Kết nối mới' : 'New Connection'}</h3>
+                                <p className="text-xs md:text-sm text-muted-foreground mt-1 hidden sm:block">
                                     {lang === 'vi' ? 'Kết nối với cơ sở dữ liệu PostgreSQL hoặc MySQL mới.' : 'Connect to a new PostgreSQL or MySQL database.'}
                                 </p>
                             </div>
@@ -116,13 +116,13 @@ export const Dashboard: React.FC = () => {
                     </div>
 
                     <div className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer" onClick={() => setSidebarOpen(true)}>
-                        <div className="p-6 flex flex-col gap-4">
-                            <div className="p-3 w-fit rounded-lg bg-orange-100 text-orange-600">
+                        <div className="p-4 md:p-6 flex flex-col gap-3 md:gap-4">
+                            <div className="p-2 md:p-3 w-fit rounded-lg bg-orange-100 text-orange-600">
                                 <Search className="h-6 w-6" />
                             </div>
                             <div>
-                                <h3 className="font-semibold text-lg">{lang === 'vi' ? 'Duyệt dữ liệu' : 'Browse Data'}</h3>
-                                <p className="text-sm text-muted-foreground mt-1">
+                                <h3 className="font-semibold text-base md:text-lg">{lang === 'vi' ? 'Duyệt dữ liệu' : 'Browse Data'}</h3>
+                                <p className="text-xs md:text-sm text-muted-foreground mt-1 hidden sm:block">
                                     {lang === 'vi' ? 'Khám phá các bảng và lược đồ trong thanh bên.' : 'Explore tables and schemas in the sidebar.'}
                                 </p>
                             </div>
@@ -133,13 +133,13 @@ export const Dashboard: React.FC = () => {
                         className={`group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer ${!activeConnectionId ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
                         onClick={() => activeConnectionId && setView('insights')}
                     >
-                        <div className="p-6 flex flex-col gap-4">
-                            <div className="p-3 w-fit rounded-lg bg-purple-100 text-purple-600">
+                        <div className="p-4 md:p-6 flex flex-col gap-3 md:gap-4">
+                            <div className="p-2 md:p-3 w-fit rounded-lg bg-purple-100 text-purple-600">
                                 <BarChart3 className="h-6 w-6" />
                             </div>
                             <div>
-                                <h3 className="font-semibold text-lg">{lang === 'vi' ? 'Thông tin chuyên sâu' : 'Database Insights'}</h3>
-                                <p className="text-sm text-muted-foreground mt-1">
+                                <h3 className="font-semibold text-base md:text-lg">{lang === 'vi' ? 'Thông tin chuyên sâu' : 'Database Insights'}</h3>
+                                <p className="text-xs md:text-sm text-muted-foreground mt-1 hidden sm:block">
                                     {lang === 'vi' ? 'Xem các chỉ số, mức sử dụng bộ nhớ và xu hướng.' : 'View metrics, storage usage, and trends.'}
                                 </p>
                             </div>
@@ -166,26 +166,26 @@ export const Dashboard: React.FC = () => {
                             {connections.length > 0 ? (
                                 <div className="divide-y">
                                     {connections.map((conn) => (
-                                        <div key={conn.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors group">
-                                            <div className="flex items-center gap-4">
-                                                <div className="p-2 rounded-full bg-primary/10 text-primary">
+                                        <div key={conn.id} className="p-3 md:p-4 flex items-center justify-between hover:bg-muted/50 transition-colors group">
+                                            <div className="flex items-center gap-3 md:gap-4 min-w-0 flex-1">
+                                                <div className="p-2 rounded-full bg-primary/10 text-primary shrink-0">
                                                     <Database className="h-5 w-5" />
                                                 </div>
-                                                <div>
-                                                    <p className="font-medium">{conn.name}</p>
-                                                    <p className="text-sm text-muted-foreground">
+                                                <div className="min-w-0">
+                                                    <p className="font-medium truncate">{conn.name}</p>
+                                                    <p className="text-xs md:text-sm text-muted-foreground truncate">
                                                         {conn.type} • {conn.host}:{conn.port} • {conn.database}
                                                     </p>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <Button variant="outline" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setActiveConnectionId(conn.id); setSidebarOpen(true); }}>
+                                            <div className="flex items-center gap-2 shrink-0 ml-2">
+                                                <Button variant="outline" size="sm" className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-xs" onClick={() => { setActiveConnectionId(conn.id); setSidebarOpen(true); }}>
                                                     {lang === 'vi' ? 'Kết nối' : 'Connect'}
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8 w-8"
+                                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8 w-8"
                                                     onClick={(e) => handleDelete(e, conn.id)}
                                                     disabled={isDeleting === conn.id}
                                                 >

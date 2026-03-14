@@ -320,3 +320,30 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Hide scrollbar utility — used by TabsBar and horizontal scroll areas */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Touch-friendly: prevent double-tap zoom on interactive elements */
+@media (pointer: coarse) {
+  button,
+  a,
+  [role="button"],
+  select,
+  input,
+  textarea {
+    touch-action: manipulation;
+  }
+}
+
+/* iOS smooth momentum scrolling for overflow areas */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+}
