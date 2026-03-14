@@ -29,13 +29,14 @@ class AiService {
         database?: string;
         beforeCursor: string;
         afterCursor?: string;
-    }): Promise<string> {
+    }, signal?: AbortSignal): Promise<string> {
         try {
             console.log('[AiService] Sending autocomplete request...');
             const response = await fetch(`${API_BASE_URL}/ai/autocomplete`, {
                 method: 'POST',
                 headers: this.getHeaders(),
                 body: JSON.stringify(params),
+                signal,
             });
 
             if (!response.ok) {

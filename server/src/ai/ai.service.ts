@@ -177,6 +177,7 @@ When the user provides files, text context, or images, DO NOT just give a superf
 
 3. **Documents (PDF, Text files, Markdown)**:
    - Extract the core arguments, architectures, or requirements.
+   - **URL Extraction**: Specifically look for and extract any important URLs (documentation links, support links, etc.) mentioned in the document.
    - If it's a documentation file, show the user exactly how to implement what they are asking for based on the doc.
    - Synthesize the information into clear, bulleted takeaways.
 
@@ -215,9 +216,11 @@ When the user provides files, text context, or images, DO NOT just give a superf
 ---
 
 # CITATION & SEARCH
-
+ 
 - When you use Google Search to find information, naturally incorporate what you find into your response.
-- Do NOT manually print raw URLs in your message — the system will automatically extract and display source links in a clean format.
+- **Official Links**: You ARE allowed and encouraged to provide official documentation URLs using Markdown format: \`[Title](https://...)\`. This is especially important when the user asks for a specific resource, download link, or documentation page.
+- **Accuracy**: Ensure the URLs you provide are valid and current. Prefer official domain names (e.g., postgresql.org, react.dev, docs.nestjs.com) over third-party blogs.
+- The system will also automatically display a consolidated list of source links at the bottom of your response for any search results found.
 - When citing statistics or specific claims, indicate the source in your text (e.g., "According to PostgreSQL documentation...").
 
 ---
@@ -555,35 +558,39 @@ ${dbContextSection}
     }): Promise<string> {
         const { beforeCursor, afterCursor = '', schemaContext, databaseType = 'postgres' } = params;
 
-        const systemPrompt = `You are a SQL autocomplete engine.
-Your task is to predict ONLY the NEXT continuation of a SQL query based on the text BEFORE the cursor.
-- **DO NOT repeat the text before the cursor**. ONLY output the exact characters that should be inserted directly at the cursor.
-- **ONLY return the prediction string**. Do NOT include explanations, markdown, or greetings.
-- Be concise. Only provide what would naturally follow.
-- Use the provided SCHEMA CONTEXT to suggest real table and column names.
-- Database engine: ${databaseType}.
-
-SCHEMA CONTEXT:
-${schemaContext || '(No schema context)'}
-
-TEXT BEFORE CURSOR:
-${beforeCursor}
-
-TEXT AFTER CURSOR:
-${afterCursor}
-
----
-PREDICTION (Pure text only):`;
-
         try {
-            // Use Gemini 3 Flash Preview (correct model ID from Google API docs)
+            // Use Gemini 3.1 Flash Lite — specifically designed for ultra-low latency autocomplete
             const model = this.genAI.getGenerativeModel({
-                model: 'gemini-3-flash-preview',
+                model: 'gemini-3.1-flash-lite-preview',
                 generationConfig: {
                     temperature: 0.1,
-                    maxOutputTokens: 256,
+                    maxOutputTokens: 32,
                 }
             });
+
+            // Keep context size reasonable to minimize latency
+            const trimmedBefore = beforeCursor.length > 1500 ? beforeCursor.slice(-1500) : beforeCursor;
+            const trimmedAfter = afterCursor.length > 300 ? afterCursor.slice(0, 300) : afterCursor;
+
+            const systemPrompt = `You are a SQL autocomplete engine for ${databaseType}.
+Your task: Predict the next FEW logical characters or a SHORT clause to insert at the cursor.
+- **Accuracy over Length**: Prefer a short, 100% correct snippet (like a column name or keyword) over a long query that might be wrong.
+- **Surgical Precision**: Only return what is highly likely based on the SCHEMA.
+- **Prioritize high-value continuations**: If a query structure looks complete, suggest useful clauses like 'WHERE', 'ORDER BY', 'LIMIT', or 'JOIN' instead of just a semicolon.
+- **NEVER repeat any text from the 'BEFORE' context**.
+- **ONLY return the raw string to be appended**. No markdown, no commentary.
+- Use the SCHEMA to suggest valid tables/columns.
+
+SCHEMA:
+${schemaContext || 'Empty'}
+
+BEFORE CURSOR:
+${trimmedBefore}
+
+AFTER CURSOR:
+${trimmedAfter}
+
+NEXT CHARACTERS:`;
 
             const result = await model.generateContent(systemPrompt);
             const responseText = result.response.text().trim();

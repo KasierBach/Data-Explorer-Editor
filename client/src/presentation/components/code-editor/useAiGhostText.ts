@@ -93,6 +93,114 @@ export function useAiGhostText(
         editor.addContentWidget(widget);
     }, [editorRef, monacoRef, clearGhostText]);
 
+
+    const abortControllerRef = useRef<AbortController | null>(null);
+
+    const triggerGhostText = useCallback((delay = 450) => {
+        const editor = editorRef.current;
+        if (!editor || !activeConnectionId) return;
+
+        clearGhostText();
+
+        // Cancel previous request
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+
+        currentRequestIdRef.current++;
+        const requestId = currentRequestIdRef.current;
+
+        debounceTimerRef.current = setTimeout(async () => {
+            if (requestId !== currentRequestIdRef.current) return;
+
+            const position = editor.getPosition();
+            if (!position) return;
+
+            const model = editor.getModel();
+            if (!model) return;
+
+            const lineContent = model.getLineContent(position.lineNumber);
+            if (lineContent.trim().length < 3) return;
+
+            // Check keywords
+            const textBefore = lineContent.substring(0, position.column - 1);
+            if (textBefore.endsWith(' ')) {
+                const lastWord = textBefore.trimEnd().split(/\s+/).pop()?.toUpperCase() || '';
+                if (POPUP_KEYWORDS.has(lastWord)) return;
+            }
+
+            const beforeCursor = model.getValueInRange({
+                startLineNumber: Math.max(1, position.lineNumber - 50),
+                startColumn: 1,
+                endLineNumber: position.lineNumber,
+                endColumn: position.column,
+            });
+
+            const afterCursor = model.getValueInRange({
+                startLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endLineNumber: Math.min(model.getLineCount(), position.lineNumber + 20),
+                endColumn: model.getLineMaxColumn(Math.min(model.getLineCount(), position.lineNumber + 20)),
+            });
+
+            try {
+                // Setup abort controller
+                abortControllerRef.current = new AbortController();
+
+                // Note: We need to update AiService.ts to support signal if we want true cancellation, 
+                // but for now we just catch the error and check requestId.
+                const completion = await aiService.getAutocomplete({
+                    connectionId: activeConnectionId,
+                    database: activeDatabase,
+                    beforeCursor,
+                    afterCursor,
+                }, abortControllerRef.current.signal);
+
+                if (requestId !== currentRequestIdRef.current) return;
+                const currentPos = editor.getPosition();
+                if (!currentPos || currentPos.lineNumber !== position.lineNumber || currentPos.column !== position.column) return;
+
+                if (completion) {
+                    let finalCompletion = completion;
+                    
+                    // Filter out suggestions that already exist in the AFTER CURSOR context
+                    if (afterCursor.startsWith(finalCompletion)) return;
+                    
+                    // If the suggestion is just a semicolon and one already exists soon in afterCursor, skip it
+                    if (finalCompletion.trim() === ';' && afterCursor.trim().startsWith(';')) return;
+
+                    const textBeforeContext = lineContent.substring(0, position.column - 1);
+                    if (
+                        textBeforeContext.length > 0 && 
+                        !/\s$/.test(textBeforeContext) && 
+                        finalCompletion.length > 0 && 
+                        !/^[\s,.;:!?)\]\}]/.test(finalCompletion)
+                    ) {
+                        const startWordMatch = finalCompletion.match(/^[a-zA-Z]+/);
+                        const startWord = startWordMatch ? startWordMatch[0].toUpperCase() : '';
+                        const sqlKeywords = new Set([
+                            'SELECT', 'FROM', 'WHERE', 'JOIN', 'ON', 'AND', 'OR', 'ORDER', 'GROUP', 
+                            'BY', 'HAVING', 'LIMIT', 'OFFSET', 'UNION', 'ALL', 'AS', 'INNER', 'LEFT', 
+                            'RIGHT', 'OUTER', 'CROSS', 'SET', 'VALUES', 'INTO', 'UPDATE', 'DELETE', 'INSERT', 'RETURNING'
+                        ]);
+                        if (sqlKeywords.has(startWord) || (finalCompletion.startsWith('*') && /[a-zA-Z0-9_]$/.test(textBeforeContext)) || /[\`\"\'\]\)]$/.test(textBeforeContext)) {
+                            finalCompletion = ' ' + finalCompletion;
+                        }
+                    }
+                    showGhostText(finalCompletion, position.lineNumber, position.column);
+                }
+            } catch (err: any) {
+                if (err.name === 'AbortError') return;
+                console.warn('[AiGhostText] Failed to fetch completion:', err.message);
+            }
+        }, delay);
+    }, [activeConnectionId, activeDatabase, clearGhostText, editorRef, showGhostText]);
+
+    const isAcceptingRef = useRef(false);
+
     const acceptGhostText = useCallback(() => {
         const editor = editorRef.current;
         if (!editor || !ghostTextRef.current) return false;
@@ -100,7 +208,8 @@ export function useAiGhostText(
         const position = editor.getPosition();
         if (!position) return false;
 
-        // Insert the ghost text at cursor position
+        isAcceptingRef.current = true;
+        
         editor.executeEdits('ai-ghost-text', [{
             range: {
                 startLineNumber: position.lineNumber,
@@ -111,7 +220,6 @@ export function useAiGhostText(
             text: ghostTextRef.current,
         }]);
 
-        // Move cursor to end of inserted text
         const lines = ghostTextRef.current.split('\n');
         const lastLine = lines[lines.length - 1];
         const newLineNumber = position.lineNumber + lines.length - 1;
@@ -120,136 +228,41 @@ export function useAiGhostText(
             : lastLine.length + 1;
 
         editor.setPosition({ lineNumber: newLineNumber, column: newColumn });
-
         clearGhostText();
+
+        // Chain trigger: Get next suggestion immediately after accepting current one
+        triggerGhostText(50); 
+        
+        // Reset flag after a short delay so the cursor move event is ignored
+        setTimeout(() => { isAcceptingRef.current = false; }, 100);
+        
         return true;
-    }, [editorRef, clearGhostText]);
+    }, [editorRef, clearGhostText, triggerGhostText]);
 
     useEffect(() => {
         const editor = editorRef.current;
         const monaco = monacoRef.current;
         if (!editor || !monaco || !activeConnectionId) return;
 
-        // Function to trigger ghost text request
-        const triggerGhostText = () => {
-            clearGhostText();
-
-            // Debounce
-            if (debounceTimerRef.current) {
-                clearTimeout(debounceTimerRef.current);
-            }
-
-            currentRequestIdRef.current++;
-            const requestId = currentRequestIdRef.current;
-
-            debounceTimerRef.current = setTimeout(async () => {
-                if (requestId !== currentRequestIdRef.current) return;
-
-                const position = editor.getPosition();
-                if (!position) return;
-
-                const model = editor.getModel();
-                if (!model) return;
-
-                const lineContent = model.getLineContent(position.lineNumber);
-                if (lineContent.trim().length < 3) return;
-
-                // Check if cursor is right after a keyword + space → let popup handle it
-                const textBefore = lineContent.substring(0, position.column - 1);
-                if (textBefore.endsWith(' ')) {
-                    const lastWord = textBefore.trimEnd().split(/\s+/).pop()?.toUpperCase() || '';
-                    if (POPUP_KEYWORDS.has(lastWord)) return;
-                }
-
-                const beforeCursor = model.getValueInRange({
-                    startLineNumber: 1,
-                    startColumn: 1,
-                    endLineNumber: position.lineNumber,
-                    endColumn: position.column,
-                });
-
-                const afterCursor = model.getValueInRange({
-                    startLineNumber: position.lineNumber,
-                    startColumn: position.column,
-                    endLineNumber: model.getLineCount(),
-                    endColumn: model.getLineMaxColumn(model.getLineCount()),
-                });
-
-                try {
-                    const completion = await aiService.getAutocomplete({
-                        connectionId: activeConnectionId,
-                        database: activeDatabase,
-                        beforeCursor,
-                        afterCursor,
-                    });
-
-                    // Check if still the latest request and cursor hasn't moved
-                    if (requestId !== currentRequestIdRef.current) return;
-                    const currentPos = editor.getPosition();
-                    if (!currentPos || currentPos.lineNumber !== position.lineNumber || currentPos.column !== position.column) return;
-
-                    if (completion) {
-                        let finalCompletion = completion;
-                        const textBeforeContext = lineContent.substring(0, position.column - 1);
-
-                        // Smart Space Prepending: Prevent words from sticking together when accepted
-                        // (e.g. "public.products" + "where" -> "public.products where")
-                        if (
-                            textBeforeContext.length > 0 && 
-                            !/\s$/.test(textBeforeContext) && 
-                            finalCompletion.length > 0 && 
-                            !/^[\s,.;:!?)\]\}]/.test(finalCompletion)
-                        ) {
-                            const startWordMatch = finalCompletion.match(/^[a-zA-Z]+/);
-                            const startWord = startWordMatch ? startWordMatch[0].toUpperCase() : '';
-                            const sqlKeywords = new Set([
-                                'SELECT', 'FROM', 'WHERE', 'JOIN', 'ON', 'AND', 'OR', 'ORDER', 'GROUP', 
-                                'BY', 'HAVING', 'LIMIT', 'OFFSET', 'UNION', 'ALL', 'AS', 'INNER', 'LEFT', 
-                                'RIGHT', 'OUTER', 'CROSS', 'SET', 'VALUES', 'INTO', 'UPDATE', 'DELETE', 'INSERT', 'RETURNING'
-                            ]);
-
-                            const endsWithBoundary = /[\`\"\'\]\)]$/.test(textBeforeContext);
-                            const textEndsWithWord = /[a-zA-Z0-9_]$/.test(textBeforeContext);
-
-                            // Case 1: Completion starts with a major SQL keyword
-                            // Case 2: Completion starts with '*' and text before ends with a word (e.g "select" + "*")
-                            // Case 3: Text before ended with a quote/bracket
-                            if (
-                                sqlKeywords.has(startWord) || 
-                                (finalCompletion.startsWith('*') && textEndsWithWord) ||
-                                endsWithBoundary
-                            ) {
-                                finalCompletion = ' ' + finalCompletion;
-                            }
-                        }
-
-                        showGhostText(finalCompletion, position.lineNumber, position.column);
-                    }
-                } catch (err) {
-                    // Silently ignore errors
-                }
-            }, 600);
-        };
-
         // Trigger when user types or deletes
         const contentDisposable = editor.onDidChangeModelContent(() => {
+            // If the change was caused by our own ghost text insertion, skip
+            if (isAcceptingRef.current) return;
             triggerGhostText();
         });
 
-        // Handle Tab key to accept ghost text
+        // Handle Tab key
         editor.addCommand(
             monaco.KeyCode.Tab,
             () => {
                 if (!acceptGhostText()) {
-                    // If no ghost text to accept, perform default Tab action (indent)
                     editor.trigger('keyboard', 'tab', null);
                 }
             },
-            // Only override Tab when ghost text is visible
             'editorTextFocus && !suggestWidgetVisible'
         );
 
-        // Handle Escape to dismiss ghost text
+        // Handle Escape
         editor.addCommand(
             monaco.KeyCode.Escape,
             () => {
@@ -258,29 +271,26 @@ export function useAiGhostText(
             'editorTextFocus'
         );
 
-        // Clear ghost text and re-trigger on cursor move (e.g. user clicks elsewhere or F5)
+        // Clear ghost text and re-trigger on cursor move
         const cursorDisposable = editor.onDidChangeCursorPosition(() => {
-            // Give a tiny delay to see if this cursor move is caused by our own Tab completion
-            setTimeout(() => {
-                if (ghostTextRef.current) {
-                    clearGhostText();
-                }
-                
-                // Only trigger if it's a simple cursor move (no text selected)
-                const selection = editor.getSelection();
-                if (selection && selection.isEmpty()) {
-                    triggerGhostText();
-                }
-            }, 50);
+            // Ignore if this move came from acceptGhostText
+            if (isAcceptingRef.current) return;
+
+            if (ghostTextRef.current) {
+                clearGhostText();
+            }
+            const selection = editor.getSelection();
+            if (selection && selection.isEmpty()) {
+                triggerGhostText();
+            }
         });
 
         return () => {
             contentDisposable.dispose();
             cursorDisposable.dispose();
             clearGhostText();
-            if (debounceTimerRef.current) {
-                clearTimeout(debounceTimerRef.current);
-            }
+            if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+            if (abortControllerRef.current) abortControllerRef.current.abort();
         };
-    }, [editorRef.current, monacoRef.current, activeConnectionId, activeDatabase]);
+    }, [editorRef.current, monacoRef.current, activeConnectionId, triggerGhostText, acceptGhostText, clearGhostText]);
 }
