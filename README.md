@@ -10,7 +10,7 @@
 - **Context-Aware SQL Generation**: Describe complex data needs in natural language; AI generates optimized SQL based on your live schema and foreign key relationships.
 - **Vision Integration**: Upload screenshots of DB diagrams or whiteboards for AI-powered schema reconstruction (Gemini Vision).
 - **Global Assistant Panel**: A resizable, togglable sidebar available across all modules with real-time SSE (Server-Sent Events) streaming.
-- **Intelligent Multi-Model Fallback**: Reliable execution using a tiered model strategy (`Gemini 2.0 Flash` -> `Gemini 1.5 Pro`) for optimal speed and reasoning balance.
+- **Intelligent Multi-Model Fallback**: Reliable execution using a tiered model strategy (`Gemini 3.1 Flash` -> `Gemini 3 Pro`) for optimal speed and reasoning balance.
 - **Surgical Precision Autocomplete**: Inline AI suggestions that prioritize exact SQL syntax completion without hallucinating unnecessary explanations or repeating existing code.
 - **Chain Tabbing (Continuous Autocomplete)**: Seamlessly accept multi-line AI suggestions one token/line at a time using the `Tab` key, allowing for rapid, uninterrupted coding momentum.
 - **Chat persistence**: Unlimited sessions and history safely stored in local state.
