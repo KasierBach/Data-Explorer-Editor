@@ -1,21 +1,30 @@
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-github2';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SocialAuthService } from '../social-auth.service';
 
 @Injectable()
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
+    private readonly logger = new Logger(GithubStrategy.name);
+
     constructor(
         private socialAuthService: SocialAuthService,
         configService: ConfigService,
     ) {
+        const clientID = (configService.get<string>('GITHUB_CLIENT_ID') || '').trim();
+        const clientSecret = (configService.get<string>('GITHUB_CLIENT_SECRET') || '').trim();
+
         super({
-            clientID: (configService.get<string>('GITHUB_CLIENT_ID') || process.env.GITHUB_CLIENT_ID || '').trim(),
-            clientSecret: (configService.get<string>('GITHUB_CLIENT_SECRET') || process.env.GITHUB_CLIENT_SECRET || '').trim(),
-            callbackURL: configService.get<string>('GITHUB_CALLBACK_URL') || process.env.GITHUB_CALLBACK_URL || 'http://localhost:3001/api/auth/github/callback',
+            clientID: clientID || 'missing_client_id',
+            clientSecret: clientSecret || 'missing_client_secret',
+            callbackURL: configService.get<string>('GITHUB_CALLBACK_URL') || 'http://localhost:3001/api/auth/github/callback',
             scope: ['user:email'],
         });
+
+        if (!clientID || !clientSecret) {
+            this.logger.warn('GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET is missing. Github Auth will not work.');
+        }
     }
 
     async validate(accessToken: string, refreshToken: string, profile: any, done: Function): Promise<any> {

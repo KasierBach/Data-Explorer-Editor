@@ -19,7 +19,8 @@ import {
     SecuritySection,
     LifecycleSection,
     FaqSection,
-    AiServiceSection
+    AiServiceSection,
+    DeploymentSection
 } from './sections';
 
 interface DocContentProps {
@@ -61,6 +62,7 @@ export function DocContent({ sectionId, lang }: DocContentProps) {
         'architecture': <ArchitectureSection lang={lang} />,
         'tech-stack': <TechStackSection lang={lang} />,
         'security': <SecuritySection lang={lang} />,
+        'deployment': <DeploymentSection lang={lang} />,
         'lifecycle': <LifecycleSection lang={lang} />,
         'faq': <FaqSection lang={lang} />
     };

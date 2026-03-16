@@ -91,6 +91,7 @@ export const DOCS_STRUCTURE: DocSection[] = [
             { id: 'architecture', title: 'Kiến trúc hệ thống', titleEn: 'System Architecture' },
             { id: 'tech-stack', title: 'Danh sách công nghệ', titleEn: 'Technology Stack' },
             { id: 'security', title: 'Bảo mật & Quyền riêng tư', titleEn: 'Security & Privacy' },
+            { id: 'deployment', title: 'Triển khai Production', titleEn: 'Production Deployment' },
             { id: 'lifecycle', title: 'Quy trình phát triển', titleEn: 'Dev Lifecycle' },
             { id: 'faq', title: 'FAQ & Khắc phục lỗi', titleEn: 'FAQ & Troubleshooting' },
         ]

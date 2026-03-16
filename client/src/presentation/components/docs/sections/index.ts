@@ -17,3 +17,5 @@ export { SecuritySection } from './SecuritySection';
 export { LifecycleSection } from './LifecycleSection';
 export { FaqSection } from './FaqSection';
 export { AiServiceSection } from './AiServiceSection';
+export { DeploymentSection } from './DeploymentSection';
+

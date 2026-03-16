@@ -111,6 +111,42 @@ export function TechStackSection({ lang }: Props) {
                         : '📌 GEMINI_API_KEY can be obtained free at Google AI Studio (aistudio.google.com). Free tier allows ~60 requests/minute — sufficient for development and small teams.'}</p>
                 </Callout>
             </DocSection>
+            {/* Technical Rationale */}
+            <DocSection title={t ? 'Lý do chúng tôi chọn bộ Stack này' : 'Technical Rationale'}>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+                    {[
+                        {
+                            title: t ? 'NestJS cho Module hóa' : 'NestJS for Modularity',
+                            desc: t ? 'NestJS cung cấp Dependency Injection (DI) mạnh mẽ, giúp triển khai Strategy Pattern một cách thanh thoát và dễ mở rộng nhất.' : 'NestJS provides robust Dependency Injection (DI), making Strategy Pattern implementation elegant and highly scalable.'
+                        },
+                        {
+                            title: t ? 'React Flow cho Đồ thị' : 'React Flow for Graphs',
+                            desc: t ? 'Không giống như Canvas thuần, React Flow cho phép chúng ta tùy chỉnh node như React component, mang lại tính tương tác ERD vô hạn.' : 'Unlike raw Canvas, React Flow lets us customize nodes as React components, offering infinite ERD interactivity.'
+                        },
+                        {
+                            title: t ? 'Zustand cho Tốc độ' : 'Zustand for Speed',
+                            desc: t ? 'Trong một app SQL cần phản hồi real-time, Zustand giúp giảm thiểu re-render không cần thiết so với Redux hay Context API.' : 'In a real-time SQL app, Zustand minimizes unnecessary re-renders compared to Redux or Context API.'
+                        },
+                        {
+                            title: t ? 'Prisma cho An toàn Type' : 'Prisma for Type Safety',
+                            desc: t ? 'Tự động sinh Types cho DB giúp loại bỏ 90% lỗi runtime liên quan đến truy vấn dữ liệu người dùng.' : 'Auto-generated DB types eliminate 90% of runtime errors related to user data queries.'
+                        },
+                        {
+                            title: t ? 'Vite cho DX' : 'Vite for Developer Experience',
+                            desc: t ? 'Hệ thống HMR (Hot Module Replacement) của Vite giúp tăng tốc độ phát triển documentation và UI lên gấp 10 lần.' : 'Vite\'s HMR system accelerates documentation and UI development speed by 10x.'
+                        },
+                        {
+                            title: t ? 'Monaco cho Tính quen thuộc' : 'Monaco for Familiarity',
+                            desc: t ? 'Việc sử dụng cùng một engine với VS Code giúp kỹ sư dữ liệu cảm thấy quen thuộc ngay lập tức với các phím tắt và behavior.' : 'Using the same engine as VS Code ensures data engineers feel immediately at home with shortcuts and behavior.'
+                        }
+                    ].map((reason, i) => (
+                        <div key={i} className="p-5 border rounded-2xl bg-muted/5 space-y-2">
+                            <h5 className="font-bold text-xs">{reason.title}</h5>
+                            <p className="text-[10px] text-muted-foreground leading-relaxed">{reason.desc}</p>
+                        </div>
+                    ))}
+                </div>
+            </DocSection>
         </DocPageLayout>
     );
 }

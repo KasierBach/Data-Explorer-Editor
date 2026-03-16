@@ -1,5 +1,5 @@
-import { Zap, Activity, Shield, Keyboard, MousePointer2, Settings2, Sparkles } from 'lucide-react';
-import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment, CodeLine } from '../primitives';
+import { Zap, Activity, Shield, Sparkles, Cpu } from 'lucide-react';
+import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment, CodeLine, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
@@ -11,6 +11,7 @@ export function EditorSection({ lang }: Props) {
             subtitle={t
                 ? 'Kế thừa sức mạnh từ Monaco Engine (VS Code), được tinh chỉnh để tối ưu hóa hiệu suất viết truy vấn và phân tích dữ liệu.'
                 : 'Powered by the Monaco Engine (VS Code), fine-tuned for high-performance query writing and data analysis.'}
+            gradient
         >
             {/* Core Capabilities */}
             <div className="grid md:grid-cols-3 gap-6 mb-12">
@@ -39,12 +40,47 @@ export function EditorSection({ lang }: Props) {
                 ))}
             </div>
 
-            {/* IntelliSense Deep Dive */}
-            <DocSection title={t ? 'IntelliSense & Autocomplete' : 'IntelliSense & Autocomplete'}>
+            {/* Technical Inner Workings */}
+            <DocSection title={t ? 'Cơ chế hoạt động (The Inner Workings)' : 'The Inner Workings'}>
                 <Prose>
                     {t
-                        ? 'Không chỉ đơn thuần là gợi ý từ khóa, IntelliSense trong Data Explorer hiểu được Schema hiện tại của bạn. Nó dựa trên kết quả của quá trình Introspection để cung cấp gợi ý chính xác tới từng tên cột.'
-                        : 'Beyond simple keyword suggestions, IntelliSense in Data Explorer understands your actual Schema. It leverages Introspection results to provide precise column-level completions.'}
+                        ? 'Data Explorer không chỉ nhúng editor vào website, chúng tôi đã cấu hình lại hạ tầng của Monaco để tối ưu cho SQL và Data Engineering.'
+                        : 'Data Explorer doesn\'t just embed an editor; we have re-engineered Monaco\'s infrastructure to optimize for SQL and Data Engineering.'}
+                </Prose>
+
+                <div className="mt-8 space-y-6">
+                    <div className="p-6 border rounded-2xl bg-muted/5 group hover:border-primary/50 transition-colors">
+                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2">
+                            <Cpu className="w-4 h-4 text-blue-500" />
+                            {t ? 'Web Worker-based Validation' : 'Web Worker-based Validation'}
+                        </h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            {t
+                                ? 'Toàn bộ việc kiểm tra cú pháp (Syntax Checking) và cung cấp gợi ý được chạy trong một luồng nền (Web Worker) riêng biệt. Điều này đảm bảo rằng ngay cả khi bạn đang gõ trong một tệp SQL khổng lồ, giao diện người dùng vẫn phản hồi tức thì với tốc độ 60fps.'
+                                : 'All syntax checking and suggestion generation run in a separate background thread (Web Worker). This ensures that even when typing in a massive SQL file, the UI remains responsive at 60fps.'}
+                        </p>
+                    </div>
+
+                    <div className="p-6 border rounded-2xl bg-muted/5 group hover:border-primary/50 transition-colors">
+                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-purple-500" />
+                            {t ? 'AI Inline Completions (Ghost Text)' : 'AI Inline Completions (Ghost Text)'}
+                        </h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            {t
+                                ? 'Chúng tôi tích hợp một Provider riêng cho Gemini AI để cung cấp "mã lệnh mờ" (Ghost Text) khi bạn gõ. Hệ thống sử dụng thuật toán debouncing tinh vi để chỉ gửi yêu cầu AI khi bạn thực sự cần, giảm thiểu chi phí API và tăng tốc độ hiện thị.'
+                                : 'We integrated a custom provider for Gemini AI to provide "Ghost Text" as you type. The system uses a sophisticated debouncing algorithm to only trigger AI requests when truly needed, minimizing API costs and boosting performance.'}
+                        </p>
+                    </div>
+                </div>
+            </DocSection>
+
+            {/* IntelliSense Deep Dive */}
+            <DocSection title={t ? 'IntelliSense & Schema Awareness' : 'IntelliSense & Schema Awareness'}>
+                <Prose>
+                    {t
+                        ? 'IntelliSense trong Data Explorer hiểu được Schema hiện tại của bạn dựa trên kết quả của quá trình Introspection để cung cấp gợi ý chính xác tới từng tên cột.'
+                        : 'IntelliSense in Data Explorer understands your actual Schema based on Introspection results to provide precise column-level completions.'}
                 </Prose>
                 <div className="mt-8 grid md:grid-cols-2 gap-8 items-start">
                     <div className="space-y-6">
@@ -62,80 +98,41 @@ export function EditorSection({ lang }: Props) {
                                 ))}
                             </ul>
                         </DocSubSection>
-                        <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10">
-                            <h5 className="font-black text-[10px] uppercase text-amber-600 mb-2 flex items-center gap-2">
-                                <Sparkles className="w-3 h-3" /> {t ? 'Mẹo nhỏ' : 'Pro Tip'}
-                            </h5>
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                                {t ? 'Sử dụng Alias (ví dụ: `FROM users u`) giúp IntelliSense hoạt động hiệu quả nhất. Khi gõ `u.`, hệ thống sẽ chỉ hiển thị các cột thuộc bảng `users`.' : 'Using Aliases (e.g., `FROM users u`) makes IntelliSense most effective. Typing `u.` will only show columns belonging to the `users` table.'}
-                            </p>
-                        </div>
+                        <Callout type="tip">
+                            {t ? 'Sử dụng Alias (ví dụ: `FROM users u`) giúp IntelliSense hoạt động hiệu quả nhất. Khi gõ `u.`, hệ thống sẽ chỉ hiển thị các cột thuộc bảng `users`.' : 'Using Aliases (e.g., `FROM users u`) makes IntelliSense most effective. Typing `u.` will only show columns belonging to the `users` table.'}
+                        </Callout>
                     </div>
                     <CodeBlock title="Smart Completion Example">
                         <CodeComment>{t ? '-- Gõ "SELECT o." để thấy gợi ý cột' : '-- Type "SELECT o." for column suggestions'}</CodeComment>
                         <CodeLine>SELECT o.order_id, o.amount, c.full_name</CodeLine>
                         <CodeLine>FROM public.orders o</CodeLine>
                         <CodeLine>JOIN public.customers c ON o.customer_id = c.id</CodeLine>
-                        <CodeLine>WHERE o.status = 'COMPLETED'</CodeLine>
                     </CodeBlock>
-                </div>
-            </DocSection>
-
-            {/* Advanced Editing Features */}
-            <DocSection title={t ? 'Tính năng Soạn thảo Nâng cao' : 'Advanced Editing Features'}>
-                <div className="grid sm:grid-cols-2 gap-4">
-                    {[
-                        {
-                            icon: <MousePointer2 className="w-4 h-4 text-violet-500" />,
-                            title: t ? 'Đa con trỏ (Multi-cursor)' : 'Multi-cursor',
-                            desc: t ? 'Giữ Alt + Click để thêm con trỏ tại nhiều vị trí. Hoặc Ctrl + D để chọn lần xuất hiện tiếp theo của một từ.' : 'Alt + Click to add multiple cursors. Ctrl + D to select the next occurrence of a word.'
-                        },
-                        {
-                            icon: <Settings2 className="w-4 h-4 text-emerald-500" />,
-                            title: t ? 'Tìm kiếm Regex' : 'Regex Search',
-                            desc: t ? 'Sử dụng Regular Expressions trong bảng tìm kiếm (Ctrl+F) để xử lý các chuỗi phức tạp.' : 'Use Regular Expressions in the search panel (Ctrl+F) for complex string manipulation.'
-                        },
-                        {
-                            icon: <Keyboard className="w-4 h-4 text-blue-500" />,
-                            title: t ? 'Gấp mã (Code Folding)' : 'Code Folding',
-                            desc: t ? 'Thu gọn các khối lệnh CASE, BEGIN...END hoặc CTE dài để tập trung vào logic chính.' : 'Collapse CASE, BEGIN...END blocks or long CTEs to focus on core logic.'
-                        }
-                    ].map((feature, i) => (
-                        <div key={i} className="p-5 border rounded-2xl bg-muted/20 hover:bg-muted/30 transition-colors flex gap-4">
-                            <div className="p-2 bg-background border rounded-lg h-fit">{feature.icon}</div>
-                            <div className="space-y-1">
-                                <h5 className="font-bold text-sm">{feature.title}</h5>
-                                <p className="text-xs text-muted-foreground leading-relaxed">{feature.desc}</p>
-                            </div>
-                        </div>
-                    ))}
                 </div>
             </DocSection>
 
             {/* Shortcuts Cheat Sheet */}
             <DocSection title={t ? 'Bảng phím tắt (Cheat Sheet)' : 'Shortcuts Cheat Sheet'}>
                 <div className="overflow-hidden border rounded-3xl">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse text-xs">
                         <thead>
                             <tr className="bg-muted/50 border-b">
-                                <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">{t ? 'Thao tác' : 'Action'}</th>
-                                <th className="p-4 text-xs font-bold uppercase tracking-widest text-muted-foreground text-right">{t ? 'Phím tắt' : 'Shortcut'}</th>
+                                <th className="p-4 font-bold uppercase tracking-widest text-muted-foreground">{t ? 'Thao tác' : 'Action'}</th>
+                                <th className="p-4 font-bold uppercase tracking-widest text-muted-foreground text-right">{t ? 'Phím tắt' : 'Shortcut'}</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y text-sm">
+                        <tbody className="divide-y">
                             {[
                                 { a: t ? 'Thực thi khối lệnh / Toàn bộ' : 'Execute Block / All', s: 'Ctrl + Enter' },
                                 { a: t ? 'Tự động định dạng mã SQL' : 'Auto Format SQL', s: 'Shift + Alt + F' },
                                 { a: t ? 'Bật/Tắt chú thích dòng' : 'Toggle Comment', s: 'Ctrl + /' },
-                                { a: t ? 'Chuyển đổi Tab editor' : 'Switch Tabs', s: 'Ctrl + Tab' },
                                 { a: t ? 'Mở Trợ lý AI (Inline)' : 'Open AI Assistant', s: 'Ctrl + I' },
-                                { a: t ? 'Tìm kiếm & Thay thế' : 'Find & Replace', s: 'Ctrl + H' },
-                                { a: t ? 'Lưu file hiện tại' : 'Save Current File', s: 'Ctrl + S' }
+                                { a: t ? 'Tìm kiếm & Thay thế' : 'Find & Replace', s: 'Ctrl + H' }
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/30 transition-colors">
                                     <td className="p-4 font-medium">{row.a}</td>
                                     <td className="p-4 text-right">
-                                        <kbd className="bg-muted px-2 py-1 rounded border font-mono text-[11px] font-bold shadow-sm">{row.s}</kbd>
+                                        <kbd className="bg-muted px-2 py-1 rounded border font-mono text-[10px] font-bold shadow-sm">{row.s}</kbd>
                                     </td>
                                 </tr>
                             ))}
@@ -143,31 +140,7 @@ export function EditorSection({ lang }: Props) {
                     </table>
                 </div>
             </DocSection>
-
-            {/* Best Practices */}
-            <div className="mt-12 p-8 rounded-3xl bg-indigo-500/5 border border-indigo-500/10 space-y-4">
-                <h4 className="font-bold flex items-center gap-2 text-indigo-600 uppercase text-xs tracking-widest border-b border-indigo-500/10 pb-4">
-                    <Sparkles className="w-4 h-4" /> {t ? 'Best Practices cho SQL Developer' : 'SQL Developer Best Practices'}
-                </h4>
-                <div className="grid sm:grid-cols-2 gap-8 pt-4">
-                    <div className="space-y-2">
-                        <strong className="text-sm block">{t ? 'Luôn sử dụng CTE thay vì Subquery' : 'Prefer CTEs over Subqueries'}</strong>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                            {t
-                                ? 'CTE (WITH clause) giúp code SQL dễ đọc và debug hơn rất nhiều. Editor hỗ trợ gấp khối mã cho CTE giúp bạn quản lý các truy vấn phức tạp hiệu quả.'
-                                : 'CTEs (WITH clause) make SQL code much more readable and debuggable. Our editor supports code folding for CTEs, helping you manage complex queries.'}
-                        </p>
-                    </div>
-                    <div className="space-y-2">
-                        <strong className="text-sm block">{t ? 'Sử dụng Uppercase cho từ khóa' : 'Uppercase for Keywords'}</strong>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                            {t
-                                ? 'Mặc dù SQL không phân biệt hoa thường, việc viết hoa từ khóa (SELECT, FROM) giúp phân tách rõ giữa logic và dữ liệu. Sử dụng Shift+Alt+F để chuẩn hóa điều này tự động.'
-                                : 'While SQL is case-insensitive, capitalizing keywords (SELECT, FROM) helps distinguish logic from data. Use Shift+Alt+F to automate this standardization.'}
-                        </p>
-                    </div>
-                </div>
-            </div>
         </DocPageLayout>
     );
 }
+
