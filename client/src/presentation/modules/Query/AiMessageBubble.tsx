@@ -7,6 +7,8 @@ import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { AiMessage } from '@/core/services/store';
+import { useAppStore } from '@/core/services/store';
+import { Sparkles } from 'lucide-react';
 
 interface AiMessageBubbleProps {
     msg: AiMessage;
@@ -15,10 +17,41 @@ interface AiMessageBubbleProps {
 }
 
 export const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({ msg, onInsertSql, onRunSql }) => {
+    const { user } = useAppStore();
+
     return (
-        <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[90%] rounded-lg p-2.5 text-xs leading-relaxed select-text cursor-text ${msg.role === 'user'
-                ? 'bg-violet-500/20 text-foreground ml-4'
+        <div className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+            {/* Avatar */}
+            <div className="shrink-0 pt-0.5">
+                {msg.role === 'user' ? (
+                    <div className="h-7 w-7 rounded-full bg-muted border border-border/50 overflow-hidden relative flex items-center justify-center">
+                        {user?.avatarUrl ? (
+                            <>
+                                <img 
+                                    src={user.avatarUrl} 
+                                    className="h-full w-full object-cover relative z-10" 
+                                    alt="User"
+                                    onError={(e) => (e.target as HTMLImageElement).classList.add('hidden')}
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center text-blue-500 font-bold text-[10px] z-0">
+                                    {(user.firstName || user.name || user.email || 'U').charAt(0).toUpperCase()}
+                                </div>
+                            </>
+                        ) : (
+                            <span className="text-blue-500 font-bold text-[10px]">
+                                {(user?.firstName || user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+                            </span>
+                        )}
+                    </div>
+                ) : (
+                    <div className="h-7 w-7 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
+                        <Sparkles className="h-4 w-4 text-violet-500" />
+                    </div>
+                )}
+            </div>
+
+            <div className={`max-w-[85%] rounded-lg p-2.5 text-xs leading-relaxed select-text cursor-text ${msg.role === 'user'
+                ? 'bg-violet-500/20 text-foreground'
                 : msg.error
                     ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                     : 'bg-muted/30 text-foreground/80 border border-border/30'

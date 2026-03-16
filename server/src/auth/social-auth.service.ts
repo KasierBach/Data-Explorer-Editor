@@ -12,20 +12,29 @@ export class SocialAuthService {
     async validateOAuthLogin(profile: any, provider: 'google' | 'github') {
         const { id, emails, name, photos, username } = profile;
         const email = emails?.[0]?.value;
-        const avatarUrl = photos?.[0]?.value;
+        
+        // Improve avatar extraction (Github uses _json.avatar_url sometimes)
+        let avatarUrl = photos?.[0]?.value;
+        if (!avatarUrl && profile._json?.avatar_url) {
+            avatarUrl = profile._json.avatar_url;
+        }
 
         // Extract names
         let firstName = name?.givenName || '';
         let lastName = name?.familyName || '';
         
-        // Github might only provide displayName
-        if (!firstName && !lastName && name?.displayName) {
-            const parts = name.displayName.split(' ');
+        // GH might not have family/given name, try displayName
+        if (!firstName && !lastName && (name?.displayName || profile.displayName)) {
+            const displayName = name?.displayName || profile.displayName;
+            const parts = displayName.split(' ');
             firstName = parts[0];
-            lastName = parts.slice(1).join(' ');
+            lastName = parts.slice(1).join(' ') || '';
         }
+
+        // Fallback for first name
+        if (!firstName) firstName = username || 'User';
         
-        // Github provides username directly
+        // GH provides username directly
         const gitHubUsername = username || null;
 
         if (!email) {
@@ -42,19 +51,18 @@ export class SocialAuthService {
             }
         });
 
-        // 2. If user exists but linked to local, update to include social data (or just log them in)
+        // 2. If user exists, update profile data from provider (keep it fresh)
         if (user) {
-            if (user.provider === 'local') {
-                // Optionally link accounts
-                user = await this.prisma.user.update({
-                    where: { id: user.id },
-                    data: {
-                        provider,
-                        providerId: id,
-                        avatarUrl: user.avatarUrl || avatarUrl,
-                    }
-                });
-            }
+            user = await this.prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    provider,
+                    providerId: id,
+                    avatarUrl: avatarUrl || user.avatarUrl,
+                    firstName: user.firstName || firstName,
+                    lastName: user.lastName || lastName,
+                }
+            });
         } else {
             // 3. Register new user
             user = await this.prisma.user.create({
@@ -82,7 +90,10 @@ export class SocialAuthService {
                 firstName: user.firstName,
                 lastName: user.lastName,
                 avatarUrl: user.avatarUrl,
-                isOnboarded: user.isOnboarded
+                isOnboarded: user.isOnboarded,
+                role: user.role,
+                username: user.username,
+                jobRole: user.jobRole
             }
         };
     }

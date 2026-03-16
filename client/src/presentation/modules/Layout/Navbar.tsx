@@ -206,36 +206,68 @@ export const Navbar: React.FC = () => {
                             </Button>
                         </>
                     )}
-
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="relative h-9 w-9 md:h-8 md:w-8 rounded-full ml-2">
+                            <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 overflow-hidden bg-muted hover:bg-muted/80 border border-border/50 transition-all shrink-0 ml-1">
                                 {user?.avatarUrl ? (
-                                    <img 
-                                        src={user.avatarUrl} 
-                                        alt={user.username || user.firstName || 'User'} 
-                                        className="h-full w-full rounded-full object-cover" 
-                                    />
+                                    <>
+                                        <img 
+                                            src={user.avatarUrl} 
+                                            alt={user.firstName || user.name || 'User'} 
+                                            className="h-full w-full object-cover relative z-10" 
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).classList.add('hidden');
+                                            }}
+                                        />
+                                        <div className="absolute inset-0 flex items-center justify-center text-blue-500 font-bold text-xs z-0">
+                                            {(user.firstName || user.name || user.email || 'U').charAt(0).toUpperCase()}
+                                        </div>
+                                    </>
                                 ) : (
-                                    <div className="flex h-full w-full items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
-                                        {user?.firstName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase()}
-                                    </div>
+                                    <span className="text-blue-500 font-bold text-xs">
+                                        {(user?.firstName || user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+                                    </span>
                                 )}
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56" align="end" forceMount>
-                            <DropdownMenuLabel className="font-normal">
-                                <div className="flex flex-col space-y-1">
-                                    <p className="text-sm font-medium leading-none">
-                                        {user?.firstName} {user?.lastName}
-                                    </p>
-                                    <p className="text-xs leading-none text-muted-foreground mt-1">
-                                        {user?.email}
-                                    </p>
+                        <DropdownMenuContent className="w-64" align="end" forceMount>
+                            <DropdownMenuLabel className="font-normal p-4">
+                                <div className="flex flex-col space-y-2">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center overflow-hidden border relative">
+                                            {user?.avatarUrl ? (
+                                                <>
+                                                    <img 
+                                                        src={user.avatarUrl} 
+                                                        alt="" 
+                                                        className="h-full w-full object-cover relative z-10" 
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).classList.add('hidden');
+                                                        }}
+                                                    />
+                                                    <div className="absolute inset-0 flex items-center justify-center text-blue-500 font-bold z-0">
+                                                        {(user.firstName || user.name || user.email || 'U').charAt(0).toUpperCase()}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <span className="text-blue-500 font-bold">
+                                                    {(user?.firstName || user?.name || user?.email || 'U').charAt(0).toUpperCase()}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col min-w-0">
+                                            <p className="text-sm font-bold leading-none truncate">
+                                                {user?.firstName} {user?.lastName}
+                                            </p>
+                                            <p className="text-[10px] leading-none text-muted-foreground mt-1 truncate">
+                                                {user?.email}
+                                            </p>
+                                        </div>
+                                    </div>
                                     {user?.jobRole && (
-                                        <p className="text-xs leading-none text-muted-foreground/80 mt-1 capitalize">
+                                        <div className="inline-flex items-center px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-500 text-[10px] font-medium w-fit capitalize">
                                             {user?.jobRole}
-                                        </p>
+                                        </div>
                                     )}
                                 </div>
                             </DropdownMenuLabel>

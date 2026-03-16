@@ -83,6 +83,8 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = 
                 automaticLayout: true,
                 padding: { top: 16, bottom: 16 },
                 wordWrap: 'on',
+                contextmenu: true,
+                copyWithSyntaxHighlighting: true,
                 suggestOnTriggerCharacters: true,
                 quickSuggestions: true,
                 wordBasedSuggestions: 'off',

@@ -13,7 +13,8 @@ interface ProfileDialogProps {
 
 export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, initialTab }) => {
     const { user, updateUser } = useAppStore();
-    const [name, setName] = useState(user?.name || '');
+    const [firstName, setFirstName] = useState(user?.firstName || '');
+    const [lastName, setLastName] = useState(user?.lastName || '');
     const [email, setEmail] = useState(user?.email || '');
 
     // Tab state
@@ -22,14 +23,15 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
     // Sync state when dialog opens or user changes
     useEffect(() => {
         if (isOpen) {
-            setName(user?.name || '');
+            setFirstName(user?.firstName || '');
+            setLastName(user?.lastName || '');
             setEmail(user?.email || '');
             setActiveTab(initialTab || 'profile'); // Use passed tab or default to profile
         }
     }, [isOpen, user, initialTab]);
 
     const handleSaveProfile = () => {
-        updateUser({ name, email });
+        updateUser({ firstName, lastName, email });
         toast.success("Profile updated successfully!");
     };
 
@@ -108,18 +110,42 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                                 <div className="space-y-3">
                                     <label className="text-sm font-medium">Avatar</label>
                                     <div className="flex items-center gap-4">
-                                        <div className="w-16 h-16 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-500 text-xl font-bold border border-violet-500/30">
-                                            {name ? name.charAt(0).toUpperCase() : 'U'}
+                                        <div className="w-16 h-16 rounded-full bg-violet-500/10 flex items-center justify-center overflow-hidden border border-violet-500/30 relative">
+                                            {user?.avatarUrl ? (
+                                                <>
+                                                    <img 
+                                                        src={user.avatarUrl} 
+                                                        alt="" 
+                                                        className="h-full w-full object-cover relative z-10" 
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).classList.add('hidden');
+                                                        }}
+                                                    />
+                                                    <div className="absolute inset-0 flex items-center justify-center text-violet-500 text-xl font-bold z-0">
+                                                        {(firstName || user?.name || email || 'U').charAt(0).toUpperCase()}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <span className="text-violet-500 text-xl font-bold">
+                                                    {(firstName || user?.name || email || 'U').charAt(0).toUpperCase()}
+                                                </span>
+                                            )}
                                         </div>
                                         <div className="space-y-1">
                                             <Button variant="outline" size="sm">Change Avatar</Button>
-                                            <p className="text-[10px] text-muted-foreground">JPG, GIF or PNG. 1MB max.</p>
+                                            <p className="text-[10px] text-muted-foreground">Social avatars are synced automatically.</p>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Display Name</label>
-                                    <Input value={name} onChange={e => setName(e.target.value)} placeholder="Your full name" />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">First Name</label>
+                                        <Input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First name" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Last Name</label>
+                                        <Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last name" />
+                                    </div>
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Email Address</label>

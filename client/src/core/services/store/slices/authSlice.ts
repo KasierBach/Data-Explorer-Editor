@@ -98,5 +98,7 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set) => ({
         queryHistory: [],
         expandedNodes: [],
     } as any),
-    updateUser: (user) => set({ user }),
+    updateUser: (userData) => set((state) => ({ 
+        user: state.user ? { ...state.user, ...userData } : userData as any
+    })),
 });
