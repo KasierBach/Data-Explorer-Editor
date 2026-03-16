@@ -1,5 +1,6 @@
-import { Wand2, Shield, Cpu, MessageSquare, Zap, Braces } from 'lucide-react';
-import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment, CodeLine } from '../primitives';
+import { Wand2, Shield, Cpu, MessageSquare, ShieldCheck, CheckCircle, XCircle } from 'lucide-react';
+import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment, CodeLine, InfoCard, Callout } from '../primitives';
+import { cn } from '@/lib/utils';
 
 interface Props { lang: 'vi' | 'en'; }
 
@@ -41,11 +42,13 @@ export function AiServiceSection({ lang }: Props) {
             </div>
 
             <DocSection title={t ? 'Kiến trúc Workflow' : 'Workflow Architecture'}>
-                <Prose>
-                    {t
-                        ? 'Khi bạn gửi một yêu cầu tới trợ lý AI, Data Explorer không chỉ gửi đi câu hỏi của bạn. Chúng tôi thực hiện một quy trình gồm 4 bước để đảm bảo câu trả lời có tính thực thi cao nhất:'
-                        : 'When you send a request to the AI assistant, Data Explorer doesn\'t just send your question. we execute a 4-step workflow to ensure the highest reliability and executability:'}
-                </Prose>
+                <div className="space-y-6">
+                    <Prose>
+                        {t
+                            ? 'Khi bạn gửi một yêu cầu tới trợ lý AI, Data Explorer không chỉ gửi đi câu hỏi của bạn. Chúng tôi thực hiện một quy trình gồm 4 bước để đảm bảo câu trả lời có tính thực thi cao nhất:'
+                            : 'When you send a request to the AI assistant, Data Explorer doesn\'t just send your question. we execute a 4-step workflow to ensure the highest reliability and executability:'}
+                    </Prose>
+                </div>
 
                 <div className="my-8 relative">
                     <div className="absolute left-6 inset-y-0 w-px bg-border sm:left-1/2" />
@@ -98,7 +101,11 @@ export function AiServiceSection({ lang }: Props) {
                         : 'Sending hundreds of tables in a single prompt can waste tokens and confuse the AI. Data Explorer uses "Context Clipping" techniques to send only what is truly necessary.'}
                 </Prose>
                 <div className="grid md:grid-cols-2 gap-4 mt-8">
-                    <InfoCard title={t ? 'Những gì được gửi' : 'What is Sent'} color="blue">
+                    <InfoCard 
+                        icon={<CheckCircle className="w-5 h-5" />} 
+                        title={t ? 'Những gì được gửi' : 'What is Sent'} 
+                        color="blue"
+                    >
                         <ul className="text-xs space-y-2 opacity-80">
                             <li>• {t ? 'Tên bảng tiêu chuẩn' : 'Standard table names'}</li>
                             <li>• {t ? 'Tên cột và kiểu dữ liệu cơ bản' : 'Column names & basic types'}</li>
@@ -106,7 +113,11 @@ export function AiServiceSection({ lang }: Props) {
                             <li>• {t ? 'Mô tả Comment trên DB (nếu có)' : 'In-DB Comments (if exist)'}</li>
                         </ul>
                     </InfoCard>
-                    <InfoCard title={t ? 'Những gì bị loại bỏ' : 'What is Stripped'} color="rose">
+                    <InfoCard 
+                        icon={<XCircle className="w-5 h-5" />} 
+                        title={t ? 'Những gì bị loại bỏ' : 'What is Stripped'} 
+                        color="red"
+                    >
                         <ul className="text-xs space-y-2 opacity-80">
                             <li>• {t ? 'Giá trị dữ liệu thực tế (Privacy)' : 'Actual row values (Privacy)'}</li>
                             <li>• {t ? 'Các bảng hệ thống (pg_*, mysql_*)' : 'System tables (pg_*, mysql_*)'}</li>
@@ -150,7 +161,7 @@ export function AiServiceSection({ lang }: Props) {
                                     : 'Note: Always verify AI suggestions with EXPLAIN before applying to Production.'}
                             </p>
                         </Callout>
-                    </div>
+                    </DocSubSection>
                 </div>
             </DocSection>
 
@@ -190,6 +201,4 @@ export function AiServiceSection({ lang }: Props) {
         </DocPageLayout>
     );
 }
-import { ShieldCheck } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
