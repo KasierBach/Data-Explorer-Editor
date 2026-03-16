@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from '@/presentation/modules/Layout/AppShell'
 import { LoginPage } from '@/presentation/pages/LoginPage'
+import { OnboardingPage } from '@/presentation/pages/OnboardingPage'
 import { LandingPage } from '@/presentation/pages/LandingPage'
 import { DocumentationPage } from '@/presentation/pages/DocumentationPage'
 import { ERDPage } from '@/presentation/pages/ERDPage'
@@ -34,6 +35,7 @@ export function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
+            <Route path="/onboarding" element={<OnboardingPage />} />
             <Route path="/docs" element={<DocumentationPage />} />
 
             <Route path="/admin" element={<RequireAuth requireAdmin={true}><AdminDashboardPage /></RequireAuth>} />

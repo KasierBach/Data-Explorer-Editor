@@ -4,10 +4,43 @@ export interface AuthSlice {
     isAuthenticated: boolean;
     accessToken: string | null;
     tokenExp: number | null;
-    user: { name: string; email: string; role?: string } | null;
-    login: (token: string, user: { name: string; email: string; role?: string }) => void;
+    user: { 
+        id?: string;
+        name?: string; 
+        firstName?: string;
+        lastName?: string;
+        email: string; 
+        role?: string;
+        avatarUrl?: string;
+        isOnboarded?: boolean;
+        username?: string;
+        jobRole?: string;
+    } | null;
+    login: (token: string, user: { 
+        id?: string;
+        name?: string; 
+        firstName?: string;
+        lastName?: string;
+        email: string; 
+        role?: string;
+        avatarUrl?: string;
+        isOnboarded?: boolean;
+        username?: string;
+        jobRole?: string;
+    }) => void;
     logout: () => void;
-    updateUser: (user: { name: string; email: string; role?: string }) => void;
+    updateUser: (user: { 
+        id?: string;
+        name?: string; 
+        firstName?: string;
+        lastName?: string;
+        email: string; 
+        role?: string;
+        avatarUrl?: string;
+        isOnboarded?: boolean;
+        username?: string;
+        jobRole?: string;
+    }) => void;
 }
 
 export const createAuthSlice: StateCreator<AuthSlice> = (set) => ({

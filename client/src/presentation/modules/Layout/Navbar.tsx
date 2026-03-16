@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ModeToggle } from '@/presentation/components/mode-toggle';
-import { Database, Settings, User, LogOut, User as UserIcon, Github, LifeBuoy, Cloud, CreditCard, FileText, FolderOpen, BarChart3, PieChart, GitGraph, Sparkles, Menu, X, Shield } from 'lucide-react';
+import { Database, Settings, LogOut, User as UserIcon, Github, LifeBuoy, Cloud, CreditCard, FileText, FolderOpen, BarChart3, PieChart, GitGraph, Sparkles, Menu, X, Shield } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import {
     DropdownMenu,
@@ -209,17 +209,34 @@ export const Navbar: React.FC = () => {
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-9 w-9 md:h-8 md:w-8 rounded-full bg-muted shadow-sm">
-                                <User className="w-4 h-4" />
+                            <Button variant="ghost" className="relative h-9 w-9 md:h-8 md:w-8 rounded-full ml-2">
+                                {user?.avatarUrl ? (
+                                    <img 
+                                        src={user.avatarUrl} 
+                                        alt={user.username || user.firstName || 'User'} 
+                                        className="h-full w-full rounded-full object-cover" 
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
+                                        {user?.firstName?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase()}
+                                    </div>
+                                )}
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="w-56" align="end" forceMount>
                             <DropdownMenuLabel className="font-normal">
                                 <div className="flex flex-col space-y-1">
-                                    <p className="text-sm font-medium leading-none">{user?.name}</p>
-                                    <p className="text-xs leading-none text-muted-foreground">
+                                    <p className="text-sm font-medium leading-none">
+                                        {user?.firstName} {user?.lastName}
+                                    </p>
+                                    <p className="text-xs leading-none text-muted-foreground mt-1">
                                         {user?.email}
                                     </p>
+                                    {user?.jobRole && (
+                                        <p className="text-xs leading-none text-muted-foreground/80 mt-1 capitalize">
+                                            {user?.jobRole}
+                                        </p>
+                                    )}
                                 </div>
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator />

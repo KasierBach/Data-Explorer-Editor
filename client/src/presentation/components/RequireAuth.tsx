@@ -10,9 +10,14 @@ export const RequireAuth = ({ children, requireAdmin = false }: { children: Reac
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
+    // Force onboarding if not completed (unless they are already on the onboarding page)
+    if (user && !user.isOnboarded && location.pathname !== '/onboarding') {
+         return <Navigate to="/onboarding" replace />;
+    }
+
     if (requireAdmin && user?.role !== 'admin') {
         return <Navigate to="/app" replace />;
     }
 
-    return children;
+    return <>{children}</>;
 };

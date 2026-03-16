@@ -27,7 +27,12 @@ export class AuthService implements OnModuleInit {
             throw new UnauthorizedException('Invalid credentials');
         }
 
-        const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
+        // Only check password if the user signed up with local provider
+        if (!user.password && user.provider !== 'local') {
+             throw new UnauthorizedException('Please login using your Social account (Google/GitHub).');
+        }
+
+        const isPasswordValid = await bcrypt.compare(loginDto.password, user.password!);
         if (!isPasswordValid) {
             throw new UnauthorizedException('Invalid credentials');
         }
@@ -36,8 +41,12 @@ export class AuthService implements OnModuleInit {
         return {
             access_token: this.jwtService.sign(payload),
             user: {
-                name: user.name,
+                id: user.id,
                 email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                avatarUrl: user.avatarUrl,
+                isOnboarded: user.isOnboarded
             },
         };
     }
@@ -52,13 +61,21 @@ export class AuthService implements OnModuleInit {
         }
 
         const hashedPassword = await bcrypt.hash(registerDto.password, this.SALT_ROUNDS);
+        
+        // Simple split of name for backward compatibility with existing register flow
+        const nameParts = registerDto.name.split(' ');
+        const firstName = nameParts[0];
+        const lastName = nameParts.slice(1).join(' ');
 
         const user = await this.prisma.user.create({
             data: {
-                name: registerDto.name,
                 email: registerDto.email,
                 password: hashedPassword,
+                firstName,
+                lastName,
                 role: 'user',
+                provider: 'local',
+                isOnboarded: false // Local users also need to complete onboarding
             },
         });
 
@@ -66,8 +83,12 @@ export class AuthService implements OnModuleInit {
         return {
             access_token: this.jwtService.sign(payload),
             user: {
-                name: user.name,
+                id: user.id,
                 email: user.email,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                avatarUrl: user.avatarUrl,
+                isOnboarded: user.isOnboarded
             },
         };
     }
@@ -80,10 +101,14 @@ export class AuthService implements OnModuleInit {
             const hashedPassword = await bcrypt.hash(adminPassword, this.SALT_ROUNDS);
             await this.prisma.user.create({
                 data: {
-                    name: 'Admin',
+                    firstName: 'System',
+                    lastName: 'Admin',
                     email: adminEmail,
                     password: hashedPassword,
                     role: 'admin',
+                    provider: 'local',
+                    isOnboarded: true, // Auto onboard admin
+                    username: 'admin'
                 },
             });
             console.log(`[Auth] Default admin seeded: ${adminEmail} (password: ***)`);

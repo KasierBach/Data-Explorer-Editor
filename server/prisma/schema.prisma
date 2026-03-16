@@ -29,12 +29,32 @@ model Connection {
 }
 
 model User {
-  id        String     @id @default(uuid())
-  name      String
-  email     String     @unique
-  password  String
-  role      String     @default("user")
-  createdAt   DateTime     @default(now())
+  id          String   @id @default(uuid())
+  email       String   @unique
+  password    String?  // Optional for social logins
+  
+  // Auth Providers
+  provider    String   @default("local") // "local", "google", "github"
+  providerId  String?  // ID from OAuth provider
+  
+  // Basic Profile
+  firstName   String?
+  lastName    String?
+  avatarUrl   String?
+  
+  // Application Data
+  role        String   @default("user")
+  
+  // Onboarding Data (Progressive Profiling)
+  isOnboarded Boolean  @default(false)
+  username    String?  @unique
+  jobRole     String?  // e.g., "Data Engineer", "Analyst"
+  phoneNumber String?
+  address     String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
   auditLogs   AuditLog[]
   connections Connection[]
 }

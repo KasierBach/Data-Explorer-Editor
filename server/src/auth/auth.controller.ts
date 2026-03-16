@@ -1,4 +1,6 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, UseGuards, Req, Res } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -19,4 +21,36 @@ export class AuthController {
     async register(@Body() registerDto: RegisterDto) {
         return this.authService.register(registerDto);
     }
+
+    // --- Social Login Routes ---
+
+    @Get('google')
+    @UseGuards(AuthGuard('google'))
+    async googleAuth() {
+        // Guard redirects to Google
+    }
+
+    @Get('google/callback')
+    @UseGuards(AuthGuard('google'))
+    async googleAuthRedirect(@Req() req: any, @Res() res: Response) {
+        // req.user comes from GoogleStrategy's validate method
+        const token = req.user.access_token;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        res.redirect(`${frontendUrl}/login?token=${token}`);
+    }
+
+    @Get('github')
+    @UseGuards(AuthGuard('github'))
+    async githubAuth() {
+        // Guard redirects to GitHub
+    }
+
+    @Get('github/callback')
+    @UseGuards(AuthGuard('github'))
+    async githubAuthRedirect(@Req() req: any, @Res() res: Response) {
+        const token = req.user.access_token;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        res.redirect(`${frontendUrl}/login?token=${token}`);
+    }
 }
+
