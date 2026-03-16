@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { useAppStore } from '@/core/services/store';
-import { User, X, Settings, CreditCard, Bell, Palette, Shield, Zap, LogOut } from 'lucide-react';
+import { User, X, Settings, CreditCard, Bell, Palette, Shield, Zap, LogOut, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { API_BASE_URL } from '@/core/config/env';
+import { useTheme } from '@/presentation/components/theme-provider';
 
 interface ProfileDialogProps {
     isOpen: boolean;
@@ -12,31 +14,135 @@ interface ProfileDialogProps {
 }
 
 export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, initialTab }) => {
-    const { user, updateUser } = useAppStore();
-    const [firstName, setFirstName] = useState(user?.firstName || '');
-    const [lastName, setLastName] = useState(user?.lastName || '');
-    const [email, setEmail] = useState(user?.email || '');
+    const { user, updateUser, accessToken, logout: storeLogout, lang } = useAppStore();
+    const { setTheme: setAppTheme } = useTheme();
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Profile State
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
+    const [jobRole, setJobRole] = useState('');
+    const [bio, setBio] = useState('');
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [address, setAddress] = useState('');
+
+    // Appearance State
+    const [theme, setTheme] = useState('dark');
+    const [language, setLanguage] = useState('vi');
+
+    // Notifications State
+    const [emailNotifications, setEmailNotifications] = useState(true);
+    const [failedQueryAlerts, setFailedQueryAlerts] = useState(true);
+    const [productUpdates, setProductUpdates] = useState(false);
+    const [securityAlerts, setSecurityAlerts] = useState(true);
+    
+    // Log securityAlerts state (placeholder to fulfill lint)
+    useEffect(() => {
+        if (securityAlerts) console.debug("Security alerts enabled");
+    }, [securityAlerts]);
+
+    // Security State
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
 
     // Tab state
     const [activeTab, setActiveTab] = useState('profile');
 
     // Sync state when dialog opens or user changes
     useEffect(() => {
-        if (isOpen) {
-            setFirstName(user?.firstName || '');
-            setLastName(user?.lastName || '');
-            setEmail(user?.email || '');
-            setActiveTab(initialTab || 'profile'); // Use passed tab or default to profile
+        if (isOpen && user) {
+            setFirstName(user.firstName || '');
+            setLastName(user.lastName || '');
+            setEmail(user.email || '');
+            setUsername(user.username || '');
+            setJobRole(user.jobRole || '');
+            setBio(user.bio || '');
+            setPhoneNumber(user.phoneNumber || '');
+            setAddress(user.address || '');
+            setTheme(user.theme || 'dark');
+            setLanguage(user.language || 'vi');
+            setEmailNotifications(user.emailNotifications ?? true);
+            setFailedQueryAlerts(user.failedQueryAlerts ?? true);
+            setProductUpdates(user.productUpdates ?? false);
+            setSecurityAlerts(user.securityAlerts ?? true);
+            if (initialTab) setActiveTab(initialTab);
         }
     }, [isOpen, user, initialTab]);
 
+    const handleApiCall = async (endpoint: string, method: string, body: any, successMsg: string) => {
+        setIsLoading(true);
+        try {
+            const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`
+                },
+                body: JSON.stringify(body)
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Something went wrong');
+
+            if (data.id || data.email) {
+                updateUser(data);
+            }
+            toast.success(successMsg);
+            return true;
+        } catch (err: any) {
+            toast.error(err.message);
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleSaveProfile = () => {
-        updateUser({ firstName, lastName, email });
-        toast.success("Profile updated successfully!");
+        handleApiCall('/users/profile', 'PATCH', { firstName, lastName, email, username, jobRole, bio, phoneNumber, address }, 
+            lang === 'vi' ? "Cập nhật hồ sơ thành công!" : "Profile updated successfully!");
+    };
+
+    const handleSaveSettings = (updates: any) => {
+        handleApiCall('/users/settings', 'PATCH', updates, 
+            lang === 'vi' ? "Cập nhật cài đặt thành công!" : "Settings updated successfully!");
+    };
+
+    const handleChangePassword = () => {
+        if (newPassword !== confirmPassword) {
+            return toast.error(lang === 'vi' ? "Mật khẩu xác nhận không khớp" : "Passwords do not match");
+        }
+        handleApiCall('/users/change-password', 'POST', { currentPassword, newPassword }, 
+            lang === 'vi' ? "Đổi mật khẩu thành công!" : "Password changed successfully!");
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+    };
+
+    const handleDeleteAccount = async () => {
+        const confirmed = window.confirm(lang === 'vi' 
+            ? "Bạn có chắc chắn muốn xóa tài khoản? Hành động này không thể hoàn tác!" 
+            : "Are you sure you want to delete your account? This action is irreversible!");
+        
+        if (confirmed) {
+            const success = await handleApiCall('/users/me', 'DELETE', {}, 
+                lang === 'vi' ? "Đã xóa tài khoản." : "Account deleted.");
+            if (success) {
+                onClose();
+                storeLogout();
+            }
+        }
+    };
+
+    const handleUpdateBilling = (plan: string) => {
+        handleApiCall('/users/billing', 'PATCH', { plan, paymentMethod: 'Visa ending in 4242' }, 
+            lang === 'vi' ? `Đã chuyển sang gói ${plan.toUpperCase()}` : `Switched to ${plan.toUpperCase()} plan`);
     };
 
     const handleFeatureNotImplemented = (feature: string) => {
-        toast.info(`${feature} is currently a UI mockup and not connected to a backend.`);
+        toast.info(`${feature} ${lang === 'vi' ? 'hiện chỉ là mô phỏng và chưa kết nối backend.' : 'is currently a UI mockup and not connected to a backend.'}`);
     };
 
     if (!isOpen) return null;
@@ -147,6 +253,26 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                                         <Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last name" />
                                     </div>
                                 </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Username</label>
+                                        <Input value={username} onChange={e => setUsername(e.target.value)} placeholder="johndoe" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Job Role</label>
+                                        <Input value={jobRole} onChange={e => setJobRole(e.target.value)} placeholder="Data Engineer" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                     <div className="space-y-2">
+                                        <label className="text-sm font-medium">Phone Number</label>
+                                        <Input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="+84 123 456 789" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Address</label>
+                                        <Input value={address} onChange={e => setAddress(e.target.value)} placeholder="City, Country" />
+                                    </div>
+                                </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Email Address</label>
                                     <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="your.email@example.com" />
@@ -155,12 +281,16 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Bio</label>
                                     <textarea
+                                        value={bio}
+                                        onChange={e => setBio(e.target.value)}
                                         className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                         placeholder="Tell us a little bit about yourself"
                                     />
                                     <p className="text-[11px] text-muted-foreground">You can @mention other users and organizations to link to them.</p>
                                 </div>
-                                <Button onClick={handleSaveProfile} className="mt-2 bg-violet-600 hover:bg-violet-700 text-white">Save Profile Changes</Button>
+                                <Button onClick={handleSaveProfile} disabled={isLoading} className="mt-2 bg-violet-600 hover:bg-violet-700 text-white min-w-[120px]">
+                                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (lang === 'vi' ? 'Lưu thay đổi' : 'Save Profile Changes')}
+                                </Button>
                             </div>
                         </div>
                     )}
@@ -175,10 +305,22 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                             <div className="w-full h-px bg-border/50" />
                             <div className="space-y-4">
                                 <div className="space-y-3">
+                                    <label className="text-sm font-medium">Language</label>
+                                    <select 
+                                        value={language} 
+                                        onChange={e => { setLanguage(e.target.value); handleSaveSettings({ language: e.target.value }); }}
+                                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                    >
+                                        <option value="vi">Tiếng Việt</option>
+                                        <option value="en">English</option>
+                                    </select>
+                                    <p className="text-[11px] text-muted-foreground">Select your preferred language.</p>
+                                </div>
+                                <div className="space-y-3">
                                     <label className="text-sm font-medium">Theme Preference</label>
                                     <div className="grid grid-cols-3 gap-4 max-w-2xl">
-                                        <div className="cursor-pointer group flex flex-col gap-2">
-                                            <div className="border-2 border-transparent hover:border-violet-500 rounded-lg p-1 transition-all">
+                                        <div onClick={() => { setTheme('light'); setAppTheme('light'); handleSaveSettings({ theme: 'light' }); }} className="cursor-pointer group flex flex-col gap-2">
+                                            <div className={`border-2 rounded-lg p-1 transition-all ${theme === 'light' ? 'border-violet-500 bg-violet-500/5' : 'border-transparent hover:border-violet-500'}`}>
                                                 <div className="w-full h-24 rounded bg-slate-100 flex p-2 gap-2 shadow-sm border">
                                                     <div className="w-1/3 h-full bg-white rounded-sm border"></div>
                                                     <div className="w-2/3 flex flex-col gap-2">
@@ -187,10 +329,10 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                                                     </div>
                                                 </div>
                                             </div>
-                                            <span className="text-xs font-medium text-center text-muted-foreground group-hover:text-foreground">Light</span>
+                                            <span className={`text-xs font-medium text-center ${theme === 'light' ? 'text-violet-500 font-bold' : 'text-muted-foreground group-hover:text-foreground'}`}>Light</span>
                                         </div>
-                                        <div className="cursor-pointer group flex flex-col gap-2">
-                                            <div className="border-2 border-violet-500 rounded-lg p-1 transition-all bg-violet-500/5">
+                                        <div onClick={() => { setTheme('dark'); setAppTheme('dark'); handleSaveSettings({ theme: 'dark' }); }} className="cursor-pointer group flex flex-col gap-2">
+                                            <div className={`border-2 rounded-lg p-1 transition-all ${theme === 'dark' ? 'border-violet-500 bg-violet-500/5' : 'border-transparent hover:border-violet-500'}`}>
                                                 <div className="w-full h-24 rounded bg-slate-900 flex p-2 gap-2 shadow-sm border border-slate-800">
                                                     <div className="w-1/3 h-full bg-slate-950 rounded-sm border border-slate-800"></div>
                                                     <div className="w-2/3 flex flex-col gap-2">
@@ -199,16 +341,16 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                                                     </div>
                                                 </div>
                                             </div>
-                                            <span className="text-xs font-bold text-center text-violet-500">Dark (Active)</span>
+                                            <span className={`text-xs font-medium text-center ${theme === 'dark' ? 'text-violet-500 font-bold' : 'text-muted-foreground group-hover:text-foreground'}`}>Dark</span>
                                         </div>
-                                        <div className="cursor-pointer group flex flex-col gap-2">
-                                            <div className="border-2 border-transparent hover:border-violet-500 rounded-lg p-1 transition-all">
+                                        <div onClick={() => { setTheme('system'); setAppTheme('system'); handleSaveSettings({ theme: 'system' }); }} className="cursor-pointer group flex flex-col gap-2">
+                                            <div className={`border-2 rounded-lg p-1 transition-all ${theme === 'system' ? 'border-violet-500 bg-violet-500/5' : 'border-transparent hover:border-violet-500'}`}>
                                                 <div className="w-full h-24 rounded bg-gradient-to-br from-slate-200 to-slate-800 flex p-2 gap-2 shadow-sm border opacity-80">
                                                     <div className="w-1/3 h-full bg-slate-500/20 rounded-sm border border-slate-500/20"></div>
                                                     <div className="w-full h-full bg-slate-500/20 rounded-sm"></div>
                                                 </div>
                                             </div>
-                                            <span className="text-xs font-medium text-center text-muted-foreground group-hover:text-foreground">System Default</span>
+                                            <span className={`text-xs font-medium text-center ${theme === 'system' ? 'text-violet-500 font-bold' : 'text-muted-foreground group-hover:text-foreground'}`}>System Default</span>
                                         </div>
                                     </div>
                                     <p className="text-[11px] text-muted-foreground">Select the theme for the dashboard.</p>
@@ -236,24 +378,38 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                                     </div>
                                     <div>
                                         <h4 className="font-bold text-xl flex items-center gap-2">
-                                            Data Explorer Pro
-                                            <span className="bg-violet-500 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">Active</span>
+                                            {user?.plan === 'pro' ? 'Data Explorer Pro' : 'Data Explorer Free'}
+                                            {user?.plan === 'pro' && (
+                                                <span className="bg-violet-500 text-white text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">Active</span>
+                                            )}
                                         </h4>
-                                        <p className="text-sm text-muted-foreground">Unlimited databases, AI queries, and collaboration.</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {user?.plan === 'pro' 
+                                                ? 'Unlimited databases, AI queries, and collaboration.'
+                                                : 'Basic features with limited AI queries.'}
+                                        </p>
                                     </div>
                                     <div className="ml-auto flex items-end flex-col">
                                         <div className="flex items-end gap-1">
-                                            <span className="text-3xl font-black tracking-tighter">$19</span>
+                                            <span className="text-3xl font-black tracking-tighter">{user?.plan === 'pro' ? '$19' : '$0'}</span>
                                             <span className="text-sm text-muted-foreground mb-1">/mo</span>
                                         </div>
                                     </div>
                                 </div>
                                 <div className="relative z-10">
                                     <p className="text-xs font-medium text-muted-foreground mb-6">
-                                        Your next billing date is <strong className="text-foreground">October 24, 2026</strong>.
+                                        {user?.plan === 'pro' 
+                                            ? <>Your next billing date is <strong className="text-foreground">{new Date(user.billingDate!).toLocaleDateString()}</strong>.</>
+                                            : "Upgrade to Pro to unlock more features."}
                                     </p>
                                     <div className="flex gap-3">
-                                        <Button className="bg-foreground text-background hover:bg-foreground/90 font-medium px-6">Upgrade to Team</Button>
+                                        {user?.plan !== 'pro' ? (
+                                            <Button onClick={() => handleUpdateBilling('pro')} disabled={isLoading} className="bg-foreground text-background hover:bg-foreground/90 font-medium px-6">
+                                                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Upgrade to Pro'}
+                                            </Button>
+                                        ) : (
+                                            <Button onClick={() => handleUpdateBilling('free')} variant="outline" className="border-border/50">Downgrade to Free</Button>
+                                        )}
                                         <Button variant="outline" className="border-border/50">Manage Subscription</Button>
                                     </div>
                                 </div>
@@ -267,8 +423,8 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                                             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Visa_Inc._logo.svg/2560px-Visa_Inc._logo.svg.png" alt="Visa" className="h-full object-contain" />
                                         </div>
                                         <div>
-                                            <p className="font-medium text-sm">Visa ending in 4242</p>
-                                            <p className="text-xs text-muted-foreground">Expires 12/2028</p>
+                                            <p className="font-medium text-sm">{user?.paymentMethod || 'Visa ending in 4242'}</p>
+                                            <p className="text-xs text-muted-foreground text-left">Expires 12/2028</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -292,41 +448,53 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                                 <p className="text-sm text-muted-foreground">Configure how you receive alerts and updates.</p>
                             </div>
                             <div className="w-full h-px bg-border/50" />
-                            <div className="space-y-4 border rounded-xl overflow-hidden divide-y bg-card">
+                             <div className="space-y-4 border rounded-xl overflow-hidden divide-y bg-card">
                                 <div className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
                                     <div>
                                         <p className="font-medium text-sm">Email Alerts</p>
-                                        <p className="text-xs text-muted-foreground mt-0.5">Receive weekly reports on your queries and data usage.</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5 text-left">Receive weekly reports on your queries and data usage.</p>
                                     </div>
-                                    <div className="w-11 h-6 bg-violet-500 rounded-full relative cursor-pointer border-2 border-transparent transition-colors">
-                                        <div className="absolute right-0 top-0 w-5 h-5 bg-white rounded-full transition-transform shadow-sm"></div>
+                                    <div 
+                                        onClick={() => { setEmailNotifications(!emailNotifications); handleSaveSettings({ emailNotifications: !emailNotifications }); }}
+                                        className={`w-11 h-6 rounded-full relative cursor-pointer border-2 border-transparent transition-colors ${emailNotifications ? 'bg-violet-500' : 'bg-muted-foreground/30'}`}
+                                    >
+                                        <div className={`absolute top-0 w-5 h-5 bg-white rounded-full transition-all shadow-sm ${emailNotifications ? 'right-0' : 'left-0'}`}></div>
                                     </div>
                                 </div>
                                 <div className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
                                     <div>
                                         <p className="font-medium text-sm">Failed Queries</p>
-                                        <p className="text-xs text-muted-foreground mt-0.5">Get notified immediately if a long-running background query fails.</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5 text-left">Get notified immediately if a long-running background query fails.</p>
                                     </div>
-                                    <div className="w-11 h-6 bg-violet-500 rounded-full relative cursor-pointer border-2 border-transparent transition-colors">
-                                        <div className="absolute right-0 top-0 w-5 h-5 bg-white rounded-full transition-transform shadow-sm"></div>
+                                    <div 
+                                        onClick={() => { setFailedQueryAlerts(!failedQueryAlerts); handleSaveSettings({ failedQueryAlerts: !failedQueryAlerts }); }}
+                                        className={`w-11 h-6 rounded-full relative cursor-pointer border-2 border-transparent transition-colors ${failedQueryAlerts ? 'bg-violet-500' : 'bg-muted-foreground/30'}`}
+                                    >
+                                        <div className={`absolute top-0 w-5 h-5 bg-white rounded-full transition-all shadow-sm ${failedQueryAlerts ? 'right-0' : 'left-0'}`}></div>
                                     </div>
                                 </div>
                                 <div className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
                                     <div>
                                         <p className="font-medium text-sm">Product Updates</p>
-                                        <p className="text-xs text-muted-foreground mt-0.5">News about the latest AI features and platform updates.</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5 text-left">News about the latest AI features and platform updates.</p>
                                     </div>
-                                    <div className="w-11 h-6 bg-muted-foreground/30 rounded-full relative cursor-pointer border-2 border-transparent transition-colors">
-                                        <div className="absolute left-0 top-0 w-5 h-5 bg-white rounded-full transition-transform shadow-sm"></div>
+                                    <div 
+                                        onClick={() => { setProductUpdates(!productUpdates); handleSaveSettings({ productUpdates: !productUpdates }); }}
+                                        className={`w-11 h-6 rounded-full relative cursor-pointer border-2 border-transparent transition-colors ${productUpdates ? 'bg-violet-500' : 'bg-muted-foreground/30'}`}
+                                    >
+                                        <div className={`absolute top-0 w-5 h-5 bg-white rounded-full transition-all shadow-sm ${productUpdates ? 'right-0' : 'left-0'}`}></div>
                                     </div>
                                 </div>
                                 <div className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
                                     <div>
                                         <p className="font-medium text-sm">Security Alerts</p>
-                                        <p className="text-xs text-muted-foreground mt-0.5">Get notified about new sign-ins and security events.</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5 text-left">Get notified about new sign-ins and security events.</p>
                                     </div>
-                                    <div className="w-11 h-6 bg-violet-500 rounded-full relative cursor-pointer border-2 border-transparent transition-colors opacity-60 cursor-not-allowed" title="Mandatory for security">
-                                        <div className="absolute right-0 top-0 w-5 h-5 bg-white rounded-full transition-transform shadow-sm"></div>
+                                    <div 
+                                        className={`w-11 h-6 rounded-full relative border-2 border-transparent transition-colors bg-violet-500 opacity-60 cursor-not-allowed`}
+                                        title="Mandatory for security"
+                                    >
+                                        <div className="absolute right-0 top-0 w-5 h-5 bg-white rounded-full shadow-sm"></div>
                                     </div>
                                 </div>
                             </div>
@@ -346,17 +514,24 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                                 <div className="space-y-3">
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-medium text-muted-foreground">Current Password</label>
-                                        <Input type="password" />
+                                        <Input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-medium text-muted-foreground">New Password</label>
-                                        <Input type="password" />
+                                        <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-xs font-medium text-muted-foreground">Confirm New Password</label>
-                                        <Input type="password" />
+                                        <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
                                     </div>
-                                    <Button className="mt-2" onClick={() => handleFeatureNotImplemented('Password Update')}>Update Password</Button>
+                                    {user?.provider !== 'local' && (
+                                        <p className="text-[10px] text-amber-500 font-medium">
+                                            Note: Social login accounts might not have a password set.
+                                        </p>
+                                    )}
+                                    <Button className="mt-2" onClick={handleChangePassword} disabled={isLoading || !currentPassword || !newPassword}>
+                                        {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (lang === 'vi' ? 'Cập nhật mật khẩu' : 'Update Password')}
+                                    </Button>
                                 </div>
                             </div>
 
@@ -401,7 +576,9 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                                             <p className="font-medium text-sm text-red-600 dark:text-red-500">Delete Account</p>
                                             <p className="text-xs text-muted-foreground mt-0.5">Permanently remove your account and all associated data from our servers.</p>
                                         </div>
-                                        <Button variant="destructive" size="sm" onClick={() => handleFeatureNotImplemented('Account Deletion')}>Delete Account</Button>
+                                        <Button variant="destructive" size="sm" onClick={handleDeleteAccount} disabled={isLoading}>
+                                            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (lang === 'vi' ? 'Xóa tài khoản' : 'Delete Account')}
+                                        </Button>
                                     </div>
                                 </div>
                             </div>

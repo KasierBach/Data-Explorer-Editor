@@ -41,10 +41,26 @@ model User {
   firstName   String?
   lastName    String?
   avatarUrl   String?
+  bio         String?
   
   // Application Data
   role        String   @default("user")
   
+  // Preferences
+  theme       String   @default("dark") // "light", "dark", "system"
+  language    String   @default("vi")   // "vi", "en"
+  
+  // Notifications
+  emailNotifications Boolean @default(true)
+  failedQueryAlerts  Boolean @default(true)
+  productUpdates     Boolean @default(false)
+  securityAlerts      Boolean @default(true)
+
+  // Billing (Mock)
+  plan               String   @default("free") // "free", "pro"
+  billingDate        DateTime?
+  paymentMethod      String?  // e.g., "Visa ending in 4242"
+
   // Onboarding Data (Progressive Profiling)
   isOnboarded Boolean  @default(false)
   username    String?  @unique

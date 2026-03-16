@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -6,6 +6,10 @@ import { Roles } from '../auth/roles.decorator';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { OnboardingDto } from './dto/onboarding.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateSettingsDto } from './dto/update-settings.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateBillingDto } from './dto/update-billing.dto';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -20,6 +24,31 @@ export class UsersController {
     @Patch('profile/onboarding')
     async onboarding(@Request() req: any, @Body() dto: OnboardingDto) {
         return this.usersService.onboarding(req.user.id, dto);
+    }
+
+    @Patch('profile')
+    async updateProfile(@Request() req: any, @Body() dto: UpdateProfileDto) {
+        return this.usersService.updateProfile(req.user.id, dto);
+    }
+
+    @Patch('settings')
+    async updateSettings(@Request() req: any, @Body() dto: UpdateSettingsDto) {
+        return this.usersService.updateSettings(req.user.id, dto);
+    }
+
+    @Patch('billing')
+    async updateBilling(@Request() req: any, @Body() dto: UpdateBillingDto) {
+        return this.usersService.updateBilling(req.user.id, dto);
+    }
+
+    @Post('change-password')
+    async changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
+        return this.usersService.changePassword(req.user.id, dto);
+    }
+
+    @Delete('me')
+    async deleteAccount(@Request() req: any) {
+        return this.usersService.deleteAccount(req.user.id);
     }
 
     @Get()

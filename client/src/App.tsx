@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from '@/presentation/modules/Layout/AppShell'
 import { LoginPage } from '@/presentation/pages/LoginPage'
@@ -10,7 +10,7 @@ import { ERDPage } from '@/presentation/pages/ERDPage'
 import { VisualizePage } from '@/presentation/pages/VisualizePage'
 import { AdminDashboardPage } from '@/presentation/pages/Admin/AdminDashboardPage'
 import { RequireAuth } from '@/presentation/components/RequireAuth'
-import { ThemeProvider } from '@/presentation/components/theme-provider'
+import { useTheme } from '@/presentation/components/theme-provider'
 import { useAppStore } from '@/core/services/store'
 import { useSyncConnections } from '@/presentation/hooks/useSyncConnections'
 
@@ -28,9 +28,18 @@ export function App() {
   // Auto-fetch connections from backend whenever user is authenticated
   useSyncConnections();
 
+  const { theme: appTheme, setTheme: setAppTheme } = useTheme();
+  const { user } = useAppStore();
+
+  // Sync profile theme with App Theme
+  useEffect(() => {
+    if (user?.theme && user.theme !== appTheme) {
+        setAppTheme(user.theme as any);
+    }
+  }, [user?.theme, appTheme, setAppTheme]);
+
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LandingPage />} />
@@ -57,8 +66,7 @@ export function App() {
           </Routes>
           <Toaster richColors position="top-center" />
         </BrowserRouter>
-      </QueryClientProvider>
-    </ThemeProvider>
+    </QueryClientProvider>
   )
 }
 
