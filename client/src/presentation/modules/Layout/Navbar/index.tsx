@@ -1,0 +1,83 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Menu, X } from 'lucide-react';
+import { Button } from '@/presentation/components/ui/button';
+import { useAppStore } from '@/core/services/store';
+import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
+import { ProfileDialog } from '../ProfileDialog/index';
+import { NavBrand } from './components/NavBrand';
+import { NavMainActions } from './components/NavMainActions';
+import { NavMenus } from './components/NavMenus';
+import { NavUserSection } from './components/NavUserSection';
+
+export const Navbar: React.FC = () => {
+    const { 
+        isSidebarOpen, setSidebarOpen, openQueryTab, openInsightsTab, 
+        activeConnectionId, user, logout, isAiPanelOpen, toggleAiPanel, lang 
+    } = useAppStore();
+    
+    const navigate = useNavigate();
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [activeProfileTab, setActiveProfileTab] = useState('profile');
+    
+    const isMobile = useMediaQuery('(max-width: 768px)');
+    const isSmallMobile = useMediaQuery('(max-width: 480px)');
+
+    return (
+        <div className="h-14 border-b flex items-center px-4 bg-card justify-between select-none shrink-0 sticky top-0 z-[60]">
+            <ProfileDialog 
+                isOpen={isProfileOpen} 
+                onClose={() => setIsProfileOpen(false)} 
+                initialTab={activeProfileTab} 
+            />
+
+            <div className="flex items-center gap-2 md:gap-6">
+                {isMobile && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() => setSidebarOpen(!isSidebarOpen)}
+                    >
+                        {isSidebarOpen ? <X className="w-5 h-5 text-primary" /> : <Menu className="w-5 h-5" />}
+                    </Button>
+                )}
+
+                <NavBrand isSmallMobile={isSmallMobile} onNavigate={navigate} />
+
+                {!isMobile && (
+                    <NavMainActions 
+                        activeConnectionId={activeConnectionId}
+                        openInsightsTab={openInsightsTab}
+                        onNavigate={navigate}
+                        lang={lang}
+                    />
+                )}
+            </div>
+
+            <div className="flex items-center gap-2 md:gap-3">
+                {!isMobile && (
+                    <NavMenus 
+                        lang={lang}
+                        openQueryTab={openQueryTab}
+                        isSidebarOpen={isSidebarOpen}
+                        setSidebarOpen={setSidebarOpen}
+                    />
+                )}
+
+                <NavUserSection 
+                    user={user}
+                    logout={logout}
+                    isAiPanelOpen={isAiPanelOpen}
+                    toggleAiPanel={toggleAiPanel}
+                    isMobile={isMobile}
+                    isSmallMobile={isSmallMobile}
+                    lang={lang}
+                    setActiveProfileTab={setActiveProfileTab}
+                    setIsProfileOpen={setIsProfileOpen}
+                    navigate={navigate}
+                />
+            </div>
+        </div>
+    );
+};

@@ -1,0 +1,108 @@
+import React, { useRef } from 'react';
+import {
+    ReactFlow,
+    Controls,
+    Background,
+    MiniMap,
+    ConnectionLineType,
+    type Node,
+    type Edge,
+    type OnNodesChange,
+    type OnEdgesChange,
+    type OnConnect,
+} from '@xyflow/react';
+import { Database } from 'lucide-react';
+import TableNode from '../../TableNode';
+import { ForeignKeyDialog, type ForeignKeyData } from '../../ForeignKeyDialog';
+
+const nodeTypes = {
+    table: TableNode,
+};
+
+interface ERDCanvasProps {
+    nodes: Node[];
+    edges: Edge[];
+    onNodesChange: OnNodesChange;
+    onEdgesChange: OnEdgesChange;
+    onConnect: OnConnect;
+    isLoading: boolean;
+    effectiveDatabase?: string;
+    lang: string;
+    showMinimap: boolean;
+    pendingConnection: { sourceTable: string; sourceColumn: string; targetTable: string; targetColumn: string } | null;
+    setPendingConnection: (v: any) => void;
+    handleCreateForeignKey: (data: ForeignKeyData) => void;
+}
+
+export const ERDCanvas: React.FC<ERDCanvasProps> = ({
+    nodes, edges, onNodesChange, onEdgesChange, onConnect, isLoading, effectiveDatabase, lang, showMinimap, pendingConnection, setPendingConnection, handleCreateForeignKey
+}) => {
+    const reactFlowRef = useRef<any>(null);
+
+    return (
+        <div className="flex-1 relative">
+            {isLoading && (
+                <div className="absolute top-0 left-0 w-full z-50 overflow-hidden">
+                    <div className="h-0.5 bg-primary/20 w-full relative">
+                        <div className="absolute top-0 left-0 h-full bg-primary animate-pulse w-1/3" />
+                    </div>
+                </div>
+            )}
+
+            {!effectiveDatabase && !isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+                    <div className="text-center">
+                        <div className="w-12 h-12 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce">
+                            <Database className="w-6 h-6 text-muted-foreground" />
+                        </div>
+                        <h3 className="font-bold text-lg mb-2">{lang === 'vi' ? 'Chọn Cơ sở dữ liệu' : 'Select a Database'}</h3>
+                        <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                            {lang === 'vi' ? 'Chọn một cơ sở dữ liệu từ thanh bên để bắt đầu trực quan hóa sơ đồ.' : 'Choose a database from the sidebar to start visualizing your schema.'}
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            <ReactFlow
+                ref={reactFlowRef}
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                nodeTypes={nodeTypes}
+                connectionLineType={ConnectionLineType.SmoothStep}
+                connectionLineStyle={{ stroke: 'hsl(var(--primary))', strokeWidth: 2, strokeDasharray: '5,5' }}
+                fitView
+                minZoom={0.05}
+                maxZoom={2}
+                colorMode="system"
+                connectionRadius={30}
+                snapToGrid={true}
+                snapGrid={[15, 15]}
+            >
+                <Background color="hsl(var(--muted-foreground))" gap={20} style={{ opacity: 0.05 }} />
+                <Controls className="bg-card border-border/40 shadow-2xl rounded-xl overflow-hidden" />
+
+                {showMinimap && (
+                    <MiniMap
+                        className="bg-card/80 border border-border/40 rounded-xl overflow-hidden !shadow-2xl"
+                        maskColor="rgba(0,0,0,0.2)"
+                        nodeColor="hsl(var(--primary))"
+                        pannable
+                        zoomable
+                    />
+                )}
+            </ReactFlow>
+
+            {pendingConnection && (
+                <ForeignKeyDialog
+                    isOpen={!!pendingConnection}
+                    onClose={() => setPendingConnection(null)}
+                    onConfirm={handleCreateForeignKey}
+                    {...pendingConnection}
+                />
+            )}
+        </div>
+    );
+};

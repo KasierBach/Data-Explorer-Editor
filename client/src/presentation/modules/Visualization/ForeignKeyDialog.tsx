@@ -28,7 +28,7 @@ interface ForeignKeyDialogProps {
     sourceColumn: string;
     targetTable: string;
     targetColumn: string;
-    existingTables: string[]; // List of all tables for validation or switching if needed (optional)
+    existingTables?: string[]; // List of all tables for validation or switching if needed
 }
 
 export interface ForeignKeyData {
