@@ -14,6 +14,7 @@ interface ERDSidebarProps {
     setSelectedDatabase: (v: string) => void;
     allDatabases: any[];
     hierarchy: any[];
+    filteredHierarchy: any[];
     visibleTableNames: Set<string>;
     toggleTable: (name: string) => void;
     searchTerm: string;
@@ -22,10 +23,11 @@ interface ERDSidebarProps {
     setSchemaFilter: (v: string) => void;
     handleSelectAll: () => void;
     handleDeselectAll: () => void;
+    isLoadingHierarchy?: boolean;
 }
 
 export const ERDSidebar: React.FC<ERDSidebarProps> = ({
-    isCollapsed, setCollapsed, lang, selectedDatabase, setSelectedDatabase, allDatabases, hierarchy, visibleTableNames, toggleTable, searchTerm, setSearchTerm, schemaFilter, setSchemaFilter, handleSelectAll, handleDeselectAll
+    isCollapsed, setCollapsed, lang, selectedDatabase, setSelectedDatabase, allDatabases, hierarchy, filteredHierarchy, visibleTableNames, toggleTable, searchTerm, setSearchTerm, schemaFilter, setSchemaFilter, handleSelectAll, handleDeselectAll, isLoadingHierarchy
 }) => {
     const hasDatabases = allDatabases && allDatabases.length > 0;
 
@@ -39,13 +41,7 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
         return Array.from(schemaSet).sort();
     }, [hierarchy]);
 
-    const filteredHierarchy = useMemo(() => {
-        if (!hierarchy) return [];
-        let filtered = hierarchy;
-        if (schemaFilter !== 'all') filtered = filtered.filter(h => h.id?.includes(`schema:${schemaFilter}`));
-        if (searchTerm) filtered = filtered.filter(h => h.name.toLowerCase().includes(searchTerm.toLowerCase()));
-        return filtered;
-    }, [hierarchy, searchTerm, schemaFilter]);
+    // Filtering is now handled by useERDLogic and passed via filteredHierarchy prop
 
     return (
         <div className={cn(
@@ -125,30 +121,56 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
             </div>
 
             <div className="flex-1 overflow-auto custom-scrollbar">
-                <div className="p-3 space-y-1">
-                    {filteredHierarchy.map((t) => (
-                        <div
-                            key={t.id}
-                            className={cn(
-                                "px-3 py-2.5 rounded-xl cursor-pointer transition-all flex items-center justify-between group",
-                                visibleTableNames.has(t.name)
-                                    ? "bg-primary/10 text-primary border border-primary/20"
-                                    : "hover:bg-muted/50 text-muted-foreground border border-transparent"
-                            )}
-                            onClick={() => toggleTable(t.name)}
-                        >
-                            <div className="flex items-center gap-2 min-w-0">
-                                <Table className={cn("h-3.5 w-3.5 shrink-0", visibleTableNames.has(t.name) ? "opacity-100" : "opacity-30")} />
-                                <span className="text-[11px] font-bold truncate">{t.name}</span>
-                            </div>
-                            {visibleTableNames.has(t.name) ? (
-                                <X className="h-3 w-3 opacity-40 group-hover:opacity-100" />
-                            ) : (
-                                <Plus className="h-3 w-3 opacity-0 group-hover:opacity-40" />
-                            )}
+                {isLoadingHierarchy ? (
+                    <div className="p-12 text-center space-y-4">
+                        <div className="w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mx-auto shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
+                        <p className="text-[11px] font-bold text-muted-foreground animate-pulse tracking-wide uppercase">
+                            {lang === 'vi' ? 'Đang tải thực thể...' : 'Exploring Entities...'}
+                        </p>
+                    </div>
+                ) : filteredHierarchy.length === 0 ? (
+                    <div className="p-12 text-center space-y-4 opacity-60 group">
+                        <div className="w-12 h-12 bg-muted/20 rounded-2xl flex items-center justify-center mx-auto transition-transform group-hover:scale-110 duration-500">
+                             <Table className="w-6 h-6 text-muted-foreground/30" />
                         </div>
-                    ))}
-                </div>
+                        <p className="text-[11px] text-muted-foreground font-medium italic">
+                            {lang === 'vi' ? 'Không tìm thấy thực thể nào' : 'No entities discovered'}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="p-4 space-y-1.5 animate-in fade-in duration-500">
+                        <div className="px-3 pb-2 text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] border-b border-border/10 mb-2">
+                             {lang === 'vi' ? 'Danh sách bảng' : 'Table List'}
+                        </div>
+                        {filteredHierarchy.map((t) => (
+                            <div
+                                key={t.id}
+                                className={cn(
+                                    "px-4 py-3 rounded-2xl cursor-pointer transition-all duration-300 flex items-center justify-between group relative overflow-hidden",
+                                    visibleTableNames.has(t.name)
+                                        ? "bg-blue-500/10 text-primary border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.1)]"
+                                        : "hover:bg-muted/40 text-muted-foreground border border-transparent hover:border-border/30"
+                                )}
+                                onClick={() => toggleTable(t.name)}
+                            >
+                                <div className="flex items-center gap-3 min-w-0 relative z-10">
+                                    <div className={cn(
+                                        "w-2 h-2 rounded-full",
+                                        visibleTableNames.has(t.name) ? "bg-blue-500 animate-pulse" : "bg-muted-foreground/20"
+                                    )} />
+                                    <span className="text-xs font-bold truncate tracking-tight">{t.name}</span>
+                                </div>
+                                <div className="relative z-10 flex items-center">
+                                    {visibleTableNames.has(t.name) ? (
+                                        <X className="h-3.5 w-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+                                    ) : (
+                                        <Plus className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <div className="p-4 border-t bg-muted/10">

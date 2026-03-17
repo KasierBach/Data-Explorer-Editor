@@ -49,43 +49,75 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         if (databaseProp) setSelectedDatabase(databaseProp);
     }, [databaseProp]);
 
+    // Explicitly sync adapter when connectionId changes
+    useEffect(() => {
+        if (!connectionId) return;
+        
+        const conn = connections.find(c => c.id === connectionId);
+        if (conn) {
+            console.log(`[ERDWorkspace] Setting active connection: ${conn.name}`);
+            connectionService.setActiveConnection({
+                id: conn.id,
+                type: conn.type as any
+            });
+        }
+    }, [connectionId, connections]);
+
     // Data Fetching
     const { data: hierarchy, isLoading: isLoadingHierarchy } = useQuery({
-        queryKey: ['erd-hierarchy', connectionId, selectedDatabase],
+        queryKey: ['erd-hierarchy', connectionId, selectedDatabase, !!activeConnection],
         queryFn: async () => {
-            if (!connectionId) return [];
-            const adapter = connectionService.getAdapter(connectionId, activeConnection?.type as any);
+            console.log(`[ERD crawl] Start crawl for connection: ${connectionId}, activeConn ready? ${!!activeConnection}`);
+            if (!connectionId || !activeConnection) return [];
+            
+            const adapter = connectionService.getAdapter(connectionId, activeConnection.type as any);
             const results: any[] = [];
+            
             const crawl = async (parentId: string | null) => {
-                const nodes = await adapter.getHierarchy(parentId);
-                for (const node of nodes) {
-                    if (node.type === 'table' || node.type === 'view') results.push(node);
-                    else if (node.type === 'database') {
-                        if (!selectedDatabase || node.name === selectedDatabase || node.id.includes(selectedDatabase)) await crawl(node.id);
-                    } else if (node.type === 'schema' || node.type === 'folder') await crawl(node.id);
+                try {
+                    console.log(`[ERD crawl] Fetching ${parentId || 'ROOT'}`);
+                    const nodes = await adapter.getHierarchy(parentId);
+                    for (const node of nodes) {
+                        if (node.type === 'table' || node.type === 'view') {
+                            results.push(node);
+                        } else if (node.type === 'database') {
+                            // If searching whole connection, or specific DB matches
+                            if (!selectedDatabase || node.name === selectedDatabase || node.id.includes(`db:${selectedDatabase}`)) {
+                                await crawl(node.id);
+                            }
+                        } else if (node.type === 'schema' || node.type === 'folder') {
+                            await crawl(node.id);
+                        }
+                    }
+                } catch (err) {
+                    console.error(`[ERD crawl] Error at ${parentId}:`, err);
                 }
             };
+
             await crawl(selectedDatabase ? `db:${selectedDatabase}` : null);
+            console.log(`[ERD crawl] Finished. Found ${results.length} entities.`);
             return results;
         },
-        enabled: !!connectionId,
+        enabled: !!connectionId && !!activeConnection,
     });
 
     const { data: relationships } = useQuery({
-        queryKey: ['erd-rels', connectionId, selectedDatabase],
+        queryKey: ['erd-rels', connectionId, selectedDatabase, !!activeConnection],
         queryFn: async () => {
-            if (!connectionId) return [];
-            const adapter = connectionService.getAdapter(connectionId, activeConnection?.type as any);
+            if (!connectionId || !activeConnection) return [];
+            const adapter = connectionService.getAdapter(connectionId, activeConnection.type as any);
+            console.log(`[useERDLogic] Fetching relationships for ${selectedDatabase}`);
             return adapter.getRelationships(selectedDatabase);
         },
         enabled: !!connectionId,
     });
 
     const { data: allDatabases } = useQuery({
-        queryKey: ['erd-databases', connectionId],
+        queryKey: ['erd-databases', connectionId, !!activeConnection],
         queryFn: async () => {
-            if (!connectionId) return [];
-            const adapter = connectionService.getAdapter(connectionId, activeConnection?.type as any);
+            if (!connectionId || !activeConnection) return [];
+            const adapter = connectionService.getAdapter(connectionId, activeConnection.type as any);
+            console.log(`[useERDLogic] Fetching database list`);
             const nodes = await adapter.getHierarchy(null);
             return nodes.filter((n: any) => n.type === 'database');
         },
@@ -109,6 +141,19 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         },
         enabled: visibleTableNames.size > 0 && !!hierarchy,
     });
+
+    const filteredHierarchy = useMemo(() => {
+        if (!hierarchy) return [];
+        let filtered = hierarchy;
+        if (schemaFilter !== 'all') {
+            filtered = filtered.filter(h => h.id?.includes(`schema:${schemaFilter}`));
+        }
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(h => h.name.toLowerCase().includes(term));
+        }
+        return filtered;
+    }, [hierarchy, schemaFilter, searchTerm]);
 
     const fkConstraintMap = useMemo(() => {
         const map = new Map<string, string>();
@@ -257,6 +302,20 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         });
     };
 
+    const handleSelectAll = useCallback(() => {
+        setVisibleTableNames(prev => {
+            const next = new Set(prev);
+            filteredHierarchy.forEach(h => next.add(h.name));
+            return next;
+        });
+    }, [filteredHierarchy]);
+
+    const handleDeselectAll = useCallback(() => {
+        setVisibleTableNames(new Set());
+        setNodes([]);
+        setEdges([]);
+    }, [setNodes, setEdges]);
+
     const handleToggleCollapse = (name: string) => {
         setCollapsedTables(prev => {
             const next = new Set(prev);
@@ -392,6 +451,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             nodes, edges, visibleTableNames, searchTerm, pendingConnection, 
             isSidebarCollapsed, detailLevel, schemaFilter, showMinimap, 
             collapsedTables, selectedDatabase, allDatabases, hierarchy, 
+            filteredHierarchy,
             tableData, isLoadingHierarchy, isLoadingCols, lang, 
             activeConnection, effectiveDatabase 
         },
@@ -401,6 +461,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             setSidebarCollapsed, setDetailLevel, setSchemaFilter, setShowMinimap, 
             setCollapsedTables, setSelectedDatabase, handleRemoveConstraint, 
             handleCreateForeignKey, handleAutoLayout, toggleTable, 
+            handleSelectAll, handleDeselectAll,
             handleToggleCollapse, handleExportPNG, handleExportSQL 
         }
     };

@@ -12,6 +12,17 @@ export const useVisualizeLogic = () => {
     const { activeConnectionId, connections, activeDatabase, pageStates, setPageState } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
 
+    // Ensure adapter is connected
+    useEffect(() => {
+        if (activeConnectionId && activeConnection) {
+            connectionService.setActiveConnection({
+                id: activeConnection.id,
+                type: activeConnection.type as any
+            });
+        }
+    }, [activeConnectionId, activeConnection]);
+
+
     const pageId = `visualize-page-${activeConnectionId || 'default'}`;
     const savedState = pageStates[pageId] || {};
 

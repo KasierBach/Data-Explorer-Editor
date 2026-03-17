@@ -1,10 +1,13 @@
-import React, { useCallback } from 'react';
+import React, { useEffect } from 'react';
 import { useERDLogic } from './useERDLogic';
+import { connectionService } from '@/core/services/ConnectionService';
+import { useAppStore } from '@/core/services/store';
 
 // UI Components
 import { ERDSidebar } from './components/ERDSidebar';
 import { ERDToolbar } from './components/ERDToolbar';
 import { ERDCanvas } from './components/ERDCanvas';
+import '@xyflow/react/dist/style.css'; // Added CSS import
 
 interface ERDWorkspaceProps {
     tabId: string;
@@ -14,17 +17,18 @@ interface ERDWorkspaceProps {
 
 export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId, database: databaseProp }) => {
     const { state, actions } = useERDLogic(tabId, connectionId, databaseProp);
+    const connections = useAppStore(state => state.connections);
+    const activeConnection = connections.find(c => c.id === connectionId);
 
-    const handleSelectAll = useCallback(() => {
-        if (!state.hierarchy) return;
-        actions.setVisibleTableNames(new Set(state.hierarchy.map(h => h.name)));
-    }, [state.hierarchy, actions]);
-
-    const handleDeselectAll = useCallback(() => {
-        actions.setVisibleTableNames(new Set());
-        actions.setNodes([]);
-        actions.setEdges([]);
-    }, [actions]);
+    // Ensure adapter is connected
+    useEffect(() => {
+        if (connectionId && activeConnection) { // Changed activeConnectionId to connectionId
+            connectionService.setActiveConnection({
+                id: activeConnection.id,
+                type: activeConnection.type as any
+            });
+        }
+    }, [connectionId, activeConnection]); // Changed activeConnectionId to connectionId
 
     return (
         <div className="h-full w-full bg-background relative flex overflow-hidden">
@@ -35,18 +39,20 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 selectedDatabase={state.selectedDatabase}
                 setSelectedDatabase={(val) => {
                     actions.setSelectedDatabase(val);
-                    handleDeselectAll();
+                    actions.handleDeselectAll();
                 }}
                 allDatabases={state.allDatabases || []}
                 hierarchy={state.hierarchy || []}
+                filteredHierarchy={state.filteredHierarchy || []}
                 visibleTableNames={state.visibleTableNames}
                 toggleTable={actions.toggleTable}
                 searchTerm={state.searchTerm}
                 setSearchTerm={actions.setSearchTerm}
                 schemaFilter={state.schemaFilter}
                 setSchemaFilter={actions.setSchemaFilter}
-                handleSelectAll={handleSelectAll}
-                handleDeselectAll={handleDeselectAll}
+                handleSelectAll={actions.handleSelectAll}
+                handleDeselectAll={actions.handleDeselectAll}
+                isLoadingHierarchy={state.isLoadingHierarchy}
             />
 
             <ERDCanvas
@@ -62,26 +68,23 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 pendingConnection={state.pendingConnection}
                 setPendingConnection={actions.setPendingConnection}
                 handleCreateForeignKey={actions.handleCreateForeignKey}
-            />
-
-            <ERDToolbar
-                isSidebarCollapsed={state.isSidebarCollapsed}
-                setSidebarCollapsed={actions.setSidebarCollapsed}
-                lang={state.lang}
-                activeConnectionName={state.activeConnection?.name}
-                selectedDatabase={state.selectedDatabase}
-                detailLevel={state.detailLevel}
-                setDetailLevel={actions.setDetailLevel}
-                showMinimap={state.showMinimap}
-                setShowMinimap={actions.setShowMinimap}
-                handleAutoLayout={actions.handleAutoLayout}
-                handleExportPNG={actions.handleExportPNG}
-                handleExportSQL={actions.handleExportSQL}
-                onFitView={() => {
-                    // This is handled by ReactFlow internally but we can call fitView if we had the instance
-                    // For now, let's just use the toolbar as a trigger.
-                    // Actually, we could use the useReactFlow hook in ERDCanvas and expose an action.
-                }}
+                toolbar={(
+                    <ERDToolbar
+                        isSidebarCollapsed={state.isSidebarCollapsed}
+                        setSidebarCollapsed={actions.setSidebarCollapsed}
+                        lang={state.lang}
+                        activeConnectionName={state.activeConnection?.name}
+                        selectedDatabase={state.selectedDatabase}
+                        detailLevel={state.detailLevel}
+                        setDetailLevel={actions.setDetailLevel}
+                        showMinimap={state.showMinimap}
+                        setShowMinimap={actions.setShowMinimap}
+                        handleAutoLayout={actions.handleAutoLayout}
+                        handleExportPNG={actions.handleExportPNG}
+                        handleExportSQL={actions.handleExportSQL}
+                        onFitView={() => {}}
+                    />
+                )}
             />
         </div>
     );

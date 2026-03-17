@@ -37,12 +37,12 @@ export const ERDToolbar: React.FC<ERDToolbarProps> = ({
                         <div className="p-2 bg-blue-500 rounded-xl text-white shadow-lg shadow-blue-500/20">
                             <GitGraph className="h-4 w-4" />
                         </div>
-                        <div>
-                            <h1 className="text-sm font-black tracking-tight leading-none mb-1">ERD Visualizer</h1>
-                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium uppercase tracking-widest opacity-60">
-                                <span>{activeConnectionName}</span>
-                                <span className="w-1 h-1 rounded-full bg-border" />
-                                <span>{selectedDatabase || (lang === 'vi' ? 'Sơ đồ mặc định' : 'Default Schema')}</span>
+                        <div className="min-w-0 overflow-hidden">
+                            <h1 className="text-sm font-black tracking-tight leading-none mb-1 truncate">ERD Visualizer</h1>
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium uppercase tracking-widest opacity-60 overflow-hidden">
+                                <span className="truncate max-w-[120px] sm:max-w-xs">{activeConnectionName}</span>
+                                <span className="w-1 h-1 rounded-full bg-border shrink-0" />
+                                <span className="truncate max-w-[80px] sm:max-w-[150px]">{selectedDatabase || (lang === 'vi' ? 'Sơ đồ mặc định' : 'Default Schema')}</span>
                             </div>
                         </div>
                     </div>

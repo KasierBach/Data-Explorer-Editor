@@ -32,10 +32,11 @@ interface ERDCanvasProps {
     pendingConnection: { sourceTable: string; sourceColumn: string; targetTable: string; targetColumn: string } | null;
     setPendingConnection: (v: any) => void;
     handleCreateForeignKey: (data: ForeignKeyData) => void;
+    toolbar?: React.ReactNode;
 }
 
 export const ERDCanvas: React.FC<ERDCanvasProps> = ({
-    nodes, edges, onNodesChange, onEdgesChange, onConnect, isLoading, effectiveDatabase, lang, showMinimap, pendingConnection, setPendingConnection, handleCreateForeignKey
+    nodes, edges, onNodesChange, onEdgesChange, onConnect, isLoading, effectiveDatabase, lang, showMinimap, pendingConnection, setPendingConnection, handleCreateForeignKey, toolbar
 }) => {
     const reactFlowRef = useRef<any>(null);
 
@@ -93,6 +94,7 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
                         zoomable
                     />
                 )}
+                {toolbar}
             </ReactFlow>
 
             {pendingConnection && (
