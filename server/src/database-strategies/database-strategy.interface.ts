@@ -19,6 +19,21 @@ export interface ColumnInfo {
     defaultValue: any;
     isPrimaryKey: boolean;
     pkConstraintName: string | null;
+    comment?: string | null;
+}
+
+export interface IndexInfo {
+    name: string;
+    columns: string[];
+    isUnique: boolean;
+    isPrimary: boolean;
+}
+
+export interface FullTableMetadata {
+    columns: ColumnInfo[];
+    indices: IndexInfo[];
+    comment?: string | null;
+    rowCount?: number;
 }
 
 export interface QueryResult {
@@ -77,6 +92,7 @@ export interface IDatabaseStrategy {
     getFunctions(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
     getFunctionParameters(pool: any, schema: string, func: string): Promise<ColumnInfo[]>;
     getColumns(pool: any, schema: string, table: string): Promise<ColumnInfo[]>;
+    getFullMetadata(pool: any, schema: string, table: string): Promise<FullTableMetadata>;
     getRelationships(pool: any): Promise<Relationship[]>;
     getDatabaseMetrics(pool: any): Promise<DatabaseMetrics>;
 }

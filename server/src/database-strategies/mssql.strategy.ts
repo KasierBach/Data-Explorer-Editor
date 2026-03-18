@@ -214,6 +214,16 @@ export class MssqlStrategy implements IDatabaseStrategy {
         }));
     }
 
+    async getFullMetadata(pool: any, schema: string, table: string): Promise<any> {
+        const columns = await this.getColumns(pool, schema, table);
+        return {
+            columns,
+            indices: [],
+            comment: null,
+            rowCount: 0
+        };
+    }
+
     async getRelationships(pool: any): Promise<Relationship[]> {
         const sql = `
             SELECT 

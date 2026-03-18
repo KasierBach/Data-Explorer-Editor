@@ -26,11 +26,14 @@ export interface TableColumn {
     isPrimaryKey: boolean;
     isForeignKey: boolean;
     isNullable: boolean;
+    comment?: string | null;
 }
 
 export interface TableMetadata {
     columns: TableColumn[];
     rowCount?: number;
+    comment?: string | null;
+    indices?: { name: string; columns: string[]; isUnique: boolean; isPrimary: boolean }[];
 }
 
 export interface QueryResult {

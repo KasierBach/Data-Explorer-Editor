@@ -90,7 +90,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
     async getMetadata(tableId: string): Promise<TableMetadata> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        const response = await fetch(`${this.baseUrl}/metadata/columns?connectionId=${this.connectionId}&tableId=${encodeURIComponent(tableId)}`, {
+        const response = await fetch(`${this.baseUrl}/metadata/full?connectionId=${this.connectionId}&tableId=${encodeURIComponent(tableId)}`, {
             headers: this.getHeaders(),
         });
 
@@ -99,17 +99,19 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         }
 
         const data = await response.json();
-        const columns = Array.isArray(data) ? data : (data.columns || []);
-
+        
         return {
-            columns: columns.map((col: any) => ({
+            columns: data.columns.map((col: any) => ({
                 name: col.name,
                 type: col.type,
                 isPrimaryKey: col.isPrimaryKey || false,
                 isNullable: col.isNullable !== undefined ? col.isNullable : true,
-                isForeignKey: col.isForeignKey || false
+                isForeignKey: col.isForeignKey || false,
+                comment: col.comment
             })),
-            rowCount: data.rowCount || 0
+            rowCount: data.rowCount || 0,
+            comment: data.comment,
+            indices: data.indices
         };
     }
 

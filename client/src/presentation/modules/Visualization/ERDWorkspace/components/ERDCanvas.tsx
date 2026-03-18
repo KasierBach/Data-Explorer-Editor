@@ -32,11 +32,16 @@ interface ERDCanvasProps {
     pendingConnection: { sourceTable: string; sourceColumn: string; targetTable: string; targetColumn: string } | null;
     setPendingConnection: (v: any) => void;
     handleCreateForeignKey: (data: ForeignKeyData) => void;
+    handleEdgeMouseEnter?: (event: React.MouseEvent, edge: Edge) => void;
+    handleEdgeMouseLeave?: (event: React.MouseEvent, edge: Edge) => void;
+    hoverPosition?: { x: number, y: number } | null;
+    hoveredEdgeId?: string | null;
     toolbar?: React.ReactNode;
 }
 
 export const ERDCanvas: React.FC<ERDCanvasProps> = ({
-    nodes, edges, onNodesChange, onEdgesChange, onConnect, isLoading, effectiveDatabase, lang, showMinimap, pendingConnection, setPendingConnection, handleCreateForeignKey, toolbar
+    nodes, edges, onNodesChange, onEdgesChange, onConnect, isLoading, effectiveDatabase, lang, showMinimap, pendingConnection, setPendingConnection, handleCreateForeignKey,
+    handleEdgeMouseEnter, handleEdgeMouseLeave, hoverPosition, hoveredEdgeId, toolbar
 }) => {
     const reactFlowRef = useRef<any>(null);
 
@@ -71,6 +76,8 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
+                onEdgeMouseEnter={handleEdgeMouseEnter}
+                onEdgeMouseLeave={handleEdgeMouseLeave}
                 nodeTypes={nodeTypes}
                 connectionLineType={ConnectionLineType.SmoothStep}
                 connectionLineStyle={{ stroke: 'hsl(var(--primary))', strokeWidth: 2, strokeDasharray: '5,5' }}
@@ -96,6 +103,29 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
                 )}
                 {toolbar}
             </ReactFlow>
+
+            {hoverPosition && (
+                <div 
+                    className="fixed z-[9999] pointer-events-none transform -translate-x-1/2 -translate-y-[120%]"
+                    style={{ 
+                        left: hoverPosition.x, 
+                        top: hoverPosition.y,
+                    }}
+                >
+                    <div className="bg-card/80 backdrop-blur-xl border border-primary/20 p-3 rounded-xl shadow-2xl ring-1 ring-white/10 flex flex-col items-center gap-1 min-w-[200px] animate-in fade-in zoom-in duration-200">
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium uppercase tracking-widest opacity-60">
+                            {lang === 'vi' ? 'Mối quan hệ' : 'Relationship'}
+                        </div>
+                        <div className="flex items-center gap-2 font-bold text-xs whitespace-nowrap">
+                            {(() => {
+                                const hoveredEdge = edges.find(e => e.id === hoveredEdgeId);
+                                if (!hoveredEdge) return '...';
+                                return `${hoveredEdge.source}(${hoveredEdge.sourceHandle}) → ${hoveredEdge.target}(${hoveredEdge.targetHandle})`;
+                            })()}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {pendingConnection && (
                 <ForeignKeyDialog

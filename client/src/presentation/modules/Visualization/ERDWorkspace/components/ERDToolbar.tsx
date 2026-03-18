@@ -15,7 +15,7 @@ interface ERDToolbarProps {
     setDetailLevel: (v: DetailLevel) => void;
     showMinimap: boolean;
     setShowMinimap: (v: boolean) => void;
-    handleAutoLayout: () => void;
+    handleAutoLayout: (direction?: 'TB' | 'LR') => void;
     handleExportPNG: () => void;
     handleExportSQL: () => void;
     onFitView: () => void;
@@ -48,10 +48,24 @@ export const ERDToolbar: React.FC<ERDToolbarProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5 pt-3 border-t border-border/10">
-                        <Button variant="secondary" size="sm" className="h-8 text-[11px] font-bold gap-2 px-3 rounded-lg shadow-sm" onClick={handleAutoLayout}>
-                            <LayoutGrid className="h-3.5 w-3.5" />
-                            {lang === 'vi' ? 'Sắp xếp' : 'Auto Layout'}
-                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="secondary" size="sm" className="h-8 text-[11px] font-bold gap-2 px-3 rounded-lg shadow-sm">
+                                    <LayoutGrid className="h-3.5 w-3.5" />
+                                    {lang === 'vi' ? 'Sắp xếp' : 'Auto Layout'}
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-48 p-1.5 rounded-xl border-border/40 backdrop-blur-3xl bg-card/80">
+                                <DropdownMenuItem onClick={() => handleAutoLayout('LR')} className="gap-2">
+                                    <LayoutGrid className="w-3.5 h-3.5 rotate-90" />
+                                    {lang === 'vi' ? 'Sắp xếp Ngang' : 'Horizontal (L-R)'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleAutoLayout('TB')} className="gap-2">
+                                    <LayoutGrid className="w-3.5 h-3.5" />
+                                    {lang === 'vi' ? 'Sắp xếp Dọc' : 'Vertical (T-B)'}
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
 
                         <div className="w-px h-6 bg-border/20 mx-1" />
 

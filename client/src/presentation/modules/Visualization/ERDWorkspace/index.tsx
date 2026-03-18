@@ -68,6 +68,10 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 pendingConnection={state.pendingConnection}
                 setPendingConnection={actions.setPendingConnection}
                 handleCreateForeignKey={actions.handleCreateForeignKey}
+                handleEdgeMouseEnter={actions.handleEdgeMouseEnter}
+                handleEdgeMouseLeave={actions.handleEdgeMouseLeave}
+                hoverPosition={state.hoverPosition}
+                hoveredEdgeId={state.hoveredEdgeId}
                 toolbar={(
                     <ERDToolbar
                         isSidebarCollapsed={state.isSidebarCollapsed}

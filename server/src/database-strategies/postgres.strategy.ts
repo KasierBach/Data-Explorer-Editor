@@ -208,11 +208,13 @@ export class PostgresStrategy implements IDatabaseStrategy {
         const sql = `
             SELECT 
                 c.column_name, c.data_type, c.is_nullable, c.column_default,
-                con.conname as pk_constraint_name
+                con.conname as pk_constraint_name,
+                pd.description as comment
             FROM information_schema.columns c
             JOIN pg_class t ON t.relname = c.table_name
             JOIN pg_namespace s ON s.oid = t.relnamespace AND s.nspname = c.table_schema
             LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attname = c.column_name
+            LEFT JOIN pg_description pd ON pd.objoid = t.oid AND pd.objsubid = a.attnum
             LEFT JOIN pg_constraint con ON con.conrelid = t.oid AND con.contype = 'p' AND a.attnum = ANY(con.conkey)
             WHERE c.table_name = $1 AND c.table_schema = $2
             ORDER BY c.ordinal_position
@@ -225,7 +227,61 @@ export class PostgresStrategy implements IDatabaseStrategy {
             defaultValue: row.column_default,
             isPrimaryKey: !!row.pk_constraint_name,
             pkConstraintName: row.pk_constraint_name,
+            comment: row.comment,
         }));
+    }
+
+    async getFullMetadata(pool: any, schema: string, table: string): Promise<any> {
+        const columns = await this.getColumns(pool, schema, table);
+        
+        // Fetch indices
+        const indicesSql = `
+            SELECT
+                i.relname as index_name,
+                a.attname as column_name,
+                ix.indisunique as is_unique,
+                ix.indisprimary as is_primary
+            FROM pg_class t
+            JOIN pg_index ix ON t.oid = ix.indrelid
+            JOIN pg_class i ON i.oid = ix.indexrelid
+            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            WHERE t.relname = $1 AND n.nspname = $2
+        `;
+        
+        const indicesRes = await pool.query(indicesSql, [table, schema]);
+        const indexMap = new Map<string, any>();
+        indicesRes.rows.forEach((row: any) => {
+            if (!indexMap.has(row.index_name)) {
+                indexMap.set(row.index_name, {
+                    name: row.index_name,
+                    columns: [],
+                    isUnique: row.is_unique,
+                    isPrimary: row.is_primary
+                });
+            }
+            indexMap.get(row.index_name).columns.push(row.column_name);
+        });
+
+        // Fetch table comment
+        const commentSql = `
+            SELECT obj_description(t.oid) as comment
+            FROM pg_class t
+            JOIN pg_namespace n ON n.nspname = $2 AND t.relnamespace = n.oid
+            WHERE t.relname = $1
+        `;
+        const commentRes = await pool.query(commentSql, [table, schema]);
+        
+        // Fetch row count estimate
+        const countSql = `SELECT reltuples as count FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = $1 AND n.nspname = $2`;
+        const countRes = await pool.query(countSql, [table, schema]);
+
+        return {
+            columns,
+            indices: Array.from(indexMap.values()),
+            comment: commentRes.rows[0]?.comment,
+            rowCount: Math.floor(countRes.rows[0]?.count || 0)
+        };
     }
 
     async getRelationships(pool: any): Promise<Relationship[]> {

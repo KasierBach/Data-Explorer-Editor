@@ -47,4 +47,13 @@ export class MetadataController {
     ) {
         return this.metadataService.getRelationships(connectionId, req.user.id, database);
     }
+
+    @Get('full')
+    getFullMetadata(
+        @Query('connectionId') connectionId: string,
+        @Query('tableId') tableId: string,
+        @Req() req: any,
+    ) {
+        return this.metadataService.getFullMetadata(connectionId, tableId, req.user.id);
+    }
 }

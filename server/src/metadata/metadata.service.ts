@@ -150,4 +150,17 @@ export class MetadataService {
 
         return strategy.getDatabaseMetrics(pool);
     }
+
+    async getFullMetadata(connectionId: string, tableId: string, userId: string) {
+        const connection = await this.connectionsService.findOne(connectionId, userId);
+        const parsed = this.parseNodeId(tableId);
+
+        const schema = parsed.schemaName || (connection.type === 'mssql' ? 'dbo' : 'public');
+        const table = parsed.tableName || tableId;
+
+        const pool = await this.connectionsService.getPool(connectionId, parsed.dbName, userId);
+        const strategy = this.strategyFactory.getStrategy(connection.type);
+
+        return strategy.getFullMetadata(pool, schema, table);
+    }
 }

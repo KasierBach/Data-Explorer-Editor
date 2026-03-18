@@ -41,6 +41,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     const [schemaFilter, setSchemaFilter] = useState<string>(initialMetadata.schemaFilter || 'all');
     const [showMinimap, setShowMinimap] = useState(initialMetadata.showMinimap ?? true);
     const [collapsedTables, setCollapsedTables] = useState<Set<string>>(new Set(initialMetadata.collapsedTables || []));
+    const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+    const [hoverPosition, setHoverPosition] = useState<{ x: number, y: number } | null>(null);
 
     const isFirstLoad = useRef(true);
 
@@ -134,7 +136,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 const hNode = hierarchy.find(h => h.name === name);
                 if (hNode) {
                     const metadata = await adapter.getMetadata(hNode.id);
-                    results[name] = metadata.columns;
+                    results[name] = metadata;
                 }
             }));
             return results;
@@ -180,6 +182,16 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             toast.error(lang === 'vi' ? `Không thể xóa ${type.toUpperCase()}` : `Failed to remove ${type.toUpperCase()}`, { description: error.message });
         }
     }, [connectionId, selectedDatabase, queryClient, lang]);
+
+    const handleEdgeMouseEnter = useCallback((event: React.MouseEvent, edge: Edge) => {
+        setHoveredEdgeId(edge.id);
+        setHoverPosition({ x: event.clientX, y: event.clientY });
+    }, []);
+
+    const handleEdgeMouseLeave = useCallback(() => {
+        setHoveredEdgeId(null);
+        setHoverPosition(null);
+    }, []);
 
     const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
         const removals = changes.filter(c => c.type === 'remove');
@@ -257,10 +269,21 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         }
     };
 
-    const handleAutoLayout = useCallback(() => {
+    const handleAutoLayout = useCallback((direction: 'TB' | 'LR' = 'LR') => {
         const dagreGraph = new dagre.graphlib.Graph();
         dagreGraph.setDefaultEdgeLabel(() => ({}));
-        dagreGraph.setGraph({ rankdir: 'LR', nodesep: 100, ranksep: 200 });
+        
+        // Adjust spacing based on direction and graph size
+        const nodesep = direction === 'LR' ? 100 : 150;
+        const ranksep = direction === 'LR' ? 200 : 150;
+        
+        dagreGraph.setGraph({ 
+            rankdir: direction, 
+            nodesep, 
+            ranksep,
+            align: 'DL', 
+            ranker: 'tight-tree'
+        });
         
         const connectedNodeIds = new Set<string>();
         edges.forEach(e => { connectedNodeIds.add(e.source); connectedNodeIds.add(e.target); });
@@ -269,26 +292,66 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         const standaloneNodes = nodes.filter(n => !connectedNodeIds.has(n.id));
         
         connectedNodes.forEach((node) => {
-            const columnCount = (node.data as any).columns?.length || 5;
-            dagreGraph.setNode(node.id, { width: 300, height: 100 + columnCount * 30 });
+            const tableData = node.data as any;
+            const columnCount = tableData.columns?.length || 0;
+            const isCollapsed = tableData.isCollapsed;
+            
+            // Width: Header is roughly 300px
+            // Height: Header is ~40px, each column row is ~30px
+            const width = 300; 
+            const height = isCollapsed ? 60 : 70 + (columnCount * 30);
+            
+            dagreGraph.setNode(node.id, { width, height });
         });
         
         edges.forEach((edge) => dagreGraph.setEdge(edge.source, edge.target));
         dagre.layout(dagreGraph);
         
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        
         const newNodes = nodes.map((node) => {
             if (connectedNodeIds.has(node.id)) {
                 const nodeWithPosition = dagreGraph.node(node.id);
+                // Dagre uses center point, React Flow uses top-left
+                const x = nodeWithPosition.x - 150; 
+                const y = nodeWithPosition.y - 25; 
+                
+                minX = Math.min(minX, x);
+                maxX = Math.max(maxX, x + 300);
+                minY = Math.min(minY, y);
+                maxY = Math.max(maxY, y + 100);
+                
                 return { 
                     ...node, 
-                    targetPosition: 'left' as any, 
-                    sourcePosition: 'right' as any, 
-                    position: { x: nodeWithPosition.x - 150, y: nodeWithPosition.y - 50 } 
+                    targetPosition: direction === 'LR' ? 'left' : 'top' as any, 
+                    sourcePosition: direction === 'LR' ? 'right' : 'bottom' as any, 
+                    position: { x, y } 
                 };
             }
-            const index = standaloneNodes.indexOf(node);
-            return { ...node, position: { x: -500, y: index * 400 } };
+            return node;
         });
+
+        if (standaloneNodes.length > 0) {
+            const startX = direction === 'LR' ? (maxX === -Infinity ? 0 : maxX + 200) : (minX === Infinity ? 0 : minX);
+            const startY = direction === 'LR' ? (minY === Infinity ? 0 : minY) : (maxY === -Infinity ? 0 : maxY + 200);
+            
+            const cols = direction === 'LR' ? 3 : 5;
+            
+            standaloneNodes.forEach((node, index) => {
+                const row = Math.floor(index / cols);
+                const col = index % cols;
+                const nodeIdx = newNodes.findIndex(n => n.id === node.id);
+                if (nodeIdx !== -1) {
+                    newNodes[nodeIdx] = {
+                        ...newNodes[nodeIdx],
+                        position: {
+                            x: startX + (col * 350),
+                            y: startY + (row * 150)
+                        }
+                    };
+                }
+            });
+        }
         
         setNodes([...newNodes]);
     }, [nodes, edges, setNodes]);
@@ -311,10 +374,12 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     }, [filteredHierarchy]);
 
     const handleDeselectAll = useCallback(() => {
-        setVisibleTableNames(new Set());
-        setNodes([]);
-        setEdges([]);
-    }, [setNodes, setEdges]);
+        setVisibleTableNames(prev => {
+            const next = new Set(prev);
+            filteredHierarchy.forEach(h => next.delete(h.name));
+            return next;
+        });
+    }, [filteredHierarchy]);
 
     const handleToggleCollapse = (name: string) => {
         setCollapsedTables(prev => {
@@ -325,7 +390,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         });
     };
 
-    // Schema sync effect
+    // Schema sync effect  
     useEffect(() => {
         if (!hierarchy || !tableData || !relationships) return;
 
@@ -341,12 +406,19 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 targetHandle: rel.source_column,
                 type: ConnectionLineType.SmoothStep,
                 animated: true,
-                style: { stroke: 'hsl(var(--primary))', strokeWidth: 2, opacity: 0.5 },
+                style: { 
+                    stroke: hoveredEdgeId === `db-e-${idx}` ? 'hsl(var(--primary))' : 'hsl(var(--primary))', 
+                    strokeWidth: hoveredEdgeId === `db-e-${idx}` ? 4 : 2, 
+                    opacity: hoveredEdgeId === `db-e-${idx}` ? 1 : 0.5,
+                    transition: 'all 0.2s ease-in-out'
+                },
+                zIndex: hoveredEdgeId === `db-e-${idx}` ? 10 : 1,
             };
         }).filter((e: Edge) => visibleTableNames.has(e.source as string) && visibleTableNames.has(e.target as string));
 
         const baseNodes: Node[] = Array.from(visibleTableNames).map((name) => {
-            const cols = tableData[name] || [];
+            const tableInfo = tableData[name] || { columns: [] };
+            const cols = tableInfo.columns || [];
             const isCollapsed = collapsedTables.has(name);
 
             let filteredCols = cols;
@@ -362,6 +434,9 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                     ...c,
                     fkConstraintName: fkConstraintMap.get(`${name}.${c.name}`)
                 })),
+                comment: tableInfo.comment,
+                indices: tableInfo.indices,
+                rowCount: tableInfo.rowCount,
                 onRemoveConstraint: handleRemoveConstraint,
                 isCollapsed,
                 onToggleCollapse: () => handleToggleCollapse(name),
@@ -384,7 +459,50 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
         setNodes(finalNodes);
         setEdges([...dbEdges, ...manualEdges]);
-    }, [visibleTableNames, tableData, relationships, hierarchy, detailLevel, collapsedTables]);
+    }, [visibleTableNames, tableData, relationships, hierarchy, detailLevel, collapsedTables, hoveredEdgeId]);
+
+    // Dedicated effect to handle hovered styles for immediate feedback
+    useEffect(() => {
+        if (!hoveredEdgeId) {
+            setEdges(eds => eds.map(e => ({
+                ...e,
+                style: { 
+                    ...e.style, 
+                    strokeWidth: 2, 
+                    opacity: 0.5,
+                },
+                zIndex: 1
+            })));
+            return;
+        }
+
+        setEdges(eds => eds.map(e => {
+            if (e.id === hoveredEdgeId) {
+                return {
+                    ...e,
+                    label: '',
+                    labelStyle: { fill: 'hsl(var(--primary))', fontWeight: 'bold', fontSize: '10px' },
+                    labelBgStyle: { fill: 'hsl(var(--background))', fillOpacity: 0.8, rx: 4, ry: 4 },
+                    style: { 
+                        ...e.style, 
+                        strokeWidth: 4, 
+                        opacity: 1,
+                    },
+                    zIndex: 20
+                };
+            }
+            return {
+                ...e,
+                label: '',
+                style: { 
+                    ...e.style, 
+                    strokeWidth: 2, 
+                    opacity: 0.2,
+                },
+                zIndex: 1
+            };
+        }));
+    }, [hoveredEdgeId, setEdges]);
 
     // Export logic
     const handleExportPNG = useCallback(() => {
@@ -451,7 +569,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             nodes, edges, visibleTableNames, searchTerm, pendingConnection, 
             isSidebarCollapsed, detailLevel, schemaFilter, showMinimap, 
             collapsedTables, selectedDatabase, allDatabases, hierarchy, 
-            filteredHierarchy,
+            filteredHierarchy, hoverPosition, hoveredEdgeId,
             tableData, isLoadingHierarchy, isLoadingCols, lang, 
             activeConnection, effectiveDatabase 
         },
@@ -462,7 +580,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             setCollapsedTables, setSelectedDatabase, handleRemoveConstraint, 
             handleCreateForeignKey, handleAutoLayout, toggleTable, 
             handleSelectAll, handleDeselectAll,
-            handleToggleCollapse, handleExportPNG, handleExportSQL 
+            handleToggleCollapse, handleExportPNG, handleExportSQL,
+            handleEdgeMouseEnter, handleEdgeMouseLeave
         }
     };
 };

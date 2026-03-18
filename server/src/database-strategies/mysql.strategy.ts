@@ -162,13 +162,19 @@ export class MysqlStrategy implements IDatabaseStrategy {
         `;
         const [rows]: any[] = await pool.query(sql, [schema, table]);
         return rows.map((row: any) => ({
-            name: row.Field,
-            type: row.Type,
-            isNullable: row.Null === 'YES',
-            defaultValue: row.Default,
             isPrimaryKey: row.Key === 'PRI',
             pkConstraintName: row.Key === 'PRI' ? 'PRIMARY' : null,
         }));
+    }
+
+    async getFullMetadata(pool: any, schema: string, table: string): Promise<any> {
+        const columns = await this.getColumns(pool, schema, table);
+        return {
+            columns,
+            indices: [],
+            comment: null,
+            rowCount: 0
+        };
     }
 
     async getRelationships(pool: any): Promise<Relationship[]> {
