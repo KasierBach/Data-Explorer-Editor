@@ -3,6 +3,7 @@ import { useAppStore } from '@/core/services/store';
 import { LandingHeader } from '../modules/LandingPage/components/LandingHeader';
 import { HeroSection } from '../modules/LandingPage/components/HeroSection';
 import { FeaturesSection } from '../modules/LandingPage/components/FeaturesSection';
+import { WorkflowSection } from '../modules/LandingPage/components/WorkflowSection';
 import { DemoMockup } from '../modules/LandingPage/components/DemoMockup';
 import { AiSpotlightSection } from '../modules/LandingPage/components/AiSpotlightSection';
 import { PricingSection } from '../modules/LandingPage/components/PricingSection';
@@ -57,7 +58,9 @@ export const LandingPage: React.FC = () => {
                 
                 <DemoMockup addToRevealRefs={addToRevealRefs} />
 
-                <FeaturesSection lang={lang} addToRevealRefs={addToRevealRefs} />
+                <FeaturesSection lang={lang} />
+                
+                <WorkflowSection lang={lang} />
 
                 <AiSpotlightSection lang={lang} addToRevealRefs={addToRevealRefs} />
 

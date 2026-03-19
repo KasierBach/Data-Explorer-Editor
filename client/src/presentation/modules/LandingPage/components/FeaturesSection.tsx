@@ -1,13 +1,12 @@
 import React from 'react';
 import { Terminal, Zap, BarChart3, GitGraph, PieChart, Lock } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 interface FeaturesSectionProps {
     lang: string;
-    addToRevealRefs: (el: HTMLDivElement | null) => void;
 }
 
-export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, addToRevealRefs }) => {
+export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
     const features = [
         {
             icon: <Terminal className="w-6 h-6 text-blue-400" />,
@@ -41,42 +40,78 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, addToRev
         }
     ];
 
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    };
+
+    const cardVariants = {
+        hidden: { y: 20, opacity: 0 },
+        visible: {
+            y: 0,
+            opacity: 1,
+            transition: { duration: 0.5, ease: "easeOut" as any }
+        }
+    };
+
     return (
-        <section id="features" className="py-12 md:py-16 relative">
+        <section id="features" className="py-24 md:py-32 relative bg-black/20">
             <div className="container mx-auto px-4 sm:px-6 relative z-10">
-                <div ref={addToRevealRefs} className="reveal text-center mb-10 md:mb-16 max-w-3xl mx-auto">
-                    <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 md:mb-6 uppercase">
+                <motion.div 
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    className="text-center mb-16 md:mb-24 max-w-4xl mx-auto"
+                >
+                    <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-6 md:mb-8 uppercase bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent">
                         {lang === 'vi' ? 'Trí tuệ hợp nhất' : 'Unified Intelligence'}
                     </h2>
-                    <p className="text-muted-foreground text-base md:text-lg font-medium leading-relaxed">
+                    <p className="text-muted-foreground text-lg md:text-xl font-medium leading-relaxed max-w-2xl mx-auto">
                         {lang === 'vi'
                             ? 'Không chỉ là một trình chỉnh sửa. Đó là trung tâm chỉ huy cho dữ liệu của bạn, được xây dựng với sự tinh xảo hiện đại.'
                             : 'Not just an editor. A command center for your data, built with modern craftsmanship.'}
                     </p>
-                </div>
+                </motion.div>
 
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <motion.div 
+                    variants={containerVariants}
+                    initial="hidden"
+                    whileInView="visible"
+                    viewport={{ once: true, margin: "-100px" }}
+                    className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10"
+                >
                     {features.map((feature, idx) => (
-                        <div
+                        <motion.div
                             key={idx}
-                            ref={addToRevealRefs}
-                            className={cn(
-                                "reveal glass-panel p-6 md:p-8 rounded-3xl hover:bg-white/10 transition-all duration-500 hover:-translate-y-2 group cursor-default border-white/5",
-                                `stagger-${(idx % 3) + 1}`
-                            )}
+                            variants={cardVariants}
+                            whileHover={{ 
+                                scale: 1.02, 
+                                rotateX: 5, 
+                                rotateY: -5,
+                                z: 50
+                            }}
+                            className="glass-panel p-8 md:p-10 rounded-[2.5rem] border-white/5 hover:border-blue-500/30 transition-all duration-300 group relative overflow-hidden preserve-3d shadow-2xl"
                         >
-                            <div className="flex flex-col gap-6">
-                                <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-xl group-hover:shadow-blue-500/10">
+                            <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-purple-600/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="flex flex-col gap-8 relative z-10">
+                                <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-blue-600/10 group-hover:scale-110 transition-all duration-500 shadow-2xl">
                                     {feature.icon}
                                 </div>
-                                <h3 className="font-black text-xl uppercase tracking-tight">{feature.title}</h3>
-                                <p className="text-muted-foreground leading-relaxed text-sm font-medium opacity-70 group-hover:opacity-100 transition-opacity">
-                                    {feature.desc}
-                                </p>
+                                <div>
+                                    <h3 className="font-black text-2xl uppercase tracking-tight mb-4 group-hover:text-blue-400 transition-colors">{feature.title}</h3>
+                                    <p className="text-muted-foreground/60 leading-relaxed text-sm font-medium group-hover:text-white/80 transition-colors">
+                                        {feature.desc}
+                                    </p>
+                                </div>
                             </div>
-                        </div>
+                        </motion.div>
                     ))}
-                </div>
+                </motion.div>
             </div>
         </section>
     );
