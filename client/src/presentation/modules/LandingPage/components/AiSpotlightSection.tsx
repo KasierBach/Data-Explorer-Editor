@@ -19,15 +19,15 @@ export const AiSpotlightSection: React.FC<AiSpotlightSectionProps> = ({ lang, ad
                 <div ref={addToRevealRefs} className="reveal bg-gradient-to-br from-blue-600/10 to-purple-600/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-12 border border-white/10 relative overflow-hidden flex flex-col lg:flex-row items-center gap-8 md:gap-12">
                     <div className="flex-1 text-center lg:text-left">
                         <Badge className="mb-4 md:mb-6 bg-purple-500/20 text-purple-400 border-purple-500/30 font-black tracking-[0.2em] px-4 py-1">
-                            {lang === 'vi' ? 'MIỀN AI' : 'AI DOMAIN'}
+                            {lang === 'vi' ? 'GEMINI 3.1 FLASH-LITE' : 'GEMINI 3.1 FLASH-LITE'}
                         </Badge>
                         <h1 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 md:mb-8 uppercase leading-none">
-                            {lang === 'vi' ? <>Cơ sở dữ liệu, <br /> Thông minh Nhân tạo.</> : <>Your Database, <br /> Artificially Intelligent.</>}
+                            {lang === 'vi' ? <>Dữ liệu Tối thượng, <br /> Trí tuệ Đa phương thức.</> : <>Ultimate Data, <br /> Multimodal Intelligence.</>}
                         </h1>
                         <p className="text-lg text-muted-foreground/80 mb-10 max-w-xl font-medium">
                             {lang === 'vi'
-                                ? 'AI nhận biết ngữ cảnh của chúng tôi không chỉ viết SQL. Nó hiểu toàn bộ lược đồ của bạn, tối ưu hóa khóa ngoại và gợi ý các mô hình kiến trúc tốt hơn.'
-                                : "Our context-aware AI doesn't just write SQL. It understands your entire schema, optimizes foreign keys, and suggests better architectural patterns."}
+                                ? 'Không chỉ dừng lại ở văn bản. Với Multimodal Vision, Gemini 3.1 có thể phân tích sơ đồ ERD, nhận diện quan hệ thực thể phức tạp và gợi ý tái cấu trúc mã nguồn backend tự động.'
+                                : "Beyond text. With Multimodal Vision, Gemini 3.1 analyzes ERD diagrams, identifies complex entity relationships, and suggests automated backend source code restructuring."}
                         </p>
                         <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
                             <Button size="lg" onClick={() => navigate('/app')} className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8">

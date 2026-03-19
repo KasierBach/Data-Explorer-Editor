@@ -39,8 +39,9 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
                     <a href="#demo" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
                         {lang === 'vi' ? 'Bản demo' : 'Live Demo'}
                     </a>
-                    <button onClick={() => navigate('/docs')} className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                    <button onClick={() => navigate('/docs')} className="relative group hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
                         {lang === 'vi' ? 'Tài liệu' : 'Docs'}
+                        <span className="absolute -top-3 -right-4 bg-blue-600 text-[8px] px-1 rounded-sm text-white font-bold animate-pulse group-hover:scale-110 transition-transform">NEW</span>
                     </button>
                     <a href="#pricing" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
                         {lang === 'vi' ? 'Giá cả' : 'Pricing'}

@@ -11,33 +11,33 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, addToRev
     const features = [
         {
             icon: <Terminal className="w-6 h-6 text-blue-400" />,
-            title: lang === 'vi' ? "Công cụ Monaco" : "Monaco Engine",
-            desc: lang === 'vi' ? "Trải nghiệm trình chỉnh sửa của VS Code trong luồng công việc dữ liệu của bạn. Đầy đủ Intellisense, đa con trỏ và hiệu suất cực nhanh." : "Experience VS Code's editor in your data workflow. Full Intellisense, multi-cursor, and ultra-fast performance."
+            title: lang === 'vi' ? "Monaco Pro" : "Monaco Pro",
+            desc: lang === 'vi' ? "Trình soạn thảo VS Code tích hợp hoàn hảo. Đầy đủ Intellisense, đa con trỏ và hiệu suất cực cao cho các câu lệnh SQL phức tạp." : "Seamlessly integrated VS Code editor. Full Intellisense, multi-cursor, and ultra-high performance for complex SQL queries."
         },
         {
             icon: <Zap className="w-6 h-6 text-yellow-400" />,
-            title: lang === 'vi' ? "AI Tạo hình" : "Generative AI",
-            desc: lang === 'vi' ? "Dịch ngôn ngữ tự nhiên sang SQL được hỗ trợ bởi Google Gemini. Được tối ưu hóa cho các mô hình kiến trúc phức tạp." : "Natural language to SQL translations powered by Google Gemini. Optimized for complex architectural patterns."
+            title: lang === 'vi' ? "Gemini 3.1 Flash-Lite" : "Gemini 3.1 Flash-Lite",
+            desc: lang === 'vi' ? "Dịch ngôn ngữ tự nhiên sang SQL thông minh vượt trội. Tối ưu hóa cho các mô hình dữ liệu phức tạp và kiến trúc doanh nghiệp." : "Supreme natural language to SQL translation. Optimized for complex data models and enterprise architectures."
         },
         {
             icon: <BarChart3 className="w-6 h-6 text-emerald-400" />,
-            title: lang === 'vi' ? "Thông tin Thông minh" : "Smart Insights",
-            desc: lang === 'vi' ? "Tự động phân tích kích thước bảng, các phiên hoạt động và lập bản đồ mối quan hệ với cấu hình bằng không." : "Automated analysis of table sizes, active sessions, and relationship mapping with zero configuration."
+            title: lang === 'vi' ? "Kiến trúc Modular" : "Modular Core",
+            desc: lang === 'vi' ? "Xây dựng trên nguyên tắc SOLID & Clean Architecture. Dễ dàng mở rộng, bảo trì và tích hợp các module mới như Otp, Seed, Token." : "Built on SOLID & Clean Architecture. Easy to extend, maintain, and integrate new modules like Otp, Seed, and Token."
         },
         {
             icon: <GitGraph className="w-6 h-6 text-purple-400" />,
-            title: lang === 'vi' ? "ERD Động" : "Dynamic ERD",
-            desc: lang === 'vi' ? "Sơ đồ mối quan hệ trực tiếp, tương tác phản ánh các thay đổi lược đồ của bạn trong thời gian thực. Xuất và thiết kế nhanh chóng." : "Live, interactive relationship diagrams that reflect your schema changes in real-time. Export and design on the fly."
+            title: lang === 'vi' ? "ERD & Vision AI" : "ERD & Vision AI",
+            desc: lang === 'vi' ? "Phân tích lược đồ bằng Multimodal Vision. Tự động ánh xạ mối quan hệ và gợi ý tối ưu hóa cấu trúc database thông minh." : "Schema analysis via Multimodal Vision. Automatic relationship mapping and intelligent database structure optimization suggestions."
         },
         {
             icon: <PieChart className="w-6 h-6 text-cyan-400" />,
-            title: lang === 'vi' ? "Biểu đồ Tức thì" : "Instant Charts",
-            desc: lang === 'vi' ? "Biến bất kỳ tập kết quả nào thành biểu đồ đẹp mắt chỉ với một cú nhấp chuột. Hỗ trợ hơn 15 loại biểu đồ hiện đại." : "Transform any result set into a beautiful chart with one click. 15+ modern chart types supported."
+            title: lang === 'vi' ? "Biểu đồ Tức thì" : "Instant Analytics",
+            desc: lang === 'vi' ? "Biến dữ liệu thô thành biểu đồ cao cấp chỉ với một cú nhấp chuột. Hỗ trợ đa dạng loại biểu đồ với hiệu suất rendering mượt mà." : "Transform raw data into premium charts with a single click. Supports diverse chart types with smooth rendering performance."
         },
         {
             icon: <Lock className="w-6 h-6 text-amber-500" />,
-            title: lang === 'vi' ? "Đám mây & Cục bộ" : "Cloud & Local",
-            desc: lang === 'vi' ? "Kết nối an toàn với Neon, Supabase hoặc thực thể Docker cục bộ của bạn. Thông tin xác thực của bạn không bao giờ rời khỏi màn hình." : "Securely connect to Neon, Supabase, or your local Docker instance. Your credentials never leave your screen."
+            title: lang === 'vi' ? "Bảo mật AES-256-GCM" : "AES-256-GCM Secure",
+            desc: lang === 'vi' ? "Mã hóa cấp quân đội cho mọi thông tin xác thực. Dữ liệu của bạn được bảo vệ tuyệt đối và không bao giờ rời khỏi tầm kiểm soát." : "Military-grade encryption for all credentials. Your data is absolutely protected and never leaves your control."
         }
     ];
 

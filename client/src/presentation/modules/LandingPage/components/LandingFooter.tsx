@@ -7,9 +7,9 @@ interface LandingFooterProps {
 
 export const LandingFooter: React.FC<LandingFooterProps> = ({ lang }) => {
     const footerLinks = [
-        { title: lang === 'vi' ? 'Sản phẩm' : 'Product', links: lang === 'vi' ? ['Tính năng', 'AI Insights', 'Sơ đồ', 'Nhật ký thay đổi'] : ['Features', 'AI Insights', 'Diagrams', 'Changelog'] },
-        { title: lang === 'vi' ? 'Tài nguyên' : 'Resources', links: lang === 'vi' ? ['Tài liệu', 'Tham chiếu API', 'Đồng bộ Cloud', 'Trạng thái'] : ['Documentation', 'API Reference', 'Cloud Sync', 'Status'] },
-        { title: lang === 'vi' ? 'Pháp lý' : 'Legal', links: lang === 'vi' ? ['Quyền riêng tư', 'Điều khoản', 'Bảo mật', 'Tuân thủ'] : ['Privacy', 'Terms', 'Security', 'Compliance'] }
+        { title: lang === 'vi' ? 'Sản phẩm' : 'Product', links: lang === 'vi' ? ['Tính năng', 'Gemini 3.1', 'ERD trực quan', 'Nhật ký thay đổi'] : ['Features', 'Gemini 3.1', 'Visual ERD', 'Changelog'] },
+        { title: lang === 'vi' ? 'Tài nguyên' : 'Resources', links: lang === 'vi' ? ['Tài liệu', 'Clean Code Guide', 'Vitest Suite', 'Trạng thái'] : ['Documentation', 'Clean Code Guide', 'Vitest Suite', 'Status'] },
+        { title: lang === 'vi' ? 'Pháp lý' : 'Legal', links: lang === 'vi' ? ['Quyền riêng tư', 'Điều khoản', 'Bảo mật AES', 'Tuân thủ'] : ['Privacy', 'Terms', 'AES Security', 'Compliance'] }
     ];
 
     return (
