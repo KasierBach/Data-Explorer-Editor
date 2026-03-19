@@ -44,6 +44,14 @@ export function FaqSection({ lang }: Props) {
             q: t ? 'Làm sao lưu truy vấn SQL để dùng lại?' : 'How to save SQL queries for reuse?',
             a: t ? 'Hiện tại, nội dung tab được lưu tạm vào Local Storage của trình duyệt — kể cả khi reload trang, nội dung vẫn được phục hồi. Tuy nhiên, nếu xóa dữ liệu trình duyệt thì sẽ mất. Khuyến nghị: copy các truy vấn quan trọng vào file .sql trên máy.' : 'Currently, tab content is temporarily saved to browser Local Storage — even after page reload, content is restored. However, clearing browser data will lose it. Recommendation: copy important queries to .sql files on your machine.'
         },
+        {
+            q: t ? 'Tại sao dự án lại chia nhỏ nhiều Service như Otp, Seed, Token?' : 'Why split into many small services like Otp, Seed, Token?',
+            a: t ? 'Đây là áp dụng nguyên tắc Single Responsibility (SRP). Việc chia nhỏ giúp code dễ test (unit test), dễ bảo trì và tránh việc một file "God Service" phình to hàng nghìn dòng. Nó cũng giúp team collab tốt hơn mà không bị xung đột code.' : 'This follows the Single Responsibility Principle (SRP). Splitting makes code easier to test (unit test), maintain, and prevents "God Service" files from growing to thousands of lines. It also improves team collaboration with fewer merge conflicts.'
+        },
+        {
+            q: t ? 'Data Explorer có hỗ trợ CI/CD không?' : 'Does Data Explorer support CI/CD?',
+            a: t ? 'Có. Bạn có thể tận dụng Vitest để chạy unit tests trong GitHub Actions. File cấu hình Docker Compose cũng sẵn sàng để deploy lên các nền tảng như Render, Railway hoặc tự host trên VPS thông qua Coolify/Portainer.' : 'Yes. You can leverage Vitest to run unit tests in GitHub Actions. The Docker Compose configuration is also ready for deployment on platforms like Render, Railway, or self-hosting on VPS via Coolify/Portainer.'
+        },
     ];
 
     return (

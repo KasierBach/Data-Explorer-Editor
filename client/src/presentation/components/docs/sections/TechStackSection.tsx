@@ -80,6 +80,34 @@ export function TechStackSection({ lang }: Props) {
                 </div>
             </DocSection>
 
+            {/* Testing */}
+            <DocSection title={t ? 'Kiểm thử & Chất lượng' : 'Testing & Quality'}>
+                <div className="border rounded-2xl overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-amber-500/10">
+                                <th className="text-left p-4 font-bold">{t ? 'Công cụ' : 'Tool'}</th>
+                                <th className="text-left p-4 font-bold">{t ? 'Phiên bản' : 'Version'}</th>
+                                <th className="text-left p-4 font-bold">{t ? 'Vai trò' : 'Purpose'}</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {[
+                                { tech: 'Vitest', ver: '1.x', role: t ? 'Test runner hiện đại, nhanh và tương thích với Vite' : 'Modern, fast test runner fully compatible with Vite' },
+                                { tech: 'React Testing Library', ver: '14.x', role: t ? 'Kiểm thử component theo hành vi người dùng' : 'Testing components based on user behavior' },
+                                { tech: 'JSDOM', ver: 'Latest', role: t ? 'Mô phỏng môi trường trình duyệt cho unit tests' : 'Browser environment simulation for unit tests' },
+                            ].map((row, i) => (
+                                <tr key={i} className="hover:bg-muted/10 transition-colors">
+                                    <td className="p-4 font-bold text-primary">{row.tech}</td>
+                                    <td className="p-4 font-mono text-xs">{row.ver}</td>
+                                    <td className="p-4 text-muted-foreground">{row.role}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </DocSection>
+
             {/* AI */}
             <DocSection title={t ? 'Trí tuệ Nhân tạo' : 'Artificial Intelligence'}>
                 <div className="border rounded-2xl overflow-hidden">

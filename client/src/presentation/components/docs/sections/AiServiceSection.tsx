@@ -162,6 +162,26 @@ export function AiServiceSection({ lang }: Props) {
                             </p>
                         </Callout>
                     </DocSubSection>
+
+                    <DocSubSection title={t ? 'Trường hợp sử dụng nâng cao' : 'Advanced Use Cases'}>
+                        <div className="grid sm:grid-cols-2 gap-4 mt-4">
+                            {[
+                                {
+                                    q: t ? "Chuyển đổi Schema" : "Schema Transformation",
+                                    a: t ? '"Hãy viết script đổi tên toàn bộ bảng sang snake_case và thêm cột version cho Optimistic Locking."' : '"Write a script to rename all tables to snake_case and add a version column for Optimistic Locking."'
+                                },
+                                {
+                                    q: t ? "Phân tích bảo mật" : "Security Analysis",
+                                    a: t ? '"Kiểm tra xem câu SQL này có nguy cơ SQL Injection không và viết lại nó dùng Parameterized Query."' : '"Check if this SQL has SQL Injection risks and rewrite it using Parameterized Queries."'
+                                }
+                            ].map((item, i) => (
+                                <div key={i} className="p-4 border rounded-xl bg-primary/5 border-primary/10">
+                                    <h6 className="font-bold text-[10px] uppercase text-primary mb-2">{item.q}</h6>
+                                    <p className="text-xs italic text-muted-foreground">{item.a}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </DocSubSection>
                 </div>
             </DocSection>
 

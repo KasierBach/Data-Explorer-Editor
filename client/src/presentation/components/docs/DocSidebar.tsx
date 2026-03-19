@@ -88,6 +88,7 @@ export const DOCS_STRUCTURE: DocSection[] = [
         titleEn: 'Architecture & Tech',
         icon: <Activity className="w-4 h-4" />,
         items: [
+            { id: 'clean-code', title: 'Clean Code & Refactor', titleEn: 'Clean Code & Refactor' },
             { id: 'architecture', title: 'Kiến trúc hệ thống', titleEn: 'System Architecture' },
             { id: 'tech-stack', title: 'Danh sách công nghệ', titleEn: 'Technology Stack' },
             { id: 'security', title: 'Bảo mật & Quyền riêng tư', titleEn: 'Security & Privacy' },

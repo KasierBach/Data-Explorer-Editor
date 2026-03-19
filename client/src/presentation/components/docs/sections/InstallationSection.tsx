@@ -107,6 +107,22 @@ export function InstallationSection({ lang }: Props) {
                     <p className="text-[11px] text-muted-foreground font-mono">http://localhost:3000/health</p>
                 </div>
             </div>
+
+            <DocSection title={t ? 'Checklist Triển khai Production' : 'Production Hardening Checklist'}>
+                <div className="grid sm:grid-cols-2 gap-4 mt-6">
+                    {[
+                        { t: t ? 'SSL/TLS Required' : 'SSL/TLS Required', d: t ? 'Luôn chạy đằng sau Reverse Proxy (Nginx/Traefik) với HTTPS.' : 'Always run behind a Reverse Proxy (Nginx/Traefik) with HTTPS.' },
+                        { t: t ? 'CORS Strict' : 'Strict CORS', d: t ? 'Chỉ cho phép domain frontend của bạn truy cập vào API backend.' : 'Only allow your frontend domain to access the backend API.' },
+                        { t: t ? 'Database Backup' : 'Database Backup', d: t ? 'Cấu hình auto-backup cho database metadata (data_explorer_meta).' : 'Configure auto-backups for the metadata database (data_explorer_meta).' },
+                        { t: t ? 'Rate Limiting' : 'Rate Limiting', d: t ? 'Giới hạn số lượng request tới discovery/ai endpoints để tránh tốn phí Gemini.' : 'Limit requests to discovery/ai endpoints to avoid excessive Gemini costs.' },
+                    ].map((item, i) => (
+                        <div key={i} className="p-4 border rounded-xl bg-orange-500/5 border-orange-500/10">
+                            <h6 className="font-bold text-xs mb-1 text-orange-600">{item.t}</h6>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">{item.d}</p>
+                        </div>
+                    ))}
+                </div>
+            </DocSection>
         </DocPageLayout>
     );
 }

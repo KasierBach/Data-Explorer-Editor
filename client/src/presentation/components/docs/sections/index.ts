@@ -18,4 +18,5 @@ export { LifecycleSection } from './LifecycleSection';
 export { FaqSection } from './FaqSection';
 export { AiServiceSection } from './AiServiceSection';
 export { DeploymentSection } from './DeploymentSection';
+export { CleanCodeSection } from './CleanCodeSection';
 
