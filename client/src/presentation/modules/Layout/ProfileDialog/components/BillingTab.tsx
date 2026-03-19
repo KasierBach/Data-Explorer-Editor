@@ -7,7 +7,7 @@ interface BillingTabProps {
     t: (key: string) => string;
     isLoading: boolean;
     actions: {
-        handleUpdateBilling: (plan: string, successMsg: string) => void;
+        handleUpdateBilling: (plan: string) => void;
     };
 }
 
@@ -58,11 +58,11 @@ export const BillingTab: React.FC<BillingTabProps> = ({
                     </p>
                     <div className="flex gap-3">
                         {user?.plan !== 'pro' ? (
-                            <Button onClick={() => actions.handleUpdateBilling('pro', t('billing_update_success'))} disabled={isLoading} className="bg-foreground text-background hover:bg-foreground/90 font-medium px-6">
+                            <Button onClick={() => actions.handleUpdateBilling('pro')} disabled={isLoading} className="bg-foreground text-background hover:bg-foreground/90 font-medium px-6">
                                 {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : t('upgrade_to_pro')}
                             </Button>
                         ) : (
-                            <Button onClick={() => actions.handleUpdateBilling('free', t('billing_update_success'))} variant="outline" className="border-border/50">{t('downgrade_to_free')}</Button>
+                            <Button onClick={() => actions.handleUpdateBilling('free')} variant="outline" className="border-border/50">{t('downgrade_to_free')}</Button>
                         )}
                         <Button variant="outline" className="border-border/50">{t('manage_subscription')}</Button>
                     </div>

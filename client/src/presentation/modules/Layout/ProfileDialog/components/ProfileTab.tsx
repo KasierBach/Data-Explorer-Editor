@@ -19,7 +19,7 @@ interface ProfileTabProps {
     isLoading: boolean;
     actions: {
         handleSaveProfile: () => void;
-        handleApiCall: (endpoint: string, method: string, body: any, successMsg: string) => Promise<boolean>;
+        handleUploadAvatar: (base64: string) => Promise<boolean>;
     };
 }
 
@@ -77,7 +77,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                                         const reader = new FileReader();
                                         reader.onloadend = async () => {
                                             const base64String = reader.result as string;
-                                            await actions.handleApiCall('/users/profile', 'PATCH', { avatarUrl: base64String }, t('profile_updated'));
+                                            await actions.handleUploadAvatar(base64String);
                                         };
                                         reader.readAsDataURL(file);
                                     }

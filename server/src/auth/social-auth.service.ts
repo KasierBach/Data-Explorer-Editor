@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { TokenService } from './token.service';
+import { UserUtils } from '../users/user.utils';
 
 @Injectable()
 export class SocialAuthService {
     constructor(
         private readonly prisma: PrismaService,
-        private readonly jwtService: JwtService,
+        private readonly tokenService: TokenService,
     ) { }
 
     async validateOAuthLogin(profile: any, provider: 'google' | 'github') {
@@ -19,17 +20,8 @@ export class SocialAuthService {
             avatarUrl = profile._json.avatar_url;
         }
 
-        // Extract names
-        let firstName = name?.givenName || '';
-        let lastName = name?.familyName || '';
-        
-        // GH might not have family/given name, try displayName
-        if (!firstName && !lastName && (name?.displayName || profile.displayName)) {
-            const displayName = name?.displayName || profile.displayName;
-            const parts = displayName.split(' ');
-            firstName = parts[0];
-            lastName = parts.slice(1).join(' ') || '';
-        }
+        // Extract names using UserUtils
+        let { firstName, lastName } = UserUtils.parseName(name?.displayName || profile.displayName || '');
 
         // Fallback for first name
         if (!firstName) firstName = username || 'User';
@@ -85,21 +77,6 @@ export class SocialAuthService {
             });
         }
 
-        // Generate JWT Token
-        const payload = { email: user.email, sub: user.id, role: user.role };
-        return {
-            access_token: this.jwtService.sign(payload),
-            user: {
-                id: user.id,
-                email: user.email,
-                firstName: user.firstName,
-                lastName: user.lastName,
-                avatarUrl: user.avatarUrl,
-                isOnboarded: user.isOnboarded,
-                role: user.role,
-                username: user.username,
-                jobRole: user.jobRole
-            }
-        };
+        return this.tokenService.generateTokenResponse(user);
     }
 }

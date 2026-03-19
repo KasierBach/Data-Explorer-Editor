@@ -12,6 +12,8 @@ import { AiModule } from './ai/ai.module';
 import { UsersModule } from './users/users.module';
 import { AuditModule } from './audit/audit.module';
 import { MailModule } from './mail/mail.module';
+import { OtpModule } from './otp/otp.module';
+import { SeedModule } from './seed/seed.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
@@ -34,6 +36,8 @@ import { APP_GUARD } from '@nestjs/core';
     AiModule,
     UsersModule,
     AuditModule,
+    OtpModule,
+    SeedModule,
   ],
   controllers: [AppController],
   providers: [
