@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { adminService } from '@/core/services/AdminService';
 import { useAppStore } from '@/core/services/store';
-import { Shield, ShieldAlert, KeyRound, User as UserIcon } from 'lucide-react';
+import { Shield, ShieldAlert, KeyRound, User as UserIcon, Trash2, Ban, UserCheck } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Badge } from '@/presentation/components/ui/badge';
 import { toast } from 'sonner';
@@ -55,6 +55,29 @@ export function UsersView() {
         }
     };
 
+    const deleteUser = async (user: any) => {
+        const confirm = window.confirm(lang === 'vi' ? `Bạn có chắc chắn muốn xóa người dùng ${user.email}?` : `Are you sure you want to delete user ${user.email}?`);
+        if (!confirm) return;
+
+        try {
+            await adminService.deleteUser(user.id);
+            toast.success(lang === 'vi' ? 'Đã xóa người dùng thành công' : 'User deleted successfully');
+            fetchUsers();
+        } catch (error: any) {
+            toast.error(error.message);
+        }
+    };
+
+    const toggleBan = async (user: any) => {
+        try {
+            const res = await adminService.toggleBan(user.id);
+            toast.success(res.message);
+            fetchUsers();
+        } catch (error: any) {
+            toast.error(error.message);
+        }
+    };
+
     if (loading) {
         return <div className="flex justify-center p-8 text-muted-foreground">Loading...</div>;
     }
@@ -79,30 +102,67 @@ export function UsersView() {
                                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
                                         <UserIcon className="h-4 w-4" />
                                     </div>
-                                    {user.name}
+                                    <div className="flex flex-col">
+                                        <span>{[user.firstName, user.lastName].filter(Boolean).join(' ') || (lang === 'vi' ? 'Chưa đặt tên' : 'No name')}</span>
+                                        {user.isBanned && (
+                                            <span className="text-[10px] text-red-500 font-bold uppercase tracking-tighter">BANNED</span>
+                                        )}
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4">{user.email}</td>
                                 <td className="px-6 py-4">
-                                    {user.role === 'admin' ? (
-                                        <Badge variant="default" className="bg-indigo-500 hover:bg-indigo-600">
-                                            <ShieldAlert className="h-3 w-3 mr-1" /> Admin
-                                        </Badge>
-                                    ) : (
-                                        <Badge variant="secondary">User</Badge>
-                                    )}
+                                    <div className="flex flex-col gap-1">
+                                        {user.role === 'admin' ? (
+                                            <Badge variant="default" className="bg-indigo-500 hover:bg-indigo-600 w-fit">
+                                                <ShieldAlert className="h-3 w-3 mr-1" /> Admin
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant="secondary" className="w-fit">User</Badge>
+                                        )}
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4 text-muted-foreground text-xs">
                                     {new Date(user.createdAt).toLocaleDateString()}
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <div className="flex justify-end gap-2">
-                                        <Button variant="outline" size="sm" onClick={() => toggleRole(user)}>
-                                            <Shield className="h-3.5 w-3.5 mr-1" />
-                                            {user.role === 'admin' ? 'Demote' : 'Promote'}
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={() => toggleRole(user)}
+                                            title={user.role === 'admin' ? 'Demote to User' : 'Promote to Admin'}
+                                        >
+                                            <Shield className="h-3.5 w-3.5" />
                                         </Button>
-                                        <Button variant="destructive" size="sm" onClick={() => resetPassword(user)}>
-                                            <KeyRound className="h-3.5 w-3.5 mr-1" />
-                                            Reset
+                                        
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={() => toggleBan(user)}
+                                            className={user.isBanned ? 'text-green-500 hover:text-green-600' : 'text-orange-500 hover:text-orange-600'}
+                                            title={user.isBanned ? 'Unban User' : 'Ban User'}
+                                            disabled={user.role === 'admin'}
+                                        >
+                                            {user.isBanned ? <UserCheck className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}
+                                        </Button>
+
+                                        <Button 
+                                            variant="secondary" 
+                                            size="sm" 
+                                            onClick={() => resetPassword(user)}
+                                            title="Reset Password"
+                                        >
+                                            <KeyRound className="h-3.5 w-3.5" />
+                                        </Button>
+
+                                        <Button 
+                                            variant="destructive" 
+                                            size="sm" 
+                                            onClick={() => deleteUser(user)}
+                                            title="Delete User"
+                                            disabled={user.role === 'admin'}
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
                                     </div>
                                 </td>

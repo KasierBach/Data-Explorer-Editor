@@ -5,7 +5,7 @@ import { API_BASE_URL } from '@/core/config/env';
 import { useTheme } from '@/presentation/components/theme-provider';
 
 export const useProfileLogic = (isOpen: boolean, initialTab?: string, onClose?: () => void) => {
-    const { user, updateUser, accessToken, logout: storeLogout, lang } = useAppStore();
+    const { user, updateUser, accessToken, logout: storeLogout, lang, setLang } = useAppStore();
     const { setTheme: setAppTheme } = useTheme();
     const [isLoading, setIsLoading] = useState(false);
 
@@ -93,6 +93,9 @@ export const useProfileLogic = (isOpen: boolean, initialTab?: string, onClose?: 
     };
 
     const handleSaveSettings = (updates: any) => {
+        if (updates.language) {
+            setLang(updates.language);
+        }
         return handleApiCall('/users/settings', 'PATCH', updates, 
             lang === 'vi' ? "Cập nhật cài đặt thành công!" : "Settings updated successfully!");
     };

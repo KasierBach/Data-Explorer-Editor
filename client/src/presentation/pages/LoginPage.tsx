@@ -3,17 +3,29 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { useAppStore } from '@/core/services/store';
-import { Database, Loader2, UserPlus, LogIn, Github } from 'lucide-react';
+import { Database, Loader2, UserPlus, LogIn, Github, MailCheck, ArrowLeft } from 'lucide-react';
 import { API_BASE_URL } from '@/core/config/env';
+import { toast } from 'sonner';
 
 export const LoginPage = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { login, lang } = useAppStore();
+    
+    // Auth Mode State
     const [isRegister, setIsRegister] = useState(false);
+    
+    // Form State
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    
+    // Verification State
+    const [verifyEmailStep, setVerifyEmailStep] = useState(false);
+    const [registeredEmail, setRegisteredEmail] = useState('');
+    const [otp, setOtp] = useState('');
+    
+    // UI State
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -84,12 +96,28 @@ export const LoginPage = () => {
                 body,
             });
 
+            const data = await response.json().catch(() => ({}));
+
             if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
+                // Handle Unverified Email Scenario for both Login & Register
+                if (data.unverified) {
+                    setRegisteredEmail(data.email || email);
+                    setVerifyEmailStep(true);
+                    throw new Error(data.message || (lang === 'vi' ? 'Vui lòng xác minh email' : 'Please verify email'));
+                }
+                
                 throw new Error(data.message || (lang === 'vi' ? 'Đã có lỗi xảy ra' : 'Something went wrong'));
             }
 
-            const data = await response.json();
+            // Handle successful registration but unverified (201 Created)
+            if (data.unverified) {
+                setRegisteredEmail(data.email || email);
+                setVerifyEmailStep(true);
+                toast.success(data.message || 'Mã xác minh đã được gửi đến email của bạn.');
+                setIsLoading(false);
+                return;
+            }
+
             login(data.access_token, data.user);
 
             try {
@@ -104,7 +132,6 @@ export const LoginPage = () => {
                 console.warn('Failed to fetch connections upon login');
             }
 
-            // Traditional register might need onboarding in the future, check here
             if (data.user?.isOnboarded === false) {
                  navigate('/onboarding');
             } else {
@@ -117,6 +144,134 @@ export const LoginPage = () => {
         }
     };
 
+    const handleVerifyOtp = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError('');
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/verify-email`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: registeredEmail, otp }),
+            });
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.message || 'Verification failed');
+            }
+
+            const data = await response.json();
+            toast.success(lang === 'vi' ? 'Xác minh thành công!' : 'Verification successful!');
+            
+            // Login with the returned token
+            login(data.access_token, data.user);
+            
+            if (data.user?.isOnboarded === false) {
+                 navigate('/onboarding');
+            } else {
+                 navigate('/');
+            }
+        } catch (err: any) {
+            setError(err.message || 'Invalid OTP');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleResendOtp = async () => {
+        setIsLoading(true);
+        setError('');
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/resend-verification`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: registeredEmail }),
+            });
+
+            const data = await response.json().catch(() => ({}));
+            
+            if (!response.ok) {
+                throw new Error(data.message || 'Failed to resend OTP');
+            }
+
+            toast.success(data.message || (lang === 'vi' ? 'Đã gửi lại mã xác minh!' : 'Verification code resent!'));
+        } catch (err: any) {
+            setError(err.message || 'Error resending OTP');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // ─── Render Verification Step ────────────────────────────────────
+    if (verifyEmailStep) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
+                <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
+                    <div className="flex flex-col items-center mb-8 space-y-2">
+                        <div className="bg-primary/10 p-3 rounded-xl mb-2">
+                            <MailCheck className="w-8 h-8 text-primary" />
+                        </div>
+                        <h1 className="text-2xl font-semibold tracking-tight text-center">
+                            {lang === 'vi' ? 'Xác minh Email' : 'Verify Email'}
+                        </h1>
+                        <p className="text-sm text-muted-foreground text-center">
+                            {lang === 'vi' ? `Mã xác minh 6 số đã được gửi tới ${registeredEmail}` : `A 6-digit code has been sent to ${registeredEmail}`}
+                        </p>
+                    </div>
+
+                    <form onSubmit={handleVerifyOtp} className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium" htmlFor="otp">Mã OTP / OTP Code</label>
+                            <Input
+                                id="otp"
+                                type="text"
+                                placeholder="123456"
+                                maxLength={6}
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                                required
+                                className="text-center tracking-widest text-lg font-mono"
+                            />
+                        </div>
+
+                        {error && (
+                            <div className="text-sm text-red-500 font-medium text-center bg-red-500/10 p-2 rounded">
+                                {error}
+                            </div>
+                        )}
+
+                        <Button className="w-full gap-2" type="submit" disabled={isLoading}>
+                            {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                            {lang === 'vi' ? 'Xác minh tài khoản' : 'Verify Account'}
+                        </Button>
+                    </form>
+
+                    <div className="mt-6 space-y-3">
+                        <Button 
+                            variant="outline" 
+                            className="w-full" 
+                            type="button" 
+                            onClick={handleResendOtp} 
+                            disabled={isLoading}
+                        >
+                            {lang === 'vi' ? 'Gửi lại mã' : 'Resend Code'}
+                        </Button>
+                        <button 
+                            type="button" 
+                            onClick={() => { setVerifyEmailStep(false); setOtp(''); setError(''); }} 
+                            className="text-sm text-muted-foreground hover:text-foreground flex items-center justify-center w-full gap-2 transition-colors"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                            {lang === 'vi' ? 'Quay lại đăng nhập' : 'Back to login'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ─── Render Login/Register Step ──────────────────────────────────
     return (
         <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
             <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
@@ -182,7 +337,14 @@ export const LoginPage = () => {
                         />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-sm font-medium" htmlFor="password">Password</label>
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium" htmlFor="password">Password</label>
+                            {!isRegister && (
+                                <button type="button" onClick={() => navigate('/forgot-password')} className="text-xs text-primary hover:underline font-medium">
+                                    {lang === 'vi' ? 'Quên mật khẩu?' : 'Forgot password?'}
+                                </button>
+                            )}
+                        </div>
                         <Input
                             id="password"
                             type="password"

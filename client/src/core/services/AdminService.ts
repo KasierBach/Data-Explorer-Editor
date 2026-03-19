@@ -62,6 +62,22 @@ class AdminService {
         return this.handleResponse(response);
     }
 
+    async deleteUser(userId: string) {
+        const response = await fetch(`${this.baseUrl}/users/${userId}`, {
+            method: 'DELETE',
+            headers: this.getHeaders(),
+        });
+        return this.handleResponse(response);
+    }
+
+    async toggleBan(userId: string) {
+        const response = await fetch(`${this.baseUrl}/users/${userId}/ban`, {
+            method: 'PATCH',
+            headers: this.getHeaders(),
+        });
+        return this.handleResponse(response);
+    }
+
     // --- Audit Logs ---
 
     async getAuditLogs(limit: number = 100) {

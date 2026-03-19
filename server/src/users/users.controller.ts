@@ -68,4 +68,16 @@ export class UsersController {
     async updateRole(@Param('id') id: string, @Body() dto: UpdateRoleDto) {
         return this.usersService.updateRole(id, dto);
     }
+
+    @Delete(':id')
+    @Roles('admin')
+    async deleteUser(@Param('id') id: string) {
+        return this.usersService.deleteAccount(id);
+    }
+
+    @Patch(':id/ban')
+    @Roles('admin')
+    async toggleBan(@Param('id') id: string) {
+        return this.usersService.toggleBan(id);
+    }
 }

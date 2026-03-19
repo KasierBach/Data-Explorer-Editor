@@ -186,12 +186,35 @@ export class UsersService {
                 email: true,
                 role: true,
                 createdAt: true,
-                isOnboarded: true
+                isOnboarded: true,
+                isBanned: true
             },
             orderBy: {
                 createdAt: 'desc',
             }
         });
+    }
+
+    async toggleBan(id: string) {
+        const user = await this.prisma.user.findUnique({ where: { id } });
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        if (user.role === 'admin') {
+            throw new ConflictException('Cannot ban an admin account');
+        }
+
+        const updatedUser = await this.prisma.user.update({
+            where: { id },
+            data: { isBanned: !user.isBanned },
+            select: {
+                id: true,
+                isBanned: true
+            }
+        });
+        
+        return { message: updatedUser.isBanned ? 'User has been banned' : 'User access restored' };
     }
 
     async resetPassword(id: string, dto: ResetPasswordDto) {

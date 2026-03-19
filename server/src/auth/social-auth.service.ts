@@ -51,6 +51,11 @@ export class SocialAuthService {
             }
         });
 
+        // Check if user is banned
+        if (user && user.isBanned) {
+            throw new Error('Your account has been banned by an administrator.');
+        }
+
         // 2. If user exists, update profile data from provider (keep it fresh)
         if (user) {
             user = await this.prisma.user.update({
