@@ -96,44 +96,53 @@ export class AuthService implements OnModuleInit {
             where: { email: registerDto.email },
         });
 
-        if (existingUser) {
-            // Check if user exists but unverified. We could allow them to request a new OTP.
-            // But usually, they should use resend-verification or try to login to get triggered.
+        if (existingUser && existingUser.isEmailVerified) {
             throw new ConflictException('Email này đã được sử dụng.');
         }
 
         const hashedPassword = await bcrypt.hash(registerDto.password, this.SALT_ROUNDS);
-
-        // Simple split of name for backward compatibility with existing register flow
         const nameParts = registerDto.name.split(' ');
         const firstName = nameParts[0];
         const lastName = nameParts.slice(1).join(' ');
 
-        // Generate 6-digit Verification OTP
         const otp = crypto.randomInt(100000, 999999).toString();
         const hashedOtp = await bcrypt.hash(otp, this.SALT_ROUNDS);
         const expiry = new Date(Date.now() + this.OTP_EXPIRY_MINUTES * 60 * 1000);
 
-        const user = await this.prisma.user.create({
-            data: {
-                email: registerDto.email,
-                password: hashedPassword,
-                firstName,
-                lastName,
-                role: 'user',
-                provider: 'local',
-                isOnboarded: false,
-                isEmailVerified: false,
-                verifyOtp: hashedOtp,
-                verifyOtpExpiry: expiry,
-            },
-        });
+        let user;
+        if (existingUser) {
+            // Update the unverified account with new info
+            user = await this.prisma.user.update({
+                where: { id: existingUser.id },
+                data: {
+                    password: hashedPassword,
+                    firstName,
+                    lastName,
+                    verifyOtp: hashedOtp,
+                    verifyOtpExpiry: expiry,
+                },
+            });
+        } else {
+            // Create new account
+            user = await this.prisma.user.create({
+                data: {
+                    email: registerDto.email,
+                    password: hashedPassword,
+                    firstName,
+                    lastName,
+                    role: 'user',
+                    provider: 'local',
+                    isOnboarded: false,
+                    isEmailVerified: false,
+                    verifyOtp: hashedOtp,
+                    verifyOtpExpiry: expiry,
+                },
+            });
+        }
 
-        // Send welcome/verification email
         const displayName = [firstName, lastName].filter(Boolean).join(' ') || registerDto.email;
         this.mailService.sendVerificationEmail(user.email, displayName, otp);
 
-        // DO NOT RETURN TOKEN. Require Verification.
         return {
             message: 'Đăng ký thành công. Vui lòng kiểm tra email để nhận mã xác minh.',
             unverified: true,
