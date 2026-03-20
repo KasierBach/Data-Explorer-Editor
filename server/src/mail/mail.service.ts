@@ -17,7 +17,7 @@ export class MailService {
             this.logger.warn('MAIL_USER or MAIL_PASS (API Key) not set. Emails will be logged to console only.');
         } else {
             const maskedKey = this.apiKey.substring(0, 10) + '...' + this.apiKey.substring(this.apiKey.length - 4);
-            this.logger.log(`Mail service initialized using Brevo REST API. Sender: ${this.senderEmail}, Key: ${maskedKey}`);
+            this.logger.log(`Mail service initialized using Brevo REST API. Sender: ${this.senderEmail}, Key: ${maskedKey} (Length: ${this.apiKey.length})`);
         }
     }
 
