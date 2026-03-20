@@ -1,53 +1,79 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import * as https from 'https';
 import { MailTemplates } from './mail.templates';
 
 @Injectable()
 export class MailService {
     private readonly logger = new Logger(MailService.name);
-    private transporter: nodemailer.Transporter;
+    private readonly apiKey: string;
+    private readonly senderEmail: string;
 
     constructor(private readonly configService: ConfigService) {
-        const mailUser = this.configService.get<string>('MAIL_USER');
-        const mailPass = this.configService.get<string>('MAIL_PASS');
+        this.apiKey = this.configService.get<string>('MAIL_PASS') || '';
+        this.senderEmail = this.configService.get<string>('MAIL_USER') || '';
 
-        if (mailUser && mailPass) {
-            this.transporter = nodemailer.createTransport({
-                host: 'smtp-relay.brevo.com',
-                port: 587,
-                secure: false, // STARTTLS
-                auth: { user: mailUser, pass: mailPass },
-                connectionTimeout: 10000,
-                greetingTimeout: 10000,
-                socketTimeout: 15000,
-                // Force IPv4 for Render environment stability
-                family: 4, 
-            } as any);
-            this.logger.log('Mail transporter initialized with Brevo SMTP.');
+        if (!this.apiKey || !this.senderEmail) {
+            this.logger.warn('MAIL_USER or MAIL_PASS (API Key) not set. Emails will be logged to console only.');
         } else {
-            this.logger.warn('MAIL_USER or MAIL_PASS not set. Emails will be logged to console only.');
+            this.logger.log('Mail service initialized using Brevo REST API.');
         }
     }
 
     /**
-     * Sends an email. Falls back to console logging if transporter is not configured.
+     * Sends an email via Brevo REST API.
      */
     private async send(to: string, subject: string, html: string): Promise<void> {
-        const from = `"Data Explorer" <${this.configService.get('MAIL_USER') || 'noreply@dataexplorer.com'}>`;
-
-        if (!this.transporter) {
+        if (!this.apiKey || !this.senderEmail) {
             this.logger.log(`[MOCK EMAIL] To: ${to} | Subject: ${subject}`);
             this.logger.debug(html);
             return;
         }
 
-        try {
-            await this.transporter.sendMail({ from, to, subject, html });
-            this.logger.log(`Email sent to ${to}: "${subject}"`);
-        } catch (error) {
-            this.logger.error(`Failed to send email to ${to}`, error);
-        }
+        const data = JSON.stringify({
+            sender: { name: 'Data Explorer', email: this.senderEmail },
+            to: [{ email: to }],
+            subject: subject,
+            htmlContent: html,
+        });
+
+        const options = {
+            hostname: 'api.brevo.com',
+            port: 443,
+            path: '/v3/smtp/email',
+            method: 'POST',
+            headers: {
+                'accept': 'application/json',
+                'api-key': this.apiKey,
+                'content-type': 'application/json',
+                'content-length': data.length,
+            },
+        };
+
+        return new Promise((resolve, reject) => {
+            const req = https.request(options, (res) => {
+                let responseBody = '';
+                res.on('data', (chunk) => responseBody += chunk);
+                res.on('end', () => {
+                    if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+                        this.logger.log(`Email sent to ${to}: "${subject}"`);
+                        resolve();
+                    } else {
+                        const errorMsg = `Brevo API Error (${res.statusCode}): ${responseBody}`;
+                        this.logger.error(errorMsg);
+                        reject(new Error(errorMsg));
+                    }
+                });
+            });
+
+            req.on('error', (error) => {
+                this.logger.error(`Failed to send email to ${to} via API`, error);
+                reject(error);
+            });
+
+            req.write(data);
+            req.end();
+        });
     }
 
     // ─── Public Methods ─────────────────────────────────────────────
