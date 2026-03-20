@@ -23,7 +23,7 @@ export class MailService {
                 socketTimeout: 15000,
                 // Force IPv4 because some environments (like Render) have issues with IPv6 ENETUNREACH
                 family: 4, 
-            });
+            } as any);
             this.logger.log('Mail transporter initialized with Gmail SMTP (Port 587).');
         } else {
             this.logger.warn('MAIL_USER or MAIL_PASS not set. Emails will be logged to console only.');
