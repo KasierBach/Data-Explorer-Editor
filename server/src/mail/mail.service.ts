@@ -14,10 +14,15 @@ export class MailService {
 
         if (mailUser && mailPass) {
             this.transporter = nodemailer.createTransport({
-                service: 'gmail',
+                host: 'smtp.gmail.com',
+                port: 587,
+                secure: false, // true for 465, false for 587 (STARTTLS)
                 auth: { user: mailUser, pass: mailPass },
+                connectionTimeout: 10000,
+                greetingTimeout: 10000,
+                socketTimeout: 15000,
             });
-            this.logger.log('Mail transporter initialized with Gmail.');
+            this.logger.log('Mail transporter initialized with Gmail SMTP (Port 587).');
         } else {
             this.logger.warn('MAIL_USER or MAIL_PASS not set. Emails will be logged to console only.');
         }
