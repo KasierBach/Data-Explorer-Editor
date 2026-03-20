@@ -16,11 +16,13 @@ export class MailService {
             this.transporter = nodemailer.createTransport({
                 host: 'smtp.gmail.com',
                 port: 587,
-                secure: false, // true for 465, false for 587 (STARTTLS)
+                secure: false, // STARTTLS
                 auth: { user: mailUser, pass: mailPass },
                 connectionTimeout: 10000,
                 greetingTimeout: 10000,
                 socketTimeout: 15000,
+                // Force IPv4 because some environments (like Render) have issues with IPv6 ENETUNREACH
+                family: 4, 
             });
             this.logger.log('Mail transporter initialized with Gmail SMTP (Port 587).');
         } else {
