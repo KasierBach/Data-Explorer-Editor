@@ -10,13 +10,14 @@ export class MailService {
     private readonly senderEmail: string;
 
     constructor(private readonly configService: ConfigService) {
-        this.apiKey = this.configService.get<string>('MAIL_PASS') || '';
-        this.senderEmail = this.configService.get<string>('MAIL_USER') || '';
+        this.apiKey = (this.configService.get<string>('MAIL_PASS') || '').trim();
+        this.senderEmail = (this.configService.get<string>('MAIL_USER') || '').trim();
 
         if (!this.apiKey || !this.senderEmail) {
             this.logger.warn('MAIL_USER or MAIL_PASS (API Key) not set. Emails will be logged to console only.');
         } else {
-            this.logger.log('Mail service initialized using Brevo REST API.');
+            const maskedKey = this.apiKey.substring(0, 10) + '...' + this.apiKey.substring(this.apiKey.length - 4);
+            this.logger.log(`Mail service initialized using Brevo REST API. Sender: ${this.senderEmail}, Key: ${maskedKey}`);
         }
     }
 
