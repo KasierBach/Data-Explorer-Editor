@@ -14,17 +14,17 @@ export class MailService {
 
         if (mailUser && mailPass) {
             this.transporter = nodemailer.createTransport({
-                host: 'smtp.gmail.com',
+                host: 'smtp-relay.brevo.com',
                 port: 587,
                 secure: false, // STARTTLS
                 auth: { user: mailUser, pass: mailPass },
                 connectionTimeout: 10000,
                 greetingTimeout: 10000,
                 socketTimeout: 15000,
-                // Force IPv4 because some environments (like Render) have issues with IPv6 ENETUNREACH
+                // Force IPv4 for Render environment stability
                 family: 4, 
             } as any);
-            this.logger.log('Mail transporter initialized with Gmail SMTP (Port 587).');
+            this.logger.log('Mail transporter initialized with Brevo SMTP.');
         } else {
             this.logger.warn('MAIL_USER or MAIL_PASS not set. Emails will be logged to console only.');
         }
