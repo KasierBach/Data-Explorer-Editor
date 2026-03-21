@@ -46,7 +46,8 @@ export const LoginPage = () => {
             });
             if (!res.ok) throw new Error('Failed to fetch user profile');
             
-            const user = await res.json();
+            const rawUser = await res.json();
+            const user = (rawUser && typeof rawUser === 'object' && 'success' in rawUser && 'data' in rawUser) ? rawUser.data : rawUser;
             login(token, user);
 
             // Fetch global connections
@@ -55,7 +56,8 @@ export const LoginPage = () => {
                     headers: { 'Authorization': `Bearer ${token}` },
                 });
                 if (connRes.ok) {
-                    const connections = await connRes.json();
+                    const json = await connRes.json();
+                    const connections = (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
                     useAppStore.getState().setConnections(connections);
                 }
             } catch (ignored) {
@@ -96,7 +98,8 @@ export const LoginPage = () => {
                 body,
             });
 
-            const data = await response.json().catch(() => ({}));
+            const rawData = await response.json().catch(() => ({}));
+            const data = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
 
             if (!response.ok) {
                 // Handle Unverified Email Scenario for both Login & Register
@@ -125,7 +128,8 @@ export const LoginPage = () => {
                     headers: { 'Authorization': `Bearer ${data.access_token}` },
                 });
                 if (connRes.ok) {
-                    const connections = await connRes.json();
+                    const rawConnections = await connRes.json();
+                    const connections = (rawConnections && typeof rawConnections === 'object' && 'success' in rawConnections && 'data' in rawConnections) ? rawConnections.data : rawConnections;
                     useAppStore.getState().setConnections(connections);
                 }
             } catch (ignored) {
@@ -161,7 +165,8 @@ export const LoginPage = () => {
                 throw new Error(data.message || 'Verification failed');
             }
 
-            const data = await response.json();
+            const rawData = await response.json();
+            const data = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
             toast.success(lang === 'vi' ? 'Xác minh thành công!' : 'Verification successful!');
             
             // Login with the returned token
@@ -189,7 +194,8 @@ export const LoginPage = () => {
                 body: JSON.stringify({ email: registeredEmail }),
             });
 
-            const data = await response.json().catch(() => ({}));
+            const rawData = await response.json().catch(() => ({}));
+            const data = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
             
             if (!response.ok) {
                 throw new Error(data.message || 'Failed to resend OTP');

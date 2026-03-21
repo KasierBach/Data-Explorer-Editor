@@ -111,7 +111,8 @@ export const ConnectionDialog: React.FC = () => {
                 throw new Error(errText || response.statusText);
             }
 
-            const savedConnection = await response.json();
+            const rawSavedConnection = await response.json();
+            const savedConnection = (rawSavedConnection && typeof rawSavedConnection === 'object' && 'success' in rawSavedConnection && 'data' in rawSavedConnection) ? rawSavedConnection.data : rawSavedConnection;
             const newConnection: Connection = {
                 id: savedConnection.id,
                 name: savedConnection.name,

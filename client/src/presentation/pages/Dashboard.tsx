@@ -30,8 +30,10 @@ export const Dashboard: React.FC = () => {
                 logout();
                 window.location.href = '/login';
             } else {
-                const errText = await response.text();
-                alert(`Failed to delete connection. Status: ${response.status}\n\nDetails: ${errText}`);
+                const rawErr = await response.json().catch(() => ({}));
+                const errData = (rawErr && typeof rawErr === 'object' && 'success' in rawErr && 'data' in rawErr) ? rawErr.data : rawErr;
+                const errMsg = errData.message || `Failed to delete connection. Status: ${response.status}`;
+                alert(errMsg);
             }
         } catch (error) {
             console.error('Error deleting connection:', error);

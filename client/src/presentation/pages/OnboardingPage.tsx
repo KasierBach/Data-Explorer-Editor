@@ -70,7 +70,8 @@ export const OnboardingPage = () => {
                 throw new Error(data.message || 'Failed to save profile');
             }
 
-            const updatedUser = await res.json();
+            const rawData = await res.json();
+            const updatedUser = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
             
             // Update Zustand store with the new user object (which now has isOnboarded: true)
             login(accessToken, updatedUser);

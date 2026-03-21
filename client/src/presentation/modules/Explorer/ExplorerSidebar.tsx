@@ -14,6 +14,7 @@ import { CreateDatabaseDialog } from '@/presentation/components/Dialogs/CreateDa
 import { DeleteDatabaseDialog } from '@/presentation/components/Dialogs/DeleteDatabaseDialog';
 import { handleTreeAction as importedHandleTreeAction } from './treeActions';
 import { API_BASE_URL } from '@/core/config/env';
+import { toast } from 'sonner';
 
 export const ExplorerSidebar: React.FC = () => {
     const connections = useAppStore(state => state.connections);
@@ -157,11 +158,19 @@ export const ExplorerSidebar: React.FC = () => {
                                                 ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
                                             },
                                             body: JSON.stringify({ showAllDatabases: newValue })
-                                        }).then(async () => {
+                                        }).then(async (res) => {
+                                            if (!res.ok) {
+                                                const rawErr = await res.json().catch(() => ({}));
+                                                const errData = (rawErr && typeof rawErr === 'object' && 'success' in rawErr && 'data' in rawErr) ? rawErr.data : rawErr;
+                                                throw new Error(errData.message || 'Failed to update connection settings');
+                                            }
                                             // Ensure backend pool connects with new settings and invalidate cache
                                             await connectionService.setActiveConnection({ ...conn, showAllDatabases: newValue } as any);
                                             triggerRefresh();
-                                        }).catch(console.error);
+                                        }).catch(err => {
+                                            console.error(err);
+                                            toast.error(err.message || 'Failed to update settings');
+                                        });
                                     }
                                 }
                                 if (action === 'refresh') {

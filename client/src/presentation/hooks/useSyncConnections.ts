@@ -30,7 +30,8 @@ export function useSyncConnections() {
                     headers: { 'Authorization': `Bearer ${accessToken}` },
                 });
                 if (res.ok) {
-                    const data = await res.json();
+                    const json = await res.json();
+                    const data = (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
                     if (Array.isArray(data)) {
                         setConnections(data);
                     }

@@ -31,7 +31,8 @@ export const ForgotPasswordPage = () => {
             });
 
             if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
+                const rawData = await response.json().catch(() => ({}));
+                const data = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
                 throw new Error(data.message || 'Something went wrong');
             }
 
@@ -57,7 +58,8 @@ export const ForgotPasswordPage = () => {
             });
 
             if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
+                const rawData = await response.json().catch(() => ({}));
+                const data = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
                 throw new Error(data.message || 'Something went wrong');
             }
 
