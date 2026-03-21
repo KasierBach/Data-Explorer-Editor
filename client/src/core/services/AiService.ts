@@ -44,7 +44,8 @@ class AiService {
                 return '';
             }
 
-            const data: AutocompleteResponse = await response.json();
+            const rawData = await response.json();
+            const data: AutocompleteResponse = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
             console.log('[AiService] Got completion:', data.completion?.slice(0, 50));
             return data.completion || '';
         } catch (error) {

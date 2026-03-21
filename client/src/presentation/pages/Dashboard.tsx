@@ -41,9 +41,13 @@ export const Dashboard: React.FC = () => {
         }
     };
 
-    // Mock stats for now
-    const queryCount = 12;
-    const tableCount = 45;
+    const queryHistory = useAppStore(state => state.queryHistory);
+    const expandedNodes = useAppStore(state => state.expandedNodes);
+
+    // Dynamic stats from local state
+    const queryCount = queryHistory ? queryHistory.length : 0;
+    // Estimate tables accessed by counting the number of expanded tree nodes in the sidebar
+    const tableCount = expandedNodes ? expandedNodes.length : 0;
 
     if (view === 'insights') {
         return (

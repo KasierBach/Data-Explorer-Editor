@@ -33,7 +33,12 @@ class ApiService {
     // Check if response is empty (e.g. 204 No Content)
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
-      return await response.json();
+      const json = await response.json();
+      // Unwrap standard response { success: true, data: ... }
+      if (json && typeof json === 'object' && 'success' in json && 'data' in json) {
+        return json.data;
+      }
+      return json;
     }
     return await response.text();
   }

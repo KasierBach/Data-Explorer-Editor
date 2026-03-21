@@ -31,7 +31,8 @@ class AdminService {
             }
             throw new Error(errorMessage);
         }
-        return await response.json();
+        const json = await response.json();
+        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
     }
 
     // --- Users Management ---

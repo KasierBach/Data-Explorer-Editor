@@ -34,7 +34,8 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
             throw new Error(`Failed to fetch hierarchy: ${response.statusText}`);
         }
 
-        return await response.json();
+        const json = await response.json();
+        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
     }
 
     private getHeaders() {
@@ -84,7 +85,8 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
             }
         }
 
-        return await response.json();
+        const json = await response.json();
+        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
     }
 
     async getMetadata(tableId: string): Promise<TableMetadata> {
@@ -98,7 +100,8 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
             throw new Error(`Failed to fetch metadata: ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const json = await response.json();
+        const data = (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
         
         return {
             columns: data.columns.map((col: any) => ({
@@ -139,7 +142,8 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
             throw new Error(error.message || `Failed to update row: ${response.statusText}`);
         }
 
-        return await response.json();
+        const json = await response.json();
+        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
     }
 
     async updateSchema(params: {
@@ -164,7 +168,8 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
             throw new Error(error.message || `Failed to update schema: ${response.statusText}`);
         }
 
-        return await response.json();
+        const json = await response.json();
+        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
     }
 
     async getMetrics(database?: string): Promise<any> {
@@ -182,7 +187,8 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
             throw new Error(`Failed to fetch metrics: ${response.statusText}`);
         }
 
-        return await response.json();
+        const json = await response.json();
+        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
     }
 
     async getDatabases(): Promise<string[]> {
@@ -196,7 +202,8 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
             throw new Error(`Failed to fetch databases: ${response.statusText}`);
         }
 
-        return await response.json();
+        const json = await response.json();
+        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
     }
 
     async getRelationships(database?: string): Promise<any[]> {
@@ -214,7 +221,8 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
             throw new Error(`Failed to fetch relationships: ${response.statusText}`);
         }
 
-        return await response.json();
+        const json = await response.json();
+        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
     }
 
     async generateSql(params: {

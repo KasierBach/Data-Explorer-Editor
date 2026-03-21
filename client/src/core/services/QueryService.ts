@@ -32,6 +32,12 @@ const getHeaders = () => {
     return headers;
 };
 
+const unwrap = async (response: Response) => {
+    if (!response.ok) throw new Error(await response.text());
+    const json = await response.json();
+    return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
+};
+
 export const queryService = {
     executeQuery: async (payload: { connectionId: string; sql: string; database?: string }) => {
         const response = await fetch(`${BASE_URL}/query`, {
@@ -39,8 +45,7 @@ export const queryService = {
             headers: getHeaders(),
             body: JSON.stringify(payload),
         });
-        if (!response.ok) throw new Error(await response.text());
-        return response.json();
+        return unwrap(response);
     },
 
     updateRow: async (payload: any) => {
@@ -49,8 +54,7 @@ export const queryService = {
             headers: getHeaders(),
             body: JSON.stringify(payload),
         });
-        if (!response.ok) throw new Error(await response.text());
-        return response.json();
+        return unwrap(response);
     },
 
     updateSchema: async (payload: UpdateSchemaDto) => {
@@ -59,8 +63,7 @@ export const queryService = {
             headers: getHeaders(),
             body: JSON.stringify(payload),
         });
-        if (!response.ok) throw new Error(await response.text());
-        return response.json();
+        return unwrap(response);
     },
 
     createDatabase: async (connectionId: string, name: string) => {
@@ -69,8 +72,7 @@ export const queryService = {
             headers: getHeaders(),
             body: JSON.stringify({ connectionId, name }),
         });
-        if (!response.ok) throw new Error(await response.text());
-        return response.json();
+        return unwrap(response);
     },
 
     dropDatabase: async (connectionId: string, name: string) => {
@@ -79,7 +81,6 @@ export const queryService = {
             headers: getHeaders(),
             body: JSON.stringify({ connectionId, name }),
         });
-        if (!response.ok) throw new Error(await response.text());
-        return response.json();
+        return unwrap(response);
     }
 };
