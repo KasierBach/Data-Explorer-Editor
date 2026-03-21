@@ -10,7 +10,11 @@ export class MailService {
     private readonly senderEmail: string;
 
     constructor(private readonly configService: ConfigService) {
-        this.apiKey = (this.configService.get<string>('MAIL_PASS') || '').trim();
+        // Aggressive sanitize: Remove spaces, newlines, and any accidental quotes
+        this.apiKey = (this.configService.get<string>('MAIL_PASS') || '')
+            .replace(/['"]/g, '')
+            .trim();
+            
         this.senderEmail = (this.configService.get<string>('MAIL_USER') || '').trim();
 
         if (!this.apiKey || !this.senderEmail) {
@@ -22,7 +26,7 @@ export class MailService {
     }
 
     /**
-     * Sends an email via Brevo REST API.
+     * Sends an email via Brevo REST API using native fetch.
      */
     private async send(to: string, subject: string, html: string): Promise<void> {
         if (!this.apiKey || !this.senderEmail) {
@@ -31,50 +35,34 @@ export class MailService {
             return;
         }
 
-        const data = JSON.stringify({
-            sender: { name: 'Data Explorer', email: this.senderEmail },
-            to: [{ email: to }],
-            subject: subject,
-            htmlContent: html,
-        });
-
-        const options = {
-            hostname: 'api.brevo.com',
-            port: 443,
-            path: '/v3/smtp/email',
-            method: 'POST',
-            headers: {
-                'accept': 'application/json',
-                'api-key': this.apiKey,
-                'content-type': 'application/json',
-                'content-length': data.length,
-            },
-        };
-
-        return new Promise((resolve, reject) => {
-            const req = https.request(options, (res) => {
-                let responseBody = '';
-                res.on('data', (chunk) => responseBody += chunk);
-                res.on('end', () => {
-                    if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-                        this.logger.log(`Email sent to ${to}: "${subject}"`);
-                        resolve();
-                    } else {
-                        const errorMsg = `Brevo API Error (${res.statusCode}): ${responseBody}`;
-                        this.logger.error(errorMsg);
-                        reject(new Error(errorMsg));
-                    }
-                });
+        try {
+            const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+                method: 'POST',
+                headers: {
+                    'accept': 'application/json',
+                    'api-key': this.apiKey,
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify({
+                    sender: { name: 'Data Explorer', email: this.senderEmail },
+                    to: [{ email: to }],
+                    subject: subject,
+                    htmlContent: html,
+                })
             });
 
-            req.on('error', (error) => {
-                this.logger.error(`Failed to send email to ${to} via API`, error);
-                reject(error);
-            });
-
-            req.write(data);
-            req.end();
-        });
+            if (response.ok) {
+                this.logger.log(`Email sent to ${to}: "${subject}"`);
+            } else {
+                const errorData = await response.text();
+                const errorMsg = `Brevo API Error (${response.status}): ${errorData}`;
+                this.logger.error(errorMsg);
+                throw new Error(errorMsg);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send email to ${to} via API: ${error.message}`);
+            throw error;
+        }
     }
 
     // ─── Public Methods ─────────────────────────────────────────────
