@@ -47,9 +47,13 @@ export const ExplorerSidebar: React.FC = () => {
         return () => window.removeEventListener('tree-node-action', handleTreeAction as EventListener);
     }, [activeConnectionId]);
 
+    // Auto-select first connection if none selected or the active one was deleted/doesn't belong to the user
     React.useEffect(() => {
-        if (!activeConnectionId && connections.length > 0) {
-            setActiveConnectionId(connections[0].id);
+        if (connections.length > 0) {
+            const isValidConnection = connections.some(c => c.id === activeConnectionId);
+            if (!isValidConnection) {
+                setActiveConnectionId(connections[0].id);
+            }
         }
     }, [activeConnectionId, connections, setActiveConnectionId]);
 

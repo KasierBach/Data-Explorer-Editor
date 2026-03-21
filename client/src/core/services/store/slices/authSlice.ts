@@ -61,8 +61,7 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set) => ({
             isConnectionDialogOpen: false,
             // Clear previous user's data to prevent cross-account leaking
             connections: [],
-            activeConnectionId: null,
-            activeDatabase: null,
+            // Preserve activeConnectionId and activeDatabase across sessions for better UX
             tabs: [],
             activeTabId: null,
             aiChats: [],
@@ -79,8 +78,7 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set) => ({
         user: null,
         // Clear all user-specific data to prevent leaking between accounts
         connections: [],
-        activeConnectionId: null,
-        activeDatabase: null,
+        // Preserve workspace state like activeConnectionId and activeDatabase
         tabs: [],
         activeTabId: null,
         aiChats: [],
