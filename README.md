@@ -54,6 +54,8 @@
 - **High-Density Desktop Mode**: Optimized for productivity with minimal whitespace and high information density.
 - **Glassmorphism Design**: Sleek dark-mode aesthetic with backdrop-blur effects and subtle micro-animations.
 - **Framer-style Interactions**: Staggered reveals and intersection-based entry animations for a polished, premium feel.
+- **Standardized API Communication**: Unified response format `{ success, data, message }` across the entire ecosystem for predictable and robust frontend data handling.
+- **Uptime Monitoring Ready**: Built-in `/api/health` endpoint for external monitoring (Better Uptime/UptimeRobot) to keep free-tier instances (like Render) active 24/7.
 
 ---
 
@@ -143,8 +145,30 @@ Data Explorer/
 ## 🚀 Installation & Local Development
 
 ### Requirements
-- **Node.js** v20.x+
 - **Google Gemini API Key** (Free tier available at [Google AI Studio](https://aistudio.google.com/))
+- **Docker & Docker Compose** (Optional, for One-Click setup)
+
+---
+
+## 🐳 One-Click Docker Deployment (Recommended)
+
+This is the fastest way to get **Data Explorer** running locally. It automatically sets up a PostgreSQL database, the backend API, and a production-grade Nginx frontend.
+
+1.  **Environment Setup**:
+    - Copy `.env.example` to create your own `.env` file in the root directory.
+    - Add your `GEMINI_API_KEY` to the `.env` file.
+
+2.  **Launch**:
+    ```bash
+    docker-compose up --build -d
+    ```
+
+### 🛰️ Access Points
+- **Web Interface**: [http://localhost](http://localhost) (Port 80)
+- **Backend API**: [http://localhost:3001/api/health](http://localhost:3001/api/health)
+- **Primary Database**: `localhost:5435` (Credentials in `.env.example`)
+
+---
 
 ### Initial Setup
 1. **Clone & Install**:
@@ -177,16 +201,18 @@ Data Explorer/
 
 ## ⚙️ Configuration
 
-### Environment Variables (`server/.env`)
+### Environment Variables
+
+Bạn có thể cấu hình dự án thông qua file `.env` (đã có sẵn file mẫu `.env.example`).
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | ✅ | Primary persistence database (e.g., `postgresql://user:pass@host:5432/db`) |
-| `JWT_SECRET` | ✅ | Secret key for JWT token signing |
-| `GEMINI_API_KEY` | ✅ | Google Gemini API key for AI features |
-| `ENCRYPTION_KEY` | ✅ | 32-character hex key (AES-256) used for securing saved DB passwords |
-| `ADMIN_EMAIL` | ❌ | Email to bootstrap the initial admin account (`AdminDashboard`) |
-| `PORT` | ❌ | Server port (default: 3000) |
+| `DATABASE_URL` | ✅ | URL kết nối cơ sở dữ liệu (Postgres). Mặc định trong Docker là `postgresql://postgres:postgres@db:5432/data_explorer`. |
+| `GEMINI_API_KEY` | ✅ | Google Gemini API key để kích hoạt các tính năng AI. |
+| `JWT_SECRET` | ✅ | Khóa bí mật để ký Token đăng nhập. |
+| `ENCRYPTION_KEY` | ✅ | Khóa Hex 32 ký tự dùng để mã hóa mật khẩu các kết nối Database được lưu lại. |
+| `PORT` | ❌ | Cổng chạy Server (Mặc định: 3001). |
+| `VITE_API_URL` | ❌ | (Frontend) URL dẫn tới Backend API. Mặc định: `http://localhost:3001/api`. |
 
 ---
 
