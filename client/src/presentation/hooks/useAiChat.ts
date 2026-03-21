@@ -342,11 +342,22 @@ export function useAiChat() {
                             });
                         } else if (event.type === 'done' && event.data) {
                             // Final parsed result with SQL/citations
+                            const finalMsgContent = event.data.message || rawText;
                             updateAiMessage(activeAiChatId, aiMsgId, {
-                                content: event.data.message || rawText,
+                                content: finalMsgContent,
                                 sql: event.data.sql || undefined,
                                 explanation: event.data.explanation || undefined,
                             });
+                            
+                            // Sync completed message to backend
+                            store.syncAiMessage(activeAiChatId, {
+                                id: aiMsgId,
+                                role: 'ai',
+                                content: finalMsgContent,
+                                sql: event.data.sql,
+                                explanation: event.data.explanation,
+                                timestamp: Date.now()
+                            } as any);
                         } else if (event.type === 'error') {
                             updateAiMessage(activeAiChatId, aiMsgId, {
                                 content: `❌ ${event.text}`,

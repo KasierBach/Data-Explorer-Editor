@@ -70,6 +70,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     const {
         activeConnectionId, connections, activeDatabase,
         aiChats, activeAiChatId, createAiChat, setActiveAiChat, tabs, activeTabId,
+        fetchAiChats, loadAiChatMessages
     } = useAppStore();
 
     const activeConnection = connections.find(c => c.id === activeConnectionId);
@@ -77,14 +78,36 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     const messages = activeChat?.messages || [];
     const activeTab = tabs.find(t => t.id === activeTabId);
 
-    // Auto-create first chat if none exists
+    // Fetch chat history from backend on open
+    useEffect(() => {
+        fetchAiChats();
+    }, [fetchAiChats]);
+
+    // Auto-create first chat if none exists after fetch, or load messages for active chat
     useEffect(() => {
         if (aiChats.length === 0) {
-            createAiChat();
+            // Wait for fetch to finish, if still 0, create it
+            // Small timeout to avoid creating before fetch finishes if it's fast
+            const timer = setTimeout(() => {
+                if (useAppStore.getState().aiChats.length === 0) {
+                    createAiChat();
+                }
+            }, 500);
+            return () => clearTimeout(timer);
         } else if (!activeAiChatId) {
             setActiveAiChat(aiChats[0].id);
         }
-    }, [aiChats.length, activeAiChatId]);
+    }, [aiChats.length, activeAiChatId, createAiChat, setActiveAiChat]);
+
+    // Load messages lazily when a chat is selected
+    useEffect(() => {
+        if (activeAiChatId) {
+            const chat = aiChats.find(c => c.id === activeAiChatId);
+            if (chat && (!chat.messages || chat.messages.length === 0)) {
+                loadAiChatMessages(activeAiChatId);
+            }
+        }
+    }, [activeAiChatId, aiChats, loadAiChatMessages]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

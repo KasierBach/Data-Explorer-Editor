@@ -86,6 +86,37 @@ model User {
   
   auditLogs   AuditLog[]
   connections Connection[]
+  aiChats     AiChat[]
+}
+
+model AiChat {
+  id               String      @id @default(uuid())
+  title            String
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  connectionId     String?
+  database         String?
+  
+  messages         AiMessage[]
+}
+
+model AiMessage {
+  id               String   @id @default(uuid())
+  chatId           String
+  chat             AiChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  
+  role             String   // "user" or "ai"
+  content          String
+  sql              String?
+  explanation      String?
+  error            Boolean  @default(false)
+  attachments      Json?
+  
+  createdAt        DateTime @default(now())
 }
 
 model AuditLog {

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/core/services/store';
-import { ERDWorkspace } from '@/presentation/modules/Visualization/ERDWorkspace';
+import React from 'react';
+const ERDWorkspace = React.lazy(() => import('@/presentation/modules/Visualization/ERDWorkspace').then(m => ({ default: m.ERDWorkspace })));
 import { Database, ArrowLeft, Plus, Wifi } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/presentation/components/ui/select';
@@ -106,11 +107,13 @@ export function ERDPage() {
 
             {/* Full-Screen ERD */}
             <div className="flex-1 overflow-hidden">
-                <ERDWorkspace
-                    tabId={`erd-page-${activeConnectionId}`}
-                    connectionId={activeConnectionId}
-                    database={activeDatabase || undefined}
-                />
+                <React.Suspense fallback={<div className="h-full w-full flex flex-col gap-3 items-center justify-center bg-muted/10 animate-pulse text-muted-foreground text-sm font-medium"><div className="w-8 h-8 rounded-full border-2 border-indigo-500/50 border-t-indigo-500 animate-spin" />Loading Visualizer...</div>}>
+                    <ERDWorkspace
+                        tabId={`erd-page-${activeConnectionId}`}
+                        connectionId={activeConnectionId}
+                        database={activeDatabase || undefined}
+                    />
+                </React.Suspense>
             </div>
             <ConnectionDialog />
         </div>

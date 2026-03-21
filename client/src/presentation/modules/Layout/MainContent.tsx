@@ -6,7 +6,7 @@ import { TabsBar } from './TabsBar';
 import { Dashboard } from '@/presentation/pages/Dashboard';
 import { InsightsDashboard } from '@/presentation/modules/Dashboard/InsightsDashboard';
 import { VisualizeWorkplace } from '@/presentation/modules/Visualization/VisualizeWorkplace';
-import { ERDWorkspace } from '@/presentation/modules/Visualization/ERDWorkspace';
+const ERDWorkspace = React.lazy(() => import('@/presentation/modules/Visualization/ERDWorkspace').then(m => ({ default: m.ERDWorkspace })));
 
 export const MainContent: React.FC = () => {
     const { tabs, activeTabId } = useAppStore();
@@ -39,12 +39,14 @@ export const MainContent: React.FC = () => {
                                 <VisualizeWorkplace key={activeTab.id} />
                             )}
                             {activeTab.type === 'erd' && (
-                                <ERDWorkspace
-                                    key={activeTab.id}
-                                    tabId={activeTab.id}
-                                    connectionId={activeTab.metadata?.connectionId}
-                                    database={activeTab.metadata?.database}
-                                />
+                                <React.Suspense fallback={<div className="h-full w-full flex flex-col gap-3 items-center justify-center bg-muted/10 animate-pulse text-muted-foreground text-sm font-medium"><div className="w-8 h-8 rounded-full border-2 border-indigo-500/50 border-t-indigo-500 animate-spin" />Loading Visualizer...</div>}>
+                                    <ERDWorkspace
+                                        key={activeTab.id}
+                                        tabId={activeTab.id}
+                                        connectionId={activeTab.metadata?.connectionId}
+                                        database={activeTab.metadata?.database}
+                                    />
+                                </React.Suspense>
                             )}
                         </div>
                     )

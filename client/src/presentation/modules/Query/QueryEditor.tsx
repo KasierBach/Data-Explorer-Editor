@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/presentation/components/ui/button';
-import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
+const SqlEditor = React.lazy(() => import('@/presentation/components/code-editor/SqlEditor').then(m => ({ default: m.SqlEditor })));
 import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw, History, Zap } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
@@ -422,15 +422,17 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 <Group orientation="vertical" className="flex-1">
                     <Panel defaultSize={50} minSize={20} className="flex flex-col relative">
                         {/* Editor Area */}
-                        <SqlEditor
-                            value={query}
-                            onChange={(val: string | undefined) => setQuery(val || '')}
-                            height="100%"
-                            onMount={(editor) => {
-                                editorRef.current = editor;
-                            }}
-                            schemaInfo={schemaInfo}
-                        />
+                        <React.Suspense fallback={<div className="h-full w-full flex items-center justify-center bg-muted/10 animate-pulse text-muted-foreground text-sm font-medium">Loading SQL Editor...</div>}>
+                            <SqlEditor
+                                value={query}
+                                onChange={(val: string | undefined) => setQuery(val || '')}
+                                height="100%"
+                                onMount={(editor) => {
+                                    editorRef.current = editor;
+                                }}
+                                schemaInfo={schemaInfo}
+                            />
+                        </React.Suspense>
                     </Panel>
 
                     <Separator className="h-1.5 bg-muted/20 hover:bg-blue-500/20 active:bg-blue-500/40 transition-colors cursor-row-resize flex items-center justify-center group">
