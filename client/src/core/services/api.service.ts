@@ -4,7 +4,7 @@ import { useAppStore } from './store';
 class ApiService {
   private baseUrl = API_BASE_URL;
 
-  private getHeaders(customHeaders: Record<string, string> = {}) {
+  public getHeaders(customHeaders: Record<string, string> = {}) {
     const token = useAppStore.getState().accessToken;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',

@@ -3,11 +3,11 @@ import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
 import { Plus, Database, Search, Clock, FileText, BarChart3, ArrowLeft, Trash, Loader2 } from 'lucide-react';
 import { InsightsDashboard } from '../modules/Dashboard/InsightsDashboard';
-import { API_BASE_URL } from '@/core/config/env';
+import { ConnectionService } from '@/core/services/ConnectionService';
 import { LanguageSwitcher } from '@/presentation/components/shared/LanguageSwitcher';
 
 export const Dashboard: React.FC = () => {
-    const { connections, openQueryTab, setSidebarOpen, openConnectionDialog, activeConnectionId, removeConnection, setActiveConnectionId, accessToken, logout, lang } = useAppStore();
+    const { connections, openQueryTab, setSidebarOpen, openConnectionDialog, activeConnectionId, removeConnection, setActiveConnectionId, lang } = useAppStore();
     const [view, setView] = useState<'welcome' | 'insights'>('welcome');
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
@@ -17,27 +17,11 @@ export const Dashboard: React.FC = () => {
 
         setIsDeleting(id);
         try {
-            const headers: Record<string, string> = {};
-            if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-            const response = await fetch(`${API_BASE_URL}/connections/${id}`, {
-                method: 'DELETE',
-                headers
-            });
-            if (response.ok) {
-                removeConnection(id);
-            } else if (response.status === 401) {
-                logout();
-                window.location.href = '/login';
-            } else {
-                const rawErr = await response.json().catch(() => ({}));
-                const errData = (rawErr && typeof rawErr === 'object' && 'success' in rawErr && 'data' in rawErr) ? rawErr.data : rawErr;
-                const errMsg = errData.message || `Failed to delete connection. Status: ${response.status}`;
-                alert(errMsg);
-            }
-        } catch (error) {
+            await ConnectionService.deleteConnection(id);
+            removeConnection(id);
+        } catch (error: any) {
             console.error('Error deleting connection:', error);
-            alert('Error deleting connection');
+            alert(error.message || 'Error deleting connection');
         } finally {
             setIsDeleting(null);
         }

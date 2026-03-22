@@ -6,6 +6,8 @@ import { useAppStore } from '@/core/services/store';
 import { Database, Loader2, UserPlus, LogIn, Github, MailCheck, ArrowLeft } from 'lucide-react';
 import { API_BASE_URL } from '@/core/config/env';
 import { toast } from 'sonner';
+import { AuthService } from '@/core/services/AuthService';
+import { ConnectionService } from '@/core/services/ConnectionService';
 
 export const LoginPage = () => {
     const navigate = useNavigate();
@@ -40,26 +42,13 @@ export const LoginPage = () => {
     const handleOAuthToken = async (token: string) => {
         setIsLoading(true);
         try {
-            // Fetch user profile with the new token
-            const res = await fetch(`${API_BASE_URL}/users/me`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (!res.ok) throw new Error('Failed to fetch user profile');
-            
-            const rawUser = await res.json();
-            const user = (rawUser && typeof rawUser === 'object' && 'success' in rawUser && 'data' in rawUser) ? rawUser.data : rawUser;
+            const user = await AuthService.getMe(token);
             login(token, user);
 
             // Fetch global connections
             try {
-                const connRes = await fetch(`${API_BASE_URL}/connections`, {
-                    headers: { 'Authorization': `Bearer ${token}` },
-                });
-                if (connRes.ok) {
-                    const json = await connRes.json();
-                    const connections = (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
-                    useAppStore.getState().setConnections(connections);
-                }
+                const connections = await ConnectionService.getConnections();
+                useAppStore.getState().setConnections(connections);
             } catch (ignored) {
                 console.warn('Failed to fetch connections upon login');
             }
@@ -87,32 +76,11 @@ export const LoginPage = () => {
         setError('');
 
         try {
-            const endpoint = isRegister ? `${API_BASE_URL}/auth/register` : `${API_BASE_URL}/auth/login`;
-            const body = isRegister
-                ? JSON.stringify({ name, email, password })
-                : JSON.stringify({ email, password });
+            const data = isRegister 
+                ? await AuthService.register(name, email, password)
+                : await AuthService.login(email, password);
 
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body,
-            });
-
-            const rawData = await response.json().catch(() => ({}));
-            const data = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
-
-            if (!response.ok) {
-                // Handle Unverified Email Scenario for both Login & Register
-                if (data.unverified) {
-                    setRegisteredEmail(data.email || email);
-                    setVerifyEmailStep(true);
-                    throw new Error(data.message || (lang === 'vi' ? 'Vui lòng xác minh email' : 'Please verify email'));
-                }
-                
-                throw new Error(data.message || (lang === 'vi' ? 'Đã có lỗi xảy ra' : 'Something went wrong'));
-            }
-
-            // Handle successful registration but unverified (201 Created)
+            // Handle successful registration but unverified (OTP required)
             if (data.unverified) {
                 setRegisteredEmail(data.email || email);
                 setVerifyEmailStep(true);
@@ -121,28 +89,31 @@ export const LoginPage = () => {
                 return;
             }
 
-            login(data.access_token, data.user);
+            if (data.access_token && data.user) {
+                login(data.access_token, data.user);
 
-            try {
-                const connRes = await fetch(`${API_BASE_URL}/connections`, {
-                    headers: { 'Authorization': `Bearer ${data.access_token}` },
-                });
-                if (connRes.ok) {
-                    const rawConnections = await connRes.json();
-                    const connections = (rawConnections && typeof rawConnections === 'object' && 'success' in rawConnections && 'data' in rawConnections) ? rawConnections.data : rawConnections;
+                try {
+                    const connections = await ConnectionService.getConnections();
                     useAppStore.getState().setConnections(connections);
+                } catch (ignored) {
+                    console.warn('Failed to fetch connections upon login');
                 }
-            } catch (ignored) {
-                console.warn('Failed to fetch connections upon login');
-            }
 
-            if (data.user?.isOnboarded === false) {
-                 navigate('/onboarding');
-            } else {
-                 navigate('/');
+                if (data.user?.isOnboarded === false) {
+                     navigate('/onboarding');
+                } else {
+                     navigate('/');
+                }
             }
         } catch (err: any) {
-            setError(err.message || (lang === 'vi' ? 'Thông tin đăng nhập không hợp lệ' : 'Invalid credentials'));
+            const data = err.data || {};
+            if (data.unverified) {
+                setRegisteredEmail(data.email || email);
+                setVerifyEmailStep(true);
+                setError(data.message || (lang === 'vi' ? 'Vui lòng xác minh email' : 'Please verify email'));
+            } else {
+                setError(err.message || (lang === 'vi' ? 'Thông tin đăng nhập không hợp lệ' : 'Invalid credentials'));
+            }
         } finally {
             setIsLoading(false);
         }
@@ -154,28 +125,17 @@ export const LoginPage = () => {
         setError('');
 
         try {
-            const response = await fetch(`${API_BASE_URL}/auth/verify-email`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: registeredEmail, otp }),
-            });
-
-            if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
-                throw new Error(data.message || 'Verification failed');
-            }
-
-            const rawData = await response.json();
-            const data = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
+            const data = await AuthService.verifyEmail(registeredEmail, otp);
             toast.success(lang === 'vi' ? 'Xác minh thành công!' : 'Verification successful!');
             
-            // Login with the returned token
-            login(data.access_token, data.user);
-            
-            if (data.user?.isOnboarded === false) {
-                 navigate('/onboarding');
-            } else {
-                 navigate('/');
+            if (data.access_token && data.user) {
+                login(data.access_token, data.user);
+                
+                if (data.user?.isOnboarded === false) {
+                     navigate('/onboarding');
+                } else {
+                     navigate('/');
+                }
             }
         } catch (err: any) {
             setError(err.message || 'Invalid OTP');
@@ -188,19 +148,7 @@ export const LoginPage = () => {
         setIsLoading(true);
         setError('');
         try {
-            const response = await fetch(`${API_BASE_URL}/auth/resend-verification`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: registeredEmail }),
-            });
-
-            const rawData = await response.json().catch(() => ({}));
-            const data = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
-            
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to resend OTP');
-            }
-
+            const data = await AuthService.resendVerification(registeredEmail);
             toast.success(data.message || (lang === 'vi' ? 'Đã gửi lại mã xác minh!' : 'Verification code resent!'));
         } catch (err: any) {
             setError(err.message || 'Error resending OTP');

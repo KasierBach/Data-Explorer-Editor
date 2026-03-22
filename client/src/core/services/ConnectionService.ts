@@ -1,12 +1,13 @@
 import type { IDatabaseAdapter } from "../domain/database-adapter.interface";
 
 import { ApiDatabaseAdapter } from "../adapters/ApiDatabaseAdapter";
+import { apiService } from "./api.service";
 
 /**
  * Service to manage database adapter instances.
  * Follows Singleton/Factory pattern logic.
  */
-class ConnectionService {
+export class ConnectionService {
     private static instance: ConnectionService;
     private activeAdapter: IDatabaseAdapter | null = null;
     private adapters: Map<string, IDatabaseAdapter> = new Map();
@@ -52,6 +53,24 @@ class ConnectionService {
 
     public getActiveAdapter(): IDatabaseAdapter | null {
         return this.activeAdapter;
+    }
+
+    // ─── API Methods ───
+
+    public static async getConnections(): Promise<any[]> {
+        return await apiService.get<any[]>('/connections');
+    }
+
+    public static async createConnection(data: any): Promise<any> {
+        return await apiService.post<any>('/connections', data);
+    }
+
+    public static async updateConnection(id: string, updates: any): Promise<void> {
+        await apiService.patch(`/connections/${id}`, updates);
+    }
+
+    public static async deleteConnection(id: string): Promise<void> {
+        await apiService.delete(`/connections/${id}`);
     }
 }
 

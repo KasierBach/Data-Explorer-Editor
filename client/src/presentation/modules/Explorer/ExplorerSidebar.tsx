@@ -4,7 +4,7 @@ import { TreeNodeItem } from './TreeNodeItem';
 import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
 import { Plus, Search, RefreshCw, Filter, Layers, Database, ChevronDown } from 'lucide-react';
-import { connectionService } from '@/core/services/ConnectionService';
+import { ConnectionService, connectionService } from '@/core/services/ConnectionService';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ConnectionSelector } from './ConnectionSelector';
@@ -13,7 +13,6 @@ import { SidebarContextMenu } from './SidebarContextMenu';
 import { CreateDatabaseDialog } from '@/presentation/components/Dialogs/CreateDatabaseDialog';
 import { DeleteDatabaseDialog } from '@/presentation/components/Dialogs/DeleteDatabaseDialog';
 import { handleTreeAction as importedHandleTreeAction } from './treeActions';
-import { API_BASE_URL } from '@/core/config/env';
 import { toast } from 'sonner';
 
 export const ExplorerSidebar: React.FC = () => {
@@ -150,24 +149,11 @@ export const ExplorerSidebar: React.FC = () => {
                                         });
 
                                         // Update backend connection setting so next fetch returns all databases
-                                        const accessToken = useAppStore.getState().accessToken;
-                                        fetch(`${API_BASE_URL}/connections/${conn.id}`, {
-                                            method: 'PATCH',
-                                            headers: {
-                                                'Content-Type': 'application/json',
-                                                ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
-                                            },
-                                            body: JSON.stringify({ showAllDatabases: newValue })
-                                        }).then(async (res) => {
-                                            if (!res.ok) {
-                                                const rawErr = await res.json().catch(() => ({}));
-                                                const errData = (rawErr && typeof rawErr === 'object' && 'success' in rawErr && 'data' in rawErr) ? rawErr.data : rawErr;
-                                                throw new Error(errData.message || 'Failed to update connection settings');
-                                            }
+                                        ConnectionService.updateConnection(conn.id, { showAllDatabases: newValue }).then(async () => {
                                             // Ensure backend pool connects with new settings and invalidate cache
                                             await connectionService.setActiveConnection({ ...conn, showAllDatabases: newValue } as any);
                                             triggerRefresh();
-                                        }).catch(err => {
+                                        }).catch((err: any) => {
                                             console.error(err);
                                             toast.error(err.message || 'Failed to update settings');
                                         });

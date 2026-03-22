@@ -1,8 +1,12 @@
 import type { IDatabaseAdapter } from '../domain/database-adapter.interface';
 import type { TableMetadata, TreeNode, QueryResult } from '../domain/entities';
-import { useAppStore } from '../services/store';
+import { apiService } from '../services/api.service';
 import { API_BASE_URL } from '../config/env';
 
+/**
+ * Adapter that communicates with the backend API to perform database operations.
+ * Standardized to use apiService for most calls, while keeping raw fetch for streams.
+ */
 export class ApiDatabaseAdapter implements IDatabaseAdapter {
     private connectionId: string | null = null;
     private baseUrl = API_BASE_URL;
@@ -21,33 +25,10 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
     async getHierarchy(parentId: string | null): Promise<TreeNode[]> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        const response = await fetch(`${this.baseUrl}/metadata/hierarchy`, {
-            method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify({
-                connectionId: this.connectionId,
-                parentId: parentId
-            }),
+        return await apiService.post<TreeNode[]>('/metadata/hierarchy', {
+            connectionId: this.connectionId,
+            parentId: parentId
         });
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch hierarchy: ${response.statusText}`);
-        }
-
-        const json = await response.json();
-        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
-    }
-
-    private getHeaders() {
-        // Read token from Zustand store (persisted in 'data-explorer-storage')
-        const token = useAppStore.getState().accessToken;
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-        };
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
-        return headers;
     }
 
     async executeQuery(sql: string, context?: { database?: string }): Promise<QueryResult> {
@@ -62,46 +43,13 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
             body.database = context.database;
         }
 
-        const response = await fetch(`${this.baseUrl}/query`, {
-            method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify(body),
-        });
-
-        if (!response.ok) {
-            if (response.status === 401) {
-                // Clear state on unauthorized using store logic
-                useAppStore.getState().logout();
-                window.location.reload();
-                throw new Error('Session expired. Please login again.');
-            }
-            const errorText = await response.text();
-            console.error('❌ API Error:', errorText);
-            try {
-                const errorJson = JSON.parse(errorText);
-                throw new Error(errorJson.message || 'Query execution failed');
-            } catch (e) {
-                throw new Error(`Query failed: ${response.status} ${response.statusText} - ${errorText}`);
-            }
-        }
-
-        const json = await response.json();
-        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
+        return await apiService.post<QueryResult>('/query', body);
     }
 
     async getMetadata(tableId: string): Promise<TableMetadata> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        const response = await fetch(`${this.baseUrl}/metadata/full?connectionId=${this.connectionId}&tableId=${encodeURIComponent(tableId)}`, {
-            headers: this.getHeaders(),
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch metadata: ${response.statusText}`);
-        }
-
-        const json = await response.json();
-        const data = (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
+        const data = await apiService.get<any>(`/metadata/full?connectionId=${this.connectionId}&tableId=${encodeURIComponent(tableId)}`);
         
         return {
             columns: data.columns.map((col: any) => ({
@@ -128,22 +76,10 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
     }): Promise<any> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        const response = await fetch(`${this.baseUrl}/query/row`, {
-            method: 'PATCH',
-            headers: this.getHeaders(),
-            body: JSON.stringify({
-                ...params,
-                connectionId: this.connectionId
-            }),
+        return await apiService.patch<any>('/query/row', {
+            ...params,
+            connectionId: this.connectionId
         });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || `Failed to update row: ${response.statusText}`);
-        }
-
-        const json = await response.json();
-        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
     }
 
     async updateSchema(params: {
@@ -154,75 +90,34 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
     }): Promise<any> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        const response = await fetch(`${this.baseUrl}/query/schema`, {
-            method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify({
-                ...params,
-                connectionId: this.connectionId
-            }),
+        return await apiService.post<any>('/query/schema', {
+            ...params,
+            connectionId: this.connectionId
         });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || `Failed to update schema: ${response.statusText}`);
-        }
-
-        const json = await response.json();
-        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
     }
 
     async getMetrics(database?: string): Promise<any> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        const url = new URL(`${this.baseUrl}/metadata/metrics`);
-        url.searchParams.append('connectionId', this.connectionId);
-        if (database) url.searchParams.append('database', database);
+        let url = `/metadata/metrics?connectionId=${this.connectionId}`;
+        if (database) url += `&database=${encodeURIComponent(database)}`;
 
-        const response = await fetch(url.toString(), {
-            headers: this.getHeaders(),
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch metrics: ${response.statusText}`);
-        }
-
-        const json = await response.json();
-        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
+        return await apiService.get<any>(url);
     }
 
     async getDatabases(): Promise<string[]> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        const response = await fetch(`${this.baseUrl}/metadata/databases?connectionId=${this.connectionId}`, {
-            headers: this.getHeaders(),
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch databases: ${response.statusText}`);
-        }
-
-        const json = await response.json();
-        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
+        return await apiService.get<string[]>(`/metadata/databases?connectionId=${this.connectionId}`);
     }
 
     async getRelationships(database?: string): Promise<any[]> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        const url = new URL(`${this.baseUrl}/metadata/relationships`);
-        url.searchParams.append('connectionId', this.connectionId);
-        if (database) url.searchParams.append('database', database);
+        let url = `/metadata/relationships?connectionId=${this.connectionId}`;
+        if (database) url += `&database=${encodeURIComponent(database)}`;
 
-        const response = await fetch(url.toString(), {
-            headers: this.getHeaders(),
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to fetch relationships: ${response.statusText}`);
-        }
-
-        const json = await response.json();
-        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
+        return await apiService.get<any[]>(url);
     }
 
     async generateSql(params: {
@@ -235,9 +130,11 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
     }): Promise<Response> {
         if (!this.connectionId) throw new Error('Not connected');
 
+        // Note: For generateSql we keep raw fetch because it might be used directly as a Response object
+        // although usually we want the stream. apiService consumes the stream.
         return fetch(`${this.baseUrl}/ai/generate-sql`, {
             method: 'POST',
-            headers: this.getHeaders(),
+            headers: apiService.getHeaders(),
             body: JSON.stringify({
                 ...params,
                 connectionId: this.connectionId
@@ -257,7 +154,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
 
         return fetch(`${this.baseUrl}/ai/generate-sql-stream`, {
             method: 'POST',
-            headers: this.getHeaders(),
+            headers: apiService.getHeaders(),
             body: JSON.stringify({
                 ...params,
                 connectionId: this.connectionId

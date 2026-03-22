@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '@/core/services/store';
-import { API_BASE_URL } from '@/core/config/env';
+import { ConnectionService } from '@/core/services/ConnectionService';
 
 /**
  * Automatically fetches the user's saved connections from the backend
@@ -26,15 +26,9 @@ export function useSyncConnections() {
 
         const fetchConnections = async () => {
             try {
-                const res = await fetch(`${API_BASE_URL}/connections`, {
-                    headers: { 'Authorization': `Bearer ${accessToken}` },
-                });
-                if (res.ok) {
-                    const json = await res.json();
-                    const data = (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
-                    if (Array.isArray(data)) {
-                        setConnections(data);
-                    }
+                const data = await ConnectionService.getConnections();
+                if (Array.isArray(data)) {
+                    setConnections(data);
                 }
             } catch (err) {
                 console.warn('useSyncConnections: Failed to fetch connections', err);

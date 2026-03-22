@@ -7,10 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/presentation/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/presentation/components/ui/tabs';
 import { Server, ShieldAlert, Key, Zap, HelpCircle, Database, Lock, Globe, Wand2, ShieldCheck } from 'lucide-react';
-import { API_BASE_URL } from '@/core/config/env';
+import { ConnectionService } from '@/core/services/ConnectionService';
 
 export const ConnectionDialog: React.FC = () => {
-    const { isConnectionDialogOpen, closeConnectionDialog, addConnection, accessToken, lang } = useAppStore();
+    const { isConnectionDialogOpen, closeConnectionDialog, addConnection, lang } = useAppStore();
     const t = lang === 'vi';
 
     const [type, setType] = useState<'postgres' | 'mysql' | 'mssql'>('postgres');
@@ -97,22 +97,8 @@ export const ConnectionDialog: React.FC = () => {
         if (database && database.trim() !== '') connectionData.database = database.trim();
 
         try {
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-            if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-            const response = await fetch(`${API_BASE_URL}/connections`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(connectionData),
-            });
-
-            if (!response.ok) {
-                const errText = await response.text();
-                throw new Error(errText || response.statusText);
-            }
-
-            const rawSavedConnection = await response.json();
-            const savedConnection = (rawSavedConnection && typeof rawSavedConnection === 'object' && 'success' in rawSavedConnection && 'data' in rawSavedConnection) ? rawSavedConnection.data : rawSavedConnection;
+            const savedConnection = await ConnectionService.createConnection(connectionData);
+            
             const newConnection: Connection = {
                 id: savedConnection.id,
                 name: savedConnection.name,

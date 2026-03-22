@@ -11,7 +11,7 @@ import { useAppStore } from "@/core/services/store"
 import { PlusCircle, Server, Trash, Loader2 } from "lucide-react"
 import { SiPostgresql, SiMysql, SiClickhouse } from "react-icons/si"
 import { DiMsqlServer } from "react-icons/di"
-import { API_BASE_URL } from '@/core/config/env'
+import { ConnectionService } from "@/core/services/ConnectionService"
 
 /** Returns a database-type-specific icon and accent color. */
 const getDbBranding = (type?: string) => {
@@ -60,7 +60,7 @@ const getDbBranding = (type?: string) => {
 };
 
 export function ConnectionSelector() {
-    const { connections, activeConnectionId, setActiveConnectionId, openConnectionDialog, removeConnection, accessToken, logout } = useAppStore()
+    const { connections, activeConnectionId, setActiveConnectionId, openConnectionDialog, removeConnection } = useAppStore()
     const [isDeleting, setIsDeleting] = useState<string | null>(null)
 
     const activeConn = connections.find(c => c.id === activeConnectionId);
@@ -73,27 +73,11 @@ export function ConnectionSelector() {
 
         setIsDeleting(id);
         try {
-            const headers: Record<string, string> = {};
-            if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
-
-            const response = await fetch(`${API_BASE_URL}/connections/${id}`, {
-                method: 'DELETE',
-                headers
-            });
-            if (response.ok) {
-                removeConnection(id);
-            } else if (response.status === 401) {
-                logout();
-                window.location.href = '/login';
-            } else {
-                const rawErr = await response.json().catch(() => ({}));
-                const errData = (rawErr && typeof rawErr === 'object' && 'success' in rawErr && 'data' in rawErr) ? rawErr.data : rawErr;
-                const errMsg = errData.message || `Failed to delete connection. Status: ${response.status}`;
-                alert(errMsg);
-            }
-        } catch (error) {
+            await ConnectionService.deleteConnection(id);
+            removeConnection(id);
+        } catch (error: any) {
             console.error('Error deleting connection:', error);
-            alert('Error deleting connection');
+            alert(error.message || 'Error deleting connection');
         } finally {
             setIsDeleting(null);
         }

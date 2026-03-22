@@ -1,92 +1,36 @@
-import { API_BASE_URL } from '../config/env';
-import { useAppStore } from './store';
+import { apiService } from './api.service';
 
+/**
+ * Service to manage administrative operations.
+ * Uses apiService for consistent fetching and error handling.
+ */
 class AdminService {
-    private baseUrl = API_BASE_URL;
-
-    private getHeaders() {
-        const token = useAppStore.getState().accessToken;
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-        };
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
-        return headers;
-    }
-
-    private async handleResponse(response: Response) {
-        if (!response.ok) {
-            if (response.status === 401 || response.status === 403) {
-                console.error(`Admin access denied: ${response.status}`);
-            }
-            const errorText = await response.text();
-            let errorMessage = `Operation failed: ${response.statusText}`;
-            try {
-                const errorJson = JSON.parse(errorText);
-                errorMessage = errorJson.message || errorMessage;
-            } catch (e) {
-                // Not JSON, just append the raw text if available
-                if (errorText) errorMessage += ` - ${errorText}`;
-            }
-            throw new Error(errorMessage);
-        }
-        const json = await response.json();
-        return (json && typeof json === 'object' && 'success' in json && 'data' in json) ? json.data : json;
-    }
-
     // --- Users Management ---
 
     async getUsers() {
-        const response = await fetch(`${this.baseUrl}/users`, {
-            method: 'GET',
-            headers: this.getHeaders(),
-        });
-        return this.handleResponse(response);
+        return await apiService.get<any[]>('/users');
     }
 
     async updateRole(userId: string, role: 'user' | 'admin') {
-        const response = await fetch(`${this.baseUrl}/users/${userId}/role`, {
-            method: 'PATCH',
-            headers: this.getHeaders(),
-            body: JSON.stringify({ role }),
-        });
-        return this.handleResponse(response);
+        return await apiService.patch<any>(`/users/${userId}/role`, { role });
     }
 
     async resetPassword(userId: string, newPassword: string) {
-        const response = await fetch(`${this.baseUrl}/users/${userId}/reset-password`, {
-            method: 'POST',
-            headers: this.getHeaders(),
-            body: JSON.stringify({ newPassword }),
-        });
-        return this.handleResponse(response);
+        return await apiService.post<any>(`/users/${userId}/reset-password`, { newPassword });
     }
 
     async deleteUser(userId: string) {
-        const response = await fetch(`${this.baseUrl}/users/${userId}`, {
-            method: 'DELETE',
-            headers: this.getHeaders(),
-        });
-        return this.handleResponse(response);
+        return await apiService.delete<any>(`/users/${userId}`);
     }
 
     async toggleBan(userId: string) {
-        const response = await fetch(`${this.baseUrl}/users/${userId}/ban`, {
-            method: 'PATCH',
-            headers: this.getHeaders(),
-        });
-        return this.handleResponse(response);
+        return await apiService.patch<any>(`/users/${userId}/ban`, {});
     }
 
     // --- Audit Logs ---
 
     async getAuditLogs(limit: number = 100) {
-        const response = await fetch(`${this.baseUrl}/audit?limit=${limit}`, {
-            method: 'GET',
-            headers: this.getHeaders(),
-        });
-        return this.handleResponse(response);
+        return await apiService.get<any[]>(`/audit?limit=${limit}`);
     }
 }
 

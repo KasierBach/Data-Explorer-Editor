@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Database, Loader2, Mail, KeyRound, ArrowLeft } from 'lucide-react';
-import { API_BASE_URL } from '@/core/config/env';
 import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
+import { AuthService } from '@/core/services/AuthService';
 
 export const ForgotPasswordPage = () => {
     const navigate = useNavigate();
@@ -24,18 +24,7 @@ export const ForgotPasswordPage = () => {
         setError('');
 
         try {
-            const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email }),
-            });
-
-            if (!response.ok) {
-                const rawData = await response.json().catch(() => ({}));
-                const data = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
-                throw new Error(data.message || 'Something went wrong');
-            }
-
+            await AuthService.forgotPassword(email);
             toast.success(lang === 'vi' ? 'Đã gửi mã OTP đến email của bạn!' : 'OTP sent to your email!');
             setStep(2);
         } catch (err: any) {
@@ -51,18 +40,7 @@ export const ForgotPasswordPage = () => {
         setError('');
 
         try {
-            const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, otp, newPassword }),
-            });
-
-            if (!response.ok) {
-                const rawData = await response.json().catch(() => ({}));
-                const data = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
-                throw new Error(data.message || 'Something went wrong');
-            }
-
+            await AuthService.resetPassword({ email, otp, newPassword });
             toast.success(lang === 'vi' ? 'Đổi mật khẩu thành công!' : 'Password reset successfully!');
             navigate('/login');
         } catch (err: any) {

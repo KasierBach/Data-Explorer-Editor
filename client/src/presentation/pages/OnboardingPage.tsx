@@ -11,9 +11,9 @@ import {
     SelectValue,
 } from "@/presentation/components/ui/select";
 import { useAppStore } from '@/core/services/store';
-import { API_BASE_URL } from '@/core/config/env';
 import { Loader2, Rocket, Briefcase, UserCircle, MapPin, Phone } from 'lucide-react';
 import { toast } from 'sonner';
+import { AuthService } from '@/core/services/AuthService';
 
 export const OnboardingPage = () => {
     const navigate = useNavigate();
@@ -56,22 +56,7 @@ export const OnboardingPage = () => {
 
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/users/profile/onboarding`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${accessToken}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.message || 'Failed to save profile');
-            }
-
-            const rawData = await res.json();
-            const updatedUser = (rawData && typeof rawData === 'object' && 'success' in rawData && 'data' in rawData) ? rawData.data : rawData;
+            const updatedUser = await AuthService.onboard(formData, accessToken);
             
             // Update Zustand store with the new user object (which now has isOnboarded: true)
             login(accessToken, updatedUser);
