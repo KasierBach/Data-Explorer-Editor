@@ -15,6 +15,8 @@ export interface UISlice {
     setPageState: (pageId: string, pageState: any) => void;
     lang: 'vi' | 'en';
     setLang: (lang: 'vi' | 'en') => void;
+    isResultPanelOpen: boolean;
+    toggleResultPanel: () => void;
 }
 
 export const createUISlice: StateCreator<UISlice> = (set) => ({
@@ -44,4 +46,6 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
         localStorage.setItem('lang', lang);
         set({ lang });
     },
+    isResultPanelOpen: true,
+    toggleResultPanel: () => set((state) => ({ isResultPanelOpen: !state.isResultPanelOpen })),
 });

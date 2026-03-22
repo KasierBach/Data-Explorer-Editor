@@ -20,6 +20,7 @@ export interface TabSlice {
     openInsightsTab: (connectionId: string, database?: string) => void;
     openVisualizeTab: () => void;
     openErdTab: (connectionId: string, database?: string) => void;
+    closeAllTabs: () => void;
 }
 
 // Helper type for cross-slice access (connection name lookup)
@@ -115,4 +116,6 @@ export const createTabSlice: StateCreator<TabSlice & ConnectionLookup, [], [], T
         };
         return { tabs: [...state.tabs, newTab], activeTabId: id };
     }),
+
+    closeAllTabs: () => set({ tabs: [], activeTabId: null }),
 });

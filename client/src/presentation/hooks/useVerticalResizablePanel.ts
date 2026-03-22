@@ -1,0 +1,95 @@
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+
+interface UseVerticalResizablePanelOptions {
+    initialHeight: number;
+    minHeight: number;
+    maxHeight?: number;
+    onHeightChange?: (height: number) => void;
+}
+
+/**
+ * Hook for creating vertically resizable panels (top-bottom split).
+ * Similar to useResizablePanel but for height.
+ */
+export function useVerticalResizablePanel({
+    initialHeight,
+    minHeight,
+    maxHeight,
+    onHeightChange
+}: UseVerticalResizablePanelOptions) {
+    const [isDragging, setIsDragging] = useState(false);
+    const [height, setHeight] = useState(initialHeight);
+
+    const isDraggingRef = useRef(false);
+    const minHeightRef = useRef(minHeight);
+    const maxHeightRef = useRef(maxHeight);
+
+    minHeightRef.current = minHeight;
+    maxHeightRef.current = maxHeight;
+
+    const startResizing = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isDraggingRef.current = true;
+        setIsDragging(true);
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+    }, []);
+
+    const stopResizing = useCallback(() => {
+        if (!isDraggingRef.current) return;
+        isDraggingRef.current = false;
+        setIsDragging(false);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    }, []);
+
+    const resize = useCallback((e: MouseEvent) => {
+        if (!isDraggingRef.current) return;
+
+        // In a vertical split where this panel is at the bottom, 
+        // the height is the distance from the bottom of the viewport.
+        let newHeight = window.innerHeight - e.clientY;
+
+        newHeight = Math.max(minHeightRef.current, newHeight);
+
+        if (maxHeightRef.current) {
+            const absoluteMaxHeight = maxHeightRef.current <= 1
+                ? window.innerHeight * maxHeightRef.current
+                : maxHeightRef.current;
+            newHeight = Math.min(newHeight, absoluteMaxHeight);
+        }
+
+        setHeight(newHeight);
+    }, []);
+
+    useEffect(() => {
+        window.addEventListener('mousemove', resize);
+        window.addEventListener('mouseup', stopResizing);
+
+        return () => {
+            window.removeEventListener('mousemove', resize);
+            window.removeEventListener('mouseup', stopResizing);
+        };
+    }, [resize, stopResizing]);
+
+    // Use ref for callback to avoid infinite loops if the function is not memoized
+    const onHeightChangeRef = useRef(onHeightChange);
+    useEffect(() => {
+        onHeightChangeRef.current = onHeightChange;
+    }, [onHeightChange]);
+
+    // Notify parent of height changes when drag completes
+    useEffect(() => {
+        if (!isDragging && onHeightChangeRef.current) {
+            onHeightChangeRef.current(height);
+        }
+    }, [isDragging, height]);
+
+    return useMemo(() => ({
+        height,
+        setHeight,
+        isDragging,
+        startResizing
+    }), [height, isDragging, startResizing]);
+}

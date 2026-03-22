@@ -8,8 +8,10 @@ import { AiAssistant } from '@/presentation/modules/Query/AiAssistant';
 import { cn } from "@/lib/utils";
 import { useResizablePanel } from '@/presentation/hooks/useResizablePanel';
 import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
+import { useGlobalShortcuts } from '@/presentation/hooks/useGlobalShortcuts';
 
 export function AppShell() {
+    useGlobalShortcuts();
     const isSidebarOpen = useAppStore(state => state.isSidebarOpen);
     const setSidebarOpen = useAppStore(state => state.setSidebarOpen);
     const sidebarWidth = useAppStore(state => state.sidebarWidth);

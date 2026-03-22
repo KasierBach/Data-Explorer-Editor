@@ -23,22 +23,36 @@ import {
     SelectValue,
 } from "@/presentation/components/ui/select";
 import type { QueryResult } from '@/core/domain/entities';
-import { Panel, Group, Separator } from "react-resizable-panels";
 import { QueryResults } from './QueryResults';
 import { useSchemaInfo } from '@/presentation/hooks/useSchemaInfo';
 import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
+import { useVerticalResizablePanel } from '@/presentation/hooks/useVerticalResizablePanel';
 import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
 
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const queryClient = useQueryClient();
-    const { activeConnectionId, connections, tabs, updateTabMetadata, activeDatabase, lang } = useAppStore();
+    const { 
+        activeConnectionId, connections, tabs, updateTabMetadata, 
+        activeDatabase, lang, isResultPanelOpen, toggleResultPanel 
+    } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const schemaInfo = useSchemaInfo();
 
     // Find options for this tab
     const tab = tabs.find(t => t.id === tabId);
     const initialMetadata = tab?.metadata || {};
+
+    const handleHeightChange = useCallback((newHeight: number) => {
+        updateTabMetadata(tabId, { resultHeight: newHeight });
+    }, [tabId, updateTabMetadata]);
+
+    const resizer = useVerticalResizablePanel({
+        initialHeight: initialMetadata.resultHeight || 300,
+        minHeight: 150,
+        maxHeight: 0.8,
+        onHeightChange: handleHeightChange
+    });
 
     const [query, setQuery] = useState(initialMetadata.sql || tab?.initialSql || '');
     const [executedQuery, setExecutedQuery] = useState<string | null>(null);
@@ -419,9 +433,9 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 </div>
 
 
-                <Group orientation="vertical" className="flex-1">
-                    <Panel defaultSize={50} minSize={20} className="flex flex-col relative">
-                        {/* Editor Area */}
+                <div className="flex-1 flex flex-col min-h-0 relative">
+                    {/* Top Editor - takes remaining space */}
+                    <div className="flex-1 min-h-0 relative">
                         <React.Suspense fallback={<div className="h-full w-full flex items-center justify-center bg-muted/10 animate-pulse text-muted-foreground text-sm font-medium">Loading SQL Editor...</div>}>
                             <SqlEditor
                                 value={query}
@@ -433,14 +447,31 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                                 schemaInfo={schemaInfo}
                             />
                         </React.Suspense>
-                    </Panel>
+                    </div>
 
-                    <Separator className="h-1.5 bg-muted/20 hover:bg-blue-500/20 active:bg-blue-500/40 transition-colors cursor-row-resize flex items-center justify-center group">
-                        <div className="w-8 h-1 rounded-full bg-muted-foreground/20 group-hover:bg-blue-500/50 transition-colors" />
-                    </Separator>
+                    {/* Resize Handle - Custom Separator */}
+                    <div 
+                        onMouseDown={resizer.startResizing}
+                        className={cn(
+                            "h-1.5 bg-muted/20 border-y border-border/10 cursor-row-resize flex items-center justify-center group transition-colors select-none z-20",
+                            resizer.isDragging ? "bg-blue-500/20" : "hover:bg-blue-500/10",
+                            !isResultPanelOpen && "hidden"
+                        )}
+                    >
+                        <div className={cn(
+                            "w-12 h-0.5 rounded-full bg-muted-foreground/20 group-hover:bg-blue-500/50 transition-colors",
+                            resizer.isDragging && "bg-blue-500"
+                        )} />
+                    </div>
 
-                    <Panel defaultSize={50} minSize={20} className="flex flex-col overflow-hidden">
-                        {/* Result Area with Tabs */}
+                    {/* Bottom Result Panel - with smooth transition */}
+                    <div 
+                        style={{ height: isResultPanelOpen ? (isMobile ? '40vh' : `${resizer.height}px`) : '0px' }}
+                        className={cn(
+                            "flex flex-col overflow-hidden bg-card shrink-0 relative z-10",
+                            resizer.isDragging ? "" : "transition-[height] duration-300 ease-in-out"
+                        )}
+                    >
                         <QueryResults
                             results={results || null}
                             isLoading={isLoading}
@@ -451,9 +482,10 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             onTabChange={setActiveResultTab}
                             explainPlan={explainPlan}
                             onClearResults={handleClearResults}
+                            onClose={toggleResultPanel}
                         />
-                    </Panel>
-                </Group>
+                    </div>
+                </div>
 
 
             </div>

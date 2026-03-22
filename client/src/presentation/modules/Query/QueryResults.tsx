@@ -5,7 +5,7 @@ import {
     TabsList,
     TabsTrigger
 } from "@/presentation/components/ui/tabs";
-import { Info, Table as TableIcon, Loader2, Play, GitBranch, X } from 'lucide-react';
+import { Info, Table as TableIcon, Loader2, Play, GitBranch, X, Eraser } from 'lucide-react';
 import type { QueryResult } from '@/core/domain/entities';
 import { ResultTable } from './ResultTable';
 import { QueryPlanVisualizer } from './QueryPlanVisualizer';
@@ -23,6 +23,7 @@ interface QueryResultsProps {
     onTabChange: (tab: string) => void;
     explainPlan?: any;
     onClearResults?: () => void;
+    onClose?: () => void;
 }
 
 export const QueryResults: React.FC<QueryResultsProps> = ({
@@ -34,7 +35,8 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
     activeTab,
     onTabChange,
     explainPlan,
-    onClearResults
+    onClearResults,
+    onClose
 }) => {
     const { lang } = useAppStore();
     const isMobile = useMediaQuery('(max-width: 768px)');
@@ -121,8 +123,18 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                     {(error || results) && onClearResults && (
                         <button
                             onClick={onClearResults}
-                            className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors"
-                            title={lang === 'vi' ? 'Xóa kết quả' : 'Clear results'}
+                            className="p-1 rounded hover:bg-muted text-muted-foreground transition-colors"
+                            title={lang === 'vi' ? 'Xóa kết quả (Clear)' : 'Clear results'}
+                        >
+                            <Eraser className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                    
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-red-500 transition-colors"
+                            title={lang === 'vi' ? 'Đóng bảng (Ctrl+J)' : 'Close Panel (Ctrl+J)'}
                         >
                             <X className="w-3.5 h-3.5" />
                         </button>
