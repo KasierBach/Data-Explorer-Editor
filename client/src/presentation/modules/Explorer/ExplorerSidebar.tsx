@@ -214,7 +214,7 @@ export const ExplorerSidebar: React.FC = () => {
                         <span className="truncate max-w-[100px]">{activeDatabase}</span>
                     </div>
                 )}
-                <span className="opacity-50">v1.0.0-PRO</span>
+                <span className="opacity-50">V3.1.0-PRO</span>
             </div>
             {/* Dialogs */}
             <CreateDatabaseDialog
