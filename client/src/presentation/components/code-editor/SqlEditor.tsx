@@ -59,8 +59,8 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = 
         };
     }, [monaco, schemaInfo]);
 
-    // AI Ghost Text (uses ContentWidget API instead of InlineCompletionsProvider)
-    useAiGhostText(editorRef, monacoInstanceRef, activeConnectionId, activeDatabase || undefined);
+    // AI Ghost Text (uses Monaco's InlineCompletionsProvider)
+    useAiGhostText(monaco, activeConnectionId, activeDatabase || undefined);
 
     const handleEditorMount = (editor: any, monacoInstance: any) => {
         editorRef.current = editor;
@@ -93,6 +93,11 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = 
                     preview: true,
                     showIcons: true,
                 },
+                inlineSuggest: {
+                    enabled: true,
+                    showToolbar: 'never',
+                },
+                fixedOverflowWidgets: true,
             }}
             onMount={handleEditorMount}
         />

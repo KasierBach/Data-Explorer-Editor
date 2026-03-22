@@ -6,6 +6,8 @@ import * as Prompts from './ai.prompts';
 @Injectable()
 export class AiService {
     private genAI: GoogleGenerativeAI;
+    private schemaCache = new Map<string, { context: string, timestamp: number }>();
+    private readonly CACHE_TTL = 1000 * 60 * 15; // 15 minutes
 
     constructor(private configService: ConfigService) {
         const apiKey = this.configService.get<string>('GEMINI_API_KEY');
@@ -211,7 +213,17 @@ ${Prompts.RESPONSE_FORMAT}`;
         yield { type: 'error', text: `AI generation failed: ${lastError?.message}` };
     }
 
-    async gatherSchemaContext(pool: any, strategy: any, database?: string): Promise<string> {
+    async gatherSchemaContext(pool: any, strategy: any, database?: string, connectionId?: string): Promise<string> {
+        const cacheKey = connectionId ? `${connectionId}:${database || 'default'}` : null;
+        
+        if (cacheKey) {
+            const cached = this.schemaCache.get(cacheKey);
+            if (cached && (Date.now() - cached.timestamp < this.CACHE_TTL)) {
+                // console.log(`[AiService] Using cached schema context for ${cacheKey}`);
+                return cached.context;
+            }
+        }
+
         let schemaContext = '';
         try {
             const schemas = await strategy.getSchemas(pool, database);
@@ -245,13 +257,34 @@ ${Prompts.RESPONSE_FORMAT}`;
             } catch { /* no relationships available */ }
 
             schemaContext = this.buildSchemaContext(allTables, columnMap, relationships);
-            console.log(`[AiService] Schema context built: ${allTables.length} tables found`);
+            
+            if (cacheKey && schemaContext && !schemaContext.includes('Could not load')) {
+                this.schemaCache.set(cacheKey, {
+                    context: schemaContext,
+                    timestamp: Date.now()
+                });
+            }
+            
+            console.log(`[AiService] Schema context built and cached: ${allTables.length} tables found`);
         } catch (error: any) {
             console.error(`[AiService] Schema gathering failed:`, error.message);
             // Continue with empty context rather than failing completely
             schemaContext = '(Could not load schema information)';
         }
         return schemaContext;
+    }
+
+    clearCache(connectionId: string, database?: string) {
+        if (database) {
+            this.schemaCache.delete(`${connectionId}:${database}`);
+        } else {
+            // Delete all entries for this connection
+            for (const key of this.schemaCache.keys()) {
+                if (key.startsWith(`${connectionId}:`)) {
+                    this.schemaCache.delete(key);
+                }
+            }
+        }
     }
 
     buildSchemaContext(tables: any[], columns: Map<string, any[]>, relationships: any[]): string {
@@ -305,14 +338,16 @@ ${Prompts.RESPONSE_FORMAT}`;
             const trimmedBefore = beforeCursor.length > 1500 ? beforeCursor.slice(-1500) : beforeCursor;
             const trimmedAfter = afterCursor.length > 300 ? afterCursor.slice(0, 300) : afterCursor;
 
-            const systemPrompt = `You are a SQL autocomplete engine for ${databaseType}.
+            const systemPrompt = `You are an expert SQL autocomplete engine for ${databaseType}.
 Your task: Predict the next FEW logical characters or a SHORT clause to insert at the cursor.
 - **Accuracy over Length**: Prefer a short, 100% correct snippet (like a column name or keyword) over a long query that might be wrong.
-- **Surgical Precision**: Only return what is highly likely based on the SCHEMA.
-- **Prioritize high-value continuations**: If a query structure looks complete, suggest useful clauses like 'WHERE', 'ORDER BY', 'LIMIT', or 'JOIN' instead of just a semicolon.
-- **NEVER repeat any text from the 'BEFORE' context**.
-- **ONLY return the raw string to be appended**. No markdown, no commentary.
-- Use the SCHEMA to suggest valid tables/columns.
+- **Surgical Precision**: ONLY return the raw string to be appended at the cursor position. No markdown, no commentary.
+- **NEVER repeat any text from the 'BEFORE' context**. If the user already typed 'SELECT', do NOT start with 'SELECT'.
+- **Context Awareness**: Look at the 'AFTER' context. Do NOT suggest code that would result in a syntax error or redundant tokens (e.g., don't suggest a closing brace or semicolon if it's already there).
+- **No Redundancy**: If the current line seems complete, suggest valid next steps (WHERE, ORDER BY, LIMIT) but keep it as brief as possible.
+- **Handling Semicolons**: Do NOT suggest a semicolon if the 'BEFORE' context already ends with one or the 'AFTER' context starts with one.
+- **Strict Table Completion**: If the 'BEFORE' context contains a closing ')' for a 'CREATE TABLE' statement, do NOT suggest more column-like definitions or another semicolon immediately.
+- **No gluing**: NEVER suggest a snippet that glues a word to another word. Start with a space if you are continuing after a word and your suggestion starts with a word.
 
 SCHEMA:
 ${schemaContext || 'Empty'}
@@ -323,7 +358,7 @@ ${trimmedBefore}
 AFTER CURSOR:
 ${trimmedAfter}
 
-NEXT CHARACTERS:`;
+NEXT CHARACTERS (START IMMEDIATELY):`;
 
             const result = await model.generateContent(systemPrompt);
             const responseText = result.response.text().trim();

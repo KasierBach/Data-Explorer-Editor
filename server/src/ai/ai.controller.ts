@@ -45,7 +45,7 @@ export class AiController {
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
         // Step 3: Gather schema context
-        const schemaContext = await this.aiService.gatherSchemaContext(pool, strategy, database);
+        const schemaContext = await this.aiService.gatherSchemaContext(pool, strategy, database, connectionId);
 
         // Step 4: Call AI (chat - can handle both SQL and general questions)
         try {
@@ -100,7 +100,7 @@ export class AiController {
         }
 
         const strategy = this.strategyFactory.getStrategy(connection.type);
-        const schemaContext = await this.aiService.gatherSchemaContext(pool, strategy, database);
+        const schemaContext = await this.aiService.gatherSchemaContext(pool, strategy, database, connectionId);
 
         try {
             const stream = this.aiService.chatStream({
@@ -148,7 +148,7 @@ export class AiController {
         }
 
         const strategy = this.strategyFactory.getStrategy(connection.type);
-        const schemaContext = await this.aiService.gatherSchemaContext(pool, strategy, database);
+        const schemaContext = await this.aiService.gatherSchemaContext(pool, strategy, database, connectionId);
 
         const completion = await this.aiService.autocomplete({
             beforeCursor,
