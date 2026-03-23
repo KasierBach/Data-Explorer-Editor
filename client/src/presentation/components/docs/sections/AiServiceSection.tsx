@@ -1,6 +1,5 @@
-import { Wand2, Shield, Cpu, MessageSquare, ShieldCheck, CheckCircle, XCircle } from 'lucide-react';
-import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment, CodeLine, InfoCard, Callout } from '../primitives';
-import { cn } from '@/lib/utils';
+import { Wand2, Shield, Cpu, MessageSquare, ShieldCheck, CheckCircle, XCircle, Zap, Terminal } from 'lucide-react';
+import { DocPageLayout, DocSection, Prose, InfoCard } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
@@ -18,9 +17,9 @@ export function AiServiceSection({ lang }: Props) {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
                 {[
                     {
-                        icon: <Wand2 className="w-6 h-6 text-violet-500" />,
-                        title: t ? 'Zero-Shot SQL' : 'Zero-Shot SQL',
-                        desc: t ? 'Khả năng sinh mã SQL chuẩn xác ngay từ yêu cầu đầu tiên mà không cần tài liệu huấn luyện bổ sung.' : 'Generate accurate SQL from the first prompt without needing additional training data.'
+                        icon: <Zap className="w-6 h-6 text-amber-500" />,
+                        title: t ? 'Gemini 3.1 Flash-Lite' : 'Gemini 3.1 Flash-Lite',
+                        desc: t ? 'Tối ưu hóa độ trễ cực thấp (Sub-second) cho các tính năng Ghost Text và Inline Completion.' : 'Ultra-low latency (Sub-second) optimization for Ghost Text and Inline Completion features.'
                     },
                     {
                         icon: <Shield className="w-6 h-6 text-emerald-500" />,
@@ -29,11 +28,11 @@ export function AiServiceSection({ lang }: Props) {
                     },
                     {
                         icon: <Cpu className="w-6 h-6 text-blue-500" />,
-                        title: t ? 'Multi-Dialect' : 'Multi-Dialect',
+                        title: t ? 'Multi-Dialect Core' : 'Multi-Dialect Core',
                         desc: t ? 'Tự động điều chỉnh cú pháp theo PostgreSQL, MySQL hoặc T-SQL dựa trên loại kết nối.' : 'Automatic syntax adjustment for PostgreSQL, MySQL, or T-SQL based on connection type.'
                     }
                 ].map((item, id) => (
-                    <div key={id} className="p-6 border rounded-2xl bg-card/50 hover:bg-card transition-colors">
+                    <div key={id} className="p-6 border rounded-2xl bg-card/50 hover:bg-card transition-colors border-border/50">
                         <div className="mb-4">{item.icon}</div>
                         <h4 className="font-bold text-sm mb-2">{item.title}</h4>
                         <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
@@ -41,64 +40,57 @@ export function AiServiceSection({ lang }: Props) {
                 ))}
             </div>
 
-            <DocSection title={t ? 'Kiến trúc Workflow' : 'Workflow Architecture'}>
-                <div className="space-y-6">
-                    <Prose>
-                        {t
-                            ? 'Khi bạn gửi một yêu cầu tới trợ lý AI, Data Explorer không chỉ gửi đi câu hỏi của bạn. Chúng tôi thực hiện một quy trình gồm 4 bước để đảm bảo câu trả lời có tính thực thi cao nhất:'
-                            : 'When you send a request to the AI assistant, Data Explorer doesn\'t just send your question. we execute a 4-step workflow to ensure the highest reliability and executability:'}
-                    </Prose>
-                </div>
+            <DocSection title={t ? 'Kiến trúc Workflow (AI Orchestration)' : 'AI Orchestration Workflow'}>
+                <Prose>
+                    {t
+                        ? 'Khi bạn gửi một yêu cầu tới trợ lý AI, Data Explorer không chỉ gửi đi câu hỏi của bạn. Chúng tôi thực hiện một quy trình gồm 4 bước nghiêm ngặt để đảm bảo câu trả lời có tính thực thi cao nhất và bảo mật tuyệt đối.'
+                        : 'When you send a request to the AI assistant, Data Explorer doesn\'t just send your question. We execute a strict 4-step workflow to ensure the highest reliability and absolute security:'}
+                </Prose>
 
-                <div className="my-8 relative">
-                    <div className="absolute left-6 inset-y-0 w-px bg-border sm:left-1/2" />
-                    <div className="space-y-12">
-                        {[
-                            {
-                                step: "01",
-                                title: t ? 'Schema Harvesting' : 'Schema Harvesting',
-                                desc: t ? 'Hệ thống quét metadata của database hiện tại (Table, Column, Type, FK).' : 'System scans current database metadata (Tables, Columns, Types, FKs).'
-                            },
-                            {
-                                step: "02",
-                                title: t ? 'Prompt Augmentation' : 'Prompt Augmentation',
-                                desc: t ? 'Gắn kèm metadata đã nén vào "System Instruction" để AI hiểu rõ bối cảnh.' : 'Attaches compressed metadata to "System Instruction" for rich context.'
-                            },
-                            {
-                                step: "03",
-                                title: t ? 'Gemini Processing' : 'Gemini Processing',
-                                desc: t ? 'Gemini 1.5 Flash xử lý ở chế độ "JSON Mode" để đảm bảo output có cấu trúc.' : 'Gemini 1.5 Flash processes in "JSON Mode" for structured logical output.'
-                            },
-                            {
-                                step: "04",
-                                title: t ? 'Post-Processing' : 'Post-Processing',
-                                desc: t ? 'Backend trích xuất SQL, kiểm tra bảo mật và trả về Monaco Editor.' : 'Backend extracts SQL, performs security checks, and updates Monaco Editor.'
-                            }
-                        ].map((item, i) => (
-                            <div key={i} className="relative flex items-center gap-8 sm:justify-between group">
-                                <div className={cn("hidden sm:block w-full text-right", i % 2 === 1 && "sm:order-last sm:text-left")}>
-                                    <h5 className="font-bold text-sm text-foreground">{item.title}</h5>
-                                    <p className="text-xs text-muted-foreground">{item.desc}</p>
-                                </div>
-                                <div className="z-10 flex items-center justify-center w-12 h-12 rounded-full border bg-card text-xs font-black shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                <div className="my-10 space-y-8">
+                    {[
+                        {
+                            step: "01",
+                            title: t ? 'Schema Harvesting & Pruning' : 'Schema Harvesting & Pruning',
+                            desc: t ? 'Hệ thống tự động quét metadata. Nếu database quá lớn, chúng tôi sử dụng thuật toán "Semantic Pruning" để chỉ lấy những bảng có khả năng liên quan nhất đến câu hỏi.' : 'Automatically scans metadata. If the DB is large, we use "Semantic Pruning" to keep only the most relevant tables.'
+                        },
+                        {
+                            step: "02",
+                            title: t ? 'Prompt Engineering (JSON Mode)' : 'Prompt Engineering (JSON Mode)',
+                            desc: t ? 'Câu lệnh được bọc trong một System Instruction khổng lồ, ép Gemini hoạt động trong "JSON Mode" để trả về cấu trúc gồm: SQL, Giải thích, và Danh sách bảng bị ảnh hưởng.' : 'Enforces Gemini into "JSON Mode" via massive System Instructions to return: SQL, Explanation, and Affected Tables list.'
+                        },
+                        {
+                            step: "03",
+                            title: t ? 'Context Window Management' : 'Context Window Management',
+                            desc: t ? 'Sử dụng Gemini 1.5 Flash với 1M context window cho phép chúng tôi gửi toàn bộ lược đồ của những database phức tạp nhất mà không bị mất mát thông tin.' : 'Leveraging Gemini 1.5 Flash with its 1M context window allows us to send entire schemas of complex databases without information loss.'
+                        },
+                        {
+                            step: "04",
+                            title: t ? 'Syntax Validation & Cleaning' : 'Syntax Validation & Cleaning',
+                            desc: t ? 'Backend thực hiện "Regex Cleaning" để loại bỏ markdown thừa và kiểm tra các từ khóa nguy hiểm trước khi trả kết quả về UI.' : 'Backend performs "Regex Cleaning" to strip markdown and checks for dangerous keywords before returning results.'
+                        }
+                    ].map((item, i) => (
+                        <div key={i} className="flex gap-6 group">
+                            <div className="flex flex-col items-center">
+                                <div className="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center text-[10px] font-black group-hover:bg-primary group-hover:text-primary-foreground transition-all">
                                     {item.step}
                                 </div>
-                                <div className={cn("w-full sm:hidden", i % 2 === 1 && "sm:order-last")}>
-                                    <h5 className="font-bold text-sm text-foreground">{item.title}</h5>
-                                    <p className="text-xs text-muted-foreground">{item.desc}</p>
-                                </div>
-                                <div className="hidden sm:block w-full" />
+                                <div className="w-px flex-1 bg-border my-2" />
                             </div>
-                        ))}
-                    </div>
+                            <div className="pb-8">
+                                <h5 className="font-bold text-sm text-foreground">{item.title}</h5>
+                                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{item.desc}</p>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </DocSection>
 
-            <DocSection title={t ? 'Nén Lược đồ (Schema Compression)' : 'Schema Compression'}>
+            <DocSection title={t ? 'Cơ chế Nén Lược đồ (Retrieval-Augmented Schema)' : 'Retrieval-Augmented Schema (RAS)'}>
                 <Prose>
                     {t
-                        ? 'Gửi hàng trăm bảng vào một Prompt có thể làm lãng phí token và gây nhiễu cho AI. Data Explorer sử dụng kỹ thuật "Context Clipping" để chỉ gửi những thông tin thực sự cần thiết.'
-                        : 'Sending hundreds of tables in a single prompt can waste tokens and confuse the AI. Data Explorer uses "Context Clipping" techniques to send only what is truly necessary.'}
+                        ? 'Gửi hàng trăm bảng vào một Prompt có thể làm lãng phí token và gây nhiễu cho AI. Data Explorer sử dụng kỹ thuật "Retrieval-Augmented" để chỉ gửi những thông tin thực sự cần thiết.'
+                        : 'Sending hundreds of tables in a single prompt can waste tokens and confuse the AI. Data Explorer uses "Retrieval-Augmented" techniques to send only what is truly necessary.'}
                 </Prose>
                 <div className="grid md:grid-cols-2 gap-4 mt-8">
                     <InfoCard 
@@ -107,10 +99,10 @@ export function AiServiceSection({ lang }: Props) {
                         color="blue"
                     >
                         <ul className="text-xs space-y-2 opacity-80">
-                            <li>• {t ? 'Tên bảng tiêu chuẩn' : 'Standard table names'}</li>
-                            <li>• {t ? 'Tên cột và kiểu dữ liệu cơ bản' : 'Column names & basic types'}</li>
-                            <li>• {t ? 'Quan hệ khóa ngoại (FK)' : 'Foreign Key definitions'}</li>
-                            <li>• {t ? 'Mô tả Comment trên DB (nếu có)' : 'In-DB Comments (if exist)'}</li>
+                            <li>• {t ? 'Tên bảng & Cột (Standardized)' : 'Standardized Table & Column names'}</li>
+                            <li>• {t ? 'Kiểu dữ liệu cơ bản (Mapped)' : 'Mapped basic data types'}</li>
+                            <li>• {t ? 'Quan hệ khóa ngoại (Foreign Keys)' : 'Foreign Key definitions'}</li>
+                            <li>• {t ? 'Mô tả Comment trên DB' : 'In-DB Comments (Metadata)'}</li>
                         </ul>
                     </InfoCard>
                     <InfoCard 
@@ -119,69 +111,39 @@ export function AiServiceSection({ lang }: Props) {
                         color="red"
                     >
                         <ul className="text-xs space-y-2 opacity-80">
-                            <li>• {t ? 'Giá trị dữ liệu thực tế (Privacy)' : 'Actual row values (Privacy)'}</li>
-                            <li>• {t ? 'Các bảng hệ thống (pg_*, mysql_*)' : 'System tables (pg_*, mysql_*)'}</li>
-                            <li>• {t ? 'Constraints không quan trọng' : 'Non-essential constraints'}</li>
-                            <li>• {t ? 'Triggers & Stored Procedures phức tạp' : 'Complex Triggers & Procedures'}</li>
+                            <li>• {t ? 'Dữ liệu hàng thực tế (Data Privacy)' : 'Actual row values (Data Privacy)'}</li>
+                            <li>• {t ? 'Các bảng hệ thống & Internal views' : 'System tables & internal views'}</li>
+                            <li>• {t ? 'Hàm & Thủ tục quá phức tạp' : 'Overly complex functions/procedures'}</li>
+                            <li>• {t ? 'Thông tin hạ tầng nhạy cảm' : 'Sensitive infrastructure info'}</li>
                         </ul>
                     </InfoCard>
                 </div>
             </DocSection>
 
-            <DocSection title={t ? 'Mẹo Prompting dành cho Data Engineer' : 'Smart Prompts for Data Engineers'}>
-                <Prose>
-                    {t
-                        ? 'Để tận dụng tối đa sức mạnh của Gemini, bạn có thể truyền kèm các ràng buộc kỹ thuật. Dưới đây là các Pattern "Pro-level":'
-                        : 'To unlock the full potential of Gemini, you can pass technical constraints directly. Here are "Pro-level" prompt patterns:'}
-                </Prose>
-                <div className="space-y-6 mt-8">
-                    <DocSubSection title={t ? 'Mô hình Dữ liệu Phức tạp' : 'Complex Data Modeling'}>
-                        <CodeBlock title="Expert Prompt">
-                            <CodeComment>{t ? '-- Prompt: "Viết truy vấn doanh thu theo tháng dùng CTE, ' : '-- Prompt: "Write revenue by month using CTE, '}</CodeComment>
-                            <CodeComment>{t ? '-- xử lý trường hợp giá bằng 0 bằng NULLIF"' : '-- handle zero prices with NULLIF"'}</CodeComment>
-                            <CodeLine>WITH MonthlyRevenue AS (</CodeLine>
-                            <CodeLine>  SELECT date_trunc('month', created_at) as month,</CodeLine>
-                            <CodeLine>  SUM(quantity * NULLIF(unit_price, 0)) as total</CodeLine>
-                            <CodeLine>  FROM sales GROUP BY 1</CodeLine>
-                            <CodeLine>)</CodeLine>
-                            <CodeLine>SELECT * FROM MonthlyRevenue ORDER BY month;</CodeLine>
-                        </CodeBlock>
-                    </DocSubSection>
-
-                    <DocSubSection title={t ? 'Tối ưu hóa Hiệu năng' : 'Performance Optimization'}>
-                        <Prose>
+            <DocSection title={t ? 'Tối ưu hóa Chi phí & Hiệu năng' : 'Cost & Performance Optimization'}>
+                <div className="grid sm:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                        <h5 className="text-sm font-bold flex items-center gap-2">
+                             <Wand2 className="w-4 h-4 text-primary" />
+                             {t ? 'Smart Debouncing (800ms)' : 'Smart Debouncing (800ms)'}
+                        </h5>
+                        <div className="text-xs text-muted-foreground leading-relaxed">
                             {t
-                                ? 'Yêu cầu AI phân tích truy vấn của bạn và gợi ý Index để thay thế full table scan.'
-                                : 'Ask the AI to analyze your query and suggest Indexes to avoid full table scans.'}
-                        </Prose>
-                        <Callout type="warning">
-                            <p className="text-xs">
-                                {t
-                                    ? 'Lưu ý: Luôn kiểm tra lại gợi ý của AI bằng lệnh EXPLAIN trước khi áp dụng lên Production.'
-                                    : 'Note: Always verify AI suggestions with EXPLAIN before applying to Production.'}
-                            </p>
-                        </Callout>
-                    </DocSubSection>
-
-                    <DocSubSection title={t ? 'Trường hợp sử dụng nâng cao' : 'Advanced Use Cases'}>
-                        <div className="grid sm:grid-cols-2 gap-4 mt-4">
-                            {[
-                                {
-                                    q: t ? "Chuyển đổi Schema" : "Schema Transformation",
-                                    a: t ? '"Hãy viết script đổi tên toàn bộ bảng sang snake_case và thêm cột version cho Optimistic Locking."' : '"Write a script to rename all tables to snake_case and add a version column for Optimistic Locking."'
-                                },
-                                {
-                                    q: t ? "Phân tích bảo mật" : "Security Analysis",
-                                    a: t ? '"Kiểm tra xem câu SQL này có nguy cơ SQL Injection không và viết lại nó dùng Parameterized Query."' : '"Check if this SQL has SQL Injection risks and rewrite it using Parameterized Queries."'
-                                }
-                            ].map((item, i) => (
-                                <div key={i} className="p-4 border rounded-xl bg-primary/5 border-primary/10">
-                                    <h6 className="font-bold text-[10px] uppercase text-primary mb-2">{item.q}</h6>
-                                    <p className="text-xs italic text-muted-foreground">{item.a}</p>
-                                </div>
-                            ))}
+                                ? 'Hệ thống Ghost Text không gửi yêu cầu khi bạn đang gõ. Chúng tôi chờ 800ms "idle" để đảm bảo ý định của bạn đã rõ ràng, giúp giảm 70% chi phí token.'
+                                : 'The Ghost Text system doesn\'t send requests while you type. We wait for an 800ms "idle" period to ensure clarity, reducing token costs by 70%.'}
                         </div>
-                    </DocSubSection>
+                    </div>
+                    <div className="space-y-4">
+                        <h5 className="text-sm font-bold flex items-center gap-2">
+                             <Terminal className="w-4 h-4 text-primary" />
+                             {t ? 'Streaming & Partial Parsing' : 'Streaming & Partial Parsing'}
+                        </h5>
+                        <div className="text-xs text-muted-foreground leading-relaxed">
+                            {t
+                                ? 'Sử dụng Server-Sent Events (SSE) để truyền tải kết quả từ Gemini. UI có thể hiển thị mã SQL ngay khi khối logic đầu tiên được tạo ra.'
+                                : 'Uses Server-Sent Events (SSE) to stream Gemini results. The UI can display SQL code as soon as the first logic block is generated.'}
+                        </div>
+                    </div>
                 </div>
             </DocSection>
 
@@ -193,8 +155,8 @@ export function AiServiceSection({ lang }: Props) {
                     </div>
                     <Prose>
                         {t
-                            ? 'Chúng tôi hiểu rằng dữ liệu cơ sở dữ liệu là tài sản nhạy cảm nhất. Data Explorer cam kết:'
-                            : 'We understand that database data is your most sensitive asset. Data Explorer commits to:'}
+                            ? 'Chúng tôi hiểu rằng cấu trúc cơ sở dữ liệu là tài sản nhạy cảm. Data Explorer áp dụng các tiêu chuẩn an toàn cao nhất:'
+                            : 'We understand that database structure is sensitive. Data Explorer applies the highest security standards:'}
                     </Prose>
                     <div className="grid md:grid-cols-2 gap-8 mt-6">
                         <div className="flex gap-4">
@@ -202,16 +164,16 @@ export function AiServiceSection({ lang }: Props) {
                             <div>
                                 <h5 className="font-bold text-xs">{t ? 'Cô lập API Key' : 'API Key Isolation'}</h5>
                                 <p className="text-[11px] text-muted-foreground leading-relaxed mt-1">
-                                    {t ? 'Khóa Gemini API của bạn được lưu an toàn tại backend (.env). Trình duyệt của client không bao giờ có quyền truy cập.' : 'Your Gemini API Key is stored safely on the backend (.env). Client browsers never have access.'}
+                                    {t ? 'Khóa Gemini API được mã hóa AES-256 và lưu trữ nghiêm ngặt phía Server. Client không bao giờ nhìn thấy khóa này.' : 'Gemini API Keys are AES-256 encrypted and stored strictly on the Server. Clients never see this key.'}
                                 </p>
                             </div>
                         </div>
                         <div className="flex gap-4">
                             <div className="p-2 bg-emerald-500/10 rounded-lg h-fit"><MessageSquare className="w-4 h-4 text-emerald-500" /></div>
                             <div>
-                                <h5 className="font-bold text-xs">{t ? 'Không huấn luyện' : 'No Data Training'}</h5>
+                                <h5 className="font-bold text-xs">{t ? 'Không dùng huấn luyện' : 'No Data Training'}</h5>
                                 <p className="text-[11px] text-muted-foreground leading-relaxed mt-1">
-                                    {t ? 'Các yêu cầu qua API thương mại của Gemini không được dùng để huấn luyện mô hình công cộng của Google.' : 'Requests via Gemini commercial APIs are not used to train Google\'s public models.'}
+                                    {t ? 'Dữ liệu truyền qua Gemini API của Google Cloud/Vertex AI cam kết không được dùng để huấn luyện các model công cộng.' : 'Data passed via Google Cloud/Vertex AI Gemini APIs is committed NOT to be used for public model training.'}
                                 </p>
                             </div>
                         </div>
@@ -221,4 +183,3 @@ export function AiServiceSection({ lang }: Props) {
         </DocPageLayout>
     );
 }
-

@@ -140,36 +140,36 @@ export function TechStackSection({ lang }: Props) {
                 </Callout>
             </DocSection>
             {/* Technical Rationale */}
-            <DocSection title={t ? 'Lý do chúng tôi chọn bộ Stack này' : 'Technical Rationale'}>
+            <DocSection title={t ? 'Lý do chúng tôi chọn bộ Stack này' : 'Technical Rationale & Deep Dive'}>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
                     {[
                         {
-                            title: t ? 'NestJS cho Module hóa' : 'NestJS for Modularity',
-                            desc: t ? 'NestJS cung cấp Dependency Injection (DI) mạnh mẽ, giúp triển khai Strategy Pattern một cách thanh thoát và dễ mở rộng nhất.' : 'NestJS provides robust Dependency Injection (DI), making Strategy Pattern implementation elegant and highly scalable.'
+                            title: t ? 'Gemini 3.1 Flash-Lite: Low Latency' : 'Gemini 3.1 Flash-Lite: Low Latency',
+                            desc: t ? 'Chúng tôi chọn Flash-Lite thay vì Pro cho các tính năng soạn thảo vì tốc độ phản hồi < 1 giây, điều cốt yếu để không làm gián đoạn luồng suy nghĩ của developer.' : 'We chose Flash-Lite over Pro for editor features because of sub-second response times, crucial for not breaking the developer\'s flow.'
                         },
                         {
-                            title: t ? 'React Flow cho Đồ thị' : 'React Flow for Graphs',
-                            desc: t ? 'Không giống như Canvas thuần, React Flow cho phép chúng ta tùy chỉnh node như React component, mang lại tính tương tác ERD vô hạn.' : 'Unlike raw Canvas, React Flow lets us customize nodes as React components, offering infinite ERD interactivity.'
+                            title: t ? 'Hexagonal + NestJS: Driver Agnostic' : 'Hexagonal + NestJS: Driver Agnostic',
+                            desc: t ? 'Sự kết hợp này cho phép Data Explorer hỗ trợ PostgreSQL, MySQL, MSSQL chỉ bằng cách đổi Adapter mà không chạm vào Domain logic.' : 'This combo allows Data Explorer to support PostgreSQL, MySQL, and MSSQL just by switching Adapters without touching Domain logic.'
                         },
                         {
-                            title: t ? 'Zustand cho Tốc độ' : 'Zustand for Speed',
-                            desc: t ? 'Trong một app SQL cần phản hồi real-time, Zustand giúp giảm thiểu re-render không cần thiết so với Redux hay Context API.' : 'In a real-time SQL app, Zustand minimizes unnecessary re-renders compared to Redux or Context API.'
+                            title: t ? 'Zustand Slices: State Scalability' : 'Zustand Slices: State Scalability',
+                            desc: t ? 'Kiến trúc Slice giúp cô lập trạng thái của Tab, Connection và UI, ngăn chặn việc re-render toàn bộ ứng dụng khi chỉ có 1 ký tự được gõ.' : 'Slice architecture isolates Tab, Connection, and UI states, preventing full-app re-renders when only 1 character is typed.'
                         },
                         {
-                            title: t ? 'Prisma cho An toàn Type' : 'Prisma for Type Safety',
-                            desc: t ? 'Tự động sinh Types cho DB giúp loại bỏ 90% lỗi runtime liên quan đến truy vấn dữ liệu người dùng.' : 'Auto-generated DB types eliminate 90% of runtime errors related to user data queries.'
+                            title: t ? 'Prisma: Schema-First Safety' : 'Prisma: Schema-First Safety',
+                            desc: t ? 'Tự động sinh Types cho DB giúp loại bỏ 90% lỗi runtime. Mọi thay đổi schema đều được TypeScript kiểm tra ngay lập tức.' : 'Auto-generated DB types eliminate 90% of runtime errors. Any schema changes are immediately validated by TypeScript.'
                         },
                         {
-                            title: t ? 'Vite cho DX' : 'Vite for Developer Experience',
-                            desc: t ? 'Hệ thống HMR (Hot Module Replacement) của Vite giúp tăng tốc độ phát triển documentation và UI lên gấp 10 lần.' : 'Vite\'s HMR system accelerates documentation and UI development speed by 10x.'
+                            title: t ? 'Web Workers: Thread Isolation' : 'Web Workers: Thread Isolation',
+                            desc: t ? 'Việc đưa Monaco Language Client vào Web Worker giúp duy trì 60fps ngay cả khi xử lý các tệp SQL hàng chục nghìn dòng.' : 'Moving Monaco Language Client to a Web Worker maintains 60fps even when handling ten-thousand-line SQL files.'
                         },
                         {
-                            title: t ? 'Monaco cho Tính quen thuộc' : 'Monaco for Familiarity',
-                            desc: t ? 'Việc sử dụng cùng một engine với VS Code giúp kỹ sư dữ liệu cảm thấy quen thuộc ngay lập tức với các phím tắt và behavior.' : 'Using the same engine as VS Code ensures data engineers feel immediately at home with shortcuts and behavior.'
+                            title: t ? 'SSE: Real-time SQL Streaming' : 'SSE: Real-time SQL Streaming',
+                            desc: t ? 'Server-Sent Events cho phép hiển thị kết quả AI ngay khi server nhận được những token đầu tiên, giảm rào cản tâm lý về độ trễ.' : 'Server-Sent Events allow displaying AI results as soon as the first tokens are received, reducing the psychological barrier of latency.'
                         }
                     ].map((reason, i) => (
-                        <div key={i} className="p-5 border rounded-2xl bg-muted/5 space-y-2">
-                            <h5 className="font-bold text-xs">{reason.title}</h5>
+                        <div key={i} className="p-5 border rounded-2xl bg-muted/5 space-y-2 hover:bg-muted/10 transition-colors">
+                            <h5 className="font-bold text-xs text-primary">{reason.title}</h5>
                             <p className="text-[10px] text-muted-foreground leading-relaxed">{reason.desc}</p>
                         </div>
                     ))}

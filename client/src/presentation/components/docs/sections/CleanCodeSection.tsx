@@ -1,5 +1,5 @@
-import { ShieldCheck, Zap, GitBranch, CheckCircle2 } from 'lucide-react';
-import { DocPageLayout, DocSection, Prose, CodeBlock, CodeComment, CodeLine, Callout } from '../primitives';
+import { ShieldCheck, Zap, CheckCircle2 } from 'lucide-react';
+import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment, CodeLine, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
@@ -35,33 +35,42 @@ export function CleanCodeSection({ lang }: Props) {
                 </div>
             </div>
 
-            <DocSection title={t ? '1. Phân rã Monolithic Services (Backend)' : '1. Decomposing Monolithic Services (Backend)'}>
+            <DocSection title={t ? '1. Chiến lược SOLID trong Thực tế' : '1. SOLID Principles in Action'}>
                 <Prose>
                     {t
-                        ? 'Trong các phiên bản trước, AuthService xử lý mọi thứ từ đăng ký, login đến tạo OTP và seeding dữ liệu. Điều này vi phạm SRP.'
-                        : 'In previous versions, AuthService handled everything from registration and login to OTP generation and data seeding. This violated SRP.'}
+                        ? 'Chúng tôi không chỉ nói về lý thuyết. Trong Data Explorer, SOLID được áp dụng để giải quyết các vấn đề hữu hình về khả năng mở rộng.'
+                        : 'We don\'t just talk about theory. In Data Explorer, SOLID is applied to solve tangible scalability problems.'}
                 </Prose>
-                <div className="mt-8 space-y-4">
-                    <Callout type="tip">
-                        <strong className="block mb-1">{t ? 'Giải pháp hiện tại:' : 'Current Solution:'}</strong>
-                        <ul className="list-disc pl-5 text-xs space-y-1">
-                            <li><strong>OtpService:</strong> {t ? 'Chuyên trách tạo và xác thực mã OTP.' : 'Specialized in OTP generation and verification.'}</li>
-                            <li><strong>SeedService:</strong> {t ? 'Xử lý dữ liệu khởi tạo (Admin seeding).' : 'Handles initial data seeding (Admin seeding).'}</li>
-                            <li><strong>TokenService:</strong> {t ? 'Tập trung logic tạo JWT và định dạng response.' : 'Centralizes JWT generation and response formatting.'}</li>
-                        </ul>
-                    </Callout>
-                    <CodeBlock title="Unified Token Generation (DRY)">
-                        <CodeComment>{t ? '// Chia sẻ logic giữa AuthService và SocialAuthService' : '// Shared logic between AuthService and SocialAuthService'}</CodeComment>
-                        <CodeLine>{'export class TokenService {'}</CodeLine>
-                        <CodeLine>{'  generateTokenResponse(user: any) {'}</CodeLine>
-                        <CodeLine>{'    const payload = { email: user.email, sub: user.id, role: user.role };'}</CodeLine>
-                        <CodeLine>{'    return {'}</CodeLine>
-                        <CodeLine>{'      access_token: this.jwtService.sign(payload),'}</CodeLine>
-                        <CodeLine>{'      user: { id: user.id, email: user.email, ... }'}</CodeLine>
-                        <CodeLine>{'    };'}</CodeLine>
-                        <CodeLine>{'  }'}</CodeLine>
-                        <CodeLine>{'}'}</CodeLine>
-                    </CodeBlock>
+                <div className="mt-8 space-y-6">
+                    <DocSubSection title={t ? 'Open/Closed & Factory Pattern' : 'Open/Closed & Factory Pattern'}>
+                        <Prose className="text-xs">
+                            {t
+                                ? 'Khi thêm một Database Engine mới, chúng tôi không sửa đổi core logic. Thay vào đó, chúng tôi tạo một Adapter mới và đăng ký nó vào Factory.'
+                                : 'When adding a new Database Engine, we don\'t modify core logic. Instead, we create a new Adapter and register it in the Factory.'}
+                        </Prose>
+                        <CodeBlock title="Database Strategy Factory">
+                            <CodeComment>{t ? '// Tuân thủ nguyên tắc Open/Closed' : '// Adheres to Open/Closed Principle'}</CodeComment>
+                            <CodeLine>{'export class DatabaseFactory {'}</CodeLine>
+                            <CodeLine>{'  private static strategies = new Map<string, DatabaseStrategy>();'}</CodeLine>
+                            <CodeLine>{'  '}</CodeLine>
+                            <CodeLine>{'  static register(key: string, strategy: DatabaseStrategy) {'}</CodeLine>
+                            <CodeLine>{'    this.strategies.set(key, strategy);'}</CodeLine>
+                            <CodeLine>{'  }'}</CodeLine>
+                            <CodeLine>{'  '}</CodeLine>
+                            <CodeLine>{'  static get(key: string): DatabaseStrategy {'}</CodeLine>
+                            <CodeLine>{'    return this.strategies.get(key) ?? new DefaultStrategy();'}</CodeLine>
+                            <CodeLine>{'  }'}</CodeLine>
+                            <CodeLine>{'}'}</CodeLine>
+                        </CodeBlock>
+                    </DocSubSection>
+
+                    <DocSubSection title={t ? 'Interface Segregation (ISP)' : 'Interface Segregation (ISP)'}>
+                        <Prose className="text-xs">
+                             {t
+                                 ? 'Thay vì một Interface khổng lồ, chúng tôi chia nhỏ thành IReadable, IWritable, IMetadataProvider giúp các adapter chỉ cần triển khai những gì nó thực sự hỗ trợ.'
+                                 : 'Instead of one generic interface, we break it down into IReadable, IWritable, and IMetadataProvider so adapters only implement what they actually support.'}
+                        </Prose>
+                    </DocSubSection>
                 </div>
             </DocSection>
 
@@ -125,23 +134,24 @@ export function CleanCodeSection({ lang }: Props) {
                 </Callout>
             </DocSection>
 
-            <DocSection title={t ? 'Tại sao lại cần làm phức tạp như vậy?' : 'Why the Complexity?'}>
+            <DocSection title={t ? 'Quy trình Refactoring: Từ Legacy sang Clean' : 'Refactoring Workflow: From Legacy to Clean'}>
                 <Prose>
                     {t
-                        ? 'Chia nhỏ code có vẻ làm tăng số lượng file, nhưng nó mang lại lợi ích khổng lồ trong dài hạn:'
-                        : 'Breaking down code might seem to increase file count, but it brings huge long-term benefits:'}
+                        ? 'Refactoring là hành trình liên tục. Chúng tôi áp dụng chiến lược "Boy Scout Rule": Luôn để lại codebase sạch hơn lúc bạn mới tìm thấy nó.'
+                        : 'Refactoring is a continuous journey. We apply the "Boy Scout Rule": Always leave the codebase cleaner than you found it.'}
                 </Prose>
-                <ul className="mt-4 space-y-3">
+                <ul className="mt-6 space-y-4">
                     {[
-                        { title: t ? "Dễ Debug" : "Easier Debugging", desc: t ? "Biết chính xác lỗi nằm ở đâu (vd: lỗi mail thì vào MailService)." : "Know exactly where the bug is (e.g., mail issues are in MailService)." },
-                        { title: t ? "Dễ Test" : "Easier Testing", desc: t ? "Viết test cho các unit nhỏ dễ hơn nhiều so với các class nghìn dòng." : "Writing tests for small units is much easier than for 1000-line classes." },
-                        { title: t ? "Team Collaboration" : "Collaboration", desc: t ? "Nhiều người có thể làm việc trên các module khác nhau mà không bị merge conflict." : "Multiple people can work on different modules without merge conflicts." }
+                        { title: t ? "Bước 1: Cô lập (Isolation)" : "Step 1: Isolation", desc: t ? "Xác định logic hỗn loạn và bao bọc nó bằng một Interface." : "Identify messy logic and wrap it with an Interface." },
+                        { title: t ? "Bước 2: Viết Test (Cover)" : "Step 2: Coverage", desc: t ? "Viết Unit Tests để bảo vệ hành vi hiện tại trước khi thay đổi." : "Write Unit Tests to protect current behavior before changing it." },
+                        { title: t ? "Bước 3: Chia nhỏ (Decomposition)" : "Step 3: Decomposition", desc: t ? "Bóc tách logic vào các Service nhỏ hơn tuân thủ SRP." : "Extract logic into smaller services following SRP." },
+                        { title: t ? "Bước 4: Bơm phụ thuộc (Injection)" : "Step 4: Dependency Injection", desc: t ? "Thay thế việc khởi tạo trực tiếp (`new`) bằng Dependency Injection." : "Replace direct instantiation (`new`) with Dependency Injection." }
                     ].map((item, i) => (
-                        <li key={i} className="flex gap-4">
-                             <div className="mt-1"><GitBranch className="w-4 h-4 text-primary" /></div>
+                        <li key={i} className="flex gap-4 p-4 border rounded-2xl bg-muted/10">
+                             <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">{i+1}</div>
                              <div>
                                  <h6 className="font-bold text-xs">{item.title}</h6>
-                                 <p className="text-[11px] text-muted-foreground leading-relaxed">{item.desc}</p>
+                                 <p className="text-[11px] text-muted-foreground leading-relaxed mt-1">{item.desc}</p>
                              </div>
                         </li>
                     ))}

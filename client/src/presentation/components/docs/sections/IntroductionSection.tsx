@@ -8,12 +8,17 @@ export function IntroductionSection({ lang }: Props) {
     const t = lang === 'vi';
     return (
         <DocPageLayout
-            title={t ? 'Giới thiệu về Data Explorer' : 'Introduction to Data Explorer'}
+            title={t ? 'Chào mừng tới Data Explorer' : 'Welcome to Data Explorer'}
             subtitle={t
-                ? 'Chào mừng bạn đến với tài liệu chính thức của Data Explorer — công cụ quản lý và trực quan hóa cơ sở dữ liệu hiệu năng cao, được thiết kế cho các nhóm kỹ thuật yêu cầu sự chính xác, tốc độ và khả năng phân tích sâu sắc.'
-                : 'Welcome to the official Data Explorer documentation — a high-performance database management and visualization tool designed for technical teams requiring precision, speed, and deep analytical capabilities.'}
+                ? 'Nền tảng quản trị cơ sở dữ liệu hiện đại, được thiết kế theo triết lý "AI-First" cho các Data Engineer và AI Developers.'
+                : 'A modern database management platform, designed with an "AI-First" philosophy for Data Engineers and AI Developers.'}
             gradient
         >
+            <Prose className="mb-12">
+                {t
+                    ? 'Data Explorer không chỉ là một SQL Client thông thường. Đây là một hệ sinh thái được tối ưu hóa để rút ngắn khoảng cách giữa ý tưởng và dữ liệu, sử dụng sức mạnh của các Large Language Models (LLMs) thế hệ mới nhất để biến ngôn ngữ tự nhiên thành những truy vấn phức tạp.'
+                    : 'Data Explorer is more than just a regular SQL Client. It is an ecosystem optimized to bridge the gap between idea and data, using the power of the latest Large Language Models (LLMs) to turn natural language into complex queries.'}
+            </Prose>
             {/* Overview Cards */}
             <FeatureGrid>
                 <InfoCard icon={<Database className="w-6 h-6 text-blue-500" />} title={t ? 'Hỗ trợ Đa Engine' : 'Multi-Engine Support'} color="blue">
@@ -21,10 +26,10 @@ export function IntroductionSection({ lang }: Props) {
                         ? 'Kết nối bản địa tới PostgreSQL, MySQL và SQL Server thông qua một giao diện thống nhất. Mỗi engine sử dụng driver riêng biệt được tối ưu hóa cho hiệu suất tốt nhất — không chỉ là một wrapper chung chung.'
                         : 'Native connections to PostgreSQL, MySQL and SQL Server through a unified interface. Each engine uses its own optimized driver for maximum performance — not just a generic wrapper.'}</p>
                 </InfoCard>
-                <InfoCard icon={<BookOpen className="w-6 h-6 text-purple-500" />} title={t ? 'Trợ lý AI Gemini' : 'Gemini AI Assistant'} color="purple">
+                <InfoCard icon={<BookOpen className="w-6 h-6 text-purple-500" />} title={t ? 'Trợ lý AI Gemini 3.1' : 'Gemini 3.1 AI Assistant'} color="purple">
                     <p>{t
-                        ? 'Tích hợp sâu với Google Gemini để tạo mã SQL từ ngôn ngữ tự nhiên, phân tích lược đồ thông minh, và thậm chí tái cấu trúc database schema từ hình ảnh chụp sơ đồ vẽ tay (Vision API).'
-                        : 'Deeply integrated with Google Gemini for natural language to SQL generation, intelligent schema analysis, and even reconstructing database schemas from hand-drawn diagram images (Vision API).'}</p>
+                        ? 'Tích hợp sâu với Google Gemini 3.1 Flash-Lite để tạo mã SQL từ ngôn ngữ tự nhiên, phân tích lược đồ thông minh, và tái cấu trúc database schema từ hình ảnh sơ đồ vẽ tay.'
+                        : 'Deeply integrated with Google Gemini 3.1 Flash-Lite for natural language to SQL generation, intelligent schema analysis, and schema reconstruction from hand-drawn diagrams.'}</p>
                 </InfoCard>
             </FeatureGrid>
 
@@ -116,6 +121,42 @@ export function IntroductionSection({ lang }: Props) {
                 </ul>
             </DocSection>
 
+            {/* Design Philosophy */}
+            <DocSection title={t ? 'Triết lý Thiết kế: AI-First' : 'AI-First Design Philosophy'}>
+                <div className="grid md:grid-cols-2 gap-12 items-center">
+                    <Prose>
+                        {t
+                            ? 'Chúng tôi tin rằng trong kỷ nguyên AI, việc gõ từng dòng mã SQL lặp đi lặp lại là một sự lãng phí. Triết lý AI-First của chúng tôi xoay quanh 3 trụ cột:'
+                            : 'We believe that in the AI era, typing repetitive SQL lines is a waste. Our AI-First philosophy revolves around 3 pillars:'}
+                        <ul className="mt-6 space-y-4">
+                            <li><strong>1. Proactive Assistance:</strong> {t ? 'AI không chỉ trả lời khi được hỏi, nó chủ động gợi ý (Ghost Text) dựa trên ngữ cảnh hiện tại.' : 'AI doesn\'t just answer when asked; it proactively suggests (Ghost Text) based on code context.'}</li>
+                            <li><strong>2. Schema-Awareness:</strong> {t ? 'AI của chúng tôi "thấu hiểu" lược đồ của bạn sâu sắc hơn bất kỳ công cụ IntelliSense truyền thống nào.' : 'Our AI "understands" your schema deeper than any traditional IntelliSense tool.'}</li>
+                            <li><strong>3. Privacy-First AI:</strong> {t ? 'Sử dụng AI nhưng không bao giờ đánh đổi dữ liệu khách hàng.' : 'Leveraging AI without ever compromising customer data.'}</li>
+                        </ul>
+                    </Prose>
+                    <div className="p-8 rounded-3xl bg-primary/5 border border-primary/10 relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-3xl -mr-16 -mt-16 group-hover:bg-primary/20 transition-all" />
+                        <h4 className="font-bold text-sm mb-4 flex items-center gap-2">
+                             <BookOpen className="w-4 h-4 text-primary" />
+                             {t ? 'Lộ trình phát triển' : 'Strategic Roadmap'}
+                        </h4>
+                        <div className="space-y-4">
+                            {[
+                                { v: 'v3.1.x', t: t ? 'AI Inline Completion & Smooth UI' : 'AI Inline Completion & Smooth UI', d: '✅ Done' },
+                                { v: 'v3.2.x', t: t ? 'Visual Query Builder (Drag-drop AI)' : 'Visual Query Builder (Drag-drop AI)', d: '🚀 Planned' },
+                                { v: 'v4.0', t: t ? 'Self-Healing Migrations' : 'Self-Healing Migrations', d: '🎯 Vision' }
+                            ].map((item, i) => (
+                                <div key={i} className="flex justify-between items-center text-[10px]">
+                                    <span className="font-mono text-muted-foreground">{item.v}</span>
+                                    <span className="font-bold">{item.t}</span>
+                                    <span className="text-primary">{item.d}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </DocSection>
+
             {/* Feature Overview Table */}
             <DocSection title={t ? 'Tổng quan tính năng' : 'Feature Overview'}>
                 <div className="border rounded-2xl overflow-hidden">
@@ -131,12 +172,9 @@ export function IntroductionSection({ lang }: Props) {
                             {[
                                 { feature: 'Monaco SQL Editor', desc: t ? 'Trình soạn thảo VS Code-grade với IntelliSense' : 'VS Code-grade editor with IntelliSense', status: '✅' },
                                 { feature: t ? 'Đa kết nối DB' : 'Multi-DB Connections', desc: t ? 'PostgreSQL, MySQL, MSSQL, ClickHouse' : 'PostgreSQL, MySQL, MSSQL, ClickHouse', status: '✅' },
-                                { feature: 'AI SQL Generation', desc: t ? 'Gemini Flash + Vision API' : 'Gemini Flash + Vision API', status: '✅' },
-                                { feature: t ? 'Sơ đồ ERD' : 'ERD Diagrams', desc: t ? 'Tương tác, auto-layout, xuất SQL' : 'Interactive, auto-layout, SQL export', status: '✅' },
-                                { feature: t ? 'Biểu đồ tương tác' : 'Interactive Charts', desc: t ? '15+ loại biểu đồ từ kết quả truy vấn' : '15+ chart types from query results', status: '✅' },
-                                { feature: t ? 'Xuất dữ liệu' : 'Data Export', desc: 'CSV, Excel (XLSX), JSON, SQL INSERT', status: '✅' },
-                                { feature: t ? 'Xác thực JWT' : 'JWT Authentication', desc: t ? 'HttpOnly cookies, AES-256 encryption' : 'HttpOnly cookies, AES-256 encryption', status: '✅' },
-                                { feature: t ? 'Chế độ tối/sáng' : 'Dark/Light Mode', desc: t ? 'Tự động theo hệ thống hoặc thủ công' : 'Auto-detect system or manual toggle', status: '✅' },
+                                { feature: t ? 'AI SQL Generation' : 'AI SQL Generation', desc: t ? 'Gemini 3.1 Flash-Lite + Vision API' : 'Gemini 3.1 Flash-Lite + Vision API', status: '✅' },
+                                { feature: t ? 'Hệ thống Phím tắt' : 'Global Shortcuts', desc: t ? 'Bộ phím tắt toàn cục (Ctrl+N, Ctrl+J, Ctrl+I...)' : 'Global keyboard shortcuts palette', status: '✅' },
+                                { feature: t ? 'Hiệu ứng Mượt mà' : 'Smooth UI Transitions', desc: t ? 'Đóng mở bảng và tab với chuyển động 300ms' : '300ms smooth panel and tab animations', status: '✅' },
                                 { feature: t ? 'Đa ngôn ngữ' : 'Internationalization', desc: t ? 'Tiếng Việt và Tiếng Anh' : 'Vietnamese and English', status: '✅' },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/10 transition-colors">

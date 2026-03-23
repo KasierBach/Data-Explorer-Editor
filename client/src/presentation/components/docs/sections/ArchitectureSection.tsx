@@ -41,38 +41,38 @@ export function ArchitectureSection({ lang }: Props) {
                 ))}
             </div>
 
-            <DocSection title={t ? 'Cấu trúc Lớp (Layered Architecture)' : 'Layered Architecture'}>
+            <DocSection title={t ? 'Cấu trúc Lớp (Deep Clean Architecture)' : 'Deep Clean Architecture'}>
                 <Prose>
                     {t
-                        ? 'Data Explorer tuân thủ nghiêm ngặt mô hình 4 lớp của Clean Architecture. Mỗi lớp có một ranh giới rõ ràng và quy tắc phụ thuộc một chiều:'
-                        : 'Data Explorer strictly adheres to the 4-layer model of Clean Architecture. Each layer has clear boundaries and a one-way dependency rule:'}
+                        ? 'Data Explorer tuân thủ nghiêm ngặt mô hình 4 lớp của Clean Architecture. Chúng tôi áp dụng nguyên tắc "Dependency Rule": Sự phụ thuộc chỉ được phép hướng vào bên trong, đảm bảo Domain Core không bao giờ bị ảnh hưởng bởi các thay đổi ở hạ tầng.'
+                        : 'Data Explorer strictly adheres to the 4-layer model of Clean Architecture. We apply the "Dependency Rule": Dependencies only point inward, ensuring that the Domain Core is never affected by infrastructure changes.'}
                 </Prose>
 
                 <div className="mt-10 space-y-8">
                     {[
                         {
-                            layer: "Domain Layer",
+                            layer: "Domain Layer (Core)",
                             color: "bg-indigo-500",
-                            title: t ? "Lõi Nghiệp vụ (Enterprise Rules)" : "Enterprise Business Rules",
+                            title: t ? "Luật Nghiệp vụ Tinh khiết" : "Pure Business Rules",
                             details: t
-                                ? "Chứa các Entities (Connection, User, Table) và các Logic không thay đổi. Đây là lớp 'tinh khiết' nhất, không biết đến sự tồn tại của NestJS hay PostgreSQL."
-                                : "Contains Entities (Connection, User, Table) and invariant logic. This is the 'purest' layer, unaware of NestJS or PostgreSQL."
+                                ? "Chứa các Entities (Connection, User, Table) và POJO (Plain Old Java/TS Objects). Lớp này hoàn toàn không có sự phụ thuộc vào các thư viện bên ngoài như NestJS hay TypeORM. Đây là 'Trái tim' của hệ thống, nơi lưu giữ logic cốt lõi về cách một truy vấn được cấu trúc."
+                                : "Contains Entities (Connection, User, Table) and POJOs. This layer has zero dependencies on external libraries like NestJS or TypeORM. It is the 'Heart' of the system, preserving the core logic of how queries are structured."
                         },
                         {
-                            layer: "Application Layer",
+                            layer: "Application Layer (Use Cases)",
                             color: "bg-blue-500",
-                            title: t ? "Logic Ứng dụng (Use Cases)" : "Application Use Cases",
+                            title: t ? "Điều phối Luồng (Orchestration)" : "Flow Orchestration",
                             details: t
-                                ? "Điều phối luồng dữ liệu. Ví dụ: 'ExecuteQueryUseCase' sẽ gọi Interface DatabasePort mà không cần biết adapter nào đang chạy."
-                                : "Orchestrates data flow. For example: 'ExecuteQueryUseCase' calls DatabasePort Interface without knowing which adapter is running."
+                                ? "Chứa các Use Cases (vd: ExecuteQueryUseCase, GetSchemaUseCase). Lớp này định nghĩa các 'Interface' (Ports) mà hạ tầng phải tuân theo. Nó đóng vai trò như một nhạc trưởng, điều phối dữ liệu đi qua các Ports mà không cần biết Adapter cụ thể phía sau là gì."
+                                : "Contains Use Cases (e.g., ExecuteQueryUseCase, GetSchemaUseCase). This layer defines 'Interfaces' (Ports) that infrastructure must follow. It acts as a conductor, orchestrating data through Ports without knowing the specific Adapter behind them."
                         },
                         {
-                            layer: "Infrastructure Layer",
+                            layer: "Infrastructure Layer (Adapters)",
                             color: "bg-emerald-500",
-                            title: t ? "Hạ tầng (Adapters)" : "Infrastructure Adapters",
+                            title: t ? "Chi tiết Triển khai (Details)" : "Implementation Details",
                             details: t
-                                ? "Nơi triển khai các công nghệ cụ thể. Chứa PostgreSQL driver, Gemini API implementation, và xác thực JWT."
-                                : "Where specific technologies are implemented. Contains PostgreSQL drivers, Gemini API implementation, and JWT authentication."
+                                ? "Nơi các công nghệ cụ thể 'cắm' vào hệ thống. Bao gồm PostgreSQL Drivers, Gemini AI API, và các Interceptor của NestJS. Nếu chúng ta muốn đổi từ Postgres sang MongoDB, chỉ cần viết một Adapter mới ở lớp này mà không chạm vào Domain Core."
+                                : "Where specific technologies 'plug' into the system. Includes PostgreSQL Drivers, Gemini AI API, and NestJS Interceptors. If we want to switch from Postgres to MongoDB, we only need to write a new Adapter in this layer without touching the Domain Core."
                         }
                     ].map((item, i) => (
                         <div key={i} className="flex gap-6 group">
@@ -84,6 +84,32 @@ export function ArchitectureSection({ lang }: Props) {
                             </div>
                         </div>
                     ))}
+                </div>
+            </DocSection>
+
+            {/* Dependency Inversion In Action */}
+            <DocSection title={t ? 'Nghịch đảo Phụ thuộc (Dependency Inversion)' : 'Dependency Inversion In Action'}>
+                <Prose>
+                    {t
+                        ? 'Để đạt được sự linh hoạt, chúng tôi không để Application Layer phụ thuộc vào Infrastructure. Thay vào đó, cả hai đều phụ thuộc vào một abstractions chung.'
+                        : 'To achieve flexibility, we don\'t let the Application Layer depend on Infrastructure. Instead, both depend on shared abstractions.'}
+                </Prose>
+                <div className="mt-8">
+                    <CodeBlock title="The Power of Ports & Adapters">
+                        <CodeComment>{t ? '// Lớp Application định nghĩa "Port"' : '// Application layer defines the "Port"'}</CodeComment>
+                        <CodeLine>{'interface DatabasePort {'}</CodeLine>
+                        <CodeLine>{'  execute(query: string): Promise<Result>;'}</CodeLine>
+                        <CodeLine>{'}'}</CodeLine>
+                        <p className="mt-4" />
+                        <CodeComment>{t ? '// Lớp Infrastructure triển khai "Adapter"' : '// Infrastructure layer implements the "Adapter"'}</CodeComment>
+                        <CodeLine>{'@Injectable()'}</CodeLine>
+                        <CodeLine>{'class PostgresAdapter implements DatabasePort {'}</CodeLine>
+                        <CodeLine>{'  async execute(query: string) { /* pg driver logic */ }'}</CodeLine>
+                        <CodeLine>{'}'}</CodeLine>
+                        <p className="mt-4" />
+                        <CodeComment>{t ? '// Dependency Injection lo việc "cắm" Adapter vào' : '// Dependency Injection handles the "plugging"'}</CodeComment>
+                        <CodeLine>{'providers: [{ provide: DatabasePort, useClass: PostgresAdapter }]'}</CodeLine>
+                    </CodeBlock>
                 </div>
             </DocSection>
 
@@ -116,20 +142,32 @@ export function ArchitectureSection({ lang }: Props) {
                 </Callout>
             </DocSection>
 
-            <DocSection title={t ? 'Đồng bộ trạng thái (UI State Sync)' : 'UI State & Real-time Synchronization'}>
-                <div className="grid sm:grid-cols-2 gap-4">
+            <DocSection title={t ? 'Đồng bộ trạng thái (Zustand Topology)' : 'Zustand State Topology'}>
+                <Prose>
+                    {t
+                        ? 'Tại client, chúng tôi quản lý trạng thái bằng Zustand với kiến trúc Slice-based. Mỗi module có một "Lát cắt" (Slice) riêng biệt nhưng vẫn có thể tương tác với nhau thông qua Root Store.'
+                        : 'On the client, we manage state using Zustand with a Slice-based architecture. Each module has its own "Slice" but remains interoperable through the Root Store.'}
+                </Prose>
+                <div className="mt-8 grid sm:grid-cols-3 gap-4">
                     {[
                         {
-                            t: t ? 'Zustand State Store' : 'Zustand State Store',
-                            d: t ? 'Quản lý tập trung toàn bộ connections và kết quả truy vấn, đảm bảo UI reactivity cực nhanh.' : 'Centralized management of all connections and query results, ensuring ultra-fast UI reactivity.'
+                            t: 'Connection Slice',
+                            d: t ? 'Quản lý danh sách DB và trạng thái kết nối active.' : 'Manages DB list and active connection state.'
                         },
                         {
-                            t: t ? 'Optimistic Updates' : 'Optimistic Updates',
-                            d: t ? 'Hiển thị kết quả dự kiến ngay lập tức khi lưu connection, tạo cảm giác app "không có độ trễ".' : 'Immediately displays expected results when saving connections, creating a "zero-latency" feel.'
+                            t: 'Tab Slice',
+                            d: t ? 'Luồng điều phối các cửa sổ làm việc SQL độc lập.' : 'Orchestrates independent SQL working windows.'
+                        },
+                        {
+                            t: 'UI/UX Slice',
+                            d: t ? 'Toàn bộ trạng thái hiển thị (Sidebar, Panels, Modals).' : 'Whole purely UI-related state (Sidebar, Panels, Modals).'
                         }
                     ].map((item, i) => (
-                        <div key={i} className="p-5 border rounded-2xl bg-muted/20">
-                            <h5 className="font-bold text-xs mb-2 tracking-tight">{item.t}</h5>
+                        <div key={i} className="p-5 border rounded-2xl bg-muted/20 border-border/50 hover:bg-muted/30 transition-all">
+                            <h5 className="font-bold text-xs mb-2 tracking-tight flex items-center gap-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                {item.t}
+                            </h5>
                             <p className="text-[11px] text-muted-foreground leading-relaxed">{item.d}</p>
                         </div>
                     ))}

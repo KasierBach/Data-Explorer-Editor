@@ -113,7 +113,7 @@ export function EditorSection({ lang }: Props) {
 
             {/* Shortcuts Cheat Sheet */}
             <DocSection title={t ? 'Bảng phím tắt (Cheat Sheet)' : 'Shortcuts Cheat Sheet'}>
-                <div className="overflow-hidden border rounded-3xl">
+                <div className="overflow-hidden border rounded-3xl mb-8">
                     <table className="w-full text-left border-collapse text-xs">
                         <thead>
                             <tr className="bg-muted/50 border-b">
@@ -122,11 +122,16 @@ export function EditorSection({ lang }: Props) {
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {[
+                             {[
                                 { a: t ? 'Thực thi khối lệnh / Toàn bộ' : 'Execute Block / All', s: 'Ctrl + Enter' },
+                                { a: t ? 'Truy vấn mới (New Query)' : 'New Query Tab', s: 'Ctrl + N' },
+                                { a: t ? 'Bật/Tắt Bảng kết quả' : 'Toggle Result Panel', s: 'Ctrl + J' },
+                                { a: t ? 'Bật/Tắt Sidebar Điều hướng' : 'Toggle Sidebar (Explorer)', s: 'Ctrl + B' },
+                                { a: t ? 'Bật/Tắt Trợ lý AI' : 'Toggle AI Assistant', s: 'Ctrl + I' },
+                                { a: t ? 'Nhân bản Tab hiện tại' : 'Duplicate Current Tab', s: 'Ctrl + D' },
+                                { a: t ? 'Đóng tất cả các Tab' : 'Close All Tabs', s: 'Ctrl + Shift + W' },
                                 { a: t ? 'Tự động định dạng mã SQL' : 'Auto Format SQL', s: 'Shift + Alt + F' },
-                                { a: t ? 'Bật/Tắt chú thích dòng' : 'Toggle Comment', s: 'Ctrl + /' },
-                                { a: t ? 'Mở Trợ lý AI (Inline)' : 'Open AI Assistant', s: 'Ctrl + I' },
+                                { a: t ? 'Bật/Tắt chú thích dòng' : 'Toggle Array Comment', s: 'Ctrl + /' },
                                 { a: t ? 'Tìm kiếm & Thay thế' : 'Find & Replace', s: 'Ctrl + H' }
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/30 transition-colors">
@@ -140,7 +145,33 @@ export function EditorSection({ lang }: Props) {
                     </table>
                 </div>
             </DocSection>
+
+            <DocSection title={t ? 'Dưới lớp vỏ (Under the Hood): Monaco Engine' : 'Under the Hood: Monaco Engine'}>
+                <div className="grid md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                        <h5 className="text-sm font-bold flex items-center gap-2 text-primary">
+                             <Cpu className="w-4 h-4" />
+                             {t ? 'Custom SQL Worker' : 'Custom SQL Worker'}
+                        </h5>
+                        <Prose className="text-xs">
+                            {t
+                                ? 'Chúng tôi không sử dụng trình kiểm tra cú pháp mặc định. Data Explorer triển khai một Web Worker riêng biệt để xử lý việc token hóa (tokenization) và định dạng mã SQL mà không làm treo UI thread.'
+                                : 'We don\'t use the default syntax checker. Data Explorer implements a dedicated Web Worker to handle SQL tokenization and formatting without freezing the UI thread.'}
+                        </Prose>
+                    </div>
+                    <div className="space-y-4">
+                        <h5 className="text-sm font-bold flex items-center gap-2 text-primary">
+                             <Zap className="w-4 h-4" />
+                             {t ? 'Schema-Aware IntelliSense' : 'Schema-Aware IntelliSense'}
+                        </h5>
+                        <Prose className="text-xs">
+                            {t
+                                ? 'Hệ thống IntelliSense được "bơm" metadata trực tiếp từ database hiện tại. Điều này cho phép gợi ý chính xác tên bảng, cột và quan hệ FK ngay khi bạn gõ `JOIN`.'
+                                : 'The IntelliSense system is "injected" with metadata directly from the active database. This allows precise suggestions for tables, columns, and FK relations as soon as you type `JOIN`.'}
+                        </Prose>
+                    </div>
+                </div>
+            </DocSection>
         </DocPageLayout>
     );
 }
-

@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 interface DocPageLayoutProps {
     title: string;
@@ -43,6 +44,6 @@ export function DocSubSection({ title, children }: { title: string; children: Re
     );
 }
 
-export function Prose({ children }: { children: React.ReactNode }) {
-    return <p className="text-muted-foreground leading-relaxed text-base text-justify">{children}</p>;
+export function Prose({ children, className }: { children: React.ReactNode; className?: string }) {
+    return <p className={cn("text-muted-foreground leading-relaxed text-base text-justify", className)}>{children}</p>;
 }
