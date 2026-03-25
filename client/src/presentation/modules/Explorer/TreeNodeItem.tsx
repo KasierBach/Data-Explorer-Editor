@@ -80,6 +80,7 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
             }
             if (isNoSql) {
                 setNosqlDatabase(node.name);
+                setActiveDatabase(node.name); // Sync for backend pool key
             } else {
                 setActiveDatabase(node.name);
             }

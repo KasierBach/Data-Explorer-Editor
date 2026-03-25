@@ -12,9 +12,6 @@ import { Input } from '@/presentation/components/ui/input';
 import { SidebarContextMenu } from '../Explorer/SidebarContextMenu';
 
 export const NoSqlSidebar: React.FC = () => {
-    const connections = useAppStore(state => state.connections);
-    const activeConnectionId = useAppStore(state => state.activeConnectionId);
-    const setActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
     const lang = useAppStore(state => state.lang);
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -24,17 +21,9 @@ export const NoSqlSidebar: React.FC = () => {
         await queryClient.resetQueries({ queryKey: ['hierarchy'] });
     };
 
-    React.useEffect(() => {
-        if (connections.length > 0) {
-            const isValidConnection = connections.some(c => c.id === activeConnectionId);
-            if (!isValidConnection) {
-                setActiveConnectionId(connections[0].id);
-            }
-        }
-    }, [activeConnectionId, connections, setActiveConnectionId]);
+    const activeConnection = useAppStore(state => state.connections.find((c: any) => c.id === state.nosqlActiveConnectionId));
 
-    const activeConnection = useAppStore(state => state.connections.find((c: any) => c.id === state.activeConnectionId));
-
+    // Sync active connection with backend when nosqlActiveConnectionId changes
     React.useEffect(() => {
         if (activeConnection) {
             connectionService.setActiveConnection(activeConnection).catch(console.error);
@@ -83,7 +72,7 @@ export const NoSqlSidebar: React.FC = () => {
                 </div>
 
                 <div className="space-y-3">
-                    <ConnectionSelector />
+                    <ConnectionSelector filter="nosql" />
 
                     <div className="relative group">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70 transition-colors group-focus-within:text-green-500" />

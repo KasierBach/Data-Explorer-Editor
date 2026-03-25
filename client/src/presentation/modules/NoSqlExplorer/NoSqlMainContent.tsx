@@ -18,12 +18,12 @@ export const NoSqlMainContent: React.FC = () => {
         nosqlResult,    
         nosqlViewMode, 
         setNosqlViewMode,
-        activeConnectionId,
+        nosqlActiveConnectionId,
         connections,
         lang
     } = useAppStore();
 
-    const activeConnection = connections.find(c => c.id === activeConnectionId);
+    const activeConnection = connections.find(c => c.id === nosqlActiveConnectionId);
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
 
     const isMobile = useMediaQuery('(max-width: 768px)');

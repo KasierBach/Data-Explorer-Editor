@@ -7,6 +7,7 @@ export interface NoSqlFilterState {
 }
 
 export interface NoSqlSlice {
+    nosqlActiveConnectionId: string | null;
     nosqlActiveDatabase: string | null;
     nosqlActiveCollection: string | null;
     nosqlViewMode: 'tree' | 'grid';
@@ -14,6 +15,7 @@ export interface NoSqlSlice {
     nosqlMqlQuery: string;
     nosqlResult: any | null;
     nosqlIsQueryRunning: boolean;
+    setNosqlActiveConnectionId: (id: string | null) => void;
     setNosqlDatabase: (db: string | null) => void;
     setNosqlCollection: (col: string | null) => void;
     setNosqlViewMode: (mode: 'tree' | 'grid') => void;
@@ -35,6 +37,7 @@ const buildDefaultMqlQuery = (collection: string | null): string => {
 };
 
 export const createNoSqlSlice: StateCreator<NoSqlSlice> = (set) => ({
+    nosqlActiveConnectionId: null,
     nosqlActiveDatabase: null,
     nosqlActiveCollection: null,
     nosqlViewMode: 'tree',
@@ -43,6 +46,7 @@ export const createNoSqlSlice: StateCreator<NoSqlSlice> = (set) => ({
     nosqlResult: null,
     nosqlIsQueryRunning: false,
 
+    setNosqlActiveConnectionId: (id) => set({ nosqlActiveConnectionId: id }),
     setNosqlDatabase: (db) => set({ nosqlActiveDatabase: db, nosqlActiveCollection: null, nosqlResult: null }),
     setNosqlCollection: (col) => set({
         nosqlActiveCollection: col,

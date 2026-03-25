@@ -35,10 +35,11 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
         const state = useAppStore.getState();
         const { 
             nosqlActiveCollection,
-            activeConnectionId, connections, activeDatabase 
+            nosqlActiveDatabase,
+            nosqlActiveConnectionId, connections
         } = state;
 
-        const activeConnection = connections.find(c => c.id === activeConnectionId);
+        const activeConnection = connections.find(c => c.id === nosqlActiveConnectionId);
 
         if (!activeConnection) {
             toast.error('No active connection');
@@ -79,7 +80,7 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
             // interprets as a JSON payload string — zero modification needed.
             const queryResult = await adapter.executeQuery(
                 JSON.stringify(payload),
-                { database: activeDatabase || undefined }
+                { database: nosqlActiveDatabase || undefined }
             );
 
             const durationMs = Math.round(performance.now() - startTime);

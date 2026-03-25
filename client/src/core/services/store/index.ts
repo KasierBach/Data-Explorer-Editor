@@ -68,6 +68,7 @@ export const useAppStore = create<AppState>()(
                 expandedNodes: state.expandedNodes,
                 pageStates: state.pageStates,
                 lang: state.lang,
+                nosqlActiveConnectionId: state.nosqlActiveConnectionId,
                 nosqlActiveDatabase: state.nosqlActiveDatabase,
                 nosqlActiveCollection: state.nosqlActiveCollection,
                 nosqlViewMode: state.nosqlViewMode,
