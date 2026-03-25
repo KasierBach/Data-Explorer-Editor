@@ -9,15 +9,18 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { AiMessage } from '@/core/services/store';
 import { useAppStore } from '@/core/services/store';
 import { Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface AiMessageBubbleProps {
     msg: AiMessage;
-    onInsertSql: (sql: string) => void;
-    onRunSql: (sql: string) => void;
+    onInsertQuery: (sql: string) => void;
+    onRunQuery: (sql: string) => void;
 }
 
-export const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({ msg, onInsertSql, onRunSql }) => {
-    const { user } = useAppStore();
+export const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({ msg, onInsertQuery, onRunQuery }) => {
+    const { user, activeConnectionId, connections } = useAppStore();
+    const activeConnection = connections.find(c => c.id === activeConnectionId);
+    const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';
 
     return (
         <div className={`flex items-start gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -106,20 +109,20 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({ msg, onInsertS
                 {msg.sql && (
                     <div className="mt-2 rounded-md overflow-hidden border border-border/50 bg-background/50">
                         <div className="flex items-center justify-between px-2 py-1 bg-muted/20 border-b border-border/30">
-                            <span className="text-[9px] text-muted-foreground font-mono">SQL</span>
+                            <span className="text-[9px] text-muted-foreground font-mono">{isNoSql ? 'MQL' : 'SQL'}</span>
                             <div className="flex gap-1">
-                                <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-green-500/20" onClick={() => onInsertSql(msg.sql!)} title="Insert vào Editor">
+                                <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-green-500/20" onClick={() => onInsertQuery(msg.sql!)} title="Insert vào Editor">
                                     <ChevronDown className="w-3 h-3 text-green-400" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-blue-500/20" onClick={() => { onInsertSql(msg.sql!); onRunSql(msg.sql!); }} title="Chạy ngay">
+                                <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-blue-500/20" onClick={() => { onInsertQuery(msg.sql!); onRunQuery(msg.sql!); }} title="Chạy ngay">
                                     <Play className="w-3 h-3 text-blue-400" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-muted/50" onClick={() => navigator.clipboard.writeText(msg.sql!)} title="Copy SQL">
+                                <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-muted/50" onClick={() => navigator.clipboard.writeText(msg.sql!)} title={isNoSql ? 'Copy MQL' : 'Copy SQL'}>
                                     <Copy className="w-3 h-3" />
                                 </Button>
                             </div>
                         </div>
-                        <pre className="p-2 text-[11px] font-mono text-cyan-400 overflow-x-auto whitespace-pre-wrap">{msg.sql}</pre>
+                        <pre className={cn("p-2 text-[11px] font-mono overflow-x-auto whitespace-pre-wrap", isNoSql ? "text-emerald-400" : "text-cyan-400")}>{msg.sql}</pre>
                     </div>
                 )}
             </div>

@@ -149,8 +149,15 @@ export function AppShell() {
                 >
                     <div style={{ width: isMobile ? '90vw' : `${rightPanel.width}px` }} className="h-full">
                         <AiAssistant
-                            onInsertSql={(sql) => {
+                            onInsertQuery={(sql) => {
                                 const store = useAppStore.getState();
+                                const activeConn = store.connections.find(c => c.id === store.activeConnectionId);
+                                if (activeConn?.type === 'mongodb' || activeConn?.type === 'mongodb+srv') {
+                                    store.setNosqlMqlQuery(sql);
+                                    if (store.nosqlViewMode === 'grid') store.setNosqlViewMode('tree'); // Switch to tree/json view to be safe
+                                    return;
+                                }
+
                                 const activeTab = store.tabs.find(t => t.id === store.activeTabId);
                                 if (activeTab && activeTab.type === 'query') {
                                     store.updateTabMetadata(activeTab.id, { sql });
@@ -162,8 +169,15 @@ export function AppShell() {
                                     }, 100);
                                 }
                             }}
-                            onRunSql={(sql) => {
+                            onRunQuery={(sql) => {
                                 const store = useAppStore.getState();
+                                const activeConn = store.connections.find(c => c.id === store.activeConnectionId);
+                                if (activeConn?.type === 'mongodb' || activeConn?.type === 'mongodb+srv') {
+                                    store.setNosqlMqlQuery(sql);
+                                    // Todo: auto execution if possible, for now just insert
+                                    return;
+                                }
+
                                 const activeTab = store.tabs.find(t => t.id === store.activeTabId);
                                 if (activeTab && activeTab.type === 'query') {
                                     store.updateTabMetadata(activeTab.id, { sql });

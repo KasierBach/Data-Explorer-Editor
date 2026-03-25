@@ -12,14 +12,14 @@ import { AiChatList } from './AiChatList';
 import { AiMessageBubble } from './AiMessageBubble';
 
 interface AiAssistantProps {
-    onInsertSql: (sql: string) => void;
-    onRunSql: (sql: string) => void;
+    onInsertQuery: (sql: string) => void;
+    onRunQuery: (sql: string) => void;
     onClose: () => void;
 }
 
 export const AiAssistant: React.FC<AiAssistantProps> = ({
-    onInsertSql,
-    onRunSql,
+    onInsertQuery,
+    onRunQuery,
     onClose,
 }) => {
     const {
@@ -30,7 +30,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         messagesEndRef,
         fileInputRef,
         handleFileSelected,
-        handlePasteSql,
+        handlePasteQuery,
         handleMentionTable,
         removeAttachment,
         handleSend,
@@ -77,6 +77,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     const activeChat = aiChats.find(c => c.id === activeAiChatId);
     const messages = activeChat?.messages || [];
     const activeTab = tabs.find(t => t.id === activeTabId);
+    const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';
 
     // Fetch chat history from backend on open
     useEffect(() => {
@@ -181,8 +182,8 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                     <AiMessageBubble
                         key={msg.id}
                         msg={msg}
-                        onInsertSql={onInsertSql}
-                        onRunSql={onRunSql}
+                        onInsertQuery={onInsertQuery}
+                        onRunQuery={onRunQuery}
                     />
                 ))}
 
@@ -276,11 +277,11 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                                                 <div className="text-[9px] text-muted-foreground">PDF, Excel, CSV, code, ảnh...</div>
                                             </div>
                                         </button>
-                                        <button className={cn("w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left", (!activeTab || activeTab.type !== 'query' || !activeTab.metadata?.sql) && "opacity-40 pointer-events-none")} onClick={() => { setShowContextMenu(false); handlePasteSql(); }}>
+                                        <button className={cn("w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left", (!isNoSql && (!activeTab || activeTab.type !== 'query' || !activeTab.metadata?.sql)) && "opacity-40 pointer-events-none")} onClick={() => { setShowContextMenu(false); handlePasteQuery(); }}>
                                             <FileCode2 className="w-4 h-4 text-cyan-400" />
                                             <div>
-                                                <div className="font-medium">SQL từ Editor</div>
-                                                <div className="text-[9px] text-muted-foreground">Đính kèm SQL đang mở</div>
+                                                <div className="font-medium">{isNoSql ? 'MQL từ Editor' : 'SQL từ Editor'}</div>
+                                                <div className="text-[9px] text-muted-foreground">{isNoSql ? 'Đính kèm JSON query' : 'Đính kèm SQL đang mở'}</div>
                                             </div>
                                         </button>
                                         <button className={cn("w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left", (!activeConnection || !activeDatabase) && "opacity-40 pointer-events-none")} onClick={() => { setShowContextMenu(false); handleMentionTable(); }}>

@@ -34,7 +34,7 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
     const executeMql = useCallback(async () => {
         const state = useAppStore.getState();
         const { 
-            nosqlActiveCollection, nosqlFilter,
+            nosqlActiveCollection,
             activeConnectionId, connections, activeDatabase 
         } = state;
 
@@ -50,30 +50,20 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
             return;
         }
 
-        // Parse filter & options from JSON strings in the store
-        let filter: any = {};
-        let options: any = {};
+// Parse MQL Query from JSON string in the store
+        let payload: any = {};
         try {
-            filter = JSON.parse(nosqlFilter.filter || '{}');
-        } catch {
-            toast.error('Invalid Filter JSON');
-            return;
-        }
-        try {
-            options = JSON.parse(nosqlFilter.options || '{}');
-        } catch {
-            toast.error('Invalid Options JSON');
+            payload = JSON.parse(state.nosqlMqlQuery || '{}');
+        } catch (err: any) {
+            toast.error('Invalid MQL JSON');
             return;
         }
 
-        // Build Mongo query payload
-        const payload = {
-            action: nosqlFilter.action || 'find',
-            collection: nosqlActiveCollection,
-            filter,
-            options,
-            limit: options.limit || 50,
-        };
+        // Validate basic payload structure
+        if (!payload.action || !payload.collection) {
+            toast.error('MQL JSON must contain "action" and "collection" fields');
+            return;
+        }
 
         setIsLoading(true);
         setError(null);

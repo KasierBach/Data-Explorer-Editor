@@ -7,13 +7,15 @@ import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
 import { cn } from '@/lib/utils';
 import { useNoSqlQuery } from '@/presentation/hooks/useNoSqlQuery';
 import { JsonTreeView } from './JsonTreeView';
+import { MqlEditor } from './MqlEditor';
+import { NoSqlGridView } from './NoSqlGridView';
 
 export const NoSqlMainContent: React.FC = () => {
     const { 
         nosqlActiveCollection, 
-        nosqlFilter, 
-        setNosqlFilter, 
-        nosqlResult, 
+        nosqlMqlQuery, 
+        setNosqlMqlQuery,
+        nosqlResult,    
         nosqlViewMode, 
         setNosqlViewMode,
         activeConnectionId,
@@ -98,37 +100,34 @@ export const NoSqlMainContent: React.FC = () => {
                 {/* Visual Filter Area (Top) */}
                 <div className="flex-1 min-h-0 relative bg-muted/10 flex flex-col">
                     <div className="p-2 border-b text-xs font-semibold text-muted-foreground bg-muted/30 uppercase tracking-widest flex items-center justify-between">
-                        <span>{lang === 'vi' ? 'Trình thiết kế Truy vấn (MQL)' : 'Visual MQL Builder'}</span>
-                        <Button 
-                            size="sm" 
-                            className="h-7 bg-green-600 hover:bg-green-700 text-white gap-1" 
-                            onClick={executeMql}
-                            disabled={isLoading}
-                        >
-                            {isLoading 
-                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> 
-                                : <Play className="w-3.5 h-3.5 fill-current" />
-                            }
-                            {lang === 'vi' ? 'Thực thi' : 'Run'}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <span>{lang === 'vi' ? 'Trình thiết kế Truy vấn (MQL)' : 'Visual MQL Builder'}</span>
+                            <span className="text-[9px] font-normal lowercase bg-background border border-border/50 px-1.5 py-0.5 rounded text-muted-foreground tracking-normal">
+                                Shift + Alt + F to format
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-normal lowercase bg-muted border px-1.5 py-0.5 rounded text-muted-foreground tracking-normal">Ctrl + Enter</span>
+                            <Button 
+                                size="sm" 
+                                className="h-7 bg-green-600 hover:bg-green-700 text-white gap-1" 
+                                onClick={executeMql}
+                                disabled={isLoading}
+                            >
+                                {isLoading 
+                                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> 
+                                    : <Play className="w-3.5 h-3.5 fill-current" />
+                                }
+                                {lang === 'vi' ? 'Thực thi' : 'Run'}
+                            </Button>
+                        </div>
                     </div>
-                    <div className="p-4 flex gap-4 h-full overflow-auto">
-                        <div className="flex-1 flex flex-col gap-2">
-                            <label className="text-xs font-medium text-green-600">.find() Filter</label>
-                            <textarea 
-                                className="flex-1 w-full bg-background rounded-md border p-3 font-mono text-sm leading-relaxed focus:ring-2 focus:ring-green-500/30 focus:border-green-500/50 transition-all" 
-                                value={nosqlFilter.filter}
-                                onChange={(e) => setNosqlFilter({ filter: e.target.value })}
-                            />
-                        </div>
-                        <div className="w-64 flex flex-col gap-2 shrink-0 border-l pl-4">
-                            <label className="text-xs font-medium text-orange-500">Options / Projection</label>
-                            <textarea 
-                                className="flex-1 w-full bg-background rounded-md border p-3 font-mono text-sm focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500/50 transition-all" 
-                                value={nosqlFilter.options}
-                                onChange={(e) => setNosqlFilter({ options: e.target.value })}
-                            />
-                        </div>
+                    <div className="flex-1 min-h-0 w-full relative">
+                        <MqlEditor 
+                            value={nosqlMqlQuery}
+                            onChange={(val: string | undefined) => setNosqlMqlQuery(val || '')}
+                            onRun={executeMql}
+                        />
                     </div>
                 </div>
                 
@@ -180,9 +179,7 @@ export const NoSqlMainContent: React.FC = () => {
                                     <JsonTreeView data={nosqlResult} initialExpanded={true} />
                                 </div>
                             ) : (
-                                <div className="h-full flex items-center justify-center border-2 border-dashed rounded-xl opacity-60">
-                                    <span>[Auto-Flatten Grid — Coming Soon]</span>
-                                </div>
+                                <NoSqlGridView data={nosqlResult} />
                             )
                         )}
                     </div>

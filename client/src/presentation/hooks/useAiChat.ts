@@ -192,8 +192,17 @@ export function useAiChat() {
         }
     };
 
-    const handlePasteSql = () => {
-        if (activeTab?.type === 'query' && activeTab.metadata?.sql) {
+    const handlePasteQuery = () => {
+        if (activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv') {
+            const mql = store.nosqlMqlQuery;
+            if (mql && mql.trim()) {
+                setAttachments(prev => [...prev, {
+                    type: 'sql',
+                    label: `MQL Query`,
+                    data: mql,
+                }]);
+            }
+        } else if (activeTab?.type === 'query' && activeTab.metadata?.sql) {
             const sql = activeTab.metadata.sql;
             if (sql.trim()) {
                 setAttachments(prev => [...prev, {
@@ -402,7 +411,7 @@ export function useAiChat() {
         messagesEndRef,
         fileInputRef,
         handleFileSelected,
-        handlePasteSql,
+        handlePasteQuery,
         handleMentionTable,
         removeAttachment,
         handleSend,

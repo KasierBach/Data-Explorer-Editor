@@ -64,6 +64,12 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
     const activeDatabase = useAppStore(state => state.activeDatabase);
     const setActiveDatabase = useAppStore(state => state.setActiveDatabase);
 
+    const setNosqlDatabase = useAppStore(state => state.setNosqlDatabase);
+    const setNosqlCollection = useAppStore(state => state.setNosqlCollection);
+    const nosqlActiveCollection = useAppStore(state => state.nosqlActiveCollection);
+    const activeConnection = useAppStore(state => state.connections.find(c => c.id === state.activeConnectionId));
+    const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
+
     const isActiveDb = node.type === 'database' && activeDatabase === node.name;
 
     const handleToggle = (e: React.MouseEvent) => {
@@ -72,7 +78,13 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
             if (node.hasChildren) {
                 toggleExpansion(node.id);
             }
-            setActiveDatabase(node.name);
+            if (isNoSql) {
+                setNosqlDatabase(node.name);
+            } else {
+                setActiveDatabase(node.name);
+            }
+        } else if (node.type === 'collection') {
+            setNosqlCollection(node.name);
         } else {
             // Other nodes: normal toggle
             if (node.hasChildren) {
@@ -103,6 +115,7 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
                     "flex items-center py-1.5 px-2 hover:bg-accent/50 cursor-pointer select-none text-sm group transition-all duration-200 border-l-2 border-transparent",
                     isExpanded && node.hasChildren && "bg-accent/20",
                     isActiveDb && "border-l-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/15",
+                    (isNoSql && node.type === 'collection' && nosqlActiveCollection === node.name) && "bg-green-500/10 border-l-green-500",
                     !isActiveDb && "hover:border-blue-500/50"
                 )}
                 style={{ paddingLeft: `${level * 12 + 4}px` }}

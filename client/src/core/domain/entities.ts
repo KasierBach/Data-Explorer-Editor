@@ -1,4 +1,4 @@
-export type ConnectionType = 'postgres' | 'mysql' | 'mssql';
+export type ConnectionType = 'postgres' | 'mysql' | 'mssql' | 'mongodb' | 'mongodb+srv' | 'redis';
 
 export interface Connection {
     id: string;
@@ -14,7 +14,7 @@ export interface TreeNode {
     id: string;
     parentId: string | null;
     name: string;
-    type: 'connection' | 'database' | 'schema' | 'table' | 'view' | 'function' | 'column' | 'folder';
+    type: 'connection' | 'database' | 'schema' | 'table' | 'view' | 'function' | 'column' | 'folder' | 'collection';
     metadata?: Record<string, any>;
     children?: TreeNode[]; // For recursive structures if needed, though we might lazy load
     hasChildren?: boolean;

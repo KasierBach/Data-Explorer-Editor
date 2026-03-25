@@ -72,6 +72,7 @@ export const useAppStore = create<AppState>()(
                 nosqlActiveCollection: state.nosqlActiveCollection,
                 nosqlViewMode: state.nosqlViewMode,
                 nosqlFilter: state.nosqlFilter,
+                nosqlMqlQuery: state.nosqlMqlQuery,
             }),
         }
     )
