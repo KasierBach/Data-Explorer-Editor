@@ -7,6 +7,7 @@ import { createConnectionSlice, type ConnectionSlice, type Connection } from './
 import { createAuthSlice, type AuthSlice } from './slices/authSlice';
 import { createTabSlice, type TabSlice, type Tab } from './slices/tabSlice';
 import { createQuerySlice, type QuerySlice, type SavedQuery, type QueryHistoryEntry } from './slices/querySlice';
+import { createNoSqlSlice, type NoSqlSlice } from './slices/nosqlSlice';
 
 // Re-export types that are used across the app
 export type { AiChat, AiMessage, Connection, Tab, SavedQuery, QueryHistoryEntry };
@@ -17,7 +18,8 @@ export type AppState = UISlice &
     ConnectionSlice &
     AuthSlice &
     TabSlice &
-    QuerySlice;
+    QuerySlice &
+    NoSqlSlice;
 
 export const useAppStore = create<AppState>()(
     persist(
@@ -28,6 +30,7 @@ export const useAppStore = create<AppState>()(
             ...createAuthSlice(set, get, api),
             ...createTabSlice(set, get, api),
             ...createQuerySlice(set, get, api),
+            ...createNoSqlSlice(set, get, api),
         }),
         {
             name: 'data-explorer-storage',
@@ -65,6 +68,10 @@ export const useAppStore = create<AppState>()(
                 expandedNodes: state.expandedNodes,
                 pageStates: state.pageStates,
                 lang: state.lang,
+                nosqlActiveDatabase: state.nosqlActiveDatabase,
+                nosqlActiveCollection: state.nosqlActiveCollection,
+                nosqlViewMode: state.nosqlViewMode,
+                nosqlFilter: state.nosqlFilter,
             }),
         }
     )

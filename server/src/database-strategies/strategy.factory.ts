@@ -3,6 +3,7 @@ import type { IDatabaseStrategy } from './database-strategy.interface';
 import { PostgresStrategy } from './postgres.strategy';
 import { MysqlStrategy } from './mysql.strategy';
 import { MssqlStrategy } from './mssql.strategy';
+import { MongoDbStrategy } from './mongodb.strategy';
 
 @Injectable()
 export class DatabaseStrategyFactory {
@@ -13,6 +14,8 @@ export class DatabaseStrategyFactory {
             ['postgres', new PostgresStrategy()],
             ['mysql', new MysqlStrategy()],
             ['mssql', new MssqlStrategy()],
+            ['mongodb', new MongoDbStrategy()],
+            ['mongodb+srv', new MongoDbStrategy()],
         ]);
     }
 

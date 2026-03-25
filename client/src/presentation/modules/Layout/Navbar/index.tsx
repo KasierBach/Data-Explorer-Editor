@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Menu, X, Database, Leaf } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { useAppStore } from '@/core/services/store';
 import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
@@ -17,6 +17,7 @@ export const Navbar: React.FC = () => {
     } = useAppStore();
     
     const navigate = useNavigate();
+    const location = useLocation();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [activeProfileTab, setActiveProfileTab] = useState('profile');
     
@@ -44,6 +45,29 @@ export const Navbar: React.FC = () => {
                 )}
 
                 <NavBrand isSmallMobile={isSmallMobile} onNavigate={navigate} />
+
+                {!isMobile && (
+                    <div className="flex bg-muted p-1 rounded-md border items-center">
+                        <Button 
+                            variant={location.pathname.startsWith('/app') ? 'secondary' : 'ghost'} 
+                            size="sm" 
+                            className="h-7 px-3 text-xs w-[88px] flex gap-1.5"
+                            onClick={() => navigate('/app')}
+                        >
+                            <Database className="w-3.5 h-3.5" />
+                            <span className="font-semibold">SQL</span>
+                        </Button>
+                        <Button 
+                            variant={location.pathname.startsWith('/nosql') ? 'secondary' : 'ghost'} 
+                            size="sm" 
+                            className="h-7 px-3 text-xs w-[88px] flex gap-1.5 text-green-600 dark:text-green-400"
+                            onClick={() => navigate('/nosql-explorer')}
+                        >
+                            <Leaf className="w-3.5 h-3.5" />
+                            <span className="font-semibold text-green-700 dark:text-green-400">NoSQL</span>
+                        </Button>
+                    </div>
+                )}
 
                 {!isMobile && (
                     <NavMainActions 

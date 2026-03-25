@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from '@/presentation/modules/Layout/AppShell'
+import { NoSqlShell } from '@/presentation/modules/Layout/NoSqlShell'
 import { LoginPage } from '@/presentation/pages/LoginPage'
 import { OnboardingPage } from '@/presentation/pages/OnboardingPage'
 import { LandingPage } from '@/presentation/pages/LandingPage'
@@ -59,6 +60,15 @@ export function App() {
               element={
                 <RequireAuth>
                   <AppShell />
+                </RequireAuth>
+              }
+            />
+
+            <Route
+              path="/nosql-explorer/*"
+              element={
+                <RequireAuth>
+                  <NoSqlShell />
                 </RequireAuth>
               }
             />

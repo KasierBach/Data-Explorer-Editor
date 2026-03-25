@@ -3,7 +3,7 @@ import type { StateCreator } from 'zustand';
 export interface Connection {
     id: string;
     name: string;
-    type: 'mysql' | 'postgres' | 'mssql' | 'clickhouse' | 'mock';
+    type: 'postgres' | 'mysql' | 'mssql' | 'sqlite' | 'clickhouse' | 'mock' | 'mongodb' | 'mongodb+srv' | 'redis';
     host?: string;
     port?: number;
     username?: string;

@@ -6,8 +6,8 @@ export class CreateConnectionDto {
     name: string;
 
     @IsString()
-    @IsIn(['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse', 'mock'])
-    type: 'postgres' | 'mysql' | 'mssql' | 'sqlite' | 'clickhouse' | 'mock';
+    @IsIn(['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse', 'mock', 'mongodb', 'mongodb+srv'])
+    type: 'postgres' | 'mysql' | 'mssql' | 'sqlite' | 'clickhouse' | 'mock' | 'mongodb' | 'mongodb+srv';
 
     @IsString()
     @IsOptional()

@@ -2,6 +2,7 @@ import type { IDatabaseAdapter } from "../domain/database-adapter.interface";
 
 import { ApiDatabaseAdapter } from "../adapters/ApiDatabaseAdapter";
 import { apiService } from "./api.service";
+import type { Connection } from "./store/slices/connectionSlice";
 
 /**
  * Service to manage database adapter instances.
@@ -24,7 +25,7 @@ export class ConnectionService {
     /**
      * Factory method to get or create an adapter for a connection.
      */
-    public getAdapter(connectionId: string, type: 'postgres' | 'mysql' | 'mssql' | 'clickhouse' | 'mock'): IDatabaseAdapter {
+    public getAdapter(connectionId: string, type: Connection['type']): IDatabaseAdapter {
         if (this.adapters.has(connectionId)) {
             return this.adapters.get(connectionId)!;
         }
@@ -36,7 +37,7 @@ export class ConnectionService {
         return adapter;
     }
 
-    public async setActiveConnection(connection: { id: string, type: 'postgres' | 'mysql' | 'mssql' | 'clickhouse' | 'mock' }): Promise<void> {
+    public async setActiveConnection(connection: Connection): Promise<void> {
         const adapter = this.getAdapter(connection.id, connection.type);
 
         // Always connect to ensure config is updated (e.g. showAllDatabases flag)

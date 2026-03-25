@@ -1,7 +1,7 @@
 export class Connection {
     id: string;
     name: string;
-    type: 'postgres' | 'mysql' | 'mssql' | 'sqlite';
+    type: 'postgres' | 'mysql' | 'mssql' | 'sqlite' | 'clickhouse' | 'mock' | 'mongodb' | 'mongodb+srv';
     host?: string;
     port?: number;
     username?: string;
