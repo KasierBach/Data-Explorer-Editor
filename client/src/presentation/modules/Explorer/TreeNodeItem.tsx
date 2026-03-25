@@ -39,6 +39,8 @@ const FileIcon = ({ type, className }: { type: string, className?: string }) => 
             return <Zap className={cn("w-4 h-4 text-yellow-500", className)} />;
         case 'procedure':
             return <FileCode className={cn("w-4 h-4 text-emerald-500", className)} />;
+        case 'collection':
+            return <FileCode className={cn("w-4 h-4 text-emerald-500", className)} />;
         case 'column':
             return <Binary className={cn("w-4 h-4 text-slate-400", className)} />;
         case 'primary_key':

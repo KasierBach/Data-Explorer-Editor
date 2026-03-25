@@ -176,7 +176,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         const adminDb = client.db().admin();
         const result = await adminDb.listDatabases();
         return result.databases.map((db: any) => ({
-            id: `db-${db.name}`,
+            id: `db:${db.name}`,
             name: db.name,
             type: 'database',
             parentId: 'root',
@@ -186,11 +186,12 @@ export class MongoDbStrategy implements IDatabaseStrategy {
 
     async getSchemas(client: MongoClient, dbName?: string): Promise<TreeNodeResult[]> {
         // Pseudo schema 'public' to satisfy the client's current tree structure expectation
+        const dbId = `db:${dbName || 'default'}`;
         return [{
-            id: `db-${dbName || 'default'}-public`,
+            id: `${dbId}.schema:public`,
             name: 'public',
             type: 'schema',
-            parentId: `db-${dbName || 'default'}`,
+            parentId: dbId,
             hasChildren: true
         }];
     }
@@ -198,12 +199,13 @@ export class MongoDbStrategy implements IDatabaseStrategy {
     async getTables(client: MongoClient, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
         const db = dbName ? client.db(dbName) : client.db();
         const collections = await db.listCollections().toArray();
+        const parentId = `db:${dbName || 'default'}.schema:${schema}`;
         return collections.map(col => ({
-            id: `col-${dbName || 'default'}-${col.name}`,
+            id: `${parentId}.collection:${col.name}`,
             name: col.name,
-            type: 'table',
-            parentId: `db-${dbName || 'default'}-${schema}`,
-            hasChildren: false
+            type: 'collection',
+            parentId: parentId,
+            hasChildren: true // For MongoDB, tables (collections) have columns/fields as children in this app's architecture
         }));
     }
 
