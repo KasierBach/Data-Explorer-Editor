@@ -53,13 +53,16 @@ const FileIcon = ({ type, className }: { type: string, className?: string }) => 
 interface TreeNodeProps {
     node: TreeNode;
     level: number;
+    connectionId?: string | null;
 }
 
-export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
-    const isExpanded = useAppStore(state => state.expandedNodes.includes(node.id));
-    const toggleExpansion = useAppStore(state => state.toggleNodeExpansion);
+export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level, connectionId: connectionIdProp }) => {
+    const { activeConnectionId: storeActiveId, expandedNodes, toggleNodeExpansion } = useAppStore();
+    const connectionId = connectionIdProp || storeActiveId;
+    const isExpanded = expandedNodes.includes(node.id);
+    const toggleExpansion = toggleNodeExpansion;
 
-    const { data: children, isLoading } = useDatabaseHierarchy(isExpanded ? node.id : null);
+    const { data: children, isLoading } = useDatabaseHierarchy(isExpanded ? node.id : null, connectionId);
     const openTab = useAppStore(state => state.openTab);
     const activeDatabase = useAppStore(state => state.activeDatabase);
     const setActiveDatabase = useAppStore(state => state.setActiveDatabase);
@@ -67,7 +70,7 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
     const setNosqlDatabase = useAppStore(state => state.setNosqlDatabase);
     const setNosqlCollection = useAppStore(state => state.setNosqlCollection);
     const nosqlActiveCollection = useAppStore(state => state.nosqlActiveCollection);
-    const activeConnection = useAppStore(state => state.connections.find(c => c.id === state.activeConnectionId));
+    const activeConnection = useAppStore(state => state.connections.find(c => c.id === connectionId));
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
 
     const isActiveDb = node.type === 'database' && activeDatabase === node.name;
@@ -167,7 +170,7 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level }) => {
                         </div>
                     )}
                     {children?.map(child => (
-                        <TreeNodeItem key={child.id} node={child} level={level + 1} />
+                        <TreeNodeItem key={child.id} node={child} level={level + 1} connectionId={connectionId} />
                     ))}
                 </div>
             )}

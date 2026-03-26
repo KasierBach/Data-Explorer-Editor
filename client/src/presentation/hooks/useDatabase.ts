@@ -12,8 +12,9 @@ export const QUERY_KEYS = {
 /**
  * Hook to fetch the database hierarchy (Tree Nodes).
  */
-export function useDatabaseHierarchy(parentId: string | null) {
-    const { activeConnectionId, connections } = useAppStore();
+export function useDatabaseHierarchy(parentId: string | null, connectionIdProp?: string | null) {
+    const { activeConnectionId: storeActiveId, connections } = useAppStore();
+    const activeConnectionId = connectionIdProp || storeActiveId;
     const activeConnection = connections.find(c => c.id === activeConnectionId);
 
     return useQuery({
@@ -40,8 +41,9 @@ export function useDatabaseHierarchy(parentId: string | null) {
 /**
  * Hook to fetch table metadata.
  */
-export function useTableMetadata(tableId: string) {
-    const { activeConnectionId, connections } = useAppStore();
+export function useTableMetadata(tableId: string, connectionIdProp?: string | null) {
+    const { activeConnectionId: storeActiveId, connections } = useAppStore();
+    const activeConnectionId = connectionIdProp || storeActiveId;
     const activeConnection = connections.find(c => c.id === activeConnectionId);
 
     return useQuery({
@@ -58,8 +60,9 @@ export function useTableMetadata(tableId: string) {
 /**
  * Hook to execute SQL.
  */
-export function useExecuteQuery(sql: string) {
-    const { activeConnectionId, connections } = useAppStore();
+export function useExecuteQuery(sql: string, connectionIdProp?: string | null) {
+    const { activeConnectionId: storeActiveId, connections } = useAppStore();
+    const activeConnectionId = connectionIdProp || storeActiveId;
     const activeConnection = connections.find(c => c.id === activeConnectionId);
 
     return useQuery({

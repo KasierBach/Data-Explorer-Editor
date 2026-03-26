@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/presentation/components/ui/button';
-const SqlEditor = React.lazy(() => import('@/presentation/components/code-editor/SqlEditor').then(m => ({ default: m.SqlEditor })));
+import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
 import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw, History, Zap } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
@@ -436,17 +436,15 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 <div className="flex-1 flex flex-col min-h-0 relative">
                     {/* Top Editor - takes remaining space */}
                     <div className="flex-1 min-h-0 relative">
-                        <React.Suspense fallback={<div className="h-full w-full flex items-center justify-center bg-muted/10 animate-pulse text-muted-foreground text-sm font-medium">Loading SQL Editor...</div>}>
-                            <SqlEditor
-                                value={query}
-                                onChange={(val: string | undefined) => setQuery(val || '')}
-                                height="100%"
-                                onMount={(editor) => {
-                                    editorRef.current = editor;
-                                }}
-                                schemaInfo={schemaInfo}
-                            />
-                        </React.Suspense>
+                        <SqlEditor
+                            value={query}
+                            onChange={(val: string | undefined) => setQuery(val || '')}
+                            height="100%"
+                            onMount={(editor) => {
+                                editorRef.current = editor;
+                            }}
+                            schemaInfo={schemaInfo}
+                        />
                     </div>
 
                     {/* Resize Handle - Custom Separator */}

@@ -21,7 +21,8 @@ export const NoSqlSidebar: React.FC = () => {
         await queryClient.resetQueries({ queryKey: ['hierarchy'] });
     };
 
-    const activeConnection = useAppStore(state => state.connections.find((c: any) => c.id === state.nosqlActiveConnectionId));
+    const nosqlActiveConnectionId = useAppStore(state => state.nosqlActiveConnectionId);
+    const activeConnection = useAppStore(state => state.connections.find((c: any) => c.id === nosqlActiveConnectionId));
 
     // Sync active connection with backend when nosqlActiveConnectionId changes
     React.useEffect(() => {
@@ -30,7 +31,7 @@ export const NoSqlSidebar: React.FC = () => {
         }
     }, [activeConnection]);
 
-    const { data: rootNodes, isLoading } = useDatabaseHierarchy(null);
+    const { data: rootNodes, isLoading } = useDatabaseHierarchy(null, nosqlActiveConnectionId);
 
     const filteredNodes = React.useMemo(() => {
         if (!rootNodes) return [];
@@ -141,7 +142,7 @@ export const NoSqlSidebar: React.FC = () => {
                                     </div>
                                 )}
                                 {filteredNodes.map(node => (
-                                    <TreeNodeItem key={node.id} node={node} level={0} />
+                                    <TreeNodeItem key={node.id} node={node} level={0} connectionId={nosqlActiveConnectionId} />
                                 ))}
                             </div>
                         </SidebarContextMenu>

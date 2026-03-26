@@ -194,7 +194,7 @@ export const ExplorerSidebar: React.FC = () => {
                                     </div>
                                 )}
                                 {filteredNodes.map(node => (
-                                    <TreeNodeItem key={node.id} node={node} level={0} />
+                                    <TreeNodeItem key={node.id} node={node} level={0} connectionId={activeConnectionId} />
                                 ))}
                             </div>
                         </SidebarContextMenu>
