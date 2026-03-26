@@ -22,11 +22,8 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
 
     // Ensure adapter is connected
     useEffect(() => {
-        if (connectionId && activeConnection) { // Changed activeConnectionId to connectionId
-            connectionService.setActiveConnection({
-                id: activeConnection.id,
-                type: activeConnection.type as any
-            });
+        if (connectionId && activeConnection) {
+            connectionService.setActiveConnection(activeConnection);
         }
     }, [connectionId, activeConnection]); // Changed activeConnectionId to connectionId
 

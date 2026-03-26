@@ -17,9 +17,9 @@ export const handleTreeAction = (
     const activeConnection = store.connections.find((c: any) => c.id === activeConnectionId);
     if (!activeConnection) return;
 
-    const dialect: 'postgres' | 'mysql' | 'mssql' | 'clickhouse' | 'mock' = activeConnection.type;
+    const dialect: any = activeConnection.type;
     const { dbName, schema, table: tableName } = parseNodeId(nodeId);
-    const qualifiedName = getFullyQualifiedTable(nodeId, dialect as any);
+    const qualifiedName = getFullyQualifiedTable(nodeId, dialect);
 
     // Cast dialect to 'postgres' | 'mysql' since getQuotedIdentifier only supports these currently
     // Defaulting to postgres if it's mssql or clickhouse for safe quoting fallback

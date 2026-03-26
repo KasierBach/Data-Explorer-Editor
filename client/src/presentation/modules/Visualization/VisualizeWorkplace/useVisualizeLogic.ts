@@ -15,10 +15,7 @@ export const useVisualizeLogic = () => {
     // Ensure adapter is connected
     useEffect(() => {
         if (activeConnectionId && activeConnection) {
-            connectionService.setActiveConnection({
-                id: activeConnection.id,
-                type: activeConnection.type as any
-            });
+            connectionService.setActiveConnection(activeConnection);
         }
     }, [activeConnectionId, activeConnection]);
 

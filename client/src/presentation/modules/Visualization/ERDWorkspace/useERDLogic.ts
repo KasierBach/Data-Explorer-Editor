@@ -58,10 +58,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         const conn = connections.find(c => c.id === connectionId);
         if (conn) {
             console.log(`[ERDWorkspace] Setting active connection: ${conn.name}`);
-            connectionService.setActiveConnection({
-                id: conn.id,
-                type: conn.type as any
-            });
+            connectionService.setActiveConnection(conn);
         }
     }, [connectionId, connections]);
 
