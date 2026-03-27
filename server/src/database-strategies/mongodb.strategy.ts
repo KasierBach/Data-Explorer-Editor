@@ -173,15 +173,27 @@ export class MongoDbStrategy implements IDatabaseStrategy {
     }
 
     async getDatabases(client: MongoClient): Promise<TreeNodeResult[]> {
-        const adminDb = client.db().admin();
-        const result = await adminDb.listDatabases();
-        return result.databases.map((db: any) => ({
-            id: `db:${db.name}`,
-            name: db.name,
-            type: 'database',
-            parentId: 'root',
-            hasChildren: true
-        }));
+        try {
+            const adminDb = client.db().admin();
+            const result = await adminDb.listDatabases();
+            return result.databases.map((db: any) => ({
+                id: `db:${db.name}`,
+                name: db.name,
+                type: 'database',
+                parentId: 'root',
+                hasChildren: true
+            }));
+        } catch (error) {
+            console.error('[MongoDbStrategy] listDatabases failed, falling back to current db:', error);
+            const currentDb = client.db().databaseName;
+            return [{
+                id: `db:${currentDb}`,
+                name: currentDb,
+                type: 'database',
+                parentId: 'root',
+                hasChildren: true
+            }];
+        }
     }
 
     async getSchemas(client: MongoClient, dbName?: string): Promise<TreeNodeResult[]> {

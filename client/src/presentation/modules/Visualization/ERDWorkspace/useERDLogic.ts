@@ -124,21 +124,32 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     });
 
     const { data: tableData, isLoading: isLoadingCols } = useQuery({
-        queryKey: ['erd-columns', connectionId, Array.from(visibleTableNames)],
+        queryKey: ['erd-columns', connectionId, Array.from(visibleTableNames), selectedDatabase],
         queryFn: async () => {
-            if (visibleTableNames.size === 0 || !hierarchy) return {};
-            const adapter = connectionService.getAdapter(connectionId, activeConnection?.type as any);
+            if (visibleTableNames.size === 0 || !hierarchy || !activeConnection) return {};
+            const adapter = connectionService.getAdapter(connectionId, activeConnection.type as any);
             const results: Record<string, any> = {};
+            
+            // Map names to full hierarchy IDs for metadata fetching
+            const nameToIdMap = new Map<string, string>();
+            hierarchy.forEach(h => nameToIdMap.set(h.name, h.id));
+
             await Promise.all(Array.from(visibleTableNames).map(async (name) => {
-                const hNode = hierarchy.find(h => h.name === name);
-                if (hNode) {
-                    const metadata = await adapter.getMetadata(hNode.id);
-                    results[name] = metadata;
+                const nodeId = nameToIdMap.get(name);
+                if (nodeId) {
+                    try {
+                        const metadata = await adapter.getMetadata(nodeId);
+                        results[name] = metadata;
+                    } catch (e) {
+                        console.error(`[ERDCols] Failed to fetch metadata for ${name} (${nodeId})`, e);
+                    }
+                } else {
+                    console.warn(`[ERDCols] No hierarchy node found for visible table: ${name}`);
                 }
             }));
             return results;
         },
-        enabled: visibleTableNames.size > 0 && !!hierarchy,
+        enabled: !!connectionId && !!activeConnection && !!hierarchy && visibleTableNames.size > 0,
     });
 
     const filteredHierarchy = useMemo(() => {
@@ -371,12 +382,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     }, [filteredHierarchy]);
 
     const handleDeselectAll = useCallback(() => {
-        setVisibleTableNames(prev => {
-            const next = new Set(prev);
-            filteredHierarchy.forEach(h => next.delete(h.name));
-            return next;
-        });
-    }, [filteredHierarchy]);
+        setVisibleTableNames(new Set());
+    }, []);
 
     const handleToggleCollapse = (name: string) => {
         setCollapsedTables(prev => {
