@@ -60,7 +60,7 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/10 to-violet-500/10 rounded-[2rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             
             <div className={cn(
-                "bg-card/90 backdrop-blur-3xl border rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.4)] overflow-hidden h-full flex flex-col ring-1 ring-white/5 transition-all duration-500 relative z-10",
+                "bg-card/90 backdrop-blur-3xl border rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.4)] h-full flex flex-col ring-1 ring-white/5 transition-all duration-500 relative z-10",
                 selected ? "border-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.2)]" : "border-white/10 group-hover:border-blue-500/30"
             )}>
                 {/* Header */}
@@ -164,7 +164,7 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
                                             type="target"
                                             position={Position.Left}
                                             id={col.name}
-                                            className="!w-2 !h-2 !-left-[24px] !bg-blue-500 !border-0 !opacity-0 group-hover/row:!opacity-100 transition-opacity"
+                                            className="!w-2 !h-2 !-left-1 !bg-blue-500 !border-0 !opacity-0 group-hover/row:!opacity-100 transition-opacity z-[100]"
                                         />
                                         {col.isPrimaryKey ? (
                                             <Key className="w-3.5 h-3.5 text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]" />
@@ -194,7 +194,7 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
                                         type="source"
                                         position={Position.Right}
                                         id={col.name}
-                                        className="!w-2 !h-2 !-right-[24px] !bg-blue-500 !border-0 !opacity-0 group-hover/row:!opacity-100 transition-opacity"
+                                        className="!w-2 !h-2 !-right-1 !bg-blue-500 !border-0 !opacity-0 group-hover/row:!opacity-100 transition-opacity z-[100]"
                                     />
                                 </div>
                                 <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 opacity-0 group-hover/row:opacity-100 transition-opacity" />
