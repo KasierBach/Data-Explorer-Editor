@@ -25,25 +25,39 @@ export class MongoDbStrategy implements IDatabaseStrategy {
     async createPool(connectionConfig: any, databaseOverride?: string): Promise<MongoClient> {
         let uri = connectionConfig.url || '';
         if (!uri) {
-            const auth = connectionConfig.user 
-                ? `${encodeURIComponent(connectionConfig.user)}:${encodeURIComponent(connectionConfig.password || '')}@` 
+            // DB schema stores 'username', not 'user'
+            const user = connectionConfig.username || connectionConfig.user;
+            const auth = user 
+                ? `${encodeURIComponent(user)}:${encodeURIComponent(connectionConfig.password || '')}@` 
                 : '';
             const host = connectionConfig.host || 'localhost';
             const port = connectionConfig.port || 27017;
             const db = databaseOverride || connectionConfig.database || '';
-            const params = connectionConfig.ssl ? '?tls=true' : '';
             const protocol = connectionConfig.type === 'mongodb+srv' ? 'mongodb+srv' : 'mongodb';
+            
+            // Build query params
+            const params: string[] = [];
+            if (connectionConfig.ssl) params.push('tls=true');
+            if (protocol === 'mongodb+srv') {
+                params.push('retryWrites=true', 'w=majority');
+            }
+            const queryString = params.length > 0 ? `?${params.join('&')}` : '';
+            
             uri = protocol === 'mongodb+srv'
-                ? `${protocol}://${auth}${host}/${db}${params}`
-                : `${protocol}://${auth}${host}:${port}/${db}${params}`;
+                ? `${protocol}://${auth}${host}/${db}${queryString}`
+                : `${protocol}://${auth}${host}:${port}/${db}${queryString}`;
         }
 
+        console.log(`[MongoDbStrategy] Connecting to: ${uri.replace(/\/\/[^@]+@/, '//***:***@')}`);
+
         const client = new MongoClient(uri, {
-            serverSelectionTimeoutMS: 5000,
-            connectTimeoutMS: 10000,
+            serverSelectionTimeoutMS: 15000,
+            connectTimeoutMS: 15000,
+            socketTimeoutMS: 30000,
         });
 
         await client.connect();
+        console.log(`[MongoDbStrategy] Connected successfully.`);
         return client;
     }
 
