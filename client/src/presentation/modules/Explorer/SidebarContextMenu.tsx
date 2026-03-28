@@ -10,14 +10,22 @@ import {
     ContextMenuSubContent,
 } from "@/presentation/components/ui/context-menu";
 
+import { useAppStore } from '@/core/services/store';
+
 interface SidebarContextMenuProps {
     children: React.ReactNode;
-    type: 'connection' | 'database' | 'table' | 'view' | 'function' | 'schema' | 'folder';
+    type: 'connection' | 'database' | 'table' | 'view' | 'function' | 'schema' | 'folder' | 'collection';
     onAction: (action: string) => void;
+    connectionId?: string | null;
 }
 
-export const SidebarContextMenu: React.FC<SidebarContextMenuProps> = ({ children, type, onAction }) => {
-    const hasMenu = ['connection', 'database', 'table', 'view', 'schema'].includes(type);
+export const SidebarContextMenu: React.FC<SidebarContextMenuProps> = ({ children, type, onAction, connectionId }) => {
+    const store = useAppStore();
+    const activeId = connectionId || store.activeConnectionId || store.nosqlActiveConnectionId;
+    const connection = store.connections.find(c => c.id === activeId);
+    const isNoSql = connection?.type === 'mongodb' || connection?.type === 'mongodb+srv' || connection?.type === 'redis';
+
+    const hasMenu = ['connection', 'database', 'table', 'view', 'schema', 'collection'].includes(type);
     if (!hasMenu) return <>{children}</>;
 
     return (
@@ -30,9 +38,11 @@ export const SidebarContextMenu: React.FC<SidebarContextMenuProps> = ({ children
                         <ContextMenuItem onSelect={() => onAction('refresh')}>
                             Refresh
                         </ContextMenuItem>
-                        <ContextMenuItem onSelect={() => onAction('toggleShowAll')}>
-                            Toggle "Show All DBs"
-                        </ContextMenuItem>
+                        {!isNoSql && (
+                            <ContextMenuItem onSelect={() => onAction('toggleShowAll')}>
+                                Toggle "Show All DBs"
+                            </ContextMenuItem>
+                        )}
                         <ContextMenuSeparator />
                         <ContextMenuItem onSelect={() => onAction('createDatabase')}>
                             Create Database...
@@ -50,10 +60,12 @@ export const SidebarContextMenu: React.FC<SidebarContextMenuProps> = ({ children
                             Refresh
                         </ContextMenuItem>
                         <ContextMenuSeparator />
-                        <ContextMenuItem onSelect={() => onAction('createSchema')}>
-                            Create Schema...
-                        </ContextMenuItem>
-                        <ContextMenuSeparator />
+                        {!isNoSql && (
+                            <ContextMenuItem onSelect={() => onAction('createSchema')}>
+                                Create Schema...
+                            </ContextMenuItem>
+                        )}
+                        {!isNoSql && <ContextMenuSeparator />}
                         <ContextMenuItem
                             onSelect={() => onAction('deleteDatabase')}
                             className="text-red-600 focus:text-red-600 focus:bg-red-500/10"
@@ -173,6 +185,19 @@ export const SidebarContextMenu: React.FC<SidebarContextMenuProps> = ({ children
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => onAction('copyQualifiedName')}>
                             Copy Qualified Name
+                        </ContextMenuItem>
+                    </>
+                )}
+
+                {/* ─── Collection (NoSQL) ─── */}
+                {type === 'collection' && (
+                    <>
+                        <ContextMenuItem onSelect={() => onAction('refresh')}>
+                            Refresh
+                        </ContextMenuItem>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem onSelect={() => onAction('deleteCollection')} className="text-red-600">
+                            Drop Collection
                         </ContextMenuItem>
                     </>
                 )}

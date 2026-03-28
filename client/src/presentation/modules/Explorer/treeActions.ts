@@ -9,11 +9,12 @@ export const handleTreeAction = (
         setDatabaseToDelete: (name: string) => void;
         setDeleteDatabaseDialogOpen: (open: boolean) => void;
         handleRefresh: () => void;
+        overrideConnectionId?: string | null;
     }
 ) => {
-    const { setDatabaseToDelete, setDeleteDatabaseDialogOpen, handleRefresh } = options;
+    const { setDatabaseToDelete, setDeleteDatabaseDialogOpen, handleRefresh, overrideConnectionId } = options;
     const store = useAppStore.getState();
-    const activeConnectionId = store.activeConnectionId;
+    const activeConnectionId = overrideConnectionId || store.activeConnectionId;
     const activeConnection = store.connections.find((c: any) => c.id === activeConnectionId);
     if (!activeConnection) return;
 

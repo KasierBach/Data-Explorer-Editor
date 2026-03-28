@@ -109,11 +109,15 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level, connectionI
     };
 
     return (
-        <SidebarContextMenu type={node.type as any} onAction={(action) => {
-            window.dispatchEvent(new CustomEvent('tree-node-action', {
-                detail: { action, nodeId: node.id, nodeType: node.type }
-            }));
-        }}>
+        <SidebarContextMenu 
+            type={node.type as any} 
+            connectionId={connectionId}
+            onAction={(action) => {
+                window.dispatchEvent(new CustomEvent('tree-node-action', {
+                    detail: { action, nodeId: node.id, nodeType: node.type }
+                }));
+            }}
+        >
             <div
                 className={cn(
                     "flex items-center py-1.5 px-2 hover:bg-accent/50 cursor-pointer select-none text-sm group transition-all duration-200 border-l-2 border-transparent",

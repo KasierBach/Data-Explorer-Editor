@@ -10,11 +10,18 @@ import { cn } from '@/lib/utils';
 import { ConnectionSelector } from '../Explorer/ConnectionSelector';
 import { Input } from '@/presentation/components/ui/input';
 import { SidebarContextMenu } from '../Explorer/SidebarContextMenu';
+import { CreateDatabaseDialog } from '@/presentation/components/Dialogs/CreateDatabaseDialog';
+import { DeleteDatabaseDialog } from '@/presentation/components/Dialogs/DeleteDatabaseDialog';
+import { handleTreeAction as importedHandleTreeAction } from '../Explorer/treeActions';
+import { toast } from 'sonner';
 
 export const NoSqlSidebar: React.FC = () => {
     const lang = useAppStore(state => state.lang);
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [isCreateDatabaseDialogOpen, setCreateDatabaseDialogOpen] = useState(false);
+    const [isDeleteDatabaseDialogOpen, setDeleteDatabaseDialogOpen] = useState(false);
+    const [databaseToDelete, setDatabaseToDelete] = useState<string | null>(null);
     const queryClient = useQueryClient();
 
     const handleRefresh = async () => {
@@ -23,6 +30,21 @@ export const NoSqlSidebar: React.FC = () => {
 
     const nosqlActiveConnectionId = useAppStore(state => state.nosqlActiveConnectionId);
     const activeConnection = useAppStore(state => state.connections.find((c: any) => c.id === nosqlActiveConnectionId));
+
+    React.useEffect(() => {
+        const handleTreeAction = (e: CustomEvent<{ action: string, nodeId: string, nodeType: string }>) => {
+            const { action, nodeId, nodeType } = e.detail;
+            importedHandleTreeAction(action, nodeId, nodeType, {
+                setDatabaseToDelete,
+                setDeleteDatabaseDialogOpen,
+                handleRefresh,
+                overrideConnectionId: nosqlActiveConnectionId
+            });
+        };
+
+        window.addEventListener('tree-node-action', handleTreeAction as EventListener);
+        return () => window.removeEventListener('tree-node-action', handleTreeAction as EventListener);
+    }, [nosqlActiveConnectionId]);
 
     // Sync active connection with backend when nosqlActiveConnectionId changes
     React.useEffect(() => {
@@ -113,8 +135,10 @@ export const NoSqlSidebar: React.FC = () => {
                     <div className="px-2">
                         <SidebarContextMenu
                             type="connection"
+                            connectionId={nosqlActiveConnectionId}
                             onAction={(action) => {
                                 if (action === 'refresh') triggerRefresh();
+                                if (action === 'createDatabase') setCreateDatabaseDialogOpen(true);
                             }}
                         >
                             <div className={cn(
@@ -156,6 +180,20 @@ export const NoSqlSidebar: React.FC = () => {
                     <span>{lang === 'vi' ? 'Document DB Active' : 'Document DB Active'}</span>
                 </div>
             </div>
+
+            <CreateDatabaseDialog
+                isOpen={isCreateDatabaseDialogOpen}
+                onClose={() => setCreateDatabaseDialogOpen(false)}
+                connectionId={nosqlActiveConnectionId}
+                onSuccess={triggerRefresh}
+            />
+            <DeleteDatabaseDialog
+                isOpen={isDeleteDatabaseDialogOpen}
+                onClose={() => setDeleteDatabaseDialogOpen(false)}
+                connectionId={nosqlActiveConnectionId}
+                databaseName={databaseToDelete}
+                onSuccess={triggerRefresh}
+            />
         </div>
     );
 };
