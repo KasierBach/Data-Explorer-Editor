@@ -13,7 +13,6 @@ import { SidebarContextMenu } from '../Explorer/SidebarContextMenu';
 import { CreateDatabaseDialog } from '@/presentation/components/Dialogs/CreateDatabaseDialog';
 import { DeleteDatabaseDialog } from '@/presentation/components/Dialogs/DeleteDatabaseDialog';
 import { handleTreeAction as importedHandleTreeAction } from '../Explorer/treeActions';
-import { toast } from 'sonner';
 
 export const NoSqlSidebar: React.FC = () => {
     const lang = useAppStore(state => state.lang);
