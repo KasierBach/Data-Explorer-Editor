@@ -125,7 +125,9 @@ export class AuthService implements OnModuleInit {
         }
 
         const displayName = UserUtils.getDisplayName(firstName, lastName, registerDto.email);
-        this.mailService.sendVerificationEmail(user.email, displayName, otp);
+        this.mailService.sendVerificationEmail(user.email, displayName, otp).catch(err => {
+            console.error('Failed to send verification email in background:', err.message);
+        });
 
         return {
             message: 'Đăng ký thành công. Vui lòng kiểm tra email để nhận mã xác minh.',

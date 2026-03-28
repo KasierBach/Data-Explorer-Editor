@@ -15,7 +15,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
 
     createPool(connectionConfig: any, databaseOverride?: string): any {
         const isLocalhost = connectionConfig.host === 'localhost' || connectionConfig.host === '127.0.0.1';
-        return new Pool({
+        const pool = new Pool({
             host: connectionConfig.host,
             port: connectionConfig.port,
             user: connectionConfig.username,
@@ -28,6 +28,13 @@ export class PostgresStrategy implements IDatabaseStrategy {
             statement_timeout: 30000, // 30 seconds
             query_timeout: 30000, // 30 seconds
         });
+        
+        // Prevent background connection errors from crashing the whole Node.js process
+        pool.on('error', (err: Error) => {
+            console.error('Unexpected error on idle Postgres client:', err.message);
+        });
+        
+        return pool;
     }
 
     async closePool(pool: any): Promise<void> {
