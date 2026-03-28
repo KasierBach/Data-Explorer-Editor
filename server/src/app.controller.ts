@@ -19,4 +19,20 @@ export class AppController {
       timestamp: new Date().toISOString()
     };
   }
+
+  // API an toàn để test xem trên Render có dán đúng biến môi trường Brevo chưa
+  @Get('mail/debug')
+  debugMailConfig() {
+    const mailUser = process.env.MAIL_USER;
+    const mailPass = process.env.MAIL_PASS;
+    return {
+        message: 'Mail Config Debug Status',
+        isMailUserConfigured: !!mailUser,
+        isMailPassConfigured: !!mailPass,
+        senderEmail: mailUser || 'Chưa cấu hình!',
+        apiKeyLength: mailPass ? mailPass.length : 0,
+        hint: (!mailUser || !mailPass) ? '⚠️ Bạn quên Add biến môi trường trên mục Environment của Render rồi!' : '✅ Tuyệt vời, Biến môi trường đã được nhận!',
+        provider: 'Brevo API (v3) qua Cổng 443 (Không bị Render block)'
+    };
+  }
 }
