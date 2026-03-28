@@ -57,7 +57,12 @@ export const NavUserSection: React.FC<NavUserSectionProps> = ({
                 <>
                     <div className="h-4 w-px bg-border mx-1" />
                     <TokenTimer />
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => { setActiveProfileTab('advanced'); setIsProfileOpen(true); }}
+                    >
                         <Settings className="w-4 h-4 text-muted-foreground" />
                     </Button>
                 </>

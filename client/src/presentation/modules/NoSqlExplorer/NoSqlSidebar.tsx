@@ -13,6 +13,7 @@ import { SidebarContextMenu } from '../Explorer/SidebarContextMenu';
 import { CreateDatabaseDialog } from '@/presentation/components/Dialogs/CreateDatabaseDialog';
 import { DeleteDatabaseDialog } from '@/presentation/components/Dialogs/DeleteDatabaseDialog';
 import { handleTreeAction as importedHandleTreeAction } from '../Explorer/treeActions';
+import { toast } from 'sonner';
 
 export const NoSqlSidebar: React.FC = () => {
     const lang = useAppStore(state => state.lang);
@@ -24,7 +25,9 @@ export const NoSqlSidebar: React.FC = () => {
     const queryClient = useQueryClient();
 
     const handleRefresh = async () => {
+        const t = toast.loading(lang === 'vi' ? 'Đang làm mới dữ liệu...' : 'Refreshing hierarchy...');
         await queryClient.resetQueries({ queryKey: ['hierarchy'] });
+        toast.success(lang === 'vi' ? 'Đã cập nhật' : 'Refreshed', { id: t });
     };
 
     const nosqlActiveConnectionId = useAppStore(state => state.nosqlActiveConnectionId);
@@ -87,7 +90,12 @@ export const NoSqlSidebar: React.FC = () => {
                         >
                             <RefreshCw className="h-3.5 h-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-green-500/20 hover:text-green-600">
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 rounded-lg hover:bg-green-500/20 hover:text-green-600"
+                            onClick={() => setCreateDatabaseDialogOpen(true)}
+                        >
                             <Plus className="h-3.5 w-3.5" />
                         </Button>
                     </div>

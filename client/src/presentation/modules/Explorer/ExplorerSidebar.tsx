@@ -29,8 +29,10 @@ export const ExplorerSidebar: React.FC = () => {
     const queryClient = useQueryClient();
 
     const handleRefresh = async () => {
+        const t = toast.loading(lang === 'vi' ? 'Đang làm mới dữ liệu...' : 'Refreshing hierarchy...');
         console.log("♻️ Sidebar triggering manual refresh");
         await queryClient.resetQueries({ queryKey: ['hierarchy'] });
+        toast.success(lang === 'vi' ? 'Đã cập nhật' : 'Refreshed', { id: t });
     };
 
     React.useEffect(() => {
@@ -99,7 +101,12 @@ export const ExplorerSidebar: React.FC = () => {
                         >
                             <RefreshCw className="h-3.5 h-3.5 text-muted-foreground/70" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-accent/50 text-muted-foreground/70">
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 rounded-lg hover:bg-accent/50 text-muted-foreground/70"
+                            onClick={() => setCreateDatabaseDialogOpen(true)}
+                        >
                             <Plus className="h-3.5 w-3.5" />
                         </Button>
                     </div>
