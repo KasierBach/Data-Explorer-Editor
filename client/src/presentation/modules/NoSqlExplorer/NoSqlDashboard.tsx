@@ -33,23 +33,27 @@ export const NoSqlDashboard: React.FC = () => {
             <div className="max-w-5xl mx-auto space-y-8">
 
                 {/* Header / Welcome Banner */}
-                <div className="flex flex-col gap-2 relative">
+                <div className="flex flex-col gap-3 relative">
                     <div className="flex items-center justify-between">
-                        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                            {lang === 'vi' ? 'Chào mừng bạn đến với Data Explorer' : 'Welcome to Data Explorer'}
-                        </h1>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
+                                {lang === 'vi' ? 'Chào mừng bạn đến với Data Explorer' : 'Welcome to Data Explorer'}
+                            </h1>
+                            <span className="hidden sm:inline-flex px-3 py-1 rounded-full bg-green-500/10 text-green-500 text-[10px] md:text-xs font-bold uppercase tracking-widest border border-green-500/20 whitespace-nowrap items-center gap-1.5">
+                                <Database className="w-3.5 h-3.5" /> NoSQL
+                            </span>
+                        </div>
                         <LanguageSwitcher />
                     </div>
-                    <p className="text-muted-foreground text-base md:text-lg flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded bg-green-500/10 text-green-500 text-sm font-semibold uppercase tracking-widest border border-green-500/20">NoSQL Workspace</span>
+                    <p className="text-muted-foreground text-base md:text-lg max-w-3xl">
                         {lang === 'vi'
-                            ? 'Làm việc mượt mà với MongoDB, truy vấn chuẩn MQL và xử lý dữ liệu JSON khổng lồ.'
-                            : 'Work seamlessly with MongoDB, run MQL queries and handle massive JSON datasets.'}
+                            ? 'Làm việc trơn tru với MongoDB, chạy các truy vấn MQL và xử lý khối lượng dữ liệu JSON khổng lồ một cách dễ dàng.'
+                            : 'Work seamlessly with MongoDB, run MQL queries and handle massive JSON datasets with ease.'}
                     </p>
                 </div>
 
                 {/* Quick Actions */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     <div className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer hover:border-green-500/50" onClick={() => setSidebarOpen(true)}>
                         <div className="p-4 md:p-6 flex flex-col gap-3 md:gap-4">
                             <div className="p-2 md:p-3 w-fit rounded-lg bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400">
