@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppStore } from '@/core/services/store';
-import { Leaf, Database, Play, Filter, BoxSelect, TreeDeciduous, Loader2, AlertCircle } from 'lucide-react';
+import { Leaf, Database, Play, Filter, TreeDeciduous, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { useVerticalResizablePanel } from '@/presentation/hooks/useVerticalResizablePanel';
 import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
@@ -9,6 +9,7 @@ import { useNoSqlQuery } from '@/presentation/hooks/useNoSqlQuery';
 import { JsonTreeView } from './JsonTreeView';
 import { MqlEditor } from './MqlEditor';
 import { NoSqlGridView } from './NoSqlGridView';
+import { NoSqlDashboard } from './NoSqlDashboard';
 
 export const NoSqlMainContent: React.FC = () => {
     const { 
@@ -52,14 +53,7 @@ export const NoSqlMainContent: React.FC = () => {
     }
 
     if (!nosqlActiveCollection) {
-        return (
-            <div className="h-full w-full bg-background flex flex-col items-center justify-center text-muted-foreground p-8">
-                <BoxSelect className="w-12 h-12 mb-4 opacity-30 text-green-500" />
-                <p className="text-lg font-medium opacity-80">
-                    {lang === 'vi' ? 'Chọn một Collection để bắt đầu' : 'Select a Collection to start'}
-                </p>
-            </div>
-        );
+        return <NoSqlDashboard />;
     }
 
     return (
