@@ -65,26 +65,47 @@ export function InstallationSection({ lang }: Props) {
                 </StepBlock>
             </DocSection>
 
-            <DocSection title={t ? 'Triển khai Docker Compose (Production-like)' : 'Docker Compose Deployment'}>
+            <DocSection title={t ? 'Triển khai Docker Compose (Production & Testing)' : 'Docker Compose Deployment'}>
                 <Prose>
                     {t
-                        ? 'Để triển khai một bản stack hoàn chỉnh bao gồm App Server và Database nội bộ, hãy sử dụng Docker Compose:'
-                        : 'To deploy a complete stack including the App Server and internal Database, use Docker Compose:'}
+                        ? 'Để triển khai một bản stack hoàn chỉnh bao gồm App Server và Database PostgreSQL nội bộ một cách nhanh chóng, hãy sử dụng quy trình Docker:'
+                        : 'To deploy a complete stack including the App Server and internal PostgreSQL database quickly, follow the Docker workflow:'}
                 </Prose>
-                <CodeBlock title="docker-compose.yml">
-                    <CodeLine>services:</CodeLine>
-                    <CodeLine>  postgres-meta:</CodeLine>
-                    <CodeLine>    image: postgres:16-alpine</CodeLine>
-                    <CodeLine>    environment:</CodeLine>
-                    <CodeLine>      POSTGRES_DB: data_explorer_meta</CodeLine>
-                    <CodeLine>    ports: ["5433:5432"]</CodeLine>
-                    <p className="mt-2" />
-                    <CodeLine>  backend:</CodeLine>
-                    <CodeLine>    build: ./server</CodeLine>
-                    <CodeLine>    environment:</CodeLine>
-                    <CodeLine>      DATABASE_URL: postgresql://...:5433/data_explorer_meta</CodeLine>
-                    <CodeLine>    ports: ["3000:3000"]</CodeLine>
-                </CodeBlock>
+
+                <StepBlock step={1} title={t ? 'Chuẩn bị Biến môi trường' : 'Prepare Environment Variables'}>
+                    <Prose>{t
+                        ? 'Tạo file server/.env và điền các API Key (GEMINI_API_KEY, v.v). Docker Compose đã được cấu hình mặc định để đọc tệp này thông qua thuộc tính env_file.'
+                        : 'Create a server/.env file and fill in your API Keys (GEMINI_API_KEY, etc). Docker Compose is pre-configured to read this file via the env_file property.'}</Prose>
+                </StepBlock>
+
+                <StepBlock step={2} title={t ? 'Khởi động Container' : 'Launch Containers'}>
+                    <CodeBlock title="Terminal">
+                        <CodeComment>{t ? 'Tự động build và chạy nền toàn bộ stack' : 'Auto build and run the entire stack in background'}</CodeComment>
+                        <CodeLine>docker-compose up -d --build</CodeLine>
+                        <p className="mt-2" />
+                        <CodeComment>{t ? 'Xem log để đảm bảo hệ thống đã sẵn sàng' : 'Check logs to ensure systems are ready'}</CodeComment>
+                        <CodeLine>docker-compose logs -f</CodeLine>
+                    </CodeBlock>
+                </StepBlock>
+
+                <StepBlock step={3} title={t ? 'Thông tin Port & Volume' : 'Ports & Persistence'}>
+                    <div className="grid sm:grid-cols-2 gap-3 mt-4">
+                        <div className="p-3 border rounded-xl bg-blue-500/5 text-xs">
+                            <span className="font-bold text-blue-600 block mb-1">Ports:</span>
+                            <ul className="space-y-1 list-disc list-inside opacity-70">
+                                <li>Frontend: 80</li>
+                                <li>Backend: 3001</li>
+                                <li>Postgres: 5435</li>
+                            </ul>
+                        </div>
+                        <div className="p-3 border rounded-xl bg-orange-500/5 text-xs">
+                            <span className="font-bold text-orange-600 block mb-1">Volumes:</span>
+                            <p className="opacity-70 leading-relaxed">
+                                {t ? 'Dữ liệu SQLite/Prisma được lưu trong pgdata volume để tránh mất dữ liệu khi restart.' : 'Prisma/Postgres data is persistent in the pgdata volume.'}
+                            </p>
+                        </div>
+                    </div>
+                </StepBlock>
             </DocSection>
 
             <div className="mt-12 grid md:grid-cols-3 gap-6">
