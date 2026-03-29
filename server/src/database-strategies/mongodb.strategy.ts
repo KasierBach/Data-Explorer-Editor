@@ -9,6 +9,7 @@ import {
     DatabaseMetrics,
     UpdateRowParams
 } from './database-strategy.interface';
+import { sanitizeNoSql, validateNoSqlPayload } from '../common/utils/nosql-sanitizer.util';
 
 const inferType = (value: any): string => {
     if (value === null) return 'null';
@@ -75,6 +76,14 @@ export class MongoDbStrategy implements IDatabaseStrategy {
             throw new Error(`Invalid MongoDB query payload (must be valid JSON). Received: ${queryPayloadStr}`);
         }
 
+        // Validate top-level structure and sanitize nested operators
+        validateNoSqlPayload(payload);
+        const filter = sanitizeNoSql(payload.filter || {});
+        const update = sanitizeNoSql(payload.update || {});
+        const document = sanitizeNoSql(payload.document || {});
+        const documents = Array.isArray(payload.documents) ? payload.documents.map(d => sanitizeNoSql(d)) : [];
+        const pipeline = Array.isArray(payload.pipeline) ? payload.pipeline.map(p => sanitizeNoSql(p)) : [];
+
         const db = client.db();
         const col = db.collection(payload.collection);
 
@@ -84,35 +93,35 @@ export class MongoDbStrategy implements IDatabaseStrategy {
 
         switch (payload.action) {
             case 'find':
-                result = await col.find(payload.filter || {}, payload.options || {}).limit(payload.limit || 100).toArray();
+                result = await col.find(filter, payload.options || {}).limit(payload.limit || 100).toArray();
                 rows = result;
                 break;
             case 'aggregate':
-                result = await col.aggregate(payload.pipeline || []).toArray();
+                result = await col.aggregate(pipeline).toArray();
                 rows = result;
                 break;
             case 'insertOne':
-                result = await col.insertOne(payload.document);
+                result = await col.insertOne(document);
                 rows = [{ insertedId: result.insertedId.toString() }];
                 break;
             case 'insertMany':
-                result = await col.insertMany(payload.documents);
+                result = await col.insertMany(documents);
                 rows = [{ insertedCount: result.insertedCount }];
                 break;
             case 'updateOne':
-                result = await col.updateOne(payload.filter, payload.update, payload.options || {});
+                result = await col.updateOne(filter, update, payload.options || {});
                 rows = [{ matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }];
                 break;
             case 'updateMany':
-                result = await col.updateMany(payload.filter, payload.update, payload.options || {});
+                result = await col.updateMany(filter, update, payload.options || {});
                 rows = [{ matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }];
                 break;
             case 'deleteOne':
-                result = await col.deleteOne(payload.filter);
+                result = await col.deleteOne(filter);
                 rows = [{ deletedCount: result.deletedCount }];
                 break;
             case 'deleteMany':
-                result = await col.deleteMany(payload.filter);
+                result = await col.deleteMany(filter);
                 rows = [{ deletedCount: result.deletedCount }];
                 break;
             default:
