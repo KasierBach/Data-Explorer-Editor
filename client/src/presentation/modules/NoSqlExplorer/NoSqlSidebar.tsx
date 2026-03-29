@@ -78,7 +78,7 @@ export const NoSqlSidebar: React.FC = () => {
                             <Leaf className="w-3.5 h-3.5 text-green-500" />
                         </div>
                         <h2 className="font-bold text-[11px] uppercase tracking-[0.2em] text-green-700 dark:text-green-400">
-                            {lang === 'vi' ? 'Bộ sưu tập' : 'Collections'}
+                            NoSQL
                         </h2>
                     </div>
                     <div className="flex items-center gap-1">

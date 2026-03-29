@@ -89,7 +89,7 @@ export const ExplorerSidebar: React.FC = () => {
                             <Layers className="w-3.5 h-3.5 text-blue-500" />
                         </div>
                         <h2 className="font-bold text-[11px] uppercase tracking-[0.2em] text-muted-foreground/80">
-                            {lang === 'vi' ? 'Điều hướng' : 'Navigator'}
+                            SQL
                         </h2>
                     </div>
                     <div className="flex items-center gap-1">
