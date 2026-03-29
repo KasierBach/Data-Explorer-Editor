@@ -55,7 +55,7 @@ export const LoginPage = () => {
 
             // Redirect based on onboarding status
             if (user.isOnboarded) {
-                navigate('/app');
+                navigate('/sql-explorer');
             } else {
                 navigate('/onboarding');
             }

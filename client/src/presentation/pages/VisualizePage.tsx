@@ -22,7 +22,7 @@ export function VisualizePage() {
                     <h2 className="text-xl font-bold">No Connections</h2>
                     <p className="text-muted-foreground">Add a database connection to create visualizations.</p>
                     <div className="flex gap-2 justify-center">
-                        <Button variant="outline" onClick={() => navigate('/app')}>Go Back</Button>
+                        <Button variant="outline" onClick={() => navigate('/sql-explorer')}>Go Back</Button>
                         <Button onClick={() => openConnectionDialog()}>
                             <Plus className="w-4 h-4 mr-2" /> Add Connection
                         </Button>
@@ -53,7 +53,7 @@ export function VisualizePage() {
                             </button>
                         ))}
                     </div>
-                    <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate('/app')}>
+                    <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate('/sql-explorer')}>
                         <ArrowLeft className="w-3 h-3 mr-2" /> Go Back
                     </Button>
                 </div>
@@ -67,7 +67,7 @@ export function VisualizePage() {
             {/* Header with connection selector */}
             <header className="h-12 border-b bg-card flex items-center px-3 md:px-4 justify-between shrink-0 select-none">
                 <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/app')}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/sql-explorer')}>
                         <ArrowLeft className="w-4 h-4" />
                     </Button>
                     <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />

@@ -30,7 +30,7 @@ export const AiSpotlightSection: React.FC<AiSpotlightSectionProps> = ({ lang, ad
                                 : "Beyond text. With Multimodal Vision, Gemini 3.1 analyzes ERD diagrams, identifies complex entity relationships, and suggests automated backend source code restructuring."}
                         </p>
                         <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
-                            <Button size="lg" onClick={() => navigate('/app')} className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8">
+                            <Button size="lg" onClick={() => navigate('/sql-explorer')} className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8">
                                 {lang === 'vi' ? 'Trò chuyện với Trợ lý' : 'Talk to Assistant'}
                             </Button>
                             <Button size="lg" variant="ghost" onClick={() => navigate('/docs')} className="text-xs font-bold text-muted-foreground hover:text-white uppercase tracking-widest">

@@ -55,7 +55,7 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
                             <Button variant="ghost" size="sm" onClick={() => { logout(); navigate('/login'); }} className="hidden sm:flex hover:bg-red-500/10 hover:text-red-500 text-xs uppercase tracking-wider">
                                 Logout
                             </Button>
-                            <Button size="sm" onClick={() => navigate('/app')} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-widest font-bold">
+                            <Button size="sm" onClick={() => navigate('/sql-explorer')} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-widest font-bold">
                                 Workspace
                             </Button>
                         </div>

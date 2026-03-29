@@ -35,7 +35,7 @@ export const OnboardingPage = () => {
     }
 
     if (user.isOnboarded) {
-        navigate('/app');
+        navigate('/sql-explorer');
         return null;
     }
 
@@ -62,7 +62,7 @@ export const OnboardingPage = () => {
             login(accessToken, updatedUser);
             
             toast.success('Welcome to Data Explorer! 🚀');
-            navigate('/app');
+            navigate('/sql-explorer');
 
         } catch (err: any) {
             toast.error(err.message || 'Something went wrong');

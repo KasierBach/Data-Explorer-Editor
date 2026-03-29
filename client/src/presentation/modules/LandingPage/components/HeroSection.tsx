@@ -90,7 +90,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-6">
                     <Button 
                         size="lg" 
-                        onClick={() => navigate(isAuthenticated ? '/app' : '/login')} 
+                        onClick={() => navigate(isAuthenticated ? '/sql-explorer' : '/login')} 
                         className="h-12 px-8 text-[10px] font-black uppercase tracking-[0.2em] bg-blue-600 hover:bg-blue-700 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)] w-full sm:w-auto rounded-xl transition-all hover:scale-105 active:scale-95 group"
                     >
                         {isAuthenticated ? (lang === 'vi' ? 'Vào Workspace' : 'Open Workspace') : (lang === 'vi' ? 'Nhận quyền truy cập' : 'Claim Your Access')}

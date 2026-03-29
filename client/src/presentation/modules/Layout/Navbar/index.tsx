@@ -49,10 +49,10 @@ export const Navbar: React.FC = () => {
                 {!isMobile && (
                     <div className="flex bg-muted p-1 rounded-md border items-center">
                         <Button 
-                            variant={location.pathname.startsWith('/app') ? 'secondary' : 'ghost'} 
+                            variant={location.pathname.startsWith('/sql-explorer') ? 'secondary' : 'ghost'} 
                             size="sm" 
                             className="h-7 px-3 text-xs w-[88px] flex gap-1.5"
-                            onClick={() => navigate('/app')}
+                            onClick={() => navigate('/sql-explorer')}
                         >
                             <Database className="w-3.5 h-3.5" />
                             <span className="font-semibold">SQL</span>

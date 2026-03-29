@@ -16,7 +16,7 @@ export const RequireAuth = ({ children, requireAdmin = false }: { children: Reac
     }
 
     if (requireAdmin && user?.role !== 'admin') {
-        return <Navigate to="/app" replace />;
+        return <Navigate to="/sql-explorer" replace />;
     }
 
     return <>{children}</>;

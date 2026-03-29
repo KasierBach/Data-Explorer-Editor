@@ -16,7 +16,7 @@ export function AdminDashboardPage() {
             {/* Sidebar */}
             <div className="w-64 border-r bg-card flex flex-col">
                 <div className="p-4 border-b flex items-center gap-3">
-                    <Button variant="ghost" size="icon" onClick={() => navigate('/app')} className="h-8 w-8">
+                    <Button variant="ghost" size="icon" onClick={() => navigate('/sql-explorer')} className="h-8 w-8">
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <div className="font-bold text-lg flex items-center gap-2">

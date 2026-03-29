@@ -109,7 +109,7 @@ export function DocumentationPage() {
                         <LanguageSwitcher />
                     </div>
 
-                    <Button variant="ghost" size="sm" onClick={() => navigate('/app')} className="text-xs h-8">
+                    <Button variant="ghost" size="sm" onClick={() => navigate('/sql-explorer')} className="text-xs h-8">
                         {lang === 'vi' ? 'Mở Ứng dụng' : 'Launch App'}
                     </Button>
                     <Button
@@ -220,7 +220,7 @@ export function DocumentationPage() {
                                 <Button variant="outline" size="sm" onClick={() => window.open('https://github.com/KasierBach/Data-Explorer-Editor.git', '_blank')}>
                                     <Github className="w-4 h-4 mr-2" /> GitHub
                                 </Button>
-                                <Button variant="default" size="sm" onClick={() => navigate('/app')}>
+                                <Button variant="default" size="sm" onClick={() => navigate('/sql-explorer')}>
                                     {lang === 'vi' ? 'Mở Ứng dụng' : 'Launch App'}
                                 </Button>
                             </div>

@@ -52,11 +52,11 @@ export function App() {
 
             <Route path="/admin" element={<RequireAuth requireAdmin={true}><AdminDashboardPage /></RequireAuth>} />
 
-            <Route path="/app/erd" element={<RequireAuth><ERDPage /></RequireAuth>} />
-            <Route path="/app/visualize" element={<RequireAuth><VisualizePage /></RequireAuth>} />
+            <Route path="/sql-explorer/erd" element={<RequireAuth><ERDPage /></RequireAuth>} />
+            <Route path="/sql-explorer/visualize" element={<RequireAuth><VisualizePage /></RequireAuth>} />
 
             <Route
-              path="/app/*"
+              path="/sql-explorer/*"
               element={
                 <RequireAuth>
                   <AppShell />
@@ -86,7 +86,7 @@ export function App() {
 function RedirectIfAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAppStore();
   if (isAuthenticated) {
-    return <Navigate to="/app" replace />;
+    return <Navigate to="/sql-explorer" replace />;
   }
   return <>{children}</>;
 }
