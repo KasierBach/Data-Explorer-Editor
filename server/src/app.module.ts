@@ -1,5 +1,6 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { LoggerMiddleware } from './common/middlewares/logger.middleware';
+import { CsrfMiddleware } from './common/middlewares/csrf.middleware';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -51,6 +52,6 @@ import { APP_GUARD } from '@nestjs/core';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(LoggerMiddleware).forRoutes('*');
+    consumer.apply(LoggerMiddleware, CsrfMiddleware).forRoutes('*');
   }
 }

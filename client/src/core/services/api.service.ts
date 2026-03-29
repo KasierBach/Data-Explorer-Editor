@@ -8,6 +8,7 @@ class ApiService {
     const token = useAppStore.getState().accessToken;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
       ...customHeaders,
     };
     if (token) {

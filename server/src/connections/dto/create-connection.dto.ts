@@ -1,4 +1,5 @@
 import { IsString, IsInt, IsOptional, IsIn, IsNotEmpty } from 'class-validator';
+import { IsValidHost } from '../../common/decorators/is-valid-host.decorator';
 
 export class CreateConnectionDto {
     @IsString()
@@ -11,6 +12,7 @@ export class CreateConnectionDto {
 
     @IsString()
     @IsOptional()
+    @IsValidHost({ message: 'Host address is not allowed for security reasons (SSRF).' })
     host?: string;
 
     @IsInt()
