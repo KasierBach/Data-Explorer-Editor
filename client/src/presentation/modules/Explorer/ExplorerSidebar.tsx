@@ -21,7 +21,6 @@ export const ExplorerSidebar: React.FC = () => {
     const setActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
     const activeDatabase = useAppStore(state => state.activeDatabase);
     const lang = useAppStore(state => state.lang);
-
     const [searchTerm, setSearchTerm] = useState('');
     const [isCreateDatabaseDialogOpen, setCreateDatabaseDialogOpen] = useState(false);
     const [isDeleteDatabaseDialogOpen, setDeleteDatabaseDialogOpen] = useState(false);
@@ -60,6 +59,9 @@ export const ExplorerSidebar: React.FC = () => {
     }, [activeConnectionId, connections, setActiveConnectionId]);
 
     const activeConnection = useAppStore(state => state.connections.find((c: any) => c.id === state.activeConnectionId));
+    const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
+    // Logic: Nếu kết nối có sẵn DB (Cloud), ưu tiên hiện DB đó. Nếu không mới hiện DB do người dùng click (activeDatabase).
+    const effectiveDatabase = activeConnection?.database || (!isNoSql ? activeDatabase : null);
 
     React.useEffect(() => {
         if (activeConnection) {
@@ -215,10 +217,10 @@ export const ExplorerSidebar: React.FC = () => {
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     <span>{lang === 'vi' ? 'Đang kết nối' : 'Connected'}</span>
                 </div>
-                {activeDatabase && (
-                    <div className="flex items-center gap-1 text-emerald-500/80 text-[8px]">
+                {!isNoSql && effectiveDatabase && (
+                    <div className="flex items-center gap-1 text-blue-500/80 text-[8px]">
                         <Database className="w-2.5 h-2.5" />
-                        <span className="truncate max-w-[100px]">{activeDatabase}</span>
+                        <span className="truncate max-w-[100px]">{effectiveDatabase}</span>
                     </div>
                 )}
                 <span className="opacity-50">V3.1.0-PRO</span>

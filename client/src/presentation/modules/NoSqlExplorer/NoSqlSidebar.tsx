@@ -31,7 +31,9 @@ export const NoSqlSidebar: React.FC = () => {
     };
 
     const nosqlActiveConnectionId = useAppStore(state => state.nosqlActiveConnectionId);
+    const nosqlActiveDatabase = useAppStore(state => state.nosqlActiveDatabase);
     const activeConnection = useAppStore(state => state.connections.find((c: any) => c.id === nosqlActiveConnectionId));
+    const nosqlEffectiveDatabase = activeConnection?.database || nosqlActiveDatabase;
 
     React.useEffect(() => {
         const handleTreeAction = (e: CustomEvent<{ action: string, nodeId: string, nodeType: string }>) => {
@@ -181,11 +183,19 @@ export const NoSqlSidebar: React.FC = () => {
                 )}
             </div>
             
+            {/* Dynamic NoSQL Footer */}
             <div className="p-3 border-t bg-muted/20 flex items-center justify-between text-[9px] font-bold uppercase tracking-widest">
                 <div className="flex items-center gap-1.5 opacity-50 text-green-600 dark:text-green-400">
                     <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                    <span>{lang === 'vi' ? 'Document DB Active' : 'Document DB Active'}</span>
+                    <span>{lang === 'vi' ? 'Kết nối NoSQL' : 'NoSQL Connected'}</span>
                 </div>
+                {nosqlEffectiveDatabase && (
+                    <div className="flex items-center gap-1 text-green-500/80">
+                        <Database className="w-2.5 h-2.5" />
+                        <span className="truncate max-w-[100px]">{nosqlEffectiveDatabase}</span>
+                    </div>
+                )}
+                <span className="opacity-50">V3.1.0-PRO</span>
             </div>
 
             <CreateDatabaseDialog

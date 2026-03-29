@@ -69,7 +69,7 @@ export const Navbar: React.FC = () => {
                     </div>
                 )}
 
-                {!isMobile && (
+                {!isMobile && location.pathname.startsWith('/sql-explorer') && (
                     <NavMainActions 
                         activeConnectionId={activeConnectionId}
                         openInsightsTab={openInsightsTab}

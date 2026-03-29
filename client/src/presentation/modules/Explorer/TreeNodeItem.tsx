@@ -73,7 +73,8 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level, connectionI
     const activeConnection = useAppStore(state => state.connections.find(c => c.id === connectionId));
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
 
-    const isActiveDb = node.type === 'database' && activeDatabase === node.name;
+    const nosqlActiveDatabase = useAppStore(state => state.nosqlActiveDatabase);
+    const isActiveDb = node.type === 'database' && (isNoSql ? nosqlActiveDatabase === node.name : activeDatabase === node.name);
 
     const handleToggle = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -83,7 +84,6 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level, connectionI
             }
             if (isNoSql) {
                 setNosqlDatabase(node.name);
-                setActiveDatabase(node.name); // Sync for backend pool key
             } else {
                 setActiveDatabase(node.name);
             }
