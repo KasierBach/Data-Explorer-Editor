@@ -24,7 +24,9 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom', 'zustand'],
-          ui: ['framer-motion', 'lucide-react', 'sonner']
+          ui: ['framer-motion', 'lucide-react', 'sonner'],
+          editor: ['@monaco-editor/react'],
+          data: ['xlsx', 'sql-formatter', 'pdfjs-dist']
         }
       }
     }
