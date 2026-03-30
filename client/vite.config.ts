@@ -19,6 +19,16 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom', 'zustand'],
+          ui: ['framer-motion', 'lucide-react', 'sonner']
+        }
+      }
+    }
+  },
   // @ts-ignore
   test: {
     globals: true,

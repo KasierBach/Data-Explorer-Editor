@@ -3,6 +3,7 @@ import { useAppStore } from '@/core/services/store';
 import { SEO } from '../components/shared/Seo';
 import { LandingHeader } from '../modules/LandingPage/components/LandingHeader';
 import { HeroSection } from '../modules/LandingPage/components/HeroSection';
+import { InteractiveBackground } from '../modules/LandingPage/components/InteractiveBackground';
 
 // Lazy load sections below the fold
 const FeaturesSection = lazy(() => import('../modules/LandingPage/components/FeaturesSection').then(m => ({ default: m.FeaturesSection })));
@@ -12,7 +13,6 @@ const AiSpotlightSection = lazy(() => import('../modules/LandingPage/components/
 const PricingSection = lazy(() => import('../modules/LandingPage/components/PricingSection').then(m => ({ default: m.PricingSection })));
 const DocsCtaSection = lazy(() => import('../modules/LandingPage/components/DocsCtaSection').then(m => ({ default: m.DocsCtaSection })));
 const LandingFooter = lazy(() => import('../modules/LandingPage/components/LandingFooter').then(m => ({ default: m.LandingFooter })));
-const InteractiveBackground = lazy(() => import('../modules/LandingPage/components/InteractiveBackground').then(m => ({ default: m.InteractiveBackground })));
 
 export const LandingPage: React.FC = () => {
     const { isAuthenticated, logout, lang } = useAppStore();
@@ -54,9 +54,7 @@ export const LandingPage: React.FC = () => {
                     : "Explore and manage SQL & NoSQL with the power of AI. Modern, fast, and secure database explorer."
                 }
             />
-            <Suspense fallback={null}>
-                <InteractiveBackground />
-            </Suspense>
+            <InteractiveBackground />
 
             <LandingHeader 
                 lang={lang} 
@@ -69,19 +67,31 @@ export const LandingPage: React.FC = () => {
             <main className="flex-1 flex flex-col relative z-10">
                 <HeroSection lang={lang} isAuthenticated={isAuthenticated} />
                 
-                <Suspense fallback={<div className="h-96" />}>
+                <Suspense fallback={<div className="min-h-[60vh] w-full" />}>
                     <DemoMockup addToRevealRefs={addToRevealRefs} />
+                </Suspense>
 
+                <Suspense fallback={<div className="min-h-screen w-full" />}>
                     <FeaturesSection lang={lang} />
-                    
+                </Suspense>
+                
+                <Suspense fallback={<div className="min-h-[80vh] w-full" />}>
                     <WorkflowSection lang={lang} />
+                </Suspense>
 
+                <Suspense fallback={<div className="min-h-[80vh] w-full" />}>
                     <AiSpotlightSection lang={lang} addToRevealRefs={addToRevealRefs} />
+                </Suspense>
 
+                <Suspense fallback={<div className="min-h-screen w-full" />}>
                     <PricingSection lang={lang} addToRevealRefs={addToRevealRefs} />
+                </Suspense>
 
+                <Suspense fallback={<div className="min-h-[40vh] w-full" />}>
                     <DocsCtaSection lang={lang} addToRevealRefs={addToRevealRefs} />
+                </Suspense>
 
+                <Suspense fallback={<div className="min-h-[30vh] w-full bg-background" />}>
                     <LandingFooter lang={lang} />
                 </Suspense>
             </main>
