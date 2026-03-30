@@ -17,10 +17,11 @@ const LandingFooter = lazy(() => import('../modules/LandingPage/components/Landi
 export const LandingPage: React.FC = () => {
     const { isAuthenticated, logout, lang } = useAppStore();
     const revealRefs = useRef<HTMLDivElement[]>([]);
+    const observer = useRef<IntersectionObserver | null>(null);
     const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
     useEffect(() => {
-        const observer = new IntersectionObserver(
+        observer.current = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {
                     if (entry.isIntersecting) {
@@ -32,15 +33,18 @@ export const LandingPage: React.FC = () => {
         );
 
         revealRefs.current.forEach((ref) => {
-            if (ref) observer.observe(ref);
+            if (ref) observer.current?.observe(ref);
         });
 
-        return () => observer.disconnect();
+        return () => observer.current?.disconnect();
     }, []);
 
     const addToRevealRefs = (el: HTMLDivElement | null) => {
         if (el && !revealRefs.current.includes(el)) {
             revealRefs.current.push(el);
+            if (observer.current) {
+                observer.current.observe(el);
+            }
         }
     };
 
