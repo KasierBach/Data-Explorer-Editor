@@ -1,16 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, Suspense, lazy } from 'react';
 import { useAppStore } from '@/core/services/store';
 import { SEO } from '../components/shared/Seo';
 import { LandingHeader } from '../modules/LandingPage/components/LandingHeader';
 import { HeroSection } from '../modules/LandingPage/components/HeroSection';
-import { FeaturesSection } from '../modules/LandingPage/components/FeaturesSection';
-import { WorkflowSection } from '../modules/LandingPage/components/WorkflowSection';
-import { DemoMockup } from '../modules/LandingPage/components/DemoMockup';
-import { AiSpotlightSection } from '../modules/LandingPage/components/AiSpotlightSection';
-import { PricingSection } from '../modules/LandingPage/components/PricingSection';
-import { DocsCtaSection } from '../modules/LandingPage/components/DocsCtaSection';
-import { LandingFooter } from '../modules/LandingPage/components/LandingFooter';
-import { InteractiveBackground } from '../modules/LandingPage/components/InteractiveBackground';
+
+// Lazy load sections below the fold
+const FeaturesSection = lazy(() => import('../modules/LandingPage/components/FeaturesSection').then(m => ({ default: m.FeaturesSection })));
+const WorkflowSection = lazy(() => import('../modules/LandingPage/components/WorkflowSection').then(m => ({ default: m.WorkflowSection })));
+const DemoMockup = lazy(() => import('../modules/LandingPage/components/DemoMockup').then(m => ({ default: m.DemoMockup })));
+const AiSpotlightSection = lazy(() => import('../modules/LandingPage/components/AiSpotlightSection').then(m => ({ default: m.AiSpotlightSection })));
+const PricingSection = lazy(() => import('../modules/LandingPage/components/PricingSection').then(m => ({ default: m.PricingSection })));
+const DocsCtaSection = lazy(() => import('../modules/LandingPage/components/DocsCtaSection').then(m => ({ default: m.DocsCtaSection })));
+const LandingFooter = lazy(() => import('../modules/LandingPage/components/LandingFooter').then(m => ({ default: m.LandingFooter })));
+const InteractiveBackground = lazy(() => import('../modules/LandingPage/components/InteractiveBackground').then(m => ({ default: m.InteractiveBackground })));
 
 export const LandingPage: React.FC = () => {
     const { isAuthenticated, logout, lang } = useAppStore();
@@ -52,7 +54,9 @@ export const LandingPage: React.FC = () => {
                     : "Explore and manage SQL & NoSQL with the power of AI. Modern, fast, and secure database explorer."
                 }
             />
-            <InteractiveBackground />
+            <Suspense fallback={null}>
+                <InteractiveBackground />
+            </Suspense>
 
             <LandingHeader 
                 lang={lang} 
@@ -65,19 +69,21 @@ export const LandingPage: React.FC = () => {
             <main className="flex-1 flex flex-col relative z-10">
                 <HeroSection lang={lang} isAuthenticated={isAuthenticated} />
                 
-                <DemoMockup addToRevealRefs={addToRevealRefs} />
+                <Suspense fallback={<div className="h-96" />}>
+                    <DemoMockup addToRevealRefs={addToRevealRefs} />
 
-                <FeaturesSection lang={lang} />
-                
-                <WorkflowSection lang={lang} />
+                    <FeaturesSection lang={lang} />
+                    
+                    <WorkflowSection lang={lang} />
 
-                <AiSpotlightSection lang={lang} addToRevealRefs={addToRevealRefs} />
+                    <AiSpotlightSection lang={lang} addToRevealRefs={addToRevealRefs} />
 
-                <PricingSection lang={lang} addToRevealRefs={addToRevealRefs} />
+                    <PricingSection lang={lang} addToRevealRefs={addToRevealRefs} />
 
-                <DocsCtaSection lang={lang} addToRevealRefs={addToRevealRefs} />
+                    <DocsCtaSection lang={lang} addToRevealRefs={addToRevealRefs} />
 
-                <LandingFooter lang={lang} />
+                    <LandingFooter lang={lang} />
+                </Suspense>
             </main>
         </div>
     );
