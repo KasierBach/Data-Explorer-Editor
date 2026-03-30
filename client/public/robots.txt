@@ -4,4 +4,4 @@ Disallow: /admin/
 Disallow: /onboarding/
 Disallow: /forgot-password/
 
-Sitemap: https://data-explorer.io/sitemap.xml
+Sitemap: https://data-explorer-editor.vercel.app/sitemap.xml

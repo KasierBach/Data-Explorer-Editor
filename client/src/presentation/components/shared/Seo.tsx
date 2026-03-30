@@ -14,8 +14,8 @@ export function SEO({
   title = "Data Explorer - Smart Database IDE for Developers",
   description = "Connect, explore and visualize your SQL & NoSQL databases with AI-powered features. The smartest local database explorer.",
   keywords = "database, sql, nosql, mongodb, postgresql, explorer, ai, developer tools",
-  ogImage = "https://data-explorer.io/og-image.png",
-  ogUrl = "https://data-explorer.io",
+  ogImage = "https://data-explorer-editor.vercel.app/og-image.png",
+  ogUrl = "https://data-explorer-editor.vercel.app",
   lang = "en",
   siteName = "Data Explorer"
 }: SeoProps) {
