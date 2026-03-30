@@ -8,6 +8,7 @@ import { API_BASE_URL } from '@/core/config/env';
 import { toast } from 'sonner';
 import { AuthService } from '@/core/services/AuthService';
 import { ConnectionService } from '@/core/services/ConnectionService';
+import { SEO } from '@/presentation/components/shared/Seo';
 
 export const LoginPage = () => {
     const navigate = useNavigate();
@@ -30,6 +31,10 @@ export const LoginPage = () => {
     // UI State
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+
+    const title = isRegister 
+        ? (lang === 'vi' ? 'Đăng ký tài khoản' : 'Create Account')
+        : (lang === 'vi' ? 'Đăng nhập' : 'Login');
 
     // Handle OAuth Callback Redirect
     useEffect(() => {
@@ -157,10 +162,10 @@ export const LoginPage = () => {
         }
     };
 
-    // ─── Render Verification Step ────────────────────────────────────
     if (verifyEmailStep) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
+                <SEO title={`${title} - ${lang === 'vi' ? 'Xác minh Email' : 'Verify Email'}`} />
                 <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
                     <div className="flex flex-col items-center mb-8 space-y-2">
                         <div className="bg-primary/10 p-3 rounded-xl mb-2">
@@ -228,6 +233,7 @@ export const LoginPage = () => {
     // ─── Render Login/Register Step ──────────────────────────────────
     return (
         <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
+            <SEO title={title} />
             <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
                 <div className="flex flex-col items-center mb-8 space-y-2">
                     <div className="bg-primary/10 p-3 rounded-xl">

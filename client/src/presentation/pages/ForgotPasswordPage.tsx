@@ -6,6 +6,7 @@ import { Database, Loader2, Mail, KeyRound, ArrowLeft } from 'lucide-react';
 import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
 import { AuthService } from '@/core/services/AuthService';
+import { SEO } from '@/presentation/components/shared/Seo';
 
 export const ForgotPasswordPage = () => {
     const navigate = useNavigate();
@@ -52,6 +53,11 @@ export const ForgotPasswordPage = () => {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
+            <SEO 
+                title={step === 1 
+                    ? (lang === 'vi' ? 'Quên mật khẩu' : 'Forgot Password') 
+                    : (lang === 'vi' ? 'Đặt lại mật khẩu' : 'Reset Password')} 
+            />
             <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
                 <div className="flex flex-col items-center mb-8 space-y-2">
                     <div className="bg-primary/10 p-3 rounded-xl mb-2">
