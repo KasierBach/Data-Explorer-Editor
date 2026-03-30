@@ -1,41 +1,20 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Data Explorer - Smart Database IDE</title>
-    <meta name="description" content="Connect, explore and visualize your SQL & NoSQL databases with AI-powered features. The smartest local database explorer." />
-    
-    <!-- Dynamic meta tags are managed by react-helmet-async in SEO component -->
-    <style>
-      body { margin: 0; padding: 0; background-color: #020617; }
-      #root { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
-      
-      /* Subtle radial glow to mimic the app background */
-      .preloader-glow { position: absolute; inset: 0; background: radial-gradient(circle at 50% 50%, #1e293b 0%, transparent 70%); opacity: 0.3; }
-      
-      /* Simple elegant spinner */
-      .preloader-spinner {
-        width: 48px;
-        height: 48px;
-        border: 3px solid rgba(37, 99, 235, 0.1);
-        border-top-color: #2563eb;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        position: relative;
-        z-index: 10;
-      }
 
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
-  </head>
-  <body>
-    <div id="root">
-      <!-- Instant FCP Preloader (Removed automatically by React) -->
-      <div class="preloader-glow"></div>
-      <div class="preloader-spinner"></div>
-    </div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data Explorer - Smart Database IDE</title>
+  <meta name="description"
+    content="Connect, explore and visualize your SQL & NoSQL databases with AI-powered features. The smartest local database explorer." />
+
+  <!-- Dynamic meta tags are managed by react-helmet-async in SEO component -->
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>
