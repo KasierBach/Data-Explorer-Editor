@@ -57,13 +57,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                     <div className="relative">
                         <div className="absolute inset-0 bg-blue-600/30 blur-2xl rounded-full scale-125 animate-pulse" />
                         <div className="relative w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl rotate-12 flex items-center justify-center shadow-2xl border border-white/20 backdrop-blur-sm">
-                            <Hexagon className="w-7 h-7 md:w-8 md:h-8 text-white animate-pulse" />
+                            <Hexagon className="w-7 h-7 md:w-8 md:h-8 text-white animate-pulse" aria-hidden="true" />
                         </div>
                     </div>
                 </motion.div>
 
                 <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-blue-400 text-[10px] font-black mb-4 md:mb-6 backdrop-blur-md uppercase tracking-[0.2em] shadow-xl">
-                    <Sparkles className="w-3 h-3" />
+                    <Sparkles className="w-3 h-3" aria-hidden="true" />
                     <span>v3.1: Gemini 3.1 Flash-Lite & Modular Hub</span>
                 </motion.div>
                 

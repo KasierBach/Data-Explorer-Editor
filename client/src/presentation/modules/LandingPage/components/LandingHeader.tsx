@@ -25,12 +25,16 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
     return (
         <header className="fixed top-0 w-full z-50 bg-background/60 backdrop-blur-xl border-b border-white/5 supports-[backdrop-filter]:bg-background/60">
             <div className="container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-                <div className="flex items-center gap-2 font-bold text-xl tracking-tight cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                <button 
+                    className="flex items-center gap-2 font-bold text-xl tracking-tight cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-lg p-1" 
+                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    aria-label="Back to top"
+                >
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                        <Database className="w-4 h-4 text-white" />
+                        <Database className="w-4 h-4 text-white" aria-hidden="true" />
                     </div>
                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">Data<span className="text-blue-500">Explorer</span></span>
-                </div>
+                </button>
 
                 <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground absolute left-1/2 -translate-x-1/2">
                     <a href="#features" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">

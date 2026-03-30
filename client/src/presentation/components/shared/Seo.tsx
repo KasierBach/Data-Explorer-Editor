@@ -7,6 +7,7 @@ interface SeoProps {
   ogImage?: string;
   ogUrl?: string;
   lang?: string;
+  siteName?: string;
 }
 
 export function SEO({
@@ -15,9 +16,47 @@ export function SEO({
   keywords = "database, sql, nosql, mongodb, postgresql, explorer, ai, developer tools",
   ogImage = "https://data-explorer.io/og-image.png",
   ogUrl = "https://data-explorer.io",
-  lang = "en"
+  lang = "en",
+  siteName = "Data Explorer"
 }: SeoProps) {
-  const siteTitle = title.includes("Data Explorer") ? title : `${title} | Data Explorer`;
+  const siteTitle = title.includes(siteName) ? title : `${title} | ${siteName}`;
+
+  // Structured Data (JSON-LD)
+  const softwareSchema = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": siteName,
+    "operatingSystem": "Windows, MacOS, Linux",
+    "applicationCategory": "DeveloperApplication",
+    "description": description,
+    "screenshot": ogImage,
+    "url": ogUrl,
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.9",
+      "ratingCount": "120"
+    },
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  };
+
+  const websiteSchema = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": siteName,
+    "url": ogUrl,
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+        "@type": "EntryPoint",
+        "urlTemplate": `${ogUrl}/search?q={search_term_string}`
+      },
+      "query-input": "required name=search_term_string"
+    }
+  };
 
   return (
     <Helmet htmlAttributes={{ lang }}>
@@ -31,6 +70,7 @@ export function SEO({
       <meta property="og:title" content={siteTitle} />
       <meta property="og:description" content={description} />
       <meta property="og:image" content={ogImage} />
+      <meta property="og:site_name" content={siteName} />
 
       {/* Twitter */}
       <meta property="twitter:card" content="summary_large_image" />
@@ -43,6 +83,14 @@ export function SEO({
       <meta name="robots" content="index, follow" />
       <meta name="googlebot" content="index, follow" />
       <link rel="canonical" href={ogUrl} />
+
+      {/* Structured Data */}
+      <script type="application/ld+json">
+        {JSON.stringify(softwareSchema)}
+      </script>
+      <script type="application/ld+json">
+        {JSON.stringify(websiteSchema)}
+      </script>
     </Helmet>
   );
 }

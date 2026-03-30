@@ -9,32 +9,32 @@ interface FeaturesSectionProps {
 export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
     const features = [
         {
-            icon: <Terminal className="w-6 h-6 text-blue-400" />,
+            icon: <Terminal className="w-6 h-6 text-blue-400" aria-hidden="true" />,
             title: lang === 'vi' ? "Monaco Pro" : "Monaco Pro",
             desc: lang === 'vi' ? "Trình soạn thảo VS Code tích hợp hoàn hảo. Đầy đủ Intellisense, đa con trỏ và hiệu suất cực cao cho các câu lệnh SQL phức tạp." : "Seamlessly integrated VS Code editor. Full Intellisense, multi-cursor, and ultra-high performance for complex SQL queries."
         },
         {
-            icon: <Zap className="w-6 h-6 text-yellow-400" />,
+            icon: <Zap className="w-6 h-6 text-yellow-400" aria-hidden="true" />,
             title: lang === 'vi' ? "Gemini 3.1 Flash-Lite" : "Gemini 3.1 Flash-Lite",
             desc: lang === 'vi' ? "Dịch ngôn ngữ tự nhiên sang SQL thông minh vượt trội. Tối ưu hóa cho các mô hình dữ liệu phức tạp và kiến trúc doanh nghiệp." : "Supreme natural language to SQL translation. Optimized for complex data models and enterprise architectures."
         },
         {
-            icon: <BarChart3 className="w-6 h-6 text-emerald-400" />,
+            icon: <BarChart3 className="w-6 h-6 text-emerald-400" aria-hidden="true" />,
             title: lang === 'vi' ? "Kiến trúc Modular" : "Modular Core",
             desc: lang === 'vi' ? "Xây dựng trên nguyên tắc SOLID & Clean Architecture. Dễ dàng mở rộng, bảo trì và tích hợp các module mới như Otp, Seed, Token." : "Built on SOLID & Clean Architecture. Easy to extend, maintain, and integrate new modules like Otp, Seed, and Token."
         },
         {
-            icon: <GitGraph className="w-6 h-6 text-purple-400" />,
+            icon: <GitGraph className="w-6 h-6 text-purple-400" aria-hidden="true" />,
             title: lang === 'vi' ? "ERD & Vision AI" : "ERD & Vision AI",
             desc: lang === 'vi' ? "Phân tích lược đồ bằng Multimodal Vision. Tự động ánh xạ mối quan hệ và gợi ý tối ưu hóa cấu trúc database thông minh." : "Schema analysis via Multimodal Vision. Automatic relationship mapping and intelligent database structure optimization suggestions."
         },
         {
-            icon: <PieChart className="w-6 h-6 text-cyan-400" />,
+            icon: <PieChart className="w-6 h-6 text-cyan-400" aria-hidden="true" />,
             title: lang === 'vi' ? "Biểu đồ Tức thì" : "Instant Analytics",
             desc: lang === 'vi' ? "Biến dữ liệu thô thành biểu đồ cao cấp chỉ với một cú nhấp chuột. Hỗ trợ đa dạng loại biểu đồ với hiệu suất rendering mượt mà." : "Transform raw data into premium charts with a single click. Supports diverse chart types with smooth rendering performance."
         },
         {
-            icon: <Lock className="w-6 h-6 text-amber-500" />,
+            icon: <Lock className="w-6 h-6 text-amber-500" aria-hidden="true" />,
             title: lang === 'vi' ? "Bảo mật AES-256-GCM" : "AES-256-GCM Secure",
             desc: lang === 'vi' ? "Mã hóa cấp quân đội cho mọi thông tin xác thực. Dữ liệu của bạn được bảo vệ tuyệt đối và không bao giờ rời khỏi tầm kiểm soát." : "Military-grade encryption for all credentials. Your data is absolutely protected and never leaves your control."
         }
