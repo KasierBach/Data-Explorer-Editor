@@ -9,6 +9,7 @@ import { DocNavigation } from '@/presentation/components/docs/DocNavigation';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/core/services/store';
 import { LanguageSwitcher } from '@/presentation/components/shared/LanguageSwitcher';
+import { SEO } from '@/presentation/components/shared/Seo';
 
 export function DocumentationPage() {
     const navigate = useNavigate();
@@ -75,6 +76,14 @@ export function DocumentationPage() {
 
     return (
         <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
+            <SEO 
+                lang={lang}
+                title={`${lang === 'vi' ? (navInfo.currentItem?.title || 'Tài liệu') : (navInfo.currentItem?.titleEn || navInfo.currentItem?.title || 'Docs')}`}
+                description={lang === 'vi'
+                    ? `Hướng dẫn chi tiết về ${navInfo.currentItem?.title} trong Data Explorer. Tìm hiểu cách tối ưu hóa quy trình làm việc với dữ liệu.`
+                    : `In-depth guide for ${navInfo.currentItem?.titleEn || navInfo.currentItem?.title} in Data Explorer. Learn how to optimize your data workflow.`
+                }
+            />
             {/* Minimal Header */}
             <header className="h-14 border-b bg-card/50 backdrop-blur-xl flex items-center justify-between px-4 shrink-0 z-50">
                 <div className="flex items-center gap-6">

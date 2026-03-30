@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@/core/services/store';
+import { SEO } from '../components/shared/Seo';
 import { LandingHeader } from '../modules/LandingPage/components/LandingHeader';
 import { HeroSection } from '../modules/LandingPage/components/HeroSection';
 import { FeaturesSection } from '../modules/LandingPage/components/FeaturesSection';
@@ -43,6 +44,14 @@ export const LandingPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-blue-500/30 overflow-x-hidden relative">
+            <SEO 
+                lang={lang} 
+                title={lang === 'vi' ? "Data Explorer - IDE Cơ sở dữ liệu Thông minh" : "Data Explorer - Smart Database IDE"}
+                description={lang === 'vi' 
+                    ? "Khám phá và quản lý SQL & NoSQL với sức mạnh của AI. Trình duyệt cơ sở dữ liệu hiện đại, nhanh chóng và bảo mật."
+                    : "Explore and manage SQL & NoSQL with the power of AI. Modern, fast, and secure database explorer."
+                }
+            />
             <InteractiveBackground />
 
             <LandingHeader 

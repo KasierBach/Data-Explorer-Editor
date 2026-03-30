@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { HelmetProvider } from 'react-helmet-async'
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from '@/presentation/modules/Layout/AppShell'
@@ -42,6 +43,7 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <HelmetProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LandingPage />} />
@@ -78,6 +80,7 @@ export function App() {
           </Routes>
           <Toaster richColors position="top-center" />
         </BrowserRouter>
+      </HelmetProvider>
     </QueryClientProvider>
   )
 }

@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /onboarding/
+Disallow: /forgot-password/
+
+Sitemap: https://data-explorer.io/sitemap.xml
