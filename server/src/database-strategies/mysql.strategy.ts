@@ -76,6 +76,33 @@ export class MysqlStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: (result as any).affectedRows };
     }
 
+    async insertRow(pool: any, params: any): Promise<{ success: boolean; rowCount: number }> {
+        const { schema, table, data } = params;
+        const columns = Object.keys(data);
+        if (columns.length === 0) return { success: false, rowCount: 0 };
+
+        const quotedTable = this.quoteTable(schema, table);
+        const colNames = columns.map(c => `\`${c}\``).join(', ');
+        const placeholders = columns.map(() => `?`).join(', ');
+        const sql = `INSERT INTO ${quotedTable} (${colNames}) VALUES (${placeholders})`;
+        const values = columns.map(c => data[c]);
+
+        const [result] = await pool.execute(sql, values);
+        return { success: true, rowCount: (result as any).affectedRows };
+    }
+
+    async deleteRows(pool: any, params: any): Promise<{ success: boolean; rowCount: number }> {
+        const { schema, table, pkColumn, pkValues } = params;
+        if (pkValues.length === 0) return { success: true, rowCount: 0 };
+
+        const quotedTable = this.quoteTable(schema, table);
+        const placeholders = pkValues.map(() => `?`).join(', ');
+        const sql = `DELETE FROM ${quotedTable} WHERE \`${pkColumn}\` IN (${placeholders})`;
+
+        const [result] = await pool.execute(sql, pkValues);
+        return { success: true, rowCount: (result as any).affectedRows };
+    }
+
     buildAlterTableSql(quotedTable: string, op: any): string {
         switch (op.type) {
             case 'add_column':

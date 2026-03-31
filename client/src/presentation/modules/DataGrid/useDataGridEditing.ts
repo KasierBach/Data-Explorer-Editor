@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore } from '@/core/services/store';
-import { getQuotedIdentifier } from '@/core/utils/id-parser';
 import { toast } from 'sonner';
 import type { TableMetadata } from '@/core/domain/entities';
 
@@ -11,13 +10,12 @@ interface UseDataGridEditingParams {
     dbName: string | undefined;
     schema: string;
     cleanTableName: string | undefined;
-    dialect: 'mysql' | 'postgres';
     pkField: string | undefined;
     refetch: () => void;
 }
 
 export function useDataGridEditing({
-    tableId, metadata, dbName, schema, cleanTableName, dialect, pkField, refetch,
+    tableId, metadata, dbName, schema, cleanTableName, pkField, refetch,
 }: UseDataGridEditingParams) {
     const { activeConnectionId, connections } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
@@ -94,12 +92,13 @@ export function useDataGridEditing({
         setIsSaving(true);
         try {
             const adapter = getAdapter();
-            const qSchema = getQuotedIdentifier(schema, dialect);
-            const qTable = getQuotedIdentifier(cleanTableName || tableId, dialect);
-            const qPk = getQuotedIdentifier(pkField, dialect);
-            const pkValues = [...selectedRows].map(v => isNaN(Number(v)) ? `'${v}'` : v).join(', ');
-            const sql = `DELETE FROM ${qSchema}.${qTable} WHERE ${qPk} IN (${pkValues});`;
-            await adapter.executeQuery(sql, dbName ? { database: dbName } : undefined);
+            await adapter.deleteRows({
+                database: dbName,
+                schema,
+                table: cleanTableName || tableId,
+                pkColumn: pkField,
+                pkValues: [...selectedRows].map(v => isNaN(Number(v)) ? v : Number(v)),
+            });
             setSelectedRows(new Set());
             toast.success(`${selectedRows.size} row(s) deleted`);
             refetch();
@@ -112,25 +111,31 @@ export function useDataGridEditing({
 
     const handleInsertRow = async () => {
         if (!activeConnection || !metadata) return;
-        const nonEmptyCols = Object.entries(newRowData).filter(([, v]) => v.trim() !== '');
-        if (nonEmptyCols.length === 0) { toast.error('Enter at least one value'); return; }
+        
+        const data: Record<string, any> = {};
+        Object.entries(newRowData).forEach(([col, v]) => {
+            if (v.trim() === '') return;
+            if (v.toLowerCase() === 'null') data[col] = null;
+            else if (v.toLowerCase() === 'true') data[col] = true;
+            else if (v.toLowerCase() === 'false') data[col] = false;
+            else if (!isNaN(Number(v))) data[col] = Number(v);
+            else data[col] = v;
+        });
+
+        if (Object.keys(data).length === 0) { 
+            toast.error('Enter at least one value'); 
+            return; 
+        }
 
         setIsSaving(true);
         try {
             const adapter = getAdapter();
-            const qSchema = getQuotedIdentifier(schema, dialect);
-            const qTable = getQuotedIdentifier(cleanTableName || tableId, dialect);
-            const colNames = nonEmptyCols.map(([col]) => getQuotedIdentifier(col, dialect)).join(', ');
-            const values = nonEmptyCols.map(([, v]) => {
-                if (v.toLowerCase() === 'null') return 'NULL';
-                if (v.toLowerCase() === 'true') return 'TRUE';
-                if (v.toLowerCase() === 'false') return 'FALSE';
-                if (!isNaN(Number(v))) return v;
-                return `'${v.replace(/'/g, "''")}'`;
-            }).join(', ');
-
-            const sql = `INSERT INTO ${qSchema}.${qTable} (${colNames}) VALUES (${values});`;
-            await adapter.executeQuery(sql, dbName ? { database: dbName } : undefined);
+            await adapter.insertRow({
+                database: dbName,
+                schema,
+                table: cleanTableName || tableId,
+                data,
+            });
             setNewRowData({});
             setIsInserting(false);
             toast.success('Row inserted successfully');

@@ -83,6 +83,33 @@ export class PostgresStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: res.rowCount };
     }
 
+    async insertRow(pool: any, params: any): Promise<{ success: boolean; rowCount: number }> {
+        const { schema, table, data } = params;
+        const columns = Object.keys(data);
+        if (columns.length === 0) return { success: false, rowCount: 0 };
+
+        const quotedTable = this.quoteTable(schema, table);
+        const colNames = columns.map(c => `"${c}"`).join(', ');
+        const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
+        const sql = `INSERT INTO ${quotedTable} (${colNames}) VALUES (${placeholders})`;
+        const values = columns.map(c => data[c]);
+
+        const res = await pool.query(sql, values);
+        return { success: true, rowCount: res.rowCount };
+    }
+
+    async deleteRows(pool: any, params: any): Promise<{ success: boolean; rowCount: number }> {
+        const { schema, table, pkColumn, pkValues } = params;
+        if (pkValues.length === 0) return { success: true, rowCount: 0 };
+
+        const quotedTable = this.quoteTable(schema, table);
+        const placeholders = pkValues.map((_, i) => `$${i + 1}`).join(', ');
+        const sql = `DELETE FROM ${quotedTable} WHERE "${pkColumn}" IN (${placeholders})`;
+
+        const res = await pool.query(sql, pkValues);
+        return { success: true, rowCount: res.rowCount };
+    }
+
     buildAlterTableSql(quotedTable: string, op: any): string {
         switch (op.type) {
             case 'add_column':

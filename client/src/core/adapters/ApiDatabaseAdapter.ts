@@ -82,6 +82,35 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         });
     }
 
+    async insertRow(params: {
+        database?: string;
+        schema: string;
+        table: string;
+        data: Record<string, any>;
+    }): Promise<any> {
+        if (!this.connectionId) throw new Error('Not connected');
+
+        return await apiService.post<any>('/query/row', {
+            ...params,
+            connectionId: this.connectionId
+        });
+    }
+
+    async deleteRows(params: {
+        database?: string;
+        schema: string;
+        table: string;
+        pkColumn: string;
+        pkValues: any[];
+    }): Promise<any> {
+        if (!this.connectionId) throw new Error('Not connected');
+
+        return await apiService.post<any>('/query/delete-rows', {
+            ...params,
+            connectionId: this.connectionId
+        });
+    }
+
     async updateSchema(params: {
         database?: string;
         schema: string;

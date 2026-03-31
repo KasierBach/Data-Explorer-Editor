@@ -1,6 +1,8 @@
 import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { CreateQueryDto } from './dto/create-query.dto';
 import { UpdateRowDto } from './dto/update-row.dto';
+import { InsertRowDto } from './dto/insert-row.dto';
+import { DeleteRowsDto } from './dto/delete-rows.dto';
 import { UpdateSchemaDto } from './dto/update-schema.dto';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
@@ -40,6 +42,34 @@ export class QueryService {
     } catch (error) {
       console.error('Update Row Error:', error);
       throw new InternalServerErrorException(`Update failed: ${error.message}`);
+    }
+  }
+
+  async insertRow(insertRowDto: InsertRowDto, userId: string) {
+    const { connectionId, database, schema, table, data } = insertRowDto;
+    const connection = await this.connectionsService.findOne(connectionId, userId);
+
+    try {
+      const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
+      const strategy = this.strategyFactory.getStrategy(connection.type);
+      return await strategy.insertRow(pool, { schema, table, data });
+    } catch (error) {
+      console.error('Insert Row Error:', error);
+      throw new InternalServerErrorException(`Insert failed: ${error.message}`);
+    }
+  }
+
+  async deleteRows(deleteRowsDto: DeleteRowsDto, userId: string) {
+    const { connectionId, database, schema, table, pkColumn, pkValues } = deleteRowsDto;
+    const connection = await this.connectionsService.findOne(connectionId, userId);
+
+    try {
+      const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
+      const strategy = this.strategyFactory.getStrategy(connection.type);
+      return await strategy.deleteRows(pool, { schema, table, pkColumn, pkValues });
+    } catch (error) {
+      console.error('Delete Rows Error:', error);
+      throw new InternalServerErrorException(`Delete failed: ${error.message}`);
     }
   }
 

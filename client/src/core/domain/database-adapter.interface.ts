@@ -40,6 +40,27 @@ export interface IDatabaseAdapter {
     }): Promise<any>;
 
     /**
+     * Inserts a new row into a table.
+     */
+    insertRow(params: {
+        database?: string;
+        schema: string;
+        table: string;
+        data: Record<string, any>;
+    }): Promise<any>;
+
+    /**
+     * Deletes one or more rows from a table.
+     */
+    deleteRows(params: {
+        database?: string;
+        schema: string;
+        table: string;
+        pkColumn: string;
+        pkValues: any[];
+    }): Promise<any>;
+
+    /**
      * Performs DDL operations on a table.
      */
     updateSchema(params: {

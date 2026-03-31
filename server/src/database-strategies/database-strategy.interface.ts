@@ -66,6 +66,19 @@ export interface UpdateRowParams {
     updates: Record<string, any>;
 }
 
+export interface InsertRowParams {
+    schema: string;
+    table: string;
+    data: Record<string, any>;
+}
+
+export interface DeleteRowsParams {
+    schema: string;
+    table: string;
+    pkColumn: string;
+    pkValues: any[];
+}
+
 export interface IDatabaseStrategy {
     // ─── Connection Management ───
     createPool(connectionConfig: any, databaseOverride?: string): Promise<any> | any;
@@ -74,6 +87,8 @@ export interface IDatabaseStrategy {
     // ─── Query Operations ───
     executeQuery(pool: any, sql: string): Promise<QueryResult>;
     updateRow(pool: any, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }>;
+    insertRow(pool: any, params: InsertRowParams): Promise<{ success: boolean; rowCount: number }>;
+    deleteRows(pool: any, params: DeleteRowsParams): Promise<{ success: boolean; rowCount: number }>;
     buildAlterTableSql(quotedTable: string, op: any): string;
 
     // ─── Identifier Quoting ───

@@ -3,6 +3,8 @@ import { QueryService } from './query.service';
 import { CreateQueryDto } from './dto/create-query.dto';
 import { UpdateQueryDto } from './dto/update-query.dto';
 import { UpdateRowDto } from './dto/update-row.dto';
+import { InsertRowDto } from './dto/insert-row.dto';
+import { DeleteRowsDto } from './dto/delete-rows.dto';
 import { UpdateSchemaDto } from './dto/update-schema.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -19,6 +21,16 @@ export class QueryController {
   @Patch('row')
   updateRow(@Body() updateRowDto: UpdateRowDto, @Req() req: any) {
     return this.queryService.updateRow(updateRowDto, req.user.id);
+  }
+
+  @Post('row')
+  insertRow(@Body() insertRowDto: InsertRowDto, @Req() req: any) {
+    return this.queryService.insertRow(insertRowDto, req.user.id);
+  }
+
+  @Post('delete-rows')
+  deleteRows(@Body() deleteRowsDto: DeleteRowsDto, @Req() req: any) {
+    return this.queryService.deleteRows(deleteRowsDto, req.user.id);
   }
 
   @Post('schema')
