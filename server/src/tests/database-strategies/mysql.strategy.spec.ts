@@ -1,4 +1,4 @@
-import { MysqlStrategy } from './mysql.strategy';
+import { MysqlStrategy } from '../../database-strategies/mysql.strategy';
 import * as mysql from 'mysql2/promise';
 
 jest.mock('mysql2/promise', () => ({

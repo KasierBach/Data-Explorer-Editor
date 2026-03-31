@@ -8,6 +8,7 @@ import type {
     UpdateRowParams,
 } from './database-strategy.interface';
 import { Pool } from 'pg';
+import { SqlUtil } from '../utils/sql.util';
 
 export class PostgresStrategy implements IDatabaseStrategy {
 
@@ -54,11 +55,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
     // ─── Query Operations ───
 
     async executeQuery(pool: any, sql: string): Promise<QueryResult> {
-        let safeSql = sql;
-        // Naive protection: append limit to top-level select if missing to prevent OOM
-        if (/^\s*SELECT/i.test(safeSql) && !/\bLIMIT\b/i.test(safeSql)) {
-            safeSql = `${safeSql.trim().replace(/;$/, '')} LIMIT 50000;`;
-        }
+        const safeSql = SqlUtil.injectLimit(sql, 50000);
 
         const client = await pool.connect();
         try {
@@ -344,5 +341,53 @@ export class PostgresStrategy implements IDatabaseStrategy {
             topTables: tablesRes.rows.map((r: any) => ({ name: r.name, sizeBytes: parseInt(r.size_bytes) })),
             tableTypes: typesRes.rows.map((r: any) => ({ type: r.type, count: parseInt(r.count) })),
         };
+    }
+
+    // ─── Polymorphic Tree & Seed ───
+
+    async getHierarchyNodes(pool: any, parentId: string | null, parsedParams: any, connectionInfo: any): Promise<TreeNodeResult[]> {
+        if (!parentId) {
+            if (connectionInfo.showAllDatabases) return this.getDatabases(pool);
+            return this.getSchemas(pool);
+        }
+        return [];
+    }
+
+    async seedData(pool: any): Promise<QueryResult> {
+        const sql = `
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100),
+                email VARCHAR(100) UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS products (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(100),
+                price DECIMAL(10, 2),
+                stock INT
+            );
+            CREATE TABLE IF NOT EXISTS orders (
+                id SERIAL PRIMARY KEY,
+                user_id INT REFERENCES users(id),
+                total DECIMAL(10, 2),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            INSERT INTO users (name, email) VALUES 
+            ('Alice Johnson', 'alice@example.com'),
+            ('Bob Smith', 'bob@example.com'),
+            ('Charlie Brown', 'charlie@example.com')
+            ON CONFLICT DO NOTHING;
+            INSERT INTO products (name, price, stock) VALUES 
+            ('Laptop', 999.99, 10),
+            ('Mouse', 25.50, 100),
+            ('Keyboard', 50.00, 50)
+            ON CONFLICT DO NOTHING;
+            INSERT INTO orders (user_id, total) VALUES 
+            (1, 1025.49),
+            (2, 25.50)
+            ON CONFLICT DO NOTHING;
+        `;
+        return this.executeQuery(pool, sql);
     }
 }

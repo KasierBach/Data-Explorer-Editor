@@ -1,4 +1,4 @@
-import { MssqlStrategy } from './mssql.strategy';
+import { MssqlStrategy } from '../../database-strategies/mssql.strategy';
 import * as mssql from 'mssql';
 
 jest.mock('mssql', () => {

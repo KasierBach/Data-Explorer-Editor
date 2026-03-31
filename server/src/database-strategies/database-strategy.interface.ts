@@ -95,4 +95,8 @@ export interface IDatabaseStrategy {
     getFullMetadata(pool: any, schema: string, table: string): Promise<FullTableMetadata>;
     getRelationships(pool: any): Promise<Relationship[]>;
     getDatabaseMetrics(pool: any): Promise<DatabaseMetrics>;
+
+    // ─── Polymorphic Tree & Seed ───
+    getHierarchyNodes(pool: any, parentId: string | null, parsedParams: any, connectionInfo: any): Promise<TreeNodeResult[]>;
+    seedData(pool: any): Promise<QueryResult>;
 }

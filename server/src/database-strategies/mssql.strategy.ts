@@ -8,6 +8,7 @@ import type {
     UpdateRowParams,
 } from './database-strategy.interface';
 import * as mssql from 'mssql';
+import { SqlUtil } from '../utils/sql.util';
 
 export class MssqlStrategy implements IDatabaseStrategy {
 
@@ -51,11 +52,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
     // ─── Query Operations ───
 
     async executeQuery(pool: any, sql: string): Promise<QueryResult> {
-        let safeSql = sql;
-        // Naive protection: inject TOP 50000 to prevent OOM
-        if (/^\s*SELECT\s+(?!TOP\b)/i.test(safeSql)) {
-            safeSql = safeSql.replace(/^\s*SELECT\s+/i, 'SELECT TOP 50000 ');
-        }
+        const safeSql = SqlUtil.injectTop(sql, 50000);
 
         const result = await pool.request().query(safeSql);
         return {
@@ -284,5 +281,35 @@ export class MssqlStrategy implements IDatabaseStrategy {
             topTables: tablesRes.recordset.map((r: any) => ({ name: r.name, sizeBytes: parseInt(r.size_bytes) })),
             tableTypes: typesRes.recordset.map((r: any) => ({ type: r.type, count: parseInt(r.count) })),
         };
+    }
+
+    // ─── Polymorphic Tree & Seed ───
+
+    async getHierarchyNodes(pool: any, parentId: string | null, parsedParams: any, connectionInfo: any): Promise<TreeNodeResult[]> {
+        if (!parentId) {
+            if (connectionInfo.showAllDatabases) return this.getDatabases(pool);
+            return this.getSchemas(pool);
+        }
+        return [];
+    }
+
+    async seedData(pool: any): Promise<QueryResult> {
+        const sql = `
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+            CREATE TABLE users (
+                id INT IDENTITY(1,1) PRIMARY KEY,
+                name NVARCHAR(100),
+                email NVARCHAR(100) UNIQUE,
+                created_at DATETIME DEFAULT GETDATE()
+            );
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='products' AND xtype='U')
+            CREATE TABLE products (
+                id INT IDENTITY(1,1) PRIMARY KEY,
+                name NVARCHAR(100),
+                price DECIMAL(10, 2),
+                stock INT
+            );
+        `;
+        return this.executeQuery(pool, sql);
     }
 }

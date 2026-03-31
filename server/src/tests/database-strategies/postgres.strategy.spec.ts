@@ -1,4 +1,4 @@
-import { PostgresStrategy } from './postgres.strategy';
+import { PostgresStrategy } from '../../database-strategies/postgres.strategy';
 import { Pool } from 'pg';
 
 jest.mock('pg', () => {

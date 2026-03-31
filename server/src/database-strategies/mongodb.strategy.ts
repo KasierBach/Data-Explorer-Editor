@@ -338,4 +338,39 @@ export class MongoDbStrategy implements IDatabaseStrategy {
             tableTypes: [{ type: 'Collection', count: tableCount }]
         };
     }
+
+    // ─── Polymorphic Tree & Seed ───
+
+    async getHierarchyNodes(client: MongoClient, parentId: string | null, parsedParams: any, connectionInfo: any): Promise<TreeNodeResult[]> {
+        if (!parentId) {
+            return this.getDatabases(client);
+        }
+        return [];
+    }
+
+    async seedData(client: MongoClient): Promise<QueryResult> {
+        const db = client.db();
+        const usersCol = db.collection('users');
+        const productsCol = db.collection('products');
+
+        const existingUsers = await usersCol.countDocuments();
+        if (existingUsers === 0) {
+            await usersCol.insertMany([
+                { name: 'Alice Johnson', email: 'alice@example.com', created_at: new Date() },
+                { name: 'Bob Smith', email: 'bob@example.com', created_at: new Date() },
+                { name: 'Charlie Brown', email: 'charlie@example.com', created_at: new Date() },
+            ]);
+        }
+
+        const existingProducts = await productsCol.countDocuments();
+        if (existingProducts === 0) {
+            await productsCol.insertMany([
+                { name: 'Laptop', price: 999.99, stock: 10 },
+                { name: 'Mouse', price: 25.50, stock: 100 },
+                { name: 'Keyboard', price: 50.00, stock: 50 },
+            ]);
+        }
+
+        return { rows: [{ message: 'Seed data inserted successfully' }], columns: ['message'], rowCount: 1 };
+    }
 }

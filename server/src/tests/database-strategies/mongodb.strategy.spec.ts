@@ -1,4 +1,4 @@
-import { MongoDbStrategy } from './mongodb.strategy';
+import { MongoDbStrategy } from '../../database-strategies/mongodb.strategy';
 import { MongoClient, ObjectId } from 'mongodb';
 
 jest.mock('mongodb', () => {

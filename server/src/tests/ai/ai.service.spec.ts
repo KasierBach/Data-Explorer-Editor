@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { AiService } from './ai.service';
+import { AiService } from '../../ai/ai.service';
 
 // Mock GoogleGenerativeAI
 jest.mock('@google/generative-ai', () => {

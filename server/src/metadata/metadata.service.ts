@@ -60,27 +60,15 @@ export class MetadataService {
     private async _getHierarchyUncached(connectionId: string, parentId: string | null, userId: string) {
         const connection = await this.connectionsService.findOne(connectionId, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
+        const parsed = this.parseNodeId(parentId || '');
 
-        // 1. Root Level
+        // 1. Root Level — delegate to each strategy's own polymorphic method (OCP)
         if (!parentId) {
-            if (connection.type === 'postgres') {
-                const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
-                if (connection.showAllDatabases) return strategy.getDatabases(pool);
-                return strategy.getSchemas(pool);
-            }
-            if (connection.type === 'mysql' || connection.type === 'mongodb' || connection.type === 'mongodb+srv') {
-                const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
-                return strategy.getDatabases(pool);
-            }
-            if (connection.type === 'mssql') {
-                const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
-                if (connection.showAllDatabases) return strategy.getDatabases(pool);
-                return strategy.getSchemas(pool);
-            }
-            return [];
+            const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
+            return strategy.getHierarchyNodes(pool, null, parsed, connection);
         }
 
-        const parsed = this.parseNodeId(parentId);
+
 
         // 2. Folder Level → delegate to strategy
         if (parentId.includes('.folder:')) {

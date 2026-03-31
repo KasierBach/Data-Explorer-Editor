@@ -69,43 +69,18 @@ export class QueryService {
     }
   }
 
-  async seedData(connectionId: string, userId: string) {
-    const sql = `
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100),
-                email VARCHAR(100) UNIQUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            CREATE TABLE IF NOT EXISTS products (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100),
-                price DECIMAL(10, 2),
-                stock INT
-            );
-            CREATE TABLE IF NOT EXISTS orders (
-                id SERIAL PRIMARY KEY,
-                user_id INT REFERENCES users(id),
-                total DECIMAL(10, 2),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            INSERT INTO users (name, email) VALUES 
-            ('Alice Johnson', 'alice@example.com'),
-            ('Bob Smith', 'bob@example.com'),
-            ('Charlie Brown', 'charlie@example.com')
-            ON CONFLICT DO NOTHING;
-            INSERT INTO products (name, price, stock) VALUES 
-            ('Laptop', 999.99, 10),
-            ('Mouse', 25.50, 100),
-            ('Keyboard', 50.00, 50)
-            ON CONFLICT DO NOTHING;
-            INSERT INTO orders (user_id, total) VALUES 
-            (1, 1025.49),
-            (2, 25.50)
-            ON CONFLICT DO NOTHING;
-        `;
-    return this.executeQuery({ connectionId, sql } as any, userId);
-  }
+    async seedData(connectionId: string, userId: string) {
+        const connection = await this.connectionsService.findOne(connectionId, userId);
+
+        try {
+            const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
+            const strategy = this.strategyFactory.getStrategy(connection.type);
+            return await strategy.seedData(pool);
+        } catch (error) {
+            console.error('Seed Data Error:', error);
+            throw new InternalServerErrorException(`Seed data failed: ${error.message}`);
+        }
+    }
 
   async createDatabase(connectionId: string, databaseName: string, userId: string) {
     const connection = await this.connectionsService.findOne(connectionId, userId);
