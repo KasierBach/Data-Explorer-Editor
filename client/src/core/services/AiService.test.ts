@@ -21,6 +21,7 @@ describe('AiService (Frontend)', () => {
 
     mockFetch.mockResolvedValue({
       ok: true,
+      headers: { get: () => 'application/json' },
       json: () => Promise.resolve(mockResponse)
     });
 
@@ -42,7 +43,9 @@ describe('AiService (Frontend)', () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 500,
-      statusText: 'Internal Server Error'
+      statusText: 'Internal Server Error',
+      headers: { get: () => 'application/json' },
+      json: () => Promise.resolve({ message: 'Internal Server Error' })
     });
 
     const result = await aiService.getAutocomplete({ connectionId: '1', beforeCursor: 'abc' });
