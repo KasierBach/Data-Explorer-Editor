@@ -57,7 +57,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         let safeSql = sql;
         // Naive protection: append limit to top-level select if missing to prevent OOM
         if (/^\s*SELECT/i.test(safeSql) && !/\bLIMIT\b/i.test(safeSql)) {
-            safeSql = `${safeSql.trim().replace(/;$/, '')} LIMIT 10000;`;
+            safeSql = `${safeSql.trim().replace(/;$/, '')} LIMIT 50000;`;
         }
 
         const client = await pool.connect();
@@ -65,7 +65,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
             const result = await client.query(safeSql);
             const queryResult = Array.isArray(result) ? result[result.length - 1] : result;
             return {
-                rows: queryResult.rows || [],
+                rows: queryResult.rows ? queryResult.rows.slice(0, 50000) : [],
                 columns: queryResult.fields ? queryResult.fields.map((f: any) => f.name) : [],
                 rowCount: queryResult.rowCount,
             };

@@ -24,6 +24,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
             connectionLimit: 20,
             queueLimit: 0,
             multipleStatements: true,
+            connectTimeout: 10000, // 10 seconds connection timeout
         });
     }
 
@@ -44,15 +45,24 @@ export class MysqlStrategy implements IDatabaseStrategy {
     // ─── Query Operations ───
 
     async executeQuery(pool: any, sql: string): Promise<QueryResult> {
-        // Use query() instead of execute() to support multiple statements separated by ';'
-        const [result, fields] = await pool.query(sql);
+        let safeSql = sql;
+        // Naive protection: append limit to top-level select if missing to prevent OOM
+        if (/^\s*SELECT/i.test(safeSql) && !/\bLIMIT\b/i.test(safeSql)) {
+            safeSql = `${safeSql.trim().replace(/;$/, '')} LIMIT 50000;`;
+        }
+
+        // Execute using query option object to enforce application-level timeout
+        const [result, fields] = await pool.query({
+            sql: safeSql,
+            timeout: 30000 // 30 seconds query timeout
+        });
 
         // If multiple statements, result is an array of results. We usually return the last valid result or handle gracefully
         const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[result.length - 1] : result;
         const actualFields = Array.isArray(fields) && Array.isArray(fields[0]) ? fields[fields.length - 1] : fields;
 
         return {
-            rows: Array.isArray(rows) ? rows : [],
+            rows: Array.isArray(rows) ? rows.slice(0, 50000) : [], // Secondary array slice guard
             columns: actualFields ? (actualFields as any[]).map(f => f.name) : [],
             rowCount: !Array.isArray(rows) && (rows as any).affectedRows !== undefined ? (rows as any).affectedRows : undefined,
         };

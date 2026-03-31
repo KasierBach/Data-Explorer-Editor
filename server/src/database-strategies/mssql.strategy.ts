@@ -20,6 +20,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
             user: connectionConfig.username,
             password: connectionConfig.password || undefined,
             database: databaseOverride || connectionConfig.database,
+            requestTimeout: 30000, // 30 seconds query timeout
             options: {
                 encrypt: false,
                 trustServerCertificate: true,
@@ -50,9 +51,15 @@ export class MssqlStrategy implements IDatabaseStrategy {
     // ─── Query Operations ───
 
     async executeQuery(pool: any, sql: string): Promise<QueryResult> {
-        const result = await pool.request().query(sql);
+        let safeSql = sql;
+        // Naive protection: inject TOP 50000 to prevent OOM
+        if (/^\s*SELECT\s+(?!TOP\b)/i.test(safeSql)) {
+            safeSql = safeSql.replace(/^\s*SELECT\s+/i, 'SELECT TOP 50000 ');
+        }
+
+        const result = await pool.request().query(safeSql);
         return {
-            rows: result.recordset || [],
+            rows: result.recordset ? result.recordset.slice(0, 50000) : [],
             columns: result.recordset?.columns ? Object.keys(result.recordset.columns) : [],
             rowCount: result.rowsAffected?.[0] ?? 0,
         };

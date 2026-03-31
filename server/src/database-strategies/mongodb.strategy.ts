@@ -93,12 +93,13 @@ export class MongoDbStrategy implements IDatabaseStrategy {
 
         switch (payload.action) {
             case 'find':
-                result = await col.find(filter, payload.options || {}).limit(payload.limit || 100).toArray();
+                const limit = Math.min(payload.limit || 50000, 50000); // Enforce hard cap of 50000
+                result = await col.find(filter, payload.options || {}).limit(limit).maxTimeMS(30000).toArray();
                 rows = result;
                 break;
             case 'aggregate':
-                result = await col.aggregate(pipeline).toArray();
-                rows = result;
+                result = await col.aggregate(pipeline).maxTimeMS(30000).toArray();
+                rows = result.slice(0, 50000); // Slice aggregation result to avoid OOM
                 break;
             case 'insertOne':
                 result = await col.insertOne(document);

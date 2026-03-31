@@ -24,7 +24,40 @@ export class MetadataService {
         return { dbName, schemaName, tableName };
     }
 
+    // 1-minute TTL cache for metadata to prevent spamming the database when expanding/collapsing sidebar nodes
+    private readonly CACHE_TTL = 60 * 1000;
+    private cache = new Map<string, { data: any; expiry: number }>();
+
+    private getCacheKey(prefix: string, connectionId: string, userId: string, identifier: string = 'default') {
+        return `${prefix}:${userId}:${connectionId}:${identifier}`;
+    }
+
+    private getCached<T>(key: string): T | null {
+        const item = this.cache.get(key);
+        if (item && Date.now() < item.expiry) {
+            return item.data as T;
+        }
+        if (item) {
+            this.cache.delete(key);
+        }
+        return null;
+    }
+
+    private setCached(key: string, data: any) {
+        this.cache.set(key, { data, expiry: Date.now() + this.CACHE_TTL });
+    }
+
     async getHierarchy(connectionId: string, parentId: string | null, userId: string) {
+        const cacheKey = this.getCacheKey('hierarchy', connectionId, userId, parentId || 'root');
+        const cached = this.getCached(cacheKey);
+        if (cached) return cached;
+
+        const result = await this._getHierarchyUncached(connectionId, parentId, userId);
+        this.setCached(cacheKey, result);
+        return result;
+    }
+
+    private async _getHierarchyUncached(connectionId: string, parentId: string | null, userId: string) {
         const connection = await this.connectionsService.findOne(connectionId, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
@@ -119,23 +152,40 @@ export class MetadataService {
     }
 
     async getDatabases(connectionId: string, userId: string) {
+        const cacheKey = this.getCacheKey('databases', connectionId, userId);
+        const cached = this.getCached<string[]>(cacheKey);
+        if (cached) return cached;
+
         const connection = await this.connectionsService.findOne(connectionId, userId);
         const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
         const nodes = await strategy.getDatabases(pool);
-        return nodes.map(n => n.name);
+        const result = nodes.map(n => n.name);
+        
+        this.setCached(cacheKey, result);
+        return result;
     }
 
     async getRelationships(connectionId: string, userId: string, database?: string) {
+        const cacheKey = this.getCacheKey('relationships', connectionId, userId, database);
+        const cached = this.getCached<any>(cacheKey);
+        if (cached) return cached;
+
         const connection = await this.connectionsService.findOne(connectionId, userId);
         const pool = await this.connectionsService.getPool(connectionId, database, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
-        return strategy.getRelationships(pool);
+        const result = await strategy.getRelationships(pool);
+        this.setCached(cacheKey, result);
+        return result;
     }
 
     async getColumns(connectionId: string, tableId: string, userId: string) {
+        const cacheKey = this.getCacheKey('columns', connectionId, userId, tableId);
+        const cached = this.getCached<any>(cacheKey);
+        if (cached) return cached;
+
         const connection = await this.connectionsService.findOne(connectionId, userId);
         const parsed = this.parseNodeId(tableId);
 
@@ -145,18 +195,30 @@ export class MetadataService {
         const pool = await this.connectionsService.getPool(connectionId, parsed.dbName, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
-        return strategy.getColumns(pool, schema, table);
+        const result = await strategy.getColumns(pool, schema, table);
+        this.setCached(cacheKey, result);
+        return result;
     }
 
     async getDatabaseMetrics(connectionId: string, userId: string, database?: string) {
+        const cacheKey = this.getCacheKey('metrics', connectionId, userId, database);
+        const cached = this.getCached<any>(cacheKey);
+        if (cached) return cached;
+
         const connection = await this.connectionsService.findOne(connectionId, userId);
         const pool = await this.connectionsService.getPool(connectionId, database, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
-        return strategy.getDatabaseMetrics(pool);
+        const result = await strategy.getDatabaseMetrics(pool);
+        this.setCached(cacheKey, result);
+        return result;
     }
 
     async getFullMetadata(connectionId: string, tableId: string, userId: string) {
+        const cacheKey = this.getCacheKey('fullmeta', connectionId, userId, tableId);
+        const cached = this.getCached<any>(cacheKey);
+        if (cached) return cached;
+
         const connection = await this.connectionsService.findOne(connectionId, userId);
         const parsed = this.parseNodeId(tableId);
 
@@ -166,6 +228,8 @@ export class MetadataService {
         const pool = await this.connectionsService.getPool(connectionId, parsed.dbName, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
-        return strategy.getFullMetadata(pool, schema, table);
+        const result = await strategy.getFullMetadata(pool, schema, table);
+        this.setCached(cacheKey, result);
+        return result;
     }
 }
