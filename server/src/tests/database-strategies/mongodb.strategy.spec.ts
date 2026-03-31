@@ -25,6 +25,7 @@ describe('MongoDbStrategy', () => {
             find: jest.fn().mockReturnThis(),
             aggregate: jest.fn().mockReturnThis(),
             limit: jest.fn().mockReturnThis(),
+            skip: jest.fn().mockReturnThis(),
             maxTimeMS: jest.fn().mockReturnThis(),
             toArray: jest.fn().mockResolvedValue([]),
         };

@@ -40,6 +40,7 @@ export interface QueryResult {
     rows: any[];
     columns: string[];
     rowCount?: number;
+    totalCount?: number; // Total rows in the table/dataset for pagination
 }
 
 export interface Relationship {
@@ -85,7 +86,7 @@ export interface IDatabaseStrategy {
     closePool(pool: any): Promise<void>;
 
     // ─── Query Operations ───
-    executeQuery(pool: any, sql: string): Promise<QueryResult>;
+    executeQuery(pool: any, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult>;
     updateRow(pool: any, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }>;
     insertRow(pool: any, params: InsertRowParams): Promise<{ success: boolean; rowCount: number }>;
     deleteRows(pool: any, params: DeleteRowsParams): Promise<{ success: boolean; rowCount: number }>;

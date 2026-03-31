@@ -20,7 +20,7 @@ export interface IDatabaseAdapter {
     /**
      * Executes a raw SQL query and returns the results.
      */
-    executeQuery(sql: string, context?: { database?: string }): Promise<QueryResult>;
+    executeQuery(sql: string, context?: { database?: string, limit?: number, offset?: number }): Promise<QueryResult>;
 
     /**
      * Retrieves metadata (columns, constraints) for a specific table.

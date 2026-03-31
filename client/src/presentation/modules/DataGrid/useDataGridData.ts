@@ -23,8 +23,14 @@ interface DataGridDataResult {
 }
 
 export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataResult {
-    const { activeConnectionId, connections } = useAppStore();
+    const { activeConnectionId, connections, tabs, activeTabId } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    
+    // Pagination state from tab metadata
+    const page = activeTab?.metadata?.page || 1;
+    const pageSize = activeTab?.metadata?.pageSize || 100;
+    const offset = (page - 1) * pageSize;
 
     const { dbName, schema, table: cleanTableName } = parseNodeId(tableId);
     const dialect: 'mysql' | 'postgres' = activeConnection?.type === 'mysql' ? 'mysql' : 'postgres';
@@ -41,9 +47,9 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
         enabled: !!activeConnectionId
     });
 
-    // Fetch Data (first page, or all for large datasets)
+    // Fetch Data (with pagination)
     const { data: queryResult, isLoading: isLoadingData, isFetching: isFetchingData, refetch } = useQuery({
-        queryKey: ['data', activeConnectionId, tableId, isLargeDataset],
+        queryKey: ['data', activeConnectionId, tableId, isLargeDataset, page, pageSize],
         queryFn: async () => {
             if (!activeConnection) throw new Error("No active connection");
             const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type as any);
@@ -57,9 +63,14 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
 
             const qSchema = getQuotedIdentifier(schema, dialect);
             const qTable = getQuotedIdentifier(cleanTableName || tableId, dialect);
+            
             return adapter.executeQuery(
-                `SELECT * FROM ${qSchema}.${qTable} LIMIT 1000`,
-                dbName ? { database: dbName } : undefined
+                `SELECT * FROM ${qSchema}.${qTable}`,
+                { 
+                    database: dbName,
+                    limit: pageSize,
+                    offset: offset
+                }
             );
         },
         enabled: !!activeConnectionId && !!metadata

@@ -21,6 +21,7 @@ export interface TabSlice {
     openVisualizeTab: () => void;
     openErdTab: (connectionId: string, database?: string) => void;
     closeAllTabs: () => void;
+    setTabPagination: (tabId: string, page: number, pageSize: number) => void;
 }
 
 // Helper type for cross-slice access (connection name lookup)
@@ -118,4 +119,10 @@ export const createTabSlice: StateCreator<TabSlice & ConnectionLookup, [], [], T
     }),
 
     closeAllTabs: () => set({ tabs: [], activeTabId: null }),
+    
+    setTabPagination: (tabId, page, pageSize) => set((state) => ({
+        tabs: state.tabs.map(t =>
+            t.id === tabId ? { ...t, metadata: { ...t.metadata, page, pageSize } } : t
+        ),
+    })),
 });

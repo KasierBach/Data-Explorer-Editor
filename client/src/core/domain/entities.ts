@@ -41,5 +41,6 @@ export interface QueryResult {
     fields?: { name: string; type: string }[];
     rows: Record<string, any>[];
     rowCount?: number; // Added to support row count in UI
+    totalCount?: number; // Total rows in table for pagination
     durationMs?: number;
 }

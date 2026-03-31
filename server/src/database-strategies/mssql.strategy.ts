@@ -51,8 +51,13 @@ export class MssqlStrategy implements IDatabaseStrategy {
 
     // ─── Query Operations ───
 
-    async executeQuery(pool: any, sql: string): Promise<QueryResult> {
-        const safeSql = SqlUtil.injectTop(sql, 50000);
+    async executeQuery(pool: any, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
+        let safeSql = sql;
+        if (options?.limit !== undefined && options?.offset !== undefined) {
+            safeSql = SqlUtil.injectPagination(sql, options.limit, options.offset, 'mssql');
+        } else {
+            safeSql = SqlUtil.injectTop(sql, 50000);
+        }
 
         const result = await pool.request().query(safeSql);
         return {

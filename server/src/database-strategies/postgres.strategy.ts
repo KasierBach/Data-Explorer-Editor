@@ -54,8 +54,13 @@ export class PostgresStrategy implements IDatabaseStrategy {
 
     // ─── Query Operations ───
 
-    async executeQuery(pool: any, sql: string): Promise<QueryResult> {
-        const safeSql = SqlUtil.injectLimit(sql, 50000);
+    async executeQuery(pool: any, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
+        let safeSql = sql;
+        if (options?.limit !== undefined && options?.offset !== undefined) {
+            safeSql = SqlUtil.injectPagination(sql, options.limit, options.offset, 'postgres');
+        } else {
+            safeSql = SqlUtil.injectLimit(sql, 50000);
+        }
 
         const client = await pool.connect();
         try {

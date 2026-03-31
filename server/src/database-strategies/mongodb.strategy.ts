@@ -68,7 +68,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         }
     }
 
-    async executeQuery(client: MongoClient, queryPayloadStr: string): Promise<QueryResult> {
+    async executeQuery(client: MongoClient, queryPayloadStr: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
         let payload: any;
         try {
             payload = JSON.parse(queryPayloadStr);
@@ -93,8 +93,9 @@ export class MongoDbStrategy implements IDatabaseStrategy {
 
         switch (payload.action) {
             case 'find':
-                const limit = Math.min(payload.limit || 50000, 50000); // Enforce hard cap of 50000
-                result = await col.find(filter, payload.options || {}).limit(limit).maxTimeMS(30000).toArray();
+                const limit = options?.limit || Math.min(payload.limit || 50000, 50000);
+                const skip = options?.offset || 0;
+                result = await col.find(filter, payload.options || {}).skip(skip).limit(limit).maxTimeMS(30000).toArray();
                 rows = result;
                 break;
             case 'aggregate':

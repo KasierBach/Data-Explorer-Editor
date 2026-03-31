@@ -31,7 +31,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         });
     }
 
-    async executeQuery(sql: string, context?: { database?: string }): Promise<QueryResult> {
+    async executeQuery(sql: string, context?: { database?: string, limit?: number, offset?: number }): Promise<QueryResult> {
         if (!this.connectionId) throw new Error('Not connected');
 
         const body: any = {
@@ -39,9 +39,9 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
             sql: sql,
         };
 
-        if (context?.database) {
-            body.database = context.database;
-        }
+        if (context?.database) body.database = context.database;
+        if (context?.limit) body.limit = context.limit;
+        if (context?.offset !== undefined) body.offset = context.offset;
 
         return await apiService.post<QueryResult>('/query', body);
     }

@@ -19,6 +19,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/presentation/components/ui/dropdown-menu";
+import { useAppStore } from '@/core/services/store';
+import { type Tab } from '@/core/services/store/slices/tabSlice';
 import { useDataGridData } from './useDataGridData';
 import { useDataGridEditing } from './useDataGridEditing';
 import { exportCSV, exportJSON, exportSQL, copyRowAsSQL, type ExportContext } from './DataGridExport';
@@ -31,8 +33,16 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'design'>('grid');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 100 });
     const tableContainerRef = useRef<HTMLDivElement>(null);
+
+    const { tabs, activeTabId, setTabPagination } = useAppStore();
+    const activeTab = tabs.find((t: Tab) => t.id === activeTabId);
+
+    // Sync local table pagination with store metadata
+    const pageIndex = (activeTab?.metadata?.page || 1) - 1;
+    const pageSize = activeTab?.metadata?.pageSize || 100;
+    
+    const pagination = useMemo(() => ({ pageIndex, pageSize }), [pageIndex, pageSize]);
 
     const isLargeDataset = tableId === 'large_dataset' || tableId === 'tbl-large';
 
@@ -43,7 +53,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     } = useDataGridData({ tableId });
 
     const editing = useDataGridEditing({
-        tableId, metadata, dbName, schema, cleanTableName, dialect, pkField, refetch,
+        tableId, metadata, dbName, schema, cleanTableName, pkField, refetch,
     });
 
     // Build columns
@@ -104,8 +114,14 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         state: { sorting, globalFilter, pagination },
         onSortingChange: setSorting,
         onGlobalFilterChange: setGlobalFilter,
-        onPaginationChange: setPagination,
-        manualPagination: !isLargeDataset,
+        onPaginationChange: (updater) => {
+           if (typeof updater === 'function') {
+               const next = updater(pagination);
+               setTabPagination(tableId, next.pageIndex + 1, next.pageSize);
+           }
+        },
+        manualPagination: true, // Always manual now because we paginate server-side
+        pageCount: queryResult?.totalCount ? Math.ceil(queryResult.totalCount / pageSize) : -1,
     });
 
     const { rows } = table.getRowModel();
@@ -222,8 +238,10 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
 
                 <FilterPopover onFilterChange={setGlobalFilter} currentFilter={globalFilter} />
 
-                <div className="text-[10px] text-muted-foreground ml-auto flex items-center gap-3 pr-2 font-mono">
-                    <span className="bg-muted px-1.5 rounded border border-border/50">{rows.length.toLocaleString()} ROWS</span>
+                <div className="text-[10px] text-muted-foreground ml-auto flex items-center gap-3 pr-2 font-mono uppercase">
+                    <span className="bg-muted px-1.5 rounded border border-border/50">
+                        {queryResult?.totalCount?.toLocaleString() || rows.length.toLocaleString()} TOTAL ROWS
+                    </span>
                     {queryResult?.durationMs && <span className="opacity-70">{queryResult.durationMs}MS</span>}
                 </div>
             </div>
@@ -338,20 +356,40 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                         {isLargeDataset ? 'VIRTUALIZED (ALL)' : `PAGE ${pagination.pageIndex + 1}`}
                     </span>
                     {!isLargeDataset && (
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-0.5">
-                                <Button variant="ghost" size="sm" className="h-4 w-4 p-0 hover:bg-muted" disabled={pagination.pageIndex === 0} onClick={() => setPagination(p => ({ ...p, pageIndex: p.pageIndex - 1 }))}>◀</Button>
-                                <Button variant="ghost" size="sm" className="h-4 w-4 p-0 hover:bg-muted" disabled={rows.length < pagination.pageSize} onClick={() => setPagination(p => ({ ...p, pageIndex: p.pageIndex + 1 }))}>▶</Button>
+                        <div className="flex items-center gap-3 ml-2">
+                            <div className="flex items-center gap-1">
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-5 w-5 p-0 hover:bg-muted" 
+                                    disabled={pagination.pageIndex === 0} 
+                                    onClick={() => setTabPagination(tableId, pagination.pageIndex, pagination.pageSize)}
+                                >
+                                    ◀
+                                </Button>
+                                <span className="min-w-[40px] text-center">
+                                    {pagination.pageIndex + 1} / {queryResult?.totalCount ? Math.ceil(queryResult.totalCount / pagination.pageSize) : '?'}
+                                </span>
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-5 w-5 p-0 hover:bg-muted" 
+                                    disabled={queryResult?.totalCount ? (pagination.pageIndex + 1) * pagination.pageSize >= queryResult.totalCount : rows.length < pagination.pageSize} 
+                                    onClick={() => setTabPagination(tableId, pagination.pageIndex + 2, pagination.pageSize)}
+                                >
+                                    ▶
+                                </Button>
                             </div>
+                            <div className="h-3 w-[1px] bg-border mx-1" />
                             <select
-                                className="bg-transparent border-none outline-none cursor-pointer hover:text-foreground text-[9px] font-bold"
+                                className="bg-transparent border-none outline-none cursor-pointer hover:text-foreground text-[9px] font-bold py-0 h-4"
                                 value={pagination.pageSize}
-                                onChange={(e) => setPagination(p => ({ ...p, pageSize: Number(e.target.value), pageIndex: 0 }))}
+                                onChange={(e) => setTabPagination(tableId, 1, Number(e.target.value))}
                             >
-                                <option value="50">50/PAGE</option>
-                                <option value="100">100/PAGE</option>
-                                <option value="500">500/PAGE</option>
-                                <option value="1000">1000/PAGE</option>
+                                <option value="50">50 / PAGE</option>
+                                <option value="100">100 / PAGE</option>
+                                <option value="500">500 / PAGE</option>
+                                <option value="1000">1000 / PAGE</option>
                             </select>
                         </div>
                     )}

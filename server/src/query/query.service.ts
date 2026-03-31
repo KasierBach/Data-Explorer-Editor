@@ -15,13 +15,39 @@ export class QueryService {
   ) { }
 
   async executeQuery(createQueryDto: CreateQueryDto, userId: string) {
-    const { connectionId, sql, database } = createQueryDto;
+    const { connectionId, sql, database, limit, offset } = createQueryDto;
     const connection = await this.connectionsService.findOne(connectionId, userId);
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId, database, userId);
+      const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
-      return await strategy.executeQuery(pool, sql);
+      
+      const result = await strategy.executeQuery(pool, sql, { limit, offset });
+
+      // Attempt to get totalCount for table views (standard SELECT * queries)
+      if (sql.trim().toUpperCase().startsWith('SELECT * FROM')) {
+        try {
+          const match = sql.match(/FROM\s+([\w"`.\[\]]+)/i);
+          if (match) {
+            const tableRef = match[1];
+            const countSql = connection.type === 'mongodb' 
+              ? JSON.stringify({ action: 'count', collection: tableRef.replace(/['"`]/g, '') })
+              : `SELECT COUNT(*) as total FROM ${tableRef}`;
+            
+            const countResult = await strategy.executeQuery(pool, countSql);
+            if (countResult.rows && countResult.rows.length > 0) {
+              // Extract count from various possible column names (total, TOTAL, count, or the first field)
+              const firstRow = countResult.rows[0];
+              const countVal = firstRow.total ?? firstRow.TOTAL ?? firstRow.count ?? firstRow[Object.keys(firstRow)[0]];
+              result.totalCount = parseInt(countVal, 10);
+            }
+          }
+        } catch (countError) {
+          console.warn('Failed to fetch total row count:', countError.message);
+        }
+      }
+
+      return result;
     } catch (error) {
       console.error('Query Service Error:', error);
       throw new InternalServerErrorException(`Query execution failed: ${error.message}`);

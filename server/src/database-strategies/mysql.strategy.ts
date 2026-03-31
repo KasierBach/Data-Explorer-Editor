@@ -45,8 +45,13 @@ export class MysqlStrategy implements IDatabaseStrategy {
 
     // ─── Query Operations ───
 
-    async executeQuery(pool: any, sql: string): Promise<QueryResult> {
-        const safeSql = SqlUtil.injectLimit(sql, 50000);
+    async executeQuery(pool: any, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
+        let safeSql = sql;
+        if (options?.limit !== undefined && options?.offset !== undefined) {
+            safeSql = SqlUtil.injectPagination(sql, options.limit, options.offset, 'mysql');
+        } else {
+            safeSql = SqlUtil.injectLimit(sql, 50000);
+        }
 
         // Execute using query option object to enforce application-level timeout
         const [result, fields] = await pool.query({
