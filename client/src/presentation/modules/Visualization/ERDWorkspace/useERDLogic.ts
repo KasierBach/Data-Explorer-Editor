@@ -98,6 +98,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             return results;
         },
         enabled: !!connectionId && !!activeConnection,
+        placeholderData: (prev) => prev,
     });
 
     const { data: relationships } = useQuery({
@@ -109,6 +110,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             return adapter.getRelationships(selectedDatabase);
         },
         enabled: !!connectionId,
+        placeholderData: (prev) => prev,
     });
 
     const { data: allDatabases } = useQuery({
@@ -121,6 +123,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             return nodes.filter((n: any) => n.type === 'database');
         },
         enabled: !!connectionId,
+        placeholderData: (prev) => prev,
     });
 
     const { data: tableData, isLoading: isLoadingCols } = useQuery({
@@ -150,6 +153,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             return results;
         },
         enabled: !!connectionId && !!activeConnection && !!hierarchy && visibleTableNames.size > 0,
+        placeholderData: (prev) => prev,
     });
 
     const filteredHierarchy = useMemo(() => {
@@ -396,7 +400,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
     // Schema sync effect  
     useEffect(() => {
-        if (!hierarchy && visibleTableNames.size > 0) return;
+        if (visibleTableNames.size > 0 && (!hierarchy || !tableData || !relationships)) return;
 
         const dbEdges: Edge[] = (relationships || []).map((rel: any, idx: number) => {
             const targetTable = rel.target_table?.split('.').pop() || rel.target_table;
