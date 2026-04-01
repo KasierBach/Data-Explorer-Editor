@@ -114,6 +114,21 @@ export class MssqlStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: result.rowsAffected?.[0] ?? 0 };
     }
 
+    async importData(pool: any, params: { schema: string; table: string; data: any[] }): Promise<{ success: boolean; rowCount: number }> {
+        const { schema, table, data } = params;
+        if (!data || data.length === 0) return { success: true, rowCount: 0 };
+
+        let totalAffected = 0;
+        // For MSSQL, we'll use a simple loop for now. 
+        // For production, we'd use a Table-Valued Parameter or Bulk Copy (bcp).
+        for (const row of data) {
+            const res = await this.insertRow(pool, { schema, table, data: row });
+            if (res.success) totalAffected += res.rowCount;
+        }
+
+        return { success: true, rowCount: totalAffected };
+    }
+
     buildAlterTableSql(quotedTable: string, op: any): string {
         switch (op.type) {
             case 'add_column':

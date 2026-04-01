@@ -7,7 +7,7 @@ import {
     DialogFooter,
 } from "@/presentation/components/ui/dialog";
 import { Button } from '@/presentation/components/ui/button';
-import { Upload, FileText, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { queryService } from '@/core/services/QueryService';
 import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
@@ -31,13 +31,11 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
     const [file, setFile] = useState<File | null>(null);
     const [data, setData] = useState<any[]>([]);
     const [isImporting, setIsImporting] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFile = e.target.files?.[0];
-        if (!selectedFile) return;
-
+    const processFile = (selectedFile: File) => {
         if (!selectedFile.name.endsWith('.csv')) {
             toast.error(lang === 'vi' ? 'Vui lòng chọn file CSV' : 'Please select a CSV file');
             return;
@@ -50,8 +48,12 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
         reader.onload = (event) => {
             const csv = event.target?.result as string;
             const lines = csv.split('\n').filter(l => l.trim());
+            if (lines.length < 2) {
+                setError(lang === 'vi' ? 'File CSV trống hoặc không đúng định dạng' : 'CSV file is empty or invalid');
+                return;
+            }
+
             const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-            
             const rows = lines.slice(1).map(line => {
                 const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
                 const obj: any = {};
@@ -64,6 +66,28 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
             setData(rows);
         };
         reader.readAsText(selectedFile);
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFile = e.target.files?.[0];
+        if (selectedFile) processFile(selectedFile);
+    };
+
+    const onDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const onDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const onDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const droppedFile = e.dataTransfer.files?.[0];
+        if (droppedFile) processFile(droppedFile);
     };
 
     const handleImport = async () => {
@@ -103,7 +127,16 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="py-6 flex flex-col items-center justify-center border-2 border-dashed border-muted-foreground/20 rounded-lg bg-muted/10">
+                <div 
+                    className={`py-10 flex flex-col items-center justify-center border-2 border-dashed rounded-lg transition-all duration-200 ${
+                        isDragging 
+                            ? 'border-primary bg-primary/5 scale-[1.02]' 
+                            : 'border-muted-foreground/20 bg-muted/10'
+                    }`}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                >
                     <input 
                         type="file" 
                         ref={fileInputRef} 
@@ -114,28 +147,39 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
                     
                     {!file ? (
                         <div className="flex flex-col items-center gap-3">
-                            <div className="p-3 bg-primary/10 rounded-full text-primary">
-                                <FileText className="w-8 h-8" />
+                            <div className={`p-4 rounded-full transition-colors ${isDragging ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary'}`}>
+                                <Upload className="w-8 h-8" />
                             </div>
                             <div className="text-center">
-                                <p className="text-sm font-medium">{lang === 'vi' ? 'Chọn file CSV để tải lên' : 'Choose a CSV file to upload'}</p>
-                                <p className="text-xs text-muted-foreground mt-1">{lang === 'vi' ? 'Dòng đầu tiên phải là tên cột' : 'First row must be column headers'}</p>
+                                <p className="text-sm font-medium">
+                                    {isDragging 
+                                        ? (lang === 'vi' ? 'Thả file vào đây' : 'Drop file here')
+                                        : (lang === 'vi' ? 'Kéo thả file CSV vào đây' : 'Drag & drop CSV file here')}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    {lang === 'vi' ? 'Hoặc click để chọn từ máy tính' : 'Or click to browse files'}
+                                </p>
                             </div>
-                            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="mt-2"
+                            >
                                 {lang === 'vi' ? 'Chọn File' : 'Select File'}
                             </Button>
                         </div>
                     ) : (
                         <div className="flex flex-col items-center gap-2">
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 text-green-600 rounded-full border border-green-500/20 text-xs font-medium">
-                                <Check className="w-3 h-3" />
+                            <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 text-green-600 rounded-full border border-green-500/20 text-xs font-semibold">
+                                <Check className="w-4 h-4" />
                                 {file.name}
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                {data.length} {lang === 'vi' ? 'dòng được tìm thấy' : 'rows detected'}
+                                {data.length} {lang === 'vi' ? 'dòng dữ liệu sẵn sàng' : 'rows ready for import'}
                             </p>
-                            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={() => { setFile(null); setData([]); }}>
-                                {lang === 'vi' ? 'Thay đổi' : 'Change file'}
+                            <Button variant="ghost" size="sm" className="text-xs h-8 mt-2" onClick={() => { setFile(null); setData([]); }}>
+                                {lang === 'vi' ? 'Chọn file khác' : 'Change file'}
                             </Button>
                         </div>
                     )}

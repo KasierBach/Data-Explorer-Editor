@@ -196,6 +196,16 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         return { success: res.acknowledged, rowCount: res.deletedCount };
     }
 
+    async importData(client: MongoClient, params: { schema: string; table: string; data: any[] }): Promise<{ success: boolean; rowCount: number }> {
+        const db = client.db();
+        const col = db.collection(params.table);
+        
+        if (!params.data || params.data.length === 0) return { success: true, rowCount: 0 };
+        
+        const res = await col.insertMany(params.data);
+        return { success: res.acknowledged, rowCount: res.insertedCount };
+    }
+
     buildAlterTableSql(quotedTable: string, op: any): string {
         throw new Error('Not applicable for MongoDB');
     }
