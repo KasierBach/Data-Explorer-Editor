@@ -11,6 +11,7 @@ import { GithubStrategy } from './strategies/github.strategy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { OtpModule } from '../otp/otp.module';
 import { SeedModule } from '../seed/seed.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
     imports: [
@@ -25,6 +26,7 @@ import { SeedModule } from '../seed/seed.module';
         }),
         OtpModule,
         SeedModule,
+        AuditModule,
     ],
     controllers: [AuthController],
     providers: [

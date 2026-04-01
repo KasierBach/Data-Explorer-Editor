@@ -6,12 +6,14 @@ import { DeleteRowsDto } from './dto/delete-rows.dto';
 import { UpdateSchemaDto } from './dto/update-schema.dto';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
+import { AuditService, AuditAction } from '../audit/audit.service';
 
 @Injectable()
 export class QueryService {
   constructor(
     private readonly connectionsService: ConnectionsService,
     private readonly strategyFactory: DatabaseStrategyFactory,
+    private readonly auditService: AuditService,
   ) { }
 
   async executeQuery(createQueryDto: CreateQueryDto, userId: string) {
@@ -46,6 +48,16 @@ export class QueryService {
           console.warn('Failed to fetch total row count:', countError.message);
         }
       }
+
+      await this.auditService.log({
+        action: AuditAction.DB_QUERY_EXECUTE,
+        userId,
+        details: { 
+          connectionId, 
+          database: database || connection.database, 
+          sqlSnippet: sql.substring(0, 100) + (sql.length > 100 ? '...' : '') 
+        }
+      });
 
       return result;
     } catch (error) {
@@ -118,6 +130,18 @@ export class QueryService {
       for (const sql of sqlStatements) {
         results.push(await this.executeQuery({ connectionId, sql, database }, userId));
       }
+      await this.auditService.log({
+        action: AuditAction.DB_QUERY_EXECUTE,
+        userId,
+        details: { 
+          connectionId, 
+          database, 
+          schema, 
+          table, 
+          operations: operations.map(op => op.type) 
+        }
+      });
+
       return { success: true, results };
     } catch (error) {
       console.error('Update Schema Error:', error);
@@ -188,6 +212,38 @@ export class QueryService {
     } catch (error) {
       console.error('Drop Database Error:', error);
       throw new InternalServerErrorException(`Failed to drop database: ${error.message}`);
+    }
+  }
+
+  async importData(body: { connectionId: string; schema: string; table: string; data: any[] }, userId: string) {
+    const { connectionId, schema, table, data } = body;
+    const connection = await this.connectionsService.findOne(connectionId, userId);
+    if (!connection) throw new BadRequestException('Invalid connection ID');
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      throw new BadRequestException('No data provided for import.');
+    }
+
+    try {
+      const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
+      const strategy = this.strategyFactory.getStrategy(connection.type);
+      const result = await strategy.importData(pool, { schema, table, data });
+
+      await this.auditService.log({
+        action: AuditAction.DB_QUERY_EXECUTE,
+        userId,
+        details: { 
+          connectionId, 
+          action: 'BULK_IMPORT',
+          table: `${schema ? schema + '.' : ''}${table}`, 
+          rowCount: result.rowCount 
+        }
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Import Data Error:', error);
+      throw new InternalServerErrorException(`Import failed: ${error.message}`);
     }
   }
 }

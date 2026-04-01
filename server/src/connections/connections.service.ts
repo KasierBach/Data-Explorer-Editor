@@ -5,6 +5,7 @@ import { Connection } from './entities/connection.entity';
 import { PrismaService } from '../prisma/prisma.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
 import { encryptAttribute, decryptAttribute } from '../utils/crypto.util';
+import { AuditService, AuditAction } from '../audit/audit.service';
 
 @Injectable()
 export class ConnectionsService implements OnModuleDestroy {
@@ -15,6 +16,7 @@ export class ConnectionsService implements OnModuleDestroy {
   constructor(
     private prisma: PrismaService,
     private strategyFactory: DatabaseStrategyFactory,
+    private auditService: AuditService,
   ) {
     // Run cleanup every minute
     this.cleanupInterval = setInterval(() => this.cleanupPools(), 60000);
@@ -65,6 +67,13 @@ export class ConnectionsService implements OnModuleDestroy {
       data: { ...createConnectionDto, password: encryptedPassword, userId } as any,
     });
     const { password: _, ...safeConnection } = connection;
+
+    await this.auditService.log({
+      action: AuditAction.DB_CONNECTION_CREATE,
+      userId,
+      details: { name: connection.name, type: connection.type, database: connection.database }
+    });
+
     return safeConnection as unknown as Connection;
   }
 
@@ -160,6 +169,12 @@ export class ConnectionsService implements OnModuleDestroy {
 
     await this.prisma.connection.delete({
       where: { id },
+    });
+
+    await this.auditService.log({
+      action: AuditAction.DB_CONNECTION_DELETE,
+      userId,
+      details: { name: connection.name, type: connection.type }
     });
   }
 

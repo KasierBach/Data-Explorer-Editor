@@ -112,7 +112,7 @@ export interface IDatabaseStrategy {
     getRelationships(pool: any): Promise<Relationship[]>;
     getDatabaseMetrics(pool: any): Promise<DatabaseMetrics>;
 
-    // ─── Polymorphic Tree & Seed ───
-    getHierarchyNodes(pool: any, parentId: string | null, parsedParams: any, connectionInfo: any): Promise<TreeNodeResult[]>;
+    // ─── Bulk Operations ───
+    importData(pool: any, params: { schema: string; table: string; data: any[] }): Promise<{ success: boolean; rowCount: number }>;
     seedData(pool: any): Promise<QueryResult>;
 }

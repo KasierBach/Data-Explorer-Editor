@@ -44,5 +44,9 @@ export const queryService = {
             method: 'DELETE',
             body: JSON.stringify({ connectionId, name })
         });
+    },
+
+    importData: async (payload: { connectionId: string; schema: string; table: string; data: any[] }) => {
+        return await apiService.post<any>('/query/import', payload);
     }
 };

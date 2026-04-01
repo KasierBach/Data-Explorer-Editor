@@ -10,7 +10,10 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/presentation/components/ui/button';
-import { RefreshCw, LayoutGrid, Download, Plus, Trash2, FileJson, FileText, FileCode, Check, X } from 'lucide-react';
+import { 
+    RefreshCw, LayoutGrid, Download, Plus, Trash2, 
+    FileJson, FileText, FileCode, Check, X, Upload 
+} from 'lucide-react';
 import { FilterPopover } from './FilterPopover';
 import { TableDesigner } from './TableDesigner';
 import {
@@ -24,6 +27,7 @@ import { type Tab } from '@/core/services/store/slices/tabSlice';
 import { useDataGridData } from './useDataGridData';
 import { useDataGridEditing } from './useDataGridEditing';
 import { exportCSV, exportJSON, exportSQL, copyRowAsSQL, type ExportContext } from './DataGridExport';
+import { BulkImportDialog } from './BulkImportDialog';
 
 interface DataGridProps {
     tableId: string;
@@ -33,6 +37,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'design'>('grid');
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const tableContainerRef = useRef<HTMLDivElement>(null);
 
     const { tabs, activeTabId, setTabPagination } = useAppStore();
@@ -228,6 +233,10 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                     <Plus className="w-3 h-3" /> Insert Row
                 </Button>
 
+                <Button variant="ghost" size="sm" onClick={() => setIsImportDialogOpen(true)} className="h-7 text-[11px] gap-1 px-2 text-blue-500 hover:text-blue-600">
+                    <Upload className="w-3 h-3" /> Import
+                </Button>
+
                 {editing.selectedRows.size > 0 && (
                     <Button variant="ghost" size="sm" onClick={editing.handleDeleteRows} disabled={editing.isSaving} className="h-7 text-[11px] gap-1 px-2 text-red-500 hover:text-red-600 hover:bg-red-500/10">
                         <Trash2 className="w-3 h-3" /> Delete ({editing.selectedRows.size})
@@ -399,6 +408,14 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                     <span>{schema}</span>
                 </div>
             </div>
+
+            <BulkImportDialog
+                open={isImportDialogOpen}
+                onOpenChange={setIsImportDialogOpen}
+                tableId={cleanTableName || tableId}
+                schema={schema}
+                onSuccess={() => refetch()}
+            />
         </div>
     );
 };

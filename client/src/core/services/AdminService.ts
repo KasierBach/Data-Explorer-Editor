@@ -32,6 +32,10 @@ class AdminService {
     async getAuditLogs(limit: number = 100) {
         return await apiService.get<any[]>(`/audit?limit=${limit}`);
     }
+
+    async getMyAuditLogs(limit: number = 200) {
+        return await apiService.get<any[]>(`/audit/me?limit=${limit}`);
+    }
 }
 
 export const adminService = new AdminService();

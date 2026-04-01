@@ -108,6 +108,33 @@ export class MysqlStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: (result as any).affectedRows };
     }
 
+    async importData(pool: any, params: { schema: string; table: string; data: any[] }): Promise<{ success: boolean; rowCount: number }> {
+        const { schema, table, data } = params;
+        if (!data || data.length === 0) return { success: true, rowCount: 0 };
+
+        const columns = Object.keys(data[0]);
+        const quotedTable = this.quoteTable(schema, table);
+        const colNames = columns.map(c => `\`${c}\``).join(', ');
+
+        // Efficient multi-row insert for MySQL
+        // INSERT INTO table (c1, c2) VALUES (?, ?), (?, ?), ...
+        const valuePlaceholders: string[] = [];
+        const flatValues: any[] = [];
+
+        data.forEach((row) => {
+            const rowPlaceholders = columns.map((col) => {
+                flatValues.push(row[col]);
+                return `?`;
+            });
+            valuePlaceholders.push(`(${rowPlaceholders.join(', ')})`);
+        });
+
+        const sql = `INSERT INTO ${quotedTable} (${colNames}) VALUES ${valuePlaceholders.join(', ')}`;
+        
+        const [result] = await pool.execute(sql, flatValues);
+        return { success: true, rowCount: (result as any).affectedRows };
+    }
+
     buildAlterTableSql(quotedTable: string, op: any): string {
         switch (op.type) {
             case 'add_column':

@@ -11,6 +11,7 @@ import { ResetPasswordWithOtpDto } from './dto/reset-password-otp.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { UserUtils } from '../users/user.utils';
+import { AuditService, AuditAction } from '../audit/audit.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -25,6 +26,7 @@ export class AuthService implements OnModuleInit {
         private readonly otpService: OtpService,
         private readonly seedService: SeedService,
         private readonly tokenService: TokenService,
+        private readonly auditService: AuditService,
     ) { }
 
     async onModuleInit() {
@@ -39,6 +41,11 @@ export class AuthService implements OnModuleInit {
         });
 
         if (!user) {
+            await this.auditService.log({
+                action: AuditAction.AUTH_LOGIN_FAILED,
+                details: { email: loginDto.email, reason: 'User not found' },
+                ipAddress: clientIp
+            });
             throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
         }
 
@@ -48,6 +55,12 @@ export class AuthService implements OnModuleInit {
 
         const isPasswordValid = await bcrypt.compare(loginDto.password, user.password!);
         if (!isPasswordValid) {
+            await this.auditService.log({
+                action: AuditAction.AUTH_LOGIN_FAILED,
+                userId: user.id,
+                details: { email: loginDto.email, reason: 'Invalid password' },
+                ipAddress: clientIp
+            });
             throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
         }
 
@@ -72,6 +85,13 @@ export class AuthService implements OnModuleInit {
         await this.prisma.user.update({
             where: { id: user.id },
             data: { lastLoginIp: clientIp || null },
+        });
+
+        await this.auditService.log({
+            action: AuditAction.AUTH_LOGIN_SUCCESS,
+            userId: user.id,
+            details: { email: user.email },
+            ipAddress: clientIp
         });
 
         return this.tokenService.generateTokenResponse(user);
@@ -127,6 +147,12 @@ export class AuthService implements OnModuleInit {
         const displayName = UserUtils.getDisplayName(firstName, lastName, registerDto.email);
         this.mailService.sendVerificationEmail(user.email, displayName, otp).catch(err => {
             console.error('Failed to send verification email in background:', err.message);
+        });
+
+        await this.auditService.log({
+            action: AuditAction.AUTH_REGISTER,
+            userId: user.id,
+            details: { email: user.email, name: registerDto.name }
         });
 
         return {

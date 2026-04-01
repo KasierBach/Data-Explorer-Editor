@@ -52,4 +52,9 @@ export class QueryController {
   async dropDatabase(@Body() body: { connectionId: string; name: string }, @Req() req: any) {
     return this.queryService.dropDatabase(body.connectionId, body.name, req.user.id);
   }
+
+  @Post('import')
+  async importData(@Body() body: { connectionId: string; schema: string; table: string; data: any[] }, @Req() req: any) {
+    return this.queryService.importData(body, req.user.id);
+  }
 }

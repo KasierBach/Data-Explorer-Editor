@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { QueryService } from './query.service';
 import { QueryController } from './query.controller';
 import { ConnectionsModule } from '../connections/connections.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [ConnectionsModule],
+  imports: [ConnectionsModule, AuditModule],
   controllers: [QueryController],
   providers: [QueryService],
 })
