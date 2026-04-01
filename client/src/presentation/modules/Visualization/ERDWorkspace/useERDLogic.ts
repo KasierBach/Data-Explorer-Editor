@@ -396,9 +396,9 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
     // Schema sync effect  
     useEffect(() => {
-        if (!hierarchy || !tableData || !relationships) return;
+        if (!hierarchy && visibleTableNames.size > 0) return;
 
-        const dbEdges: Edge[] = relationships.map((rel: any, idx: number) => {
+        const dbEdges: Edge[] = (relationships || []).map((rel: any, idx: number) => {
             const targetTable = rel.target_table?.split('.').pop() || rel.target_table;
             const sourceTable = rel.source_table?.split('.').pop() || rel.source_table;
 
@@ -421,7 +421,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         }).filter((e: Edge) => visibleTableNames.has(e.source as string) && visibleTableNames.has(e.target as string));
 
         const baseNodes: Node[] = Array.from(visibleTableNames).map((name) => {
-            const tableInfo = tableData[name] || { columns: [] };
+            const tableInfo = (tableData || {})[name] || { columns: [] };
             const cols = tableInfo.columns || [];
             const isCollapsed = collapsedTables.has(name);
 
