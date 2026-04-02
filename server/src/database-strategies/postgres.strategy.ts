@@ -123,8 +123,6 @@ export class PostgresStrategy implements IDatabaseStrategy {
         const quotedTable = this.quoteTable(schema, table);
         const colNames = columns.map(c => `"${c}"`).join(', ');
 
-        // Efficient multi-row insert for Postgres
-        // INSERT INTO table (c1, c2) VALUES ($1, $2), ($3, $4), ...
         const valuePlaceholders: string[] = [];
         const flatValues: any[] = [];
 
@@ -140,6 +138,24 @@ export class PostgresStrategy implements IDatabaseStrategy {
         
         const res = await pool.query(sql, flatValues);
         return { success: true, rowCount: res.rowCount };
+    }
+
+    async exportStream(pool: any, schema: string, table: string): Promise<any> {
+        // Dynamic import because pg-query-stream might only be used here
+        const QueryStream = (await import('pg-query-stream')).default || (await import('pg-query-stream'));
+        
+        const quotedTable = this.quoteTable(schema, table);
+        const query = new QueryStream(`SELECT * FROM ${quotedTable}`);
+        
+        const client = await pool.connect();
+        const stream = client.query(query);
+        
+        // Ensure client is released back to the pool when the stream ends or errors
+        stream.on('end', () => client.release());
+        stream.on('error', () => client.release());
+        stream.on('close', () => client.release());
+
+        return stream;
     }
 
     buildAlterTableSql(quotedTable: string, op: any): string {

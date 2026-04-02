@@ -206,6 +206,12 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         return { success: res.acknowledged, rowCount: res.insertedCount };
     }
 
+    async exportStream(client: MongoClient, schema: string, table: string): Promise<any> {
+        const db = client.db();
+        const col = db.collection(table);
+        return col.find().stream();
+    }
+
     buildAlterTableSql(quotedTable: string, op: any): string {
         throw new Error('Not applicable for MongoDB');
     }

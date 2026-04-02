@@ -114,6 +114,7 @@ export interface IDatabaseStrategy {
 
     // ─── Bulk Operations ───
     importData(pool: any, params: { schema: string; table: string; data: any[] }): Promise<{ success: boolean; rowCount: number }>;
+    exportStream(pool: any, schema: string, table: string): Promise<any>;
     
     // ─── Polymorphic Tree & Seed ───
     getHierarchyNodes(pool: any, parentId: string | null, parsedParams: any, connectionInfo: any): Promise<TreeNodeResult[]>;

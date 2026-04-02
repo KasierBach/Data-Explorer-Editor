@@ -116,8 +116,6 @@ export class MysqlStrategy implements IDatabaseStrategy {
         const quotedTable = this.quoteTable(schema, table);
         const colNames = columns.map(c => `\`${c}\``).join(', ');
 
-        // Efficient multi-row insert for MySQL
-        // INSERT INTO table (c1, c2) VALUES (?, ?), (?, ?), ...
         const valuePlaceholders: string[] = [];
         const flatValues: any[] = [];
 
@@ -133,6 +131,23 @@ export class MysqlStrategy implements IDatabaseStrategy {
         
         const [result] = await pool.execute(sql, flatValues);
         return { success: true, rowCount: (result as any).affectedRows };
+    }
+
+    async exportStream(pool: any, schema: string, table: string): Promise<any> {
+        const quotedTable = this.quoteTable(schema, table);
+        const sql = `SELECT * FROM ${quotedTable}`;
+        
+        // pool is from mysql2/promise. We need the raw connection for streaming
+        const connection = await pool.getConnection();
+        
+        // .connection accesses the underlying non-promise mysql2 connection
+        const stream = connection.connection.query(sql).stream();
+        
+        stream.on('end', () => connection.release());
+        stream.on('error', () => connection.release());
+        stream.on('close', () => connection.release());
+
+        return stream;
     }
 
     buildAlterTableSql(quotedTable: string, op: any): string {

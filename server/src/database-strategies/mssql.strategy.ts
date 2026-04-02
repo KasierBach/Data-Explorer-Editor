@@ -129,6 +129,27 @@ export class MssqlStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: totalAffected };
     }
 
+    async exportStream(pool: any, schema: string, table: string): Promise<any> {
+        const quotedTable = this.quoteTable(schema, table);
+        const sql = `SELECT * FROM ${quotedTable}`;
+        
+        const request = pool.request();
+        request.stream = true;
+        
+        // Wrap the mssql event emitter in a standard Node Readable stream for consistency
+        const { PassThrough } = await import('stream');
+        const pt = new PassThrough({ objectMode: true });
+        
+        request.on('row', (row: any) => pt.write(row));
+        request.on('done', () => pt.end());
+        request.on('error', (err: any) => pt.destroy(err));
+        
+        // Start the query
+        request.query(sql);
+        
+        return pt;
+    }
+
     buildAlterTableSql(quotedTable: string, op: any): string {
         switch (op.type) {
             case 'add_column':

@@ -18,6 +18,7 @@ import { OtpModule } from './otp/otp.module';
 import { SeedModule } from './seed/seed.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { MigrationModule } from './migration/migration.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { APP_GUARD } from '@nestjs/core';
     AuditModule,
     OtpModule,
     SeedModule,
+    MigrationModule,
   ],
   controllers: [AppController],
   providers: [
