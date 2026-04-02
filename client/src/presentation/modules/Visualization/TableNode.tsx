@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useMemo } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
 import { Table, Hash, Key, ChevronDown, ChevronRight, X, Settings, Link as LinkIcon, Info, Database, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -28,10 +28,12 @@ export interface TableNodeData {
     isCollapsed?: boolean;
     detailLevel?: 'all' | 'keys' | 'name';
     selected?: boolean;
+    performanceMode?: boolean;
 }
 
 const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean }) => {
-    const columns = data.columns || [];
+    // Memoize the base columns map to prevent full regeneration on each table re-render
+    const columns = useMemo(() => data.columns || [], [data.columns]);
     const shouldShowAll = data.detailLevel !== 'name';
     const [showIndices, setShowIndices] = useState(false);
     
@@ -46,8 +48,10 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
         data.onRemove?.(data.id);
     };
 
+    const isPerf = data.performanceMode;
+
     return (
-        <div className="group relative h-full">
+        <div className={cn("group relative h-full", isPerf ? "will-change-transform" : "")}>
             <NodeResizer 
                 minWidth={300} 
                 minHeight={150} 
@@ -56,11 +60,14 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
                 handleClassName="h-3 w-3 bg-white border-2 border-blue-500 rounded-full"
             />
             
-            {/* Glow effect on hover */}
-            <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/10 to-violet-500/10 rounded-[2rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            {/* Glow effect on hover (Disabled in Performance Mode) */}
+            {!isPerf && (
+                <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/10 to-violet-500/10 rounded-[2rem] blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+            )}
             
             <div className={cn(
-                "bg-card/90 backdrop-blur-3xl border rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.4)] h-full flex flex-col ring-1 ring-white/5 transition-all duration-500 relative z-10",
+                "bg-card/90 backdrop-blur-3xl border rounded-3xl h-full flex flex-col ring-1 ring-white/5 relative z-10",
+                !isPerf && "shadow-[0_25px_60px_-15px_rgba(0,0,0,0.4)] transition-all duration-500",
                 selected ? "border-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.2)]" : "border-white/10 group-hover:border-blue-500/30"
             )}>
                 {/* Header */}

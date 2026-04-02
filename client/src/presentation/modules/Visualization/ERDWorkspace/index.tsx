@@ -83,6 +83,10 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                         handleAutoLayout={actions.handleAutoLayout}
                         handleExportPNG={actions.handleExportPNG}
                         handleExportSQL={actions.handleExportSQL}
+                        performanceMode={state.performanceMode}
+                        setPerformanceMode={actions.setPerformanceMode}
+                        edgeRouting={state.edgeRouting}
+                        setEdgeRouting={actions.setEdgeRouting}
                         onFitView={() => {}}
                     />
                 )}

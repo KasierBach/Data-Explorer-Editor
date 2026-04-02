@@ -1,6 +1,6 @@
 import React from 'react';
 import { Panel } from '@xyflow/react';
-import { PanelLeft, GitGraph, LayoutGrid, Download, FileCode, Eye, Maximize2 } from 'lucide-react';
+import { PanelLeft, GitGraph, LayoutGrid, Download, FileCode, Eye, Maximize2, Settings } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/presentation/components/ui/dropdown-menu";
 import type { DetailLevel } from '../useERDLogic';
@@ -18,11 +18,15 @@ interface ERDToolbarProps {
     handleAutoLayout: (direction?: 'TB' | 'LR') => void;
     handleExportPNG: () => void;
     handleExportSQL: () => void;
+    performanceMode: boolean;
+    setPerformanceMode: (v: boolean) => void;
+    edgeRouting: 'smoothstep' | 'step' | 'straight';
+    setEdgeRouting: (v: 'smoothstep' | 'step' | 'straight') => void;
     onFitView: () => void;
 }
 
 export const ERDToolbar: React.FC<ERDToolbarProps> = ({
-    isSidebarCollapsed, setSidebarCollapsed, lang, activeConnectionName, selectedDatabase, detailLevel, setDetailLevel, showMinimap, setShowMinimap, handleAutoLayout, handleExportPNG, handleExportSQL, onFitView
+    isSidebarCollapsed, setSidebarCollapsed, lang, activeConnectionName, selectedDatabase, detailLevel, setDetailLevel, showMinimap, setShowMinimap, handleAutoLayout, handleExportPNG, handleExportSQL, performanceMode, setPerformanceMode, edgeRouting, setEdgeRouting, onFitView
 }) => {
     return (
         <Panel position="top-left" className="m-4">
@@ -92,6 +96,37 @@ export const ERDToolbar: React.FC<ERDToolbarProps> = ({
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
+
+                        <div className="w-px h-6 bg-border/20 mx-1" />
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 text-[11px] font-bold gap-2 px-3 rounded-lg">
+                                    <Settings className="h-3.5 w-3.5" />
+                                    {lang === 'vi' ? 'Tuỳ chỉnh UI' : 'UI Options'}
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 p-1.5 rounded-xl border-border/40 backdrop-blur-3xl bg-card/80">
+                                <DropdownMenuItem onClick={() => setPerformanceMode(!performanceMode)} className={performanceMode ? 'bg-primary/10 text-primary font-bold' : ''}>
+                                    {performanceMode ? (lang === 'vi' ? 'Đang bật Tối ưu' : 'Performance Mode ON') : (lang === 'vi' ? 'Tắt hiệu ứng chống lag' : 'Basic Performance')}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <div className="px-2 py-1.5 text-[9px] font-black uppercase text-muted-foreground/50 tracking-widest">
+                                    {lang === 'vi' ? 'Kiểu đường nối' : 'Edge Routing'}
+                                </div>
+                                <DropdownMenuItem onClick={() => setEdgeRouting('smoothstep')} className={edgeRouting === 'smoothstep' ? 'bg-primary/10 text-primary font-bold' : ''}>
+                                    {lang === 'vi' ? 'Góc Trơn (Mặc định)' : 'Smooth Step'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setEdgeRouting('step')} className={edgeRouting === 'step' ? 'bg-primary/10 text-primary font-bold' : ''}>
+                                    {lang === 'vi' ? 'Góc Vuông' : 'Step'}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setEdgeRouting('straight')} className={edgeRouting === 'straight' ? 'bg-primary/10 text-primary font-bold' : ''}>
+                                    {lang === 'vi' ? 'Đường Thẳng' : 'Straight'}
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <div className="w-px h-6 bg-border/20 mx-1" />
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>

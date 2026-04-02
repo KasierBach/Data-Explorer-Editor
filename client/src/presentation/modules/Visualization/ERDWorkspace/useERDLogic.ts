@@ -41,6 +41,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     const [schemaFilter, setSchemaFilter] = useState<string>(initialMetadata.schemaFilter || 'all');
     const [showMinimap, setShowMinimap] = useState(initialMetadata.showMinimap ?? true);
     const [collapsedTables, setCollapsedTables] = useState<Set<string>>(new Set(initialMetadata.collapsedTables || []));
+    const [performanceMode, setPerformanceMode] = useState<boolean>(initialMetadata.performanceMode || false);
+    const [edgeRouting, setEdgeRouting] = useState<'smoothstep' | 'step' | 'straight'>(initialMetadata.edgeRouting || 'smoothstep');
     const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
     const [hoverPosition, setHoverPosition] = useState<{ x: number, y: number } | null>(null);
 
@@ -137,19 +139,26 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             const nameToIdMap = new Map<string, string>();
             hierarchy.forEach(h => nameToIdMap.set(h.name, h.id));
 
-            await Promise.all(Array.from(visibleTableNames).map(async (name) => {
-                const nodeId = nameToIdMap.get(name);
-                if (nodeId) {
-                    try {
-                        const metadata = await adapter.getMetadata(nodeId);
-                        results[name] = metadata;
-                    } catch (e) {
-                        console.error(`[ERDCols] Failed to fetch metadata for ${name} (${nodeId})`, e);
+            const tablesArray = Array.from(visibleTableNames);
+            
+            // Chunk the array to avoid flooding the event loop / connection pool
+            const chunkSize = 5;
+            for (let i = 0; i < tablesArray.length; i += chunkSize) {
+                const chunk = tablesArray.slice(i, i + chunkSize);
+                await Promise.all(chunk.map(async (name) => {
+                    const nodeId = nameToIdMap.get(name);
+                    if (nodeId) {
+                        try {
+                            const metadata = await adapter.getMetadata(nodeId);
+                            results[name] = metadata;
+                        } catch (e) {
+                            console.error(`[ERDCols] Failed to fetch metadata for ${name} (${nodeId})`, e);
+                        }
+                    } else {
+                        console.warn(`[ERDCols] No hierarchy node found for visible table: ${name}`);
                     }
-                } else {
-                    console.warn(`[ERDCols] No hierarchy node found for visible table: ${name}`);
-                }
-            }));
+                }));
+            }
             return results;
         },
         enabled: !!connectionId && !!activeConnection && !!hierarchy && visibleTableNames.size > 0,
@@ -412,15 +421,17 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 target: sourceTable,
                 sourceHandle: rel.target_column,
                 targetHandle: rel.source_column,
-                type: ConnectionLineType.SmoothStep,
+                // We use default styling here. The dedicated effect will pick up the edgeRouting
+                // type and hovered state, overriding it via setEdges.
+                type: 'smoothstep', 
                 animated: true,
                 style: { 
-                    stroke: hoveredEdgeId === `db-e-${idx}` ? 'hsl(var(--primary))' : 'hsl(var(--primary))', 
-                    strokeWidth: hoveredEdgeId === `db-e-${idx}` ? 4 : 2, 
-                    opacity: hoveredEdgeId === `db-e-${idx}` ? 1 : 0.5,
+                    stroke: 'hsl(var(--primary))', 
+                    strokeWidth: 2, 
+                    opacity: 0.5,
                     transition: 'all 0.2s ease-in-out'
                 },
-                zIndex: hoveredEdgeId === `db-e-${idx}` ? 10 : 1,
+                zIndex: 1,
             };
         }).filter((e: Edge) => visibleTableNames.has(e.source as string) && visibleTableNames.has(e.target as string));
 
@@ -449,6 +460,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 isCollapsed,
                 onToggleCollapse: () => handleToggleCollapse(name),
                 detailLevel,
+                performanceMode,
             };
 
             const existing = nodes.find(n => n.id === name);
@@ -467,50 +479,39 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
         setNodes(finalNodes);
         setEdges([...dbEdges, ...manualEdges]);
-    }, [visibleTableNames, tableData, relationships, hierarchy, detailLevel, collapsedTables, hoveredEdgeId]);
+        // NOTE: Purposely removed hoveredEdgeId from dependencies to avoid N^2 re-renders.
+    }, [visibleTableNames, tableData, relationships, hierarchy, detailLevel, collapsedTables, performanceMode]);
 
-    // Dedicated effect to handle hovered styles for immediate feedback
+    // Dedicated effect to handle hovered styles for immediate feedback and edge routing
     useEffect(() => {
-        if (!hoveredEdgeId) {
-            setEdges(eds => eds.map(e => ({
-                ...e,
-                style: { 
-                    ...e.style, 
-                    strokeWidth: 2, 
-                    opacity: 0.5,
-                },
-                zIndex: 1
-            })));
-            return;
-        }
-
         setEdges(eds => eds.map(e => {
-            if (e.id === hoveredEdgeId) {
+            const isHovered = e.id === hoveredEdgeId;
+            const updatedStyle = {
+                ...e.style,
+                strokeWidth: isHovered ? 4 : 2,
+                opacity: isHovered ? 1 : 0.5,
+            };
+
+            if (isHovered) {
                 return {
                     ...e,
+                    type: edgeRouting,
                     label: '',
                     labelStyle: { fill: 'hsl(var(--primary))', fontWeight: 'bold', fontSize: '10px' },
                     labelBgStyle: { fill: 'hsl(var(--background))', fillOpacity: 0.8, rx: 4, ry: 4 },
-                    style: { 
-                        ...e.style, 
-                        strokeWidth: 4, 
-                        opacity: 1,
-                    },
+                    style: updatedStyle,
                     zIndex: 20
                 };
             }
             return {
                 ...e,
+                type: edgeRouting,
                 label: '',
-                style: { 
-                    ...e.style, 
-                    strokeWidth: 2, 
-                    opacity: 0.2,
-                },
+                style: updatedStyle,
                 zIndex: 1
             };
         }));
-    }, [hoveredEdgeId, setEdges]);
+    }, [hoveredEdgeId, edgeRouting, setEdges]);
 
     // Export logic
     const handleExportPNG = useCallback(() => {
@@ -561,6 +562,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 detailLevel,
                 schemaFilter,
                 showMinimap,
+                performanceMode,
+                edgeRouting,
                 collapsedTables: Array.from(collapsedTables)
             };
             if (isStandalone) setPageState(tabId, stateToSave);
@@ -579,7 +582,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             collapsedTables, selectedDatabase, allDatabases, hierarchy, 
             filteredHierarchy, hoverPosition, hoveredEdgeId,
             tableData, isLoadingHierarchy, isLoadingCols, lang, 
-            activeConnection, effectiveDatabase 
+            activeConnection, effectiveDatabase, performanceMode, edgeRouting 
         },
         actions: { 
             setNodes, setEdges, onNodesChange, onEdgesChange, handleEdgesChange, 
@@ -587,7 +590,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             setSidebarCollapsed, setDetailLevel, setSchemaFilter, setShowMinimap, 
             setCollapsedTables, setSelectedDatabase, handleRemoveConstraint, 
             handleCreateForeignKey, handleAutoLayout, toggleTable, 
-            handleSelectAll, handleDeselectAll,
+            handleSelectAll, handleDeselectAll, setPerformanceMode, setEdgeRouting,
             handleToggleCollapse, handleExportPNG, handleExportSQL,
             handleEdgeMouseEnter, handleEdgeMouseLeave
         }
