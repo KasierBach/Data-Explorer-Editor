@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class StartMigrationDto {
     @IsString()
@@ -6,7 +6,7 @@ export class StartMigrationDto {
     sourceConnectionId: string;
 
     @IsString()
-    @IsNotEmpty()
+    @IsOptional()
     sourceSchema: string;
 
     @IsString()
@@ -18,7 +18,7 @@ export class StartMigrationDto {
     targetConnectionId: string;
 
     @IsString()
-    @IsNotEmpty()
+    @IsOptional()
     targetSchema: string;
 
     @IsString()

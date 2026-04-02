@@ -16,6 +16,11 @@ export class PostgresStrategy implements IDatabaseStrategy {
 
     createPool(connectionConfig: any, databaseOverride?: string): any {
         const isLocalhost = connectionConfig.host === 'localhost' || connectionConfig.host === '127.0.0.1';
+
+        // Support timeout overrides for migration pools (default: 30s for normal queries)
+        const stmtTimeout = connectionConfig.statementTimeout ?? 30000;
+        const qryTimeout = connectionConfig.queryTimeout ?? 30000;
+
         const pool = new Pool({
             host: connectionConfig.host,
             port: connectionConfig.port,
@@ -26,8 +31,8 @@ export class PostgresStrategy implements IDatabaseStrategy {
             max: 20,
             idleTimeoutMillis: 30000,
             connectionTimeoutMillis: 10000,
-            statement_timeout: 30000, // 30 seconds
-            query_timeout: 30000, // 30 seconds
+            statement_timeout: stmtTimeout,
+            query_timeout: qryTimeout,
         });
         
         // Prevent background connection errors from crashing the whole Node.js process
@@ -145,15 +150,30 @@ export class PostgresStrategy implements IDatabaseStrategy {
         const QueryStream = (await import('pg-query-stream')).default || (await import('pg-query-stream'));
         
         const quotedTable = this.quoteTable(schema, table);
-        const query = new QueryStream(`SELECT * FROM ${quotedTable}`);
+        const query = new QueryStream(`SELECT * FROM ${quotedTable}`, undefined, {
+            batchSize: 2000,
+        });
         
         const client = await pool.connect();
+
+        // Disable statement_timeout for this client so long-running migration
+        // streams are not killed by the pool's default 30s timeout.
+        await client.query('SET statement_timeout = 0');
+
         const stream = client.query(query);
         
-        // Ensure client is released back to the pool when the stream ends or errors
-        stream.on('end', () => client.release());
-        stream.on('error', () => client.release());
-        stream.on('close', () => client.release());
+        // Guard: ensure client.release() is called exactly once
+        let released = false;
+        const safeRelease = () => {
+            if (!released) {
+                released = true;
+                client.release();
+            }
+        };
+
+        stream.on('end', safeRelease);
+        stream.on('error', safeRelease);
+        stream.on('close', safeRelease);
 
         return stream;
     }

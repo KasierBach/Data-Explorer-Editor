@@ -25,13 +25,23 @@ const inferType = (value: any): string => {
 export class MongoDbStrategy implements IDatabaseStrategy {
     async createPool(connectionConfig: any, databaseOverride?: string): Promise<MongoClient> {
         let uri = connectionConfig.url || '';
+        if (!uri && connectionConfig.host && connectionConfig.host.includes('://')) {
+            uri = connectionConfig.host;
+        }
+
         if (!uri) {
             // DB schema stores 'username', not 'user'
             const user = connectionConfig.username || connectionConfig.user;
             const auth = user 
                 ? `${encodeURIComponent(user)}:${encodeURIComponent(connectionConfig.password || '')}@` 
                 : '';
-            const host = connectionConfig.host || 'localhost';
+            
+            let host = connectionConfig.host || 'localhost';
+            // Strip protocol if present in host field (common error with Atlas URIs)
+            if (host.includes('://')) {
+                host = host.split('://')[1];
+            }
+            
             const port = connectionConfig.port || 27017;
             const db = databaseOverride || connectionConfig.database || '';
             const protocol = connectionConfig.type === 'mongodb+srv' ? 'mongodb+srv' : 'mongodb';
@@ -44,17 +54,21 @@ export class MongoDbStrategy implements IDatabaseStrategy {
             }
             const queryString = params.length > 0 ? `?${params.join('&')}` : '';
             
+            const dbName = db ? `/${db}` : '/';
             uri = protocol === 'mongodb+srv'
-                ? `${protocol}://${auth}${host}/${db}${queryString}`
-                : `${protocol}://${auth}${host}:${port}/${db}${queryString}`;
+                ? `${protocol}://${auth}${host}${dbName}${queryString}`
+                : `${protocol}://${auth}${host}:${port}${dbName}${queryString}`;
         }
 
         console.log(`[MongoDbStrategy] Connecting to: ${uri.replace(/\/\/[^@]+@/, '//***:***@')}`);
 
+        // Support timeout overrides for migration pools (0 = unlimited)
+        const socketTimeout = connectionConfig.socketTimeout ?? 30000;
+
         const client = new MongoClient(uri, {
             serverSelectionTimeoutMS: 15000,
             connectTimeoutMS: 15000,
-            socketTimeoutMS: 30000,
+            socketTimeoutMS: socketTimeout || 0,
         });
 
         await client.connect();

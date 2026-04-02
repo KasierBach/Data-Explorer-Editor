@@ -24,10 +24,14 @@ export class TransformInterceptor<T>
   ): Observable<Response<T>> {
     const ctx = context.switchToHttp();
     const response = ctx.getResponse();
+    const request = ctx.getRequest();
 
-    // Do not transform if it's SSE (Server-Sent Events) for AI streaming.
-    // Streaming endpoints usually return raw streams or specific Content-Type.
-    if (response.getHeader('Content-Type') === 'text/event-stream') {
+    // Do not transform if it's SSE (Server-Sent Events) or a stream.
+    // Check Content-Type OR the specific migration progress path
+    const contentType = response.getHeader ? response.getHeader('Content-Type') : '';
+    const isSsePath = request.url && request.url.includes('/migration/progress');
+
+    if (isSsePath || (contentType && (contentType as string).includes('text/event-stream'))) {
         return next.handle();
     }
 

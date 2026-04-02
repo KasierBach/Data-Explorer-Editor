@@ -15,13 +15,16 @@ export class MssqlStrategy implements IDatabaseStrategy {
     // ─── Connection Management ───
 
     async createPool(connectionConfig: any, databaseOverride?: string): Promise<any> {
+        // Migration override: connectionConfig.statementTimeout/queryTimeout will be 0
+        const reqTimeout = connectionConfig.statementTimeout ?? 30000;
+
         const config: mssql.config = {
             server: connectionConfig.host || 'localhost',
             port: connectionConfig.port || 1433,
             user: connectionConfig.username,
             password: connectionConfig.password || undefined,
             database: databaseOverride || connectionConfig.database,
-            requestTimeout: 30000, // 30 seconds query timeout
+            requestTimeout: reqTimeout, // Overridable timeout
             options: {
                 encrypt: false,
                 trustServerCertificate: true,

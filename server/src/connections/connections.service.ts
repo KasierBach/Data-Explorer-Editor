@@ -101,6 +101,16 @@ export class ConnectionsService implements OnModuleDestroy {
     return safeConnection as unknown as Connection;
   }
 
+  /**
+   * Retrieves a connection with the password decrypted.
+   * Internal use only (e.g. MigrationService).
+   */
+  async getDecryptedConnection(id: string, userId: string) {
+    const connection = await this.findRawOne(id, userId);
+    const decryptedPassword = connection.password ? decryptAttribute(connection.password) : undefined;
+    return { ...connection, password: decryptedPassword };
+  }
+
   async getPool(id: string, databaseOverride?: string, userId?: string) {
     if (!userId) {
       // if userId isn't provided (e.g from legacy code), fallback to system fetch

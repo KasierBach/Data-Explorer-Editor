@@ -1,4 +1,4 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
 import { ConnectionsService } from '../connections/connections.service';
@@ -26,7 +26,6 @@ export class MigrationService {
         private dbStrategiesFactory: DatabaseStrategyFactory,
     ) { }
 
-
     async startMigration(userId: string, dto: StartMigrationDto): Promise<{ jobId: string }> {
         const jobId = uuidv4();
         this.jobs.set(jobId, { id: jobId, status: 'pending', processedRows: 0 });
@@ -34,9 +33,29 @@ export class MigrationService {
         // Fire-and-forget: run the migration asynchronously in the background
         this.runMigrationPipeline(userId, jobId, dto).catch(err => {
             this.logger.error(`Migration ${jobId} failed to start or crashed:`, err);
+            const job = this.jobs.get(jobId);
+            if (job) {
+                job.status = 'failed';
+                job.error = err.message || 'Background process crashed';
+                this.updateJob(jobId, job);
+            }
         });
 
         return { jobId };
+    }
+
+    /**
+     * Override connection config to remove timeouts for migration pools.
+     * Normal query pools keep 30s timeout, but migration needs unlimited time.
+     */
+    private buildMigrationConnectionConfig(conn: any): any {
+        return {
+            ...conn,
+            // These flags are read by createPool() in strategies that support them
+            statementTimeout: 0,
+            queryTimeout: 0,
+            socketTimeout: 0,
+        };
     }
 
     private async runMigrationPipeline(userId: string, jobId: string, dto: StartMigrationDto) {
@@ -47,20 +66,26 @@ export class MigrationService {
         let sourcePool: any = null;
         let targetPool: any = null;
         let sourceStrategy: any = null;
+        let targetStrategy: any = null;
 
         try {
-            // 1. Fetch Connection Credentials
-            const sourceConn = await this.connectionsService.findOne(dto.sourceConnectionId, userId);
-            const targetConn = await this.connectionsService.findOne(dto.targetConnectionId, userId);
+            // 1. Fetch Connection Credentials (with decrypted passwords)
+            const sourceConn = await this.connectionsService.getDecryptedConnection(dto.sourceConnectionId, userId);
+            const targetConn = await this.connectionsService.getDecryptedConnection(dto.targetConnectionId, userId);
 
             if (!sourceConn || !targetConn) throw new Error('Source or Target connection not found');
 
-            // 2. Initialize Strategies & Pools
+            // 2. Initialize Strategies & Pools (with migration-safe timeout overrides)
             sourceStrategy = this.dbStrategiesFactory.getStrategy(sourceConn.type);
-            const targetStrategy = this.dbStrategiesFactory.getStrategy(targetConn.type);
+            targetStrategy = this.dbStrategiesFactory.getStrategy(targetConn.type);
 
-            sourcePool = await sourceStrategy.createPool(sourceConn);
-            targetPool = await targetStrategy.createPool(targetConn);
+            const migrationSourceConfig = this.buildMigrationConnectionConfig(sourceConn);
+            const migrationTargetConfig = this.buildMigrationConnectionConfig(targetConn);
+
+            sourcePool = await sourceStrategy.createPool(migrationSourceConfig);
+            targetPool = await targetStrategy.createPool(migrationTargetConfig);
+
+            this.logger.log(`Migration ${jobId}: pools created, starting stream...`);
 
             // 3. Get the Readable Stream from Source
             const stream = await sourceStrategy.exportStream(sourcePool, dto.sourceSchema, dto.sourceTable);
@@ -72,39 +97,33 @@ export class MigrationService {
 
             const flushBuffer = async () => {
                 if (buffer.length === 0) return;
-                
-                // For SQL to NoSQL, JSON stringification for deeply nested objects is recommended.
-                // But for v1, we directly pass the buffer and rely on the target strategy to insert it.
+                const batch = buffer;
+                buffer = [];
+
                 await targetStrategy.importData(targetPool, {
                     schema: dto.targetSchema,
                     table: dto.targetTable,
-                    data: buffer
+                    data: batch
                 });
 
-                job.processedRows += buffer.length;
+                job.processedRows += batch.length;
                 this.updateJob(jobId, job);
-                buffer = [];
+                this.logger.verbose(`Migration ${jobId}: flushed ${batch.length} rows (total: ${job.processedRows})`);
             };
 
-            // Common event handler for streams
             const handleData = async (chunk: any) => {
-                // If it's pg-stream, chunk is a row object.
-                // Provide a uniform adapter if needed, but standard object streams emit row objects.
                 buffer.push(chunk);
-
                 if (buffer.length >= BATCH_SIZE) {
                     if (stream.pause && !isPaused) {
                         isPaused = true;
                         stream.pause();
                     }
-
                     try {
                         await flushBuffer();
                     } catch (error) {
-                        stream.emit('error', error); // Abort stream
+                        stream.emit('error', error);
                         return;
                     }
-
                     if (stream.resume && isPaused) {
                         isPaused = false;
                         stream.resume();
@@ -112,19 +131,19 @@ export class MigrationService {
                 }
             };
 
-            // Attach listeners depending on stream type (MySQL and Pg emit 'data', custom streams emit 'data')
             if (typeof stream.on === 'function') {
                 stream.on('data', handleData);
-                stream.on('row', handleData); // MSSQL backup if not piped fully
+                stream.on('row', handleData);
 
                 stream.on('end', async () => {
                     const currentJob = this.jobs.get(jobId)!;
                     if ((currentJob.status as string) === 'failed') return;
                     try {
                         await flushBuffer();
-                        if ((this.jobs.get(jobId)!.status as string) !== 'failed') {
-                            const updatedJob = this.jobs.get(jobId)!;
+                        const updatedJob = this.jobs.get(jobId)!;
+                        if ((updatedJob.status as string) !== 'failed') {
                             updatedJob.status = 'completed';
+                            this.logger.log(`Migration ${jobId}: completed (${updatedJob.processedRows} rows)`);
                             this.updateJob(jobId, updatedJob);
                         }
                     } catch (error) {
@@ -141,7 +160,6 @@ export class MigrationService {
                     this.updateJob(jobId, currentJob);
                 });
             } else {
-                // Fallback for async iterables if stream doesn't have .on
                 for await (const chunk of stream) {
                     if ((this.jobs.get(jobId)!.status as string) === 'failed') break;
                     await handleData(chunk);
@@ -150,21 +168,25 @@ export class MigrationService {
                 if ((currentJob.status as string) !== 'failed') {
                     await flushBuffer();
                     currentJob.status = 'completed';
+                    this.logger.log(`Migration ${jobId}: completed (${currentJob.processedRows} rows)`);
                     this.updateJob(jobId, currentJob);
                 }
             }
 
         } catch (error: any) {
-            this.logger.error(`Migration ${jobId} failed:`, error);
-            job.status = 'failed';
-            job.error = error.message;
-            this.updateJob(jobId, job);
+            this.logger.error(`Migration ${jobId} PIPELINE EXCEPTION`, error);
+            const currentJob = this.jobs.get(jobId)!;
+            currentJob.status = 'failed';
+            currentJob.error = error.message;
+            this.updateJob(jobId, currentJob);
         } finally {
             // Clean up pools
             if (sourcePool && sourceStrategy) {
                 try { await sourceStrategy.closePool(sourcePool); } catch (e) { }
             }
-            // Add close targetPool if strategy service tracks it or close manually
+            if (targetPool && targetStrategy) {
+                try { await targetStrategy.closePool(targetPool); } catch (e) { }
+            }
         }
     }
 
@@ -173,3 +195,4 @@ export class MigrationService {
         this.eventEmitter.emit(`migration-${jobId}`, job);
     }
 }
+

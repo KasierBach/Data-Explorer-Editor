@@ -12,7 +12,8 @@ export class MigrationController {
 
     @Post('start')
     async startMigration(@Req() req: any, @Body() dto: StartMigrationDto) {
-        const userId = (req.user as any).sub;
+        // The JwtStrategy returns 'id', not 'sub'
+        const userId = (req.user as any).id;
         return this.migrationService.startMigration(userId, dto);
     }
 
@@ -32,17 +33,30 @@ export class MigrationController {
             const listener = (update: any) => {
                 observer.next({ data: update });
                 if (update.status === 'completed' || update.status === 'failed') {
+                    cleanup();
                     observer.complete();
-                    this.migrationService.eventEmitter.removeListener(`migration-${jobId}`, listener);
                 }
             };
 
             this.migrationService.eventEmitter.on(`migration-${jobId}`, listener);
 
-            // Cleanup when client disconnects
-            return () => {
+            // Heartbeat: send a comment ping every 15s to keep the SSE connection
+            // alive through proxies, load balancers, and browser idle timeouts.
+            const heartbeat = setInterval(() => {
+                try {
+                    observer.next({ data: '__heartbeat__', type: 'ping' } as MessageEvent);
+                } catch {
+                    // observer may be closed; cleanup will handle it
+                }
+            }, 15_000);
+
+            // Cleanup when client disconnects or migration ends
+            const cleanup = () => {
+                clearInterval(heartbeat);
                 this.migrationService.eventEmitter.removeListener(`migration-${jobId}`, listener);
             };
+
+            return cleanup;
         });
     }
 }

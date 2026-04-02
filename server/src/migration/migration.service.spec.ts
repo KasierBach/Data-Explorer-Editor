@@ -38,7 +38,7 @@ describe('MigrationService', () => {
 
     beforeEach(async () => {
         mockConnectionsService = {
-            findOne: jest.fn().mockImplementation((id: string) => {
+            getDecryptedConnection: jest.fn().mockImplementation((id: string) => {
                 if (id === 'src-1') return Promise.resolve(mockSourceConn);
                 if (id === 'tgt-1') return Promise.resolve(mockTargetConn);
                 return Promise.resolve(null);
@@ -230,7 +230,7 @@ describe('MigrationService', () => {
     // ─── Test 5: Connection Not Found ───
 
     it('should fail immediately if source connection is not found', async () => {
-        mockConnectionsService.findOne.mockResolvedValue(null);
+        mockConnectionsService.getDecryptedConnection.mockResolvedValue(null);
 
         const { jobId } = await service.startMigration('user-1', baseDto);
 

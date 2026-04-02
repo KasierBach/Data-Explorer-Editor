@@ -15,6 +15,9 @@ export class MysqlStrategy implements IDatabaseStrategy {
     // ─── Connection Management ───
 
     createPool(connectionConfig: any, databaseOverride?: string): any {
+        // Migration override: connectionConfig.statementTimeout/queryTimeout will be 0
+        const timeoutMs = connectionConfig.statementTimeout !== undefined ? connectionConfig.statementTimeout : 10000;
+        
         return mysql.createPool({
             host: connectionConfig.host,
             port: connectionConfig.port,
@@ -25,7 +28,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
             connectionLimit: 20,
             queueLimit: 0,
             multipleStatements: true,
-            connectTimeout: 10000, // 10 seconds connection timeout
+            connectTimeout: timeoutMs, 
         });
     }
 
@@ -54,6 +57,8 @@ export class MysqlStrategy implements IDatabaseStrategy {
         }
 
         // Execute using query option object to enforce application-level timeout
+        // (mysql2 supports timeout in the options object per query).
+        // Since we don't have pool-level query_timeout, we use the default 30s.
         const [result, fields] = await pool.query({
             sql: safeSql,
             timeout: 30000 // 30 seconds query timeout

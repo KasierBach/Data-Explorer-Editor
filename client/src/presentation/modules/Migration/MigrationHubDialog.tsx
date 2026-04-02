@@ -63,7 +63,13 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
             migrationService.subscribeToProgress(
                 jobId,
                 (updatedJob) => setJob(updatedJob),
-                (errMsg) => setJob(prev => prev ? { ...prev, status: 'failed', error: errMsg } : null),
+                (errMsg) => setJob(prev => {
+                    // Only set error from SSE closure if we don't have a terminal status yet
+                    if (prev && (prev.status === 'completed' || prev.status === 'failed')) {
+                        return prev;
+                    }
+                    return prev ? { ...prev, status: 'failed', error: errMsg } : null;
+                }),
             );
         } catch (err: any) {
             setJob({ id: '', status: 'failed', processedRows: 0, error: err.message });
@@ -85,11 +91,11 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
             <div
-                className="bg-card border border-border rounded-xl shadow-2xl w-[600px] max-h-[85vh] overflow-hidden"
+                className="bg-card border border-border rounded-xl shadow-2xl w-[600px] max-h-[85vh] flex flex-col overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="p-4 border-b bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10">
+                <div className="p-4 border-b bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 shrink-0">
                     <div className="flex items-center gap-2">
                         <ArrowRightLeft className="w-5 h-5 text-indigo-400" />
                         <h2 className="text-base font-semibold">Data Transfer Hub</h2>
@@ -100,7 +106,7 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
                 </div>
 
                 {/* Body */}
-                <div className="p-4 space-y-4">
+                <div className="p-4 space-y-4 overflow-y-auto flex-1">
                     {/* Source & Target Side by Side */}
                     <div className="grid grid-cols-[1fr,auto,1fr] gap-3 items-start">
                         {/* Source */}
@@ -233,7 +239,7 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
                 </div>
 
                 {/* Footer */}
-                <div className="p-3 border-t flex justify-end gap-2 bg-muted/20">
+                <div className="p-3 border-t flex justify-end gap-2 bg-muted/20 shrink-0">
                     <Button variant="ghost" size="sm" onClick={onClose} className="h-8 text-xs">
                         {isCompleted || isFailed ? 'Close' : 'Cancel'}
                     </Button>
