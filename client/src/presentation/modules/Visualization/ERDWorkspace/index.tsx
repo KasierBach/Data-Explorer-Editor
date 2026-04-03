@@ -69,6 +69,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 handleEdgeMouseLeave={actions.handleEdgeMouseLeave}
                 hoverPosition={state.hoverPosition}
                 hoveredEdgeId={state.hoveredEdgeId}
+                backgroundVariant={state.backgroundVariant}
                 toolbar={(
                     <ERDToolbar
                         isSidebarCollapsed={state.isSidebarCollapsed}
@@ -87,6 +88,12 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                         setPerformanceMode={actions.setPerformanceMode}
                         edgeRouting={state.edgeRouting}
                         setEdgeRouting={actions.setEdgeRouting}
+                        backgroundVariant={state.backgroundVariant}
+                        setBackgroundVariant={actions.setBackgroundVariant}
+                        isEdgeAnimated={state.isEdgeAnimated}
+                        setIsEdgeAnimated={actions.setIsEdgeAnimated}
+                        isToolbarCollapsed={state.isToolbarCollapsed}
+                        setIsToolbarCollapsed={actions.setIsToolbarCollapsed}
                         onFitView={() => {}}
                     />
                 )}

@@ -10,6 +10,7 @@ import {
     type OnNodesChange,
     type OnEdgesChange,
     type OnConnect,
+    BackgroundVariant,
 } from '@xyflow/react';
 import { Database } from 'lucide-react';
 import TableNode from '../../TableNode';
@@ -36,12 +37,13 @@ interface ERDCanvasProps {
     handleEdgeMouseLeave?: (event: React.MouseEvent, edge: Edge) => void;
     hoverPosition?: { x: number, y: number } | null;
     hoveredEdgeId?: string | null;
+    backgroundVariant?: 'dots' | 'lines' | 'cross';
     toolbar?: React.ReactNode;
 }
 
 export const ERDCanvas: React.FC<ERDCanvasProps> = ({
     nodes, edges, onNodesChange, onEdgesChange, onConnect, isLoading, effectiveDatabase, lang, showMinimap, pendingConnection, setPendingConnection, handleCreateForeignKey,
-    handleEdgeMouseEnter, handleEdgeMouseLeave, hoverPosition, hoveredEdgeId, toolbar
+    handleEdgeMouseEnter, handleEdgeMouseLeave, hoverPosition, hoveredEdgeId, backgroundVariant = 'dots', toolbar
 }) => {
     const reactFlowRef = useRef<any>(null);
 
@@ -89,7 +91,13 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
                 snapToGrid={true}
                 snapGrid={[15, 15]}
             >
-                <Background color="hsl(var(--muted-foreground))" gap={20} style={{ opacity: 0.05 }} />
+                {backgroundVariant !== 'lines' && backgroundVariant !== 'cross' ? 
+                    <Background color="hsl(var(--muted-foreground))" gap={20} style={{ opacity: 0.1 }} variant={BackgroundVariant.Dots} /> 
+                    : backgroundVariant === 'lines' ?
+                    <Background color="hsl(var(--muted-foreground))" gap={20} style={{ opacity: 0.05 }} variant={BackgroundVariant.Lines} />
+                    :
+                    <Background color="hsl(var(--muted-foreground))" gap={20} style={{ opacity: 0.05 }} variant={BackgroundVariant.Cross} />
+                }
                 <Controls className="bg-card border-border/40 shadow-2xl rounded-xl overflow-hidden" />
 
                 {showMinimap && (

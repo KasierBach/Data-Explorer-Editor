@@ -43,6 +43,10 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     const [collapsedTables, setCollapsedTables] = useState<Set<string>>(new Set(initialMetadata.collapsedTables || []));
     const [performanceMode, setPerformanceMode] = useState<boolean>(initialMetadata.performanceMode || false);
     const [edgeRouting, setEdgeRouting] = useState<'smoothstep' | 'step' | 'straight'>(initialMetadata.edgeRouting || 'smoothstep');
+    const [backgroundVariant, setBackgroundVariant] = useState<'dots' | 'lines' | 'cross'>(initialMetadata.backgroundVariant || 'dots');
+    const [isEdgeAnimated, setIsEdgeAnimated] = useState<boolean>(initialMetadata.isEdgeAnimated ?? true);
+    const [isToolbarCollapsed, setIsToolbarCollapsed] = useState<boolean>(initialMetadata.isToolbarCollapsed || false);
+    
     const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
     const [hoverPosition, setHoverPosition] = useState<{ x: number, y: number } | null>(null);
 
@@ -424,7 +428,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 // We use default styling here. The dedicated effect will pick up the edgeRouting
                 // type and hovered state, overriding it via setEdges.
                 type: 'smoothstep', 
-                animated: true,
+                animated: isEdgeAnimated,
                 style: { 
                     stroke: 'hsl(var(--primary))', 
                     strokeWidth: 2, 
@@ -480,7 +484,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         setNodes(finalNodes);
         setEdges([...dbEdges, ...manualEdges]);
         // NOTE: Purposely removed hoveredEdgeId from dependencies to avoid N^2 re-renders.
-    }, [visibleTableNames, tableData, relationships, hierarchy, detailLevel, collapsedTables, performanceMode]);
+    }, [visibleTableNames, tableData, relationships, hierarchy, detailLevel, collapsedTables, performanceMode, isEdgeAnimated]);
 
     // Dedicated effect to handle hovered styles for immediate feedback and edge routing
     useEffect(() => {
@@ -564,6 +568,9 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 showMinimap,
                 performanceMode,
                 edgeRouting,
+                backgroundVariant,
+                isEdgeAnimated,
+                isToolbarCollapsed,
                 collapsedTables: Array.from(collapsedTables)
             };
             if (isStandalone) setPageState(tabId, stateToSave);
@@ -582,7 +589,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             collapsedTables, selectedDatabase, allDatabases, hierarchy, 
             filteredHierarchy, hoverPosition, hoveredEdgeId,
             tableData, isLoadingHierarchy, isLoadingCols, lang, 
-            activeConnection, effectiveDatabase, performanceMode, edgeRouting 
+            activeConnection, effectiveDatabase, performanceMode, edgeRouting,
+            backgroundVariant, isEdgeAnimated, isToolbarCollapsed
         },
         actions: { 
             setNodes, setEdges, onNodesChange, onEdgesChange, handleEdgesChange, 
@@ -591,6 +599,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             setCollapsedTables, setSelectedDatabase, handleRemoveConstraint, 
             handleCreateForeignKey, handleAutoLayout, toggleTable, 
             handleSelectAll, handleDeselectAll, setPerformanceMode, setEdgeRouting,
+            setBackgroundVariant, setIsEdgeAnimated, setIsToolbarCollapsed,
             handleToggleCollapse, handleExportPNG, handleExportSQL,
             handleEdgeMouseEnter, handleEdgeMouseLeave
         }
