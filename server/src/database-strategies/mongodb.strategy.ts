@@ -309,23 +309,53 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         return [];
     }
 
-    async getColumns(client: MongoClient, schema: string, table: string): Promise<ColumnInfo[]> {
-        const db = client.db();
-        const docs = await db.collection(table).find({}).limit(20).toArray();
+    async getColumns(client: MongoClient, schema: string, table: string, dbName?: string): Promise<ColumnInfo[]> {
+        const db = dbName ? client.db(dbName) : client.db();
+        const MAX_DEPTH = 2;
+        const MAX_COLUMNS = 40;
+        const SAMPLE_SIZE = 20;
+
+        const docs = await db.collection(table).find({}).limit(SAMPLE_SIZE).toArray();
         const colsMap = new Map<string, ColumnInfo>();
+
+        const processValue = (prefix: string, value: any, depth: number) => {
+            if (value === null || value === undefined) return;
+            if (colsMap.size >= MAX_COLUMNS) return;
+            const type = inferType(value);
+            
+            if (!colsMap.has(prefix)) {
+                colsMap.set(prefix, {
+                    name: prefix,
+                    type: type,
+                    isNullable: true,
+                    defaultValue: null,
+                    isPrimaryKey: prefix === '_id',
+                    pkConstraintName: prefix === '_id' ? 'PK' : null
+                });
+            }
+
+            if (depth >= MAX_DEPTH) return;
+
+            if (type === 'object' && value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date) && value._bsontype !== 'ObjectId') {
+                for (const key of Object.keys(value)) {
+                    if (colsMap.size >= MAX_COLUMNS) break;
+                    processValue(`${prefix}.${key}`, value[key], depth + 1);
+                }
+            } else if (type === 'array' && Array.isArray(value) && value.length > 0) {
+                const firstObj = value.find((item: any) => item && typeof item === 'object' && !Array.isArray(item));
+                if (firstObj) {
+                    for (const key of Object.keys(firstObj)) {
+                        if (colsMap.size >= MAX_COLUMNS) break;
+                        processValue(`${prefix}[].${key}`, firstObj[key], depth + 1);
+                    }
+                }
+            }
+        };
 
         for (const doc of docs) {
             for (const key of Object.keys(doc)) {
-                if (!colsMap.has(key)) {
-                    colsMap.set(key, {
-                        name: key,
-                        type: inferType(doc[key]),
-                        isNullable: true,
-                        defaultValue: null,
-                        isPrimaryKey: key === '_id',
-                        pkConstraintName: key === '_id' ? 'PK' : null
-                    });
-                }
+                if (colsMap.size >= MAX_COLUMNS) break;
+                processValue(key, doc[key], 0);
             }
         }
         
@@ -343,9 +373,9 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         return Array.from(colsMap.values());
     }
 
-    async getFullMetadata(client: MongoClient, schema: string, table: string): Promise<FullTableMetadata> {
-        const db = client.db();
-        const cols = await this.getColumns(client, schema, table);
+    async getFullMetadata(client: MongoClient, schema: string, table: string, dbName?: string): Promise<FullTableMetadata> {
+        const db = dbName ? client.db(dbName) : client.db();
+        const cols = await this.getColumns(client, schema, table, dbName);
         
         let count = 0;
         let indexes: any[] = [];
@@ -368,8 +398,56 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         };
     }
 
-    async getRelationships(client: MongoClient): Promise<Relationship[]> {
-        return [];
+    async getRelationships(client: MongoClient, dbName?: string): Promise<Relationship[]> {
+        const db = dbName ? client.db(dbName) : client.db();
+        const relationships: Relationship[] = [];
+        
+        try {
+            const collections = await db.listCollections().toArray();
+            const collectionNames = collections.map(c => c.name);
+            
+            // Process collections in parallel batches of 3, with only 10 docs each
+            // (we only need field name patterns, not full data)
+            const batchSize = 3;
+            for (let i = 0; i < collectionNames.length; i += batchSize) {
+                const batch = collectionNames.slice(i, i + batchSize);
+                await Promise.all(batch.map(async (colName) => {
+                const docs = await db.collection(colName).find({}).limit(10).toArray();
+                const possibleRelations = new Map<string, string>(); // column -> target table
+
+                for (const doc of docs) {
+                    for (const key of Object.keys(doc)) {
+                        const val = doc[key];
+                        // Heuristic: Key ends with 'Id' or '_id', and type is objectId or string
+                        if (key.length >= 3 && (key.endsWith('Id') || key.endsWith('_id')) && key !== '_id') {
+                            const prefix = key.replace(/Id$/, '').replace(/_id$/, '').toLowerCase();
+                            // Look for matching collection (exact prefix, or prefix + 's', or prefix + 'es')
+                            const targetMatch = collectionNames.find(c => c.toLowerCase() === prefix || c.toLowerCase() === prefix + 's' || c.toLowerCase() === prefix + 'es');
+                            
+                            if (targetMatch && !possibleRelations.has(key)) {
+                                possibleRelations.set(key, targetMatch);
+                            }
+                        }
+                    }
+                }
+
+                // Push inferred relations
+                for (const [colKey, targetTable] of possibleRelations.entries()) {
+                    relationships.push({
+                        constraint_name: `vfk_${colName}_${colKey}`,
+                        source_table: colName,
+                        source_column: colKey,
+                        target_table: targetTable,
+                        target_column: '_id'
+                    });
+                }
+                }));
+            }
+        } catch (e) {
+            console.error('[MongoDbStrategy] Failed to infer MongoDB relationships', e);
+        }
+
+        return relationships;
     }
 
     async getDatabaseMetrics(client: MongoClient): Promise<DatabaseMetrics> {

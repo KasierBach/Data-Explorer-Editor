@@ -69,12 +69,13 @@ export const Navbar: React.FC = () => {
                     </div>
                 )}
 
-                {!isMobile && location.pathname.startsWith('/sql-explorer') && (
+                {!isMobile && (location.pathname.startsWith('/sql-explorer') || location.pathname.startsWith('/nosql')) && (
                     <NavMainActions 
                         activeConnectionId={activeConnectionId}
                         openInsightsTab={openInsightsTab}
                         onNavigate={navigate}
                         lang={lang}
+                        isNoSql={location.pathname.startsWith('/nosql')}
                     />
                 )}
             </div>

@@ -164,7 +164,7 @@ export class MetadataService {
         const pool = await this.connectionsService.getPool(connectionId, database, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
-        const result = await strategy.getRelationships(pool);
+        const result = await strategy.getRelationships(pool, database);
         this.setCached(cacheKey, result);
         return result;
     }
@@ -183,7 +183,7 @@ export class MetadataService {
         const pool = await this.connectionsService.getPool(connectionId, parsed.dbName, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
-        const result = await strategy.getColumns(pool, schema, table);
+        const result = await strategy.getColumns(pool, schema, table, parsed.dbName);
         this.setCached(cacheKey, result);
         return result;
     }
@@ -216,7 +216,7 @@ export class MetadataService {
         const pool = await this.connectionsService.getPool(connectionId, parsed.dbName, userId);
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
-        const result = await strategy.getFullMetadata(pool, schema, table);
+        const result = await strategy.getFullMetadata(pool, schema, table, parsed.dbName);
         this.setCached(cacheKey, result);
         return result;
     }

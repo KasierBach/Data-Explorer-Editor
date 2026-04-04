@@ -32,14 +32,19 @@ interface ERDToolbarProps {
 }
 
 export const ERDToolbar: React.FC<ERDToolbarProps> = ({
-    isSidebarCollapsed, setSidebarCollapsed, lang, activeConnectionName, selectedDatabase, detailLevel, setDetailLevel, showMinimap, setShowMinimap, handleAutoLayout, handleExportPNG, handleExportSQL, performanceMode, setPerformanceMode, edgeRouting, setEdgeRouting, backgroundVariant, setBackgroundVariant, isEdgeAnimated, setIsEdgeAnimated, isToolbarCollapsed, setIsToolbarCollapsed, onFitView
+    isSidebarCollapsed, setSidebarCollapsed, lang, activeConnectionName, selectedDatabase, detailLevel, setDetailLevel, showMinimap, setShowMinimap, handleAutoLayout, handleExportPNG, handleExportSQL, performanceMode, setPerformanceMode, edgeRouting, setEdgeRouting, backgroundVariant, setBackgroundVariant, isEdgeAnimated, setIsEdgeAnimated, isToolbarCollapsed, setIsToolbarCollapsed
 }) => {
     if (isToolbarCollapsed) {
         return (
-            <Panel position="top-left" className="m-4">
+            <Panel position="top-left" className="m-4 flex flex-col gap-2">
                 <Button variant="outline" size="icon" className="h-10 w-10 bg-card/80 backdrop-blur border-border/40 shadow-xl rounded-xl" onClick={() => setIsToolbarCollapsed(false)} title="Expand Toolbar">
                     <Maximize2 className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
                 </Button>
+                {isSidebarCollapsed && (
+                    <Button variant="outline" size="icon" className="h-10 w-10 bg-card/80 backdrop-blur border-border/40 shadow-xl rounded-xl" onClick={() => setSidebarCollapsed(!isSidebarCollapsed)} title="Toggle Sidebar">
+                        <PanelLeft className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+                    </Button>
+                )}
             </Panel>
         );
     }
@@ -197,11 +202,7 @@ export const ERDToolbar: React.FC<ERDToolbarProps> = ({
                             </DropdownMenuContent>
                         </DropdownMenu>
 
-                        <div className="w-px h-6 bg-border/20 mx-1" />
 
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={onFitView} title="Fit View">
-                            <Maximize2 className="h-3.5 w-3.5" />
-                        </Button>
                     </div>
                 </div>
             </div>

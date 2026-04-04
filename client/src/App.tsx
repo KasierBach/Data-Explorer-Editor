@@ -74,6 +74,7 @@ export function App() {
                 </RequireAuth>
               }
             />
+            <Route path="/nosql-explorer/erd" element={<RequireAuth><ERDPage /></RequireAuth>} />
 
             {/* Catch all redirect to root */}
             <Route path="*" element={<Navigate to="/" replace />} />

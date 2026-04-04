@@ -107,9 +107,9 @@ export interface IDatabaseStrategy {
     getViews(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
     getFunctions(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
     getFunctionParameters(pool: any, schema: string, func: string): Promise<ColumnInfo[]>;
-    getColumns(pool: any, schema: string, table: string): Promise<ColumnInfo[]>;
-    getFullMetadata(pool: any, schema: string, table: string): Promise<FullTableMetadata>;
-    getRelationships(pool: any): Promise<Relationship[]>;
+    getColumns(pool: any, schema: string, table: string, dbName?: string): Promise<ColumnInfo[]>;
+    getFullMetadata(pool: any, schema: string, table: string, dbName?: string): Promise<FullTableMetadata>;
+    getRelationships(pool: any, dbName?: string): Promise<Relationship[]>;
     getDatabaseMetrics(pool: any): Promise<DatabaseMetrics>;
 
     // ─── Bulk Operations ───

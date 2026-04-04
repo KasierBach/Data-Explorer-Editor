@@ -20,11 +20,23 @@ import type { ForeignKeyData } from '../ForeignKeyDialog';
 export type DetailLevel = 'all' | 'keys' | 'name';
 
 export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: string) => {
-    const { connections, tabs, updateTabMetadata, pageStates, setPageState, lang } = useAppStore();
+    const { connections, tabs, updateTabMetadata, pageStates, setPageState, lang, setActiveDatabase, setNosqlDatabase } = useAppStore();
     const activeConnection = connections.find(c => c.id === connectionId);
     const queryClient = useQueryClient();
 
-    const [selectedDatabase, setSelectedDatabase] = useState<string | undefined>(databaseProp);
+    const [selectedDatabase, setLocalSelectedDatabase] = useState<string | undefined>(databaseProp);
+
+    const handleSetSelectedDatabase = useCallback((val: string | undefined) => {
+        setLocalSelectedDatabase(val);
+        if (val && activeConnection) {
+            const isNoSql = activeConnection.type.toLowerCase().includes('mongo');
+            if (isNoSql) {
+                setNosqlDatabase(val);
+            } else {
+                setActiveDatabase(val);
+            }
+        }
+    }, [activeConnection, setNosqlDatabase, setActiveDatabase]);
     
     const isStandalone = tabId.startsWith('erd-page-');
     const tab = tabs.find(t => t.id === tabId);
@@ -54,8 +66,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
     // Sync if prop changes externally
     useEffect(() => {
-        if (databaseProp) setSelectedDatabase(databaseProp);
-    }, [databaseProp]);
+        if (databaseProp) handleSetSelectedDatabase(databaseProp);
+    }, [databaseProp, handleSetSelectedDatabase]);
 
     // Explicitly sync adapter when connectionId changes
     useEffect(() => {
@@ -70,7 +82,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
     // Data Fetching
     const { data: hierarchy, isLoading: isLoadingHierarchy } = useQuery({
-        queryKey: ['erd-hierarchy', connectionId, selectedDatabase, !!activeConnection],
+        queryKey: ['erd-hierarchy-v2', connectionId, selectedDatabase, !!activeConnection],
         queryFn: async () => {
             console.log(`[ERD crawl] Start crawl for connection: ${connectionId}, activeConn ready? ${!!activeConnection}`);
             if (!connectionId || !activeConnection) return [];
@@ -83,7 +95,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                     console.log(`[ERD crawl] Fetching ${parentId || 'ROOT'}`);
                     const nodes = await adapter.getHierarchy(parentId);
                     for (const node of nodes) {
-                        if (node.type === 'table' || node.type === 'view') {
+                        if (node.type === 'table' || node.type === 'view' || node.type === 'collection') {
                             results.push(node);
                         } else if (node.type === 'database') {
                             // If searching whole connection, or specific DB matches
@@ -105,6 +117,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         },
         enabled: !!connectionId && !!activeConnection,
         placeholderData: (prev) => prev,
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const { data: relationships } = useQuery({
@@ -115,8 +129,10 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             console.log(`[useERDLogic] Fetching relationships for ${selectedDatabase}`);
             return adapter.getRelationships(selectedDatabase);
         },
-        enabled: !!connectionId,
+        enabled: !!connectionId && !!hierarchy && hierarchy.length > 0,
         placeholderData: (prev) => prev,
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const { data: allDatabases } = useQuery({
@@ -130,10 +146,12 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         },
         enabled: !!connectionId,
         placeholderData: (prev) => prev,
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const { data: tableData, isLoading: isLoadingCols } = useQuery({
-        queryKey: ['erd-columns', connectionId, Array.from(visibleTableNames), selectedDatabase],
+        queryKey: ['erd-columns-v2', connectionId, Array.from(visibleTableNames), selectedDatabase],
         queryFn: async () => {
             if (visibleTableNames.size === 0 || !hierarchy || !activeConnection) return {};
             const adapter = connectionService.getAdapter(connectionId, activeConnection.type as any);
@@ -145,8 +163,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
             const tablesArray = Array.from(visibleTableNames);
             
-            // Chunk the array to avoid flooding the event loop / connection pool
-            const chunkSize = 5;
+            // Chunk: 2 at a time for NoSQL (Atlas latency), 5 for SQL
+            const chunkSize = 2;
             for (let i = 0; i < tablesArray.length; i += chunkSize) {
                 const chunk = tablesArray.slice(i, i + chunkSize);
                 await Promise.all(chunk.map(async (name) => {
@@ -167,6 +185,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         },
         enabled: !!connectionId && !!activeConnection && !!hierarchy && visibleTableNames.size > 0,
         placeholderData: (prev) => prev,
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 
     const filteredHierarchy = useMemo(() => {
@@ -413,7 +433,13 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
     // Schema sync effect  
     useEffect(() => {
-        if (visibleTableNames.size > 0 && (!hierarchy || !tableData || !relationships)) return;
+        // Only rebuild when we have ALL required data for the currently visible tables
+        if (visibleTableNames.size > 0) {
+            if (!hierarchy || !tableData || !relationships) return;
+            // Check that tableData has columns loaded for all visible tables
+            const allTablesReady = Array.from(visibleTableNames).every(name => name in (tableData || {}));
+            if (!allTablesReady) return;
+        }
 
         const dbEdges: Edge[] = (relationships || []).map((rel: any, idx: number) => {
             const targetTable = rel.target_table?.split('.').pop() || rel.target_table;
@@ -425,10 +451,12 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 target: sourceTable,
                 sourceHandle: rel.target_column,
                 targetHandle: rel.source_column,
+                data: { isVirtual: rel.constraint_name?.startsWith('vfk_') },
                 // We use default styling here. The dedicated effect will pick up the edgeRouting
                 // type and hovered state, overriding it via setEdges.
                 type: 'smoothstep', 
                 animated: isEdgeAnimated,
+                pathOptions: { borderRadius: 40 },
                 style: { 
                     stroke: 'hsl(var(--primary))', 
                     strokeWidth: 2, 
@@ -490,17 +518,24 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     useEffect(() => {
         setEdges(eds => eds.map(e => {
             const isHovered = e.id === hoveredEdgeId;
+            const isVirtual = e.data?.isVirtual;
             const updatedStyle = {
                 ...e.style,
                 strokeWidth: isHovered ? 4 : 2,
                 opacity: isHovered ? 1 : 0.5,
+                strokeDasharray: isVirtual ? (isHovered ? '8,8' : '5,5') : 'none'
+            };
+
+            const baseEdgeProps = {
+                ...e,
+                type: edgeRouting,
+                label: '',
+                ...(edgeRouting === 'smoothstep' ? { pathOptions: { borderRadius: 40 } } : {})
             };
 
             if (isHovered) {
                 return {
-                    ...e,
-                    type: edgeRouting,
-                    label: '',
+                    ...baseEdgeProps,
                     labelStyle: { fill: 'hsl(var(--primary))', fontWeight: 'bold', fontSize: '10px' },
                     labelBgStyle: { fill: 'hsl(var(--background))', fillOpacity: 0.8, rx: 4, ry: 4 },
                     style: updatedStyle,
@@ -508,9 +543,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 };
             }
             return {
-                ...e,
-                type: edgeRouting,
-                label: '',
+                ...baseEdgeProps,
                 style: updatedStyle,
                 zIndex: 1
             };
@@ -596,7 +629,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             setNodes, setEdges, onNodesChange, onEdgesChange, handleEdgesChange, 
             onConnect, setVisibleTableNames, setSearchTerm, setPendingConnection, 
             setSidebarCollapsed, setDetailLevel, setSchemaFilter, setShowMinimap, 
-            setCollapsedTables, setSelectedDatabase, handleRemoveConstraint, 
+            setCollapsedTables, setSelectedDatabase: handleSetSelectedDatabase, handleRemoveConstraint, 
             handleCreateForeignKey, handleAutoLayout, toggleTable, 
             handleSelectAll, handleDeselectAll, setPerformanceMode, setEdgeRouting,
             setBackgroundVariant, setIsEdgeAnimated, setIsToolbarCollapsed,

@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '@/core/services/store';
 import React from 'react';
 const ERDWorkspace = React.lazy(() => import('@/presentation/modules/Visualization/ERDWorkspace').then(m => ({ default: m.ERDWorkspace })));
@@ -9,22 +9,44 @@ import { ConnectionDialog } from '@/presentation/modules/Connection/ConnectionDi
 
 export function ERDPage() {
     const navigate = useNavigate();
-    const activeConnectionId = useAppStore(state => state.activeConnectionId);
-    const connections = useAppStore(state => state.connections);
-    const activeDatabase = useAppStore(state => state.activeDatabase);
-    const setActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
+    const sqlActiveConnectionId = useAppStore(state => state.activeConnectionId);
+    const sqlActiveDatabase = useAppStore(state => state.activeDatabase);
+    const setSqlActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
+
+    const nosqlActiveConnectionId = useAppStore(state => state.nosqlActiveConnectionId);
+    const nosqlActiveDatabase = useAppStore(state => state.nosqlActiveDatabase);
+    const setNosqlActiveConnectionId = useAppStore(state => state.setNosqlActiveConnectionId);
+
     const openConnectionDialog = useAppStore(state => state.openConnectionDialog);
 
-    // No connections at all → prompt to add one
-    if (connections.length === 0) {
+    const location = useLocation();
+    const isNoSql = location.pathname.startsWith('/nosql');
+    const goBackPath = isNoSql ? '/nosql-explorer' : '/sql-explorer';
+
+    const activeConnectionId = isNoSql ? nosqlActiveConnectionId : sqlActiveConnectionId;
+    const activeDatabase = isNoSql ? nosqlActiveDatabase : sqlActiveDatabase;
+    const setActiveConnectionId = isNoSql ? setNosqlActiveConnectionId : setSqlActiveConnectionId;
+
+    const connections = useAppStore(state => state.connections);
+
+    // Filter connections based on workspace context (SQL vs NoSQL)
+    const filteredConnections = connections.filter(c => {
+        const isMongo = c.type.toLowerCase().includes('mongo');
+        return isNoSql ? isMongo : !isMongo;
+    });
+
+    const hasValidActiveConnection = filteredConnections.some(c => c.id === activeConnectionId);
+
+    // No connections matches context → prompt to add or go back
+    if (filteredConnections.length === 0) {
         return (
             <div className="h-screen w-full flex items-center justify-center bg-background page-enter">
                 <div className="text-center space-y-4">
                     <Database className="w-12 h-12 text-muted-foreground mx-auto" />
-                    <h2 className="text-xl font-bold">No Connections</h2>
-                    <p className="text-muted-foreground">Add a database connection to get started.</p>
+                    <h2 className="text-xl font-bold">No {isNoSql ? 'NoSQL' : 'SQL'} Connections</h2>
+                    <p className="text-muted-foreground">Add a {isNoSql ? 'MongoDB' : 'SQL database'} connection to get started.</p>
                     <div className="flex gap-2 justify-center">
-                        <Button variant="outline" onClick={() => navigate('/sql-explorer')}>Go Back</Button>
+                        <Button variant="outline" onClick={() => navigate(goBackPath)}>Go Back</Button>
                         <Button onClick={() => openConnectionDialog()}>
                             <Plus className="w-4 h-4 mr-2" /> Add Connection
                         </Button>
@@ -35,16 +57,16 @@ export function ERDPage() {
         );
     }
 
-    // Has connections but none active → auto-select first, or let user pick
-    if (!activeConnectionId) {
+    // Has connections but none active (or active is wrong type) → auto-select first, or let user pick
+    if (!hasValidActiveConnection) {
         return (
             <div className="h-screen w-full flex items-center justify-center bg-background page-enter">
                 <div className="text-center space-y-4 max-w-sm">
                     <Wifi className="w-12 h-12 text-muted-foreground mx-auto" />
-                    <h2 className="text-xl font-bold">Select Connection</h2>
+                    <h2 className="text-xl font-bold">Select {isNoSql ? 'NoSQL' : 'SQL'} Connection</h2>
                     <p className="text-sm text-muted-foreground">Choose a database connection to open the ERD designer.</p>
-                    <div className="space-y-2">
-                        {connections.map(c => (
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                        {filteredConnections.map(c => (
                             <button key={c.id} onClick={() => setActiveConnectionId(c.id)}
                                 className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/30 bg-card hover:bg-muted/20 transition-all text-left">
                                 <Database className="w-4 h-4 text-blue-500 shrink-0" />
@@ -55,7 +77,7 @@ export function ERDPage() {
                             </button>
                         ))}
                     </div>
-                    <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate('/sql-explorer')}>
+                    <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate(goBackPath)}>
                         <ArrowLeft className="w-3 h-3 mr-2" /> Go Back
                     </Button>
                 </div>
@@ -69,7 +91,7 @@ export function ERDPage() {
             {/* Header with connection selector */}
             <header className="h-12 border-b bg-card flex items-center px-3 md:px-4 justify-between shrink-0 select-none">
                 <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/sql-explorer')}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate(goBackPath)}>
                         <ArrowLeft className="w-4 h-4" />
                     </Button>
                     <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
@@ -81,7 +103,7 @@ export function ERDPage() {
                     </div>
                     <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
                     {/* Connection Selector */}
-                    <Select value={activeConnectionId} onValueChange={(id) => setActiveConnectionId(id)}>
+                    <Select value={activeConnectionId as string} onValueChange={(id) => setActiveConnectionId(id)}>
                         <SelectTrigger className="h-8 w-auto min-w-[100px] sm:min-w-[140px] bg-muted/10 border-border/20 text-xs rounded-lg gap-1 pr-2">
                             <div className="flex items-center gap-1.5">
                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
@@ -89,7 +111,7 @@ export function ERDPage() {
                             </div>
                         </SelectTrigger>
                         <SelectContent>
-                            {connections.map(c => (
+                            {filteredConnections.map(c => (
                                 <SelectItem key={c.id} value={c.id} className="text-xs">
                                     <span className="font-bold">{c.name}</span>
                                     <span className="text-muted-foreground ml-1.5">({c.type})</span>
@@ -109,8 +131,9 @@ export function ERDPage() {
             <div className="flex-1 overflow-hidden">
                 <React.Suspense fallback={<div className="h-full w-full flex flex-col gap-3 items-center justify-center bg-muted/10 animate-pulse text-muted-foreground text-sm font-medium"><div className="w-8 h-8 rounded-full border-2 border-indigo-500/50 border-t-indigo-500 animate-spin" />Loading Visualizer...</div>}>
                     <ERDWorkspace
-                        tabId={`erd-page-${activeConnectionId}`}
-                        connectionId={activeConnectionId}
+                        key={`erd-page-${activeConnectionId}-${activeDatabase || 'default'}`}
+                        tabId={`erd-page-${activeConnectionId}-${activeDatabase || 'default'}`}
+                        connectionId={activeConnectionId as string}
                         database={activeDatabase || undefined}
                     />
                 </React.Suspense>

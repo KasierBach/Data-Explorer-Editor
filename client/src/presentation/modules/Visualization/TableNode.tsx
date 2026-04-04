@@ -153,13 +153,19 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
                 {/* Content */}
                 {shouldShowAll && (
                     <div className="flex-1 overflow-y-auto custom-scrollbar bg-black/10">
-                        {columns.length > 0 ? columns.map((col) => (
+                        {columns.length > 0 ? columns.map((col) => {
+                            const nestLevel = (col.name.match(/\./g) || []).length;
+                            const displayName = col.name.split('.').pop() || col.name;
+                            const isArrayNode = col.name.includes('[]');
+
+                            return (
                             <div
                                 key={col.name}
                                 className={cn(
                                     "group/row flex items-center justify-between px-5 py-3 hover:bg-white/5 transition-all duration-300 relative border-b border-white/5 last:border-0",
                                     col.isPrimaryKey && "bg-blue-500/5"
                                 )}
+                                style={{ paddingLeft: `${1.25 + nestLevel * 1}rem` }}
                                 onContextMenu={(e) => {
                                     e.preventDefault();
                                     showContextMenu(e, col.name);
@@ -187,7 +193,7 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
                                                 "text-xs font-bold tracking-tight transition-colors duration-300 truncate",
                                                 col.isPrimaryKey ? "text-amber-500/90" : "text-muted-foreground group-hover/row:text-white"
                                             )}>
-                                                {col.name}
+                                                {isArrayNode && !displayName.includes('[]') ? displayName + ' []' : displayName}
                                             </span>
                                             <span className="text-[9px] font-medium text-muted-foreground/40 uppercase tracking-widest">{col.type}</span>
                                         </div>
@@ -206,7 +212,7 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
                                 </div>
                                 <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 opacity-0 group-hover/row:opacity-100 transition-opacity" />
                             </div>
-                        )) : (
+                        )}) : (
                             <div className="p-10 text-center space-y-3 opacity-30">
                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mx-auto animate-pulse" />
                                 <span className="text-[9px] font-black uppercase tracking-[0.3em] block">No Fields Found</span>
