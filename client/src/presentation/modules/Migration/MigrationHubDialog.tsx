@@ -80,13 +80,19 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
 
     if (!isOpen) return null;
 
+    const srcConn = connections.find(c => c.id === srcConnId);
+    const tgtConn = connections.find(c => c.id === tgtConnId);
     const isRunning = job?.status === 'running';
     const isCompleted = job?.status === 'completed';
     const isFailed = job?.status === 'failed';
-    const canStart = srcConnId && srcTable && tgtConnId && tgtTable && !isRunning && !isStarting;
-
-    const srcConn = connections.find(c => c.id === srcConnId);
-    const tgtConn = connections.find(c => c.id === tgtConnId);
+    const sourceBlocked = !!srcConn && (srcConn.allowQueryExecution === false);
+    const targetBlocked = !!tgtConn && (
+        tgtConn.readOnly ||
+        tgtConn.allowImportExport === false ||
+        tgtConn.allowSchemaChanges === false ||
+        tgtConn.allowQueryExecution === false
+    );
+    const canStart = srcConnId && srcTable && tgtConnId && tgtTable && !isRunning && !isStarting && !sourceBlocked && !targetBlocked;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -195,6 +201,14 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
                             <ArrowRight className="w-3 h-3 text-indigo-400" />
                             <span className="font-medium text-foreground">{tgtConn.name}</span>
                             <span className="text-muted-foreground">({tgtConn.type})</span>
+                        </div>
+                    )}
+
+                    {(sourceBlocked || targetBlocked) && (
+                        <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-400">
+                            {sourceBlocked
+                                ? 'Source connection must allow query execution before transfer can start.'
+                                : 'Target connection must allow query execution, schema changes, and import/export to receive transferred data.'}
                         </div>
                     )}
 

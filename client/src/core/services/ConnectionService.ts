@@ -70,6 +70,15 @@ export class ConnectionService {
         await apiService.patch(`/connections/${id}`, updates);
     }
 
+    public static async checkConnectionHealth(id: string): Promise<{
+        status: 'healthy' | 'error';
+        checkedAt: string;
+        latencyMs: number;
+        error: string | null;
+    }> {
+        return await apiService.post(`/connections/${id}/health-check`, {});
+    }
+
     public static async deleteConnection(id: string): Promise<void> {
         await apiService.delete(`/connections/${id}`);
     }

@@ -20,6 +20,15 @@ model Connection {
   password         String?
   database         String?
   showAllDatabases Boolean  @default(false)
+  readOnly         Boolean  @default(false)
+  allowSchemaChanges Boolean @default(true)
+  allowImportExport Boolean @default(true)
+  allowQueryExecution Boolean @default(true)
+  lastHealthCheckAt DateTime?
+  lastHealthStatus  String?
+  lastHealthError   String?
+  lastConnectedAt   DateTime?
+  lastConnectionLatencyMs Int?
   createdAt        DateTime @default(now())
 
   userId           String

@@ -26,6 +26,11 @@ export const NoSqlMainContent: React.FC = () => {
 
     const activeConnection = connections.find(c => c.id === nosqlActiveConnectionId);
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
+    const guardrailMessage = activeConnection?.allowQueryExecution === false
+        ? (lang === 'vi' ? 'Kết nối này đang tắt quyền chạy truy vấn.' : 'Query execution is disabled for this connection.')
+        : activeConnection?.readOnly
+            ? (lang === 'vi' ? 'Chế độ chỉ đọc đang bật. Chỉ cho phép find/aggregate.' : 'Read-only mode is enabled. Only find/aggregate actions are allowed.')
+            : (lang === 'vi' ? 'Kết quả được giới hạn để bảo vệ hiệu năng và tránh quá tải.' : 'Results are guarded with execution limits to protect performance.');
 
     const isMobile = useMediaQuery('(max-width: 768px)');
     const resizer = useVerticalResizablePanel({
@@ -57,9 +62,22 @@ export const NoSqlMainContent: React.FC = () => {
     }
 
     return (
-        <div className="h-full w-full bg-background flex flex-col">
+            <div className="h-full w-full bg-background flex flex-col">
+            <div className={cn(
+                "mx-4 mt-4 rounded-lg border px-3 py-2 text-xs",
+                activeConnection?.allowQueryExecution === false
+                    ? "border-red-500/20 bg-red-500/10 text-red-400"
+                    : activeConnection?.readOnly
+                        ? "border-amber-500/20 bg-amber-500/10 text-amber-400"
+                        : "border-green-500/20 bg-green-500/10 text-green-500"
+            )}>
+                <div className="font-semibold uppercase tracking-wide text-[10px]">
+                    {lang === 'vi' ? 'Guardrails NoSQL' : 'NoSQL guardrails'}
+                </div>
+                <div className="mt-1 text-muted-foreground">{guardrailMessage}</div>
+            </div>
             {/* Visual MQL Builder Banner */}
-            <div className="h-14 border-b bg-card flex items-center px-4 justify-between shrink-0">
+            <div className="h-14 border-b bg-card flex items-center px-4 justify-between shrink-0 mt-4">
                 <div className="flex items-center gap-2">
                     <Database className="w-4 h-4 text-green-500" />
                     <span className="font-semibold text-sm">db.{nosqlActiveCollection}</span>
@@ -106,7 +124,7 @@ export const NoSqlMainContent: React.FC = () => {
                                 size="sm" 
                                 className="h-7 bg-green-600 hover:bg-green-700 text-white gap-1" 
                                 onClick={executeMql}
-                                disabled={isLoading}
+                                disabled={isLoading || activeConnection?.allowQueryExecution === false}
                             >
                                 {isLoading 
                                     ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> 

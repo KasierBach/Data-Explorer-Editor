@@ -29,6 +29,7 @@ import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
 import { useVerticalResizablePanel } from '@/presentation/hooks/useVerticalResizablePanel';
 import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
+import { ApiError } from '@/core/services/api.service';
 
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const queryClient = useQueryClient();
@@ -105,6 +106,21 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         enabled: !!executedQuery && !!activeConnectionId && runNonce > 0,
         retry: false
     });
+    const blockedReason = (error as ApiError | null)?.reason;
+    const guardrailMessage = React.useMemo(() => {
+        if (!activeConnection) return null;
+        const parts: string[] = [];
+        if (activeConnection.readOnly) {
+            parts.push(lang === 'vi' ? 'Kết nối đang ở chế độ chỉ đọc' : 'Connection is read-only');
+        }
+        if (activeConnection.allowQueryExecution === false) {
+            parts.push(lang === 'vi' ? 'đã tắt chạy truy vấn' : 'query execution is disabled');
+        } else {
+            parts.push(lang === 'vi' ? `giới hạn ${limit === 'all' ? '50,000+' : limit} dòng` : `${limit === 'all' ? '50,000+' : limit} row limit`);
+            parts.push(lang === 'vi' ? 'timeout ~30s' : '~30s timeout');
+        }
+        return parts.join(' • ');
+    }, [activeConnection, lang, limit]);
 
     // Record history on success/error
     useEffect(() => {
@@ -317,7 +333,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                         <Button
                             size="sm"
                             onClick={() => handleRun()}
-                            disabled={isLoading}
+                            disabled={isLoading || activeConnection?.allowQueryExecution === false}
                             className={cn(
                                 "h-8 gap-1.5 px-3 bg-green-600 hover:bg-green-700 text-white border-none shadow-sm transition-all",
                                 isMobile && "px-2"
@@ -364,7 +380,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                                     {lang === 'vi' ? 'Lịch sử' : 'History'}
                                 </Button>
                                 <div className="h-4 w-[1px] bg-border mx-1" />
-                                <Button variant="ghost" size="sm" onClick={handleExplain} disabled={isLoading} className="h-7 gap-1 px-2 text-xs text-orange-500 hover:text-orange-600" title="EXPLAIN ANALYZE">
+                                <Button variant="ghost" size="sm" onClick={handleExplain} disabled={isLoading || activeConnection?.allowQueryExecution === false} className="h-7 gap-1 px-2 text-xs text-orange-500 hover:text-orange-600" title="EXPLAIN ANALYZE">
                                     <Zap className="w-3.5 h-3.5" />
                                     {lang === 'vi' ? 'Giải thích' : 'Explain'}
                                 </Button>
@@ -396,7 +412,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                                         <span>{lang === 'vi' ? 'Lịch sử' : 'History'}</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={handleExplain} className="text-orange-500">
+                                    <DropdownMenuItem onClick={handleExplain} className="text-orange-500" disabled={activeConnection?.allowQueryExecution === false}>
                                         <Zap className="mr-2 h-4 w-4" />
                                         <span>{lang === 'vi' ? 'Giải thích thực thi' : 'Explain Plan'}</span>
                                     </DropdownMenuItem>
@@ -437,6 +453,30 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                         )}
                     </div>
                 </div>
+
+                {activeConnection && (
+                    <div className={cn(
+                        "mx-2 mt-2 rounded-lg border px-3 py-2 text-xs",
+                        activeConnection.allowQueryExecution === false
+                            ? "border-red-500/20 bg-red-500/10 text-red-400"
+                            : activeConnection.readOnly
+                                ? "border-amber-500/20 bg-amber-500/10 text-amber-400"
+                                : "border-blue-500/20 bg-blue-500/10 text-blue-400"
+                    )}>
+                        <div className="font-semibold uppercase tracking-wide text-[10px]">
+                            {blockedReason === 'READ_ONLY_CONNECTION'
+                                ? (lang === 'vi' ? 'Truy vấn bị chặn bởi chế độ chỉ đọc' : 'Read-only protection active')
+                                : blockedReason === 'QUERY_EXECUTION_DISABLED'
+                                    ? (lang === 'vi' ? 'Truy vấn bị chặn bởi policy kết nối' : 'Execution blocked by connection policy')
+                                    : (lang === 'vi' ? 'Guardrails kết nối' : 'Connection guardrails')}
+                        </div>
+                        <div className="mt-1 text-muted-foreground">
+                            {blockedReason
+                                ? (error as Error)?.message
+                                : guardrailMessage}
+                        </div>
+                    </div>
+                )}
 
 
                 <div className="flex-1 flex flex-col min-h-0 relative">

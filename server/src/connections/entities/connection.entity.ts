@@ -8,5 +8,14 @@ export class Connection {
     password?: string;
     database?: string;
     showAllDatabases: boolean;
+    readOnly: boolean;
+    allowSchemaChanges: boolean;
+    allowImportExport: boolean;
+    allowQueryExecution: boolean;
+    lastHealthCheckAt?: Date;
+    lastHealthStatus?: 'healthy' | 'error';
+    lastHealthError?: string | null;
+    lastConnectedAt?: Date;
+    lastConnectionLatencyMs?: number | null;
     createdAt: Date;
 }

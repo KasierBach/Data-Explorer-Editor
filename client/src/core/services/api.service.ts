@@ -1,6 +1,13 @@
 import { API_BASE_URL } from '../config/env';
 import { useAppStore } from './store';
 
+export class ApiError extends Error {
+  statusCode?: number;
+  reason?: string;
+  action?: string;
+  details?: any;
+}
+
 class ApiService {
   private baseUrl = API_BASE_URL;
 
@@ -28,7 +35,14 @@ class ApiService {
       }
 
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `API Error: ${response.status} ${response.statusText}`);
+      const error = new ApiError(
+        errorData.message || `API Error: ${response.status} ${response.statusText}`,
+      );
+      error.statusCode = errorData.statusCode ?? response.status;
+      error.reason = errorData.reason;
+      error.action = errorData.action;
+      error.details = errorData.details;
+      throw error;
     }
 
     // Check if response is empty (e.g. 204 No Content)

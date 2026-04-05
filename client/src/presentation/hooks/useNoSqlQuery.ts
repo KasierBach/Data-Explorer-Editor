@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
+import { ApiError } from '@/core/services/api.service';
 
 interface NoSqlQueryResult {
     rows: any[];
@@ -46,6 +47,11 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
             return;
         }
 
+        if (activeConnection.allowQueryExecution === false) {
+            toast.error('Query execution is disabled for this connection');
+            return;
+        }
+
         if (!nosqlActiveCollection) {
             toast.warning('Please select a Collection first');
             return;
@@ -63,6 +69,13 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
         // Validate basic payload structure
         if (!payload.action || !payload.collection) {
             toast.error('MQL JSON must contain "action" and "collection" fields');
+            return;
+        }
+
+        const action = String(payload.action || '');
+        const isMutatingAction = ['insertOne', 'insertMany', 'updateOne', 'updateMany', 'deleteOne', 'deleteMany'].includes(action);
+        if (activeConnection.readOnly && isMutatingAction) {
+            toast.error('This connection is read-only. Only find and aggregate are allowed.');
             return;
         }
 
@@ -94,8 +107,9 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
             state.setNosqlResult(queryResult.rows);
             toast.success(`${queryResult.rowCount ?? queryResult.rows.length} documents returned (${durationMs}ms)`);
         } catch (err: any) {
+            const apiError = err as ApiError;
             setError(err);
-            toast.error(err.message || 'MQL Execution Failed');
+            toast.error(apiError.message || 'MQL Execution Failed');
         } finally {
             setIsLoading(false);
             state.setNosqlQueryRunning(false);

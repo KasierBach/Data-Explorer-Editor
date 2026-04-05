@@ -28,6 +28,8 @@
   - **SQL Server** (Azure SQL, Local MSSQL)
   - **MongoDB** and **MongoDB Atlas (SRV)**
 - **Enterprise-Grade Credential Protection**: Saved connection passwords are encrypted using **AES-256-GCM** before persistence.
+- **Connection Safety Controls**: Each saved connection can now be configured as read-only and can independently allow or block query execution, schema changes, and import/export flows.
+- **Connection Health Visibility**: Saved connections track their last health-check result, latency, and last successful connection timestamp so operators can spot broken credentials or degraded endpoints faster.
 - **Centralized Persistence**: Connections are stored in the app database so they survive client refreshes and redeployments.
 - **Real-time Discovery**: Fast schema inspection for tables, columns, views, indexes, and metadata.
 - **Cross-DB Browsing**: Jump between databases and schemas in a single workspace.
@@ -46,6 +48,7 @@
 - **Monaco Engine**: VS Code-grade editing experience with advanced syntax highlighting and multi-cursor support.
 - **Schema-Aware IntelliSense**: Deep autocompletion that understands your tables, columns, and custom types.
 - **Smart Safeguards and Optimization**: Automatic limit injection, pagination support, and per-engine query guards help prevent accidental OOM scenarios.
+- **Backend-Enforced Guardrails**: Read-only and restricted connections are enforced server-side, so blocked updates, deletes, DDL, and imports cannot be bypassed by skipping the UI.
 - **Keyboard Shortcuts**: Use `Ctrl+Enter` to run, `Ctrl+S` to save, and `Ctrl+H` to open history.
 - **Execution Analytics**: Query plans and execution timing are surfaced in the workspace.
 - **Tabbed Results**: Separate panes for data, messages, and explain output.
@@ -191,6 +194,10 @@ This is the fastest way to run **Data Explorer** locally with PostgreSQL, the ba
 1. **Environment Setup**
    - Copy `server/.env.example` to `server/.env`.
    - Fill in at least `JWT_SECRET`, `ENCRYPTION_KEY`, and any optional AI or OAuth variables you want to use.
+   - Apply Prisma migrations before first production boot if your database does not already have the latest connection safety columns:
+     ```bash
+     npx prisma migrate deploy
+     ```
    - If you are serving the frontend through Docker on port `80`, set:
      - `FRONTEND_URL=http://localhost`
 

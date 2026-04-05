@@ -8,11 +8,14 @@ interface TableDesignerProps {
     metadata: TableMetadata;
     onSave: (operations: any[]) => void;
     onCancel: () => void;
+    isReadOnly?: boolean;
+    schemaChangesAllowed?: boolean;
 }
 
-export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadata, onSave, onCancel }) => {
+export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadata, onSave, onCancel, isReadOnly = false, schemaChangesAllowed = true }) => {
     const [columns, setColumns] = useState<TableColumn[]>([...metadata.columns]);
     const [isSaving, setIsSaving] = useState(false);
+    const isBlocked = isReadOnly || !schemaChangesAllowed;
 
     const handleAddColumn = () => {
         setColumns([...columns, {
@@ -35,6 +38,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
     };
 
     const handleSave = async () => {
+        if (isBlocked) return;
         setIsSaving(true);
         const operations: any[] = [];
 
@@ -85,12 +89,20 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                     <Button variant="ghost" size="sm" onClick={onCancel} className="h-8 text-xs gap-1.5">
                         <X className="w-3.5 h-3.5" /> Cancel
                     </Button>
-                    <Button variant="default" size="sm" onClick={handleSave} disabled={isSaving} className="h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700">
+                    <Button variant="default" size="sm" onClick={handleSave} disabled={isSaving || isBlocked} className="h-8 text-xs gap-1.5 bg-blue-600 hover:bg-blue-700">
                         {isSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                         Save Changes
                     </Button>
                 </div>
             </div>
+
+            {isBlocked && (
+                <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+                    {isReadOnly
+                        ? 'This connection is read-only. Table design is locked.'
+                        : 'Schema changes are disabled for this connection.'}
+                </div>
+            )}
 
             <div className="border rounded-lg overflow-hidden bg-card shadow-sm">
                 <table className="w-full text-xs text-left border-collapse">
@@ -115,6 +127,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                                         className="w-full bg-transparent border-none outline-none focus:ring-1 focus:ring-primary rounded px-1 -mx-1 py-0.5 h-7"
                                         value={col.name}
                                         onChange={(e) => handleUpdateColumn(idx, { name: e.target.value })}
+                                        disabled={isBlocked}
                                     />
                                 </td>
                                 <td className="p-1 px-2 border-r">
@@ -122,6 +135,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                                         className="w-full bg-transparent border-none outline-none focus:ring-1 focus:ring-primary rounded px-1 -mx-1 py-0.5 h-7 cursor-pointer"
                                         value={col.type}
                                         onChange={(e) => handleUpdateColumn(idx, { type: e.target.value })}
+                                        disabled={isBlocked}
                                     >
                                         <option value="varchar(255)">VARCHAR(255)</option>
                                         <option value="text">TEXT</option>
@@ -138,6 +152,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                                         type="checkbox"
                                         checked={col.isNullable}
                                         onChange={(e) => handleUpdateColumn(idx, { isNullable: e.target.checked })}
+                                        disabled={isBlocked}
                                     />
                                 </td>
                                 <td className="p-1 px-2 border-r text-center">
@@ -153,10 +168,11 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                                                 handleUpdateColumn(idx, { isPrimaryKey: false });
                                             }
                                         }}
+                                        disabled={isBlocked}
                                     />
                                 </td>
                                 <td className="p-1 px-2 text-center">
-                                    <Button variant="ghost" size="sm" onClick={() => handleRemoveColumn(idx)} className="h-7 w-7 p-0 text-destructive hover:text-white hover:bg-destructive">
+                                    <Button variant="ghost" size="sm" onClick={() => handleRemoveColumn(idx)} disabled={isBlocked} className="h-7 w-7 p-0 text-destructive hover:text-white hover:bg-destructive">
                                         <Trash2 className="w-3.5 h-3.5" />
                                     </Button>
                                 </td>
@@ -165,7 +181,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                     </tbody>
                 </table>
                 <div className="p-2 bg-muted/10 border-t">
-                    <Button variant="outline" size="sm" onClick={handleAddColumn} className="h-8 text-xs gap-1.5 w-full border-dashed">
+                    <Button variant="outline" size="sm" onClick={handleAddColumn} disabled={isBlocked} className="h-8 text-xs gap-1.5 w-full border-dashed">
                         <Plus className="w-3.5 h-3.5" /> Add New Column
                     </Button>
                 </div>

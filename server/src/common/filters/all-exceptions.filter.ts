@@ -37,12 +37,24 @@ export class AllExceptionsFilter implements ExceptionFilter {
        this.logger.error(`Exception: ${exception instanceof Error ? exception.message : exception}`, exception instanceof Error ? exception.stack : undefined);
     }
 
+    const extraDetails =
+      typeof exceptionResponse === 'object' && exceptionResponse !== null
+        ? {
+            reason: (exceptionResponse as any).reason,
+            action: (exceptionResponse as any).action,
+            details: (exceptionResponse as any).details,
+          }
+        : {};
+
     const responseBody = {
       success: false,
       statusCode: httpStatus,
       timestamp: new Date().toISOString(),
       path: request.url,
       message: Array.isArray(message) ? message[0] : message,
+      ...Object.fromEntries(
+        Object.entries(extraDetails).filter(([, value]) => value !== undefined),
+      ),
     };
 
     // Prevent formatting for SSE streaming connections which need their own abort mechanisms

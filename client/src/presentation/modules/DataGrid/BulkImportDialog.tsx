@@ -18,6 +18,8 @@ interface BulkImportDialogProps {
     tableId: string;
     schema?: string;
     onSuccess: () => void;
+    importAllowed?: boolean;
+    readOnly?: boolean;
 }
 
 export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
@@ -26,6 +28,8 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
     tableId,
     schema,
     onSuccess,
+    importAllowed = true,
+    readOnly = false,
 }) => {
     const { activeConnectionId, lang } = useAppStore();
     const [file, setFile] = useState<File | null>(null);
@@ -92,6 +96,7 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
 
     const handleImport = async () => {
         if (!activeConnectionId || data.length === 0) return;
+        if (!importAllowed || readOnly) return;
 
         setIsImporting(true);
         setError(null);
@@ -192,12 +197,20 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
                     </div>
                 )}
 
+                {(!importAllowed || readOnly) && (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-md text-amber-500 text-xs mt-2">
+                        {readOnly
+                            ? (lang === 'vi' ? 'Kết nối đang ở chế độ chỉ đọc nên không thể import.' : 'This connection is read-only, so import is blocked.')
+                            : (lang === 'vi' ? 'Import/export đã bị tắt cho kết nối này.' : 'Import/export has been disabled for this connection.')}
+                    </div>
+                )}
+
                 <DialogFooter className="mt-4">
                     <Button variant="ghost" onClick={() => onOpenChange(false)}>
                         {lang === 'vi' ? 'Hủy' : 'Cancel'}
                     </Button>
                     <Button 
-                        disabled={!file || isImporting} 
+                        disabled={!file || isImporting || !importAllowed || readOnly} 
                         onClick={handleImport}
                     >
                         {isImporting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}

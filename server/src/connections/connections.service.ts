@@ -22,6 +22,52 @@ export class ConnectionsService implements OnModuleDestroy {
     this.cleanupInterval = setInterval(() => this.cleanupPools(), 60000);
   }
 
+  private sanitizeConnection<T extends { password?: string | null }>(connection: T) {
+    const { password: _, ...safe } = connection;
+    return safe;
+  }
+
+  private async updateHealthState(
+    id: string,
+    health: {
+      status: 'healthy' | 'error';
+      latencyMs?: number | null;
+      error?: string | null;
+      connected?: boolean;
+    },
+  ) {
+    await this.prisma.connection.update({
+      where: { id },
+      data: {
+        lastHealthCheckAt: new Date(),
+        lastHealthStatus: health.status,
+        lastHealthError: health.error ?? null,
+        lastConnectionLatencyMs: health.latencyMs ?? null,
+        ...(health.connected ? { lastConnectedAt: new Date() } : {}),
+      },
+    });
+  }
+
+  private async pingPool(pool: any, type: string) {
+    switch (type) {
+      case 'postgres':
+        await pool.query('SELECT 1');
+        return;
+      case 'mysql':
+        await pool.query('SELECT 1');
+        return;
+      case 'mssql':
+        await pool.request().query('SELECT 1');
+        return;
+      case 'mongodb':
+      case 'mongodb+srv':
+        await pool.db().admin().ping();
+        return;
+      default:
+        return;
+    }
+  }
+
   private async cleanupPools() {
     const now = Date.now();
     for (const [key, { pool, lastAccessed }] of this.pools.entries()) {
@@ -64,9 +110,17 @@ export class ConnectionsService implements OnModuleDestroy {
     const encryptedPassword = password ? encryptAttribute(password) : undefined;
 
     const connection = await this.prisma.connection.create({
-      data: { ...createConnectionDto, password: encryptedPassword, userId } as any,
+      data: {
+        ...rest,
+        password: encryptedPassword,
+        userId,
+        readOnly: createConnectionDto.readOnly ?? false,
+        allowSchemaChanges: createConnectionDto.readOnly ? false : (createConnectionDto.allowSchemaChanges ?? true),
+        allowImportExport: createConnectionDto.readOnly ? false : (createConnectionDto.allowImportExport ?? true),
+        allowQueryExecution: createConnectionDto.allowQueryExecution ?? true,
+      } as any,
     });
-    const { password: _, ...safeConnection } = connection;
+    const safeConnection = this.sanitizeConnection(connection);
 
     await this.auditService.log({
       action: AuditAction.DB_CONNECTION_CREATE,
@@ -79,10 +133,7 @@ export class ConnectionsService implements OnModuleDestroy {
 
   async findAll(userId: string): Promise<Connection[]> {
     const connections = await this.prisma.connection.findMany({ where: { userId } });
-    return connections.map(c => {
-      const { password: _, ...safe } = c;
-      return safe;
-    }) as unknown as Connection[];
+    return connections.map(c => this.sanitizeConnection(c)) as unknown as Connection[];
   }
 
   private async findRawOne(id: string, userId: string) {
@@ -97,7 +148,7 @@ export class ConnectionsService implements OnModuleDestroy {
 
   async findOne(id: string, userId: string): Promise<Connection> {
     const connection = await this.findRawOne(id, userId);
-    const { password: _, ...safeConnection } = connection;
+    const safeConnection = this.sanitizeConnection(connection);
     return safeConnection as unknown as Connection;
   }
 
@@ -134,10 +185,19 @@ export class ConnectionsService implements OnModuleDestroy {
     const connectionWithDecryptedPassword = { ...connection, password: decryptedPassword };
 
     const strategy = this.strategyFactory.getStrategy(connection.type);
-    const pool = await strategy.createPool(connectionWithDecryptedPassword, databaseOverride);
+    try {
+      const pool = await strategy.createPool(connectionWithDecryptedPassword, databaseOverride);
 
-    this.pools.set(poolKey, { pool, lastAccessed: Date.now() });
-    return pool;
+      this.pools.set(poolKey, { pool, lastAccessed: Date.now() });
+      await this.updateHealthState(id, { status: 'healthy', connected: true });
+      return pool;
+    } catch (error) {
+      await this.updateHealthState(id, {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Connection failed',
+      });
+      throw error;
+    }
   }
 
   async update(id: string, updateConnectionDto: UpdateConnectionDto, userId: string): Promise<Connection> {
@@ -154,14 +214,25 @@ export class ConnectionsService implements OnModuleDestroy {
 
     const { password, ...rest } = updateConnectionDto;
     const encryptedPassword = password !== undefined && password !== null ? encryptAttribute(password) : undefined;
-    const dataToUpdate = password !== undefined && password !== null ? { ...rest, password: encryptedPassword } : rest;
+    const readOnly =
+      updateConnectionDto.readOnly !== undefined
+        ? updateConnectionDto.readOnly
+        : connection.readOnly;
+    const dataToUpdate = {
+      ...rest,
+      ...(password !== undefined && password !== null ? { password: encryptedPassword } : {}),
+      readOnly,
+      allowSchemaChanges: readOnly ? false : (updateConnectionDto.allowSchemaChanges ?? connection.allowSchemaChanges),
+      allowImportExport: readOnly ? false : (updateConnectionDto.allowImportExport ?? connection.allowImportExport),
+      allowQueryExecution: updateConnectionDto.allowQueryExecution ?? connection.allowQueryExecution,
+    };
 
     const updatedConnection = await this.prisma.connection.update({
       where: { id },
       data: dataToUpdate,
     });
 
-    const { password: _, ...safeConnection } = updatedConnection;
+    const safeConnection = this.sanitizeConnection(updatedConnection);
     return safeConnection as unknown as Connection;
   }
 
@@ -207,6 +278,64 @@ export class ConnectionsService implements OnModuleDestroy {
         if (typeof poolData.pool.close === 'function') await poolData.pool.close();
       } finally {
         this.pools.delete(poolKey);
+      }
+    }
+  }
+
+  async checkHealth(id: string, userId: string) {
+    const connection = await this.getDecryptedConnection(id, userId);
+    const strategy = this.strategyFactory.getStrategy(connection.type);
+    const startedAt = Date.now();
+    let pool: any;
+
+    try {
+      pool = await strategy.createPool(connection);
+      await this.pingPool(pool, connection.type);
+
+      const health = {
+        status: 'healthy' as const,
+        checkedAt: new Date().toISOString(),
+        latencyMs: Date.now() - startedAt,
+        error: null,
+      };
+
+      await this.updateHealthState(id, {
+        status: 'healthy',
+        latencyMs: health.latencyMs,
+        connected: true,
+      });
+
+      await this.auditService.log({
+        action: AuditAction.DB_CONNECTION_HEALTH_CHECK,
+        userId,
+        details: { connectionId: id, ...health },
+      });
+
+      return health;
+    } catch (error) {
+      const health = {
+        status: 'error' as const,
+        checkedAt: new Date().toISOString(),
+        latencyMs: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : 'Connection failed',
+      };
+
+      await this.updateHealthState(id, {
+        status: 'error',
+        latencyMs: health.latencyMs,
+        error: health.error,
+      });
+
+      await this.auditService.log({
+        action: AuditAction.DB_CONNECTION_HEALTH_CHECK,
+        userId,
+        details: { connectionId: id, ...health },
+      });
+
+      return health;
+    } finally {
+      if (pool) {
+        await strategy.closePool(pool).catch(() => undefined);
       }
     }
   }

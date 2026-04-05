@@ -6,7 +6,7 @@ import { Input } from '@/presentation/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/presentation/components/ui/select';
 import { Label } from '@/presentation/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/presentation/components/ui/tabs';
-import { ShieldAlert, Database, Lock, Globe, Wand2, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, Database, Lock, Globe, Wand2, ShieldCheck, Shield, FileWarning, Upload } from 'lucide-react';
 import { ConnectionService } from '@/core/services/ConnectionService';
 
 export const ConnectionDialog: React.FC = () => {
@@ -21,6 +21,10 @@ export const ConnectionDialog: React.FC = () => {
     const [password, setPassword] = useState('');
     const [database, setDatabase] = useState('');
     const [showAllDatabases] = useState(false);
+    const [readOnly, setReadOnly] = useState(false);
+    const [allowSchemaChanges, setAllowSchemaChanges] = useState(true);
+    const [allowImportExport, setAllowImportExport] = useState(true);
+    const [allowQueryExecution, setAllowQueryExecution] = useState(true);
     const [connectionString, setConnectionString] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -35,6 +39,10 @@ export const ConnectionDialog: React.FC = () => {
             setUsername('postgres');
             setPassword('');
             setDatabase('');
+            setReadOnly(false);
+            setAllowSchemaChanges(true);
+            setAllowImportExport(true);
+            setAllowQueryExecution(true);
             setConnectionString('');
             setError(null);
             setIsSaving(false);
@@ -119,7 +127,11 @@ export const ConnectionDialog: React.FC = () => {
             host,
             username,
             password,
-            showAllDatabases
+            showAllDatabases,
+            readOnly,
+            allowSchemaChanges: readOnly ? false : allowSchemaChanges,
+            allowImportExport: readOnly ? false : allowImportExport,
+            allowQueryExecution,
         };
 
         const parsedPort = parseInt(port);
@@ -139,6 +151,15 @@ export const ConnectionDialog: React.FC = () => {
                 password: savedConnection.password,
                 database: savedConnection.database,
                 showAllDatabases: savedConnection.showAllDatabases,
+                readOnly: savedConnection.readOnly,
+                allowSchemaChanges: savedConnection.allowSchemaChanges,
+                allowImportExport: savedConnection.allowImportExport,
+                allowQueryExecution: savedConnection.allowQueryExecution,
+                lastHealthCheckAt: savedConnection.lastHealthCheckAt,
+                lastHealthStatus: savedConnection.lastHealthStatus,
+                lastHealthError: savedConnection.lastHealthError,
+                lastConnectedAt: savedConnection.lastConnectedAt,
+                lastConnectionLatencyMs: savedConnection.lastConnectionLatencyMs,
             };
             addConnection(newConnection);
             closeConnectionDialog();
@@ -278,6 +299,97 @@ export const ConnectionDialog: React.FC = () => {
                                         <span className="text-[10px] font-medium text-muted-foreground">
                                             {t ? 'Mã hóa AES-256-GCM • SSL Mode tự động' : 'AES-256-GCM Encrypted • Auto SSL Mode'}
                                         </span>
+                                    </div>
+                                </div>
+
+                                <div className="h-px bg-border/40 w-full" />
+
+                                <div className="space-y-2.5">
+                                    <div className="flex items-center gap-1.5 text-xs font-medium">
+                                        <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+                                        {t ? 'Quyền & An toàn' : 'Access & Safety'}
+                                    </div>
+
+                                    <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                                        <label className="flex items-start gap-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={readOnly}
+                                                onChange={(e) => setReadOnly(e.target.checked)}
+                                                className="mt-0.5"
+                                            />
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 text-xs font-semibold">
+                                                    <FileWarning className="w-3.5 h-3.5 text-amber-500" />
+                                                    {t ? 'Chế độ chỉ đọc' : 'Read-only mode'}
+                                                </div>
+                                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                    {t
+                                                        ? 'Chặn mọi thao tác sửa dữ liệu, đổi schema, import và tạo/xóa database.'
+                                                        : 'Blocks data edits, schema changes, imports, and database create/drop actions.'}
+                                                </p>
+                                            </div>
+                                        </label>
+
+                                        <label className="flex items-start gap-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={allowQueryExecution}
+                                                onChange={(e) => setAllowQueryExecution(e.target.checked)}
+                                                className="mt-0.5"
+                                            />
+                                            <div className="min-w-0">
+                                                <div className="text-xs font-semibold">
+                                                    {t ? 'Cho phép chạy truy vấn' : 'Allow query execution'}
+                                                </div>
+                                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                    {t
+                                                        ? 'Tắt tùy chọn này nếu chỉ muốn lưu kết nối để xem metadata hoặc kiểm tra sức khỏe.'
+                                                        : 'Turn this off if the connection should be discoverable but not runnable.'}
+                                                </p>
+                                            </div>
+                                        </label>
+
+                                        <label className={`flex items-start gap-3 ${readOnly ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={!readOnly && allowSchemaChanges}
+                                                onChange={(e) => setAllowSchemaChanges(e.target.checked)}
+                                                disabled={readOnly}
+                                                className="mt-0.5"
+                                            />
+                                            <div className="min-w-0">
+                                                <div className="text-xs font-semibold">
+                                                    {t ? 'Cho phép đổi schema' : 'Allow schema changes'}
+                                                </div>
+                                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                    {t
+                                                        ? 'Bao gồm table designer, create/drop database và các thay đổi DDL.'
+                                                        : 'Includes table designer, create/drop database, and other DDL actions.'}
+                                                </p>
+                                            </div>
+                                        </label>
+
+                                        <label className={`flex items-start gap-3 ${readOnly ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={!readOnly && allowImportExport}
+                                                onChange={(e) => setAllowImportExport(e.target.checked)}
+                                                disabled={readOnly}
+                                                className="mt-0.5"
+                                            />
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 text-xs font-semibold">
+                                                    <Upload className="w-3.5 h-3.5 text-blue-500" />
+                                                    {t ? 'Cho phép import/export' : 'Allow import/export'}
+                                                </div>
+                                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                    {t
+                                                        ? 'Kiểm soát bulk import và các thao tác copy dữ liệu khối lượng lớn.'
+                                                        : 'Controls bulk import and other heavy data transfer workflows.'}
+                                                </p>
+                                            </div>
+                                        </label>
                                     </div>
                                 </div>
                             </TabsContent>

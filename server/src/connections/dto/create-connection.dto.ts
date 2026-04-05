@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsOptional, IsIn, IsNotEmpty } from 'class-validator';
+import { IsString, IsInt, IsOptional, IsIn, IsNotEmpty, IsBoolean } from 'class-validator';
 import { IsValidHost } from '../../common/decorators/is-valid-host.decorator';
 
 export class CreateConnectionDto {
@@ -33,4 +33,20 @@ export class CreateConnectionDto {
 
     @IsOptional()
     showAllDatabases?: boolean;
+
+    @IsBoolean()
+    @IsOptional()
+    readOnly?: boolean;
+
+    @IsBoolean()
+    @IsOptional()
+    allowSchemaChanges?: boolean;
+
+    @IsBoolean()
+    @IsOptional()
+    allowImportExport?: boolean;
+
+    @IsBoolean()
+    @IsOptional()
+    allowQueryExecution?: boolean;
 }

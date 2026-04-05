@@ -8,7 +8,7 @@ import {
     SelectTrigger,
 } from "../../components/ui/select"
 import { useAppStore } from "@/core/services/store"
-import { PlusCircle, Server, Trash, Loader2 } from "lucide-react"
+import { PlusCircle, Server, Trash, Loader2, Activity, RefreshCw } from "lucide-react"
 import { SiPostgresql, SiMysql, SiClickhouse, SiMongodb, SiRedis } from "react-icons/si"
 import { DiMsqlServer } from "react-icons/di"
 import { ConnectionService } from "@/core/services/ConnectionService"
@@ -85,10 +85,12 @@ interface ConnectionSelectorProps {
 }
 
 export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
-    const { connections, activeConnectionId, setActiveConnectionId, openConnectionDialog, removeConnection } = useAppStore()
+    const { connections, activeConnectionId, setActiveConnectionId, openConnectionDialog, removeConnection, updateConnection } = useAppStore()
     const nosqlActiveConnectionId = useAppStore(state => state.nosqlActiveConnectionId);
     const setNosqlActiveConnectionId = useAppStore(state => state.setNosqlActiveConnectionId);
     const [isDeleting, setIsDeleting] = useState<string | null>(null)
+    const [isCheckingHealth, setIsCheckingHealth] = useState<string | null>(null)
+    const checkedConnectionIds = React.useRef<Set<string>>(new Set())
 
     // Determine which connectionId to use based on workspace filter
     const currentConnectionId = filter === 'nosql' ? nosqlActiveConnectionId : activeConnectionId;
@@ -114,6 +116,34 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
     const activeConn = visibleConnections.find(c => c.id === currentConnectionId);
     const activeBranding = getDbBranding(activeConn?.type);
 
+    const runHealthCheck = React.useCallback(async (connectionId: string) => {
+        setIsCheckingHealth(connectionId);
+        try {
+            const result = await ConnectionService.checkConnectionHealth(connectionId);
+            updateConnection(connectionId, {
+                lastHealthStatus: result.status,
+                lastHealthCheckAt: result.checkedAt,
+                lastHealthError: result.error,
+                lastConnectionLatencyMs: result.latencyMs,
+                ...(result.status === 'healthy' ? { lastConnectedAt: result.checkedAt } : {}),
+            });
+        } catch (error: any) {
+            updateConnection(connectionId, {
+                lastHealthStatus: 'error',
+                lastHealthCheckAt: new Date().toISOString(),
+                lastHealthError: error.message || 'Health check failed',
+            });
+        } finally {
+            setIsCheckingHealth(null);
+        }
+    }, [updateConnection]);
+
+    React.useEffect(() => {
+        if (!currentConnectionId || checkedConnectionIds.current.has(currentConnectionId)) return;
+        checkedConnectionIds.current.add(currentConnectionId);
+        void runHealthCheck(currentConnectionId);
+    }, [currentConnectionId, runHealthCheck]);
+
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.preventDefault();
         e.stopPropagation();
@@ -131,8 +161,19 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
         }
     }
 
+    const getHealthTone = (status?: string) => {
+        if (status === 'healthy') {
+            return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+        }
+        if (status === 'error') {
+            return 'text-red-400 bg-red-500/10 border-red-500/20';
+        }
+        return 'text-muted-foreground bg-muted/40 border-border/50';
+    };
+
     return (
         <div className="px-0">
+            <div className="space-y-2">
             <Select value={currentConnectionId || ''} onValueChange={setCurrentConnectionId}>
                 <SelectTrigger className="w-full h-10 bg-muted/30 border-none ring-1 ring-border/50 hover:ring-blue-500/30 transition-all rounded-xl shadow-inner group">
                     <div className="flex items-center gap-2.5 truncate">
@@ -160,10 +201,24 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
                                             </div>
                                             <div className="flex flex-col min-w-0">
                                                 <span className="font-bold text-sm">{conn.name}</span>
-                                                <div className="flex items-center gap-1.5 opacity-60">
+                                                <div className="flex items-center gap-1.5 opacity-60 flex-wrap">
                                                     <span className={`text-[9px] font-bold uppercase ${branding.color}`}>{branding.label}</span>
                                                     <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/40" />
                                                     <span className="text-[10px] truncate">{conn.host || 'localhost'}</span>
+                                                    {conn.readOnly && (
+                                                        <>
+                                                            <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/40" />
+                                                            <span className="text-[9px] font-bold uppercase text-amber-400">RO</span>
+                                                        </>
+                                                    )}
+                                                    {conn.lastHealthStatus && (
+                                                        <>
+                                                            <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/40" />
+                                                            <span className={`text-[9px] font-bold uppercase ${conn.lastHealthStatus === 'healthy' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                                {conn.lastHealthStatus}
+                                                            </span>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -192,6 +247,36 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
                     </div>
                 </SelectContent>
             </Select>
+                {activeConn && (
+                    <div className="flex items-center justify-between gap-2 rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <div className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${getHealthTone(activeConn.lastHealthStatus)}`}>
+                                <Activity className="w-3 h-3" />
+                                {activeConn.lastHealthStatus || 'unknown'}
+                            </div>
+                            {activeConn.readOnly && (
+                                <div className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-400">
+                                    Read-only
+                                </div>
+                            )}
+                            {activeConn.lastConnectionLatencyMs !== undefined && activeConn.lastConnectionLatencyMs !== null && (
+                                <span className="text-[10px] text-muted-foreground">
+                                    {activeConn.lastConnectionLatencyMs}ms
+                                </span>
+                            )}
+                        </div>
+                        <button
+                            type="button"
+                            className="inline-flex h-7 items-center gap-1 rounded-md border border-border/50 bg-background px-2 text-[10px] font-semibold text-muted-foreground transition-colors hover:text-foreground"
+                            onClick={() => void runHealthCheck(activeConn.id)}
+                            disabled={isCheckingHealth === activeConn.id}
+                        >
+                            {isCheckingHealth === activeConn.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                            Check
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     )
 }

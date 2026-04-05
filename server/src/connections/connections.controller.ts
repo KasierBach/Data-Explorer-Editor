@@ -24,6 +24,11 @@ export class ConnectionsController {
     return this.connectionsService.findOne(id, req.user.id);
   }
 
+  @Post(':id/health-check')
+  checkHealth(@Param('id') id: string, @Req() req: any) {
+    return this.connectionsService.checkHealth(id, req.user.id);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateConnectionDto: UpdateConnectionDto, @Req() req: any) {
     return this.connectionsService.update(id, updateConnectionDto, req.user.id);

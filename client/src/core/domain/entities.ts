@@ -8,6 +8,15 @@ export interface Connection {
     port?: number;
     username?: string;
     database?: string; // Default DB
+    readOnly?: boolean;
+    allowSchemaChanges?: boolean;
+    allowImportExport?: boolean;
+    allowQueryExecution?: boolean;
+    lastHealthCheckAt?: string;
+    lastHealthStatus?: 'healthy' | 'error';
+    lastHealthError?: string | null;
+    lastConnectedAt?: string;
+    lastConnectionLatencyMs?: number | null;
 }
 
 export interface TreeNode {

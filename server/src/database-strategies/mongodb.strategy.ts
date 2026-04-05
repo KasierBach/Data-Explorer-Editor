@@ -116,6 +116,10 @@ export class MongoDbStrategy implements IDatabaseStrategy {
                 result = await col.aggregate(pipeline).maxTimeMS(30000).toArray();
                 rows = result.slice(0, 50000); // Slice aggregation result to avoid OOM
                 break;
+            case 'count':
+                result = await col.countDocuments(filter, payload.options || {});
+                rows = [{ count: result }];
+                break;
             case 'insertOne':
                 result = await col.insertOne(document);
                 rows = [{ insertedId: result.insertedId.toString() }];

@@ -60,6 +60,7 @@ export const ExplorerSidebar: React.FC = () => {
 
     const activeConnection = useAppStore(state => state.connections.find((c: any) => c.id === state.activeConnectionId));
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
+    const schemaChangesDisabled = activeConnection?.readOnly || activeConnection?.allowSchemaChanges === false;
     // Logic: Nếu kết nối có sẵn DB (Cloud), ưu tiên hiện DB đó. Nếu không mới hiện DB do người dùng click (activeDatabase).
     const effectiveDatabase = activeConnection?.database || (!isNoSql ? activeDatabase : null);
 
@@ -108,6 +109,7 @@ export const ExplorerSidebar: React.FC = () => {
                             size="icon" 
                             className="h-7 w-7 rounded-lg hover:bg-accent/50 text-muted-foreground/70"
                             onClick={() => setCreateDatabaseDialogOpen(true)}
+                            disabled={!!schemaChangesDisabled}
                         >
                             <Plus className="h-3.5 w-3.5" />
                         </Button>
@@ -213,9 +215,9 @@ export const ExplorerSidebar: React.FC = () => {
 
             {/* Optional Sidebar Footer/Status */}
             <div className="p-3 border-t bg-muted/20 flex items-center justify-between text-[9px] font-bold uppercase tracking-widest">
-                <div className="flex items-center gap-1.5 opacity-50">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>{lang === 'vi' ? 'Đang kết nối' : 'Connected'}</span>
+                <div className="flex items-center gap-1.5 opacity-70">
+                    <div className={`w-1.5 h-1.5 rounded-full ${activeConnection?.lastHealthStatus === 'error' ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`} />
+                    <span>{activeConnection?.lastHealthStatus === 'error' ? (lang === 'vi' ? 'Cần kiểm tra' : 'Needs attention') : (lang === 'vi' ? 'Đang kết nối' : 'Connected')}</span>
                 </div>
                 {!isNoSql && effectiveDatabase && (
                     <div className="flex items-center gap-1 text-blue-500/80 text-[8px]">

@@ -42,8 +42,14 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const [isMigrationDialogOpen, setIsMigrationDialogOpen] = useState(false);
     const tableContainerRef = useRef<HTMLDivElement>(null);
 
-    const { tabs, activeTabId, setTabPagination } = useAppStore();
+    const { tabs, activeTabId, setTabPagination, connections, activeConnectionId } = useAppStore();
     const activeTab = tabs.find((t: Tab) => t.id === activeTabId);
+    const activeConnection = connections.find((connection) => connection.id === activeConnectionId);
+    const readOnlyConnection = activeConnection?.readOnly === true;
+    const queryExecutionDisabled = activeConnection?.allowQueryExecution === false;
+    const schemaChangesDisabled = activeConnection?.allowSchemaChanges === false || readOnlyConnection;
+    const importExportDisabled = activeConnection?.allowImportExport === false || readOnlyConnection;
+    const dataEditsDisabled = queryExecutionDisabled || readOnlyConnection;
 
     // Sync local table pagination with store metadata
     const pageIndex = (activeTab?.metadata?.page || 1) - 1;
@@ -164,6 +170,8 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                 metadata={metadata}
                 onSave={editing.handleSaveSchema}
                 onCancel={() => setViewMode('grid')}
+                isReadOnly={readOnlyConnection}
+                schemaChangesAllowed={!schemaChangesDisabled}
             />
         );
     }
@@ -190,6 +198,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                         variant={editing.isEditMode ? "secondary" : "ghost"}
                         size="sm"
                         onClick={editing.toggleEditMode}
+                        disabled={dataEditsDisabled}
                         className={`h-6 px-2 text-[11px] gap-1.5 rounded-sm ${editing.isEditMode ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' : ''}`}
                     >
                         {editing.isEditMode ? 'Cancel Edit' : 'Edit Data'}
@@ -197,7 +206,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                 </div>
 
                 {Object.keys(editing.pendingChanges).length > 0 && (
-                    <Button variant="default" size="sm" onClick={editing.handleSaveData} disabled={editing.isSaving} className="h-6 px-3 text-[11px] bg-green-600 hover:bg-green-700 text-white ml-2">
+                    <Button variant="default" size="sm" onClick={editing.handleSaveData} disabled={editing.isSaving || dataEditsDisabled} className="h-6 px-3 text-[11px] bg-green-600 hover:bg-green-700 text-white ml-2">
                         {editing.isSaving ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : null}
                         Save Changes ({Object.keys(editing.pendingChanges).length})
                     </Button>
@@ -231,20 +240,20 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
 
                 <div className="h-4 w-[1px] bg-border mx-1" />
 
-                <Button variant="ghost" size="sm" onClick={editing.toggleInsertMode} className={`h-7 text-[11px] gap-1 px-2 ${editing.isInserting ? 'text-green-500' : ''}`}>
+                <Button variant="ghost" size="sm" onClick={editing.toggleInsertMode} disabled={dataEditsDisabled} className={`h-7 text-[11px] gap-1 px-2 ${editing.isInserting ? 'text-green-500' : ''}`}>
                     <Plus className="w-3 h-3" /> Insert Row
                 </Button>
 
-                <Button variant="ghost" size="sm" onClick={() => setIsImportDialogOpen(true)} className="h-7 text-[11px] gap-1 px-2 text-blue-500 hover:text-blue-600">
+                <Button variant="ghost" size="sm" onClick={() => setIsImportDialogOpen(true)} disabled={importExportDisabled} className="h-7 text-[11px] gap-1 px-2 text-blue-500 hover:text-blue-600">
                     <Upload className="w-3 h-3" /> Import
                 </Button>
 
-                <Button variant="ghost" size="sm" onClick={() => setIsMigrationDialogOpen(true)} className="h-7 text-[11px] gap-1 px-2 text-purple-500 hover:text-purple-600">
+                <Button variant="ghost" size="sm" onClick={() => setIsMigrationDialogOpen(true)} disabled={queryExecutionDisabled} className="h-7 text-[11px] gap-1 px-2 text-purple-500 hover:text-purple-600">
                     <ArrowRightLeft className="w-3 h-3" /> Transfer
                 </Button>
 
                 {editing.selectedRows.size > 0 && (
-                    <Button variant="ghost" size="sm" onClick={editing.handleDeleteRows} disabled={editing.isSaving} className="h-7 text-[11px] gap-1 px-2 text-red-500 hover:text-red-600 hover:bg-red-500/10">
+                    <Button variant="ghost" size="sm" onClick={editing.handleDeleteRows} disabled={editing.isSaving || dataEditsDisabled} className="h-7 text-[11px] gap-1 px-2 text-red-500 hover:text-red-600 hover:bg-red-500/10">
                         <Trash2 className="w-3 h-3" /> Delete ({editing.selectedRows.size})
                     </Button>
                 )}
@@ -260,6 +269,19 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                     {queryResult?.durationMs && <span className="opacity-70">{queryResult.durationMs}MS</span>}
                 </div>
             </div>
+
+            {activeConnection && (readOnlyConnection || queryExecutionDisabled || schemaChangesDisabled || importExportDisabled) && (
+                <div className="mx-2 mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+                    {readOnlyConnection
+                        ? 'This connection is read-only. Editing, schema design, import, and destructive actions are locked.'
+                        : queryExecutionDisabled
+                            ? 'Query execution is disabled for this connection.'
+                            : `Restricted connection: ${[
+                                schemaChangesDisabled ? 'schema changes disabled' : null,
+                                importExportDisabled ? 'import/export disabled' : null,
+                            ].filter(Boolean).join(' • ')}`}
+                </div>
+            )}
 
             {/* Main Content */}
             <div className="flex-1 relative overflow-hidden bg-background">
@@ -338,7 +360,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                                         placeholder={col.isPrimaryKey ? '(auto)' : col.type}
                                                         value={editing.newRowData[col.name] || ''}
                                                         onChange={(e) => editing.setNewRowData(prev => ({ ...prev, [col.name]: e.target.value }))}
-                                                        disabled={col.isPrimaryKey}
+                                                        disabled={col.isPrimaryKey || dataEditsDisabled}
                                                     />
                                                 </td>
                                             ))}
@@ -346,7 +368,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                         <tr>
                                             <td colSpan={metadata.columns.length + 1} className="px-2 py-1">
                                                 <div className="flex items-center gap-1">
-                                                    <Button size="sm" onClick={editing.handleInsertRow} disabled={editing.isSaving} className="h-6 px-3 text-[10px] bg-green-600 hover:bg-green-700 text-white gap-1">
+                                                    <Button size="sm" onClick={editing.handleInsertRow} disabled={editing.isSaving || dataEditsDisabled} className="h-6 px-3 text-[10px] bg-green-600 hover:bg-green-700 text-white gap-1">
                                                         <Check className="w-3 h-3" /> Insert
                                                     </Button>
                                                     <Button variant="ghost" size="sm" onClick={editing.toggleInsertMode} className="h-6 px-2 text-[10px] gap-1">
@@ -421,6 +443,8 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                 tableId={cleanTableName || tableId}
                 schema={schema}
                 onSuccess={() => refetch()}
+                importAllowed={!importExportDisabled}
+                readOnly={readOnlyConnection}
             />
 
             <MigrationHubDialog
