@@ -3,6 +3,7 @@ import * as net from 'net';
 import { promisify } from 'util';
 
 const lookup = promisify(dns.lookup);
+const resolveSrv = promisify(dns.resolveSrv);
 
 function isDevelopment() {
   return process.env.NODE_ENV !== 'production';
@@ -11,6 +12,36 @@ function isDevelopment() {
 function isLocalDevHost(host: string): boolean {
   const normalized = host.trim().toLowerCase();
   return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
+}
+
+function normalizeHost(host: string): string {
+  return host.trim().replace(/\.$/, '').toLowerCase();
+}
+
+async function isSafeResolvedAddress(address: string): Promise<boolean> {
+  if (isDevelopment() && isLocalDevHost(address)) {
+    return true;
+  }
+
+  return !isPrivateIp(address);
+}
+
+async function validateMongoSrvHost(host: string): Promise<boolean> {
+  const records = await resolveSrv(`_mongodb._tcp.${host}`);
+  if (!records.length) {
+    return false;
+  }
+
+  for (const record of records) {
+    const targetHost = normalizeHost(record.name);
+    const result = await lookup(targetHost);
+
+    if (!(await isSafeResolvedAddress(result.address))) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -64,32 +95,34 @@ export function isPrivateIp(ip: string): boolean {
  */
 export async function validateHost(host: string): Promise<boolean> {
   if (!host) return true;
+  const normalizedHost = normalizeHost(host);
   
   // Environment override for local development if needed
   if (process.env.ALLOW_INTERNAL_IPS === 'true') {
     return true;
   }
 
-  if (isDevelopment() && isLocalDevHost(host)) {
+  if (isDevelopment() && isLocalDevHost(normalizedHost)) {
     return true;
   }
 
   try {
     // If it's already an IP, check it
-    if (net.isIP(host)) {
-      if (isDevelopment() && isLocalDevHost(host)) {
+    if (net.isIP(normalizedHost)) {
+      if (isDevelopment() && isLocalDevHost(normalizedHost)) {
         return true;
       }
-      return !isPrivateIp(host);
+      return !isPrivateIp(normalizedHost);
     }
 
     // Resolve domain to IP (prevents DNS Rebinding if checked before connection)
-    const result = await lookup(host);
-    if (isDevelopment() && isLocalDevHost(result.address)) {
-      return true;
+    const result = await lookup(normalizedHost);
+    return isSafeResolvedAddress(result.address);
+  } catch {
+    try {
+      return await validateMongoSrvHost(normalizedHost);
+    } catch {
+      return false;
     }
-    return !isPrivateIp(result.address);
-  } catch (error) {
-    return false;
   }
 }
