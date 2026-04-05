@@ -9,6 +9,7 @@ import { RequireAuth } from '@/presentation/components/RequireAuth'
 import { useTheme } from '@/presentation/components/theme-provider'
 import { useAppStore } from '@/core/services/store'
 import { useSyncConnections } from '@/presentation/hooks/useSyncConnections'
+import { useSyncSavedQueries } from '@/presentation/hooks/useSyncSavedQueries'
 
 import { Toaster } from 'sonner';
 
@@ -38,6 +39,7 @@ export function App() {
 
   // Auto-fetch connections from backend whenever user is authenticated
   useSyncConnections();
+  useSyncSavedQueries();
 
   const { theme: appTheme, setTheme: setAppTheme } = useTheme();
   const { user } = useAppStore();

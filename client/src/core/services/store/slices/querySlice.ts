@@ -4,9 +4,21 @@ export interface SavedQuery {
     id: string;
     name: string;
     sql: string;
+    connectionId?: string | null;
     database?: string;
-    createdAt: number;
-    updatedAt: number;
+    visibility: 'private' | 'team' | 'workspace';
+    folderId?: string | null;
+    tags: string[];
+    description?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    owner?: {
+        id: string;
+        email: string;
+        firstName?: string | null;
+        lastName?: string | null;
+    };
+    isOwner?: boolean;
 }
 
 export interface QueryHistoryEntry {
@@ -23,6 +35,7 @@ export interface QueryHistoryEntry {
 
 export interface QuerySlice {
     savedQueries: SavedQuery[];
+    setSavedQueries: (queries: SavedQuery[]) => void;
     saveQuery: (query: SavedQuery) => void;
     updateSavedQuery: (id: string, updates: Partial<SavedQuery>) => void;
     deleteSavedQuery: (id: string) => void;
@@ -33,12 +46,13 @@ export interface QuerySlice {
 
 export const createQuerySlice: StateCreator<QuerySlice> = (set) => ({
     savedQueries: [],
+    setSavedQueries: (queries) => set({ savedQueries: queries }),
     saveQuery: (query) => set((state) => ({
-        savedQueries: [...state.savedQueries, query],
+        savedQueries: [query, ...state.savedQueries.filter(existing => existing.id !== query.id)],
     })),
     updateSavedQuery: (id, updates) => set((state) => ({
         savedQueries: state.savedQueries.map(q =>
-            q.id === id ? { ...q, ...updates, updatedAt: Date.now() } : q
+            q.id === id ? { ...q, ...updates, updatedAt: new Date().toISOString() } : q
         ),
     })),
     deleteSavedQuery: (id) => set((state) => ({

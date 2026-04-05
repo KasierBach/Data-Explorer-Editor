@@ -96,6 +96,7 @@ model User {
   auditLogs   AuditLog[]
   connections Connection[]
   aiChats     AiChat[]
+  savedQueries SavedQuery[]
 }
 
 model AiChat {
@@ -139,4 +140,24 @@ model AuditLog {
   // Optional relation if we want to tie logs strictly to users, 
   // though nullable since some actions (like failed logins) might not have a hard user ID link
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model SavedQuery {
+  id          String   @id @default(uuid())
+  name        String
+  sql         String
+  database    String?
+  connectionId String?
+  visibility  String   @default("private")
+  folderId    String?
+  tags        String[] @default([])
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@index([visibility, updatedAt])
 }

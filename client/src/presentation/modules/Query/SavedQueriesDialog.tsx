@@ -8,8 +8,10 @@ import {
 } from "@/presentation/components/ui/dialog";
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
-import { Search, FileCode, Trash2, FolderOpen, Clock, Database } from 'lucide-react';
+import { Search, FileCode, Trash2, FolderOpen, Clock, Database, UserRound, Tags } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SavedQueryService } from '@/core/services/SavedQueryService';
+import { toast } from 'sonner';
 
 interface SavedQueriesDialogProps {
     open: boolean;
@@ -31,13 +33,15 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
         const term = search.toLowerCase();
         return savedQueries.filter(q =>
             q.name.toLowerCase().includes(term) ||
-            q.sql.toLowerCase().includes(term)
+            q.sql.toLowerCase().includes(term) ||
+            q.description?.toLowerCase().includes(term) ||
+            q.tags.some(tag => tag.toLowerCase().includes(term))
         );
     }, [savedQueries, search]);
 
     // Sort by most recently updated
     const sorted = useMemo(() =>
-        [...filtered].sort((a, b) => b.updatedAt - a.updatedAt),
+        [...filtered].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
         [filtered]
     );
 
@@ -48,18 +52,30 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
         onOpenChange(false);
     };
 
-    const handleDelete = (id: string, e: React.MouseEvent) => {
+    const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        deleteSavedQuery(id);
-        if (selectedId === id) setSelectedId(null);
+        try {
+            await SavedQueryService.deleteSavedQuery(id);
+            deleteSavedQuery(id);
+            if (selectedId === id) setSelectedId(null);
+            toast.success('Saved query deleted');
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to delete saved query');
+        }
     };
 
-    const formatDate = (ts: number) => {
+    const formatDate = (ts: string) => {
         const d = new Date(ts);
         return d.toLocaleDateString('vi-VN', {
             day: '2-digit', month: '2-digit', year: 'numeric',
             hour: '2-digit', minute: '2-digit'
         });
+    };
+
+    const getOwnerLabel = (query: SavedQuery) => {
+        const owner = query.owner;
+        if (!owner) return 'Unknown owner';
+        return `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || owner.email;
     };
 
     return (
@@ -119,16 +135,18 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                                             <FileCode className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                                             <span className="text-sm font-medium truncate">{q.name}</span>
                                         </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={(e) => handleDelete(q.id, e)}
-                                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-                                        >
-                                            <Trash2 className="w-3 h-3" />
-                                        </Button>
+                                        {q.isOwner && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(e) => void handleDelete(q.id, e)}
+                                                className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </Button>
+                                        )}
                                     </div>
-                                    <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
+                                    <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground flex-wrap">
                                         <span className="flex items-center gap-1">
                                             <Clock className="w-2.5 h-2.5" />
                                             {formatDate(q.updatedAt)}
@@ -139,6 +157,9 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                                                 {q.database}
                                             </span>
                                         )}
+                                        <span className="rounded-full border border-border/50 px-1.5 py-0.5 uppercase tracking-wide">
+                                            {q.visibility}
+                                        </span>
                                     </div>
                                 </div>
                             ))
@@ -159,6 +180,35 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                                         <FolderOpen className="w-3 h-3" />
                                         Open
                                     </Button>
+                                </div>
+                                <div className="px-3 py-2 border-b bg-muted/10 text-xs space-y-2">
+                                    <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                                        <span className="inline-flex items-center gap-1">
+                                            <UserRound className="w-3 h-3" />
+                                            {getOwnerLabel(selectedQuery)}
+                                        </span>
+                                        <span className="rounded-full border border-border/50 px-2 py-0.5 uppercase tracking-wide">
+                                            {selectedQuery.visibility}
+                                        </span>
+                                        {selectedQuery.folderId && (
+                                            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-blue-400">
+                                                {selectedQuery.folderId}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {selectedQuery.tags.length > 0 && (
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <Tags className="w-3 h-3 text-muted-foreground" />
+                                            {selectedQuery.tags.map((tag) => (
+                                                <span key={tag} className="rounded-full bg-muted px-2 py-0.5 text-[10px]">
+                                                    {tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {selectedQuery.description && (
+                                        <p className="text-muted-foreground leading-relaxed">{selectedQuery.description}</p>
+                                    )}
                                 </div>
                                 <pre className="flex-1 p-3 text-xs font-mono overflow-auto whitespace-pre-wrap text-foreground/80 bg-muted/10">
                                     {selectedQuery.sql}

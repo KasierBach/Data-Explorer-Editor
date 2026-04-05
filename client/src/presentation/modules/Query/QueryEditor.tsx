@@ -30,6 +30,9 @@ import { useVerticalResizablePanel } from '@/presentation/hooks/useVerticalResiz
 import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
 import { ApiError } from '@/core/services/api.service';
+import { SavedQueryService } from '@/core/services/SavedQueryService';
+import { SaveQueryDialog, type SaveQueryFormValues } from './SaveQueryDialog';
+import { toast } from 'sonner';
 
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const queryClient = useQueryClient();
@@ -61,16 +64,25 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const [runNonce, setRunNonce] = useState(0);
     const [activeResultTab, setActiveResultTab] = useState("data");
     const [isSavedDialogOpen, setIsSavedDialogOpen] = useState(false);
+    const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
     const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
     const [currentSavedQueryId, setCurrentSavedQueryId] = useState<string | null>(initialMetadata.savedQueryId || null);
     const [explainPlan, setExplainPlan] = useState<any>(null);
+    const [saveDialogInitialValues, setSaveDialogInitialValues] = useState<SaveQueryFormValues>({
+        name: '',
+        visibility: 'private',
+        folderId: '',
+        tags: '',
+        description: '',
+    });
 
     const isFirstLoad = useRef(true);
     const editorRef = useRef<any>(null);
     const effectiveLimit = limit === 'all' ? undefined : Number.parseInt(limit, 10);
     const requestLimit = Number.isInteger(effectiveLimit) ? effectiveLimit : undefined;
 
-    const { saveQuery, updateSavedQuery, openTab, addQueryHistory } = useAppStore();
+    const { saveQuery, openTab, addQueryHistory, savedQueries } = useAppStore();
+    const currentSavedQuery = savedQueries.find((savedQuery) => savedQuery.id === currentSavedQueryId) || null;
 
     // Persist SQL query to store
     useEffect(() => {
@@ -243,33 +255,55 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     };
 
     // Save query
-    const handleSave = useCallback(() => {
+    const handleSave = useCallback(async () => {
         if (!query.trim()) return;
 
-        if (currentSavedQueryId) {
-            // Update existing
-            updateSavedQuery(currentSavedQueryId, { sql: query });
+        if (currentSavedQueryId && currentSavedQuery?.isOwner) {
+            try {
+                const updated = await SavedQueryService.updateSavedQuery(currentSavedQueryId, { sql: query });
+                saveQuery(updated);
+                toast.success(lang === 'vi' ? 'Da cap nhat saved query' : 'Saved query updated');
+            } catch (err: any) {
+                toast.error(err.message || 'Failed to update saved query');
+            }
         } else {
-            // New: prompt for name
-            const promptTitle = lang === 'vi' ? 'Lưu truy vấn thành:' : 'Save Query As:';
-            const defaultName = lang === 'vi' ? `Truy vấn ${new Date().toLocaleString('vi-VN')}` : `Query ${new Date().toLocaleString('en-US')}`;
-            const name = prompt(promptTitle, defaultName);
-            if (!name) return;
-
-            const id = `saved-${Date.now()}`;
-            const newQuery: SavedQuery = {
-                id,
-                name,
-                sql: query,
-                database: activeConnection?.database,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-            };
-            saveQuery(newQuery);
-            setCurrentSavedQueryId(id);
-            updateTabMetadata(tabId, { savedQueryId: id });
+            const defaultName = lang === 'vi' ? `Truy van ${new Date().toLocaleString('vi-VN')}` : `Query ${new Date().toLocaleString('en-US')}`;
+            setSaveDialogInitialValues({
+                name: currentSavedQuery?.name || defaultName,
+                visibility: currentSavedQuery?.isOwner ? (currentSavedQuery.visibility || 'private') : 'private',
+                folderId: currentSavedQuery?.folderId || '',
+                tags: currentSavedQuery?.tags?.join(', ') || '',
+                description: currentSavedQuery?.description || '',
+            });
+            setIsSaveDialogOpen(true);
         }
-    }, [query, currentSavedQueryId, updateSavedQuery, saveQuery, activeConnection, tabId, updateTabMetadata]);
+    }, [query, currentSavedQueryId, currentSavedQuery, saveQuery, lang]);
+
+    const handleSaveDialogSubmit = useCallback(async (values: SaveQueryFormValues) => {
+        const payload = {
+            name: values.name,
+            sql: query,
+            database: activeDatabase || activeConnection?.database || undefined,
+            connectionId: activeConnection?.id,
+            visibility: values.visibility,
+            folderId: values.folderId || undefined,
+            tags: values.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+            description: values.description || undefined,
+        } as const;
+
+        if (currentSavedQueryId && currentSavedQuery?.isOwner) {
+            const updated = await SavedQueryService.updateSavedQuery(currentSavedQueryId, payload);
+            saveQuery(updated);
+            toast.success(lang === 'vi' ? 'Da cap nhat saved query' : 'Saved query updated');
+            return;
+        }
+
+        const created = await SavedQueryService.createSavedQuery(payload);
+        saveQuery(created);
+        setCurrentSavedQueryId(created.id);
+        updateTabMetadata(tabId, { savedQueryId: created.id });
+        toast.success(lang === 'vi' ? 'Da luu saved query' : 'Query saved');
+    }, [query, activeDatabase, activeConnection, currentSavedQueryId, currentSavedQuery, saveQuery, lang, tabId, updateTabMetadata]);
 
     // Open saved query into a new tab
     const handleOpenSavedQuery = useCallback((sq: SavedQuery) => {
@@ -546,6 +580,14 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                     setQuery(sql);
                     handleRun(sql);
                 }}
+            />
+            <SaveQueryDialog
+                open={isSaveDialogOpen}
+                onOpenChange={setIsSaveDialogOpen}
+                lang={lang}
+                initialValues={saveDialogInitialValues}
+                currentQuery={currentSavedQuery?.isOwner ? currentSavedQuery : null}
+                onSubmit={handleSaveDialogSubmit}
             />
         </>
     );

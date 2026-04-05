@@ -19,6 +19,7 @@ import { SeedModule } from './seed/seed.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { MigrationModule } from './migration/migration.module';
+import { SavedQueriesModule } from './saved-queries/saved-queries.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { MigrationModule } from './migration/migration.module';
     OtpModule,
     SeedModule,
     MigrationModule,
+    SavedQueriesModule,
   ],
   controllers: [AppController],
   providers: [
