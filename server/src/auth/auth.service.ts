@@ -296,4 +296,20 @@ export class AuthService implements OnModuleInit {
 
         return { message: 'Cập nhật mật khẩu thành công.' };
     }
+    async exchangeOauthCode(code: string) {
+        const payload = this.tokenService.verifyOauthExchangeToken(code);
+        const user = await this.prisma.user.findUnique({
+            where: { id: payload.sub },
+        });
+
+        if (!user) {
+            throw new UnauthorizedException('OAuth account not found.');
+        }
+
+        if (user.isBanned) {
+            throw new UnauthorizedException('Account is banned.');
+        }
+
+        return this.tokenService.generateTokenResponse(user);
+    }
 }

@@ -42,6 +42,10 @@ export const useAppStore = create<AppState>()(
                 if (persisted.expandedNodes && !Array.isArray(persisted.expandedNodes)) {
                     persisted.expandedNodes = [];
                 }
+                delete persisted.accessToken;
+                delete persisted.isAuthenticated;
+                delete persisted.tokenExp;
+                delete persisted.user;
                 return { ...currentState, ...persisted } as AppState;
             },
             // Only persist essential state AND sanitize passwords
@@ -52,10 +56,6 @@ export const useAppStore = create<AppState>()(
                 }),
                 activeConnectionId: state.activeConnectionId,
                 activeDatabase: state.activeDatabase,
-                isAuthenticated: state.isAuthenticated,
-                accessToken: state.accessToken,
-                tokenExp: state.tokenExp,
-                user: state.user,
                 tabs: state.tabs,
                 activeTabId: state.activeTabId,
                 isSidebarOpen: state.isSidebarOpen,

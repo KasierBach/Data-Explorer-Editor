@@ -5,7 +5,7 @@ import { validateHost } from '../utils/ssrf-validator.util';
 export class IsValidHostConstraint implements ValidatorConstraintInterface {
   async validate(host: string, args: ValidationArguments) {
     if (!host) return true;
-    return await validateHost(host).catch(() => true);
+    return await validateHost(host).catch(() => false);
   }
 
   defaultMessage(args: ValidationArguments) {

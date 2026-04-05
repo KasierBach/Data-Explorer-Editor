@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { v4 as uuidv4 } from 'uuid';
 import { ConnectionsService } from '../connections/connections.service';
@@ -12,12 +12,16 @@ export interface MigrationJob {
     error?: string;
 }
 
+interface StoredMigrationJob extends MigrationJob {
+    ownerId: string;
+}
+
 @Injectable()
 export class MigrationService {
     private readonly logger = new Logger(MigrationService.name);
     
     // In-memory store of active/completed jobs
-    public readonly jobs = new Map<string, MigrationJob>();
+    public readonly jobs = new Map<string, StoredMigrationJob>();
     // Event emitter to broadcast progress to SSE controllers
     public readonly eventEmitter = new EventEmitter();
 
@@ -28,7 +32,7 @@ export class MigrationService {
 
     async startMigration(userId: string, dto: StartMigrationDto): Promise<{ jobId: string }> {
         const jobId = uuidv4();
-        this.jobs.set(jobId, { id: jobId, status: 'pending', processedRows: 0 });
+        this.jobs.set(jobId, { id: jobId, status: 'pending', processedRows: 0, ownerId: userId });
 
         // Fire-and-forget: run the migration asynchronously in the background
         this.runMigrationPipeline(userId, jobId, dto).catch(err => {
@@ -42,6 +46,23 @@ export class MigrationService {
         });
 
         return { jobId };
+    }
+
+    assertJobOwnership(jobId: string, userId: string) {
+        const job = this.jobs.get(jobId);
+        if (!job) {
+            throw new NotFoundException('Job not found.');
+        }
+
+        if (job.ownerId !== userId) {
+            throw new ForbiddenException('You do not have access to this migration job.');
+        }
+
+        return job;
+    }
+
+    getPublicJob(jobId: string, userId: string): MigrationJob {
+        return this.toPublicJob(this.assertJobOwnership(jobId, userId));
     }
 
     /**
@@ -191,8 +212,16 @@ export class MigrationService {
     }
 
     private updateJob(jobId: string, job: MigrationJob) {
-        this.jobs.set(jobId, job);
-        this.eventEmitter.emit(`migration-${jobId}`, job);
+        this.jobs.set(jobId, job as StoredMigrationJob);
+        this.eventEmitter.emit(`migration-${jobId}`, this.toPublicJob(job as StoredMigrationJob));
+    }
+
+    private toPublicJob(job: StoredMigrationJob): MigrationJob {
+        return {
+            id: job.id,
+            status: job.status,
+            processedRows: job.processedRows,
+            error: job.error,
+        };
     }
 }
-

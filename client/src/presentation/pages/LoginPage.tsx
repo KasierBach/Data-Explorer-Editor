@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { useAppStore } from '@/core/services/store';
@@ -12,7 +12,6 @@ import { SEO } from '@/presentation/components/shared/Seo';
 
 export const LoginPage = () => {
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
     const { login, lang } = useAppStore();
     
     // Auth Mode State
@@ -38,17 +37,23 @@ export const LoginPage = () => {
 
     // Handle OAuth Callback Redirect
     useEffect(() => {
-        const token = searchParams.get('token');
-        if (token) {
-            handleOAuthToken(token);
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const code = hashParams.get('code');
+        if (code) {
+            window.history.replaceState(null, '', window.location.pathname);
+            handleOAuthCode(code);
         }
-    }, [searchParams]);
+    }, []);
 
-    const handleOAuthToken = async (token: string) => {
+    const handleOAuthCode = async (code: string) => {
         setIsLoading(true);
         try {
-            const user = await AuthService.getMe(token);
-            login(token, user);
+            const data = await AuthService.exchangeOauthCode(code);
+            if (!data.access_token || !data.user) {
+                throw new Error('Social login exchange failed');
+            }
+
+            login(data.access_token, data.user);
 
             // Fetch global connections
             try {
@@ -59,7 +64,7 @@ export const LoginPage = () => {
             }
 
             // Redirect based on onboarding status
-            if (user.isOnboarded) {
+            if (data.user.isOnboarded) {
                 navigate('/sql-explorer');
             } else {
                 navigate('/onboarding');

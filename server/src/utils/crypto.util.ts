@@ -1,13 +1,52 @@
 import * as crypto from 'crypto';
+import { getRequiredSecret } from '../common/utils/secret.util';
 
 const ALGORITHM = 'aes-256-gcm';
-// Ensure the key is exactly 32 bytes (256 bits) for aes-256-gcm
-// Ideally, provide a 32-character string in the .env file
-const ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY || '12345678901234567890123456789012', 'utf-8');
+const ENCRYPTION_KEY = Buffer.from(
+    getRequiredSecret('ENCRYPTION_KEY', {
+        exactLength: 32,
+        disallowValues: ['12345678901234567890123456789012', 'your-32-char-encryption-key'],
+    }),
+    'utf-8',
+);
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
+const LEGACY_DEV_FALLBACK_KEY = Buffer.from('12345678901234567890123456789012', 'utf-8');
 
-const DEFAULT_KEY_FALLBACK = Buffer.from('12345678901234567890123456789012', 'utf-8');
+function isProduction() {
+    return process.env.NODE_ENV === 'production';
+}
+
+function getLegacyKeys(): Buffer[] {
+    const keys: Buffer[] = [];
+    const configured = (process.env.LEGACY_ENCRYPTION_KEYS || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+    for (const key of configured) {
+        if (Buffer.byteLength(key, 'utf8') === 32) {
+            keys.push(Buffer.from(key, 'utf-8'));
+        }
+    }
+
+    if (!isProduction()) {
+        keys.push(LEGACY_DEV_FALLBACK_KEY);
+    }
+
+    return keys.filter((key, index, array) =>
+        array.findIndex((candidate) => candidate.equals(key)) === index,
+    );
+}
+
+function decryptWithKey(encryptedText: Buffer, iv: Buffer, authTag: Buffer, key: Buffer) {
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    decipher.setAuthTag(authTag);
+
+    let decrypted = decipher.update(encryptedText, undefined, 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+}
 
 /**
  * Encrypts a plain text string using AES-256-GCM.
@@ -30,8 +69,8 @@ export function encryptAttribute(text: string): string {
         const payload = Buffer.concat([iv, authTag, Buffer.from(encrypted, 'hex')]);
         return `v1:${payload.toString('base64')}`;
     } catch (error) {
-        console.error('Encryption failing fallback to raw:', error);
-        return text;
+        console.error('Encryption failed:', error);
+        throw new Error('Failed to encrypt database credentials.');
     }
 }
 
@@ -55,27 +94,22 @@ export function decryptAttribute(encryptedPayload: string): string {
         const authTag = buffer.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
         const encryptedText = buffer.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
 
-        const decipher = crypto.createDecipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
-        decipher.setAuthTag(authTag);
-
         try {
-            let decrypted = decipher.update(encryptedText, undefined, 'utf8');
-            decrypted += decipher.final('utf8');
-            return decrypted;
-        } catch (error) {
-            // If main key fails, try the default fallback key (for legacy items)
-            if (ENCRYPTION_KEY.toString() !== DEFAULT_KEY_FALLBACK.toString()) {
+            return decryptWithKey(encryptedText, iv, authTag, ENCRYPTION_KEY);
+        } catch (primaryError) {
+            for (const legacyKey of getLegacyKeys()) {
+                if (legacyKey.equals(ENCRYPTION_KEY)) {
+                    continue;
+                }
+
                 try {
-                    const fallbackDecipher = crypto.createDecipheriv(ALGORITHM, DEFAULT_KEY_FALLBACK, iv);
-                    fallbackDecipher.setAuthTag(authTag);
-                    let decrypted = fallbackDecipher.update(encryptedText, undefined, 'utf8');
-                    decrypted += fallbackDecipher.final('utf8');
-                    return decrypted;
-                } catch (fallbackError) {
-                    throw error; // throw original error if fallback also fails
+                    return decryptWithKey(encryptedText, iv, authTag, legacyKey);
+                } catch {
+                    // try next legacy key
                 }
             }
-            throw error;
+
+            throw primaryError;
         }
     } catch (error) {
         console.error('Decryption failed for payload:', error);

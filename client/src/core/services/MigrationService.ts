@@ -1,6 +1,5 @@
 import { apiService } from './api.service';
 import { API_BASE_URL } from '../config/env';
-import { useAppStore } from './store';
 
 export interface StartMigrationPayload {
     sourceConnectionId: string;
@@ -41,11 +40,19 @@ export const migrationService = {
         let retryTimeout: ReturnType<typeof setTimeout> | null = null;
         let terminated = false;
 
-        const connect = () => {
+        const connect = async () => {
             if (terminated) return;
 
-            const token = useAppStore.getState().accessToken;
-            const url = `${API_BASE_URL}/migration/progress/${jobId}?token=${token}`;
+            let ticket: string;
+            try {
+                const response = await apiService.post<{ ticket: string }>(`/migration/progress-ticket/${jobId}`, {});
+                ticket = response.ticket;
+            } catch (error) {
+                onError?.('Unable to authorize migration progress stream');
+                return;
+            }
+
+            const url = `${API_BASE_URL}/migration/progress/${jobId}?ticket=${encodeURIComponent(ticket)}`;
 
             eventSource = new EventSource(url);
 
@@ -106,4 +113,3 @@ export const migrationService = {
         return cleanup;
     },
 };
-

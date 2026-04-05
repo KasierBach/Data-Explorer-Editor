@@ -1,33 +1,48 @@
-import { Controller, Post, Body, Req, UseGuards, Param, Sse } from '@nestjs/common';
+import { Controller, Post, Body, Req, UseGuards, Param, Query, Sse, UnauthorizedException } from '@nestjs/common';
 import type { MessageEvent } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MigrationService } from './migration.service';
 import { StartMigrationDto } from './dto/start-migration.dto';
+import { TokenService } from '../auth/token.service';
 
 @Controller('migration')
-@UseGuards(JwtAuthGuard)
 export class MigrationController {
-    constructor(private readonly migrationService: MigrationService) {}
+    constructor(
+        private readonly migrationService: MigrationService,
+        private readonly tokenService: TokenService,
+    ) {}
 
     @Post('start')
+    @UseGuards(JwtAuthGuard)
     async startMigration(@Req() req: any, @Body() dto: StartMigrationDto) {
-        // The JwtStrategy returns 'id', not 'sub'
         const userId = (req.user as any).id;
         return this.migrationService.startMigration(userId, dto);
     }
 
-    @Sse('progress/:jobId')
-    progress(@Param('jobId') jobId: string): Observable<MessageEvent> {
-        return new Observable<MessageEvent>((observer) => {
-            const job = this.migrationService.jobs.get(jobId);
-            if (!job) {
-                observer.error('Job not found');
-                return;
-            }
+    @Post('progress-ticket/:jobId')
+    @UseGuards(JwtAuthGuard)
+    async createProgressTicket(@Param('jobId') jobId: string, @Req() req: any) {
+        const userId = (req.user as any).id;
+        this.migrationService.assertJobOwnership(jobId, userId);
 
+        return {
+            ticket: this.tokenService.createMigrationProgressTicket(userId, jobId),
+        };
+    }
+
+    @Sse('progress/:jobId')
+    progress(@Param('jobId') jobId: string, @Query('ticket') ticket: string): Observable<MessageEvent> {
+        const payload = this.tokenService.verifyMigrationProgressTicket(ticket);
+        if (payload.jobId !== jobId) {
+            throw new UnauthorizedException('Migration progress ticket does not match this job.');
+        }
+
+        const initialJob = this.migrationService.getPublicJob(jobId, payload.sub!);
+
+        return new Observable<MessageEvent>((observer) => {
             // Emit initial status
-            observer.next({ data: job });
+            observer.next({ data: initialJob });
 
             // Listen for progress updates
             const listener = (update: any) => {

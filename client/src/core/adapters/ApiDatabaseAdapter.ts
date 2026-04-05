@@ -40,7 +40,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         };
 
         if (context?.database) body.database = context.database;
-        if (context?.limit) body.limit = context.limit;
+        if (context?.limit !== undefined) body.limit = context.limit;
         if (context?.offset !== undefined) body.offset = context.offset;
 
         return await apiService.post<QueryResult>('/query', body);

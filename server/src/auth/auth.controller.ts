@@ -1,6 +1,6 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Get, UseGuards, Req, Res, Ip } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import type { Response, Request } from 'express';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -9,10 +9,15 @@ import { ResetPasswordWithOtpDto } from './dto/reset-password-otp.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { Throttle } from '@nestjs/throttler';
+import { ExchangeOauthCodeDto } from './dto/exchange-oauth-code.dto';
+import { TokenService } from './token.service';
 
 @Controller('auth')
 export class AuthController {
-    constructor(private readonly authService: AuthService) {}
+    constructor(
+        private readonly authService: AuthService,
+        private readonly tokenService: TokenService,
+    ) {}
 
     @Post('login')
     @HttpCode(HttpStatus.OK)
@@ -54,6 +59,13 @@ export class AuthController {
         return this.authService.resetPasswordWithOtp(dto);
     }
 
+    @Post('exchange-oauth-code')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ default: { limit: 10, ttl: 60000 } })
+    async exchangeOauthCode(@Body() dto: ExchangeOauthCodeDto) {
+        return this.authService.exchangeOauthCode(dto.code);
+    }
+
     // --- Social Login Routes ---
 
     @Get('google')
@@ -65,9 +77,9 @@ export class AuthController {
     @Get('google/callback')
     @UseGuards(AuthGuard('google'))
     async googleAuthRedirect(@Req() req: any, @Res() res: Response) {
-        const token = req.user.access_token;
+        const code = this.tokenService.createOauthExchangeToken(req.user.user.id);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}/login?token=${token}`);
+        res.redirect(`${frontendUrl}/login#code=${encodeURIComponent(code)}`);
     }
 
     @Get('github')
@@ -79,8 +91,8 @@ export class AuthController {
     @Get('github/callback')
     @UseGuards(AuthGuard('github'))
     async githubAuthRedirect(@Req() req: any, @Res() res: Response) {
-        const token = req.user.access_token;
+        const code = this.tokenService.createOauthExchangeToken(req.user.user.id);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-        res.redirect(`${frontendUrl}/login?token=${token}`);
+        res.redirect(`${frontendUrl}/login#code=${encodeURIComponent(code)}`);
     }
 }

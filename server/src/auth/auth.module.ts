@@ -8,19 +8,22 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './jwt-auth.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { GithubStrategy } from './strategies/github.strategy';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { OtpModule } from '../otp/otp.module';
 import { SeedModule } from '../seed/seed.module';
 import { AuditModule } from '../audit/audit.module';
+import { getRequiredSecret } from '../common/utils/secret.util';
 
 @Module({
     imports: [
         PassportModule,
         JwtModule.registerAsync({
             imports: [ConfigModule],
-            inject: [ConfigService],
-            useFactory: async (configService: ConfigService) => ({
-                secret: configService.get<string>('JWT_SECRET'),
+            useFactory: async () => ({
+                secret: getRequiredSecret('JWT_SECRET', {
+                    minLength: 32,
+                    disallowValues: ['super-secret-key', 'your-secret-key'],
+                }),
                 signOptions: { expiresIn: '1d' },
             }),
         }),

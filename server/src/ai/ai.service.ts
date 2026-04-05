@@ -126,16 +126,20 @@ ${Prompts.RESPONSE_FORMAT}`;
 
         const urls = candidate.groundingMetadata.groundingChunks
             .filter((c: any) => c.web?.uri && c.web?.title)
-            .map((c: any) => `[${c.web.title}](${c.web.uri})`);
+            .map((c: any) => ({
+                title: c.web.title,
+                url: c.web.uri,
+            }));
 
-        const uniqueUrls = [...new Set(urls)];
+        const uniqueUrls = urls.filter(
+            (item: { title: string; url: string }, index: number, array: { title: string; url: string }[]) =>
+                array.findIndex((entry) => entry.url === item.url) === index,
+        );
         if (uniqueUrls.length === 0) return '';
 
-        return '\n\n---\n<div class="not-prose mt-4 pt-4 border-t border-border/50">\n<p class="text-[11px] font-semibold text-muted-foreground mb-3 flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Nguồn tham khảo</p>\n<div class="flex flex-wrap gap-2">' + uniqueUrls.map((u: string) => {
-            const linkText = u.match(/\[(.*?)\]/)?.[1] || 'Link';
-            const linkHref = u.match(/\((.*?)\)/)?.[1] || '#';
-            return `<a title="Chuyển đến: ${linkHref}" class="inline-flex items-center rounded-md border border-border/50 bg-muted/30 px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted/80 no-underline cursor-pointer" href="${linkHref}" target="_blank" rel="noopener noreferrer">${linkText}</a>`;
-        }).join('') + '</div>\n</div>';
+        return `\n\n---\n**Nguon tham khao**\n${uniqueUrls
+            .map((item: { title: string; url: string }) => `- [${item.title}](${item.url})`)
+            .join('\n')}`;
     }
 
     private parseAiResponse(fullText: string): { message: string; sql?: string; explanation?: string } {

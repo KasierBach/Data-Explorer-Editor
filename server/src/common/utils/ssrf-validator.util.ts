@@ -4,6 +4,15 @@ import { promisify } from 'util';
 
 const lookup = promisify(dns.lookup);
 
+function isDevelopment() {
+  return process.env.NODE_ENV !== 'production';
+}
+
+function isLocalDevHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase();
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
+}
+
 /**
  * Returns true if the given IP address is private or reserved.
  * (RFC 1918, RFC 1122, RFC 3927, RFC 4193, RFC 4291)
@@ -61,19 +70,26 @@ export async function validateHost(host: string): Promise<boolean> {
     return true;
   }
 
+  if (isDevelopment() && isLocalDevHost(host)) {
+    return true;
+  }
+
   try {
     // If it's already an IP, check it
     if (net.isIP(host)) {
+      if (isDevelopment() && isLocalDevHost(host)) {
+        return true;
+      }
       return !isPrivateIp(host);
     }
 
     // Resolve domain to IP (prevents DNS Rebinding if checked before connection)
     const result = await lookup(host);
+    if (isDevelopment() && isLocalDevHost(result.address)) {
+      return true;
+    }
     return !isPrivateIp(result.address);
   } catch (error) {
-    // If it can't be resolved, it might be an invalid domain or internal one
-    // We default to true (allow) because the connection attempt will fail anyway, 
-    // but the SSRF check is mostly to prevent scanning *valid* internal IPs.
-    return true; 
+    return false;
   }
 }

@@ -57,6 +57,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const [query, setQuery] = useState(initialMetadata.sql || tab?.initialSql || '');
     const [executedQuery, setExecutedQuery] = useState<string | null>(null);
     const [limit, setLimit] = useState(initialMetadata.limit || "1000");
+    const [runNonce, setRunNonce] = useState(0);
     const [activeResultTab, setActiveResultTab] = useState("data");
     const [isSavedDialogOpen, setIsSavedDialogOpen] = useState(false);
     const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
@@ -65,6 +66,8 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
     const isFirstLoad = useRef(true);
     const editorRef = useRef<any>(null);
+    const effectiveLimit = limit === 'all' ? undefined : Number.parseInt(limit, 10);
+    const requestLimit = Number.isInteger(effectiveLimit) ? effectiveLimit : undefined;
 
     const { saveQuery, updateSavedQuery, openTab, addQueryHistory } = useAppStore();
 
@@ -85,8 +88,8 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         return () => clearTimeout(timer);
     }, [query, limit, tabId, updateTabMetadata]);
 
-    const { data: results, isLoading, error, refetch, dataUpdatedAt, isSuccess, isError } = useQuery<QueryResult | null, Error>({
-        queryKey: ['query-execution', activeConnectionId, executedQuery, limit],
+    const { data: results, isLoading, error, dataUpdatedAt, isSuccess, isError } = useQuery<QueryResult | null, Error>({
+        queryKey: ['query-execution', activeConnectionId, activeDatabase, executedQuery, requestLimit, runNonce],
         queryFn: async () => {
             if (!executedQuery) return null;
             if (!activeConnection) throw new Error("No active connection");
@@ -94,9 +97,12 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type as any);
             await adapter.connect(activeConnection);
 
-            return adapter.executeQuery(executedQuery, { database: activeDatabase || undefined });
+            return adapter.executeQuery(executedQuery, {
+                database: activeDatabase || undefined,
+                limit: requestLimit,
+            });
         },
-        enabled: !!executedQuery && !!activeConnectionId,
+        enabled: !!executedQuery && !!activeConnectionId && runNonce > 0,
         retry: false
     });
 
@@ -148,7 +154,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
         if (!sqlToExecute.trim()) return;
         setExecutedQuery(sqlToExecute);
-        setTimeout(() => refetch(), 0);
+        setRunNonce((current) => current + 1);
     };
 
     const handleExplain = async () => {

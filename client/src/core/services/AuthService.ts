@@ -13,6 +13,10 @@ export class AuthService {
         return await apiService.post<AuthResponse>('/auth/login', { email, password });
     }
 
+    static async exchangeOauthCode(code: string): Promise<AuthResponse> {
+        return await apiService.post<AuthResponse>('/auth/exchange-oauth-code', { code });
+    }
+
     static async register(name: string, email: string, password: string): Promise<AuthResponse> {
         return await apiService.post<AuthResponse>('/auth/register', { name, email, password });
     }

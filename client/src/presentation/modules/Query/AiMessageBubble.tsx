@@ -3,7 +3,6 @@ import { Button } from '@/presentation/components/ui/button';
 import { ChevronDown, Play, Copy } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { AiMessage } from '@/core/services/store';
@@ -78,7 +77,7 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({ msg, onInsertQ
                     <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-pre:m-0 prose-td:border prose-th:border prose-table:border-collapse prose-table:w-full prose-th:bg-muted/50 prose-th:p-2 prose-td:p-2 prose-a:text-violet-400 select-text">
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeRaw]}
+                            skipHtml
                             components={{
                                 a: ({ node, className, ...props }: any) => <a className={className || "text-violet-400 hover:underline"} {...props} target="_blank" rel="noopener noreferrer" />,
                                 code({ node, inline, className, children, ...props }: any) {
