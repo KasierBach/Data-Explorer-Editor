@@ -42,14 +42,14 @@ export const useAppStore = create<AppState>()(
                 if (persisted.expandedNodes && !Array.isArray(persisted.expandedNodes)) {
                     persisted.expandedNodes = [];
                 }
-                delete persisted.accessToken;
-                delete persisted.isAuthenticated;
-                delete persisted.tokenExp;
-                delete persisted.user;
                 return { ...currentState, ...persisted } as AppState;
             },
             // Only persist essential state AND sanitize passwords
             partialize: (state) => ({
+                isAuthenticated: state.isAuthenticated,
+                accessToken: state.accessToken,
+                tokenExp: state.tokenExp,
+                user: state.user,
                 connections: state.connections.map(c => {
                     const { password, ...safeConnection } = c;
                     return safeConnection;
