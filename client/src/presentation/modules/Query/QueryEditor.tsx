@@ -119,6 +119,9 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         retry: false
     });
     const blockedReason = (error as ApiError | null)?.reason;
+    const hasPersistentGuardrail = Boolean(
+        activeConnection?.readOnly || activeConnection?.allowQueryExecution === false
+    );
     const guardrailMessage = React.useMemo(() => {
         if (!activeConnection) return null;
         const parts: string[] = [];
@@ -488,7 +491,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                     </div>
                 </div>
 
-                {activeConnection && (
+                {activeConnection && (blockedReason || hasPersistentGuardrail) && (
                     <div className={cn(
                         "mx-2 mt-2 rounded-lg border px-3 py-2 text-xs",
                         activeConnection.allowQueryExecution === false

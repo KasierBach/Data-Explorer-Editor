@@ -26,6 +26,9 @@ export const NoSqlMainContent: React.FC = () => {
 
     const activeConnection = connections.find(c => c.id === nosqlActiveConnectionId);
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
+    const hasPersistentGuardrail = Boolean(
+        activeConnection?.readOnly || activeConnection?.allowQueryExecution === false
+    );
     const guardrailMessage = activeConnection?.allowQueryExecution === false
         ? (lang === 'vi' ? 'Kết nối này đang tắt quyền chạy truy vấn.' : 'Query execution is disabled for this connection.')
         : activeConnection?.readOnly
@@ -63,21 +66,21 @@ export const NoSqlMainContent: React.FC = () => {
 
     return (
             <div className="h-full w-full bg-background flex flex-col">
-            <div className={cn(
-                "mx-4 mt-4 rounded-lg border px-3 py-2 text-xs",
-                activeConnection?.allowQueryExecution === false
-                    ? "border-red-500/20 bg-red-500/10 text-red-400"
-                    : activeConnection?.readOnly
-                        ? "border-amber-500/20 bg-amber-500/10 text-amber-400"
-                        : "border-green-500/20 bg-green-500/10 text-green-500"
-            )}>
-                <div className="font-semibold uppercase tracking-wide text-[10px]">
-                    {lang === 'vi' ? 'Guardrails NoSQL' : 'NoSQL guardrails'}
+            {hasPersistentGuardrail && (
+                <div className={cn(
+                    "mx-4 mt-4 rounded-lg border px-3 py-2 text-xs",
+                    activeConnection?.allowQueryExecution === false
+                        ? "border-red-500/20 bg-red-500/10 text-red-400"
+                        : "border-amber-500/20 bg-amber-500/10 text-amber-400"
+                )}>
+                    <div className="font-semibold uppercase tracking-wide text-[10px]">
+                        {lang === 'vi' ? 'Guardrails NoSQL' : 'NoSQL guardrails'}
+                    </div>
+                    <div className="mt-1 text-muted-foreground">{guardrailMessage}</div>
                 </div>
-                <div className="mt-1 text-muted-foreground">{guardrailMessage}</div>
-            </div>
+            )}
             {/* Visual MQL Builder Banner */}
-            <div className="h-14 border-b bg-card flex items-center px-4 justify-between shrink-0 mt-4">
+            <div className={`h-14 border-b bg-card flex items-center px-4 justify-between shrink-0 ${hasPersistentGuardrail ? 'mt-4' : ''}`}>
                 <div className="flex items-center gap-2">
                     <Database className="w-4 h-4 text-green-500" />
                     <span className="font-semibold text-sm">db.{nosqlActiveCollection}</span>
