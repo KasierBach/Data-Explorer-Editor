@@ -53,3 +53,39 @@ export interface QueryResult {
     totalCount?: number; // Total rows in table for pagination
     durationMs?: number;
 }
+
+export interface DashboardWidget {
+    id: string;
+    title: string;
+    chartType: string;
+    queryText?: string | null;
+    connectionId?: string | null;
+    database?: string | null;
+    columns: string[];
+    xAxis?: string | null;
+    yAxis: string[];
+    orderIndex: number;
+    config?: Record<string, any> | null;
+    dataSnapshot: Record<string, any>[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface DashboardEntity {
+    id: string;
+    name: string;
+    description?: string | null;
+    visibility: 'private' | 'team' | 'workspace';
+    connectionId?: string | null;
+    database?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    owner: {
+        id: string;
+        email: string;
+        firstName?: string | null;
+        lastName?: string | null;
+    };
+    isOwner: boolean;
+    widgets: DashboardWidget[];
+}

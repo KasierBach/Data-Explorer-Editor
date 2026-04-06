@@ -18,6 +18,7 @@ export interface TabSlice {
     reorderTabs: (fromIndex: number, toIndex: number) => void;
     openQueryTab: () => void;
     openInsightsTab: (connectionId: string, database?: string) => void;
+    openDashboardTab: (dashboardId: string, name?: string) => void;
     openVisualizeTab: () => void;
     openErdTab: (connectionId: string, database?: string) => void;
     closeAllTabs: () => void;
@@ -91,6 +92,20 @@ export const createTabSlice: StateCreator<TabSlice & ConnectionLookup, [], [], T
             title: `Insights: ${conn?.name || 'DB'}${database ? ` (${database})` : ''}`,
             type: 'insights',
             metadata: { connectionId, database },
+        };
+        return { tabs: [...state.tabs, newTab], activeTabId: id };
+    }),
+
+    openDashboardTab: (dashboardId, name) => set((state) => {
+        const id = `dashboard-${dashboardId}`;
+        const exists = state.tabs.find(t => t.id === id);
+        if (exists) return { activeTabId: id };
+
+        const newTab: Tab = {
+            id,
+            title: name ? `Dashboard: ${name}` : 'Dashboard',
+            type: 'dashboard',
+            metadata: { dashboardId },
         };
         return { tabs: [...state.tabs, newTab], activeTabId: id };
     }),

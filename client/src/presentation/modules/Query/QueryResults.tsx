@@ -5,7 +5,7 @@ import {
     TabsList,
     TabsTrigger
 } from "@/presentation/components/ui/tabs";
-import { Info, Table as TableIcon, Loader2, Play, GitBranch, X, Eraser } from 'lucide-react';
+import { Info, Table as TableIcon, Loader2, Play, GitBranch, X, Eraser, LayoutDashboard } from 'lucide-react';
 import type { QueryResult } from '@/core/domain/entities';
 import { ResultTable } from './ResultTable';
 import { QueryPlanVisualizer } from './QueryPlanVisualizer';
@@ -24,6 +24,7 @@ interface QueryResultsProps {
     explainPlan?: any;
     onClearResults?: () => void;
     onClose?: () => void;
+    onSaveToDashboard?: () => void;
 }
 
 export const QueryResults: React.FC<QueryResultsProps> = ({
@@ -36,7 +37,8 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
     onTabChange,
     explainPlan,
     onClearResults,
-    onClose
+    onClose,
+    onSaveToDashboard,
 }) => {
     const { lang } = useAppStore();
     const isMobile = useMediaQuery('(max-width: 768px)');
@@ -127,6 +129,15 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                             title={lang === 'vi' ? 'Xóa kết quả (Clear)' : 'Clear results'}
                         >
                             <Eraser className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                    {results && !error && onSaveToDashboard && (
+                        <button
+                            onClick={onSaveToDashboard}
+                            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
+                            title={lang === 'vi' ? 'Luu vao dashboard' : 'Save to dashboard'}
+                        >
+                            <LayoutDashboard className="w-3.5 h-3.5" />
                         </button>
                     )}
                     

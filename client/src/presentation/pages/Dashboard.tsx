@@ -5,11 +5,17 @@ import { Plus, Database, Search, Clock, FileText, BarChart3, ArrowLeft, Trash, L
 import { InsightsDashboard } from '../modules/Dashboard/InsightsDashboard';
 import { ConnectionService } from '@/core/services/ConnectionService';
 import { LanguageSwitcher } from '@/presentation/components/shared/LanguageSwitcher';
+import { useQuery } from '@tanstack/react-query';
+import { DashboardService } from '@/core/services/DashboardService';
 
 export const Dashboard: React.FC = () => {
-    const { connections, openQueryTab, setSidebarOpen, openConnectionDialog, activeConnectionId, removeConnection, setActiveConnectionId, lang } = useAppStore();
+    const { connections, openQueryTab, setSidebarOpen, openConnectionDialog, activeConnectionId, removeConnection, setActiveConnectionId, openDashboardTab, lang } = useAppStore();
     const [view, setView] = useState<'welcome' | 'insights'>('welcome');
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
+    const { data: dashboards = [] } = useQuery({
+        queryKey: ['dashboards'],
+        queryFn: () => DashboardService.getDashboards(),
+    });
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
@@ -221,6 +227,42 @@ export const Dashboard: React.FC = () => {
                                     : <>You can use <code className="bg-primary/10 px-1 rounded text-primary">Ctrl+N</code> to quickly open a new query tab from anywhere in the application.</>}
                             </p>
                         </div>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                        <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                        {lang === 'vi' ? 'Dashboards gần đây' : 'Recent Dashboards'}
+                    </h2>
+                    <div className="rounded-lg border bg-card">
+                        {dashboards.length > 0 ? (
+                            <div className="divide-y">
+                                {dashboards.slice(0, 6).map((dashboard) => (
+                                    <button
+                                        key={dashboard.id}
+                                        onClick={() => openDashboardTab(dashboard.id, dashboard.name)}
+                                        className="w-full text-left p-4 hover:bg-muted/40 transition-colors"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className="font-medium truncate">{dashboard.name}</div>
+                                                <div className="text-xs text-muted-foreground truncate">
+                                                    {dashboard.widgets.length} {dashboard.widgets.length === 1 ? 'widget' : 'widgets'} • {dashboard.visibility}
+                                                </div>
+                                            </div>
+                                            <div className="text-[10px] uppercase tracking-widest text-muted-foreground shrink-0">
+                                                {new Date(dashboard.updatedAt).toLocaleDateString()}
+                                            </div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="p-8 text-center text-muted-foreground">
+                                {lang === 'vi' ? 'Chưa có dashboard nào. Hãy lưu chart đầu tiên từ Query Results.' : 'No dashboards yet. Save your first chart from query results.'}
+                            </div>
+                        )}
                     </div>
                 </div>
 

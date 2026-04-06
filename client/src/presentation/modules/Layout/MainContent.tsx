@@ -5,6 +5,7 @@ import { QueryEditor } from '@/presentation/modules/Query/QueryEditor';
 import { TabsBar } from './TabsBar';
 import { Dashboard } from '@/presentation/pages/Dashboard';
 import { InsightsDashboard } from '@/presentation/modules/Dashboard/InsightsDashboard';
+import { SavedDashboardView } from '@/presentation/modules/Dashboard/SavedDashboardView';
 import { VisualizeWorkplace } from '@/presentation/modules/Visualization/VisualizeWorkplace';
 const ERDWorkspace = React.lazy(() => import('@/presentation/modules/Visualization/ERDWorkspace').then(m => ({ default: m.ERDWorkspace })));
 
@@ -33,6 +34,12 @@ export const MainContent: React.FC = () => {
                                     key={activeTab.id}
                                     connectionId={activeTab.metadata?.connectionId}
                                     database={activeTab.metadata?.database}
+                                />
+                            )}
+                            {activeTab.type === 'dashboard' && (
+                                <SavedDashboardView
+                                    key={activeTab.id}
+                                    dashboardId={activeTab.metadata?.dashboardId}
                                 />
                             )}
                             {activeTab.type === 'visualize' && (

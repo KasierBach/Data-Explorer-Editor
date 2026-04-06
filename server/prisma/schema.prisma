@@ -97,6 +97,7 @@ model User {
   connections Connection[]
   aiChats     AiChat[]
   savedQueries SavedQuery[]
+  dashboards  Dashboard[]
 }
 
 model AiChat {
@@ -160,4 +161,44 @@ model SavedQuery {
 
   @@index([userId, updatedAt])
   @@index([visibility, updatedAt])
+}
+
+model Dashboard {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  visibility   String   @default("private")
+  connectionId String?
+  database     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  widgets      DashboardWidget[]
+
+  @@index([userId, updatedAt])
+  @@index([visibility, updatedAt])
+}
+
+model DashboardWidget {
+  id           String   @id @default(uuid())
+  title        String
+  chartType    String
+  queryText    String?
+  connectionId String?
+  database     String?
+  columns      String[] @default([])
+  xAxis        String?
+  yAxis        String[] @default([])
+  orderIndex   Int      @default(0)
+  config       Json?
+  dataSnapshot Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  dashboardId  String
+  dashboard    Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+
+  @@index([dashboardId, orderIndex])
 }

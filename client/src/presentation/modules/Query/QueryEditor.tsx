@@ -33,6 +33,8 @@ import { ApiError } from '@/core/services/api.service';
 import { SavedQueryService } from '@/core/services/SavedQueryService';
 import { SaveQueryDialog, type SaveQueryFormValues } from './SaveQueryDialog';
 import { toast } from 'sonner';
+import { DashboardService } from '@/core/services/DashboardService';
+import { SaveToDashboardDialog, type SaveToDashboardFormValues } from '@/presentation/modules/Dashboard/SaveToDashboardDialog';
 
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const queryClient = useQueryClient();
@@ -75,13 +77,25 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         tags: '',
         description: '',
     });
+    const [isDashboardDialogOpen, setIsDashboardDialogOpen] = useState(false);
+    const [dashboardDialogInitialValues, setDashboardDialogInitialValues] = useState<SaveToDashboardFormValues>({
+        mode: 'new',
+        dashboardId: '',
+        dashboardName: '',
+        dashboardDescription: '',
+        visibility: 'private',
+        widgetTitle: '',
+        chartType: 'bar',
+        xAxis: '',
+        yAxis: [],
+    });
 
     const isFirstLoad = useRef(true);
     const editorRef = useRef<any>(null);
     const effectiveLimit = limit === 'all' ? undefined : Number.parseInt(limit, 10);
     const requestLimit = Number.isInteger(effectiveLimit) ? effectiveLimit : undefined;
 
-    const { saveQuery, openTab, addQueryHistory, savedQueries } = useAppStore();
+    const { saveQuery, openTab, addQueryHistory, savedQueries, openDashboardTab } = useAppStore();
     const currentSavedQuery = savedQueries.find((savedQuery) => savedQuery.id === currentSavedQueryId) || null;
 
     // Persist SQL query to store
@@ -136,6 +150,16 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         }
         return parts.join(' • ');
     }, [activeConnection, lang, limit]);
+    const resultColumns = React.useMemo(() => {
+        if (results?.columns?.length) return results.columns;
+        if (results?.rows?.length) return Object.keys(results.rows[0]);
+        return [];
+    }, [results]);
+    const resultNumericColumns = React.useMemo(() => {
+        if (!results?.rows?.length) return [];
+        const sample = results.rows[0];
+        return resultColumns.filter((column) => typeof sample?.[column] === 'number');
+    }, [results, resultColumns]);
 
     // Record history on success/error
     useEffect(() => {
@@ -323,6 +347,75 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         console.log("♻️ Triggering Hierarchy Refresh via QueryClient");
         await queryClient.resetQueries({ queryKey: ['hierarchy'] });
     };
+
+    const handleOpenDashboardDialog = useCallback(() => {
+        if (!results?.rows?.length) return;
+        const defaultName = currentSavedQuery?.name || tab?.title || (lang === 'vi' ? 'Query Widget' : 'Query Widget');
+        setDashboardDialogInitialValues({
+            mode: 'new',
+            dashboardId: '',
+            dashboardName: activeConnection?.name ? `${activeConnection.name} Dashboard` : 'New Dashboard',
+            dashboardDescription: '',
+            visibility: 'private',
+            widgetTitle: defaultName,
+            chartType: resultNumericColumns.length ? 'bar' : 'table',
+            xAxis: resultColumns[0] || '',
+            yAxis: resultNumericColumns.slice(0, 1),
+        });
+        setIsDashboardDialogOpen(true);
+    }, [results, currentSavedQuery?.name, tab?.title, lang, activeConnection?.name, resultColumns, resultNumericColumns]);
+
+    const handleSaveToDashboard = useCallback(async (values: SaveToDashboardFormValues) => {
+        if (!results) return;
+
+        let dashboardId = values.dashboardId;
+        let dashboardName = values.dashboardName;
+
+        if (values.mode === 'new') {
+            const dashboard = await DashboardService.createDashboard({
+                name: values.dashboardName,
+                description: values.dashboardDescription || undefined,
+                visibility: values.visibility,
+                connectionId: activeConnection?.id,
+                database: activeDatabase || activeConnection?.database || undefined,
+            });
+            dashboardId = dashboard.id;
+            dashboardName = dashboard.name;
+        }
+
+        const updatedDashboard = await DashboardService.addWidget(dashboardId, {
+            title: values.widgetTitle,
+            chartType: values.chartType,
+            queryText: executedQuery || query,
+            connectionId: activeConnection?.id,
+            database: activeDatabase || activeConnection?.database || undefined,
+            columns: resultColumns,
+            xAxis: values.chartType === 'table' ? undefined : values.xAxis,
+            yAxis: values.chartType === 'table' ? [] : values.yAxis,
+            config: {
+                source: 'query-editor',
+                savedQueryId: currentSavedQueryId || undefined,
+            },
+            dataSnapshot: (results.rows || []).slice(0, 200),
+        });
+
+        queryClient.invalidateQueries({ queryKey: ['dashboards'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard', dashboardId] });
+        openDashboardTab(updatedDashboard.id, dashboardName || updatedDashboard.name);
+        toast.success(lang === 'vi' ? 'Da luu widget vao dashboard' : 'Widget saved to dashboard');
+    }, [
+        results,
+        activeConnection?.id,
+        activeConnection?.database,
+        activeDatabase,
+        executedQuery,
+        query,
+        resultColumns,
+        currentSavedQueryId,
+        queryClient,
+        openDashboardTab,
+        lang,
+    ]);
 
     const isMobile = useMediaQuery('(max-width: 768px)');
     const isSmallMobile = useMediaQuery('(max-width: 480px)');
@@ -564,6 +657,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             explainPlan={explainPlan}
                             onClearResults={handleClearResults}
                             onClose={toggleResultPanel}
+                            onSaveToDashboard={results ? handleOpenDashboardDialog : undefined}
                         />
                     </div>
                 </div>
@@ -591,6 +685,14 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 initialValues={saveDialogInitialValues}
                 currentQuery={currentSavedQuery?.isOwner ? currentSavedQuery : null}
                 onSubmit={handleSaveDialogSubmit}
+            />
+            <SaveToDashboardDialog
+                open={isDashboardDialogOpen}
+                onOpenChange={setIsDashboardDialogOpen}
+                columns={resultColumns}
+                numericColumns={resultNumericColumns}
+                initialValues={dashboardDialogInitialValues}
+                onSubmit={handleSaveToDashboard}
             />
         </>
     );
