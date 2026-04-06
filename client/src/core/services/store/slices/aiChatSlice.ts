@@ -1,12 +1,22 @@
 import type { StateCreator } from 'zustand';
 import { AiChatService } from '../../AiChatService';
 
+export interface AiRecommendation {
+    type: 'query_fix' | 'index_suggestion' | 'schema_suggestion' | 'chart_suggestion';
+    title: string;
+    summary: string;
+    sql?: string;
+    chartType?: string;
+    fields?: string[];
+}
+
 export interface AiMessage {
     id: string;
     role: 'user' | 'ai';
     content: string;
     sql?: string;
     explanation?: string;
+    recommendations?: AiRecommendation[];
     modelInfo?: {
         provider?: string;
         model?: string;

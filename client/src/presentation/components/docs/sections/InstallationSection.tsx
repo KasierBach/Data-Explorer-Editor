@@ -1,149 +1,153 @@
-import { Cpu, Layout, Globe, Terminal, Box } from 'lucide-react';
-import { DocPageLayout, DocSection, Prose, StepBlock, CodeBlock, CodeComment, CodeLine, CodeWarning } from '../primitives';
+import { Terminal, Box, Globe, Database } from 'lucide-react';
+import { DocPageLayout, DocSection, Prose, StepBlock, CodeBlock, CodeComment, CodeLine, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
 export function InstallationSection({ lang }: Props) {
     const t = lang === 'vi';
+
     return (
         <DocPageLayout
-            title={t ? 'Hướng dẫn Cài đặt & Triển khai' : 'Installation & Deployment Guide'}
+            title={t ? 'Cài đặt & chạy local' : 'Installation & local setup'}
             subtitle={t
-                ? 'Quy trình chuẩn để thiết lập Data Explorer từ môi trường phát triển (Development) đến sẵn sàng vận hành (Production).'
-                : 'Standard process for setting up Data Explorer from development to production-ready environments.'}
+                ? 'Thiết lập Data Explorer đúng với repo hiện tại: Prisma sync bằng db push, backend NestJS, frontend Vite, và các biến môi trường cần thiết.'
+                : 'Set up Data Explorer the way the current repo actually works: Prisma sync via db push, NestJS backend, Vite frontend, and the required environment variables.'}
         >
             <div className="grid md:grid-cols-2 gap-4 mb-12">
                 <div className="p-6 border rounded-3xl bg-muted/20">
-                    <h4 className="font-bold flex items-center gap-2 mb-2"><Terminal className="w-4 h-4 text-primary" /> {t ? 'Phương pháp Git' : 'Git-based Setup'}</h4>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{t ? 'Phù hợp cho lập trình viên muốn tùy chỉnh mã nguồn và đóng góp tính năng mới.' : 'Ideal for developers looking to customize source code and contribute new features.'}</p>
+                    <h4 className="font-bold flex items-center gap-2 mb-2"><Terminal className="w-4 h-4 text-primary" /> {t ? 'Dev setup khuyên dùng' : 'Recommended dev setup'}</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                        {t
+                            ? 'Phù hợp nhất cho phát triển hằng ngày: chạy app metadata database, backend, và frontend riêng để debug nhanh hơn.'
+                            : 'Best for day-to-day development: run the app metadata database, backend, and frontend separately for faster debugging.'}
+                    </p>
                 </div>
                 <div className="p-6 border rounded-3xl bg-primary/5 border-primary/20">
-                    <h4 className="font-bold flex items-center gap-2 mb-2"><Box className="w-4 h-4 text-primary" /> {t ? 'Phương pháp Docker' : 'Docker-first Setup'}</h4>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{t ? 'Cách nhanh nhất để chạy ứng dụng trong môi trường cô lập, không lo xung đột dependency.' : 'The fastest way to run the app in an isolated environment without dependency conflicts.'}</p>
+                    <h4 className="font-bold flex items-center gap-2 mb-2"><Box className="w-4 h-4 text-primary" /> {t ? 'Docker là tùy chọn' : 'Docker is optional'}</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                        {t
+                            ? 'Docker hữu ích khi bạn muốn có PostgreSQL local ổn định cho metadata app. Với repo hiện tại, manual setup vẫn là đường dễ nhất.'
+                            : 'Docker is useful if you want a stable local PostgreSQL instance for app metadata. For the current repo, manual setup is still the simplest path.'}
+                    </p>
                 </div>
             </div>
 
-            <DocSection title={t ? 'Cài đặt Thủ công (Development)' : 'Manual Setup (Development)'}>
-                <StepBlock step={1} title={t ? 'Tải mã nguồn & Cài đặt Dependency' : 'Clone & Install'}>
+            <DocSection title={t ? 'Local setup chuẩn' : 'Standard local setup'}>
+                <StepBlock step={1} title={t ? 'Clone repo và cài dependencies' : 'Clone the repo and install dependencies'}>
                     <CodeBlock title="Terminal">
                         <CodeLine>git clone https://github.com/KasierBach/Data-Explorer-Editor.git</CodeLine>
                         <CodeLine>cd Data-Explorer-Editor</CodeLine>
-                        <p className="mt-3" />
-                        <CodeComment>{t ? 'Cài đặt song song cho cả Client & Server' : 'Parallel installation for both Client & Server'}</CodeComment>
-                        <CodeLine>cd server && npm install && cd ../client && npm install</CodeLine>
+                        <CodeLine>npm install</CodeLine>
                     </CodeBlock>
                 </StepBlock>
 
-                <StepBlock step={2} title={t ? 'Cấu hình Biến môi trường (.env)' : 'Configure Environment (.env)'}>
-                    <Prose>{t
-                        ? 'Tạo file .env tại thư mục server/. Đây là bước quan trọng nhất để kích hoạt các dịch vụ AI và Database.'
-                        : 'Create a .env file in the server/ directory. This is the most crucial step to activate AI services and databases.'}</Prose>
+                <StepBlock step={2} title={t ? 'Tạo file server/.env' : 'Create server/.env'}>
+                    <Prose>
+                        {t
+                            ? 'Local run cần app metadata database, JWT secret đủ mạnh, encryption key đúng 32 ký tự, và FRONTEND_URL. OAuth và AI provider là tùy chọn.'
+                            : 'A local run needs an app metadata database, a strong JWT secret, an encryption key with exactly 32 characters, and FRONTEND_URL. OAuth and AI providers are optional.'}
+                    </Prose>
                     <CodeBlock title="server/.env">
-                        <CodeWarning># Google AI API Key</CodeWarning>
-                        <CodeLine>GEMINI_API_KEY=AIzaSy...</CodeLine>
-                        <p className="mt-2" />
-                        <CodeWarning># Primary Postgres for App Data</CodeWarning>
-                        <CodeLine>DATABASE_URL="postgresql://user:pass@host:5432/data_explorer_meta"</CodeLine>
-                        <p className="mt-2" />
-                        <CodeWarning># Security Keys</CodeWarning>
-                        <CodeLine>JWT_SECRET=any_long_random_string</CodeLine>
-                        <CodeLine>ENCRYPTION_KEY=exactly_32_chars_long_string_123</CodeLine>
+                        <CodeComment>{t ? 'Bắt buộc' : 'Required'}</CodeComment>
+                        <CodeLine>DATABASE_URL=postgresql://postgres:postgres@localhost:5432/data_explorer_dev?schema=public</CodeLine>
+                        <CodeLine>JWT_SECRET=replace-with-a-strong-secret-at-least-32-chars</CodeLine>
+                        <CodeLine>ENCRYPTION_KEY=replace-with-exactly-32-characters</CodeLine>
+                        <CodeLine>FRONTEND_URL=http://localhost:5173</CodeLine>
+                        <p className="mt-3" />
+                        <CodeComment>{t ? 'Tùy chọn cho compatibility / local rules' : 'Optional compatibility / local rules'}</CodeComment>
+                        <CodeLine>LEGACY_ENCRYPTION_KEYS=</CodeLine>
+                        <CodeLine>ALLOW_INTERNAL_IPS=false</CodeLine>
+                        <p className="mt-3" />
+                        <CodeComment>{t ? 'Tùy chọn cho AI routing' : 'Optional for AI routing'}</CodeComment>
+                        <CodeLine>GEMINI_API_KEY=...</CodeLine>
+                        <CodeLine>CEREBRAS_API_KEY=...</CodeLine>
+                        <CodeLine>CEREBRAS_BASE_URL=https://api.cerebras.ai/v1</CodeLine>
+                        <CodeLine>CEREBRAS_CHAT_MODEL=llama3.1-8b</CodeLine>
+                        <CodeLine>OPENROUTER_API_KEY=...</CodeLine>
+                        <CodeLine>OPENROUTER_BASE_URL=https://openrouter.ai/api/v1</CodeLine>
+                        <CodeLine>OPENROUTER_CHAT_MODEL=openrouter/auto</CodeLine>
                     </CodeBlock>
                 </StepBlock>
 
-                <StepBlock step={3} title={t ? 'Đồng bộ Schema & Khởi động' : 'Sync Schema & Launch'}>
+                <StepBlock step={3} title={t ? 'Đồng bộ schema app' : 'Sync the app schema'}>
+                    <Prose>
+                        {t
+                            ? 'Repo hiện tại dùng Prisma `db push` cho metadata schema. Đây cũng là lệnh nên dùng trên production build hiện nay.'
+                            : 'The current repo uses Prisma `db push` for the metadata schema. This is also the command you should use in the current production build flow.'}
+                    </Prose>
                     <CodeBlock title="Terminal">
-                        <CodeComment>{t ? 'Terminal 1: Backend (NestJS)' : 'Terminal 1: Backend (NestJS)'}</CodeComment>
                         <CodeLine>cd server</CodeLine>
                         <CodeLine>npx prisma db push</CodeLine>
+                    </CodeBlock>
+                </StepBlock>
+
+                <StepBlock step={4} title={t ? 'Chạy backend và frontend' : 'Run the backend and frontend'}>
+                    <CodeBlock title="Backend">
+                        <CodeLine>cd server</CodeLine>
                         <CodeLine>npm run start:dev</CodeLine>
-                        <p className="mt-3" />
-                        <CodeComment>{t ? 'Terminal 2: Frontend (Vite)' : 'Terminal 2: Frontend (Vite)'}</CodeComment>
+                    </CodeBlock>
+                    <div className="h-4" />
+                    <CodeBlock title="Frontend">
                         <CodeLine>cd client</CodeLine>
                         <CodeLine>npm run dev</CodeLine>
                     </CodeBlock>
                 </StepBlock>
             </DocSection>
 
-            <DocSection title={t ? 'Triển khai Docker Compose (Production & Testing)' : 'Docker Compose Deployment'}>
+            <DocSection title={t ? 'Chạy từ root repo' : 'Run from the repo root'}>
                 <Prose>
                     {t
-                        ? 'Để triển khai một bản stack hoàn chỉnh bao gồm App Server và Database PostgreSQL nội bộ một cách nhanh chóng, hãy sử dụng quy trình Docker:'
-                        : 'To deploy a complete stack including the App Server and internal PostgreSQL database quickly, follow the Docker workflow:'}
+                        ? 'Nếu bạn muốn bật toàn bộ stack development bằng một lệnh, root repo đã có script `npm run dev`.'
+                        : 'If you want to boot the whole development stack with one command, the repo root already provides `npm run dev`.'}
                 </Prose>
-
-                <StepBlock step={1} title={t ? 'Chuẩn bị Biến môi trường' : 'Prepare Environment Variables'}>
-                    <Prose>{t
-                        ? 'Tạo file server/.env và điền các API Key (GEMINI_API_KEY, v.v). Docker Compose đã được cấu hình mặc định để đọc tệp này thông qua thuộc tính env_file.'
-                        : 'Create a server/.env file and fill in your API Keys (GEMINI_API_KEY, etc). Docker Compose is pre-configured to read this file via the env_file property.'}</Prose>
-                </StepBlock>
-
-                <StepBlock step={2} title={t ? 'Khởi động Container' : 'Launch Containers'}>
-                    <CodeBlock title="Terminal">
-                        <CodeComment>{t ? 'Tự động build và chạy nền toàn bộ stack' : 'Auto build and run the entire stack in background'}</CodeComment>
-                        <CodeLine>docker-compose up -d --build</CodeLine>
-                        <p className="mt-2" />
-                        <CodeComment>{t ? 'Xem log để đảm bảo hệ thống đã sẵn sàng' : 'Check logs to ensure systems are ready'}</CodeComment>
-                        <CodeLine>docker-compose logs -f</CodeLine>
-                    </CodeBlock>
-                </StepBlock>
-
-                <StepBlock step={3} title={t ? 'Thông tin Port & Volume' : 'Ports & Persistence'}>
-                    <div className="grid sm:grid-cols-2 gap-3 mt-4">
-                        <div className="p-3 border rounded-xl bg-blue-500/5 text-xs">
-                            <span className="font-bold text-blue-600 block mb-1">Ports:</span>
-                            <ul className="space-y-1 list-disc list-inside opacity-70">
-                                <li>Frontend: 80</li>
-                                <li>Backend: 3001</li>
-                                <li>Postgres: 5435</li>
-                            </ul>
-                        </div>
-                        <div className="p-3 border rounded-xl bg-orange-500/5 text-xs">
-                            <span className="font-bold text-orange-600 block mb-1">Volumes:</span>
-                            <p className="opacity-70 leading-relaxed">
-                                {t ? 'Dữ liệu SQLite/Prisma được lưu trong pgdata volume để tránh mất dữ liệu khi restart.' : 'Prisma/Postgres data is persistent in the pgdata volume.'}
-                            </p>
-                        </div>
-                    </div>
-                </StepBlock>
+                <CodeBlock title="Terminal">
+                    <CodeLine>npm run dev</CodeLine>
+                </CodeBlock>
             </DocSection>
 
-            <div className="mt-12 grid md:grid-cols-3 gap-6">
-                <div className="p-5 border rounded-2xl bg-card border-l-4 border-l-blue-500">
-                    <div className="flex items-center gap-2 mb-2 font-bold text-sm">
-                        <Layout className="w-4 h-4 text-blue-500" /> UI Access
-                    </div>
-                    <p className="text-[11px] text-muted-foreground font-mono">http://localhost:5173</p>
-                </div>
-                <div className="p-5 border rounded-2xl bg-card border-l-4 border-l-emerald-500">
-                    <div className="flex items-center gap-2 mb-2 font-bold text-sm">
-                        <Cpu className="w-4 h-4 text-emerald-500" /> API Access
-                    </div>
-                    <p className="text-[11px] text-muted-foreground font-mono">http://localhost:3000/api</p>
-                </div>
-                <div className="p-5 border rounded-2xl bg-card border-l-4 border-l-indigo-500">
-                    <div className="flex items-center gap-2 mb-2 font-bold text-sm">
-                        <Globe className="w-4 h-4 text-indigo-500" /> Health Check
-                    </div>
-                    <p className="text-[11px] text-muted-foreground font-mono">http://localhost:3000/health</p>
-                </div>
-            </div>
+            <DocSection title={t ? 'Docker notes' : 'Docker notes'}>
+                <Prose>
+                    {t
+                        ? 'Docker phù hợp khi bạn muốn metadata database cục bộ ổn định hoặc không muốn cài PostgreSQL trực tiếp trên máy. Với code hiện tại, đường manual setup + `prisma db push` vẫn là lối dev đơn giản nhất.'
+                        : 'Docker is a good fit if you want a stable local metadata database or do not want to install PostgreSQL directly on your machine. With the current codebase, manual setup + `prisma db push` is still the easiest development path.'}
+                </Prose>
+                <CodeBlock title="Docker">
+                    <CodeLine>docker-compose up --build -d</CodeLine>
+                </CodeBlock>
+            </DocSection>
 
-            <DocSection title={t ? 'Checklist Triển khai Production' : 'Production Hardening Checklist'}>
-                <div className="grid sm:grid-cols-2 gap-4 mt-6">
-                    {[
-                        { t: t ? 'SSL/TLS Required' : 'SSL/TLS Required', d: t ? 'Luôn chạy đằng sau Reverse Proxy (Nginx/Traefik) với HTTPS.' : 'Always run behind a Reverse Proxy (Nginx/Traefik) with HTTPS.' },
-                        { t: t ? 'CORS Strict' : 'Strict CORS', d: t ? 'Chỉ cho phép domain frontend của bạn truy cập vào API backend.' : 'Only allow your frontend domain to access the backend API.' },
-                        { t: t ? 'Database Backup' : 'Database Backup', d: t ? 'Cấu hình auto-backup cho database metadata (data_explorer_meta).' : 'Configure auto-backups for the metadata database (data_explorer_meta).' },
-                        { t: t ? 'Rate Limiting' : 'Rate Limiting', d: t ? 'Giới hạn số lượng request tới discovery/ai endpoints để tránh tốn phí Gemini.' : 'Limit requests to discovery/ai endpoints to avoid excessive Gemini costs.' },
-                    ].map((item, i) => (
-                        <div key={i} className="p-4 border rounded-xl bg-orange-500/5 border-orange-500/10">
-                            <h6 className="font-bold text-xs mb-1 text-orange-600">{item.t}</h6>
-                            <p className="text-[11px] text-muted-foreground leading-relaxed">{item.d}</p>
-                        </div>
-                    ))}
+            <DocSection title={t ? 'Các địa chỉ local quan trọng' : 'Important local URLs'}>
+                <div className="grid md:grid-cols-3 gap-4">
+                    <div className="rounded-2xl border border-border/50 bg-card/40 p-4">
+                        <div className="flex items-center gap-2 text-sm font-bold"><Globe className="w-4 h-4 text-blue-500" />Frontend</div>
+                        <div className="mt-2 text-xs font-mono text-muted-foreground">http://localhost:5173</div>
+                    </div>
+                    <div className="rounded-2xl border border-border/50 bg-card/40 p-4">
+                        <div className="flex items-center gap-2 text-sm font-bold"><Terminal className="w-4 h-4 text-emerald-500" />API</div>
+                        <div className="mt-2 text-xs font-mono text-muted-foreground">http://localhost:3001/api</div>
+                    </div>
+                    <div className="rounded-2xl border border-border/50 bg-card/40 p-4">
+                        <div className="flex items-center gap-2 text-sm font-bold"><Database className="w-4 h-4 text-amber-500" />Health</div>
+                        <div className="mt-2 text-xs font-mono text-muted-foreground">http://localhost:3001/api/health</div>
+                    </div>
                 </div>
             </DocSection>
+
+            <Callout type="warning">
+                <p className="text-sm">
+                    {t
+                        ? 'Nếu backend không khởi động được sau khi sửa env, hãy kiểm tra `JWT_SECRET` và `ENCRYPTION_KEY` trước. Backend hiện fail closed nếu secret yếu hoặc sai format. Nếu bạn đang dùng DB cloud, hãy nhớ local/network có thể chặn các cổng database như 5432, 3306 hoặc 27017.'
+                        : 'If the backend refuses to start after env changes, check `JWT_SECRET` and `ENCRYPTION_KEY` first. The backend now fails closed when secrets are weak or wrongly formatted. If you use a cloud database, remember that local networks can block database ports such as 5432, 3306, or 27017.'}
+                </p>
+            </Callout>
+
+            <Callout type="info">
+                <p className="text-sm">
+                    {t
+                        ? 'Production hiện nên build backend bằng `npx prisma db push && npm run build` thay vì `prisma migrate deploy`, vì migration history hiện tại của repo chưa sẵn sàng cho PostgreSQL deploy flow chuẩn.'
+                        : 'Production should currently build the backend with `npx prisma db push && npm run build` instead of `prisma migrate deploy`, because the repo’s migration history is not yet aligned with a clean PostgreSQL deploy flow.'}
+                </p>
+            </Callout>
         </DocPageLayout>
     );
 }

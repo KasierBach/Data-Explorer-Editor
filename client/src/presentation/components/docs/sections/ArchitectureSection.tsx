@@ -71,8 +71,8 @@ export function ArchitectureSection({ lang }: Props) {
                             color: "bg-emerald-500",
                             title: t ? "Chi tiết Triển khai (Details)" : "Implementation Details",
                             details: t
-                                ? "Nơi các công nghệ cụ thể 'cắm' vào hệ thống. Bao gồm PostgreSQL Drivers, Gemini AI API, và các Interceptor của NestJS. Nếu chúng ta muốn đổi từ Postgres sang MongoDB, chỉ cần viết một Adapter mới ở lớp này mà không chạm vào Domain Core."
-                                : "Where specific technologies 'plug' into the system. Includes PostgreSQL Drivers, Gemini AI API, and NestJS Interceptors. If we want to switch from Postgres to MongoDB, we only need to write a new Adapter in this layer without touching the Domain Core."
+                                ? "Nơi các công nghệ cụ thể 'cắm' vào hệ thống. Bao gồm PostgreSQL/MySQL/MSSQL/MongoDB drivers, AI provider runners, Prisma, và các interceptor của NestJS. Việc thêm lane AI mới hay engine mới chủ yếu diễn ra ở lớp này mà không làm vỡ Domain Core."
+                                : "Where specific technologies 'plug' into the system. This includes PostgreSQL/MySQL/MSSQL/MongoDB drivers, AI provider runners, Prisma, and NestJS interceptors. Adding a new AI lane or a new engine mostly happens here without breaking the Domain Core."
                         }
                     ].map((item, i) => (
                         <div key={i} className="flex gap-6 group">
@@ -136,8 +136,8 @@ export function ArchitectureSection({ lang }: Props) {
                 <Callout type="info">
                     <p className="text-xs italic">
                         {t
-                            ? '"Strategy Pattern cho phép chúng tôi thêm hỗ trợ cho Oracle hay ClickHouse chỉ trong vài giờ bằng cách tạo adapter mới mà không cần chạm vào logic giao diện."'
-                            : '"The Strategy Pattern allows us to add support for Oracle or ClickHouse in hours by creating a new adapter without touching the UI logic."'}
+                            ? '"Strategy Pattern cho phép chúng tôi mở rộng thêm MongoDB, một dialect SQL khác, hoặc một AI execution lane mới mà không cần viết lại toàn bộ UI."'
+                            : '"The Strategy Pattern lets us extend the product with MongoDB, another SQL dialect, or a new AI execution lane without rewriting the whole UI."'}
                     </p>
                 </Callout>
             </DocSection>
@@ -178,15 +178,20 @@ export function ArchitectureSection({ lang }: Props) {
                 <CodeBlock title="Directory Tree">
                     <CodeLine>server/</CodeLine>
                     <CodeLine> ├── src/</CodeLine>
-                    <CodeLine> │    ├── auth/           # {t ? 'Xác thực & Phân quyền' : 'Auth & RBAC'}</CodeLine>
-                    <CodeLine> │    ├── connections/    # {t ? 'Quản lý DB Connections' : 'DB Connection Management'}</CodeLine>
-                    <CodeLine> │    ├── strategies/     # {t ? 'Cài đặt Database Engines' : 'DB Engine Implementations'}</CodeLine>
-                    <CodeLine> │    └── metadata/       # {t ? 'Xử lý lược đồ AI' : 'AI Schema Processing'}</CodeLine>
+                    <CodeLine> │    ├── auth/           # {t ? 'Auth, JWT, OAuth, session flows' : 'Auth, JWT, OAuth, session flows'}</CodeLine>
+                    <CodeLine> │    ├── connections/    # {t ? 'Connection records + safety policies' : 'Connection records + safety policies'}</CodeLine>
+                    <CodeLine> │    ├── query/          # {t ? 'SQL execution và guardrails' : 'SQL execution and guardrails'}</CodeLine>
+                    <CodeLine> │    ├── ai/             # {t ? 'AI routing, prompts, provider runners' : 'AI routing, prompts, provider runners'}</CodeLine>
+                    <CodeLine> │    ├── saved-queries/  # {t ? 'Shared saved queries' : 'Shared saved queries'}</CodeLine>
+                    <CodeLine> │    ├── dashboards/     # {t ? 'Dashboards và widgets' : 'Dashboards and widgets'}</CodeLine>
+                    <CodeLine> │    ├── database-strategies/ # {t ? 'Engine-specific DB strategies' : 'Engine-specific DB strategies'}</CodeLine>
+                    <CodeLine> │    └── metadata/       # {t ? 'Schema/context builders' : 'Schema/context builders'}</CodeLine>
                     <CodeLine>client/</CodeLine>
                     <CodeLine> ├── src/</CodeLine>
-                    <CodeLine> │    ├── core/           # {t ? 'Logic nghiệp vụ (Domain)' : 'Business Logic (Domain)'}</CodeLine>
-                    <CodeLine> │    ├── presentation/   # {t ? 'Giao diện hạt nhân (Atom UI)' : 'Atomic UI Components'}</CodeLine>
-                    <CodeLine> │    └── modules/        # {t ? 'Tính năng (Editor, Charts, ERD)' : 'Feature Modules (Editor, Charts, ERD)'}</CodeLine>
+                    <CodeLine> │    ├── core/           # {t ? 'Adapters, domain entities, app services' : 'Adapters, domain entities, app services'}</CodeLine>
+                    <CodeLine> │    ├── infrastructure/ # {t ? 'Infra glue cho client' : 'Client-side infrastructure glue'}</CodeLine>
+                    <CodeLine> │    ├── presentation/   # {t ? 'Pages, modules, docs, UI shell' : 'Pages, modules, docs, UI shell'}</CodeLine>
+                    <CodeLine> │    └── test/           # {t ? 'Frontend test setup' : 'Frontend test setup'}</CodeLine>
                 </CodeBlock>
             </DocSection>
         </DocPageLayout>

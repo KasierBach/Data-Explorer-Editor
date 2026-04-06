@@ -1,4 +1,4 @@
-import { Cpu, Eye } from 'lucide-react';
+import { Cpu, Route, Shield, Sparkles } from 'lucide-react';
 import { DocPageLayout, DocSection, Prose, CodeBlock, CodeComment, CodeLine, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
@@ -7,36 +7,40 @@ export function SqlGenerationSection({ lang }: Props) {
     const t = lang === 'vi';
     return (
         <DocPageLayout
-            title={t ? 'Tạo mã SQL bằng AI' : 'AI SQL Generation'}
+            title={t ? 'AI SQL generation' : 'AI SQL generation'}
             subtitle={t
-                ? 'Data Explorer tích hợp Google Gemini để chuyển đổi ngôn ngữ tự nhiên thành truy vấn SQL tối ưu, dựa trên ngữ cảnh thực tế của database.'
-                : 'Data Explorer integrates Google Gemini to convert natural language into optimized SQL queries, based on the actual context of your database.'}
+                ? 'Cách Data Explorer dùng schema context, AI routing, và typed recommendations để biến yêu cầu tự nhiên thành SQL có thể dùng thật.'
+                : 'How Data Explorer uses schema context, AI routing, and typed recommendations to turn natural-language requests into usable SQL.'}
             gradient
         >
-            {/* How It Works */}
-            <DocSection title={t ? 'Kỹ thuật Độ chính xác cao' : 'High-Precision Engineering'}>
-                <Prose>{t
-                    ? 'Khác với các công cụ AI SQL thông thường chỉ dựa vào prompt của người dùng, Data Explorer thực hiện một quy trình 3 bước để đảm bảo SQL được tạo ra luôn chính xác và tối ưu:'
-                    : 'Unlike typical AI SQL tools that rely solely on user prompts, Data Explorer performs a 3-step process to ensure generated SQL is always accurate and optimized:'}</Prose>
+            <DocSection title={t ? 'Luồng tạo SQL hiện tại' : 'Current SQL generation flow'}>
+                <Prose>
+                    {t
+                        ? 'Data Explorer không còn là một luồng Gemini-only đơn giản. App hiện xây SQL flow bằng ba lớp: lấy schema context từ connection đang active, chọn provider bằng AI router, rồi chuẩn hóa output để editor và action cards dùng được.'
+                        : 'Data Explorer is no longer a simple Gemini-only flow. The app now builds SQL generation in three layers: capture schema context from the active connection, route the request through the AI router, then normalize the output so the editor and action cards can use it safely.'}
+                </Prose>
                 <div className="space-y-6">
                     {[
                         {
-                            step: '01', title: t ? 'Phân tích Lược đồ sâu' : 'Deep Schema Analysis',
+                            step: '01',
+                            title: t ? 'Schema-aware context' : 'Schema-aware context',
                             desc: t
-                                ? 'Khi bạn gửi yêu cầu AI, hệ thống tự động trích xuất metadata từ database: danh sách bảng, tên cột, kiểu dữ liệu, ràng buộc khóa ngoại (foreign keys), và thậm cả check constraints. Thông tin này được nén thành định dạng token-efficient trước khi gửi đến Gemini.'
-                                : 'When you send an AI request, the system automatically extracts metadata from the database: table list, column names, data types, foreign key constraints, and even check constraints. This information is compressed into a token-efficient format before sending to Gemini.'
+                                ? 'Backend trích xuất metadata từ connection hiện tại: tables, columns, relationships, và một phần query context. AI không bị ép đoán tên bảng/cột từ khoảng không.'
+                                : 'The backend extracts metadata from the active connection: tables, columns, relationships, and part of the query context. The AI is not forced to guess table and column names from thin air.'
                         },
                         {
-                            step: '02', title: t ? 'Contextual Prompting' : 'Contextual Prompting',
+                            step: '02',
+                            title: t ? 'Provider-aware routing' : 'Provider-aware routing',
                             desc: t
-                                ? 'Metadata thu gọn được đưa vào system prompt cùng với hướng dẫn về SQL dialect cụ thể (PostgreSQL, MySQL, etc.). Nhờ vậy, AI không bao giờ "ảo tưởng" (hallucinate) về tên bảng hoặc cột không tồn tại. Nó biết chính xác bạn có những gì trong database.'
-                                : 'Condensed metadata is injected into the system prompt along with specific SQL dialect instructions (PostgreSQL, MySQL, etc.). This ensures the AI never "hallucinates" non-existent table or column names. It knows exactly what\'s in your database.'
+                                ? 'Routing mode trong UI quyết định lane nào được ưu tiên. Prompt nhẹ có thể đi qua Cerebras hoặc OpenRouter trước; image, vision, hoặc task khó hơn có thể được đẩy sang Gemini.'
+                                : 'The routing mode in the UI decides which lane is preferred. Light prompts can go through Cerebras or OpenRouter first; images, vision, or harder tasks can be escalated to Gemini.'
                         },
                         {
-                            step: '03', title: 'SSE Streaming',
+                            step: '03',
+                            title: t ? 'Structured output + action cards' : 'Structured output + action cards',
                             desc: t
-                                ? 'SQL được tạo ra hiển thị ngay lập tức trong Monaco Editor theo phong cách "typing" — như thể bạn đang xem AI gõ trực tiếp. Kỹ thuật Server-Sent Events (SSE) được sử dụng để truyền từng token, giúp bạn thấy kết quả trong vài trăm milliseconds thay vì phải đợi toàn bộ response.'
-                                : 'Generated SQL appears instantly in the Monaco Editor in a "typing" style — as if watching the AI type live. Server-Sent Events (SSE) technique is used to stream each token, letting you see results within a few hundred milliseconds instead of waiting for the complete response.'
+                                ? 'Nếu task là SQL/query work, backend sẽ cố trả về SQL rõ ràng, explanation, và recommendation cards như `query_fix`, `index_suggestion`, `schema_suggestion`, `chart_suggestion`.'
+                                : 'If the task is SQL/query work, the backend tries to return clear SQL, an explanation, and recommendation cards such as `query_fix`, `index_suggestion`, `schema_suggestion`, and `chart_suggestion`.'
                         },
                     ].map((item, i) => (
                         <div key={i} className="flex gap-6 items-start p-6 border rounded-2xl bg-muted/10">
@@ -50,79 +54,84 @@ export function SqlGenerationSection({ lang }: Props) {
                 </div>
             </DocSection>
 
-            {/* Prompt Examples */}
-            <DocSection title={t ? 'Ví dụ Prompt hiệu quả' : 'Effective Prompt Examples'}>
-                <Prose>{t
-                    ? 'Dưới đây là một số ví dụ về cách viết prompt để nhận được SQL chất lượng cao nhất từ AI:'
-                    : 'Here are examples of how to write prompts to get the highest quality SQL from AI:'}</Prose>
-
-                <div className="space-y-6">
-                    <div className="space-y-3">
-                        <h4 className="font-bold text-sm text-emerald-600 uppercase tracking-widest">{t ? '✅ Prompt tốt' : '✅ Good Prompts'}</h4>
-                        <CodeBlock title={t ? 'Ví dụ 1: Truy vấn phân tích' : 'Example 1: Analytical Query'}>
-                            <CodeComment>{t ? 'Prompt: "Liệt kê top 10 khách hàng chi tiêu nhiều nhất trong Q4 2024, kèm số đơn hàng và tổng doanh thu"' : 'Prompt: "List top 10 customers by spending in Q4 2024, with order count and total revenue"'}</CodeComment>
-                            <p className="mt-3" />
-                            <CodeLine>{'SELECT'}</CodeLine>
-                            <CodeLine>{'  u.name AS customer_name,'}</CodeLine>
-                            <CodeLine>{'  COUNT(o.id) AS total_orders,'}</CodeLine>
-                            <CodeLine>{'  SUM(o.total_amount) AS total_revenue'}</CodeLine>
-                            <CodeLine>{'FROM public.users u'}</CodeLine>
-                            <CodeLine>{'JOIN public.orders o ON u.id = o.user_id'}</CodeLine>
-                            <CodeLine>{"WHERE o.status = 'completed'"}</CodeLine>
-                            <CodeLine>{"  AND o.created_at BETWEEN '2024-10-01' AND '2024-12-31'"}</CodeLine>
-                            <CodeLine>{'GROUP BY u.id, u.name'}</CodeLine>
-                            <CodeLine>{'ORDER BY total_revenue DESC'}</CodeLine>
-                            <CodeLine>{'LIMIT 10;'}</CodeLine>
-                        </CodeBlock>
-                        <CodeBlock title={t ? 'Ví dụ 2: Tạo bảng' : 'Example 2: Create Table'}>
-                            <CodeComment>{t ? 'Prompt: "Tạo bảng products với các trường: id (UUID), name, price (decimal), category, inventory count, và timestamps"' : 'Prompt: "Create products table with: id (UUID), name, price (decimal), category, inventory count, and timestamps"'}</CodeComment>
-                            <p className="mt-3" />
-                            <CodeLine>{'CREATE TABLE public.products ('}</CodeLine>
-                            <CodeLine>{'  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),'}</CodeLine>
-                            <CodeLine>{'  name VARCHAR(255) NOT NULL,'}</CodeLine>
-                            <CodeLine>{'  price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),'}</CodeLine>
-                            <CodeLine>{'  category VARCHAR(100),'}</CodeLine>
-                            <CodeLine>{'  inventory_count INTEGER NOT NULL DEFAULT 0,'}</CodeLine>
-                            <CodeLine>{'  created_at TIMESTAMPTZ DEFAULT NOW(),'}</CodeLine>
-                            <CodeLine>{'  updated_at TIMESTAMPTZ DEFAULT NOW()'}</CodeLine>
-                            <CodeLine>{');'}</CodeLine>
-                        </CodeBlock>
-                    </div>
-
-                    <Callout type="tip">
-                        <p className="font-bold">{t ? '💡 Mẹo viết Prompt hiệu quả' : '💡 Tips for Effective Prompts'}</p>
-                        <ul className="mt-2 space-y-1 text-sm text-muted-foreground list-disc pl-4">
-                            <li>{t ? 'Luôn nêu rõ tên bảng nếu biết — AI sẽ match chính xác hơn' : 'Always mention table names if known — AI matches more accurately'}</li>
-                            <li>{t ? 'Mô tả rõ điều kiện lọc (WHERE): khoảng thời gian, giá trị status, etc.' : 'Clearly describe filter conditions (WHERE): time ranges, status values, etc.'}</li>
-                            <li>{t ? 'Chỉ rõ cần sắp xếp (ORDER BY) và giới hạn (LIMIT) nếu cần' : 'Specify sorting (ORDER BY) and limits (LIMIT) when needed'}</li>
-                            <li>{t ? 'Với truy vấn phức tạp, mô tả theo từng bước logic' : 'For complex queries, describe step by step logically'}</li>
-                        </ul>
-                    </Callout>
+            <DocSection title={t ? 'Routing modes' : 'Routing modes'}>
+                <div className="grid md:grid-cols-2 gap-4">
+                    {[
+                        {
+                            icon: <Route className="w-5 h-5 text-primary" />,
+                            title: 'Auto',
+                            desc: t
+                                ? 'Cân bằng cost và quality. Prompt nhẹ có thể dùng lane rẻ hơn trước; task khó hơn hoặc cần vision có thể lên Gemini.'
+                                : 'Balances cost and quality. Lighter prompts may use cheaper lanes first; harder or vision-heavy tasks can escalate to Gemini.'
+                        },
+                        {
+                            icon: <Cpu className="w-5 h-5 text-primary" />,
+                            title: 'Fast / Cheap',
+                            desc: t
+                                ? 'Ưu tiên lane rẻ hơn để giảm tần suất gọi Gemini, nhưng vẫn có thể fallback nếu cần.'
+                                : 'Prefers lower-cost lanes to reduce Gemini usage, while still allowing fallback when needed.'
+                        },
+                        {
+                            icon: <Sparkles className="w-5 h-5 text-primary" />,
+                            title: 'Best Quality',
+                            desc: t
+                                ? 'Đẩy task lên lane chất lượng cao sớm hơn để tối đa độ chắc tay trong phân tích/query work.'
+                                : 'Escalates work to the higher-quality lane earlier to maximize reliability for analysis and query work.'
+                        },
+                        {
+                            icon: <Shield className="w-5 h-5 text-primary" />,
+                            title: 'Gemini Only',
+                            desc: t
+                                ? 'Luôn dùng model Gemini bạn đã chọn. Hữu ích khi bạn cần đầu ra ổn định nhất hoặc muốn tránh provider khác.'
+                                : 'Always uses the Gemini model you selected. Useful when you want the most stable output or want to avoid other providers entirely.'
+                        },
+                    ].map((item, i) => (
+                        <div key={i} className="p-5 border rounded-2xl bg-card/40">
+                            <div className="flex items-center gap-2 font-bold text-sm">{item.icon}{item.title}</div>
+                            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+                        </div>
+                    ))}
                 </div>
             </DocSection>
 
-            {/* Model Info */}
-            <DocSection title={t ? 'Model AI được sử dụng' : 'AI Model Used'}>
-                <div className="p-6 border rounded-2xl bg-gradient-to-r from-blue-500/5 to-purple-500/5 space-y-4">
-                    <div className="flex items-center gap-4">
-                        <div className="p-2 bg-blue-500/20 rounded-xl"><Cpu className="w-6 h-6 text-blue-600" /></div>
-                        <div>
-                            <span className="font-bold block text-lg italic">Gemini-2.0-flash</span>
-                            <span className="text-xs text-muted-foreground">{t
-                                ? 'Model chính phục vụ việc tạo SQL tốc độ cao và cực kỳ chính xác.'
-                                : 'Main model serving high-speed and extremely accurate SQL generation.'}</span>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <div className="p-2 bg-purple-500/20 rounded-xl"><Eye className="w-6 h-6 text-purple-600" /></div>
-                        <div>
-                            <span className="font-bold block text-lg italic">Gemini 1.5 Pro Vision</span>
-                            <span className="text-xs text-muted-foreground">{t
-                                ? 'Phân tích hình ảnh sơ đồ vẽ tay để thiết kế database schema.'
-                                : 'Analyze hand-drawn diagram images to design database schemas.'}</span>
-                        </div>
-                    </div>
+            <DocSection title={t ? 'Prompt test hiệu quả' : 'Effective prompt patterns'}>
+                <Prose>
+                    {t
+                        ? 'Những prompt tốt nhất là prompt có ý định rõ ràng: cần SQL mới, cần tối ưu, cần index, hay cần chart suggestion từ result set.'
+                        : 'The best prompts are intention-clear prompts: ask for a new SQL statement, an optimization pass, an index suggestion, or a chart suggestion from a result set.'}
+                </Prose>
+
+                <div className="space-y-6">
+                    <CodeBlock title={t ? 'Tạo query mới' : 'Generate a new query'}>
+                        <CodeComment>{t ? 'Prompt mẫu' : 'Sample prompt'}</CodeComment>
+                        <CodeLine>List top 10 customers by spending in Q4 2025 with order count and total revenue.</CodeLine>
+                    </CodeBlock>
+
+                    <CodeBlock title={t ? 'Tối ưu + gợi ý index' : 'Optimize + suggest indexes'}>
+                        <CodeComment>{t ? 'Prompt mẫu' : 'Sample prompt'}</CodeComment>
+                        <CodeLine>Optimize this query and give me actionable index recommendations with runnable SQL if possible.</CodeLine>
+                    </CodeBlock>
+
+                    <CodeBlock title={t ? 'Gợi ý biểu đồ' : 'Chart suggestion'}>
+                        <CodeComment>{t ? 'Prompt mẫu' : 'Sample prompt'}</CodeComment>
+                        <CodeLine>Suggest the best chart for this result set and explain which fields should be used.</CodeLine>
+                    </CodeBlock>
                 </div>
+            </DocSection>
+
+            <DocSection title={t ? 'Action cards & execution safety' : 'Action cards & execution safety'}>
+                <Prose>
+                    {t
+                        ? 'Recommendation cards dưới bubble AI có thể chèn SQL vào editor hoặc chạy luôn nếu card có payload phù hợp. Tuy nhiên `Insert into editor` chỉ chèn SQL, còn `Run suggestion` mới là hành động thực thi và app hiện hỏi xác nhận trước khi chạy SQL do AI sinh ra.'
+                        : 'Recommendation cards under the AI bubble can now insert SQL into the editor or run it directly when the card carries the right payload. However, `Insert into editor` only inserts the SQL, while `Run suggestion` is the execution path and the app now asks for confirmation before running AI-generated SQL.'}
+                </Prose>
+                <Callout type="warning">
+                    <p className="text-sm">
+                        {t
+                            ? 'AI có thể gợi ý câu lệnh sai cột, sai bảng, hoặc không phù hợp với dữ liệu thực tế. Hãy xem lại SQL trước khi chạy, đặc biệt với DDL, index creation, hoặc các thao tác có thể ảnh hưởng hiệu năng.'
+                            : 'AI can still suggest the wrong column, the wrong table, or a statement that does not match your real data. Review SQL before running it, especially for DDL, index creation, or operations that can affect performance.'}
+                    </p>
+                </Callout>
             </DocSection>
         </DocPageLayout>
     );

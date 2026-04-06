@@ -160,16 +160,19 @@ export function AppShell() {
 
                                 const activeTab = store.tabs.find(t => t.id === store.activeTabId);
                                 if (activeTab && activeTab.type === 'query') {
-                                    store.updateTabMetadata(activeTab.id, { sql });
+                                    store.updateTabMetadata(activeTab.id, { sql, runRequestedAt: null });
                                 } else {
                                     store.openQueryTab();
                                     setTimeout(() => {
                                         const newTab = useAppStore.getState().tabs.find(t => t.id === useAppStore.getState().activeTabId);
-                                        if (newTab) useAppStore.getState().updateTabMetadata(newTab.id, { sql });
+                                        if (newTab) useAppStore.getState().updateTabMetadata(newTab.id, { sql, runRequestedAt: null });
                                     }, 100);
                                 }
                             }}
                             onRunQuery={(sql) => {
+                                const confirmed = window.confirm('Run this AI-generated SQL now?');
+                                if (!confirmed) return;
+
                                 const store = useAppStore.getState();
                                 const activeConn = store.connections.find(c => c.id === store.activeConnectionId);
                                 if (activeConn?.type === 'mongodb' || activeConn?.type === 'mongodb+srv') {
@@ -180,12 +183,12 @@ export function AppShell() {
 
                                 const activeTab = store.tabs.find(t => t.id === store.activeTabId);
                                 if (activeTab && activeTab.type === 'query') {
-                                    store.updateTabMetadata(activeTab.id, { sql });
+                                    store.updateTabMetadata(activeTab.id, { sql, runRequestedAt: Date.now() });
                                 } else {
                                     store.openQueryTab();
                                     setTimeout(() => {
                                         const newTab = useAppStore.getState().tabs.find(t => t.id === useAppStore.getState().activeTabId);
-                                        if (newTab) useAppStore.getState().updateTabMetadata(newTab.id, { sql });
+                                        if (newTab) useAppStore.getState().updateTabMetadata(newTab.id, { sql, runRequestedAt: Date.now() });
                                     }, 100);
                                 }
                             }}

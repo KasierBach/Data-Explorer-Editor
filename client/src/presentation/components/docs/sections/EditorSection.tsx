@@ -29,7 +29,7 @@ export function EditorSection({ lang }: Props) {
                     {
                         icon: <Shield className="w-8 h-8 text-rose-500" />,
                         title: t ? 'Safe Execution' : 'Safe Execution',
-                        desc: t ? 'Cơ chế tự động giới hạn kết quả trả về và Timeout 30s giúp bảo vệ Backend khỏi các truy vấn "treo".' : 'Automatic result capping and 30s timeout mechanism protects backend from hanging queries.'
+                        desc: t ? 'Row limit, timeout hiển thị rõ trong toolbar, connection guardrails, và xác nhận khi chạy SQL do AI gợi ý giúp giảm rủi ro thao tác nhầm.' : 'Visible row limits, timeout guardrails, connection policies, and confirmation before running AI-generated SQL reduce accidental execution risk.'
                     }
                 ].map((item, i) => (
                     <div key={i} className="p-6 border rounded-3xl bg-card/50 space-y-4">
@@ -68,8 +68,8 @@ export function EditorSection({ lang }: Props) {
                         </h5>
                         <p className="text-xs text-muted-foreground leading-relaxed">
                             {t
-                                ? 'Chúng tôi tích hợp một Provider riêng cho Gemini AI để cung cấp "mã lệnh mờ" (Ghost Text) khi bạn gõ. Hệ thống sử dụng thuật toán debouncing tinh vi để chỉ gửi yêu cầu AI khi bạn thực sự cần, giảm thiểu chi phí API và tăng tốc độ hiện thị.'
-                                : 'We integrated a custom provider for Gemini AI to provide "Ghost Text" as you type. The system uses a sophisticated debouncing algorithm to only trigger AI requests when truly needed, minimizing API costs and boosting performance.'}
+                                ? 'Inline AI completions hiện đi qua lớp AI routing của app thay vì cứng vào một provider duy nhất. Hệ thống dùng debouncing để chỉ gọi AI khi có ngữ cảnh đủ rõ, giúp tiết kiệm chi phí và tránh làm editor bị ồn.'
+                                : 'Inline AI completions now go through the app’s AI routing layer instead of being hard-wired to a single provider. The system uses debouncing so AI is only called when the context is clear enough, reducing cost and keeping the editor calm.'}
                         </p>
                     </div>
                 </div>

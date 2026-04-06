@@ -1,136 +1,104 @@
-import { Shield, Lock, ShieldCheck } from 'lucide-react';
-import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid } from '../primitives';
+import { Lock, ShieldCheck, KeyRound, Database, AlertTriangle } from 'lucide-react';
+import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
 export function SecuritySection({ lang }: Props) {
     const t = lang === 'vi';
+
     return (
         <DocPageLayout
             title={t ? 'Bảo mật & Quyền riêng tư' : 'Security & Privacy'}
             subtitle={t
-                ? 'Data Explorer được thiết kế với triết lý "Security by Default" — mọi dữ liệu nhạy cảm đều được bảo vệ ở cấp độ cao nhất.'
-                : 'Data Explorer is designed with "Security by Default" philosophy — all sensitive data is protected at the highest level.'}
+                ? 'Những lớp bảo vệ hiện có trong Data Explorer, cách chúng hoạt động, và những giới hạn bạn vẫn cần hiểu trước khi dùng app với dữ liệu thật.'
+                : 'The security layers currently present in Data Explorer, how they work, and the limits you should still understand before using the app with real data.'}
         >
-            {/* Core Security Features */}
             <FeatureGrid>
-                <InfoCard icon={<Shield className="w-6 h-6 text-emerald-500" />} title={t ? 'Kiến trúc Multi-Tier Riêng Tư' : 'Private Multi-Tier Architecture'} color="emerald">
-                    <p>{t
-                        ? 'Backend kết nối trực tiếp với Database của bạn một cách an toàn. Thông tin cấu hình hệ thống (như Database Connection của bạn) giờ đây được lưu trên một Cluster PostgreSQL trung tâm có độ tin cậy cao, đảm bảo không bao giờ có nguy cơ mất kết nối do xóa bộ nhớ trình duyệt hoặc deploy lại server.'
-                        : 'Backend securely connects directly to your databases. Application configuration data (like your Saved Connections) is now persistently stored on a reliable central PostgreSQL cluster, guaranteeing zero risk of data loss on browser cache clears or server redeployments.'}</p>
+                <InfoCard icon={<Lock className="w-6 h-6 text-blue-500" />} title="AES-256-GCM" color="blue">
+                    <p>
+                        {t
+                            ? 'Saved connection passwords được mã hóa bằng AES-256-GCM trước khi lưu. Đây là lớp bảo vệ chính cho credential ở phía backend.'
+                            : 'Saved connection passwords are encrypted with AES-256-GCM before persistence. This is the primary backend protection layer for stored credentials.'}
+                    </p>
                 </InfoCard>
-                <InfoCard icon={<Lock className="w-6 h-6 text-blue-500" />} title={t ? 'Mã hóa AES-256-GCM' : 'AES-256-GCM Encryption'} color="blue">
-                    <p>{t
-                        ? 'Toàn bộ mật khẩu DB của bạn đều được mã hóa bằng thuật toán cấp ngân hàng AES-256-GCM trước khi lưu xuống PostgreSQL. Thuật toán này sử dụng IV ngẫu nhiên và Auth Tag chặn tuyệt đối hacker chỉnh sửa CipherText, đảm bảo an toàn tuyệt đối ngay cả khi Database rò rỉ.'
-                        : 'All user database passwords are encrypted using military-grade AES-256-GCM before writing to PostgreSQL. This leverages random IVs and Auth Tags to tamper-proof the CipherText, guaranteeing absolute safety even if the persistent database is breached.'}</p>
+                <InfoCard icon={<ShieldCheck className="w-6 h-6 text-emerald-500" />} title={t ? 'Connection guardrails' : 'Connection guardrails'} color="emerald">
+                    <p>
+                        {t
+                            ? 'Mỗi connection có thể được cấu hình read-only, cấm schema changes, cấm import/export, hoặc cấm query execution hoàn toàn.'
+                            : 'Each connection can be configured as read-only, block schema changes, block import/export, or disable query execution entirely.'}
+                    </p>
+                </InfoCard>
+                <InfoCard icon={<KeyRound className="w-6 h-6 text-amber-500" />} title={t ? 'Secret enforcement' : 'Secret enforcement'} color="amber">
+                    <p>
+                        {t
+                            ? 'Backend từ chối khởi động nếu JWT secret quá yếu hoặc đang dùng placeholder. Điều này giúp tránh deploy production với config mặc định nguy hiểm.'
+                            : 'The backend refuses to boot if the JWT secret is too weak or still using a placeholder. This helps prevent dangerous default production deployments.'}
+                    </p>
                 </InfoCard>
             </FeatureGrid>
 
-            {/* Deep Dive Encryption */}
-            <DocSection title={t ? 'Chi tiết về Mã hóa AES-256-GCM' : 'AES-256-GCM Deep Dive'}>
-                <Prose>
-                    {t
-                        ? 'Khác với chế độ CBC truyền thống, GCM (Galois/Counter Mode) cung cấp cả tính bảo mật (Confidentiality) và tính xác thực (Authenticity). Nó tạo ra một "Authentication Tag" đi kèm với dữ liệu mã hóa để đảm bảo rằng mật khẩu không bị thay đổi bởi bên thứ ba trong quá trình lưu trữ.'
-                        : 'Unlike traditional CBC mode, GCM (Galois/Counter Mode) provides both confidentiality and authenticity. It generates an "Authentication Tag" alongside the encrypted data to ensure that passwords haven\'t been tampered with by a third party during storage.'}
-                </Prose>
-                <div className="mt-6 grid md:grid-cols-2 gap-4">
-                    <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10">
-                        <span className="block text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-2">IV (Initialization Vector)</span>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                            {t ? 'Mỗi mật khẩu được mã hóa với một IV 12-byte duy nhất thu được từ nguồn ngẫu nhiên cực mạnh của hệ thống. Điều này đảm bảo rằng cùng một mật khẩu nếu mã hóa hai lần sẽ ra hai chuỗi CipherText hoàn toàn khác nhau.' : 'Each password is encrypted with a unique 12-byte IV obtained from the system\'s cryptographically strong random source. This ensures that the same password encrypted twice will result in two completely different CipherText strings.'}
-                        </p>
-                    </div>
-                    <div className="p-5 rounded-2xl bg-blue-500/5 border border-blue-500/10">
-                        <span className="block text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2">AAD & Tag</span>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                            {t ? 'Chúng tôi sử dụng Additional Authenticated Data để ràng buộc metadata với CipherText. Authentication Tag 16-byte được kiểm tra trong mỗi lần giải mã để đảm bảo tính toàn vẹn tuyệt đối.' : 'We use Additional Authenticated Data to bind metadata to the CipherText. A 16-byte Authentication Tag is verified during each decryption to ensure absolute integrity.'}
-                        </p>
-                    </div>
-                </div>
-            </DocSection>
-
-            {/* JWT Auth */}
-            <DocSection title={t ? 'Xác thực & Phiên làm việc (Session)' : 'Auth & Session Management'}>
-                <Prose>{t
-                    ? 'Hệ thống sử dụng cơ chế JWT (JSON Web Token) kết hợp với HttpOnly Cookie để bảo vệ người dùng khỏi các cuộc tấn công phổ biến như XSS và Session Hijacking.'
-                    : 'The system utilizes JWT (JSON Web Token) combined with HttpOnly Cookies to protect users from common attacks like XSS and Session Hijacking.'}</Prose>
-
-                <ul className="mt-6 space-y-4">
+            <DocSection title={t ? 'Những gì app đang bảo vệ tốt' : 'What the app protects well today'}>
+                <ul className="grid gap-3 mt-2">
                     {[
-                        {
-                            label: 'HttpOnly Cookies',
-                            desc: t ? 'Token không thể bị truy cập thông qua JavaScript (document.cookie), ngăn chặn đánh cắp session từ các script độc hại.' : 'Tokens cannot be accessed via JavaScript (document.cookie), preventing session theft from malicious scripts.'
-                        },
-                        {
-                            label: 'Stateless Auth',
-                            desc: t ? 'Server không lưu trữ session trong RAM, cho phép hệ thống mở rộng ngang dễ dàng khi có nhiều người dùng đồng thời.' : 'The server doesn\'t store sessions in RAM, allowing easy horizontal scaling as concurrent user count grows.'
-                        },
-                        {
-                            label: 'Automatic Invalidation',
-                            desc: t ? 'Mỗi token có thời hạn (TTL) và sẽ tự động bị vô hiệu hóa nếu server restart mà không cấu hình JWT_SECRET cố định.' : 'Each token has a Time-To-Live (TTL) and will be automatically invalidated if the server restarts without a fixed JWT_SECRET.'
-                        }
-                    ].map((item, i) => (
-                        <li key={i} className="flex gap-4 p-4 rounded-xl bg-muted/20 border border-border/50">
-                            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-                                <ShieldCheck className="w-4 h-4 text-blue-500" />
-                            </div>
-                            <div>
-                                <h5 className="font-bold text-xs mb-1">{item.label}</h5>
-                                <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
-                            </div>
+                        t ? 'Credential lưu trong app database được mã hóa thay vì để plain text.' : 'Credentials stored in the app database are encrypted instead of kept in plaintext.',
+                        t ? 'OAuth login không còn trả bearer token trực tiếp trên URL query string.' : 'OAuth login no longer returns bearer tokens directly in the URL query string.',
+                        t ? 'Host validation và SSRF guard chặn tốt hơn các target nội bộ/nguy hiểm, kể cả MongoDB Atlas SRV flows.' : 'Host validation and SSRF guards better block dangerous/internal targets, including MongoDB Atlas SRV flows.',
+                        t ? 'Connection health checks giúp phát hiện credential hỏng hoặc endpoint bị degrade sớm hơn.' : 'Connection health checks help surface broken credentials or degraded endpoints earlier.'
+                    ].map((item) => (
+                        <li key={item} className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                            {item}
                         </li>
                     ))}
                 </ul>
             </DocSection>
 
-            {/* AI Privacy Table */}
-            <DocSection title={t ? 'Quyền riêng tư AI' : 'AI Privacy'}>
-                <Prose>{t
-                    ? 'Dưới đây là bảng phân tích chi tiết các loại dữ liệu được trao đổi khi bạn sử dụng trợ lý AI Gemini:'
-                    : 'Here is a detailed breakdown of the data types exchanged when using the Gemini AI assistant:'}</Prose>
+            <DocSection title={t ? 'Session và đăng nhập hiện tại' : 'Current session and sign-in behavior'}>
+                <Prose>
+                    {t
+                        ? 'Hiện tại app vẫn dùng JWT access token ở phía client để giữ trải nghiệm refresh mượt hơn. Điều này tiện cho UX, nhưng chưa phải mô hình production-hardening mạnh nhất.'
+                        : 'The app currently still uses a client-side JWT access token to keep refresh behavior smoother. This is convenient for UX, but it is not the strongest possible production-hardening model yet.'}
+                </Prose>
+                <Callout type="warning">
+                    <p className="text-sm">
+                        {t
+                            ? 'Nếu bạn cần mô hình an toàn hơn cho production, hướng tiếp theo nên là httpOnly cookie + refresh token thay vì chỉ dựa vào persisted client token.'
+                            : 'If you need a stronger production model, the next step should be httpOnly cookies plus refresh tokens instead of relying only on a persisted client token.'}
+                    </p>
+                </Callout>
+            </DocSection>
 
-                <div className="mt-6 border rounded-2xl overflow-hidden">
-                    <table className="w-full text-xs">
-                        <thead>
-                            <tr className="bg-muted/50">
-                                <th className="text-left p-4 font-bold">{t ? 'Thông tin' : 'Information'}</th>
-                                <th className="text-center p-4 font-bold">{t ? 'Gửi tới AI?' : 'Sent to AI?'}</th>
-                                <th className="text-left p-4 font-bold">{t ? 'Mục đích' : 'Purpose'}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                            {[
-                                { info: t ? 'Tên bảng & Kiểu dữ liệu' : 'Table names & Types', sent: '✅', reason: t ? 'Để AI hiểu cấu trúc DB và sinh truy vấn đúng' : 'To help AI understand DB structure and generate correct queries' },
-                                { info: t ? 'Quan hệ Foreign Key' : 'FK relationships', sent: '✅', reason: t ? 'Để AI thực hiện các lệnh JOIN chính xác' : 'To help AI perform accurate JOIN operations' },
-                                { info: t ? 'Dữ liệu thực tế' : 'Actual row data', sent: '❌', reason: t ? 'DataExplorer không bao giờ gửi dữ liệu khách hàng lên cloud' : 'DataExplorer never sends customer data to the cloud' },
-                                { info: t ? 'Mật khẩu & Connection string' : 'Passwords & Connections', sent: '❌', reason: t ? 'Thông tin nhạy cảm luôn được giữ kín tuyệt đối' : 'Sensitive credentials always kept strictly private' },
-                            ].map((row, i) => (
-                                <tr key={i} className="hover:bg-muted/15 transition-colors">
-                                    <td className="p-4 font-medium">{row.info}</td>
-                                    <td className="p-4 text-center text-lg">{row.sent}</td>
-                                    <td className="p-4 text-muted-foreground leading-relaxed">{row.reason}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+            <DocSection title={t ? 'Read-only và policy theo connection' : 'Read-only and connection policy controls'}>
+                <div className="grid md:grid-cols-2 gap-4">
+                    <InfoCard icon={<Database className="w-5 h-5 text-cyan-500" />} title={t ? 'Server-side enforcement' : 'Server-side enforcement'} color="blue">
+                        <p className="text-xs">
+                            {t
+                                ? 'Các thao tác bị cấm như UPDATE, DELETE, DROP, schema edits, import, hoặc mutation NoSQL sẽ bị chặn ở backend, không chỉ ẩn ở UI.'
+                                : 'Blocked operations such as UPDATE, DELETE, DROP, schema edits, import flows, or NoSQL mutations are rejected in the backend, not merely hidden in the UI.'}
+                        </p>
+                    </InfoCard>
+                    <InfoCard icon={<AlertTriangle className="w-5 h-5 text-amber-500" />} title={t ? 'AI actions vẫn cần kiểm tra' : 'AI actions still require review'} color="amber">
+                        <p className="text-xs">
+                            {t
+                                ? 'Ngay cả khi AI gợi ý SQL hợp lý, bạn vẫn nên kiểm tra lại trước khi chạy, đặc biệt với index creation, schema changes, và các truy vấn ghi dữ liệu.'
+                                : 'Even when AI suggestions look reasonable, you should still review them before execution, especially for index creation, schema changes, and write queries.'}
+                        </p>
+                    </InfoCard>
                 </div>
             </DocSection>
 
-            {/* Best Practices */}
-            <DocSection title={t ? 'Thực hành Bảo mật Khuyến nghị' : 'Security Best Practices'}>
-                <div className="grid gap-4">
+            <DocSection title={t ? 'Best practices khuyến nghị' : 'Recommended best practices'}>
+                <ul className="grid gap-3">
                     {[
-                        t ? 'Sử dụng biến JWT_SECRET có độ dài ít nhất 32 ký tự ngẫu nhiên trong môi trường Production.' : 'Use a JWT_SECRET with at least 32 random characters in Production environments.',
-                        t ? 'Luôn bật SSL/TLS cho kết nối database nếu truy cập qua mạng công cộng.' : 'Always enable SSL/TLS for database connections if accessing over public networks.',
-                        t ? 'Cấu hình ENCRYPTION_KEY cố định và lưu trữ an toàn để đảm bảo mật khẩu luôn giải mã được.' : 'Configure a fixed ENCRYPTION_KEY and store it securely to ensure passwords can always be decrypted.',
-                        t ? 'Giới hạn quyền của user database (Principle of Least Privilege) chỉ bao gồm các quyền cần thiết.' : 'Limit database user permissions (Principle of Least Privilege) to only what is necessary.'
-                    ].map((item, i) => (
-                        <div key={i} className="flex items-center gap-3 p-4 border rounded-xl bg-emerald-500/5 border-emerald-500/10">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                            <span className="text-xs text-muted-foreground font-medium">{item}</span>
-                        </div>
+                        t ? 'Dùng JWT_SECRET mạnh ít nhất 32 bytes và ENCRYPTION_KEY đúng 32 ký tự.' : 'Use a strong JWT_SECRET of at least 32 bytes and an ENCRYPTION_KEY that is exactly 32 characters.',
+                        t ? 'Ưu tiên read-only connection cho production analytics hoặc tài khoản chỉ xem dữ liệu.' : 'Prefer read-only connections for production analytics or accounts that only need to inspect data.',
+                        t ? 'Bật SSL/TLS với database cloud và xác nhận callback URL thật kỹ nếu dùng Google/GitHub login.' : 'Enable SSL/TLS for cloud databases and verify callback URLs carefully when using Google/GitHub login.',
+                        t ? 'Không commit file .env và luôn rotate secret nếu chúng từng bị lộ trong git history hoặc logs.' : 'Never commit your .env file and always rotate secrets if they were ever exposed in git history or logs.'
+                    ].map((item) => (
+                        <li key={item} className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 px-4 py-3 text-xs text-muted-foreground">
+                            {item}
+                        </li>
                     ))}
-                </div>
+                </ul>
             </DocSection>
         </DocPageLayout>
     );

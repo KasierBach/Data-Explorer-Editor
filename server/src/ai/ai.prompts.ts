@@ -39,7 +39,20 @@ export const RESPONSE_FORMAT_STRUCTURED = `You MUST respond with a JSON object. 
 ## JSON SCHEMA:
 - **"message"** (required string): Your full response in rich Markdown format.
 - **"sql"** (OPTIONAL string): Include this only when the user is asking for a query, executable command text, or a schema/data operation.
-- **"explanation"** (OPTIONAL string): A short explanation for the SQL or operation when helpful.`;
+- **"explanation"** (OPTIONAL string): A short explanation for the SQL or operation when helpful.
+- **"recommendations"** (OPTIONAL array): Include only when you have a concrete next-step suggestion. Each item must be an object with:
+  - **"type"**: one of 'query_fix', 'index_suggestion', 'schema_suggestion', 'chart_suggestion'
+  - **"title"**: short action-oriented label
+  - **"summary"**: concise explanation of the suggestion
+  - **"sql"** (optional): only when the recommendation includes executable SQL
+  - **"chartType"** (optional): only for chart suggestions
+  - **"fields"** (optional string array): only when useful for chart/index/schema suggestions
+
+When the user is asking for something actionable and executable, prefer returning the primary SQL in the top-level "sql" field first. Use recommendations for secondary or optional follow-up ideas.
+
+When the recommendation is a query fix, index suggestion, or schema suggestion and you can express it as executable SQL, you SHOULD include the SQL in the recommendation's "sql" field so the UI can insert or run it.
+
+Only include 1-3 recommendations, and only when they are specific, actionable, and grounded in the user's schema or request.`;
 
 export const RESPONSE_FORMAT_CHAT = `Respond in normal Markdown, not JSON.
 

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as Prompts from './ai.prompts';
+import type { AiRecommendation, AiRecommendationType } from './ai.types';
 
 @Injectable()
 export class AiPromptBuilderService {
@@ -65,7 +66,7 @@ ${responseFormat}`;
         return parts;
     }
 
-    parseAiResponse(fullText: string): { message: string; sql?: string; explanation?: string } {
+    parseAiResponse(fullText: string): { message: string; sql?: string; explanation?: string; recommendations?: AiRecommendation[] } {
         try {
             const match = fullText.match(/\{[\s\S]*\}/);
             const cleanJsonStr = match ? match[0] : fullText;
@@ -74,6 +75,7 @@ ${responseFormat}`;
                 message: parsed.message || (match ? '' : fullText),
                 sql: parsed.sql || undefined,
                 explanation: parsed.explanation || undefined,
+                recommendations: this.normalizeRecommendations(parsed.recommendations),
             };
         } catch {
             return { message: fullText };
@@ -129,6 +131,49 @@ ${responseFormat}`;
             return delta.map((item: any) => item?.text || '').join('');
         }
         return '';
+    }
+
+    private normalizeRecommendations(value: unknown): AiRecommendation[] | undefined {
+        if (!Array.isArray(value)) {
+            return undefined;
+        }
+
+        const allowedTypes = new Set<AiRecommendationType>([
+            'query_fix',
+            'index_suggestion',
+            'schema_suggestion',
+            'chart_suggestion',
+        ]);
+
+        const normalized = value
+            .flatMap((entry) => {
+                if (!entry || typeof entry !== 'object') {
+                    return [];
+                }
+
+                const candidate = entry as Record<string, unknown>;
+                const type = typeof candidate.type === 'string' ? candidate.type.trim() as AiRecommendationType : null;
+                const title = typeof candidate.title === 'string' ? candidate.title.trim() : '';
+                const summary = typeof candidate.summary === 'string' ? candidate.summary.trim() : '';
+
+                if (!type || !allowedTypes.has(type) || !title || !summary) {
+                    return [];
+                }
+
+                return [{
+                    type,
+                    title,
+                    summary,
+                    sql: typeof candidate.sql === 'string' && candidate.sql.trim() ? candidate.sql.trim() : undefined,
+                    chartType: typeof candidate.chartType === 'string' && candidate.chartType.trim() ? candidate.chartType.trim() : undefined,
+                    fields: Array.isArray(candidate.fields)
+                        ? candidate.fields.filter((field): field is string => typeof field === 'string' && field.trim().length > 0).slice(0, 6)
+                        : undefined,
+                } satisfies AiRecommendation];
+            })
+            .slice(0, 3);
+
+        return normalized.length ? normalized : undefined;
     }
 
     private shouldUseStructuredOutput(prompt: string, context?: string): boolean {

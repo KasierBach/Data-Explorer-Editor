@@ -7,59 +7,79 @@ export function FaqSection({ lang }: Props) {
 
     const faqs = [
         {
-            q: t ? 'Tôi có cần cài đặt database trước khi dùng Data Explorer không?' : 'Do I need to install a database before using Data Explorer?',
-            a: t ? 'Có — bạn cần có ít nhất một instance database đang chạy (PostgreSQL, MySQL hoặc SQL Server) để kết nối. Data Explorer là công cụ quản lý, không phải database server. Tuy nhiên, bạn có thể nhanh chóng tạo một container Docker cho mục đích thử nghiệm (xem phần Installation).' : 'Yes — you need at least one running database instance (PostgreSQL, MySQL, or SQL Server) to connect to. Data Explorer is a management tool, not a database server. However, you can quickly spin up a Docker container for testing purposes (see Installation section).'
+            q: t ? 'Tôi có cần cài database trước khi dùng Data Explorer không?' : 'Do I need a database before using Data Explorer?',
+            a: t
+                ? 'Có. Data Explorer là công cụ quản lý và khám phá dữ liệu, không phải database server. Bạn cần ít nhất một database đang chạy để kết nối vào. App metadata của Data Explorer cũng cần một PostgreSQL riêng cho users, connections, saved queries, dashboards và các dữ liệu nội bộ khác.'
+                : 'Yes. Data Explorer is a management and exploration tool, not a database server. You need at least one running database to connect to. The app itself also needs a separate PostgreSQL database for users, connections, saved queries, dashboards, and other internal metadata.'
+        },
+        {
+            q: t ? 'App hiện hỗ trợ những engine nào?' : 'Which engines are supported right now?',
+            a: t
+                ? 'Hiện tại app hỗ trợ PostgreSQL, MySQL, SQL Server, MongoDB và MongoDB Atlas (SRV). SQL workspace và NoSQL workspace là hai bề mặt riêng, nhưng cùng dùng chung hệ thống auth, connections, AI, dashboards và audit.'
+                : 'The app currently supports PostgreSQL, MySQL, SQL Server, MongoDB, and MongoDB Atlas (SRV). The SQL workspace and NoSQL workspace are separate surfaces, but they share the same auth, connections, AI, dashboards, and audit foundations.'
         },
         {
             q: t ? 'Dữ liệu của tôi có bị gửi lên cloud không?' : 'Is my data sent to the cloud?',
-            a: t ? 'Không. Data Explorer chạy hoàn toàn trên máy/server của bạn (Local-First). Dữ liệu thực trong database không bao giờ rời khỏi mạng nội bộ. Chỉ khi bạn sử dụng tính năng AI, metadata lược đồ (tên bảng, tên cột) mới được gửi tới Google Gemini API — nhưng dữ liệu dòng (rows) thì không bao giờ.' : 'No. Data Explorer runs entirely on your machine/server (Local-First). Actual database data never leaves your internal network. Only when using AI features, schema metadata (table names, column names) is sent to Google Gemini API — but row data is never sent.'
-        },
-        {
-            q: t ? 'Data Explorer có miễn phí không?' : 'Is Data Explorer free?',
-            a: t ? 'Data Explorer là mã nguồn mở. Bạn có thể tự host trên máy tính cá nhân hoặc server nội bộ hoàn toàn miễn phí. Để sử dụng tính năng AI, bạn cần API key từ Google AI Studio (miễn phí cho free tier với giới hạn 60 requests/phút).' : 'Data Explorer is open source. You can self-host on your personal machine or internal server completely free. For AI features, you need an API key from Google AI Studio (free tier with 60 requests/minute limit).'
-        },
-        {
-            q: t ? 'Làm sao để thêm hỗ trợ cho database engine mới (ví dụ: SQLite)?' : 'How to add support for a new database engine (e.g., SQLite)?',
-            a: t ? 'Nhờ Strategy Pattern, bạn chỉ cần tạo class mới implements IDatabaseAdapter interface (ví dụ: SQLiteAdapter) với các method: connect(), disconnect(), executeQuery(), introspect(). Không cần thay đổi bất kỳ code nào ở Domain Layer hoặc các adapter khác.' : 'Thanks to the Strategy Pattern, you only need to create a new class implementing IDatabaseAdapter interface (e.g., SQLiteAdapter) with methods: connect(), disconnect(), executeQuery(), introspect(). No changes needed to the Domain Layer or other adapters.'
-        },
-        {
-            q: t ? 'Tại sao kết nối của tôi bị từ chối (Connection refused)?' : 'Why is my connection being refused?',
             a: t
-                ? 'Nguyên nhân phổ biến: (1) Database chưa khởi động — kiểm tra bằng systemctl status hoặc docker ps. (2) Sai port — xác nhận database đang lắng nghe trên port bạn nhập. (3) Firewall chặn — mở port trong Windows Firewall hoặc iptables. (4) listen_addresses — PostgreSQL mặc định chỉ nghe localhost, cần thay đổi thành 0.0.0.0 nếu truy cập từ xa.'
-                : 'Common causes: (1) Database not started — check with systemctl status or docker ps. (2) Wrong port — verify the database is listening on the port you entered. (3) Firewall blocking — open the port in Windows Firewall or iptables. (4) listen_addresses — PostgreSQL defaults to localhost only, change to 0.0.0.0 for remote access.'
+                ? 'Không theo kiểu “dump toàn bộ data” lên cloud. Khi dùng AI, app có thể gửi prompt, schema context, hoặc phần ngữ cảnh bạn chủ động yêu cầu sang provider AI đang cấu hình. App hiện ưu tiên không render raw HTML từ AI và không tự gửi toàn bộ result set trừ khi flow đó thật sự cần.'
+                : 'Not in the sense of dumping your whole database to the cloud. When you use AI, the app can send prompts, schema context, or the context you explicitly request to the configured AI provider. The app now avoids rendering raw HTML from AI and does not automatically send full result sets unless that flow really needs them.'
         },
         {
-            q: t ? 'AI không hoạt động / trả về lỗi API key' : 'AI not working / API key error',
-            a: t ? 'Kiểm tra: (1) Biến GEMINI_API_KEY trong file server/.env đã được set chưa. (2) API key có hợp lệ không — test bằng cách gọi trực tiếp từ Google AI Studio. (3) Đã vượt quota free tier chưa (~60 requests/phút). (4) Backend server đã được restart sau khi thay đổi .env chưa (NestJS cần restart để đọc lại env).' : 'Check: (1) GEMINI_API_KEY in server/.env is properly set. (2) API key is valid — test by calling directly from Google AI Studio. (3) Free tier quota (~60 requests/min) not exceeded. (4) Backend server was restarted after changing .env (NestJS needs restart to re-read env).'
+            q: t ? 'AI hiện dùng Gemini hay gì khác?' : 'Does the AI only use Gemini?',
+            a: t
+                ? 'Không còn chỉ là Gemini. App hiện có AI routing: Gemini vẫn là lane chất lượng cao, nhưng bạn có thể cấu hình thêm Cerebras và OpenRouter để giảm tần suất gọi Gemini. Routing mode trong UI sẽ quyết định ưu tiên lane nào, và mỗi response đều hiển thị provider/model thực tế.'
+                : 'No longer Gemini-only. The app now supports AI routing: Gemini remains the high-quality lane, but you can also configure Cerebras and OpenRouter to reduce Gemini usage. The routing mode in the UI controls which lane is preferred, and every response shows the actual provider/model that answered.'
         },
         {
-            q: t ? 'Tôi bị mất phiên đăng nhập sau khi restart server' : 'Login session lost after server restart',
-            a: t ? 'Nếu bạn không đặt JWT_SECRET cố định trong .env, server sẽ tạo secret ngẫu nhiên mỗi lần khởi động — khiến tất cả JWT token cũ bị invalidate. Giải pháp: thêm một giá trị cố định vào JWT_SECRET và giữ nguyên nó giữa các lần restart.' : 'If you don\'t set a fixed JWT_SECRET in .env, the server generates a random secret on each startup — invalidating all old JWT tokens. Solution: add a fixed value to JWT_SECRET and keep it consistent across restarts.'
+            q: t ? 'Tại sao AI trả lời khác nhau giữa các mode như Auto, Fast / Cheap và Gemini Only?' : 'Why do answers differ across Auto, Fast / Cheap, and Gemini Only?',
+            a: t
+                ? 'Vì mỗi mode điều khiển router khác nhau. `Auto` cân bằng chi phí và chất lượng, `Fast / Cheap` ưu tiên lane rẻ hơn trước, `Best Quality` nghiêng về Gemini sớm hơn, còn `Gemini Only` luôn dùng model Gemini bạn đã chọn. Nếu provider rẻ trả lời không tốt hoặc fail, app có thể fallback tùy mode.'
+                : 'Because each mode steers the router differently. `Auto` balances cost and quality, `Fast / Cheap` prefers lower-cost lanes first, `Best Quality` leans toward Gemini earlier, and `Gemini Only` always uses the Gemini model you selected. If a cheaper provider performs badly or fails, the app can fallback depending on the active mode.'
         },
         {
-            q: t ? 'Kết quả truy vấn quá lớn, trình duyệt bị chậm' : 'Query results too large, browser slows down',
-            a: t ? 'Result Grid sử dụng virtual scrolling, nhưng nếu truy vấn trả về hàng triệu dòng, trình duyệt vẫn cần xử lý metadata. Giải pháp: (1) Thêm LIMIT vào truy vấn (ví dụ: LIMIT 10000). (2) Sử dụng WHERE để lọc trước. (3) Dùng pagination phía SQL (OFFSET / FETCH NEXT).' : 'Result Grid uses virtual scrolling, but if queries return millions of rows, the browser still needs to process metadata. Solutions: (1) Add LIMIT to queries (e.g., LIMIT 10000). (2) Use WHERE to filter first. (3) Use SQL-side pagination (OFFSET / FETCH NEXT).'
+            q: t ? 'Tại sao tôi bị mất đăng nhập sau refresh hay restart?' : 'Why do I lose my login after refresh or restart?',
+            a: t
+                ? 'Hiện tại app đang persist JWT session ở client để giữ trải nghiệm refresh mượt. Nếu bạn vẫn bị out, hãy kiểm tra `JWT_SECRET` trên backend có cố định hay không và backend/frontend có đang chạy cùng version không. Một JWT secret đổi giữa các lần deploy hoặc restart sẽ làm token cũ mất hiệu lực.'
+                : 'The app currently persists the JWT session on the client to keep refreshes smooth. If you still get logged out, check whether `JWT_SECRET` is fixed on the backend and whether the frontend/backend are running matching versions. Changing the JWT secret across deploys or restarts invalidates older tokens.'
         },
         {
-            q: t ? 'Làm sao lưu truy vấn SQL để dùng lại?' : 'How to save SQL queries for reuse?',
-            a: t ? 'Hiện tại, nội dung tab được lưu tạm vào Local Storage của trình duyệt — kể cả khi reload trang, nội dung vẫn được phục hồi. Tuy nhiên, nếu xóa dữ liệu trình duyệt thì sẽ mất. Khuyến nghị: copy các truy vấn quan trọng vào file .sql trên máy.' : 'Currently, tab content is temporarily saved to browser Local Storage — even after page reload, content is restored. However, clearing browser data will lose it. Recommendation: copy important queries to .sql files on your machine.'
+            q: t ? 'Saved queries hiện lưu ở đâu?' : 'Where are saved queries stored now?',
+            a: t
+                ? 'Saved queries không còn chỉ là local-only nữa. Chúng được lưu ở backend metadata database và hỗ trợ `private`, `team`, và `workspace` visibility. Tab content vẫn có state phía client để phục hồi UX, nhưng luồng saved queries đã là server-backed.'
+                : 'Saved queries are no longer local-only. They are stored in the backend metadata database and support `private`, `team`, and `workspace` visibility. Tab content still has client-side state for UX recovery, but the saved-query flow itself is now server-backed.'
         },
         {
-            q: t ? 'Tại sao dự án lại chia nhỏ nhiều Service như Otp, Seed, Token?' : 'Why split into many small services like Otp, Seed, Token?',
-            a: t ? 'Đây là áp dụng nguyên tắc Single Responsibility (SRP). Việc chia nhỏ giúp code dễ test (unit test), dễ bảo trì và tránh việc một file "God Service" phình to hàng nghìn dòng. Nó cũng giúp team collab tốt hơn mà không bị xung đột code.' : 'This follows the Single Responsibility Principle (SRP). Splitting makes code easier to test (unit test), maintain, and prevents "God Service" files from growing to thousands of lines. It also improves team collaboration with fewer merge conflicts.'
+            q: t ? 'Vì sao `prisma migrate deploy` lỗi còn `prisma db push` lại chạy được?' : 'Why does `prisma migrate deploy` fail while `prisma db push` works?',
+            a: t
+                ? 'Vì migration history hiện tại của repo chưa khớp một PostgreSQL deploy flow sạch. Trong trạng thái hiện nay, bạn nên dùng `npx prisma db push` cho local và production build. Đây là lý do docs deployment hiện nhấn mạnh `db push` thay vì `migrate deploy`.'
+                : 'Because the current migration history in the repo is not aligned with a clean PostgreSQL deploy flow. In the current state, you should use `npx prisma db push` for local and production builds. That is why the deployment docs now emphasize `db push` instead of `migrate deploy`.'
         },
         {
-            q: t ? 'Data Explorer có hỗ trợ CI/CD không?' : 'Does Data Explorer support CI/CD?',
-            a: t ? 'Có. Bạn có thể tận dụng Vitest để chạy unit tests trong GitHub Actions. File cấu hình Docker Compose cũng sẵn sàng để deploy lên các nền tảng như Render, Railway hoặc tự host trên VPS thông qua Coolify/Portainer.' : 'Yes. You can leverage Vitest to run unit tests in GitHub Actions. The Docker Compose configuration is also ready for deployment on platforms like Render, Railway, or self-hosting on VPS via Coolify/Portainer.'
+            q: t ? 'Tại sao kết nối database ở trường hoặc mạng công cộng lại hay bị lỗi?' : 'Why do database connections often fail on school or public networks?',
+            a: t
+                ? 'Nhiều mạng chặn trực tiếp các cổng database như 5432, 3306 hoặc 27017. Khi đó cả local dev lẫn app web đều có thể gặp lỗi reachability tới DB cloud/private. Giải pháp thực tế nhất là dùng DB local cho dev, hoặc tunnel/VPN/agent cho các mạng bị chặn mạnh.'
+                : 'Many networks block database ports such as 5432, 3306, or 27017 directly. In that case, both local development and the deployed app can lose reachability to cloud or private databases. The most practical workaround is to use a local database for development, or tunnels/VPN/agents on heavily restricted networks.'
+        },
+        {
+            q: t ? 'AI-generated SQL có chạy ngay lập tức không?' : 'Does AI-generated SQL run immediately?',
+            a: t
+                ? 'Không mặc định. `Insert into editor` chỉ chèn SQL vào editor. `Run suggestion` mới là hành động chạy, và app hiện có bước xác nhận trước khi execute SQL do AI đề xuất để giảm rủi ro chạy nhầm.'
+                : 'Not by default. `Insert into editor` only inserts SQL into the editor. `Run suggestion` is the action that executes it, and the app now shows a confirmation step before running AI-generated SQL to reduce the risk of accidental execution.'
+        },
+        {
+            q: t ? 'Tại sao connection của tôi bị chặn bởi guardrails?' : 'Why is my connection blocked by guardrails?',
+            a: t
+                ? 'Connection hiện có policy flags như `readOnly`, `allowSchemaChanges`, `allowImportExport`, và `allowQueryExecution`. Backend sẽ enforce các guardrails này kể cả khi frontend bị bypass. Nếu một câu lệnh bị chặn, UI sẽ hiển thị lý do thay vì chỉ thất bại mơ hồ.'
+                : 'Connections now carry policy flags such as `readOnly`, `allowSchemaChanges`, `allowImportExport`, and `allowQueryExecution`. The backend enforces these guardrails even if the frontend is bypassed. When a statement is blocked, the UI shows a clear reason instead of failing vaguely.'
         },
     ];
 
     return (
         <DocPageLayout
-            title={t ? 'Câu hỏi Thường gặp & Khắc phục sự cố' : 'FAQ & Troubleshooting'}
+            title={t ? 'Câu hỏi thường gặp & khắc phục sự cố' : 'FAQ & troubleshooting'}
             subtitle={t
-                ? 'Tổng hợp các câu hỏi phổ biến nhất và hướng dẫn xử lý các lỗi thường gặp khi sử dụng Data Explorer.'
-                : 'Collection of the most common questions and guides for handling frequent issues when using Data Explorer.'}
+                ? 'Những câu hỏi và lỗi phổ biến nhất, được cập nhật đúng với Data Explorer hiện tại.'
+                : 'The most common questions and failure modes, updated to match the current Data Explorer codebase.'}
         >
             <div className="space-y-4">
                 {faqs.map((faq, i) => (

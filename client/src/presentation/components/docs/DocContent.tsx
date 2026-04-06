@@ -42,6 +42,7 @@ export function DocContent({ sectionId, lang }: DocContentProps) {
         'postgres': <ConnectionSection lang={lang} engine="postgres" />,
         'mysql': <ConnectionSection lang={lang} engine="mysql" />,
         'mssql': <ConnectionSection lang={lang} engine="mssql" />,
+        'mongodb': <ConnectionSection lang={lang} engine="mongodb" />,
 
         // SQL Workspace
         'editor': <EditorSection lang={lang} />,

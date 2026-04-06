@@ -3,7 +3,7 @@ import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment
 
 interface Props {
     lang: 'vi' | 'en';
-    engine: 'postgres' | 'mysql' | 'mssql';
+    engine: 'postgres' | 'mysql' | 'mssql' | 'mongodb';
 }
 
 const ENGINE_CONFIG: Record<string, any> = {
@@ -82,6 +82,29 @@ FROM sys.tables t
 JOIN sys.columns c ON t.object_id = c.object_id
 JOIN sys.types ty ON c.system_type_id = ty.system_type_id
 ORDER BY t.name, c.column_id;`,
+    },
+    mongodb: {
+        name: 'MongoDB / Atlas',
+        port: '27017',
+        icon: '🍃',
+        uriScheme: 'mongodb',
+        uriExample: 'mongodb+srv://username:password@cluster0.mongodb.net/mydb?retryWrites=true&w=majority',
+        dockerImage: 'mongo:7',
+        dockerEnv: [],
+        features: {
+            en: ['Collection and document browsing', 'MongoDB Atlas SRV connection string support', 'Database and collection hierarchy discovery', 'JSON document exploration with tree/grid views', 'Safer SSRF validation for Atlas SRV hosts', 'MQL shell integration inside the NoSQL workspace', 'Health checks for saved MongoDB connections'],
+            vi: ['Duyệt collection và document', 'Hỗ trợ connection string MongoDB Atlas SRV', 'Khám phá database và collection theo cây thư mục', 'Xem JSON document ở cả tree và grid view', 'SSRF validation an toàn hơn cho Atlas SRV host', 'Tích hợp MQL shell trong NoSQL workspace', 'Kiểm tra sức khỏe cho kết nối MongoDB đã lưu'],
+        },
+        sslNote: {
+            en: 'For MongoDB Atlas, prefer the mongodb+srv URI from the Atlas dashboard. SRV records and TLS are handled automatically by the driver.',
+            vi: 'Với MongoDB Atlas, nên dùng mongodb+srv URI lấy trực tiếp từ Atlas dashboard. Driver sẽ tự xử lý SRV records và TLS.',
+        },
+        introspectQuery: `// MongoDB does not use SQL introspection.
+// Data Explorer discovers your hierarchy by listing:
+// - databases
+// - collections
+// - sampled document fields
+// - index metadata`,
     }
 };
 

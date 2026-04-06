@@ -1,185 +1,167 @@
-import { Wand2, Shield, Cpu, MessageSquare, ShieldCheck, CheckCircle, XCircle, Zap, Terminal } from 'lucide-react';
-import { DocPageLayout, DocSection, Prose, InfoCard } from '../primitives';
+import { Sparkles, Route, Shield, Image, Database, Gauge, Bot } from 'lucide-react';
+import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, Callout, CodeBlock, CodeComment, CodeLine } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
 export function AiServiceSection({ lang }: Props) {
     const t = lang === 'vi';
+
     return (
         <DocPageLayout
-            title={t ? 'Trợ lý AI Gemini — Deep Dive' : 'Gemini AI Assistant — Deep Dive'}
+            title={t ? 'AI Routing & Assistant' : 'AI Routing & Assistant'}
             subtitle={t
-                ? 'Phân tích chi tiết kiến trúc, cơ chế xử lý Context và các kỹ thuật tối ưu hóa mã nguồn SQL bằng trí tuệ nhân tạo hàng đầu từ Google.'
-                : 'A technical deep-dive into architecture, context handling, and SQL optimization techniques using state-of-the-art AI from Google.'}
+                ? 'Tổng quan về cách Data Explorer chọn model, stream kết quả, giữ an toàn cho context, và biến câu trả lời AI thành hành động dùng được ngay trong editor.'
+                : 'A practical guide to how Data Explorer chooses models, streams results, protects context, and turns AI responses into actions you can use immediately in the editor.'}
             gradient
         >
-            {/* Value Proposition Grid */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
-                {[
-                    {
-                        icon: <Zap className="w-6 h-6 text-amber-500" />,
-                        title: t ? 'Gemini 3.1 Flash-Lite' : 'Gemini 3.1 Flash-Lite',
-                        desc: t ? 'Tối ưu hóa độ trễ cực thấp (Sub-second) cho các tính năng Ghost Text và Inline Completion.' : 'Ultra-low latency (Sub-second) optimization for Ghost Text and Inline Completion features.'
-                    },
-                    {
-                        icon: <Shield className="w-6 h-6 text-emerald-500" />,
-                        title: t ? 'Context Clipping' : 'Context Clipping',
-                        desc: t ? 'Thuật toán nén lược đồ (schema) thông minh để tối ưu hóa context window (32k - 1M tokens).' : 'Intelligent schema compression algorithm to optimize context window usage.'
-                    },
-                    {
-                        icon: <Cpu className="w-6 h-6 text-blue-500" />,
-                        title: t ? 'Multi-Dialect Core' : 'Multi-Dialect Core',
-                        desc: t ? 'Tự động điều chỉnh cú pháp theo PostgreSQL, MySQL hoặc T-SQL dựa trên loại kết nối.' : 'Automatic syntax adjustment for PostgreSQL, MySQL, or T-SQL based on connection type.'
-                    }
-                ].map((item, id) => (
-                    <div key={id} className="p-6 border rounded-2xl bg-card/50 hover:bg-card transition-colors border-border/50">
-                        <div className="mb-4">{item.icon}</div>
-                        <h4 className="font-bold text-sm mb-2">{item.title}</h4>
-                        <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
-                    </div>
-                ))}
-            </div>
+            <FeatureGrid>
+                <InfoCard icon={<Route className="w-6 h-6 text-blue-500" />} title={t ? 'Routing thông minh' : 'Smart routing'} color="blue">
+                    <p>
+                        {t
+                            ? 'AI có thể ưu tiên lane rẻ hơn cho câu hỏi nhẹ, rồi fallback sang model mạnh hơn khi câu hỏi dài, cần suy luận sâu, hoặc cần hình ảnh/current context.'
+                            : 'AI can prefer a cheaper lane for lightweight prompts, then fall back to stronger models when the task is longer, needs deeper reasoning, or requires image/current context.'}
+                    </p>
+                </InfoCard>
+                <InfoCard icon={<Gauge className="w-6 h-6 text-emerald-500" />} title={t ? 'SSE thời gian thực' : 'Realtime SSE'} color="emerald">
+                    <p>
+                        {t
+                            ? 'Phản hồi AI được stream về từng phần để bạn thấy kết quả ngay, thay vì chờ toàn bộ payload hoàn tất mới render.'
+                            : 'AI responses are streamed progressively so you can see results immediately instead of waiting for the entire payload to finish before rendering.'}
+                    </p>
+                </InfoCard>
+                <InfoCard icon={<Database className="w-6 h-6 text-amber-500" />} title={t ? 'SQL-first output' : 'SQL-first output'} color="amber">
+                    <p>
+                        {t
+                            ? 'Khi tác vụ mang tính hành động, Data Explorer ưu tiên SQL/MQL ở top-level trước để bạn chèn hoặc chạy nhanh, rồi phần giải thích mới đi theo sau.'
+                            : 'When the task is actionable, Data Explorer prioritizes top-level SQL/MQL first so you can insert or run it quickly, with explanation following after.'}
+                    </p>
+                </InfoCard>
+            </FeatureGrid>
 
-            <DocSection title={t ? 'Kiến trúc Workflow (AI Orchestration)' : 'AI Orchestration Workflow'}>
+            <DocSection title={t ? 'Các chế độ định tuyến' : 'Routing modes'}>
                 <Prose>
                     {t
-                        ? 'Khi bạn gửi một yêu cầu tới trợ lý AI, Data Explorer không chỉ gửi đi câu hỏi của bạn. Chúng tôi thực hiện một quy trình gồm 4 bước nghiêm ngặt để đảm bảo câu trả lời có tính thực thi cao nhất và bảo mật tuyệt đối.'
-                        : 'When you send a request to the AI assistant, Data Explorer doesn\'t just send your question. We execute a strict 4-step workflow to ensure the highest reliability and absolute security:'}
+                        ? 'Ngay trong panel AI, bạn có thể đổi Routing Mode để cân bằng giữa chi phí, tốc độ, và chất lượng. Đây là lớp chọn nằm trên model cụ thể.'
+                        : 'Inside the AI panel, you can switch Routing Mode to balance cost, speed, and quality. This sits above the specific model selector.'}
                 </Prose>
-
-                <div className="my-10 space-y-8">
+                <div className="grid md:grid-cols-2 gap-4 mt-6">
                     {[
                         {
-                            step: "01",
-                            title: t ? 'Schema Harvesting & Pruning' : 'Schema Harvesting & Pruning',
-                            desc: t ? 'Hệ thống tự động quét metadata. Nếu database quá lớn, chúng tôi sử dụng thuật toán "Semantic Pruning" để chỉ lấy những bảng có khả năng liên quan nhất đến câu hỏi.' : 'Automatically scans metadata. If the DB is large, we use "Semantic Pruning" to keep only the most relevant tables.'
+                            title: 'Auto',
+                            descVi: 'Tự động chọn provider/model phù hợp nhất cho câu hỏi hiện tại. Đây là mode nên dùng hằng ngày.',
+                            descEn: 'Automatically picks the most suitable provider/model for the current request. This is the default daily mode.'
                         },
                         {
-                            step: "02",
-                            title: t ? 'Prompt Engineering (JSON Mode)' : 'Prompt Engineering (JSON Mode)',
-                            desc: t ? 'Câu lệnh được bọc trong một System Instruction khổng lồ, ép Gemini hoạt động trong "JSON Mode" để trả về cấu trúc gồm: SQL, Giải thích, và Danh sách bảng bị ảnh hưởng.' : 'Enforces Gemini into "JSON Mode" via massive System Instructions to return: SQL, Explanation, and Affected Tables list.'
+                            title: 'Fast / Cheap',
+                            descVi: 'Ưu tiên lane rẻ hoặc nhanh hơn cho các câu hỏi phổ thông, nhưng vẫn có thể fallback nếu cần.',
+                            descEn: 'Prefers cheaper or faster lanes for common prompts, while still allowing fallback when needed.'
                         },
                         {
-                            step: "03",
-                            title: t ? 'Context Window Management' : 'Context Window Management',
-                            desc: t ? 'Sử dụng Gemini 1.5 Flash với 1M context window cho phép chúng tôi gửi toàn bộ lược đồ của những database phức tạp nhất mà không bị mất mát thông tin.' : 'Leveraging Gemini 1.5 Flash with its 1M context window allows us to send entire schemas of complex databases without information loss.'
+                            title: 'Best Quality',
+                            descVi: 'Đẩy yêu cầu sang lane chất lượng cao sớm hơn, phù hợp với schema analysis, prompt dài, và reasoning nhiều bước.',
+                            descEn: 'Escalates requests to the higher-quality lane sooner, ideal for schema analysis, long prompts, and multi-step reasoning.'
                         },
                         {
-                            step: "04",
-                            title: t ? 'Syntax Validation & Cleaning' : 'Syntax Validation & Cleaning',
-                            desc: t ? 'Backend thực hiện "Regex Cleaning" để loại bỏ markdown thừa và kiểm tra các từ khóa nguy hiểm trước khi trả kết quả về UI.' : 'Backend performs "Regex Cleaning" to strip markdown and checks for dangerous keywords before returning results.'
+                            title: 'Gemini Only',
+                            descVi: 'Luôn dùng Gemini model đang chọn. Phù hợp khi bạn muốn hành vi ổn định hoặc cần nhất quán với một model cụ thể.',
+                            descEn: 'Always uses the currently selected Gemini model. Best when you want stable behavior or strict consistency with one model.'
                         }
-                    ].map((item, i) => (
-                        <div key={i} className="flex gap-6 group">
-                            <div className="flex flex-col items-center">
-                                <div className="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center text-[10px] font-black group-hover:bg-primary group-hover:text-primary-foreground transition-all">
-                                    {item.step}
-                                </div>
-                                <div className="w-px flex-1 bg-border my-2" />
-                            </div>
-                            <div className="pb-8">
-                                <h5 className="font-bold text-sm text-foreground">{item.title}</h5>
-                                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{item.desc}</p>
-                            </div>
+                    ].map((item) => (
+                        <div key={item.title} className="rounded-2xl border bg-card/40 p-5">
+                            <div className="text-sm font-bold">{item.title}</div>
+                            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                                {t ? item.descVi : item.descEn}
+                            </p>
                         </div>
                     ))}
                 </div>
             </DocSection>
 
-            <DocSection title={t ? 'Cơ chế Nén Lược đồ (Retrieval-Augmented Schema)' : 'Retrieval-Augmented Schema (RAS)'}>
+            <DocSection title={t ? 'Provider lanes hiện có' : 'Available provider lanes'}>
+                <div className="grid md:grid-cols-3 gap-4">
+                    <InfoCard icon={<Bot className="w-5 h-5 text-violet-500" />} title="Gemini" color="purple">
+                        <p className="text-xs">
+                            {t
+                                ? 'Lane chất lượng cao cho reasoning dài, image input, query generation khó, và những câu cần độ tin cậy cao hơn.'
+                                : 'Higher-quality lane for longer reasoning, image input, harder query generation, and prompts that need stronger reliability.'}
+                        </p>
+                    </InfoCard>
+                    <InfoCard icon={<Sparkles className="w-5 h-5 text-cyan-500" />} title="Cerebras / cheap lane" color="blue">
+                        <p className="text-xs">
+                            {t
+                                ? 'Lane chi phí thấp hơn cho general chat, giải thích khái niệm, và các câu hỏi ngắn không cần image/search.'
+                                : 'Lower-cost lane for general chat, concept explanations, and short prompts that do not need image/search.'}
+                        </p>
+                    </InfoCard>
+                    <InfoCard icon={<Image className="w-5 h-5 text-emerald-500" />} title={t ? 'Vision path' : 'Vision path'} color="emerald">
+                        <p className="text-xs">
+                            {t
+                                ? 'Ảnh và sơ đồ vẫn đi qua lane có hỗ trợ vision. Đây là lý do image-based tasks thường được route khác với chat văn bản.'
+                                : 'Images and diagrams still use a vision-capable lane. That is why image-based tasks are often routed differently from plain text chat.'}
+                        </p>
+                    </InfoCard>
+                </div>
+            </DocSection>
+
+            <DocSection title={t ? 'Action cards & typed recommendations' : 'Action cards & typed recommendations'}>
                 <Prose>
                     {t
-                        ? 'Gửi hàng trăm bảng vào một Prompt có thể làm lãng phí token và gây nhiễu cho AI. Data Explorer sử dụng kỹ thuật "Retrieval-Augmented" để chỉ gửi những thông tin thực sự cần thiết.'
-                        : 'Sending hundreds of tables in a single prompt can waste tokens and confuse the AI. Data Explorer uses "Retrieval-Augmented" techniques to send only what is truly necessary.'}
+                        ? 'Khi AI thấy có bước tiếp theo rõ ràng, câu trả lời không chỉ là text. Nó có thể trả về recommendation cards với loại cụ thể như query fix, index suggestion, schema suggestion, hoặc chart suggestion.'
+                        : 'When the AI detects a concrete next step, the answer is not just text. It can return recommendation cards with a specific type such as query fix, index suggestion, schema suggestion, or chart suggestion.'}
                 </Prose>
-                <div className="grid md:grid-cols-2 gap-4 mt-8">
-                    <InfoCard 
-                        icon={<CheckCircle className="w-5 h-5" />} 
-                        title={t ? 'Những gì được gửi' : 'What is Sent'} 
-                        color="blue"
-                    >
-                        <ul className="text-xs space-y-2 opacity-80">
-                            <li>• {t ? 'Tên bảng & Cột (Standardized)' : 'Standardized Table & Column names'}</li>
-                            <li>• {t ? 'Kiểu dữ liệu cơ bản (Mapped)' : 'Mapped basic data types'}</li>
-                            <li>• {t ? 'Quan hệ khóa ngoại (Foreign Keys)' : 'Foreign Key definitions'}</li>
-                            <li>• {t ? 'Mô tả Comment trên DB' : 'In-DB Comments (Metadata)'}</li>
-                        </ul>
+                <ul className="mt-6 grid gap-3">
+                    {[
+                        t ? 'Insert into editor: chỉ chèn SQL/MQL vào editor hiện tại.' : 'Insert into editor: inserts SQL/MQL into the current editor only.',
+                        t ? 'Run suggestion: hỏi xác nhận trước khi thực thi SQL do AI sinh ra.' : 'Run suggestion: asks for confirmation before executing AI-generated SQL.',
+                        t ? 'Copy suggestion: copy nhanh để dùng ở nơi khác, không ảnh hưởng editor.' : 'Copy suggestion: copies the suggestion for use elsewhere without touching the editor.',
+                        t ? 'Chart suggestions: giúp bạn chọn loại chart phù hợp hơn trước khi lưu vào dashboard.' : 'Chart suggestions: help you choose a better chart type before saving into a dashboard.'
+                    ].map((item) => (
+                        <li key={item} className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                            {item}
+                        </li>
+                    ))}
+                </ul>
+            </DocSection>
+
+            <DocSection title={t ? 'An toàn context & những gì AI không thấy' : 'Context safety and what the AI does not see'}>
+                <div className="grid md:grid-cols-2 gap-4">
+                    <InfoCard icon={<Shield className="w-5 h-5 text-emerald-500" />} title={t ? 'Được gửi có chọn lọc' : 'Sent selectively'} color="emerald">
+                        <p className="text-xs">
+                            {t
+                                ? 'Schema context, active database, prompt hiện tại, và file/ảnh đính kèm liên quan có thể được gửi để tăng độ chính xác của câu trả lời.'
+                                : 'Schema context, the active database, the current prompt, and relevant attached files/images may be sent to improve accuracy.'}
+                        </p>
                     </InfoCard>
-                    <InfoCard 
-                        icon={<XCircle className="w-5 h-5" />} 
-                        title={t ? 'Những gì bị loại bỏ' : 'What is Stripped'} 
-                        color="red"
-                    >
-                        <ul className="text-xs space-y-2 opacity-80">
-                            <li>• {t ? 'Dữ liệu hàng thực tế (Data Privacy)' : 'Actual row values (Data Privacy)'}</li>
-                            <li>• {t ? 'Các bảng hệ thống & Internal views' : 'System tables & internal views'}</li>
-                            <li>• {t ? 'Hàm & Thủ tục quá phức tạp' : 'Overly complex functions/procedures'}</li>
-                            <li>• {t ? 'Thông tin hạ tầng nhạy cảm' : 'Sensitive infrastructure info'}</li>
-                        </ul>
+                    <InfoCard icon={<Shield className="w-5 h-5 text-rose-500" />} title={t ? 'Không gửi mặc định' : 'Not sent by default'} color="red">
+                        <p className="text-xs">
+                            {t
+                                ? 'Saved connection passwords, app secrets, và raw credentials không được đưa vào prompt. Row data cũng không nên bị gửi trừ khi chính bạn đính kèm nó vào context.'
+                                : 'Saved connection passwords, app secrets, and raw credentials are never injected into prompts. Row data should not be sent unless you explicitly include it in context.'}
+                        </p>
                     </InfoCard>
                 </div>
             </DocSection>
 
-            <DocSection title={t ? 'Tối ưu hóa Chi phí & Hiệu năng' : 'Cost & Performance Optimization'}>
-                <div className="grid sm:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                        <h5 className="text-sm font-bold flex items-center gap-2">
-                             <Wand2 className="w-4 h-4 text-primary" />
-                             {t ? 'Smart Debouncing (800ms)' : 'Smart Debouncing (800ms)'}
-                        </h5>
-                        <div className="text-xs text-muted-foreground leading-relaxed">
-                            {t
-                                ? 'Hệ thống Ghost Text không gửi yêu cầu khi bạn đang gõ. Chúng tôi chờ 800ms "idle" để đảm bảo ý định của bạn đã rõ ràng, giúp giảm 70% chi phí token.'
-                                : 'The Ghost Text system doesn\'t send requests while you type. We wait for an 800ms "idle" period to ensure clarity, reducing token costs by 70%.'}
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        <h5 className="text-sm font-bold flex items-center gap-2">
-                             <Terminal className="w-4 h-4 text-primary" />
-                             {t ? 'Streaming & Partial Parsing' : 'Streaming & Partial Parsing'}
-                        </h5>
-                        <div className="text-xs text-muted-foreground leading-relaxed">
-                            {t
-                                ? 'Sử dụng Server-Sent Events (SSE) để truyền tải kết quả từ Gemini. UI có thể hiển thị mã SQL ngay khi khối logic đầu tiên được tạo ra.'
-                                : 'Uses Server-Sent Events (SSE) to stream Gemini results. The UI can display SQL code as soon as the first logic block is generated.'}
-                        </div>
-                    </div>
-                </div>
+            <DocSection title={t ? 'Ví dụ prompt dùng tốt nhất' : 'Prompts that work best'}>
+                <CodeBlock title={t ? 'Prompt templates' : 'Prompt templates'}>
+                    <CodeComment>{t ? 'Tối ưu query' : 'Optimize a query'}</CodeComment>
+                    <CodeLine>Optimize this query for PostgreSQL and suggest indexes if needed.</CodeLine>
+                    <p className="mt-3" />
+                    <CodeComment>{t ? 'Chọn biểu đồ' : 'Choose a chart'}</CodeComment>
+                    <CodeLine>Suggest the best chart for this result set and explain why.</CodeLine>
+                    <p className="mt-3" />
+                    <CodeComment>{t ? 'Sửa query và cho SQL chạy được' : 'Fix a query and return runnable SQL'}</CodeComment>
+                    <CodeLine>Fix this SQL and return a safer version I can run immediately.</CodeLine>
+                </CodeBlock>
             </DocSection>
 
-            <DocSection title={t ? 'Quyền riêng tư & An toàn (Security First)' : 'Privacy & Security First'}>
-                <div className="p-8 rounded-3xl bg-emerald-500/5 border border-emerald-500/10 space-y-6">
-                    <div className="flex items-center gap-3 text-emerald-600">
-                        <Shield className="w-6 h-6" />
-                        <h4 className="font-bold uppercase text-xs tracking-widest">{t ? 'Bảo vệ dữ liệu doanh nghiệp' : 'Enterprise Data Protection'}</h4>
-                    </div>
-                    <Prose>
-                        {t
-                            ? 'Chúng tôi hiểu rằng cấu trúc cơ sở dữ liệu là tài sản nhạy cảm. Data Explorer áp dụng các tiêu chuẩn an toàn cao nhất:'
-                            : 'We understand that database structure is sensitive. Data Explorer applies the highest security standards:'}
-                    </Prose>
-                    <div className="grid md:grid-cols-2 gap-8 mt-6">
-                        <div className="flex gap-4">
-                            <div className="p-2 bg-emerald-500/10 rounded-lg h-fit"><ShieldCheck className="w-4 h-4 text-emerald-500" /></div>
-                            <div>
-                                <h5 className="font-bold text-xs">{t ? 'Cô lập API Key' : 'API Key Isolation'}</h5>
-                                <p className="text-[11px] text-muted-foreground leading-relaxed mt-1">
-                                    {t ? 'Khóa Gemini API được mã hóa AES-256 và lưu trữ nghiêm ngặt phía Server. Client không bao giờ nhìn thấy khóa này.' : 'Gemini API Keys are AES-256 encrypted and stored strictly on the Server. Clients never see this key.'}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex gap-4">
-                            <div className="p-2 bg-emerald-500/10 rounded-lg h-fit"><MessageSquare className="w-4 h-4 text-emerald-500" /></div>
-                            <div>
-                                <h5 className="font-bold text-xs">{t ? 'Không dùng huấn luyện' : 'No Data Training'}</h5>
-                                <p className="text-[11px] text-muted-foreground leading-relaxed mt-1">
-                                    {t ? 'Dữ liệu truyền qua Gemini API của Google Cloud/Vertex AI cam kết không được dùng để huấn luyện các model công cộng.' : 'Data passed via Google Cloud/Vertex AI Gemini APIs is committed NOT to be used for public model training.'}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </DocSection>
+            <Callout type="tip">
+                <p className="text-sm font-medium">
+                    {t
+                        ? 'Mẹo: nếu bạn chỉ muốn tiết kiệm chi phí, dùng Auto hoặc Fast / Cheap. Nếu bạn đang làm schema analysis dài, query khó, hoặc vision, hãy chuyển sang Best Quality hoặc Gemini Only.'
+                        : 'Tip: if your goal is cost savings, use Auto or Fast / Cheap. For longer schema analysis, difficult queries, or vision tasks, switch to Best Quality or Gemini Only.'}
+                </p>
+            </Callout>
         </DocPageLayout>
     );
 }

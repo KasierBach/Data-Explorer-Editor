@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useAppStore, type AiMessage } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
 import * as XLSX from 'xlsx';
@@ -228,6 +228,69 @@ export function useAiChat() {
         setAttachments(prev => prev.filter((_, i) => i !== index));
     };
 
+    const processSseLine = useCallback((chatId: string, aiMessageId: string, raw: string, line: string) => {
+        if (!line.startsWith('data: ')) return raw;
+
+        const data = line.slice(6).trim();
+        if (!data || data === '[DONE]') return raw;
+
+        try {
+            const event = JSON.parse(data);
+
+            if (event.type === 'chunk' && event.text) {
+                const nextRaw = raw + event.text;
+                const displayText = extractMessageFromPartialJson(nextRaw);
+                updateAiMessage(chatId, aiMessageId, {
+                    content: displayText,
+                });
+                return nextRaw;
+            }
+
+            if (event.type === 'done' && event.data) {
+                const finalMsgContent = event.data.message || raw;
+                updateAiMessage(chatId, aiMessageId, {
+                    content: finalMsgContent,
+                    sql: event.data.sql || undefined,
+                    explanation: event.data.explanation || undefined,
+                    recommendations: event.data.recommendations || undefined,
+                    modelInfo: {
+                        provider: event.data.provider,
+                        model: event.data.model,
+                        routingMode: event.data.routingMode,
+                    },
+                });
+
+                store.syncAiMessage(chatId, {
+                    id: aiMessageId,
+                    role: 'ai',
+                    content: finalMsgContent,
+                    sql: event.data.sql,
+                    explanation: event.data.explanation,
+                    recommendations: event.data.recommendations,
+                    modelInfo: {
+                        provider: event.data.provider,
+                        model: event.data.model,
+                        routingMode: event.data.routingMode,
+                    },
+                    timestamp: Date.now()
+                } as any);
+
+                return raw;
+            }
+
+            if (event.type === 'error') {
+                updateAiMessage(chatId, aiMessageId, {
+                    content: `❌ ${event.text}`,
+                    error: true,
+                });
+            }
+        } catch {
+            // Skip malformed SSE lines
+        }
+
+        return raw;
+    }, [store, updateAiMessage]);
+
     const handleSend = async () => {
         if ((!input.trim() && attachments.length === 0) || isLoading || !activeAiChatId) return;
 
@@ -331,10 +394,13 @@ export function useAiChat() {
                 buffer += decoder.decode(value, { stream: true });
 
                 // Parse SSE events from buffer
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || ''; // keep incomplete line in buffer
+                const lines = buffer.split(/\r?\n/);
+                buffer = lines.pop() || '';
 
                 for (const line of lines) {
+                    rawText = processSseLine(activeAiChatId, aiMsgId, rawText, line.trimEnd());
+                    continue;
+
                     if (!line.startsWith('data: ')) continue;
                     const data = line.slice(6).trim();
                     if (data === '[DONE]') continue;
@@ -347,16 +413,17 @@ export function useAiChat() {
                             // Show raw streamed text progressively
                             // Try to extract "message" field content for display
                             const displayText = extractMessageFromPartialJson(rawText);
-                            updateAiMessage(activeAiChatId, aiMsgId, {
+                            updateAiMessage(activeAiChatId!, aiMsgId, {
                                 content: displayText,
                             });
                         } else if (event.type === 'done' && event.data) {
                             // Final parsed result with SQL/citations
                             const finalMsgContent = event.data.message || rawText;
-                            updateAiMessage(activeAiChatId, aiMsgId, {
+                            updateAiMessage(activeAiChatId!, aiMsgId, {
                                 content: finalMsgContent,
                                 sql: event.data.sql || undefined,
                                 explanation: event.data.explanation || undefined,
+                                recommendations: event.data.recommendations || undefined,
                                 modelInfo: {
                                     provider: event.data.provider,
                                     model: event.data.model,
@@ -365,12 +432,13 @@ export function useAiChat() {
                             });
                             
                             // Sync completed message to backend
-                            store.syncAiMessage(activeAiChatId, {
+                            store.syncAiMessage(activeAiChatId!, {
                                 id: aiMsgId,
                                 role: 'ai',
                                 content: finalMsgContent,
                                 sql: event.data.sql,
                                 explanation: event.data.explanation,
+                                recommendations: event.data.recommendations,
                                 modelInfo: {
                                     provider: event.data.provider,
                                     model: event.data.model,
@@ -379,7 +447,7 @@ export function useAiChat() {
                                 timestamp: Date.now()
                             } as any);
                         } else if (event.type === 'error') {
-                            updateAiMessage(activeAiChatId, aiMsgId, {
+                            updateAiMessage(activeAiChatId!, aiMsgId, {
                                 content: `❌ ${event.text}`,
                                 error: true,
                             });
@@ -387,6 +455,15 @@ export function useAiChat() {
                     } catch {
                         // Skip unparseable lines
                     }
+                }
+            }
+
+            buffer += decoder.decode();
+
+            if (buffer) {
+                const remainingLines = buffer.split(/\r?\n/);
+                for (const line of remainingLines) {
+                    rawText = processSseLine(activeAiChatId, aiMsgId, rawText, line.trimEnd());
                 }
             }
         } catch (error: any) {

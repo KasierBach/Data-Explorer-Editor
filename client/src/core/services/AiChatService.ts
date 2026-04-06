@@ -4,6 +4,7 @@ import type { AiMessage, AiChat } from './store/slices/aiChatSlice';
 function normalizeAttachmentPayload(payload: any): {
     attachments?: { type: string; label: string; preview?: string }[];
     modelInfo?: AiMessage['modelInfo'];
+    recommendations?: AiMessage['recommendations'];
 } {
     if (Array.isArray(payload)) {
         return { attachments: payload };
@@ -13,6 +14,7 @@ function normalizeAttachmentPayload(payload: any): {
         return {
             attachments: Array.isArray(payload.items) ? payload.items : undefined,
             modelInfo: payload.modelInfo || undefined,
+            recommendations: Array.isArray(payload.recommendations) ? payload.recommendations : undefined,
         };
     }
 
@@ -56,10 +58,11 @@ export class AiChatService {
     }
 
     static async saveMessage(chatId: string, message: Partial<AiMessage>): Promise<void> {
-        const attachmentsPayload = message.modelInfo
+        const attachmentsPayload = message.modelInfo || message.recommendations
             ? {
                 items: message.attachments || [],
                 modelInfo: message.modelInfo,
+                recommendations: message.recommendations,
             }
             : message.attachments;
 

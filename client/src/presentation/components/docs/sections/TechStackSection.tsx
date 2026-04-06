@@ -4,14 +4,14 @@ interface Props { lang: 'vi' | 'en'; }
 
 export function TechStackSection({ lang }: Props) {
     const t = lang === 'vi';
+
     return (
         <DocPageLayout
-            title={t ? 'Công nghệ Sử dụng' : 'Technology Stack'}
+            title={t ? 'Công nghệ sử dụng' : 'Technology stack'}
             subtitle={t
-                ? 'Tổng quan chi tiết về toàn bộ các công nghệ, thư viện và framework được sử dụng trong Data Explorer.'
-                : 'Detailed overview of all technologies, libraries, and frameworks used in Data Explorer.'}
+                ? 'Tổng quan các framework, runtime, driver, và lane AI đang được dùng thật trong Data Explorer.'
+                : 'Overview of the frameworks, runtimes, drivers, and AI lanes actually used in Data Explorer today.'}
         >
-            {/* Frontend */}
             <DocSection title={t ? 'Frontend' : 'Frontend'}>
                 <div className="border rounded-2xl overflow-hidden">
                     <table className="w-full text-sm">
@@ -24,17 +24,16 @@ export function TechStackSection({ lang }: Props) {
                         </thead>
                         <tbody className="divide-y">
                             {[
-                                { tech: 'React', ver: '18.x', role: t ? 'Thư viện xây dựng giao diện với component-based architecture' : 'UI library with component-based architecture' },
-                                { tech: 'Vite', ver: '5.x', role: t ? 'Build tool siêu nhanh với HMR (Hot Module Replacement)' : 'Ultra-fast build tool with HMR (Hot Module Replacement)' },
-                                { tech: 'TypeScript', ver: '5.x', role: t ? 'Type safety cho cả frontend và backend' : 'Type safety for both frontend and backend' },
-                                { tech: 'Tailwind CSS', ver: '3.x', role: t ? 'Utility-first CSS framework cho styling nhanh và nhất quán' : 'Utility-first CSS framework for fast, consistent styling' },
-                                { tech: 'Zustand', ver: '4.x', role: t ? 'Quản lý state toàn cục nhẹ hơn Redux rất nhiều (chỉ ~1KB)' : 'Global state management much lighter than Redux (only ~1KB)' },
-                                { tech: 'Monaco Editor', ver: '0.44+', role: t ? 'Code editor engine (giống VS Code) cho trải nghiệm soạn SQL' : 'Code editor engine (VS Code-like) for SQL editing experience' },
-                                { tech: 'React Flow', ver: '11.x', role: t ? 'Render sơ đồ ERD tương tác với nút và cạnh kéo thả được' : 'Render interactive ERD diagrams with draggable nodes and edges' },
-                                { tech: 'TanStack Query', ver: '5.x', role: t ? 'Quản lý async data fetching, caching, và synchronization' : 'Async data fetching, caching, and synchronization management' },
-                                { tech: 'Radix UI', ver: 'Latest', role: t ? 'Headless UI primitives accessible (Dialog, Dropdown, Tooltip...)' : 'Accessible headless UI primitives (Dialog, Dropdown, Tooltip...)' },
-                                { tech: 'Lucide React', ver: 'Latest', role: t ? 'Bộ icon SVG 800+ icons, nhẹ và tùy biến cao' : '800+ SVG icon set, lightweight and highly customizable' },
-                                { tech: 'Recharts', ver: '2.x', role: t ? 'Thư viện biểu đồ React cho visualization dữ liệu' : 'React charting library for data visualization' },
+                                { tech: 'React', ver: '19.x', role: t ? 'Nền tảng giao diện chính cho toàn bộ ứng dụng client.' : 'Primary UI foundation for the entire client application.' },
+                                { tech: 'Vite', ver: '7.x', role: t ? 'Dev server và build pipeline tốc độ cao.' : 'Fast dev server and build pipeline.' },
+                                { tech: 'TypeScript', ver: '5.9.x', role: t ? 'Type safety xuyên suốt frontend và backend.' : 'Type safety across frontend and backend.' },
+                                { tech: 'Tailwind CSS', ver: '4.x', role: t ? 'Styling utility-first cho toàn bộ surface UI.' : 'Utility-first styling across the whole UI surface.' },
+                                { tech: 'Zustand', ver: '5.x', role: t ? 'State management dạng slice cho tabs, AI chat, connections và UI shell.' : 'Slice-based state management for tabs, AI chat, connections, and the shell.' },
+                                { tech: 'Monaco Editor', ver: '4.7+', role: t ? 'SQL editor chính với shortcut, formatting, và completions.' : 'Primary SQL editor with shortcuts, formatting, and completions.' },
+                                { tech: '@tanstack/react-query', ver: '5.x', role: t ? 'Server state, caching, và request synchronization.' : 'Server state, caching, and request synchronization.' },
+                                { tech: '@xyflow/react', ver: '12.x', role: t ? 'Canvas engine cho ERD/visual diagram flow.' : 'Canvas engine for ERD and visual diagram flows.' },
+                                { tech: 'Recharts', ver: '3.x', role: t ? 'Chart rendering cho query results và dashboard widgets.' : 'Chart rendering for query results and dashboard widgets.' },
+                                { tech: 'Radix UI', ver: 'latest', role: t ? 'Headless primitives cho dialog, dropdown, tooltip, tabs và menus.' : 'Headless primitives for dialogs, dropdowns, tooltips, tabs, and menus.' },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/20 transition-colors">
                                     <td className="p-4 font-bold text-primary">{row.tech}</td>
@@ -47,7 +46,6 @@ export function TechStackSection({ lang }: Props) {
                 </div>
             </DocSection>
 
-            {/* Backend */}
             <DocSection title={t ? 'Backend' : 'Backend'}>
                 <div className="border rounded-2xl overflow-hidden">
                     <table className="w-full text-sm">
@@ -60,14 +58,15 @@ export function TechStackSection({ lang }: Props) {
                         </thead>
                         <tbody className="divide-y">
                             {[
-                                { tech: 'NestJS', ver: '10.x', role: t ? 'Enterprise Node.js framework với dependency injection và modular architecture' : 'Enterprise Node.js framework with dependency injection and modular architecture' },
-                                { tech: 'Prisma ORM', ver: '5.x', role: t ? 'Type-safe ORM kết nối với PostgreSQL/Supabase (quản lý users & connections bền vững)' : 'Type-safe ORM for PostgreSQL/Supabase database (persistently manages users & connections)' },
-                                { tech: 'Passport.js', ver: '0.7+', role: t ? 'Xác thực người dùng với chiến lược JWT (JSON Web Token)' : 'User authentication with JWT (JSON Web Token) strategy' },
-                                { tech: 'pg (node-postgres)', ver: '8.x', role: t ? 'Driver PostgreSQL native cho Node.js' : 'Native PostgreSQL driver for Node.js' },
-                                { tech: 'mysql2', ver: '3.x', role: t ? 'Driver MySQL/MariaDB with promise support' : 'MySQL/MariaDB driver with promise support' },
-                                { tech: 'mssql (tedious)', ver: '10.x', role: t ? 'Driver SQL Server chính thức cho Node.js' : 'Official SQL Server driver for Node.js' },
-
-                                { tech: 'RxJS', ver: '7.x', role: t ? 'Reactive programming cho SSE streaming và event handling' : 'Reactive programming for SSE streaming and event handling' },
+                                { tech: 'NestJS', ver: '11.x', role: t ? 'Framework backend chính với module boundaries và DI.' : 'Primary backend framework with module boundaries and DI.' },
+                                { tech: 'Prisma', ver: '6.x', role: t ? 'ORM cho metadata app: users, connections, saved queries, dashboards.' : 'ORM for app metadata: users, connections, saved queries, and dashboards.' },
+                                { tech: 'Passport + JWT', ver: '11.x / 4.x', role: t ? 'Email login, Google/GitHub OAuth, JWT session flow.' : 'Email login, Google/GitHub OAuth, and JWT session flow.' },
+                                { tech: 'pg', ver: '8.x', role: t ? 'Native PostgreSQL driver cho SQL execution.' : 'Native PostgreSQL driver for SQL execution.' },
+                                { tech: 'mysql2', ver: '3.x', role: t ? 'MySQL/MariaDB driver.' : 'MySQL/MariaDB driver.' },
+                                { tech: 'mssql', ver: '12.x', role: t ? 'SQL Server driver.' : 'SQL Server driver.' },
+                                { tech: 'mongodb', ver: '7.x', role: t ? 'MongoDB / Atlas support cho NoSQL workspace.' : 'MongoDB / Atlas support for the NoSQL workspace.' },
+                                { tech: 'RxJS', ver: '7.x', role: t ? 'Streaming flows, especially cho AI SSE responses.' : 'Streaming flows, especially for AI SSE responses.' },
+                                { tech: 'helmet', ver: '8.x', role: t ? 'HTTP hardening headers trên backend.' : 'HTTP hardening headers on the backend.' },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/20 transition-colors">
                                     <td className="p-4 font-bold text-primary">{row.tech}</td>
@@ -80,49 +79,33 @@ export function TechStackSection({ lang }: Props) {
                 </div>
             </DocSection>
 
-            {/* Testing */}
-            <DocSection title={t ? 'Kiểm thử & Chất lượng' : 'Testing & Quality'}>
-                <div className="border rounded-2xl overflow-hidden">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="bg-amber-500/10">
-                                <th className="text-left p-4 font-bold">{t ? 'Công cụ' : 'Tool'}</th>
-                                <th className="text-left p-4 font-bold">{t ? 'Phiên bản' : 'Version'}</th>
-                                <th className="text-left p-4 font-bold">{t ? 'Vai trò' : 'Purpose'}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                            {[
-                                { tech: 'Vitest', ver: '1.x', role: t ? 'Test runner hiện đại, nhanh và tương thích với Vite' : 'Modern, fast test runner fully compatible with Vite' },
-                                { tech: 'React Testing Library', ver: '14.x', role: t ? 'Kiểm thử component theo hành vi người dùng' : 'Testing components based on user behavior' },
-                                { tech: 'JSDOM', ver: 'Latest', role: t ? 'Mô phỏng môi trường trình duyệt cho unit tests' : 'Browser environment simulation for unit tests' },
-                            ].map((row, i) => (
-                                <tr key={i} className="hover:bg-muted/10 transition-colors">
-                                    <td className="p-4 font-bold text-primary">{row.tech}</td>
-                                    <td className="p-4 font-mono text-xs">{row.ver}</td>
-                                    <td className="p-4 text-muted-foreground">{row.role}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </DocSection>
-
-            {/* AI */}
-            <DocSection title={t ? 'Trí tuệ Nhân tạo' : 'Artificial Intelligence'}>
+            <DocSection title={t ? 'AI stack & routing' : 'AI stack & routing'}>
                 <div className="border rounded-2xl overflow-hidden">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-purple-500/10">
-                                <th className="text-left p-4 font-bold">{t ? 'Dịch vụ' : 'Service'}</th>
-                                <th className="text-left p-4 font-bold">Model</th>
+                                <th className="text-left p-4 font-bold">{t ? 'Lane / Provider' : 'Lane / Provider'}</th>
+                                <th className="text-left p-4 font-bold">{t ? 'Ví dụ model' : 'Example model'}</th>
                                 <th className="text-left p-4 font-bold">{t ? 'Vai trò' : 'Purpose'}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
                             {[
-                                { service: 'Google AI Studio', model: 'gemini-2.0-flash', role: t ? 'Tạo SQL từ ngôn ngữ tự nhiên, giải thích truy vấn, phân tích lược đồ' : 'Natural language to SQL, query explanation, schema analysis' },
-                                { service: 'Google AI Studio', model: 'gemini-1.5-pro-vision', role: t ? 'Phân tích hình ảnh sơ đồ ERD vẽ tay → tạo CREATE TABLE SQL' : 'Analyze hand-drawn ERD diagram images → generate CREATE TABLE SQL' },
+                                {
+                                    service: 'Gemini premium lane',
+                                    model: 'gemini-3-flash-preview / selected Gemini model',
+                                    role: t ? 'Task khó hơn, image input, vision flows, và fallback chất lượng cao.' : 'Harder tasks, image input, vision flows, and higher-quality fallback.'
+                                },
+                                {
+                                    service: 'Cerebras cheap lane',
+                                    model: 'llama3.1-8b',
+                                    role: t ? 'General chat và prompt nhẹ để giảm tần suất gọi Gemini.' : 'General chat and light prompts to reduce Gemini usage.'
+                                },
+                                {
+                                    service: 'OpenRouter fallback lane',
+                                    model: 'openrouter/auto',
+                                    role: t ? 'Fallback lane tùy chọn khi muốn thêm provider ngoài Gemini/Cerebras.' : 'Optional fallback lane when you want a provider beyond Gemini/Cerebras.'
+                                },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/20 transition-colors">
                                     <td className="p-4 font-bold">{row.service}</td>
@@ -134,45 +117,39 @@ export function TechStackSection({ lang }: Props) {
                     </table>
                 </div>
                 <Callout type="info">
-                    <p className="text-muted-foreground">{t
-                        ? '📌 GEMINI_API_KEY có thể được lấy miễn phí tại Google AI Studio (aistudio.google.com). Free tier cho phép ~60 requests/phút — đủ dùng cho phát triển và team nhỏ.'
-                        : '📌 GEMINI_API_KEY can be obtained free at Google AI Studio (aistudio.google.com). Free tier allows ~60 requests/minute — sufficient for development and small teams.'}</p>
+                    <p className="text-muted-foreground">
+                        {t
+                            ? 'AI panel hiện hỗ trợ các routing mode như Auto, Fast / Cheap, Best Quality và Gemini Only. UI cũng hiển thị provider/model thực tế đã trả lời để tránh nhầm lẫn khi routing đang hoạt động.'
+                            : 'The AI panel now supports routing modes such as Auto, Fast / Cheap, Best Quality, and Gemini Only. The UI also shows the actual provider/model that answered so routing decisions stay transparent.'}
+                    </p>
                 </Callout>
             </DocSection>
-            {/* Technical Rationale */}
-            <DocSection title={t ? 'Lý do chúng tôi chọn bộ Stack này' : 'Technical Rationale & Deep Dive'}>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-                    {[
-                        {
-                            title: t ? 'Gemini 3.1 Flash-Lite: Low Latency' : 'Gemini 3.1 Flash-Lite: Low Latency',
-                            desc: t ? 'Chúng tôi chọn Flash-Lite thay vì Pro cho các tính năng soạn thảo vì tốc độ phản hồi < 1 giây, điều cốt yếu để không làm gián đoạn luồng suy nghĩ của developer.' : 'We chose Flash-Lite over Pro for editor features because of sub-second response times, crucial for not breaking the developer\'s flow.'
-                        },
-                        {
-                            title: t ? 'Hexagonal + NestJS: Driver Agnostic' : 'Hexagonal + NestJS: Driver Agnostic',
-                            desc: t ? 'Sự kết hợp này cho phép Data Explorer hỗ trợ PostgreSQL, MySQL, MSSQL chỉ bằng cách đổi Adapter mà không chạm vào Domain logic.' : 'This combo allows Data Explorer to support PostgreSQL, MySQL, and MSSQL just by switching Adapters without touching Domain logic.'
-                        },
-                        {
-                            title: t ? 'Zustand Slices: State Scalability' : 'Zustand Slices: State Scalability',
-                            desc: t ? 'Kiến trúc Slice giúp cô lập trạng thái của Tab, Connection và UI, ngăn chặn việc re-render toàn bộ ứng dụng khi chỉ có 1 ký tự được gõ.' : 'Slice architecture isolates Tab, Connection, and UI states, preventing full-app re-renders when only 1 character is typed.'
-                        },
-                        {
-                            title: t ? 'Prisma: Schema-First Safety' : 'Prisma: Schema-First Safety',
-                            desc: t ? 'Tự động sinh Types cho DB giúp loại bỏ 90% lỗi runtime. Mọi thay đổi schema đều được TypeScript kiểm tra ngay lập tức.' : 'Auto-generated DB types eliminate 90% of runtime errors. Any schema changes are immediately validated by TypeScript.'
-                        },
-                        {
-                            title: t ? 'Web Workers: Thread Isolation' : 'Web Workers: Thread Isolation',
-                            desc: t ? 'Việc đưa Monaco Language Client vào Web Worker giúp duy trì 60fps ngay cả khi xử lý các tệp SQL hàng chục nghìn dòng.' : 'Moving Monaco Language Client to a Web Worker maintains 60fps even when handling ten-thousand-line SQL files.'
-                        },
-                        {
-                            title: t ? 'SSE: Real-time SQL Streaming' : 'SSE: Real-time SQL Streaming',
-                            desc: t ? 'Server-Sent Events cho phép hiển thị kết quả AI ngay khi server nhận được những token đầu tiên, giảm rào cản tâm lý về độ trễ.' : 'Server-Sent Events allow displaying AI results as soon as the first tokens are received, reducing the psychological barrier of latency.'
-                        }
-                    ].map((reason, i) => (
-                        <div key={i} className="p-5 border rounded-2xl bg-muted/5 space-y-2 hover:bg-muted/10 transition-colors">
-                            <h5 className="font-bold text-xs text-primary">{reason.title}</h5>
-                            <p className="text-[10px] text-muted-foreground leading-relaxed">{reason.desc}</p>
-                        </div>
-                    ))}
+
+            <DocSection title={t ? 'Testing & quality' : 'Testing & quality'}>
+                <div className="border rounded-2xl overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-amber-500/10">
+                                <th className="text-left p-4 font-bold">{t ? 'Công cụ' : 'Tool'}</th>
+                                <th className="text-left p-4 font-bold">{t ? 'Phiên bản' : 'Version'}</th>
+                                <th className="text-left p-4 font-bold">{t ? 'Vai trò' : 'Purpose'}</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {[
+                                { tech: 'Vitest', ver: '4.x', role: t ? 'Frontend unit tests và component tests.' : 'Frontend unit tests and component tests.' },
+                                { tech: 'React Testing Library', ver: '16.x', role: t ? 'UI testing theo hành vi người dùng.' : 'User-behavior-oriented UI testing.' },
+                                { tech: 'Jest', ver: '30.x', role: t ? 'Backend test runner cho NestJS services/controllers.' : 'Backend test runner for NestJS services and controllers.' },
+                                { tech: 'ts-jest', ver: '29.x', role: t ? 'TypeScript transform cho backend test suite.' : 'TypeScript transform for the backend test suite.' },
+                            ].map((row, i) => (
+                                <tr key={i} className="hover:bg-muted/10 transition-colors">
+                                    <td className="p-4 font-bold text-primary">{row.tech}</td>
+                                    <td className="p-4 font-mono text-xs">{row.ver}</td>
+                                    <td className="p-4 text-muted-foreground">{row.role}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </DocSection>
         </DocPageLayout>

@@ -1,133 +1,143 @@
-import { Server, Globe, Shield, Container, Cpu } from 'lucide-react';
-import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment, CodeLine, Callout, InfoCard } from '../primitives';
+import { Server, Globe, Shield, Rocket, Database, KeyRound } from 'lucide-react';
+import { DocPageLayout, DocSection, DocSubSection, CodeBlock, CodeComment, CodeLine, Callout, InfoCard } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
 export function DeploymentSection({ lang }: Props) {
     const t = lang === 'vi';
+
     return (
         <DocPageLayout
             title={t ? 'Triển khai Production' : 'Production Deployment'}
             subtitle={t
-                ? 'Hướng dẫn chi tiết cách đưa Data Explorer lên môi trường server thực tế, sử dụng Docker, PM2 và cấu hình Nginx SSL.'
-                : 'Detailed guide on deploying Data Explorer to real-world server environments using Docker, PM2, and Nginx SSL configuration.'}
+                ? 'Checklist thực dụng để đưa Data Explorer lên web thật, gồm Render/Vercel, env bắt buộc, db push, OAuth callback, và những lỗi deploy hay gặp nhất.'
+                : 'A practical checklist for shipping Data Explorer to production, including Render/Vercel, required envs, db push, OAuth callbacks, and the most common deployment pitfalls.'}
             gradient
         >
-            {/* Deployment Strategies */}
-            <div className="grid md:grid-cols-2 gap-6 mb-16">
+            <div className="grid md:grid-cols-2 gap-6 mb-12">
                 <div className="p-8 border rounded-3xl bg-gradient-to-br from-blue-500/10 via-background to-background">
-                    <Container className="w-10 h-10 text-blue-500 mb-6" />
-                    <h3 className="text-xl font-bold mb-3">{t ? 'Cơ bản (Docker)' : 'Standard (Docker)'}</h3>
+                    <Rocket className="w-10 h-10 text-blue-500 mb-6" />
+                    <h3 className="text-xl font-bold mb-3">{t ? 'Frontend: Vercel' : 'Frontend: Vercel'}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
                         {t
-                            ? 'Cách tiếp cận hiện đại và cô lập nhất. Chạy toàn bộ stack (FE, BE, DB) chỉ với một file docker-compose.'
-                            : 'The most modern and isolated approach. Run the entire stack (FE, BE, DB) with a single docker-compose file.'}
+                            ? 'Phù hợp để deploy client nhanh, CDN tốt, và chỉ cần trỏ VITE_API_URL về backend.'
+                            : 'Great for shipping the client quickly, with strong CDN behavior and only one required API URL to point to the backend.'}
                     </p>
                 </div>
                 <div className="p-8 border rounded-3xl bg-gradient-to-br from-emerald-500/10 via-background to-background">
-                    <Cpu className="w-10 h-10 text-emerald-500 mb-6" />
-                    <h3 className="text-xl font-bold mb-3">{t ? 'Nâng cao (PM2 + Nginx)' : 'Bare Metal (PM2 + Nginx)'}</h3>
+                    <Server className="w-10 h-10 text-emerald-500 mb-6" />
+                    <h3 className="text-xl font-bold mb-3">{t ? 'Backend: Render' : 'Backend: Render'}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
                         {t
-                            ? 'Dành cho các server Linux truyền thống. Tận dụng tối đa tài nguyên phần cứng và linh hoạt cấu hình proxy.'
-                            : 'For traditional Linux servers. Maximize hardware resources and flexible proxy configuration.'}
+                            ? 'Phù hợp để chạy NestJS backend và Prisma, miễn là build command có bước sync schema trước khi boot.'
+                            : 'A solid fit for the NestJS backend and Prisma, as long as your build command syncs the schema before boot.'}
                     </p>
                 </div>
             </div>
 
-            {/* Docker Compose Section */}
-            <DocSection title={t ? '1. Triển khai bằng Docker Compose' : '1. Deploy with Docker Compose'}>
-                <Prose>
-                    {t
-                        ? 'Đây là cách nhanh nhất để deploy Data Explorer. File docker-compose.yml sẽ tự động build image và thiết lập mạng nội bộ.'
-                        : 'The fastest way to deploy Data Explorer. The docker-compose.yml file will automatically build images and set up internal networking.'}
-                </Prose>
-                <CodeBlock title="docker-compose.yml">
-                    <CodeComment># {t ? 'Cấu hình Production Stack' : 'Production Stack Configuration'}</CodeComment>
-                    <CodeLine>services:</CodeLine>
-                    <CodeLine>  server:</CodeLine>
-                    <CodeLine>    build: ./server</CodeLine>
-                    <CodeLine>    ports: ["3001:3001"]</CodeLine>
-                    <CodeLine>    env_file: .env.production</CodeLine>
-                    <CodeLine>  client:</CodeLine>
-                    <CodeLine>    build: ./client</CodeLine>
-                    <CodeLine>    ports: ["80:80"]</CodeLine>
-                    <CodeLine>    depends_on: [server]</CodeLine>
-                </CodeBlock>
-                <CodeBlock title={t ? 'Lệnh thực thi' : 'Command'}>
-                    <CodeLine>docker-compose up -d --build</CodeLine>
-                </CodeBlock>
+            <DocSection title={t ? '1. Build commands khuyên dùng' : '1. Recommended build commands'}>
+                <DocSubSection title={t ? 'Backend service (Render)' : 'Backend service (Render)'}>
+                    <CodeBlock title={t ? 'Build command' : 'Build command'}>
+                        <CodeLine>npx prisma db push && npm run build</CodeLine>
+                    </CodeBlock>
+                    <CodeBlock title={t ? 'Start command' : 'Start command'}>
+                        <CodeLine>npm run start:prod</CodeLine>
+                    </CodeBlock>
+                    <Callout type="warning">
+                        <p className="text-sm">
+                            {t
+                                ? 'Repo hiện tại chưa sẵn sàng cho prisma migrate deploy xuyên suốt mọi môi trường. Nếu bạn đang deploy bản app này, hãy dùng db push để đồng bộ schema production.'
+                                : 'The current repo is not yet fully aligned for prisma migrate deploy across every environment. For this app version, use db push to sync production schema.'}
+                        </p>
+                    </Callout>
+                </DocSubSection>
+
+                <DocSubSection title={t ? 'Frontend service (Vercel)' : 'Frontend service (Vercel)'}>
+                    <CodeBlock title={t ? 'Frontend env' : 'Frontend env'}>
+                        <CodeLine>VITE_API_URL=https://your-backend-domain.com/api</CodeLine>
+                    </CodeBlock>
+                </DocSubSection>
             </DocSection>
 
-            {/* Environment Variables */}
-            <DocSection title={t ? '2. Biến môi trường (Environment)' : '2. Environment Variables'}>
-                <Prose>
-                    {t
-                        ? 'Đảm bảo tệp .env của bạn chứa các thông tin bảo mật cho môi trường Production.'
-                        : 'Ensure your .env file contains secure information for the Production environment.'}
-                </Prose>
-                <div className="grid gap-4 mt-6">
+            <DocSection title={t ? '2. Biến môi trường bắt buộc' : '2. Required environment variables'}>
+                <div className="grid gap-4 mt-4">
                     {[
-                        { k: 'JWT_SECRET', d: t ? 'Khóa bảo mật phiên làm việc (Cực kỳ quan trọng)' : 'Session security key (Extremely Important)' },
-                        { k: 'ENCRYPTION_KEY', d: t ? 'Khóa mã hóa mật khẩu Database (32 bytes)' : 'Database password encryption key (32 bytes)' },
-                        { k: 'CORS_ORIGIN', d: t ? 'Domain frontend chính thức của bạn' : 'Your official frontend domain' }
-                    ].map((env, i) => (
-                        <div key={i} className="flex items-center justify-between p-4 border rounded-xl bg-muted/5">
-                            <code className="text-xs font-bold text-blue-500">{env.k}</code>
-                            <span className="text-xs text-muted-foreground">{env.d}</span>
+                        { icon: <Database className="w-4 h-4" />, key: 'DATABASE_URL', descVi: 'Database trung tâm của ứng dụng.', descEn: 'The central database for the application.' },
+                        { icon: <KeyRound className="w-4 h-4" />, key: 'JWT_SECRET', descVi: 'Secret mạnh để ký token. Placeholder sẽ bị backend từ chối.', descEn: 'A strong token-signing secret. Placeholder values will be rejected by the backend.' },
+                        { icon: <Shield className="w-4 h-4" />, key: 'ENCRYPTION_KEY', descVi: 'Phải đúng 32 ký tự để mã hóa saved connection passwords.', descEn: 'Must be exactly 32 characters to encrypt saved connection passwords.' },
+                        { icon: <Globe className="w-4 h-4" />, key: 'FRONTEND_URL', descVi: 'Origin frontend thật dùng cho CORS và OAuth redirects.', descEn: 'The real frontend origin used for CORS and OAuth redirects.' }
+                    ].map((env) => (
+                        <div key={env.key} className="flex items-center justify-between gap-4 rounded-2xl border bg-muted/10 px-4 py-4">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-primary/10 p-2 text-primary">{env.icon}</div>
+                                <code className="text-xs font-bold text-primary">{env.key}</code>
+                            </div>
+                            <span className="text-xs text-muted-foreground text-right max-w-[34rem]">
+                                {t ? env.descVi : env.descEn}
+                            </span>
                         </div>
                     ))}
                 </div>
             </DocSection>
 
-            {/* Nginx & SSL */}
-            <DocSection title={t ? '3. Cấu hình Reverse Proxy & SSL' : '3. Reverse Proxy & SSL Configuration'}>
-                <div className="space-y-6">
-                    <DocSubSection title="Nginx Virtual Host">
-                        <Prose>{t ? 'Sử dụng Nginx để xử lý HTTPS và forward request tới backend/frontend.' : 'Use Nginx to handle HTTPS and forward requests to backend/frontend.'}</Prose>
-                        <CodeBlock title="/etc/nginx/sites-available/data-explorer">
-                            <CodeLine>server {'{'}</CodeLine>
-                            <CodeLine>  listen 443 ssl;</CodeLine>
-                            <CodeLine>  server_name yourdomain.com;</CodeLine>
-                            <p className="mt-2" />
-                            <CodeComment># Frontend</CodeComment>
-                            <CodeLine>  location / {'{'}</CodeLine>
-                            <CodeLine>    proxy_pass http://localhost:5173;</CodeLine>
-                            <CodeLine>  {'}'}</CodeLine>
-                            <p className="mt-2" />
-                            <CodeComment># Backend API</CodeComment>
-                            <CodeLine>  location /api {'{'}</CodeLine>
-                            <CodeLine>    proxy_pass http://localhost:3001;</CodeLine>
-                            <CodeLine>    proxy_set_header Upgrade $http_upgrade;</CodeLine>
-                            <CodeLine>  {'}'}</CodeLine>
-                            <CodeLine>{'}'}</CodeLine>
-                        </CodeBlock>
-                    </DocSubSection>
-                    
-                    <Callout type="warning">
-                        <p className="text-xs">
-                          {t 
-                            ? 'Luôn sử dụng Certbot hoặc các giải pháp SSL khác để kích hoạt HTTPS. Backend sẽ chặn các connection nếu không chạy trên giao thức an toàn trong mode Production.' 
-                            : 'Always use Certbot or other SSL solutions to enable HTTPS. The backend will block connections if not running on a secure protocol in Production mode.'}
+            <DocSection title={t ? '3. OAuth checklist' : '3. OAuth checklist'}>
+                <ul className="grid gap-3">
+                    {[
+                        t ? 'GOOGLE_CALLBACK_URL và GITHUB_CALLBACK_URL phải trỏ về backend thật, ví dụ https://your-backend.onrender.com/api/auth/google/callback.' : 'GOOGLE_CALLBACK_URL and GITHUB_CALLBACK_URL must point to the real backend, for example https://your-backend.onrender.com/api/auth/google/callback.',
+                        t ? 'FRONTEND_URL phải khớp origin thực tế của client, nếu không exchange flow sau /login#code=... sẽ fail.' : 'FRONTEND_URL must match the real client origin, otherwise the exchange flow after /login#code=... will fail.',
+                        t ? 'Sau mỗi lần đổi env OAuth, redeploy backend để callback/controller nạp cấu hình mới.' : 'After changing any OAuth env, redeploy the backend so the callback/controller loads the new configuration.'
+                    ].map((item) => (
+                        <li key={item} className="rounded-xl border border-border/50 bg-card/40 px-4 py-3 text-xs text-muted-foreground">
+                            {item}
+                        </li>
+                    ))}
+                </ul>
+            </DocSection>
+
+            <DocSection title={t ? '4. AI provider envs' : '4. AI provider envs'}>
+                <CodeBlock title={t ? 'Optional AI lanes' : 'Optional AI lanes'}>
+                    <CodeComment>{t ? 'Premium lane' : 'Premium lane'}</CodeComment>
+                    <CodeLine>GEMINI_API_KEY=...</CodeLine>
+                    <p className="mt-3" />
+                    <CodeComment>{t ? 'Lower-cost lane' : 'Lower-cost lane'}</CodeComment>
+                    <CodeLine>CEREBRAS_API_KEY=...</CodeLine>
+                    <CodeLine>CEREBRAS_BASE_URL=https://api.cerebras.ai/v1</CodeLine>
+                    <CodeLine>CEREBRAS_CHAT_MODEL=llama3.1-8b</CodeLine>
+                    <p className="mt-3" />
+                    <CodeComment>{t ? 'Fallback lane' : 'Fallback lane'}</CodeComment>
+                    <CodeLine>OPENROUTER_API_KEY=...</CodeLine>
+                    <CodeLine>OPENROUTER_BASE_URL=https://openrouter.ai/api/v1</CodeLine>
+                    <CodeLine>OPENROUTER_CHAT_MODEL=openrouter/auto</CodeLine>
+                </CodeBlock>
+            </DocSection>
+
+            <DocSection title={t ? '5. Những lỗi deploy hay gặp' : '5. Common deployment failures'}>
+                <div className="grid md:grid-cols-3 gap-4">
+                    <InfoCard icon={<Database className="w-4 h-4" />} title={t ? 'Schema lệch' : 'Schema drift'} color="amber">
+                        <p className="text-[10px]">
+                            {t ? 'Backend lên code mới nhưng DB chưa db push, gây lỗi 500 ở login hoặc dashboard APIs.' : 'The backend ships new code but the database has not been db pushed yet, causing 500 errors in login or dashboard APIs.'}
                         </p>
-                    </Callout>
+                    </InfoCard>
+                    <InfoCard icon={<Shield className="w-4 h-4" />} title={t ? 'Secret yếu' : 'Weak secret'} color="red">
+                        <p className="text-[10px]">
+                            {t ? 'JWT_SECRET placeholder sẽ làm backend không khởi động được.' : 'A placeholder JWT_SECRET will prevent the backend from booting.'}
+                        </p>
+                    </InfoCard>
+                    <InfoCard icon={<Globe className="w-4 h-4" />} title={t ? 'Callback sai domain' : 'Wrong callback domain'} color="blue">
+                        <p className="text-[10px]">
+                            {t ? 'Google/GitHub login fail nếu callback URL hoặc FRONTEND_URL không khớp deployment thật.' : 'Google/GitHub login will fail if callback URLs or FRONTEND_URL do not match the real deployment.'}
+                        </p>
+                    </InfoCard>
                 </div>
             </DocSection>
 
-            {/* Health Checks */}
-            <DocSection title={t ? 'Kiểm tra trạng thái (Health Checks)' : 'Status & Health Checks'}>
-                <div className="grid md:grid-cols-3 gap-4">
-                    <InfoCard icon={<Server className="w-4 h-4" />} title="Backend" color="blue">
-                        <p className="text-[10px]">{t ? 'Check endpoint /api/health' : 'Check endpoint /api/health'}</p>
-                    </InfoCard>
-                    <InfoCard icon={<Globe className="w-4 h-4" />} title="Frontend" color="emerald">
-                        <p className="text-[10px]">{t ? 'Kiểm tra tệp build trong dist/' : 'Check build files in dist/'}</p>
-                    </InfoCard>
-                    <InfoCard icon={<Shield className="w-4 h-4" />} title="Database" color="amber">
-                        <p className="text-[10px]">{t ? 'Kiểm tra Prisma connection pool' : 'Check Prisma connection pool'}</p>
-                    </InfoCard>
-                </div>
-            </DocSection>
+            <Callout type="tip">
+                <p className="text-sm">
+                    {t
+                        ? 'Nếu bạn chỉ muốn ship nhanh: Vercel cho client, Render cho backend, set env chuẩn, chạy db push trong build command, rồi test login + health check + 1 query thật trước khi public.'
+                        : 'If you just want to ship quickly: use Vercel for the client, Render for the backend, set the envs correctly, run db push in the build command, then test login + health check + one real query before going public.'}
+                </p>
+            </Callout>
         </DocPageLayout>
     );
 }

@@ -26,10 +26,10 @@ export function IntroductionSection({ lang }: Props) {
                         ? 'Kết nối bản địa tới PostgreSQL, MySQL và SQL Server thông qua một giao diện thống nhất. Mỗi engine sử dụng driver riêng biệt được tối ưu hóa cho hiệu suất tốt nhất — không chỉ là một wrapper chung chung.'
                         : 'Native connections to PostgreSQL, MySQL and SQL Server through a unified interface. Each engine uses its own optimized driver for maximum performance — not just a generic wrapper.'}</p>
                 </InfoCard>
-                <InfoCard icon={<BookOpen className="w-6 h-6 text-purple-500" />} title={t ? 'Trợ lý AI Gemini 3.1' : 'Gemini 3.1 AI Assistant'} color="purple">
+                <InfoCard icon={<BookOpen className="w-6 h-6 text-purple-500" />} title={t ? 'AI Assistant đa lane' : 'Multi-lane AI Assistant'} color="purple">
                     <p>{t
-                        ? 'Tích hợp sâu với Google Gemini 3.1 Flash-Lite để tạo mã SQL từ ngôn ngữ tự nhiên, phân tích lược đồ thông minh, và tái cấu trúc database schema từ hình ảnh sơ đồ vẽ tay.'
-                        : 'Deeply integrated with Google Gemini 3.1 Flash-Lite for natural language to SQL generation, intelligent schema analysis, and schema reconstruction from hand-drawn diagrams.'}</p>
+                        ? 'Kết hợp AI routing, Gemini, và lane chi phí thấp hơn để hỗ trợ general chat, SQL generation, schema analysis, typed recommendations, và vision flows.'
+                        : 'Combines AI routing, Gemini, and lower-cost lanes to support general chat, SQL generation, schema analysis, typed recommendations, and vision flows.'}</p>
                 </InfoCard>
             </FeatureGrid>
 
@@ -94,8 +94,8 @@ export function IntroductionSection({ lang }: Props) {
                         {
                             title: t ? "Bảo mật tuyệt đối" : "Absolute Security",
                             desc: t
-                                ? "Kiến trúc Multi-Tier đảm bảo thông tin kết nối chỉ lưu trên server PostgreSQL của bạn. Mật khẩu được mã hóa AES-256-GCM trước khi lưu. JWT tokens sử dụng HttpOnly cookies để ngăn chặn XSS."
-                                : "Multi-Tier architecture ensures all connection data stays on your PostgreSQL server. Passwords are AES-256-GCM encrypted before storage. JWT tokens use HttpOnly cookies to prevent XSS attacks."
+                                ? "Kiến trúc nhiều lớp giúp tách dữ liệu kết nối, metadata app, và UI. Mật khẩu connection được mã hóa AES-256-GCM trước khi lưu; backend ép buộc secret mạnh, guardrails cho query, và SSRF validation cho host đích."
+                                : "A layered architecture keeps connection data, app metadata, and UI concerns separated. Connection passwords are AES-256-GCM encrypted before storage; the backend enforces strong secrets, query guardrails, and SSRF validation for target hosts."
                         },
                         {
                             title: t ? "Trải nghiệm lập trình viên" : "Developer Experience",
@@ -142,9 +142,9 @@ export function IntroductionSection({ lang }: Props) {
                         </h4>
                         <div className="space-y-4">
                             {[
-                                { v: 'v3.1.x', t: t ? 'AI Inline Completion & Smooth UI' : 'AI Inline Completion & Smooth UI', d: '✅ Done' },
-                                { v: 'v3.2.x', t: t ? 'Visual Query Builder (Drag-drop AI)' : 'Visual Query Builder (Drag-drop AI)', d: '🚀 Planned' },
-                                { v: 'v4.0', t: t ? 'Self-Healing Migrations' : 'Self-Healing Migrations', d: '🎯 Vision' }
+                                { v: 'Now', t: t ? 'Connection guardrails + shared queries' : 'Connection guardrails + shared queries', d: '✅ Live' },
+                                { v: 'Next', t: t ? 'ERD save/load + migration dry-run' : 'ERD save/load + migration dry-run', d: '🚀 In progress' },
+                                { v: 'Later', t: t ? 'Scheduled reports + richer dashboards' : 'Scheduled reports + richer dashboards', d: '🎯 Roadmap' }
                             ].map((item, i) => (
                                 <div key={i} className="flex justify-between items-center text-[10px]">
                                     <span className="font-mono text-muted-foreground">{item.v}</span>
@@ -171,8 +171,10 @@ export function IntroductionSection({ lang }: Props) {
                         <tbody className="divide-y">
                             {[
                                 { feature: 'Monaco SQL Editor', desc: t ? 'Trình soạn thảo VS Code-grade với IntelliSense' : 'VS Code-grade editor with IntelliSense', status: '✅' },
-                                { feature: t ? 'Đa kết nối DB' : 'Multi-DB Connections', desc: t ? 'PostgreSQL, MySQL, MSSQL, ClickHouse' : 'PostgreSQL, MySQL, MSSQL, ClickHouse', status: '✅' },
-                                { feature: t ? 'AI SQL Generation' : 'AI SQL Generation', desc: t ? 'Gemini 3.1 Flash-Lite + Vision API' : 'Gemini 3.1 Flash-Lite + Vision API', status: '✅' },
+                                { feature: t ? 'Đa kết nối DB' : 'Multi-DB Connections', desc: t ? 'PostgreSQL, MySQL, MSSQL, MongoDB, MongoDB Atlas' : 'PostgreSQL, MySQL, MSSQL, MongoDB, MongoDB Atlas', status: '✅' },
+                                { feature: t ? 'AI SQL Generation' : 'AI SQL Generation', desc: t ? 'AI routing + Gemini + typed recommendations' : 'AI routing + Gemini + typed recommendations', status: '✅' },
+                                { feature: t ? 'Saved Queries chia sẻ' : 'Shared Saved Queries', desc: t ? 'Private, team, và workspace visibility' : 'Private, team, and workspace visibility', status: '✅' },
+                                { feature: t ? 'Dashboard từ query' : 'Query to Dashboard', desc: t ? 'Lưu query result thành dashboard widget' : 'Save query results as dashboard widgets', status: '✅' },
                                 { feature: t ? 'Hệ thống Phím tắt' : 'Global Shortcuts', desc: t ? 'Bộ phím tắt toàn cục (Ctrl+N, Ctrl+J, Ctrl+I...)' : 'Global keyboard shortcuts palette', status: '✅' },
                                 { feature: t ? 'Hiệu ứng Mượt mà' : 'Smooth UI Transitions', desc: t ? 'Đóng mở bảng và tab với chuyển động 300ms' : '300ms smooth panel and tab animations', status: '✅' },
                                 { feature: t ? 'Đa ngôn ngữ' : 'Internationalization', desc: t ? 'Tiếng Việt và Tiếng Anh' : 'Vietnamese and English', status: '✅' },

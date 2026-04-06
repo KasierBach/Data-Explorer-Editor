@@ -48,6 +48,8 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     // Find options for this tab
     const tab = tabs.find(t => t.id === tabId);
     const initialMetadata = tab?.metadata || {};
+    const externalSql = tab?.metadata?.sql ?? tab?.initialSql ?? '';
+    const externalRunRequest = tab?.metadata?.runRequestedAt as number | undefined;
 
     const handleHeightChange = useCallback((newHeight: number) => {
         updateTabMetadata(tabId, { resultHeight: newHeight });
@@ -91,6 +93,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     });
 
     const isFirstLoad = useRef(true);
+    const lastHandledRunRequestRef = useRef<number | null>(null);
     const editorRef = useRef<any>(null);
     const effectiveLimit = limit === 'all' ? undefined : Number.parseInt(limit, 10);
     const requestLimit = Number.isInteger(effectiveLimit) ? effectiveLimit : undefined;
@@ -114,6 +117,27 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
         return () => clearTimeout(timer);
     }, [query, limit, tabId, updateTabMetadata]);
+
+    useEffect(() => {
+        if (typeof externalSql === 'string' && externalSql !== query) {
+            setQuery(externalSql);
+        }
+    }, [externalSql]);
+
+    useEffect(() => {
+        if (!externalRunRequest || lastHandledRunRequestRef.current === externalRunRequest) {
+            return;
+        }
+
+        lastHandledRunRequestRef.current = externalRunRequest;
+
+        if (externalSql.trim()) {
+            setQuery(externalSql);
+            setExecutedQuery(externalSql);
+            setRunNonce((current) => current + 1);
+            updateTabMetadata(tabId, { runRequestedAt: null });
+        }
+    }, [externalRunRequest, externalSql, tabId, updateTabMetadata]);
 
     const { data: results, isLoading, error, dataUpdatedAt, isSuccess, isError } = useQuery<QueryResult | null, Error>({
         queryKey: ['query-execution', activeConnectionId, activeDatabase, executedQuery, requestLimit, runNonce],
