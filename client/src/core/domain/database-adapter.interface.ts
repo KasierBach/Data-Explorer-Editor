@@ -95,5 +95,6 @@ export interface IDatabaseAdapter {
         context?: string;
         model: string;
         mode: string;
+        routingMode?: string;
     }): Promise<Response>;
 }

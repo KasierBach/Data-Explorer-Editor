@@ -1,6 +1,24 @@
 import { apiService } from './api.service';
 import type { AiMessage, AiChat } from './store/slices/aiChatSlice';
 
+function normalizeAttachmentPayload(payload: any): {
+    attachments?: { type: string; label: string; preview?: string }[];
+    modelInfo?: AiMessage['modelInfo'];
+} {
+    if (Array.isArray(payload)) {
+        return { attachments: payload };
+    }
+
+    if (payload && typeof payload === 'object') {
+        return {
+            attachments: Array.isArray(payload.items) ? payload.items : undefined,
+            modelInfo: payload.modelInfo || undefined,
+        };
+    }
+
+    return {};
+}
+
 export class AiChatService {
     static async fetchChats(): Promise<AiChat[]> {
         const data = await apiService.get<any[]>('/api/ai/chats');
@@ -24,7 +42,7 @@ export class AiChatService {
             sql: m.sql,
             explanation: m.explanation,
             error: m.error,
-            attachments: m.attachments,
+            ...normalizeAttachmentPayload(m.attachments),
             timestamp: new Date(m.createdAt).getTime()
         }));
     }
@@ -38,13 +56,20 @@ export class AiChatService {
     }
 
     static async saveMessage(chatId: string, message: Partial<AiMessage>): Promise<void> {
+        const attachmentsPayload = message.modelInfo
+            ? {
+                items: message.attachments || [],
+                modelInfo: message.modelInfo,
+            }
+            : message.attachments;
+
         await apiService.post(`/api/ai/chats/${chatId}/messages`, {
             role: message.role,
             content: message.content,
             sql: message.sql,
             explanation: message.explanation,
             error: message.error || false,
-            attachments: message.attachments
+            attachments: attachmentsPayload
         });
     }
 

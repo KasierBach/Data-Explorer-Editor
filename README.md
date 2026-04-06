@@ -277,6 +277,12 @@ The backend reads configuration from `server/.env`. The frontend reads `VITE_API
 |---|---|---|
 | `DATABASE_URL` | Yes | Connection string for the app's central PostgreSQL database. Docker default: `postgresql://postgres:postgres@db:5432/data_explorer`. |
 | `GEMINI_API_KEY` | No | Google Gemini API key used to enable AI features. |
+| `CEREBRAS_API_KEY` | No | Optional lower-cost AI provider key used by AI routing in `Auto` / `Fast` mode. |
+| `CEREBRAS_BASE_URL` | No | Base URL for Cerebras' OpenAI-compatible API. Default: `https://api.cerebras.ai/v1`. |
+| `CEREBRAS_CHAT_MODEL` | No | Preferred Cerebras chat model for cheaper AI routing. |
+| `OPENROUTER_API_KEY` | No | Optional fallback AI provider key used when you want more free/cheap routing options. |
+| `OPENROUTER_BASE_URL` | No | Base URL for OpenRouter. Default: `https://openrouter.ai/api/v1`. |
+| `OPENROUTER_CHAT_MODEL` | No | OpenRouter model slug to use in `Auto` / `Fast` mode. |
 | `JWT_SECRET` | Yes | Strong secret used to sign auth tokens. Placeholder values are rejected. |
 | `ENCRYPTION_KEY` | Yes | Exactly **32 characters**, used to encrypt saved database connection passwords. |
 | `LEGACY_ENCRYPTION_KEYS` | No | Comma-separated list of older keys used to decrypt connections saved before the hardening update. |

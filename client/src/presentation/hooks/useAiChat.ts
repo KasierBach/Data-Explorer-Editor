@@ -103,7 +103,7 @@ export function useAiChat() {
     const {
         activeConnectionId, connections, activeDatabase,
         activeAiChatId, addAiMessage, updateAiMessage, tabs, activeTabId,
-        aiModel, aiMode,
+        aiModel, aiMode, aiRoutingMode,
     } = store;
 
     const activeConnection = connections.find(c => c.id === activeConnectionId);
@@ -309,6 +309,7 @@ export function useAiChat() {
                 context: contextStr,
                 model: aiModel,
                 mode: aiMode,
+                routingMode: aiRoutingMode,
             });
 
             if (!response.ok) {
@@ -356,6 +357,11 @@ export function useAiChat() {
                                 content: finalMsgContent,
                                 sql: event.data.sql || undefined,
                                 explanation: event.data.explanation || undefined,
+                                modelInfo: {
+                                    provider: event.data.provider,
+                                    model: event.data.model,
+                                    routingMode: event.data.routingMode,
+                                },
                             });
                             
                             // Sync completed message to backend
@@ -365,6 +371,11 @@ export function useAiChat() {
                                 content: finalMsgContent,
                                 sql: event.data.sql,
                                 explanation: event.data.explanation,
+                                modelInfo: {
+                                    provider: event.data.provider,
+                                    model: event.data.model,
+                                    routingMode: event.data.routingMode,
+                                },
                                 timestamp: Date.now()
                             } as any);
                         } else if (event.type === 'error') {

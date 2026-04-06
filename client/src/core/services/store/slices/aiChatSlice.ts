@@ -7,6 +7,11 @@ export interface AiMessage {
     content: string;
     sql?: string;
     explanation?: string;
+    modelInfo?: {
+        provider?: string;
+        model?: string;
+        routingMode?: string;
+    };
     error?: boolean;
     timestamp: number;
     attachments?: { type: string; label: string; preview?: string }[];
@@ -25,6 +30,7 @@ export interface AiChatSlice {
     activeAiChatId: string | null;
     aiModel: string;
     aiMode: string;
+    aiRoutingMode: string;
     fetchAiChats: () => Promise<void>;
     loadAiChatMessages: (chatId: string) => Promise<void>;
     createAiChat: () => Promise<string | null>;
@@ -37,6 +43,7 @@ export interface AiChatSlice {
     clearAiChats: () => void;
     setAiModel: (model: string) => void;
     setAiMode: (mode: string) => void;
+    setAiRoutingMode: (mode: string) => void;
 }
 
 export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
@@ -44,6 +51,7 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
     activeAiChatId: null,
     aiModel: 'gemini-3-flash-preview',
     aiMode: 'planning',
+    aiRoutingMode: 'auto',
     fetchAiChats: async () => {
         try {
             const formatted = await AiChatService.fetchChats();
@@ -178,4 +186,5 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
     clearAiChats: () => set({ aiChats: [], activeAiChatId: null }),
     setAiModel: (model) => set({ aiModel: model }),
     setAiMode: (mode) => set({ aiMode: mode }),
+    setAiRoutingMode: (mode) => set({ aiRoutingMode: mode }),
 });

@@ -42,6 +42,12 @@ export const useAppStore = create<AppState>()(
                 if (persisted.expandedNodes && !Array.isArray(persisted.expandedNodes)) {
                     persisted.expandedNodes = [];
                 }
+                if (Array.isArray(persisted.aiChats)) {
+                    persisted.aiChats = persisted.aiChats.map((chat: Record<string, any>) => ({
+                        ...chat,
+                        messages: [],
+                    }));
+                }
                 return { ...currentState, ...persisted } as AppState;
             },
             // Only persist essential state AND sanitize passwords
@@ -62,8 +68,14 @@ export const useAppStore = create<AppState>()(
                 sidebarWidth: state.sidebarWidth,
                 savedQueries: state.savedQueries,
                 queryHistory: state.queryHistory,
-                aiChats: state.aiChats,
+                aiChats: state.aiChats.map(chat => ({
+                    ...chat,
+                    messages: [],
+                })),
                 activeAiChatId: state.activeAiChatId,
+                aiModel: state.aiModel,
+                aiMode: state.aiMode,
+                aiRoutingMode: state.aiRoutingMode,
                 isAiPanelOpen: state.isAiPanelOpen,
                 expandedNodes: state.expandedNodes,
                 pageStates: state.pageStates,

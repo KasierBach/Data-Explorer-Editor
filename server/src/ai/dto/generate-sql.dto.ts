@@ -28,4 +28,8 @@ export class GenerateSqlDto {
     @IsOptional()
     @IsString()
     mode?: string; // e.g. 'planning' or 'fast'
+
+    @IsOptional()
+    @IsString()
+    routingMode?: string; // e.g. 'auto', 'fast', 'best', 'gemini-only'
 }

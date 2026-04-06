@@ -58,6 +58,15 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = ({ msg, onInsertQ
                     ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                     : 'bg-muted/30 text-foreground/80 border border-border/30'
                 }`}>
+                {msg.role === 'ai' && msg.modelInfo && !msg.error && (
+                    <div className="mb-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <span className="rounded-full border border-violet-500/20 bg-violet-500/10 px-2 py-0.5 text-violet-300">
+                            {msg.modelInfo.provider || 'ai'}
+                        </span>
+                        {msg.modelInfo.model && <span>{msg.modelInfo.model}</span>}
+                    </div>
+                )}
+
                 {msg.role === 'user' ? (
                     <div className="flex flex-col gap-2">
                         {/* Render Images if present */}

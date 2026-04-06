@@ -156,6 +156,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         context?: string;
         model: string;
         mode: string;
+        routingMode?: string;
     }): Promise<Response> {
         if (!this.connectionId) throw new Error('Not connected');
 
@@ -178,6 +179,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         context?: string;
         model: string;
         mode: string;
+        routingMode?: string;
     }): Promise<Response> {
         if (!this.connectionId) throw new Error('Not connected');
 

@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AiService } from '../../ai/ai.service';
+import { AiPromptBuilderService } from '../../ai/ai.prompt-builder.service';
+import { AiRoutingService } from '../../ai/ai.routing.service';
+import { AiSchemaContextService } from '../../ai/ai.schema-context.service';
+import { AiProviderRunnerService } from '../../ai/ai.provider-runner.service';
 
 // Mock GoogleGenerativeAI
 jest.mock('@google/generative-ai', () => {
@@ -29,10 +33,17 @@ describe('AiService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AiService,
+        AiPromptBuilderService,
+        AiRoutingService,
+        AiSchemaContextService,
+        AiProviderRunnerService,
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn().mockReturnValue('fake-api-key'),
+            get: jest.fn().mockImplementation((key: string) => {
+              if (key === 'GEMINI_API_KEY') return 'fake-api-key';
+              return undefined;
+            }),
           },
         },
       ],
@@ -81,6 +92,8 @@ describe('AiService', () => {
       const result = await service.chat({ prompt: 'Test prompt' });
       expect(result).toHaveProperty('message', 'Hello from AI');
       expect(result).toHaveProperty('sql', 'SELECT * FROM users');
+      expect(result).toHaveProperty('provider', 'gemini');
+      expect(result).toHaveProperty('routingMode', 'auto');
     });
   });
 });

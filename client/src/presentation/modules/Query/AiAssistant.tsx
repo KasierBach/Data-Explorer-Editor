@@ -1,6 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from '@/presentation/components/ui/dropdown-menu';
+import {
     Sparkles, Send, Loader2, X, Plus,
     MessageSquare, Image, FileCode2, Clock,
     Table2, ChevronUp, TriangleAlert
@@ -41,15 +46,24 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     const [showContextMenu, setShowContextMenu] = useState(false);
     const [showModeMenu, setShowModeMenu] = useState(false);
     const [showModelMenu, setShowModelMenu] = useState(false);
+    const [showRoutingMenu, setShowRoutingMenu] = useState(false);
 
     const {
         aiModel, setAiModel,
-        aiMode, setAiMode
+        aiMode, setAiMode,
+        aiRoutingMode, setAiRoutingMode
     } = useAppStore();
 
     const MODES = [
         { id: 'planning', label: 'Planning', description: 'Agent can plan before executing tasks. Use for deep research, complex tasks, or collaborative work' },
         { id: 'fast', label: 'Fast', description: 'Agent will execute tasks directly. Use for simple tasks that can be completed faster' }
+    ];
+
+    const ROUTING_MODES = [
+        { id: 'auto', label: 'Auto', description: 'Balance cost and quality automatically. Simple prompts may use cheaper models first.' },
+        { id: 'fast', label: 'Fast / Cheap', description: 'Prefer lower-cost providers whenever possible before falling back to Gemini.' },
+        { id: 'best', label: 'Best Quality', description: 'Prioritize your selected Gemini model sooner for harder or more important tasks.' },
+        { id: 'gemini-only', label: 'Gemini Only', description: 'Always use the selected Gemini model. Best for consistency, highest cost.' },
     ];
 
     const MODELS: Array<{ id: string; label: string; isNew?: boolean; warning?: boolean }> = [
@@ -64,8 +78,6 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
 
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const contextMenuRef = useRef<HTMLDivElement>(null);
-    const modeMenuRef = useRef<HTMLDivElement>(null);
-    const modelMenuRef = useRef<HTMLDivElement>(null);
 
     const {
         activeConnectionId, connections, activeDatabase,
@@ -123,8 +135,6 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         const handleClickOutside = (e: MouseEvent) => {
             const target = e.target as Node;
             if (contextMenuRef.current && !contextMenuRef.current.contains(target)) setShowContextMenu(false);
-            if (modeMenuRef.current && !modeMenuRef.current.contains(target)) setShowModeMenu(false);
-            if (modelMenuRef.current && !modelMenuRef.current.contains(target)) setShowModelMenu(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -152,7 +162,9 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                 <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-violet-400" />
                     <span className="text-xs font-bold text-foreground">AI Assistant</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400 font-medium">Gemini</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400 font-medium">
+                        {ROUTING_MODES.find(m => m.id === aiRoutingMode)?.label || 'Auto'}
+                    </span>
                 </div>
                 <div className="flex items-center gap-0.5">
                     <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-violet-500/10" onClick={() => { createAiChat(); setShowHistory(false); }} title="Cuộc trò chuyện mới">
@@ -295,72 +307,113 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                                 )}
                             </div>
 
-                            {/* Mode Selector */}
-                            <div className="relative" ref={modeMenuRef}>
-                                <button
-                                    onClick={() => {
-                                        setShowModeMenu(!showModeMenu);
+                            {/* Routing Selector */}
+                            <DropdownMenu
+                                open={showRoutingMenu}
+                                onOpenChange={(open) => {
+                                    setShowRoutingMenu(open);
+                                    if (open) {
                                         setShowModelMenu(false);
-                                        setShowContextMenu(false);
-                                    }}
-                                    className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                                >
-                                    <ChevronUp className="w-3 h-3 opacity-50" />
-                                    {MODES.find(m => m.id === aiMode)?.label}
-                                </button>
-                                {showModeMenu && (
-                                    <div className="absolute bottom-[calc(100%+8px)] left-[-1rem] w-[17rem] max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border border-border/10 rounded-xl shadow-2xl p-1.5 z-[99999] text-foreground animate-in fade-in slide-in-from-bottom-2 duration-150">
-                                        <div className="px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground mb-1">Conversation mode</div>
-                                        <div className="flex flex-col gap-0.5">
-                                            {MODES.map(m => (
-                                                <button
-                                                    key={m.id}
-                                                    className={cn("w-full flex flex-col items-start px-2.5 py-2 hover:bg-white/5 rounded-lg transition-colors text-left", aiMode === m.id && "bg-white/5")}
-                                                    onClick={() => { setAiMode(m.id); setShowModeMenu(false); }}
-                                                >
-                                                    <span className="text-xs font-semibold mb-0.5">{m.label}</span>
-                                                    <span className="text-[10px] text-muted-foreground leading-relaxed">{m.description}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Model Selector */}
-                            <div className="relative" ref={modelMenuRef}>
-                                <button
-                                    onClick={() => {
-                                        setShowModelMenu(!showModelMenu);
                                         setShowModeMenu(false);
                                         setShowContextMenu(false);
-                                    }}
-                                    className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                                >
-                                    <ChevronUp className="w-3 h-3 opacity-50" />
-                                    {MODELS.find(m => m.id === aiModel)?.label}
-                                </button>
-                                {showModelMenu && (
-                                    <div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 w-64 max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border border-border/10 rounded-xl shadow-2xl p-1.5 z-[99999] text-foreground animate-in fade-in slide-in-from-bottom-2 duration-150">
-                                        <div className="px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground mb-1">Model</div>
-                                        <div className="flex flex-col gap-0.5">
-                                            {MODELS.map(m => (
-                                                <button
-                                                    key={m.id}
-                                                    className="w-full flex items-center justify-between px-2.5 py-2 text-xs hover:bg-white/5 rounded-lg transition-colors text-left"
-                                                    onClick={() => { setAiModel(m.id); setShowModelMenu(false); }}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={aiModel === m.id ? "font-semibold" : "font-medium"}>{m.label}</span>
-                                                        {m.warning && <TriangleAlert className="w-3.5 h-3.5 text-yellow-500" />}
-                                                    </div>
-                                                    {m.isNew && <span className="bg-white/10 text-muted-foreground font-semibold text-[9px] px-2 py-0.5 rounded-full">New</span>}
-                                                </button>
-                                            ))}
-                                        </div>
+                                    }
+                                }}
+                            >
+                                <DropdownMenuTrigger asChild>
+                                    <button className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                                        <ChevronUp className="w-3 h-3 opacity-50" />
+                                        {ROUTING_MODES.find(m => m.id === aiRoutingMode)?.label}
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent side="top" align="start" className="w-[18rem] max-w-[calc(100vw-2rem)] max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border-border/10 rounded-xl shadow-2xl p-1.5 text-foreground">
+                                    <div className="px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground mb-1">Routing mode</div>
+                                    <div className="flex flex-col gap-0.5">
+                                        {ROUTING_MODES.map(m => (
+                                            <button
+                                                key={m.id}
+                                                className={cn("w-full flex flex-col items-start px-2.5 py-2 hover:bg-white/5 rounded-lg transition-colors text-left", aiRoutingMode === m.id && "bg-white/5")}
+                                                onClick={() => { setAiRoutingMode(m.id); setShowRoutingMenu(false); }}
+                                            >
+                                                <span className="text-xs font-semibold mb-0.5">{m.label}</span>
+                                                <span className="text-[10px] text-muted-foreground leading-relaxed">{m.description}</span>
+                                            </button>
+                                        ))}
                                     </div>
-                                )}
-                            </div>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* Mode Selector */}
+                            <DropdownMenu
+                                open={showModeMenu}
+                                onOpenChange={(open) => {
+                                    setShowModeMenu(open);
+                                    if (open) {
+                                        setShowModelMenu(false);
+                                        setShowRoutingMenu(false);
+                                        setShowContextMenu(false);
+                                    }
+                                }}
+                            >
+                                <DropdownMenuTrigger asChild>
+                                    <button className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                                        <ChevronUp className="w-3 h-3 opacity-50" />
+                                        {MODES.find(m => m.id === aiMode)?.label}
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent side="top" align="start" className="w-[17rem] max-w-[calc(100vw-2rem)] max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border-border/10 rounded-xl shadow-2xl p-1.5 text-foreground">
+                                    <div className="px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground mb-1">Conversation mode</div>
+                                    <div className="flex flex-col gap-0.5">
+                                        {MODES.map(m => (
+                                            <button
+                                                key={m.id}
+                                                className={cn("w-full flex flex-col items-start px-2.5 py-2 hover:bg-white/5 rounded-lg transition-colors text-left", aiMode === m.id && "bg-white/5")}
+                                                onClick={() => { setAiMode(m.id); setShowModeMenu(false); }}
+                                            >
+                                                <span className="text-xs font-semibold mb-0.5">{m.label}</span>
+                                                <span className="text-[10px] text-muted-foreground leading-relaxed">{m.description}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* Model Selector */}
+                            <DropdownMenu
+                                open={showModelMenu}
+                                onOpenChange={(open) => {
+                                    setShowModelMenu(open);
+                                    if (open) {
+                                        setShowModeMenu(false);
+                                        setShowRoutingMenu(false);
+                                        setShowContextMenu(false);
+                                    }
+                                }}
+                            >
+                                <DropdownMenuTrigger asChild>
+                                    <button className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                                        <ChevronUp className="w-3 h-3 opacity-50" />
+                                        {MODELS.find(m => m.id === aiModel)?.label}
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent side="top" align="start" className="w-64 max-w-[calc(100vw-2rem)] max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border-border/10 rounded-xl shadow-2xl p-1.5 text-foreground">
+                                    <div className="px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground mb-1">Preferred Gemini model</div>
+                                    <div className="flex flex-col gap-0.5">
+                                        {MODELS.map(m => (
+                                            <button
+                                                key={m.id}
+                                                className="w-full flex items-center justify-between px-2.5 py-2 text-xs hover:bg-white/5 rounded-lg transition-colors text-left"
+                                                onClick={() => { setAiModel(m.id); setShowModelMenu(false); }}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className={aiModel === m.id ? "font-semibold" : "font-medium"}>{m.label}</span>
+                                                    {m.warning && <TriangleAlert className="w-3.5 h-3.5 text-yellow-500" />}
+                                                </div>
+                                                {m.isNew && <span className="bg-white/10 text-muted-foreground font-semibold text-[9px] px-2 py-0.5 rounded-full">New</span>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
 
                         <div className="flex items-center gap-1 shrink-0">
@@ -374,9 +427,17 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                             </Button>
                         </div>
                     </div>
+
+                    <div className="px-3 pb-1">
+                        <div className="text-[9px] leading-relaxed text-muted-foreground/80">
+                            {aiRoutingMode === 'gemini-only'
+                                ? 'Always uses your selected Gemini model.'
+                                : <>Simple requests may use cheaper models first. <span className="text-foreground/80">Gemini is kept for harder tasks.</span></>}
+                        </div>
+                    </div>
                 </div>
 
-                <div className="flex items-center justify-center mt-2 px-1">
+                <div className="flex items-center justify-center mt-1 px-1">
                     <span className="text-[9px] text-muted-foreground/70">
                         AI có thể trả lời KHÔNG CHÍNH XÁC — hãy kiểm tra lại trước khi chạy </span>
                 </div>

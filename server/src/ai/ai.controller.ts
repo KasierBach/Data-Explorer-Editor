@@ -18,9 +18,9 @@ export class AiController {
 
     @Post('generate-sql')
     async generateSql(@Body() body: GenerateSqlDto, @Req() req: any) {
-        const { connectionId, database, prompt, image, context, model, mode } = body;
+        const { connectionId, database, prompt, image, context, model, mode, routingMode } = body;
 
-        console.log(`[AI] generate-sql request: connectionId=${connectionId}, database=${database}, prompt="${prompt}"`);
+        console.log(`[AI] generate-sql request: connectionId=${connectionId}, database=${database}, routingMode=${routingMode || 'auto'}, mode=${mode || 'planning'}, prompt="${prompt}"`);
 
         // Step 1: Get connection info
         let connection: any;
@@ -57,20 +57,21 @@ export class AiController {
                 databaseType: connection.type,
                 image,
                 context,
+                routingMode,
             });
             console.log(`[AI] Response generated successfully`);
             return result;
         } catch (error) {
-            console.error(`[AI] Gemini API call failed:`, error.message);
+            console.error(`[AI] AI provider call failed:`, error.message);
             throw new InternalServerErrorException(`AI generation failed: ${error.message}`);
         }
     }
 
     @Post('generate-sql-stream')
     async generateSqlStream(@Body() body: GenerateSqlDto, @Res() res: Response, @Req() req: any) {
-        const { connectionId, database, prompt, image, context, model, mode } = body;
+        const { connectionId, database, prompt, image, context, model, mode, routingMode } = body;
 
-        console.log(`[AI:Stream] generate-sql-stream request: prompt="${prompt}"`);
+        console.log(`[AI:Stream] generate-sql-stream request: routingMode=${routingMode || 'auto'}, mode=${mode || 'planning'}, prompt="${prompt}"`);
 
         // Setup SSE headers
         res.setHeader('Content-Type', 'text/event-stream');
@@ -111,6 +112,7 @@ export class AiController {
                 databaseType: connection.type,
                 image,
                 context,
+                routingMode,
             });
 
             for await (const event of stream) {
