@@ -63,7 +63,8 @@ export function DeploymentSection({ lang }: Props) {
                 <div className="grid gap-4 mt-4">
                     {[
                         { icon: <Database className="w-4 h-4" />, key: 'DATABASE_URL', descVi: 'Database trung tâm của ứng dụng.', descEn: 'The central database for the application.' },
-                        { icon: <KeyRound className="w-4 h-4" />, key: 'JWT_SECRET', descVi: 'Secret mạnh để ký token. Placeholder sẽ bị backend từ chối.', descEn: 'A strong token-signing secret. Placeholder values will be rejected by the backend.' },
+                        { icon: <KeyRound className="w-4 h-4" />, key: 'JWT_SECRET', descVi: 'Secret mạnh để ký access token. Placeholder sẽ bị backend từ chối.', descEn: 'A strong secret used to sign access tokens. Placeholder values will be rejected by the backend.' },
+                        { icon: <Shield className="w-4 h-4" />, key: 'REFRESH_TOKEN_SECRET', descVi: 'Khuyến nghị dùng secret riêng cho refresh token cookie. Nếu để trống, app sẽ fallback về JWT_SECRET.', descEn: 'Recommended separate secret for the refresh-token cookie. If omitted, the app falls back to JWT_SECRET.' },
                         { icon: <Shield className="w-4 h-4" />, key: 'ENCRYPTION_KEY', descVi: 'Phải đúng 32 ký tự để mã hóa saved connection passwords.', descEn: 'Must be exactly 32 characters to encrypt saved connection passwords.' },
                         { icon: <Globe className="w-4 h-4" />, key: 'FRONTEND_URL', descVi: 'Origin frontend thật dùng cho CORS và OAuth redirects.', descEn: 'The real frontend origin used for CORS and OAuth redirects.' }
                     ].map((env) => (
@@ -85,6 +86,7 @@ export function DeploymentSection({ lang }: Props) {
                     {[
                         t ? 'GOOGLE_CALLBACK_URL và GITHUB_CALLBACK_URL phải trỏ về backend thật, ví dụ https://your-backend.onrender.com/api/auth/google/callback.' : 'GOOGLE_CALLBACK_URL and GITHUB_CALLBACK_URL must point to the real backend, for example https://your-backend.onrender.com/api/auth/google/callback.',
                         t ? 'FRONTEND_URL phải khớp origin thực tế của client, nếu không exchange flow sau /login#code=... sẽ fail.' : 'FRONTEND_URL must match the real client origin, otherwise the exchange flow after /login#code=... will fail.',
+                        t ? 'Với frontend và backend khác domain ở production, hãy dùng HTTPS để refresh-token cookie có thể chạy với secure + sameSite phù hợp.' : 'When the frontend and backend live on different production domains, use HTTPS so the refresh-token cookie can work with the correct secure + sameSite policy.',
                         t ? 'Sau mỗi lần đổi env OAuth, redeploy backend để callback/controller nạp cấu hình mới.' : 'After changing any OAuth env, redeploy the backend so the callback/controller loads the new configuration.'
                     ].map((item) => (
                         <li key={item} className="rounded-xl border border-border/50 bg-card/40 px-4 py-3 text-xs text-muted-foreground">
@@ -98,6 +100,8 @@ export function DeploymentSection({ lang }: Props) {
                 <CodeBlock title={t ? 'Optional AI lanes' : 'Optional AI lanes'}>
                     <CodeComment>{t ? 'Premium lane' : 'Premium lane'}</CodeComment>
                     <CodeLine>GEMINI_API_KEY=...</CodeLine>
+                    <CodeLine>AI_PROVIDER_TIMEOUT_MS=15000</CodeLine>
+                    <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=15000</CodeLine>
                     <p className="mt-3" />
                     <CodeComment>{t ? 'Lower-cost lane' : 'Lower-cost lane'}</CodeComment>
                     <CodeLine>CEREBRAS_API_KEY=...</CodeLine>

@@ -21,6 +21,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { MigrationModule } from './migration/migration.module';
 import { SavedQueriesModule } from './saved-queries/saved-queries.module';
 import { DashboardsModule } from './dashboards/dashboards.module';
+import { ErdWorkspacesModule } from './erd-workspaces/erd-workspaces.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { DashboardsModule } from './dashboards/dashboards.module';
     MigrationModule,
     SavedQueriesModule,
     DashboardsModule,
+    ErdWorkspacesModule,
   ],
   controllers: [AppController],
   providers: [

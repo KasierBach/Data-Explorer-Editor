@@ -5,7 +5,6 @@ import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw, History,
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore, type SavedQuery } from '@/core/services/store';
-import { format } from 'sql-formatter';
 import { SavedQueriesDialog } from './SavedQueriesDialog';
 import { QueryHistoryDialog } from './QueryHistoryDialog';
 import {
@@ -285,8 +284,9 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         }
     };
 
-    const handleFormat = () => {
+    const handleFormat = async () => {
         try {
+            const { format } = await import('sql-formatter');
             const formatted = format(query, {
                 language: activeConnection?.type === 'mysql' ? 'mysql' : 'postgresql',
                 keywordCase: 'upper',

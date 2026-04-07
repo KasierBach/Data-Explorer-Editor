@@ -1,13 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { TokenService } from './token.service';
 import { UserUtils } from '../users/user.utils';
 
 @Injectable()
 export class SocialAuthService {
     constructor(
         private readonly prisma: PrismaService,
-        private readonly tokenService: TokenService,
     ) { }
 
     async validateOAuthLogin(profile: any, provider: 'google' | 'github') {
@@ -77,6 +75,6 @@ export class SocialAuthService {
             });
         }
 
-        return this.tokenService.generateTokenResponse(user);
+        return user;
     }
 }

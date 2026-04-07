@@ -7,12 +7,12 @@ export function useSyncSavedQueries() {
     const hasFetched = useRef(false);
 
     useEffect(() => {
-        if (!isAuthenticated) {
+        if (!isAuthenticated || !accessToken) {
             hasFetched.current = false;
             return;
         }
 
-        if (!accessToken || hasFetched.current) return;
+        if (hasFetched.current) return;
 
         hasFetched.current = true;
 

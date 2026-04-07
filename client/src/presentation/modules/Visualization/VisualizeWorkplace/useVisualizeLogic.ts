@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
-import { toPng } from 'html-to-image';
 import { toast } from 'sonner';
 import type { TreeNode } from '@/core/domain/entities';
 
@@ -154,13 +153,16 @@ export const useVisualizeLogic = () => {
     // ─── Handlers ───
     const handleExportPNG = useCallback(() => {
         if (!chartRef.current) return;
-        toPng(chartRef.current, { backgroundColor: '#0a0a0a', pixelRatio: 2 }).then(dataUrl => {
-            const link = document.createElement('a');
-            link.download = `chart-${title.replace(/\s+/g, '_')}-${Date.now()}.png`;
-            link.href = dataUrl;
-            link.click();
-            toast.success('Chart exported as PNG');
-        }).catch(() => toast.error('Failed to export PNG'));
+        import('html-to-image')
+            .then(({ toPng }) => toPng(chartRef.current!, { backgroundColor: '#0a0a0a', pixelRatio: 2 }))
+            .then((dataUrl) => {
+                const link = document.createElement('a');
+                link.download = `chart-${title.replace(/\s+/g, '_')}-${Date.now()}.png`;
+                link.href = dataUrl;
+                link.click();
+                toast.success('Chart exported as PNG');
+            })
+            .catch(() => toast.error('Failed to export PNG'));
     }, [title]);
 
     const handleExportCSV = useCallback(() => {

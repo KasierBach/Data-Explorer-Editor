@@ -12,11 +12,12 @@
 
 ## Key Features
 
-### AI Assistant (Gemini-powered)
+### AI Assistant and Routing
 - **Context-Aware SQL Generation**: Describe complex data needs in natural language and the AI generates SQL based on your live schema and foreign key relationships.
 - **Vision Integration**: Upload screenshots of DB diagrams or whiteboards for AI-assisted schema reconstruction and query help.
 - **Global Assistant Panel**: A resizable, toggleable sidebar available across major modules with SSE-based streaming responses.
-- **Intelligent Model Fallback**: The AI layer can iterate through a model list when a requested model fails, helping keep generation more resilient.
+- **Provider-Aware Routing**: Gemini remains the premium lane, while Cerebras and OpenRouter can be configured as lower-cost or fallback lanes.
+- **Intelligent Model Fallback**: The AI layer can iterate through providers and models when a requested lane fails, helping keep generation more resilient.
 - **Surgical Precision Autocomplete**: Inline AI suggestions prioritize exact SQL syntax completion without unnecessary explanations.
 - **Chain Tabbing**: Accept multi-line AI suggestions incrementally with the `Tab` key for fast editing flow.
 - **Chat Persistence**: Conversation history is stored in app state for continuity across sessions.
@@ -194,9 +195,9 @@ This is the fastest way to run **Data Explorer** locally with PostgreSQL, the ba
 1. **Environment Setup**
    - Copy `server/.env.example` to `server/.env`.
    - Fill in at least `JWT_SECRET`, `ENCRYPTION_KEY`, and any optional AI or OAuth variables you want to use.
-   - Apply Prisma migrations before first production boot if your database does not already have the latest connection safety columns:
+   - Sync the Prisma schema before first boot:
      ```bash
-     npx prisma migrate deploy
+     npx prisma db push
      ```
    - If you are serving the frontend through Docker on port `80`, set:
      - `FRONTEND_URL=http://localhost`
@@ -277,13 +278,16 @@ The backend reads configuration from `server/.env`. The frontend reads `VITE_API
 |---|---|---|
 | `DATABASE_URL` | Yes | Connection string for the app's central PostgreSQL database. Docker default: `postgresql://postgres:postgres@db:5432/data_explorer`. |
 | `GEMINI_API_KEY` | No | Google Gemini API key used to enable AI features. |
+| `AI_PROVIDER_TIMEOUT_MS` | No | Timeout in milliseconds for AI provider requests. Default: `15000`. |
+| `AI_STREAM_IDLE_TIMEOUT_MS` | No | Idle timeout in milliseconds for streaming AI responses. Default: `15000`. |
 | `CEREBRAS_API_KEY` | No | Optional lower-cost AI provider key used by AI routing in `Auto` / `Fast` mode. |
 | `CEREBRAS_BASE_URL` | No | Base URL for Cerebras' OpenAI-compatible API. Default: `https://api.cerebras.ai/v1`. |
 | `CEREBRAS_CHAT_MODEL` | No | Preferred Cerebras chat model for cheaper AI routing. |
 | `OPENROUTER_API_KEY` | No | Optional fallback AI provider key used when you want more free/cheap routing options. |
 | `OPENROUTER_BASE_URL` | No | Base URL for OpenRouter. Default: `https://openrouter.ai/api/v1`. |
 | `OPENROUTER_CHAT_MODEL` | No | OpenRouter model slug to use in `Auto` / `Fast` mode. |
-| `JWT_SECRET` | Yes | Strong secret used to sign auth tokens. Placeholder values are rejected. |
+| `JWT_SECRET` | Yes | Strong secret used to sign access tokens. Placeholder values are rejected. |
+| `REFRESH_TOKEN_SECRET` | No | Recommended separate secret for refresh-token cookies. If omitted, the app falls back to `JWT_SECRET`. |
 | `ENCRYPTION_KEY` | Yes | Exactly **32 characters**, used to encrypt saved database connection passwords. |
 | `LEGACY_ENCRYPTION_KEYS` | No | Comma-separated list of older keys used to decrypt connections saved before the hardening update. |
 | `PORT` | No | Server port. Local default: `3001`. |
@@ -310,7 +314,8 @@ Recent hardening introduced a few important changes:
 - **Encrypted connection credentials**: Saved DB connection passwords are encrypted with **AES-256-GCM**, and the backend supports `LEGACY_ENCRYPTION_KEYS` to preserve older saved connections.
 - **Localhost still works in development**: The SSRF validator is fail-closed for unsafe hosts, while local development still allows `localhost`, `127.0.0.1`, and `::1`.
 - **Reduced XSS exposure**: AI markdown no longer renders raw HTML in the client.
-- **Safer auth-state handling**: Access tokens are no longer persisted in local storage.
+- **Safer session handling**: Refresh tokens now live in `httpOnly` cookies, while access tokens stay in memory and are re-bootstrapped through `/auth/refresh`.
+- **AI request guardrails**: Provider calls now use request timeouts and streaming idle timeouts so a slow lane cannot hang the backend indefinitely.
 
 ---
 

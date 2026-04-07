@@ -1,6 +1,6 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Get, UseGuards, Req, Res, Ip } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -11,6 +11,12 @@ import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { Throttle } from '@nestjs/throttler';
 import { ExchangeOauthCodeDto } from './dto/exchange-oauth-code.dto';
 import { TokenService } from './token.service';
+import {
+    extractCookie,
+    getClearedRefreshTokenCookieOptions,
+    getRefreshTokenCookieOptions,
+    REFRESH_TOKEN_COOKIE,
+} from './auth-cookie.util';
 
 @Controller('auth')
 export class AuthController {
@@ -22,8 +28,19 @@ export class AuthController {
     @Post('login')
     @HttpCode(HttpStatus.OK)
     @Throttle({ default: { limit: 5, ttl: 60000 } })
-    async login(@Body() loginDto: LoginDto, @Ip() ip: string) {
-        return this.authService.login(loginDto, ip);
+    async login(@Body() loginDto: LoginDto, @Ip() ip: string, @Res({ passthrough: true }) res: Response) {
+        const session = await this.authService.login(loginDto, ip);
+        res.cookie(
+            REFRESH_TOKEN_COOKIE,
+            session.refreshToken,
+            getRefreshTokenCookieOptions(session.refreshTokenExpiresAt.getTime() - Date.now()),
+        );
+
+        return {
+            access_token: session.access_token,
+            accessTokenExpiresAt: session.accessTokenExpiresAt,
+            user: session.user,
+        };
     }
 
     @Post('register')
@@ -34,8 +51,19 @@ export class AuthController {
     @Post('verify-email')
     @HttpCode(HttpStatus.OK)
     @Throttle({ default: { limit: 5, ttl: 60000 } })
-    async verifyEmail(@Body() dto: VerifyEmailDto) {
-        return this.authService.verifyEmail(dto);
+    async verifyEmail(@Body() dto: VerifyEmailDto, @Res({ passthrough: true }) res: Response) {
+        const session = await this.authService.verifyEmail(dto);
+        res.cookie(
+            REFRESH_TOKEN_COOKIE,
+            session.refreshToken,
+            getRefreshTokenCookieOptions(session.refreshTokenExpiresAt.getTime() - Date.now()),
+        );
+
+        return {
+            access_token: session.access_token,
+            accessTokenExpiresAt: session.accessTokenExpiresAt,
+            user: session.user,
+        };
     }
 
     @Post('resend-verification')
@@ -47,7 +75,7 @@ export class AuthController {
 
     @Post('forgot-password')
     @HttpCode(HttpStatus.OK)
-    @Throttle({ default: { limit: 3, ttl: 60000 } }) // Max 3 requests per minute
+    @Throttle({ default: { limit: 3, ttl: 60000 } })
     async forgotPassword(@Body() dto: ForgotPasswordDto) {
         return this.authService.forgotPassword(dto);
     }
@@ -62,11 +90,47 @@ export class AuthController {
     @Post('exchange-oauth-code')
     @HttpCode(HttpStatus.OK)
     @Throttle({ default: { limit: 10, ttl: 60000 } })
-    async exchangeOauthCode(@Body() dto: ExchangeOauthCodeDto) {
-        return this.authService.exchangeOauthCode(dto.code);
+    async exchangeOauthCode(@Body() dto: ExchangeOauthCodeDto, @Res({ passthrough: true }) res: Response) {
+        const session = await this.authService.exchangeOauthCode(dto.code);
+        res.cookie(
+            REFRESH_TOKEN_COOKIE,
+            session.refreshToken,
+            getRefreshTokenCookieOptions(session.refreshTokenExpiresAt.getTime() - Date.now()),
+        );
+
+        return {
+            access_token: session.access_token,
+            accessTokenExpiresAt: session.accessTokenExpiresAt,
+            user: session.user,
+        };
     }
 
-    // --- Social Login Routes ---
+    @Post('refresh')
+    @HttpCode(HttpStatus.OK)
+    async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+        const refreshToken = extractCookie(req, REFRESH_TOKEN_COOKIE);
+        const session = await this.authService.refreshSession(refreshToken);
+        res.cookie(
+            REFRESH_TOKEN_COOKIE,
+            session.refreshToken,
+            getRefreshTokenCookieOptions(session.refreshTokenExpiresAt.getTime() - Date.now()),
+        );
+
+        return {
+            access_token: session.access_token,
+            accessTokenExpiresAt: session.accessTokenExpiresAt,
+            user: session.user,
+        };
+    }
+
+    @Post('logout')
+    @HttpCode(HttpStatus.OK)
+    async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+        const refreshToken = extractCookie(req, REFRESH_TOKEN_COOKIE);
+        const result = await this.authService.logout(refreshToken);
+        res.cookie(REFRESH_TOKEN_COOKIE, '', getClearedRefreshTokenCookieOptions());
+        return result;
+    }
 
     @Get('google')
     @UseGuards(AuthGuard('google'))
@@ -77,7 +141,7 @@ export class AuthController {
     @Get('google/callback')
     @UseGuards(AuthGuard('google'))
     async googleAuthRedirect(@Req() req: any, @Res() res: Response) {
-        const code = this.tokenService.createOauthExchangeToken(req.user.user.id);
+        const code = this.tokenService.createOauthExchangeToken(req.user.id);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         res.redirect(`${frontendUrl}/login#code=${encodeURIComponent(code)}`);
     }
@@ -91,7 +155,7 @@ export class AuthController {
     @Get('github/callback')
     @UseGuards(AuthGuard('github'))
     async githubAuthRedirect(@Req() req: any, @Res() res: Response) {
-        const code = this.tokenService.createOauthExchangeToken(req.user.user.id);
+        const code = this.tokenService.createOauthExchangeToken(req.user.id);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         res.redirect(`${frontendUrl}/login#code=${encodeURIComponent(code)}`);
     }

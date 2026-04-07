@@ -17,7 +17,7 @@ import { AuthService } from '@/core/services/AuthService';
 
 export const OnboardingPage = () => {
     const navigate = useNavigate();
-    const { user, accessToken, login } = useAppStore();
+    const { user, isAuthenticated, updateUser } = useAppStore();
     const [isLoading, setIsLoading] = useState(false);
 
     // Initial state based on Google/GitHub data if available
@@ -28,8 +28,8 @@ export const OnboardingPage = () => {
         address: ''
     });
 
-    // If somehow they get here without a token or are already onboarded, redirect
-    if (!accessToken || !user) {
+    // If somehow they get here without a session or are already onboarded, redirect
+    if (!isAuthenticated || !user) {
         navigate('/login');
         return null;
     }
@@ -56,10 +56,9 @@ export const OnboardingPage = () => {
 
         setIsLoading(true);
         try {
-            const updatedUser = await AuthService.onboard(formData, accessToken);
+            const updatedUser = await AuthService.onboard(formData);
             
-            // Update Zustand store with the new user object (which now has isOnboarded: true)
-            login(accessToken, updatedUser);
+            updateUser(updatedUser);
             
             toast.success('Welcome to Data Explorer! 🚀');
             navigate('/sql-explorer');

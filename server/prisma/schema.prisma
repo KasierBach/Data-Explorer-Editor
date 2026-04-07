@@ -81,6 +81,8 @@ model User {
   resetOtp       String?
   resetOtpExpiry DateTime?
   lastLoginIp    String?
+  refreshTokenHash   String?
+  refreshTokenExpiry DateTime?
 
   // Email Verification
   isEmailVerified Boolean @default(false)
@@ -98,6 +100,7 @@ model User {
   aiChats     AiChat[]
   savedQueries SavedQuery[]
   dashboards  Dashboard[]
+  erdWorkspaces ErdWorkspace[]
 }
 
 model AiChat {
@@ -201,4 +204,21 @@ model DashboardWidget {
   dashboard    Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
 
   @@index([dashboardId, orderIndex])
+}
+
+model ErdWorkspace {
+  id           String   @id @default(uuid())
+  name         String
+  notes        String?
+  connectionId String?
+  database     String?
+  layout       Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@index([connectionId, updatedAt])
 }

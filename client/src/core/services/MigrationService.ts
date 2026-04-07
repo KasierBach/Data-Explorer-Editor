@@ -13,7 +13,9 @@ export interface StartMigrationPayload {
 export interface MigrationJob {
     id: string;
     status: 'pending' | 'running' | 'completed' | 'failed';
+    stage?: 'queued' | 'validating' | 'connecting' | 'preflight' | 'streaming' | 'completed' | 'failed';
     processedRows: number;
+    batchesProcessed?: number;
     error?: string;
 }
 

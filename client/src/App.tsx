@@ -10,6 +10,7 @@ import { useTheme } from '@/presentation/components/theme-provider'
 import { useAppStore } from '@/core/services/store'
 import { useSyncConnections } from '@/presentation/hooks/useSyncConnections'
 import { useSyncSavedQueries } from '@/presentation/hooks/useSyncSavedQueries'
+import { AuthService } from '@/core/services/AuthService'
 
 import { Toaster } from 'sonner';
 
@@ -42,7 +43,7 @@ export function App() {
   useSyncSavedQueries();
 
   const { theme: appTheme, setTheme: setAppTheme } = useTheme();
-  const { user } = useAppStore();
+  const { user, restoreSession, setAuthBootstrapped } = useAppStore();
 
   // Sync profile theme with App Theme
   useEffect(() => {
@@ -50,6 +51,31 @@ export function App() {
         setAppTheme(user.theme as any);
     }
   }, [user?.theme, appTheme, setAppTheme]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrapSession = async () => {
+      try {
+        const data = await AuthService.refreshSession();
+        if (!cancelled && data.access_token && data.user) {
+          restoreSession(data.access_token, data.user, data.accessTokenExpiresAt ?? null);
+        }
+      } catch {
+        // Anonymous sessions are allowed.
+      } finally {
+        if (!cancelled) {
+          setAuthBootstrapped(true);
+        }
+      }
+    };
+
+    void bootstrapSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [restoreSession, setAuthBootstrapped]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -59,7 +85,7 @@ export function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
               <Route path="/forgot-password" element={<RedirectIfAuth><ForgotPasswordPage /></RedirectIfAuth>} />
-              <Route path="/onboarding" element={<OnboardingPage />} />
+              <Route path="/onboarding" element={<RequireAuth><OnboardingPage /></RequireAuth>} />
               <Route path="/docs" element={<DocumentationPage />} />
 
               <Route path="/admin" element={<RequireAuth requireAdmin={true}><AdminDashboardPage /></RequireAuth>} />
@@ -97,7 +123,10 @@ export function App() {
 
 // Helper to redirect authenticated users to app
 function RedirectIfAuth({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, accessToken } = useAppStore();
+  const { isAuthenticated, isAuthBootstrapped, accessToken } = useAppStore();
+  if (!isAuthBootstrapped) {
+    return <RouteFallback />;
+  }
   if (isAuthenticated && accessToken) {
     return <Navigate to="/sql-explorer" replace />;
   }

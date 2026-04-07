@@ -14,13 +14,13 @@ export function useSyncConnections() {
 
     useEffect(() => {
         // Reset the fetch flag when user logs out
-        if (!isAuthenticated) {
+        if (!isAuthenticated || !accessToken) {
             hasFetched.current = false;
             return;
         }
 
         // Only fetch if authenticated, have a token, and haven't fetched yet this session
-        if (!accessToken || hasFetched.current) return;
+        if (hasFetched.current) return;
 
         hasFetched.current = true;
 

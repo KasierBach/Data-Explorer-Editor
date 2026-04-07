@@ -1,4 +1,11 @@
-import { Injectable, UnauthorizedException, ConflictException, OnModuleInit, NotFoundException } from '@nestjs/common';
+import {
+    Injectable,
+    UnauthorizedException,
+    ConflictException,
+    OnModuleInit,
+    NotFoundException,
+} from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { OtpService } from '../otp/otp.service';
@@ -12,13 +19,12 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { UserUtils } from '../users/user.utils';
 import { AuditService, AuditAction } from '../audit/audit.service';
-import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
     private readonly SALT_ROUNDS = 10;
-    private readonly VERIFY_OTP_EXPIRY = 15; // mins
-    private readonly RESET_OTP_EXPIRY = 5; // mins
+    private readonly VERIFY_OTP_EXPIRY = 15;
+    private readonly RESET_OTP_EXPIRY = 5;
 
     constructor(
         private readonly prisma: PrismaService,
@@ -27,13 +33,42 @@ export class AuthService implements OnModuleInit {
         private readonly seedService: SeedService,
         private readonly tokenService: TokenService,
         private readonly auditService: AuditService,
-    ) { }
+    ) {}
 
     async onModuleInit() {
         await this.seedService.seedAdmin();
     }
 
-    // ─── Login ──────────────────────────────────────────────────────
+    private async issueSession(user: any) {
+        const session = this.tokenService.generateSessionTokens(user);
+        const refreshTokenHash = await bcrypt.hash(session.refreshToken, this.SALT_ROUNDS);
+
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                refreshTokenHash,
+                refreshTokenExpiry: session.refreshTokenExpiresAt,
+            },
+        });
+
+        return {
+            access_token: session.accessToken,
+            accessTokenExpiresAt: session.accessTokenExpiresAt,
+            refreshToken: session.refreshToken,
+            refreshTokenExpiresAt: session.refreshTokenExpiresAt,
+            user: session.user,
+        };
+    }
+
+    private async revokeRefreshSession(userId: string) {
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                refreshTokenHash: null,
+                refreshTokenExpiry: null,
+            },
+        });
+    }
 
     async login(loginDto: LoginDto, clientIp?: string) {
         const user = await this.prisma.user.findUnique({
@@ -44,13 +79,15 @@ export class AuthService implements OnModuleInit {
             await this.auditService.log({
                 action: AuditAction.AUTH_LOGIN_FAILED,
                 details: { email: loginDto.email, reason: 'User not found' },
-                ipAddress: clientIp
+                ipAddress: clientIp,
             });
             throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
         }
 
         if (!user.password && user.provider !== 'local') {
-            throw new UnauthorizedException(`Tài khoản này được đăng nhập bằng ${user.provider}. Vui lòng đăng nhập qua ${user.provider}.`);
+            throw new UnauthorizedException(
+                `Tài khoản này được đăng nhập bằng ${user.provider}. Vui lòng đăng nhập qua ${user.provider}.`,
+            );
         }
 
         const isPasswordValid = await bcrypt.compare(loginDto.password, user.password!);
@@ -59,7 +96,7 @@ export class AuthService implements OnModuleInit {
                 action: AuditAction.AUTH_LOGIN_FAILED,
                 userId: user.id,
                 details: { email: loginDto.email, reason: 'Invalid password' },
-                ipAddress: clientIp
+                ipAddress: clientIp,
             });
             throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
         }
@@ -79,7 +116,7 @@ export class AuthService implements OnModuleInit {
         if (clientIp && user.lastLoginIp && user.lastLoginIp !== clientIp && user.securityAlerts) {
             const displayName = UserUtils.getDisplayName(user.firstName, user.lastName, user.email);
             const loginTime = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-            this.mailService.sendSecurityAlertEmail(user.email, displayName, clientIp, loginTime);
+            void this.mailService.sendSecurityAlertEmail(user.email, displayName, clientIp, loginTime);
         }
 
         await this.prisma.user.update({
@@ -91,13 +128,11 @@ export class AuthService implements OnModuleInit {
             action: AuditAction.AUTH_LOGIN_SUCCESS,
             userId: user.id,
             details: { email: user.email },
-            ipAddress: clientIp
+            ipAddress: clientIp,
         });
 
-        return this.tokenService.generateTokenResponse(user);
+        return this.issueSession(user);
     }
-
-    // ─── Register ───────────────────────────────────────────────────
 
     async register(registerDto: RegisterDto) {
         const existingUser = await this.prisma.user.findUnique({
@@ -145,14 +180,14 @@ export class AuthService implements OnModuleInit {
         }
 
         const displayName = UserUtils.getDisplayName(firstName, lastName, registerDto.email);
-        this.mailService.sendVerificationEmail(user.email, displayName, otp).catch(err => {
+        void this.mailService.sendVerificationEmail(user.email, displayName, otp).catch((err) => {
             console.error('Failed to send verification email in background:', err.message);
         });
 
         await this.auditService.log({
             action: AuditAction.AUTH_REGISTER,
             userId: user.id,
-            details: { email: user.email, name: registerDto.name }
+            details: { email: user.email, name: registerDto.name },
         });
 
         return {
@@ -161,8 +196,6 @@ export class AuthService implements OnModuleInit {
             email: user.email,
         };
     }
-
-    // ─── Email Verification ─────────────────────────────────────────
 
     async verifyEmail(dto: VerifyEmailDto) {
         const user = await this.prisma.user.findUnique({
@@ -174,7 +207,7 @@ export class AuthService implements OnModuleInit {
         }
 
         if (user.isEmailVerified) {
-            return this.tokenService.generateTokenResponse(user);
+            return this.issueSession(user);
         }
 
         if (!user.verifyOtp || !user.verifyOtpExpiry) {
@@ -199,7 +232,7 @@ export class AuthService implements OnModuleInit {
             },
         });
 
-        return this.tokenService.generateTokenResponse(updatedUser);
+        return this.issueSession(updatedUser);
     }
 
     async resendVerificationEmail(dto: ResendVerificationDto) {
@@ -230,8 +263,6 @@ export class AuthService implements OnModuleInit {
         return { message: 'Mã xác minh mới đã được gửi.' };
     }
 
-    // ─── Forgot Password ────────────────────────────────────────────
-
     async forgotPassword(dto: ForgotPasswordDto) {
         const user = await this.prisma.user.findUnique({
             where: { email: dto.email },
@@ -242,7 +273,9 @@ export class AuthService implements OnModuleInit {
         }
 
         if (user.provider !== 'local') {
-            throw new ConflictException(`Tài khoản này được đăng nhập bằng ${user.provider}. Vui lòng đăng nhập qua ${user.provider}.`);
+            throw new ConflictException(
+                `Tài khoản này được đăng nhập bằng ${user.provider}. Vui lòng đăng nhập qua ${user.provider}.`,
+            );
         }
 
         const otp = this.otpService.generateOtp();
@@ -259,8 +292,6 @@ export class AuthService implements OnModuleInit {
 
         return { message: 'If the email is registered, an OTP has been sent.' };
     }
-
-    // ─── Reset Password with OTP ────────────────────────────────────
 
     async resetPasswordWithOtp(dto: ResetPasswordWithOtpDto) {
         const user = await this.prisma.user.findUnique({
@@ -291,11 +322,14 @@ export class AuthService implements OnModuleInit {
                 password: hashedPassword,
                 resetOtp: null,
                 resetOtpExpiry: null,
+                refreshTokenHash: null,
+                refreshTokenExpiry: null,
             },
         });
 
         return { message: 'Cập nhật mật khẩu thành công.' };
     }
+
     async exchangeOauthCode(code: string) {
         const payload = this.tokenService.verifyOauthExchangeToken(code);
         const user = await this.prisma.user.findUnique({
@@ -310,6 +344,51 @@ export class AuthService implements OnModuleInit {
             throw new UnauthorizedException('Account is banned.');
         }
 
-        return this.tokenService.generateTokenResponse(user);
+        return this.issueSession(user);
+    }
+
+    async refreshSession(refreshToken?: string) {
+        const payload = this.tokenService.verifyRefreshToken(refreshToken);
+        const user = await this.prisma.user.findUnique({
+            where: { id: payload.sub },
+        });
+
+        if (!user || !user.refreshTokenHash || !user.refreshTokenExpiry) {
+            throw new UnauthorizedException('Refresh session not found.');
+        }
+
+        if (user.isBanned) {
+            throw new UnauthorizedException('Account is banned.');
+        }
+
+        if (user.refreshTokenExpiry.getTime() < Date.now()) {
+            await this.revokeRefreshSession(user.id);
+            throw new UnauthorizedException('Refresh token expired.');
+        }
+
+        const isMatch = await bcrypt.compare(refreshToken!, user.refreshTokenHash);
+        if (!isMatch) {
+            await this.revokeRefreshSession(user.id);
+            throw new UnauthorizedException('Refresh token is invalid.');
+        }
+
+        return this.issueSession(user);
+    }
+
+    async logout(refreshToken?: string) {
+        if (!refreshToken) {
+            return { message: 'Logged out.' };
+        }
+
+        try {
+            const payload = this.tokenService.verifyRefreshToken(refreshToken);
+            if (payload.sub) {
+                await this.revokeRefreshSession(payload.sub);
+            }
+        } catch {
+            // Ignore invalid refresh tokens while still clearing cookies on the client.
+        }
+
+        return { message: 'Logged out.' };
     }
 }

@@ -89,3 +89,21 @@ export interface DashboardEntity {
     isOwner: boolean;
     widgets: DashboardWidget[];
 }
+
+export interface ErdWorkspaceEntity {
+    id: string;
+    name: string;
+    notes?: string | null;
+    connectionId?: string | null;
+    database?: string | null;
+    layout: Record<string, any>;
+    createdAt: string;
+    updatedAt: string;
+    owner: {
+        id: string;
+        email: string;
+        firstName?: string | null;
+        lastName?: string | null;
+    };
+    isOwner: boolean;
+}

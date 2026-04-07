@@ -16,12 +16,10 @@ export class AiService {
 
     async chat(params: ChatParams): Promise<ChatResult> {
         const { routingMode, plans } = this.routingService.buildPlanChain(params, this.providerRunner.isGeminiAvailable());
-        console.log(`[AiService] routing=${routingMode} plans=${plans.map((plan) => `${plan.provider}:${plan.model}`).join(' -> ')}`);
         let lastError: any = null;
 
         for (const plan of plans) {
             try {
-                console.log(`[AiService] trying provider=${plan.provider} model=${plan.model}`);
                 if (plan.provider === 'gemini') {
                     return await this.providerRunner.runGemini(plan, params, routingMode);
                 }
@@ -38,12 +36,10 @@ export class AiService {
 
     async * chatStream(params: ChatParams): AsyncGenerator<StreamEvent> {
         const { routingMode, plans } = this.routingService.buildPlanChain(params, this.providerRunner.isGeminiAvailable());
-        console.log(`[AiService:Stream] routing=${routingMode} plans=${plans.map((plan) => `${plan.provider}:${plan.model}`).join(' -> ')}`);
         let lastError: any = null;
 
         for (const plan of plans) {
             try {
-                console.log(`[AiService:Stream] trying provider=${plan.provider} model=${plan.model}`);
                 if (plan.provider === 'gemini') {
                     yield* this.providerRunner.streamGemini(plan, params, routingMode);
                     return;

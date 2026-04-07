@@ -22,6 +22,13 @@ describe('MigrationService', () => {
         closePool: jest.fn().mockResolvedValue(undefined),
         exportStream: jest.fn(),
         importData: jest.fn().mockResolvedValue({ success: true, rowCount: 0 }),
+        getFullMetadata: jest.fn().mockResolvedValue({
+            columns: [
+                { name: 'id', isNullable: false, defaultValue: null, isPrimaryKey: true },
+                { name: 'name', isNullable: true, defaultValue: null, isPrimaryKey: false },
+                { name: 'email', isNullable: true, defaultValue: null, isPrimaryKey: false },
+            ],
+        }),
     });
 
     const mockSourceConn = { id: 'src-1', name: 'Source DB', type: 'postgres' };
@@ -285,5 +292,71 @@ describe('MigrationService', () => {
         expect(job.status).toBe('completed');
         expect(job.processedRows).toBe(0);
         expect(targetStrategy.importData).not.toHaveBeenCalled();
+    });
+
+    it('should fail immediately when source and target point to the same table', async () => {
+        const { jobId } = await service.startMigration('user-1', {
+            ...baseDto,
+            targetConnectionId: 'src-1',
+            targetSchema: 'public',
+            targetTable: 'users',
+        });
+
+        await new Promise<void>((resolve) => {
+            const check = () => {
+                const job = service.jobs.get(jobId);
+                if (job?.status === 'completed' || job?.status === 'failed') {
+                    resolve();
+                } else {
+                    setTimeout(check, 25);
+                }
+            };
+            check();
+        });
+
+        const job = service.jobs.get(jobId)!;
+        expect(job.status).toBe('failed');
+        expect(job.error).toContain('same table');
+    });
+
+    it('should fail during preflight when SQL target is missing source columns', async () => {
+        const sourceStrategy = createMockStrategy();
+        const targetStrategy = createMockStrategy();
+
+        targetStrategy.getFullMetadata.mockResolvedValue({
+            columns: [
+                { name: 'id', isNullable: false, defaultValue: null, isPrimaryKey: true },
+                { name: 'name', isNullable: true, defaultValue: null, isPrimaryKey: false },
+            ],
+        });
+
+        mockTargetConn.type = 'postgres';
+
+        mockStrategyFactory.getStrategy
+            .mockReturnValueOnce(sourceStrategy)
+            .mockReturnValueOnce(targetStrategy);
+
+        const { jobId } = await service.startMigration('user-1', {
+            ...baseDto,
+            targetConnectionId: 'src-1',
+            targetSchema: 'public',
+            targetTable: 'users_copy',
+        });
+
+        await new Promise<void>((resolve) => {
+            const check = () => {
+                const job = service.jobs.get(jobId);
+                if (job?.status === 'completed' || job?.status === 'failed') {
+                    resolve();
+                } else {
+                    setTimeout(check, 25);
+                }
+            };
+            check();
+        });
+
+        const job = service.jobs.get(jobId)!;
+        expect(job.status).toBe('failed');
+        expect(job.error).toContain('missing source columns');
     });
 });

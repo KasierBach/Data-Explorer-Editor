@@ -42,6 +42,11 @@ export const useAppStore = create<AppState>()(
                 if (persisted.expandedNodes && !Array.isArray(persisted.expandedNodes)) {
                     persisted.expandedNodes = [];
                 }
+                delete persisted.isAuthenticated;
+                delete persisted.isAuthBootstrapped;
+                delete persisted.accessToken;
+                delete persisted.tokenExp;
+                delete persisted.user;
                 if (Array.isArray(persisted.aiChats)) {
                     persisted.aiChats = persisted.aiChats.map((chat: Record<string, any>) => ({
                         ...chat,
@@ -52,10 +57,6 @@ export const useAppStore = create<AppState>()(
             },
             // Only persist essential state AND sanitize passwords
             partialize: (state) => ({
-                isAuthenticated: state.isAuthenticated,
-                accessToken: state.accessToken,
-                tokenExp: state.tokenExp,
-                user: state.user,
                 connections: state.connections.map(c => {
                     const { password, ...safeConnection } = c;
                     return safeConnection;

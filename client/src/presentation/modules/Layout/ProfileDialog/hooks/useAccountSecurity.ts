@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppStore } from '@/core/services/store';
 import { apiService } from '@/core/services/api.service';
 import { toast } from 'sonner';
+import { AuthService } from '@/core/services/AuthService';
 
 export const useAccountSecurity = (onClose?: () => void) => {
     const { logout: storeLogout, lang } = useAppStore();
@@ -43,7 +44,13 @@ export const useAccountSecurity = (onClose?: () => void) => {
                 await apiService.delete('/users/me');
                 toast.success(successText);
                 onClose?.();
-                storeLogout();
+                try {
+                    await AuthService.logout();
+                } catch {
+                    // Ignore logout cleanup failures after account deletion.
+                } finally {
+                    storeLogout();
+                }
                 return true;
             } catch (err: any) {
                 toast.error(err.message);

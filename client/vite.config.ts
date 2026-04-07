@@ -23,10 +23,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom', 'zustand'],
-          ui: ['framer-motion', 'lucide-react', 'sonner'],
-          editor: ['@monaco-editor/react'],
-          data: ['xlsx', 'sql-formatter', 'pdfjs-dist']
+          'vendor-core': ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'zustand'],
+          'vendor-ui': ['framer-motion', 'lucide-react', 'sonner', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
+          'vendor-editor': ['@monaco-editor/react', 'monaco-editor'],
+          'vendor-data': ['xlsx', 'sql-formatter', 'pdfjs-dist'],
+          'vendor-diagram': ['@xyflow/react', 'dagre'],
+          'vendor-charts': ['recharts'],
+          'vendor-markdown': ['react-markdown', 'remark-gfm', 'react-syntax-highlighter'],
         }
       }
     }

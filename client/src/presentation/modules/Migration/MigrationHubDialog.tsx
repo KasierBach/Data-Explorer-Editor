@@ -85,6 +85,15 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
     const isRunning = job?.status === 'running';
     const isCompleted = job?.status === 'completed';
     const isFailed = job?.status === 'failed';
+    const normalizedSourceSchema = srcSchema.trim();
+    const normalizedTargetSchema = tgtSchema.trim();
+    const normalizedSourceTable = srcTable.trim();
+    const normalizedTargetTable = tgtTable.trim();
+    const sameEndpoint = !!srcConnId && !!tgtConnId &&
+        srcConnId === tgtConnId &&
+        normalizedSourceSchema === normalizedTargetSchema &&
+        normalizedSourceTable !== '' &&
+        normalizedSourceTable === normalizedTargetTable;
     const sourceBlocked = !!srcConn && (srcConn.allowQueryExecution === false);
     const targetBlocked = !!tgtConn && (
         tgtConn.readOnly ||
@@ -92,7 +101,7 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
         tgtConn.allowSchemaChanges === false ||
         tgtConn.allowQueryExecution === false
     );
-    const canStart = srcConnId && srcTable && tgtConnId && tgtTable && !isRunning && !isStarting && !sourceBlocked && !targetBlocked;
+    const canStart = srcConnId && srcTable && tgtConnId && tgtTable && !isRunning && !isStarting && !sourceBlocked && !targetBlocked && !sameEndpoint;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -212,6 +221,12 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
                         </div>
                     )}
 
+                    {sameEndpoint && (
+                        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400">
+                            Source and target cannot point to the same table or collection.
+                        </div>
+                    )}
+
                     {/* Progress */}
                     {job && (
                         <div className="rounded-lg border p-3 space-y-2">
@@ -242,6 +257,15 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
                                 </span>
                                 {' '}rows transferred
                             </div>
+
+                            {job.stage && (
+                                <div className="text-[11px] text-muted-foreground">
+                                    Stage: <span className="font-medium text-foreground capitalize">{job.stage}</span>
+                                    {typeof job.batchesProcessed === 'number' && (
+                                        <span> · Batches: <span className="font-medium text-foreground">{job.batchesProcessed}</span></span>
+                                    )}
+                                </div>
+                            )}
 
                             {job.error && (
                                 <div className="text-xs text-red-400 bg-red-500/10 p-2 rounded border border-red-500/20">

@@ -10,6 +10,7 @@ export class ApiError extends Error {
 
 class ApiService {
   private baseUrl = API_BASE_URL;
+  private refreshPromise: Promise<boolean> | null = null;
 
   public getHeaders(customHeaders: Record<string, string> = {}) {
     const token = useAppStore.getState().accessToken;
@@ -24,84 +25,171 @@ class ApiService {
     return headers;
   }
 
-  private async handleResponse(response: Response) {
-    if (!response.ok) {
-      if (response.status === 401) {
-        // Clear state and redirect on unauthorized
-        useAppStore.getState().logout();
-        // Option: window.location.href = '/login'; 
-        // We'll let the user decide if they want a hard redirect or just state clear
-        throw new Error('Phiên làm việc hết hạn. Vui lòng đăng nhập lại.');
-      }
-
-      const errorData = await response.json().catch(() => ({}));
-      const error = new ApiError(
-        errorData.message || `API Error: ${response.status} ${response.statusText}`,
-      );
-      error.statusCode = errorData.statusCode ?? response.status;
-      error.reason = errorData.reason;
-      error.action = errorData.action;
-      error.details = errorData.details;
-      throw error;
-    }
-
-    // Check if response is empty (e.g. 204 No Content)
+  private async parseResponse<T>(response: Response): Promise<T> {
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
       const json = await response.json();
-      // Unwrap standard response { success: true, data: ... }
       if (json && typeof json === 'object' && 'success' in json && 'data' in json) {
-        return json.data;
+        return json.data as T;
       }
-      return json;
+      return json as T;
     }
-    return await response.text();
+    return (await response.text()) as T;
   }
 
-  async get<T>(endpoint: string, headers: Record<string, string> = {}): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: 'GET',
-      headers: this.getHeaders(headers),
-    });
-    return this.handleResponse(response) as Promise<T>;
+  private async buildApiError(response: Response) {
+    const errorData = await response.json().catch(() => ({}));
+    const error = new ApiError(
+      errorData.message || `API Error: ${response.status} ${response.statusText}`,
+    );
+    error.statusCode = errorData.statusCode ?? response.status;
+    error.reason = errorData.reason;
+    error.action = errorData.action;
+    error.details = errorData.details;
+    return error;
   }
 
-  async post<T>(endpoint: string, body: any, headers: Record<string, string> = {}): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: 'POST',
-      headers: this.getHeaders(headers),
-      body: JSON.stringify(body),
-    });
-    return this.handleResponse(response) as Promise<T>;
+  private async tryRefreshSession() {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = (async () => {
+      try {
+        const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          credentials: 'include',
+          body: JSON.stringify({}),
+        });
+
+        if (!response.ok) {
+          useAppStore.getState().logout();
+          return false;
+        }
+
+        const data = await this.parseResponse<{
+          access_token?: string;
+          accessTokenExpiresAt?: number;
+          user?: any;
+        }>(response);
+
+        if (!data?.access_token || !data.user) {
+          useAppStore.getState().logout();
+          return false;
+        }
+
+        useAppStore.getState().restoreSession(data.access_token, data.user, data.accessTokenExpiresAt ?? null);
+        return true;
+      } catch {
+        useAppStore.getState().logout();
+        return false;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
   }
 
-  async patch<T>(endpoint: string, body: any, headers: Record<string, string> = {}): Promise<T> {
+  private async requestInternal<T>(
+    endpoint: string,
+    options: RequestInit,
+    allowRefresh: boolean,
+  ): Promise<T> {
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: 'PATCH',
-      headers: this.getHeaders(headers),
-      body: JSON.stringify(body),
-    });
-    return this.handleResponse(response) as Promise<T>;
-  }
-
-  async delete<T>(endpoint: string, headers: Record<string, string> = {}): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: 'DELETE',
-      headers: this.getHeaders(headers),
-    });
-    return this.handleResponse(response) as Promise<T>;
-  }
-
-  // Helper for multi-part/form-data or other cases
-  async request<T>(endpoint: string, options: RequestInit): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      credentials: 'include',
       ...options,
-      headers: {
-        ...this.getHeaders(),
-        ...(options.headers as Record<string, string>),
-      },
     });
-    return this.handleResponse(response) as Promise<T>;
+
+    if (response.status === 401 && allowRefresh && endpoint !== '/auth/refresh' && endpoint !== '/auth/login') {
+      const refreshed = await this.tryRefreshSession();
+      if (refreshed) {
+        return this.requestInternal<T>(endpoint, options, false);
+      }
+    }
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        useAppStore.getState().logout();
+      }
+      throw await this.buildApiError(response);
+    }
+
+    return this.parseResponse<T>(response);
+  }
+
+  async get<T>(endpoint: string, headers: Record<string, string> = {}, allowRefresh = true): Promise<T> {
+    return this.requestInternal<T>(
+      endpoint,
+      {
+        method: 'GET',
+        headers: this.getHeaders(headers),
+      },
+      allowRefresh,
+    );
+  }
+
+  async post<T>(
+    endpoint: string,
+    body: any,
+    headers: Record<string, string> = {},
+    allowRefresh = true,
+  ): Promise<T> {
+    return this.requestInternal<T>(
+      endpoint,
+      {
+        method: 'POST',
+        headers: this.getHeaders(headers),
+        body: JSON.stringify(body),
+      },
+      allowRefresh,
+    );
+  }
+
+  async patch<T>(
+    endpoint: string,
+    body: any,
+    headers: Record<string, string> = {},
+    allowRefresh = true,
+  ): Promise<T> {
+    return this.requestInternal<T>(
+      endpoint,
+      {
+        method: 'PATCH',
+        headers: this.getHeaders(headers),
+        body: JSON.stringify(body),
+      },
+      allowRefresh,
+    );
+  }
+
+  async delete<T>(endpoint: string, headers: Record<string, string> = {}, allowRefresh = true): Promise<T> {
+    return this.requestInternal<T>(
+      endpoint,
+      {
+        method: 'DELETE',
+        headers: this.getHeaders(headers),
+      },
+      allowRefresh,
+    );
+  }
+
+  async request<T>(endpoint: string, options: RequestInit, allowRefresh = true): Promise<T> {
+    return this.requestInternal<T>(
+      endpoint,
+      {
+        ...options,
+        headers: {
+          ...this.getHeaders(),
+          ...(options.headers as Record<string, string>),
+        },
+      },
+      allowRefresh,
+    );
   }
 }
 

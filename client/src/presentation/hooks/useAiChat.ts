@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { useAppStore, type AiMessage } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
-import * as XLSX from 'xlsx';
 
 export interface Attachment {
     type: 'image' | 'sql' | 'table' | 'file';
@@ -59,8 +58,9 @@ async function readPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
     }
 }
 
-function readExcelAsText(arrayBuffer: ArrayBuffer, fileName: string): string {
+async function readExcelAsText(arrayBuffer: ArrayBuffer, fileName: string): Promise<string> {
     try {
+        const XLSX = await import('xlsx');
         const wb = XLSX.read(arrayBuffer, { type: 'array' });
         const sheets: string[] = [];
         for (const sheetName of wb.SheetNames) {
@@ -147,7 +147,7 @@ export function useAiChat() {
         // 3. Excel → extract as CSV text
         if (EXCEL_EXTENSIONS.has(ext)) {
             const buffer = await file.arrayBuffer();
-            const text = readExcelAsText(buffer, file.name);
+            const text = await readExcelAsText(buffer, file.name);
             setAttachments(prev => [...prev, {
                 type: 'file',
                 label: `📗 ${file.name}`,

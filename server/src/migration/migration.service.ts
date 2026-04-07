@@ -5,223 +5,376 @@ import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
 import { StartMigrationDto } from './dto/start-migration.dto';
 
+export type MigrationStage =
+  | 'queued'
+  | 'validating'
+  | 'connecting'
+  | 'preflight'
+  | 'streaming'
+  | 'completed'
+  | 'failed';
+
 export interface MigrationJob {
-    id: string;
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    processedRows: number;
-    error?: string;
+  id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  stage: MigrationStage;
+  processedRows: number;
+  batchesProcessed: number;
+  error?: string;
 }
 
 interface StoredMigrationJob extends MigrationJob {
-    ownerId: string;
+  ownerId: string;
+}
+
+interface ResolvedMigrationContext {
+  sourceConn: any;
+  targetConn: any;
+  sourceStrategy: any;
+  targetStrategy: any;
+  sourcePool: any;
+  targetPool: any;
+  sourceMetadata: any;
+  targetMetadata: any;
 }
 
 @Injectable()
 export class MigrationService {
-    private readonly logger = new Logger(MigrationService.name);
-    
-    // In-memory store of active/completed jobs
-    public readonly jobs = new Map<string, StoredMigrationJob>();
-    // Event emitter to broadcast progress to SSE controllers
-    public readonly eventEmitter = new EventEmitter();
+  private readonly logger = new Logger(MigrationService.name);
 
-    constructor(
-        private connectionsService: ConnectionsService,
-        private dbStrategiesFactory: DatabaseStrategyFactory,
-    ) { }
+  public readonly jobs = new Map<string, StoredMigrationJob>();
+  public readonly eventEmitter = new EventEmitter();
 
-    async startMigration(userId: string, dto: StartMigrationDto): Promise<{ jobId: string }> {
-        const jobId = uuidv4();
-        this.jobs.set(jobId, { id: jobId, status: 'pending', processedRows: 0, ownerId: userId });
+  constructor(
+    private connectionsService: ConnectionsService,
+    private dbStrategiesFactory: DatabaseStrategyFactory,
+  ) {}
 
-        // Fire-and-forget: run the migration asynchronously in the background
-        this.runMigrationPipeline(userId, jobId, dto).catch(err => {
-            this.logger.error(`Migration ${jobId} failed to start or crashed:`, err);
-            const job = this.jobs.get(jobId);
-            if (job) {
-                job.status = 'failed';
-                job.error = err.message || 'Background process crashed';
-                this.updateJob(jobId, job);
-            }
+  async startMigration(userId: string, dto: StartMigrationDto): Promise<{ jobId: string }> {
+    const jobId = uuidv4();
+    this.jobs.set(jobId, {
+      id: jobId,
+      status: 'pending',
+      stage: 'queued',
+      processedRows: 0,
+      batchesProcessed: 0,
+      ownerId: userId,
+    });
+
+    this.runMigrationPipeline(userId, jobId, dto).catch((err) => {
+      this.logger.error(`Migration ${jobId} failed to start or crashed:`, err);
+      this.failJob(jobId, err.message || 'Background process crashed');
+    });
+
+    return { jobId };
+  }
+
+  assertJobOwnership(jobId: string, userId: string) {
+    const job = this.jobs.get(jobId);
+    if (!job) {
+      throw new NotFoundException('Job not found.');
+    }
+
+    if (job.ownerId !== userId) {
+      throw new ForbiddenException('You do not have access to this migration job.');
+    }
+
+    return job;
+  }
+
+  getPublicJob(jobId: string, userId: string): MigrationJob {
+    return this.toPublicJob(this.assertJobOwnership(jobId, userId));
+  }
+
+  private updateJob(jobId: string, updater: Partial<MigrationJob> | ((job: StoredMigrationJob) => void)) {
+    const existing = this.jobs.get(jobId);
+    if (!existing) return;
+
+    if (typeof updater === 'function') {
+      updater(existing);
+    } else {
+      Object.assign(existing, updater);
+    }
+
+    this.jobs.set(jobId, existing);
+    this.eventEmitter.emit(`migration-${jobId}`, this.toPublicJob(existing));
+  }
+
+  private markStage(jobId: string, stage: MigrationStage, status?: MigrationJob['status']) {
+    this.updateJob(jobId, {
+      stage,
+      ...(status ? { status } : {}),
+    });
+  }
+
+  private failJob(jobId: string, error: string) {
+    const current = this.jobs.get(jobId);
+    if (!current || current.status === 'failed' || current.status === 'completed') return;
+    this.logger.error(`Migration ${jobId} failed`, error);
+    this.updateJob(jobId, {
+      status: 'failed',
+      stage: 'failed',
+      error,
+    });
+  }
+
+  private completeJob(jobId: string) {
+    const current = this.jobs.get(jobId);
+    if (!current || current.status === 'failed') return;
+    this.updateJob(jobId, {
+      status: 'completed',
+      stage: 'completed',
+    });
+  }
+
+  private isMongoLike(type: string) {
+    return type === 'mongodb' || type === 'mongodb+srv';
+  }
+
+  private buildMigrationConnectionConfig(conn: any): any {
+    return {
+      ...conn,
+      statementTimeout: 0,
+      queryTimeout: 0,
+      socketTimeout: 0,
+    };
+  }
+
+  private normalizeSchemaName(type: string, schema?: string) {
+    if (this.isMongoLike(type)) return '';
+    return schema?.trim() || (type === 'postgres' ? 'public' : '');
+  }
+
+  private normalizeTableName(table: string) {
+    return table.trim();
+  }
+
+  private sameMigrationEndpoint(dto: StartMigrationDto) {
+    return (
+      dto.sourceConnectionId === dto.targetConnectionId &&
+      (dto.sourceSchema || '') === (dto.targetSchema || '') &&
+      dto.sourceTable === dto.targetTable
+    );
+  }
+
+  private async fetchMetadata(strategy: any, pool: any, schema: string, table: string, database?: string) {
+    return strategy.getFullMetadata(pool, schema, table, database);
+  }
+
+  private validateTargetCompatibility(sourceConn: any, targetConn: any, sourceMetadata: any, targetMetadata: any) {
+    if (this.isMongoLike(targetConn.type)) {
+      return;
+    }
+
+    const sourceColumns = new Set((sourceMetadata?.columns || []).map((column: any) => column.name));
+    const targetColumns = Array.isArray(targetMetadata?.columns) ? targetMetadata.columns : [];
+
+    if (targetColumns.length === 0) {
+      throw new Error('Target table not found or has no accessible columns.');
+    }
+
+    const missingColumns = targetColumns
+      .filter((column: any) => !sourceColumns.has(column.name))
+      .filter((column: any) => !column.isNullable && column.defaultValue == null && !column.isPrimaryKey)
+      .map((column: any) => column.name);
+
+    if (missingColumns.length > 0) {
+      throw new Error(`Target table is missing required values for columns: ${missingColumns.slice(0, 5).join(', ')}`);
+    }
+
+    const unsupportedSourceColumns = (sourceMetadata?.columns || [])
+      .map((column: any) => column.name)
+      .filter((columnName: string) => !targetColumns.some((targetColumn: any) => targetColumn.name === columnName));
+
+    if (unsupportedSourceColumns.length > 0) {
+      throw new Error(`Target table is missing source columns: ${unsupportedSourceColumns.slice(0, 5).join(', ')}`);
+    }
+
+    if (this.isMongoLike(sourceConn.type) && unsupportedSourceColumns.some((name: string) => name.includes('.') || name.includes('[]'))) {
+      throw new Error('MongoDB nested document fields are not compatible with the selected SQL target table.');
+    }
+  }
+
+  private async resolveMigrationContext(userId: string, dto: StartMigrationDto, jobId: string): Promise<ResolvedMigrationContext> {
+    if (this.sameMigrationEndpoint(dto)) {
+      throw new Error('Source and target cannot point to the same table or collection.');
+    }
+
+    this.markStage(jobId, 'validating', 'running');
+
+    const sourceConn = await this.connectionsService.getDecryptedConnection(dto.sourceConnectionId, userId);
+    const targetConn = await this.connectionsService.getDecryptedConnection(dto.targetConnectionId, userId);
+
+    if (!sourceConn || !targetConn) {
+      throw new Error('Source or target connection not found.');
+    }
+
+    this.markStage(jobId, 'connecting');
+
+    const sourceStrategy = this.dbStrategiesFactory.getStrategy(sourceConn.type);
+    const targetStrategy = this.dbStrategiesFactory.getStrategy(targetConn.type);
+    const sourcePool = await sourceStrategy.createPool(this.buildMigrationConnectionConfig(sourceConn));
+    const targetPool = await targetStrategy.createPool(this.buildMigrationConnectionConfig(targetConn));
+
+    this.markStage(jobId, 'preflight');
+
+    const sourceSchema = this.normalizeSchemaName(sourceConn.type, dto.sourceSchema);
+    const targetSchema = this.normalizeSchemaName(targetConn.type, dto.targetSchema);
+    const sourceTable = this.normalizeTableName(dto.sourceTable);
+    const targetTable = this.normalizeTableName(dto.targetTable);
+
+    const sourceMetadata = await this.fetchMetadata(sourceStrategy, sourcePool, sourceSchema, sourceTable, sourceConn.database || undefined);
+
+    if (!sourceMetadata?.columns || sourceMetadata.columns.length === 0) {
+      throw new Error('Source table or collection could not be validated. Check schema, table name, and permissions.');
+    }
+
+    const targetMetadata = await this.fetchMetadata(targetStrategy, targetPool, targetSchema, targetTable, targetConn.database || undefined);
+    this.validateTargetCompatibility(sourceConn, targetConn, sourceMetadata, targetMetadata);
+
+    return {
+      sourceConn,
+      targetConn,
+      sourceStrategy,
+      targetStrategy,
+      sourcePool,
+      targetPool,
+      sourceMetadata,
+      targetMetadata,
+    };
+  }
+
+  private async closeResources(context?: Partial<ResolvedMigrationContext>) {
+    if (context?.sourcePool && context?.sourceStrategy) {
+      try {
+        await context.sourceStrategy.closePool(context.sourcePool);
+      } catch {}
+    }
+    if (context?.targetPool && context?.targetStrategy) {
+      try {
+        await context.targetStrategy.closePool(context.targetPool);
+      } catch {}
+    }
+  }
+
+  private async runMigrationPipeline(userId: string, jobId: string, dto: StartMigrationDto) {
+    let context: Partial<ResolvedMigrationContext> | undefined;
+
+    try {
+      context = await this.resolveMigrationContext(userId, dto, jobId);
+      this.markStage(jobId, 'streaming');
+
+      const stream = await context.sourceStrategy!.exportStream(
+        context.sourcePool,
+        this.normalizeSchemaName(context.sourceConn!.type, dto.sourceSchema),
+        this.normalizeTableName(dto.sourceTable),
+      );
+
+      const BATCH_SIZE = 2000;
+      let buffer: any[] = [];
+      let isPaused = false;
+
+      const flushBuffer = async () => {
+        if (buffer.length === 0) return;
+
+        const batch = buffer;
+        buffer = [];
+
+        await context!.targetStrategy!.importData(context!.targetPool, {
+          schema: this.normalizeSchemaName(context!.targetConn!.type, dto.targetSchema),
+          table: this.normalizeTableName(dto.targetTable),
+          data: batch,
         });
 
-        return { jobId };
-    }
+        this.updateJob(jobId, (job) => {
+          job.processedRows += batch.length;
+          job.batchesProcessed += 1;
+        });
 
-    assertJobOwnership(jobId: string, userId: string) {
-        const job = this.jobs.get(jobId);
-        if (!job) {
-            throw new NotFoundException('Job not found.');
+        this.logger.verbose(`Migration ${jobId}: flushed ${batch.length} rows`);
+      };
+
+      const handleChunk = async (chunk: any) => {
+        buffer.push(chunk);
+        if (buffer.length < BATCH_SIZE) return;
+
+        if (typeof stream.pause === 'function' && !isPaused) {
+          isPaused = true;
+          stream.pause();
         }
-
-        if (job.ownerId !== userId) {
-            throw new ForbiddenException('You do not have access to this migration job.');
-        }
-
-        return job;
-    }
-
-    getPublicJob(jobId: string, userId: string): MigrationJob {
-        return this.toPublicJob(this.assertJobOwnership(jobId, userId));
-    }
-
-    /**
-     * Override connection config to remove timeouts for migration pools.
-     * Normal query pools keep 30s timeout, but migration needs unlimited time.
-     */
-    private buildMigrationConnectionConfig(conn: any): any {
-        return {
-            ...conn,
-            // These flags are read by createPool() in strategies that support them
-            statementTimeout: 0,
-            queryTimeout: 0,
-            socketTimeout: 0,
-        };
-    }
-
-    private async runMigrationPipeline(userId: string, jobId: string, dto: StartMigrationDto) {
-        const job = this.jobs.get(jobId)!;
-        job.status = 'running';
-        this.updateJob(jobId, job);
-
-        let sourcePool: any = null;
-        let targetPool: any = null;
-        let sourceStrategy: any = null;
-        let targetStrategy: any = null;
 
         try {
-            // 1. Fetch Connection Credentials (with decrypted passwords)
-            const sourceConn = await this.connectionsService.getDecryptedConnection(dto.sourceConnectionId, userId);
-            const targetConn = await this.connectionsService.getDecryptedConnection(dto.targetConnectionId, userId);
-
-            if (!sourceConn || !targetConn) throw new Error('Source or Target connection not found');
-
-            // 2. Initialize Strategies & Pools (with migration-safe timeout overrides)
-            sourceStrategy = this.dbStrategiesFactory.getStrategy(sourceConn.type);
-            targetStrategy = this.dbStrategiesFactory.getStrategy(targetConn.type);
-
-            const migrationSourceConfig = this.buildMigrationConnectionConfig(sourceConn);
-            const migrationTargetConfig = this.buildMigrationConnectionConfig(targetConn);
-
-            sourcePool = await sourceStrategy.createPool(migrationSourceConfig);
-            targetPool = await targetStrategy.createPool(migrationTargetConfig);
-
-            this.logger.log(`Migration ${jobId}: pools created, starting stream...`);
-
-            // 3. Get the Readable Stream from Source
-            const stream = await sourceStrategy.exportStream(sourcePool, dto.sourceSchema, dto.sourceTable);
-
-            // 4. Batch Processing Setup
-            const BATCH_SIZE = 2000;
-            let buffer: any[] = [];
-            let isPaused = false;
-
-            const flushBuffer = async () => {
-                if (buffer.length === 0) return;
-                const batch = buffer;
-                buffer = [];
-
-                await targetStrategy.importData(targetPool, {
-                    schema: dto.targetSchema,
-                    table: dto.targetTable,
-                    data: batch
-                });
-
-                job.processedRows += batch.length;
-                this.updateJob(jobId, job);
-                this.logger.verbose(`Migration ${jobId}: flushed ${batch.length} rows (total: ${job.processedRows})`);
-            };
-
-            const handleData = async (chunk: any) => {
-                buffer.push(chunk);
-                if (buffer.length >= BATCH_SIZE) {
-                    if (stream.pause && !isPaused) {
-                        isPaused = true;
-                        stream.pause();
-                    }
-                    try {
-                        await flushBuffer();
-                    } catch (error) {
-                        stream.emit('error', error);
-                        return;
-                    }
-                    if (stream.resume && isPaused) {
-                        isPaused = false;
-                        stream.resume();
-                    }
-                }
-            };
-
-            if (typeof stream.on === 'function') {
-                stream.on('data', handleData);
-                stream.on('row', handleData);
-
-                stream.on('end', async () => {
-                    const currentJob = this.jobs.get(jobId)!;
-                    if ((currentJob.status as string) === 'failed') return;
-                    try {
-                        await flushBuffer();
-                        const updatedJob = this.jobs.get(jobId)!;
-                        if ((updatedJob.status as string) !== 'failed') {
-                            updatedJob.status = 'completed';
-                            this.logger.log(`Migration ${jobId}: completed (${updatedJob.processedRows} rows)`);
-                            this.updateJob(jobId, updatedJob);
-                        }
-                    } catch (error) {
-                        stream.emit('error', error);
-                    }
-                });
-
-                stream.on('error', (err: any) => {
-                    const currentJob = this.jobs.get(jobId)!;
-                    if ((currentJob.status as string) === 'failed') return;
-                    this.logger.error(`Stream error in migration ${jobId}`, err);
-                    currentJob.status = 'failed';
-                    currentJob.error = err.message;
-                    this.updateJob(jobId, currentJob);
-                });
-            } else {
-                for await (const chunk of stream) {
-                    if ((this.jobs.get(jobId)!.status as string) === 'failed') break;
-                    await handleData(chunk);
-                }
-                const currentJob = this.jobs.get(jobId)!;
-                if ((currentJob.status as string) !== 'failed') {
-                    await flushBuffer();
-                    currentJob.status = 'completed';
-                    this.logger.log(`Migration ${jobId}: completed (${currentJob.processedRows} rows)`);
-                    this.updateJob(jobId, currentJob);
-                }
-            }
-
+          await flushBuffer();
         } catch (error: any) {
-            this.logger.error(`Migration ${jobId} PIPELINE EXCEPTION`, error);
-            const currentJob = this.jobs.get(jobId)!;
-            currentJob.status = 'failed';
-            currentJob.error = error.message;
-            this.updateJob(jobId, currentJob);
-        } finally {
-            // Clean up pools
-            if (sourcePool && sourceStrategy) {
-                try { await sourceStrategy.closePool(sourcePool); } catch (e) { }
-            }
-            if (targetPool && targetStrategy) {
-                try { await targetStrategy.closePool(targetPool); } catch (e) { }
-            }
+          stream.emit?.('error', error);
+          return;
         }
-    }
 
-    private updateJob(jobId: string, job: MigrationJob) {
-        this.jobs.set(jobId, job as StoredMigrationJob);
-        this.eventEmitter.emit(`migration-${jobId}`, this.toPublicJob(job as StoredMigrationJob));
-    }
+        if (typeof stream.resume === 'function' && isPaused) {
+          isPaused = false;
+          stream.resume();
+        }
+      };
 
-    private toPublicJob(job: StoredMigrationJob): MigrationJob {
-        return {
-            id: job.id,
-            status: job.status,
-            processedRows: job.processedRows,
-            error: job.error,
+      const handleTerminalFailure = (error: any) => {
+        this.logger.error(`Stream error in migration ${jobId}`, error);
+        this.failJob(jobId, error?.message || 'Migration stream failed.');
+      };
+
+      if (typeof stream.on === 'function') {
+        let processing = Promise.resolve();
+        const enqueueChunk = (chunk: any) => {
+          processing = processing.then(() => handleChunk(chunk));
+          processing.catch(handleTerminalFailure);
         };
+
+        stream.on('data', enqueueChunk);
+        stream.on('row', enqueueChunk);
+
+        stream.on('end', async () => {
+          const currentJob = this.jobs.get(jobId);
+          if (!currentJob || currentJob.status === 'failed') return;
+          try {
+            await processing;
+            await flushBuffer();
+            this.logger.log(`Migration ${jobId}: completed (${this.jobs.get(jobId)?.processedRows || 0} rows)`);
+            this.completeJob(jobId);
+          } catch (error: any) {
+            handleTerminalFailure(error);
+          }
+        });
+
+        stream.on('error', handleTerminalFailure);
+      } else {
+        for await (const chunk of stream) {
+          const currentJob = this.jobs.get(jobId);
+          if (!currentJob || currentJob.status === 'failed') break;
+          await handleChunk(chunk);
+        }
+
+        const currentJob = this.jobs.get(jobId);
+        if (currentJob && currentJob.status !== 'failed') {
+          await flushBuffer();
+          this.logger.log(`Migration ${jobId}: completed (${currentJob.processedRows} rows)`);
+          this.completeJob(jobId);
+        }
+      }
+    } catch (error: any) {
+      this.logger.error(`Migration ${jobId} PIPELINE EXCEPTION`, error);
+      this.failJob(jobId, error.message || 'Migration pipeline failed.');
+    } finally {
+      await this.closeResources(context);
     }
+  }
+
+  private toPublicJob(job: StoredMigrationJob): MigrationJob {
+    return {
+      id: job.id,
+      status: job.status,
+      stage: job.stage,
+      processedRows: job.processedRows,
+      batchesProcessed: job.batchesProcessed,
+      error: job.error,
+    };
+  }
 }

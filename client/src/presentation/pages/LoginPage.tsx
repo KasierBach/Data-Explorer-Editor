@@ -53,7 +53,7 @@ export const LoginPage = () => {
                 throw new Error('Social login exchange failed');
             }
 
-            login(data.access_token, data.user);
+            login(data.access_token, data.user, data.accessTokenExpiresAt ?? null);
 
             // Fetch global connections
             try {
@@ -100,7 +100,7 @@ export const LoginPage = () => {
             }
 
             if (data.access_token && data.user) {
-                login(data.access_token, data.user);
+                login(data.access_token, data.user, data.accessTokenExpiresAt ?? null);
 
                 try {
                     const connections = await ConnectionService.getConnections();
@@ -139,7 +139,7 @@ export const LoginPage = () => {
             toast.success(lang === 'vi' ? 'Xác minh thành công!' : 'Verification successful!');
             
             if (data.access_token && data.user) {
-                login(data.access_token, data.user);
+                login(data.access_token, data.user, data.accessTokenExpiresAt ?? null);
                 
                 if (data.user?.isOnboarded === false) {
                      navigate('/onboarding');

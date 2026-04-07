@@ -8,7 +8,7 @@ import { LanguageSwitcher } from '@/presentation/components/shared/LanguageSwitc
 interface LandingHeaderProps {
     lang: string;
     isAuthenticated: boolean;
-    logout: () => void;
+    logout: () => void | Promise<void>;
     isMobileNavOpen: boolean;
     setIsMobileNavOpen: (open: boolean) => void;
 }
@@ -56,7 +56,7 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
                     <LanguageSwitcher />
                     {isAuthenticated ? (
                         <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => { logout(); navigate('/login'); }} className="hidden sm:flex hover:bg-red-500/10 hover:text-red-500 text-xs uppercase tracking-wider">
+                            <Button variant="ghost" size="sm" onClick={() => { void logout(); navigate('/login'); }} className="hidden sm:flex hover:bg-red-500/10 hover:text-red-500 text-xs uppercase tracking-wider">
                                 Logout
                             </Button>
                             <Button size="sm" onClick={() => navigate('/sql-explorer')} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-widest font-bold">

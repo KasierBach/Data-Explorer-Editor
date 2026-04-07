@@ -2,14 +2,15 @@ import type { StateCreator } from 'zustand';
 
 export interface AuthSlice {
     isAuthenticated: boolean;
+    isAuthBootstrapped: boolean;
     accessToken: string | null;
     tokenExp: number | null;
-    user: { 
+    user: {
         id?: string;
-        name?: string; 
+        name?: string;
         firstName?: string;
         lastName?: string;
-        email: string; 
+        email: string;
         role?: string;
         avatarUrl?: string;
         bio?: string;
@@ -29,39 +30,57 @@ export interface AuthSlice {
         billingDate?: string;
         paymentMethod?: string;
     } | null;
-    login: (token: string, user: any) => void;
+    login: (token: string, user: any, tokenExp?: number | null) => void;
+    restoreSession: (token: string, user: any, tokenExp?: number | null) => void;
     logout: () => void;
+    setAuthBootstrapped: (value: boolean) => void;
     updateUser: (user: any) => void;
+}
+
+function parseTokenExp(token?: string | null, fallback?: number | null) {
+    if (typeof fallback === 'number') {
+        return fallback;
+    }
+
+    if (!token) {
+        return null;
+    }
+
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const payload = JSON.parse(window.atob(base64));
+        return payload.exp ?? null;
+    } catch (e) {
+        console.error('Failed to parse JWT', e);
+        return null;
+    }
+}
+
+function buildSessionState(token: string, user: any, tokenExp?: number | null) {
+    const parsedTokenExp = parseTokenExp(token, tokenExp);
+    const role = user?.role;
+
+    return {
+        isAuthenticated: true,
+        isAuthBootstrapped: true,
+        accessToken: token,
+        tokenExp: parsedTokenExp,
+        user: { ...user, role },
+    };
 }
 
 export const createAuthSlice: StateCreator<AuthSlice> = (set) => ({
     isAuthenticated: false,
+    isAuthBootstrapped: false,
     accessToken: null,
     tokenExp: null,
     user: null,
-    login: (token, user) => {
-        let tokenExp: number | null = null;
-        let role = user.role;
-
-        try {
-            const base64Url = token.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const payload = JSON.parse(window.atob(base64));
-            if (payload.exp) tokenExp = payload.exp;
-            if (!role && payload.role) role = payload.role;
-        } catch (e) {
-            console.error('Failed to parse JWT', e);
-        }
-
+    login: (token, user, tokenExp) => {
         set({
-            isAuthenticated: true,
-            accessToken: token,
-            tokenExp,
-            user: { ...user, role },
+            ...buildSessionState(token, user, tokenExp),
             isConnectionDialogOpen: false,
-            // Clear previous user's data to prevent cross-account leaking
             connections: [],
-            // Preserve activeConnectionId and activeDatabase across sessions for better UX
             tabs: [],
             activeTabId: null,
             aiChats: [],
@@ -71,23 +90,30 @@ export const createAuthSlice: StateCreator<AuthSlice> = (set) => ({
             expandedNodes: [],
         } as any);
     },
-    logout: () => set({
-        isAuthenticated: false,
-        accessToken: null,
-        tokenExp: null,
-        user: null,
-        // Clear all user-specific data to prevent leaking between accounts
-        connections: [],
-        // Preserve workspace state like activeConnectionId and activeDatabase
-        tabs: [],
-        activeTabId: null,
-        aiChats: [],
-        activeAiChatId: null,
-        savedQueries: [],
-        queryHistory: [],
-        expandedNodes: [],
-    } as any),
-    updateUser: (userData) => set((state) => ({ 
-        user: state.user ? { ...state.user, ...userData } : userData as any
-    })),
+    restoreSession: (token, user, tokenExp) => {
+        set({
+            ...buildSessionState(token, user, tokenExp),
+        });
+    },
+    logout: () =>
+        set({
+            isAuthenticated: false,
+            isAuthBootstrapped: true,
+            accessToken: null,
+            tokenExp: null,
+            user: null,
+            connections: [],
+            tabs: [],
+            activeTabId: null,
+            aiChats: [],
+            activeAiChatId: null,
+            savedQueries: [],
+            queryHistory: [],
+            expandedNodes: [],
+        } as any),
+    setAuthBootstrapped: (value) => set({ isAuthBootstrapped: value }),
+    updateUser: (userData) =>
+        set((state) => ({
+            user: state.user ? { ...state.user, ...userData } : (userData as any),
+        })),
 });

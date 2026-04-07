@@ -4,6 +4,7 @@ import { SEO } from '../components/shared/Seo';
 import { LandingHeader } from '../modules/LandingPage/components/LandingHeader';
 import { HeroSection } from '../modules/LandingPage/components/HeroSection';
 import { InteractiveBackground } from '../modules/LandingPage/components/InteractiveBackground';
+import { AuthService } from '@/core/services/AuthService';
 
 // Lazy load sections below the fold
 const FeaturesSection = lazy(() => import('../modules/LandingPage/components/FeaturesSection').then(m => ({ default: m.FeaturesSection })));
@@ -48,6 +49,16 @@ export const LandingPage: React.FC = () => {
         }
     };
 
+    const handleLogout = async () => {
+        try {
+            await AuthService.logout();
+        } catch {
+            // Best effort. Local state still gets cleared below.
+        } finally {
+            logout();
+        }
+    };
+
     return (
         <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-blue-500/30 overflow-x-hidden relative">
             <SEO 
@@ -63,7 +74,7 @@ export const LandingPage: React.FC = () => {
             <LandingHeader 
                 lang={lang} 
                 isAuthenticated={isAuthenticated} 
-                logout={logout}
+                logout={handleLogout}
                 isMobileNavOpen={isMobileNavOpen}
                 setIsMobileNavOpen={setIsMobileNavOpen}
             />

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AiPromptBuilderService } from './ai.prompt-builder.service';
@@ -7,6 +7,7 @@ import type { AiRoutingMode, ChatParams, ChatResult, ProviderPlan, StreamEvent }
 @Injectable()
 export class AiProviderRunnerService {
     private readonly genAI: GoogleGenerativeAI | null;
+    private readonly logger = new Logger(AiProviderRunnerService.name);
 
     constructor(
         private readonly configService: ConfigService,
@@ -14,7 +15,7 @@ export class AiProviderRunnerService {
     ) {
         const apiKey = this.configService.get<string>('GEMINI_API_KEY');
         if (!apiKey) {
-            console.warn('[AiProviderRunnerService] GEMINI_API_KEY not set - Gemini lane disabled');
+            this.logger.warn('GEMINI_API_KEY not set - Gemini lane disabled');
             this.genAI = null;
         } else {
             this.genAI = new GoogleGenerativeAI(apiKey);
@@ -23,6 +24,64 @@ export class AiProviderRunnerService {
 
     isGeminiAvailable(): boolean {
         return !!this.genAI;
+    }
+
+    private getProviderTimeoutMs(): number {
+        const raw = Number(this.configService.get<string>('AI_PROVIDER_TIMEOUT_MS') || 15000);
+        return Number.isFinite(raw) && raw > 0 ? raw : 15000;
+    }
+
+    private getStreamIdleTimeoutMs(): number {
+        const raw = Number(this.configService.get<string>('AI_STREAM_IDLE_TIMEOUT_MS') || this.getProviderTimeoutMs());
+        return Number.isFinite(raw) && raw > 0 ? raw : this.getProviderTimeoutMs();
+    }
+
+    private async withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = this.getProviderTimeoutMs()): Promise<T> {
+        let timer: NodeJS.Timeout | null = null;
+
+        try {
+            return await Promise.race<T>([
+                promise,
+                new Promise<T>((_, reject) => {
+                    timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+                }),
+            ]);
+        } finally {
+            if (timer) {
+                clearTimeout(timer);
+            }
+        }
+    }
+
+    private createAbortController(label: string, timeoutMs = this.getProviderTimeoutMs()) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+
+        return {
+            signal: controller.signal,
+            clear: () => clearTimeout(timer),
+        };
+    }
+
+    private async readWithTimeout<T>(
+        reader: ReadableStreamDefaultReader<T>,
+        label: string,
+        timeoutMs = this.getStreamIdleTimeoutMs(),
+    ): Promise<ReadableStreamReadResult<T>> {
+        let timer: NodeJS.Timeout | null = null;
+
+        try {
+            return await Promise.race<ReadableStreamReadResult<T>>([
+                reader.read(),
+                new Promise<ReadableStreamReadResult<T>>((_, reject) => {
+                    timer = setTimeout(() => reject(new Error(`${label} stalled after ${timeoutMs}ms`)), timeoutMs);
+                }),
+            ]);
+        } finally {
+            if (timer) {
+                clearTimeout(timer);
+            }
+        }
     }
 
     async completeGeminiText(params: {
@@ -43,7 +102,10 @@ export class AiProviderRunnerService {
             },
         });
 
-        const result = await model.generateContent(params.prompt);
+        const result = await this.withTimeout(
+            model.generateContent(params.prompt),
+            `Gemini completion (${params.model})`,
+        );
         return result.response.text().trim();
     }
 
@@ -66,10 +128,13 @@ export class AiProviderRunnerService {
             tools: [{ googleSearch: {} } as any],
         });
 
-        const result = await model.generateContent({
-            contents: [{ role: 'user', parts }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
-        });
+        const result = await this.withTimeout(
+            model.generateContent({
+                contents: [{ role: 'user', parts }],
+                generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+            }),
+            `Gemini request (${plan.model})`,
+        );
 
         const responseText = result.response.text();
         const parsed = this.promptBuilder.parseAiResponse(responseText);
@@ -98,6 +163,7 @@ export class AiProviderRunnerService {
             databaseType: params.databaseType,
         });
 
+        const requestTimeout = this.createAbortController(`${plan.provider} request (${plan.model})`);
         const response = await fetch(`${plan.baseUrl}/chat/completions`, {
             method: 'POST',
             headers: this.getOpenAiCompatibleHeaders(plan),
@@ -107,7 +173,8 @@ export class AiProviderRunnerService {
                 temperature: 0.7,
                 max_tokens: 8192,
             }),
-        });
+            signal: requestTimeout.signal,
+        }).finally(requestTimeout.clear);
 
         if (!response.ok) {
             throw new Error(await response.text());
@@ -148,21 +215,38 @@ export class AiProviderRunnerService {
             tools: [{ googleSearch: {} } as any],
         });
 
-        const result = await model.generateContentStream({
-            contents: [{ role: 'user', parts }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
-        });
+        const result = await this.withTimeout(
+            model.generateContentStream({
+                contents: [{ role: 'user', parts }],
+                generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+            }),
+            `Gemini stream bootstrap (${plan.model})`,
+        );
 
         let fullText = '';
-        for await (const chunk of result.stream) {
-            const chunkText = chunk.text();
+        const iterator = result.stream[Symbol.asyncIterator]();
+        while (true) {
+            const nextChunk = await this.withTimeout(
+                iterator.next(),
+                `Gemini stream (${plan.model})`,
+                this.getStreamIdleTimeoutMs(),
+            );
+
+            if (nextChunk.done) {
+                break;
+            }
+
+            const chunkText = nextChunk.value.text();
             if (chunkText) {
                 fullText += chunkText;
                 yield { type: 'chunk', text: chunkText };
             }
         }
 
-        const aggregatedResponse = await result.response;
+        const aggregatedResponse = await this.withTimeout(
+            result.response,
+            `Gemini stream finalize (${plan.model})`,
+        );
         const parsed = this.promptBuilder.parseAiResponse(fullText);
         this.promptBuilder.assertUsableStructuredResponse(parsed, fullText, `Gemini (${plan.model})`);
         const sourcesSuffix = this.promptBuilder.extractSources(aggregatedResponse);
@@ -192,6 +276,7 @@ export class AiProviderRunnerService {
             databaseType: params.databaseType,
         });
 
+        const requestTimeout = this.createAbortController(`${plan.provider} stream request (${plan.model})`);
         const response = await fetch(`${plan.baseUrl}/chat/completions`, {
             method: 'POST',
             headers: this.getOpenAiCompatibleHeaders(plan),
@@ -202,7 +287,8 @@ export class AiProviderRunnerService {
                 max_tokens: 8192,
                 stream: true,
             }),
-        });
+            signal: requestTimeout.signal,
+        }).finally(requestTimeout.clear);
 
         if (!response.ok) {
             throw new Error(await response.text());
@@ -218,13 +304,42 @@ export class AiProviderRunnerService {
         let fullText = '';
 
         while (true) {
-            const { value, done } = await reader.read();
+            const { value, done } = await this.readWithTimeout(
+                reader,
+                `${plan.provider} stream (${plan.model})`,
+            );
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
             const events = buffer.split('\n\n');
             buffer = events.pop() || '';
 
+            for (const event of events) {
+                const line = event
+                    .split('\n')
+                    .find((entry) => entry.startsWith('data: '));
+
+                if (!line) continue;
+
+                const data = line.slice(6).trim();
+                if (!data || data === '[DONE]') continue;
+
+                const payload = JSON.parse(data);
+                const deltaText = this.promptBuilder.extractOpenAiStreamText(payload);
+                if (deltaText) {
+                    fullText += deltaText;
+                    yield { type: 'chunk', text: deltaText };
+                }
+            }
+        }
+
+        const finalChunk = decoder.decode();
+        if (finalChunk) {
+            buffer += finalChunk;
+        }
+
+        if (buffer.trim()) {
+            const events = buffer.split('\n\n');
             for (const event of events) {
                 const line = event
                     .split('\n')

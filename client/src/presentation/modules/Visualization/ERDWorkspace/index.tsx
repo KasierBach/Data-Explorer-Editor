@@ -7,6 +7,8 @@ import { useAppStore } from '@/core/services/store';
 import { ERDSidebar } from './components/ERDSidebar';
 import { ERDToolbar } from './components/ERDToolbar';
 import { ERDCanvas } from './components/ERDCanvas';
+import { SaveErdWorkspaceDialog } from './components/SaveERDWorkspaceDialog';
+import { OpenErdWorkspaceDialog } from './components/OpenERDWorkspaceDialog';
 import '@xyflow/react/dist/style.css'; // Added CSS import
 
 interface ERDWorkspaceProps {
@@ -94,9 +96,33 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                         setIsEdgeAnimated={actions.setIsEdgeAnimated}
                         isToolbarCollapsed={state.isToolbarCollapsed}
                         setIsToolbarCollapsed={actions.setIsToolbarCollapsed}
+                        currentWorkspaceName={state.currentWorkspaceName}
+                        onOpenSaveDialog={actions.openSaveDialog}
+                        onOpenWorkspaceDialog={actions.openWorkspaceDialog}
                         onFitView={() => {}}
                     />
                 )}
+            />
+
+            <SaveErdWorkspaceDialog
+                open={state.isSaveDialogOpen}
+                onOpenChange={actions.setIsSaveDialogOpen}
+                lang={state.lang}
+                currentWorkspaceName={state.currentWorkspaceName}
+                initialValues={{
+                    name: state.currentWorkspaceName || `${state.selectedDatabase || state.activeConnection?.name || 'ERD'} workspace`,
+                    notes: state.currentWorkspaceNotes || '',
+                }}
+                onSubmit={actions.saveWorkspace}
+            />
+
+            <OpenErdWorkspaceDialog
+                open={state.isOpenWorkspaceDialogOpen}
+                onOpenChange={actions.setIsOpenWorkspaceDialogOpen}
+                lang={state.lang}
+                workspaces={state.erdWorkspaces}
+                onOpenWorkspace={actions.loadWorkspace}
+                onDeleteWorkspace={actions.deleteWorkspace}
             />
         </div>
     );
