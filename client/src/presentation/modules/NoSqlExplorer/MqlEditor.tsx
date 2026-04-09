@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import Editor from '@monaco-editor/react';
+import Editor, { useMonaco } from '@monaco-editor/react';
 import { useAppStore } from '@/core/services/store';
 import { Loader2 } from 'lucide-react';
+import { useAiGhostText } from '@/presentation/components/code-editor/useAiGhostText';
 
 interface MqlEditorProps {
     value: string;
@@ -12,12 +13,15 @@ interface MqlEditorProps {
 
 /**
  * Monaco-based JSON editor for MQL queries.
- * Supports Ctrl+Enter to execute and Shift+Alt+F to format.
+ * Supports Ctrl+Enter to execute, Shift+Alt+F to format, and AI Ghost Text.
  */
 export const MqlEditor: React.FC<MqlEditorProps> = ({ value, onChange, onRun, height = '100%' }) => {
     const [theme, setTheme] = React.useState<'vs-dark' | 'light'>('vs-dark');
     const editorRef = useRef<any>(null);
-    const activeConnectionId = useAppStore(state => state.activeConnectionId);
+    const { activeConnectionId, activeDatabase } = useAppStore();
+    
+    const monaco = useMonaco();
+    useAiGhostText(monaco, activeConnectionId, activeDatabase || undefined, 'json');
 
     useEffect(() => {
         const isDark = document.documentElement.classList.contains('dark');

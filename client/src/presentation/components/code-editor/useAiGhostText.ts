@@ -11,6 +11,7 @@ export function useAiGhostText(
     monaco: any,
     activeConnectionId: string | null,
     activeDatabase: string | undefined,
+    language: string = 'sql'
 ) {
     useEffect(() => {
         if (!monaco || !activeConnectionId) return;
@@ -126,7 +127,7 @@ export function useAiGhostText(
             freeInlineCompletions: () => {},
         };
 
-        const disposable = monaco.languages.registerInlineCompletionsProvider('sql', provider);
+        const disposable = monaco.languages.registerInlineCompletionsProvider(language, provider);
 
         return () => disposable.dispose();
     }, [monaco, activeConnectionId, activeDatabase]);
