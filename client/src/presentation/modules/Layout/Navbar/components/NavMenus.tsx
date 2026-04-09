@@ -17,13 +17,15 @@ interface NavMenusProps {
     openQueryTab: () => void;
     isSidebarOpen: boolean;
     setSidebarOpen: (v: boolean) => void;
+    isNoSql?: boolean;
 }
 
 export const NavMenus: React.FC<NavMenusProps> = ({ 
     lang, 
     openQueryTab, 
     isSidebarOpen, 
-    setSidebarOpen 
+    setSidebarOpen,
+    isNoSql
 }) => {
     const { openTab, closeAllTabs, isResultPanelOpen, toggleResultPanel } = useAppStore();
 
@@ -41,48 +43,52 @@ export const NavMenus: React.FC<NavMenusProps> = ({
 
     return (
         <nav className="flex items-center gap-1">
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">
-                        {lang === 'vi' ? 'Tệp' : 'File'}
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64">
-                    <DropdownMenuLabel>{lang === 'vi' ? 'Thao tác Tệp' : 'File Operations'}</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => openQueryTab()}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        <span>{lang === 'vi' ? 'Truy vấn mới' : 'New Query'}</span>
-                        <DropdownMenuShortcut>Ctrl+N</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleDuplicateTab}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        <span>{lang === 'vi' ? 'Nhân bản Tab' : 'Duplicate Tab'}</span>
-                        <DropdownMenuShortcut>Ctrl+D</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={closeAllTabs} className="text-destructive focus:text-destructive">
-                        <X className="mr-2 h-4 w-4" />
-                        <span>{lang === 'vi' ? 'Đóng tất cả Tab' : 'Close All Tabs'}</span>
-                        <DropdownMenuShortcut>Ctrl+Shift+W</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+            {!isNoSql && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">
+                            {lang === 'vi' ? 'Tệp' : 'File'}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-64">
+                        <DropdownMenuLabel>{lang === 'vi' ? 'Thao tác Tệp' : 'File Operations'}</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => openQueryTab()}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            <span>{lang === 'vi' ? 'Truy vấn mới' : 'New Query'}</span>
+                            <DropdownMenuShortcut>Ctrl+N</DropdownMenuShortcut>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleDuplicateTab}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            <span>{lang === 'vi' ? 'Nhân bản Tab' : 'Duplicate Tab'}</span>
+                            <DropdownMenuShortcut>Ctrl+D</DropdownMenuShortcut>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={closeAllTabs} className="text-destructive focus:text-destructive">
+                            <X className="mr-2 h-4 w-4" />
+                            <span>{lang === 'vi' ? 'Đóng tất cả Tab' : 'Close All Tabs'}</span>
+                            <DropdownMenuShortcut>Ctrl+Shift+W</DropdownMenuShortcut>
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
 
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">
-                        {lang === 'vi' ? 'Sửa' : 'Edit'}
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64">
-                    <DropdownMenuItem>{lang === 'vi' ? 'Hoàn tác' : 'Undo'} <DropdownMenuShortcut>Ctrl+Z</DropdownMenuShortcut></DropdownMenuItem>
-                    <DropdownMenuItem>{lang === 'vi' ? 'Lấy lại' : 'Redo'} <DropdownMenuShortcut>Ctrl+Y</DropdownMenuShortcut></DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>{lang === 'vi' ? 'Cắt' : 'Cut'} <DropdownMenuShortcut>Ctrl+X</DropdownMenuShortcut></DropdownMenuItem>
-                    <DropdownMenuItem>{lang === 'vi' ? 'Sao chép' : 'Copy'} <DropdownMenuShortcut>Ctrl+C</DropdownMenuShortcut></DropdownMenuItem>
-                    <DropdownMenuItem>{lang === 'vi' ? 'Dán' : 'Paste'} <DropdownMenuShortcut>Ctrl+V</DropdownMenuShortcut></DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+            {!isNoSql && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">
+                            {lang === 'vi' ? 'Sửa' : 'Edit'}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-64">
+                        <DropdownMenuItem>{lang === 'vi' ? 'Hoàn tác' : 'Undo'} <DropdownMenuShortcut>Ctrl+Z</DropdownMenuShortcut></DropdownMenuItem>
+                        <DropdownMenuItem>{lang === 'vi' ? 'Lấy lại' : 'Redo'} <DropdownMenuShortcut>Ctrl+Y</DropdownMenuShortcut></DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem>{lang === 'vi' ? 'Cắt' : 'Cut'} <DropdownMenuShortcut>Ctrl+X</DropdownMenuShortcut></DropdownMenuItem>
+                        <DropdownMenuItem>{lang === 'vi' ? 'Sao chép' : 'Copy'} <DropdownMenuShortcut>Ctrl+C</DropdownMenuShortcut></DropdownMenuItem>
+                        <DropdownMenuItem>{lang === 'vi' ? 'Dán' : 'Paste'} <DropdownMenuShortcut>Ctrl+V</DropdownMenuShortcut></DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
 
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -95,10 +101,12 @@ export const NavMenus: React.FC<NavMenusProps> = ({
                         {isSidebarOpen ? (lang === 'vi' ? "Ẩn thanh bên" : "Hide Sidebar") : (lang === 'vi' ? "Hiện thanh bên" : "Show Sidebar")}
                         <DropdownMenuShortcut>Ctrl+B</DropdownMenuShortcut>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={toggleResultPanel}>
-                        {isResultPanelOpen ? (lang === 'vi' ? "Ẩn bảng kết quả" : "Hide Result Panel") : (lang === 'vi' ? "Hiện bảng kết quả" : "Show Result Panel")}
-                        <DropdownMenuShortcut>Ctrl+J</DropdownMenuShortcut>
-                    </DropdownMenuItem>
+                    {!isNoSql && (
+                        <DropdownMenuItem onClick={toggleResultPanel}>
+                            {isResultPanelOpen ? (lang === 'vi' ? "Ẩn bảng kết quả" : "Hide Result Panel") : (lang === 'vi' ? "Hiện bảng kết quả" : "Show Result Panel")}
+                            <DropdownMenuShortcut>Ctrl+J</DropdownMenuShortcut>
+                        </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem>{lang === 'vi' ? 'Cửa sổ toàn màn hình' : 'Toggle Full Screen'} <DropdownMenuShortcut>F11</DropdownMenuShortcut></DropdownMenuItem>
                 </DropdownMenuContent>

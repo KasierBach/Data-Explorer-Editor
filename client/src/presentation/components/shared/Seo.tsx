@@ -11,9 +11,9 @@ interface SeoProps {
 }
 
 export function SEO({
-  title = "Data Explorer - Smart Database IDE for Developers",
-  description = "Connect, explore and visualize your SQL & NoSQL databases with AI-powered features. The smartest local database explorer.",
-  keywords = "database, sql, nosql, mongodb, postgresql, explorer, ai, developer tools",
+  title = "Data Explorer - Multi-Engine Database IDE & AI Assistant",
+  description = "A unified workspace for PostgreSQL, MySQL, SQL Server, and MongoDB. Experience seamless querying with Gemini 3.1 AI, visual ERD generation, and RBAC security.",
+  keywords = "database client, sql tool, nosql gui, mongodb explorer, postgresql client, ai database assistant, text to sql, gemini 3.1, erd diagram generator, database management",
   ogImage = "https://data-explorer-editor.vercel.app/og-image.png",
   ogUrl = "https://data-explorer-editor.vercel.app",
   lang = "en",

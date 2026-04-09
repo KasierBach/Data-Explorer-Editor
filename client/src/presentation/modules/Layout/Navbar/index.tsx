@@ -87,6 +87,7 @@ export const Navbar: React.FC = () => {
                         openQueryTab={openQueryTab}
                         isSidebarOpen={isSidebarOpen}
                         setSidebarOpen={setSidebarOpen}
+                        isNoSql={location.pathname.startsWith('/nosql')}
                     />
                 )}
 

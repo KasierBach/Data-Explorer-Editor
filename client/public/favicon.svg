@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <rect width="24" height="24" rx="5" fill="url(#blue-gradient)" />
+  <defs>
+    <linearGradient id="blue-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" /> <!-- blue-600 -->
+      <stop offset="100%" stop-color="#4f46e5" /> <!-- indigo-600 -->
+    </linearGradient>
+  </defs>
+  <g stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="12" cy="8" rx="6" ry="2" />
+    <path d="M6 8V16A6 2 0 0 0 18 16V8" />
+    <path d="M6 12A6 2 0 0 0 18 12" />
+  </g>
+</svg>
