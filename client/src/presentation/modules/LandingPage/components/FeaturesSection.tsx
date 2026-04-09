@@ -10,33 +10,33 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
     const features = [
         {
             icon: <Terminal className="w-6 h-6 text-blue-400" aria-hidden="true" />,
-            title: lang === 'vi' ? "Monaco Pro" : "Monaco Pro",
-            desc: lang === 'vi' ? "Trình soạn thảo VS Code tích hợp hoàn hảo. Đầy đủ Intellisense, đa con trỏ và hiệu suất cực cao cho các câu lệnh SQL phức tạp." : "Seamlessly integrated VS Code editor. Full Intellisense, multi-cursor, and ultra-high performance for complex SQL queries."
+            title: lang === 'vi' ? "Monaco Editor" : "Monaco Editor",
+            desc: lang === 'vi' ? "Trình soạn thảo mã chuyên nghiệp với Auto-Complete, gợi ý cấu trúc bảng trực tiếp bằng AI và Schema Intellisense." : "Professional grade editor with precise Auto-complete, AI-driven schema suggestions, and Intellisense."
         },
         {
             icon: <Zap className="w-6 h-6 text-yellow-400" aria-hidden="true" />,
-            title: lang === 'vi' ? "Gemini 3.1 Flash-Lite" : "Gemini 3.1 Flash-Lite",
-            desc: lang === 'vi' ? "Dịch ngôn ngữ tự nhiên sang SQL thông minh vượt trội. Tối ưu hóa cho các mô hình dữ liệu phức tạp và kiến trúc doanh nghiệp." : "Supreme natural language to SQL translation. Optimized for complex data models and enterprise architectures."
-        },
-        {
-            icon: <BarChart3 className="w-6 h-6 text-emerald-400" aria-hidden="true" />,
-            title: lang === 'vi' ? "Kiến trúc Modular" : "Modular Core",
-            desc: lang === 'vi' ? "Xây dựng trên nguyên tắc SOLID & Clean Architecture. Dễ dàng mở rộng, bảo trì và tích hợp các module mới như Otp, Seed, Token." : "Built on SOLID & Clean Architecture. Easy to extend, maintain, and integrate new modules like Otp, Seed, and Token."
+            title: lang === 'vi' ? "Hỗ Trợ SQL & NoSQL" : "SQL & NoSQL Engines",
+            desc: lang === 'vi' ? "Kết nối và thao tác trên PostgreSQL, MySQL, SQL Server, và MongoDB Atlas... tất cả trong một nền tảng duy nhất." : "Query across PostgreSQL, MySQL, SQL Server, and MongoDB Atlas seamlessly from a single unified workspace."
         },
         {
             icon: <GitGraph className="w-6 h-6 text-purple-400" aria-hidden="true" />,
-            title: lang === 'vi' ? "ERD & Vision AI" : "ERD & Vision AI",
-            desc: lang === 'vi' ? "Phân tích lược đồ bằng Multimodal Vision. Tự động ánh xạ mối quan hệ và gợi ý tối ưu hóa cấu trúc database thông minh." : "Schema analysis via Multimodal Vision. Automatic relationship mapping and intelligent database structure optimization suggestions."
+            title: lang === 'vi' ? "Live ERD Visualizer" : "Live ERD Visualizer",
+            desc: lang === 'vi' ? "Tự động phân tích và tạo sơ đồ quan hệ (ERD) bằng React Flow. Cung cấp góc nhìn tổng quan 100% rõ ràng về kiến trúc database." : "Automatically generate and explore interactive Entity Relationship Diagrams (ERD) powered by React Flow."
         },
         {
-            icon: <PieChart className="w-6 h-6 text-cyan-400" aria-hidden="true" />,
-            title: lang === 'vi' ? "Biểu đồ Tức thì" : "Instant Analytics",
-            desc: lang === 'vi' ? "Biến dữ liệu thô thành biểu đồ cao cấp chỉ với một cú nhấp chuột. Hỗ trợ đa dạng loại biểu đồ với hiệu suất rendering mượt mà." : "Transform raw data into premium charts with a single click. Supports diverse chart types with smooth rendering performance."
+            icon: <BarChart3 className="w-6 h-6 text-emerald-400" aria-hidden="true" />,
+            title: lang === 'vi' ? "Gemini 3.1 AI Agent" : "Gemini 3.1 AI Agent",
+            desc: lang === 'vi' ? "Sức mạnh AI Assistant phân tích ngữ cảnh, giúp bạn tạo SQL bằng ngôn ngữ tự nhiên hoặc sửa lỗi tối ưu hóa Query." : "Context-aware AI understands your schema, converts natural language to SQL, and highlights query bugs."
         },
         {
             icon: <Lock className="w-6 h-6 text-amber-500" aria-hidden="true" />,
-            title: lang === 'vi' ? "Bảo mật AES-256-GCM" : "AES-256-GCM Secure",
-            desc: lang === 'vi' ? "Mã hóa cấp quân đội cho mọi thông tin xác thực. Dữ liệu của bạn được bảo vệ tuyệt đối và không bao giờ rời khỏi tầm kiểm soát." : "Military-grade encryption for all credentials. Your data is absolutely protected and never leaves your control."
+            title: lang === 'vi' ? "Bảo mật & Phân Quyền" : "Enterprise Security",
+            desc: lang === 'vi' ? "Phân quyền cực sâu bằng RBAC. Mã hóa mật khẩu DB bằng AES-256-GCM. Hỗ trợ đăng nhập Single Sign On (SSO)." : "Deep RBAC, AES-256-GCM encrypted connections, and seamless OAuth (SSO) integration."
+        },
+        {
+            icon: <PieChart className="w-6 h-6 text-cyan-400" aria-hidden="true" />,
+            title: lang === 'vi' ? "Lịch Sử & Export" : "History & Data Export",
+            desc: lang === 'vi' ? "Giám sát thời gian thực thi, giữ lại lịch sử câu lệnh, và hỗ trợ xuất dữ liệu ra file CSV, JSON hoặc chèn script SQL." : "Track query timings, retain execution history, and instantly export data grids to CSV, JSON, or SQL format."
         }
     ];
 

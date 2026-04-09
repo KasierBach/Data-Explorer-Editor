@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Database } from 'lucide-react';
+import { Database, ArrowLeft } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { cn } from '@/lib/utils';
 import { LanguageSwitcher } from '@/presentation/components/shared/LanguageSwitcher';
@@ -11,6 +11,7 @@ interface LandingHeaderProps {
     logout: () => void | Promise<void>;
     isMobileNavOpen: boolean;
     setIsMobileNavOpen: (open: boolean) => void;
+    hideSectionLinks?: boolean;
 }
 
 export const LandingHeader: React.FC<LandingHeaderProps> = ({
@@ -18,7 +19,8 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
     isAuthenticated,
     logout,
     isMobileNavOpen,
-    setIsMobileNavOpen
+    setIsMobileNavOpen,
+    hideSectionLinks
 }) => {
     const navigate = useNavigate();
 
@@ -37,22 +39,35 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
                 </button>
 
                 <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground absolute left-1/2 -translate-x-1/2">
-                    <a href="#features" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
-                        {lang === 'vi' ? 'Tính năng' : 'Features'}
-                    </a>
-                    <a href="#demo" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
-                        {lang === 'vi' ? 'Bản demo' : 'Live Demo'}
-                    </a>
+                    {!hideSectionLinks && (
+                        <>
+                            <a href="#features" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                                {lang === 'vi' ? 'Tính năng' : 'Features'}
+                            </a>
+                            <a href="#demo" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                                {lang === 'vi' ? 'Bản demo' : 'Live Demo'}
+                            </a>
+                            <a href="#pricing" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                                {lang === 'vi' ? 'Giá cả' : 'Pricing'}
+                            </a>
+                        </>
+                    )}
                     <button onClick={() => navigate('/docs')} className="relative group hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
                         {lang === 'vi' ? 'Tài liệu' : 'Docs'}
+                    </button>
+                    <button onClick={() => navigate('/changelog')} className="relative group hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                        {lang === 'vi' ? 'Cập nhật' : 'Changelog'}
                         <span className="absolute -top-3 -right-4 bg-blue-600 text-[8px] px-1 rounded-sm text-white font-bold animate-pulse group-hover:scale-110 transition-transform">NEW</span>
                     </button>
-                    <a href="#pricing" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
-                        {lang === 'vi' ? 'Giá cả' : 'Pricing'}
-                    </a>
                 </nav>
 
                 <div className="flex items-center gap-2 sm:gap-4">
+                    {hideSectionLinks && (
+                        <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="hidden md:flex text-[10px] h-8 items-center gap-1.5 text-muted-foreground uppercase tracking-widest hover:text-blue-500 hover:bg-transparent">
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            {lang === 'vi' ? 'Quay lại' : 'Go Back'}
+                        </Button>
+                    )}
                     <LanguageSwitcher />
                     {isAuthenticated ? (
                         <div className="flex items-center gap-2">
@@ -90,18 +105,32 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
             {isMobileNavOpen && (
                 <div className="md:hidden border-t border-white/5 bg-background/95 backdrop-blur-xl animate-in slide-in-from-top duration-200">
                     <nav className="container mx-auto px-4 py-4 flex flex-col gap-3">
-                        <a href="#features" onClick={() => setIsMobileNavOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5">
-                            {lang === 'vi' ? 'Tính năng' : 'Features'}
-                        </a>
-                        <a href="#demo" onClick={() => setIsMobileNavOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5">
-                            {lang === 'vi' ? 'Bản demo' : 'Live Demo'}
-                        </a>
+                        {!hideSectionLinks && (
+                            <>
+                                <a href="#features" onClick={() => setIsMobileNavOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5">
+                                    {lang === 'vi' ? 'Tính năng' : 'Features'}
+                                </a>
+                                <a href="#demo" onClick={() => setIsMobileNavOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5">
+                                    {lang === 'vi' ? 'Bản demo' : 'Live Demo'}
+                                </a>
+                                <a href="#pricing" onClick={() => setIsMobileNavOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5">
+                                    {lang === 'vi' ? 'Giá cả' : 'Pricing'}
+                                </a>
+                            </>
+                        )}
+                        {hideSectionLinks && (
+                            <button onClick={() => { navigate('/'); setIsMobileNavOpen(false); }} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5 text-left flex items-center gap-2">
+                                <ArrowLeft className="w-4 h-4" />
+                                {lang === 'vi' ? 'Quay lại' : 'Go Back'}
+                            </button>
+                        )}
                         <button onClick={() => { navigate('/docs'); setIsMobileNavOpen(false); }} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5 text-left">
                             {lang === 'vi' ? 'Tài liệu' : 'Docs'}
                         </button>
-                        <a href="#pricing" onClick={() => setIsMobileNavOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2">
-                            {lang === 'vi' ? 'Giá cả' : 'Pricing'}
-                        </a>
+                        <button onClick={() => { navigate('/changelog'); setIsMobileNavOpen(false); }} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 text-left flex items-center justify-between">
+                            {lang === 'vi' ? 'Cập nhật' : 'Changelog'}
+                            <span className="bg-blue-600 text-[8px] px-1 rounded-sm text-white font-bold">NEW</span>
+                        </button>
                     </nav>
                 </div>
             )}

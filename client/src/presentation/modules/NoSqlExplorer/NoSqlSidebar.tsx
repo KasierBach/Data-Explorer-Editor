@@ -195,7 +195,7 @@ export const NoSqlSidebar: React.FC = () => {
                         <span className="truncate max-w-[100px]">{nosqlEffectiveDatabase}</span>
                     </div>
                 )}
-                <span className="opacity-50">V3.1.0-PRO</span>
+                <span className="opacity-50">V3.2.0-PRO</span>
             </div>
 
             <CreateDatabaseDialog

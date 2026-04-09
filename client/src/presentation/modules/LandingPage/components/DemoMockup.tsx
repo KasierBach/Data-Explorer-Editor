@@ -43,12 +43,16 @@ export const DemoMockup: React.FC<DemoMockupProps> = ({ addToRevealRefs }) => {
                                 <div className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em]">Navigator</div>
                                 <div className="space-y-1.5">
                                     <div className="flex items-center gap-2.5 p-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-bold">
-                                        <Database className="w-3.5 h-3.5" />
-                                        production_neon
+                                        <Database className="w-3.5 h-3.5 text-blue-400" />
+                                        production_pg (Postgres)
                                     </div>
                                     <div className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-white/5 text-muted-foreground/50 text-xs group-hover:text-muted-foreground transition-colors">
-                                        <Database className="w-3.5 h-3.5" />
-                                        staging_local
+                                        <Database className="w-3.5 h-3.5 text-green-500/50" />
+                                        mongodb_atlas (NoSQL)
+                                    </div>
+                                    <div className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-white/5 text-muted-foreground/50 text-xs group-hover:text-muted-foreground transition-colors">
+                                        <Database className="w-3.5 h-3.5 text-red-500/50" />
+                                        mssql_legacy (SQL Server)
                                     </div>
                                 </div>
                             </div>

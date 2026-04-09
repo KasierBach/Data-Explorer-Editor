@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Database, Search, Menu, X, Github } from 'lucide-react';
+import { Database, Search, Menu, X, Github, ArrowLeft } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { DocSidebar, DOCS_STRUCTURE } from '@/presentation/components/docs/DocSidebar';
@@ -117,6 +117,11 @@ export function DocumentationPage() {
                     <div className="sm:hidden">
                         <LanguageSwitcher />
                     </div>
+
+                    <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="hidden sm:flex text-xs h-8 items-center gap-1.5 text-muted-foreground">
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        {lang === 'vi' ? 'Quay lại' : 'Go Back'}
+                    </Button>
 
                     <Button variant="ghost" size="sm" onClick={() => navigate('/sql-explorer')} className="text-xs h-8">
                         {lang === 'vi' ? 'Mở Ứng dụng' : 'Launch App'}

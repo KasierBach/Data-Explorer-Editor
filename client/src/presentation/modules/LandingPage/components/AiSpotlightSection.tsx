@@ -22,12 +22,12 @@ export const AiSpotlightSection: React.FC<AiSpotlightSectionProps> = ({ lang, ad
                             {lang === 'vi' ? 'GEMINI 3.1 FLASH-LITE' : 'GEMINI 3.1 FLASH-LITE'}
                         </Badge>
                         <h1 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 md:mb-8 uppercase leading-none">
-                            {lang === 'vi' ? <>Dữ liệu Tối thượng, <br /> Trí tuệ Đa phương thức.</> : <>Ultimate Data, <br /> Multimodal Intelligence.</>}
+                            {lang === 'vi' ? <>Trợ lý Dữ liệu <br /> AI Đa Phương Thức.</> : <>The Ultimate <br /> AI Data Assistant.</>}
                         </h1>
                         <p className="text-lg text-muted-foreground/80 mb-10 max-w-xl font-medium">
                             {lang === 'vi'
-                                ? 'Không chỉ dừng lại ở văn bản. Với Multimodal Vision, Gemini 3.1 có thể phân tích sơ đồ ERD, nhận diện quan hệ thực thể phức tạp và gợi ý tái cấu trúc mã nguồn backend tự động.'
-                                : "Beyond text. With Multimodal Vision, Gemini 3.1 analyzes ERD diagrams, identifies complex entity relationships, and suggests automated backend source code restructuring."}
+                                ? 'Phân tích tự động 100% Data Schema của bạn. Dùng ngôn ngữ tự nhiên để truy vấn dữ liệu phức tạp. Với Multimodal Vision, Gemini 3.1 còn có thể đọc sơ đồ ERD bằng hình ảnh và tái tạo cấu trúc DB.'
+                                : "Automatically parses 100% of your Data Schema. Use natural language to perform complex queries. With Multimodal Vision, the AI can even read ERD image diagrams and reconstruct DB structures."}
                         </p>
                         <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
                             <Button size="lg" onClick={() => navigate('/sql-explorer')} className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8">

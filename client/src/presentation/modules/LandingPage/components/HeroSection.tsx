@@ -64,17 +64,17 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
 
                 <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-blue-400 text-[10px] font-black mb-4 md:mb-6 backdrop-blur-md uppercase tracking-[0.2em] shadow-xl">
                     <Sparkles className="w-3 h-3" aria-hidden="true" />
-                    <span>v3.1: Gemini 3.1 Flash-Lite & Modular Hub</span>
+                    <span>v3.2: MULTI-ENGINE & GEMINI 3.1</span>
                 </motion.div>
                 
                 <motion.h1 
                     variants={itemVariants}
-                    className="text-4xl md:text-7xl font-black tracking-tighter mb-4 md:mb-6 bg-gradient-to-b from-white via-white to-white/30 bg-clip-text text-transparent max-w-5xl mx-auto leading-[0.9] uppercase"
+                    className="text-4xl md:text-7xl font-black tracking-tighter mb-4 md:mb-6 bg-gradient-to-b from-white via-white to-white/30 bg-clip-text text-transparent max-w-5xl mx-auto leading-none md:leading-[1.1] uppercase pb-2"
                 >
                     {lang === 'vi' ? (
-                        <>TRỰC QUAN HÓA <br /> <span className="bg-gradient-to-r from-blue-400 to-indigo-600 bg-clip-text text-transparent">DỮ LIỆU THÔNG MINH</span></>
+                        <>HỆ QUẢN TRỊ <br /> <span className="bg-gradient-to-r from-blue-400 to-indigo-600 bg-clip-text text-transparent">CƠ SỞ DỮ LIỆU BẰNG AI</span></>
                     ) : (
-                        <>VISUALIZE YOUR <br /> <span className="bg-gradient-to-r from-blue-400 to-indigo-600 bg-clip-text text-transparent">DATA INTELLIGENCE</span></>
+                        <>THE AI-POWERED <br /> <span className="bg-gradient-to-r from-blue-400 to-indigo-600 bg-clip-text text-transparent">DATABASE IDE</span></>
                     )}
                 </motion.h1>
                 
@@ -83,8 +83,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                     className="text-base md:text-lg text-muted-foreground/60 max-w-2xl mx-auto mb-8 md:mb-10 leading-relaxed font-medium"
                 >
                     {lang === 'vi'
-                        ? 'Nền tảng quản trị dữ liệu tích hợp Gemini 3.1 Flash-Lite. Trải nghiệm tốc độ ánh xạ cực nhanh và bảo mật đa lớp chuẩn doanh nghiệp.'
-                        : 'The ultimate data management platform powered by Gemini 3.1 Flash-Lite. Experience lightning-fast mapping and enterprise-grade multi-layer security.'}
+                        ? 'Thay thế các công cụ cũ kĩ. Kết nối SQL & NoSQL, bảo mật đa lớp chuẩn doanh nghiệp, và viết query siêu tốc cùng AI Assistant.'
+                        : 'Ditch the legacy tools. Connect to SQL & NoSQL simultaneously, secure your workflows, and write queries at lightspeed with AI.'}
                 </motion.p>
                 
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-6">

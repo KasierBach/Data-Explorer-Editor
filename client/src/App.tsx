@@ -20,6 +20,7 @@ const DocumentationPage = lazy(() => import('@/presentation/pages/DocumentationP
 const ERDPage = lazy(() => import('@/presentation/pages/ERDPage').then((m) => ({ default: m.ERDPage })))
 const VisualizePage = lazy(() => import('@/presentation/pages/VisualizePage').then((m) => ({ default: m.VisualizePage })))
 const AdminDashboardPage = lazy(() => import('@/presentation/pages/Admin/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })))
+const ChangelogPage = lazy(() => import('@/presentation/pages/ChangelogPage').then((m) => ({ default: m.ChangelogPage })))
 
 function RouteFallback() {
   return (
@@ -87,6 +88,7 @@ export function App() {
               <Route path="/forgot-password" element={<RedirectIfAuth><ForgotPasswordPage /></RedirectIfAuth>} />
               <Route path="/onboarding" element={<RequireAuth><OnboardingPage /></RequireAuth>} />
               <Route path="/docs" element={<DocumentationPage />} />
+              <Route path="/changelog" element={<ChangelogPage />} />
 
               <Route path="/admin" element={<RequireAuth requireAdmin={true}><AdminDashboardPage /></RequireAuth>} />
 
