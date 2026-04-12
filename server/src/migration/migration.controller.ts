@@ -24,7 +24,7 @@ export class MigrationController {
     @UseGuards(JwtAuthGuard)
     async createProgressTicket(@Param('jobId') jobId: string, @Req() req: any) {
         const userId = (req.user as any).id;
-        this.migrationService.assertJobOwnership(jobId, userId);
+        await this.migrationService.assertJobOwnership(jobId, userId);
 
         return {
             ticket: this.tokenService.createMigrationProgressTicket(userId, jobId),
@@ -38,11 +38,14 @@ export class MigrationController {
             throw new UnauthorizedException('Migration progress ticket does not match this job.');
         }
 
-        const initialJob = this.migrationService.getPublicJob(jobId, payload.sub!);
-
         return new Observable<MessageEvent>((observer) => {
-            // Emit initial status
-            observer.next({ data: initialJob });
+            this.migrationService.getPublicJob(jobId, payload.sub!)
+                .then((initialJob) => {
+                    observer.next({ data: initialJob });
+                })
+                .catch((error) => {
+                    observer.error(error);
+                });
 
             // Listen for progress updates
             const listener = (update: any) => {

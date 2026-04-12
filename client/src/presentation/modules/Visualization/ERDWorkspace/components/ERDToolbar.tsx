@@ -23,7 +23,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/presentation/components/ui/dropdown-menu';
-import type { DetailLevel } from '../useERDLogic';
+import type { BackgroundVariant, DetailLevel, EdgeRouting } from '../workspace-layout';
 
 interface ERDToolbarProps {
     isSidebarCollapsed: boolean;
@@ -40,10 +40,10 @@ interface ERDToolbarProps {
     handleExportSQL: () => void;
     performanceMode: boolean;
     setPerformanceMode: (v: boolean) => void;
-    edgeRouting: 'smoothstep' | 'step' | 'straight';
-    setEdgeRouting: (v: 'smoothstep' | 'step' | 'straight') => void;
-    backgroundVariant: 'dots' | 'lines' | 'cross';
-    setBackgroundVariant: (v: 'dots' | 'lines' | 'cross') => void;
+    edgeRouting: EdgeRouting;
+    setEdgeRouting: (v: EdgeRouting) => void;
+    backgroundVariant: BackgroundVariant;
+    setBackgroundVariant: (v: BackgroundVariant) => void;
     isEdgeAnimated: boolean;
     setIsEdgeAnimated: (v: boolean) => void;
     isToolbarCollapsed: boolean;

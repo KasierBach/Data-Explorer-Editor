@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { useAppStore, type AiMessage } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 export interface Attachment {
     type: 'image' | 'sql' | 'table' | 'file';
@@ -42,14 +43,13 @@ function getFileEmoji(ext: string): string {
 async function readPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
     try {
         const pdfjsLib = await import('pdfjs-dist');
-        // Use bundled worker
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const pages: string[] = [];
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const content = await page.getTextContent();
-            const text = content.items.map((item: any) => item.str).join(' ');
+            const text = content.items.map((item) => ('str' in item ? item.str : '')).join(' ');
             pages.push(`--- Page ${i} ---\n${text}`);
         }
         return pages.join('\n\n');

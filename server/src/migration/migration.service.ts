@@ -1,5 +1,7 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { EventEmitter } from 'events';
+import { promises as fs } from 'fs';
+import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
@@ -39,8 +41,9 @@ interface ResolvedMigrationContext {
 }
 
 @Injectable()
-export class MigrationService {
+export class MigrationService implements OnModuleInit {
   private readonly logger = new Logger(MigrationService.name);
+  private readonly jobsFilePath = path.join(process.cwd(), 'storage', 'migration-jobs.json');
 
   public readonly jobs = new Map<string, StoredMigrationJob>();
   public readonly eventEmitter = new EventEmitter();
@@ -50,43 +53,107 @@ export class MigrationService {
     private dbStrategiesFactory: DatabaseStrategyFactory,
   ) {}
 
+  async onModuleInit() {
+    const persistedJobs = await this.loadPersistedJobs();
+    for (const job of persistedJobs.values()) {
+      if (job.status === 'pending' || job.status === 'running') {
+        job.status = 'failed';
+        job.stage = 'failed';
+        job.error = 'Migration server restarted before the job completed.';
+      }
+
+      this.jobs.set(job.id, job);
+    }
+
+    await this.persistAllJobs();
+  }
+
   async startMigration(userId: string, dto: StartMigrationDto): Promise<{ jobId: string }> {
     const jobId = uuidv4();
-    this.jobs.set(jobId, {
+    const storedJob: StoredMigrationJob = {
       id: jobId,
       status: 'pending',
       stage: 'queued',
       processedRows: 0,
       batchesProcessed: 0,
       ownerId: userId,
-    });
+    };
+    this.jobs.set(jobId, storedJob);
+    await this.persistJob(storedJob);
 
     this.runMigrationPipeline(userId, jobId, dto).catch((err) => {
       this.logger.error(`Migration ${jobId} failed to start or crashed:`, err);
-      this.failJob(jobId, err.message || 'Background process crashed');
+      void this.failJob(jobId, err.message || 'Background process crashed');
     });
 
     return { jobId };
   }
 
-  assertJobOwnership(jobId: string, userId: string) {
-    const job = this.jobs.get(jobId);
+  async assertJobOwnership(jobId: string, userId: string) {
+    const job = await this.getOwnedJob(jobId, userId);
     if (!job) {
       throw new NotFoundException('Job not found.');
     }
-
-    if (job.ownerId !== userId) {
-      throw new ForbiddenException('You do not have access to this migration job.');
-    }
-
     return job;
   }
 
-  getPublicJob(jobId: string, userId: string): MigrationJob {
-    return this.toPublicJob(this.assertJobOwnership(jobId, userId));
+  async getPublicJob(jobId: string, userId: string): Promise<MigrationJob> {
+    return this.toPublicJob(await this.assertJobOwnership(jobId, userId));
   }
 
-  private updateJob(jobId: string, updater: Partial<MigrationJob> | ((job: StoredMigrationJob) => void)) {
+  private async getOwnedJob(jobId: string, userId: string): Promise<StoredMigrationJob | null> {
+    if (this.jobs.size === 0) {
+      const persistedJobs = await this.loadPersistedJobs();
+      for (const job of persistedJobs.values()) {
+        this.jobs.set(job.id, job);
+      }
+    }
+
+    const inMemoryJob = this.jobs.get(jobId);
+    if (inMemoryJob) {
+      if (inMemoryJob.ownerId !== userId) {
+        throw new ForbiddenException('You do not have access to this migration job.');
+      }
+      return inMemoryJob;
+    }
+
+    return null;
+  }
+
+  private async loadPersistedJobs(): Promise<Map<string, StoredMigrationJob>> {
+    try {
+      const raw = await fs.readFile(this.jobsFilePath, 'utf8');
+      const jobs = JSON.parse(raw) as StoredMigrationJob[];
+      return new Map(jobs.map((job) => [job.id, job]));
+    } catch (error: any) {
+      if (error?.code === 'ENOENT') {
+        return new Map();
+      }
+
+      this.logger.warn(`Unable to read persisted migration jobs: ${error?.message || error}`);
+      return new Map();
+    }
+  }
+
+  private async persistAllJobs() {
+    try {
+      await fs.mkdir(path.dirname(this.jobsFilePath), { recursive: true });
+      await fs.writeFile(
+        this.jobsFilePath,
+        JSON.stringify(Array.from(this.jobs.values()), null, 2),
+        'utf8',
+      );
+    } catch (error: any) {
+      this.logger.warn(`Unable to persist migration jobs: ${error?.message || error}`);
+    }
+  }
+
+  private async persistJob(job: StoredMigrationJob) {
+    this.jobs.set(job.id, job);
+    await this.persistAllJobs();
+  }
+
+  private async updateJob(jobId: string, updater: Partial<MigrationJob> | ((job: StoredMigrationJob) => void)) {
     const existing = this.jobs.get(jobId);
     if (!existing) return;
 
@@ -97,31 +164,32 @@ export class MigrationService {
     }
 
     this.jobs.set(jobId, existing);
+    await this.persistJob(existing);
     this.eventEmitter.emit(`migration-${jobId}`, this.toPublicJob(existing));
   }
 
-  private markStage(jobId: string, stage: MigrationStage, status?: MigrationJob['status']) {
-    this.updateJob(jobId, {
+  private async markStage(jobId: string, stage: MigrationStage, status?: MigrationJob['status']) {
+    await this.updateJob(jobId, {
       stage,
       ...(status ? { status } : {}),
     });
   }
 
-  private failJob(jobId: string, error: string) {
+  private async failJob(jobId: string, error: string) {
     const current = this.jobs.get(jobId);
     if (!current || current.status === 'failed' || current.status === 'completed') return;
     this.logger.error(`Migration ${jobId} failed`, error);
-    this.updateJob(jobId, {
+    await this.updateJob(jobId, {
       status: 'failed',
       stage: 'failed',
       error,
     });
   }
 
-  private completeJob(jobId: string) {
+  private async completeJob(jobId: string) {
     const current = this.jobs.get(jobId);
     if (!current || current.status === 'failed') return;
-    this.updateJob(jobId, {
+    await this.updateJob(jobId, {
       status: 'completed',
       stage: 'completed',
     });
@@ -200,7 +268,7 @@ export class MigrationService {
       throw new Error('Source and target cannot point to the same table or collection.');
     }
 
-    this.markStage(jobId, 'validating', 'running');
+    await this.markStage(jobId, 'validating', 'running');
 
     const sourceConn = await this.connectionsService.getDecryptedConnection(dto.sourceConnectionId, userId);
     const targetConn = await this.connectionsService.getDecryptedConnection(dto.targetConnectionId, userId);
@@ -209,14 +277,14 @@ export class MigrationService {
       throw new Error('Source or target connection not found.');
     }
 
-    this.markStage(jobId, 'connecting');
+    await this.markStage(jobId, 'connecting');
 
     const sourceStrategy = this.dbStrategiesFactory.getStrategy(sourceConn.type);
     const targetStrategy = this.dbStrategiesFactory.getStrategy(targetConn.type);
     const sourcePool = await sourceStrategy.createPool(this.buildMigrationConnectionConfig(sourceConn));
     const targetPool = await targetStrategy.createPool(this.buildMigrationConnectionConfig(targetConn));
 
-    this.markStage(jobId, 'preflight');
+    await this.markStage(jobId, 'preflight');
 
     const sourceSchema = this.normalizeSchemaName(sourceConn.type, dto.sourceSchema);
     const targetSchema = this.normalizeSchemaName(targetConn.type, dto.targetSchema);
@@ -262,7 +330,7 @@ export class MigrationService {
 
     try {
       context = await this.resolveMigrationContext(userId, dto, jobId);
-      this.markStage(jobId, 'streaming');
+      await this.markStage(jobId, 'streaming');
 
       const stream = await context.sourceStrategy!.exportStream(
         context.sourcePool,
@@ -286,7 +354,7 @@ export class MigrationService {
           data: batch,
         });
 
-        this.updateJob(jobId, (job) => {
+        await this.updateJob(jobId, (job) => {
           job.processedRows += batch.length;
           job.batchesProcessed += 1;
         });
@@ -316,16 +384,18 @@ export class MigrationService {
         }
       };
 
-      const handleTerminalFailure = (error: any) => {
+      const handleTerminalFailure = async (error: any) => {
         this.logger.error(`Stream error in migration ${jobId}`, error);
-        this.failJob(jobId, error?.message || 'Migration stream failed.');
+        await this.failJob(jobId, error?.message || 'Migration stream failed.');
       };
 
       if (typeof stream.on === 'function') {
         let processing = Promise.resolve();
         const enqueueChunk = (chunk: any) => {
           processing = processing.then(() => handleChunk(chunk));
-          processing.catch(handleTerminalFailure);
+          processing.catch((error) => {
+            void handleTerminalFailure(error);
+          });
         };
 
         stream.on('data', enqueueChunk);
@@ -338,13 +408,15 @@ export class MigrationService {
             await processing;
             await flushBuffer();
             this.logger.log(`Migration ${jobId}: completed (${this.jobs.get(jobId)?.processedRows || 0} rows)`);
-            this.completeJob(jobId);
+            await this.completeJob(jobId);
           } catch (error: any) {
-            handleTerminalFailure(error);
+            await handleTerminalFailure(error);
           }
         });
 
-        stream.on('error', handleTerminalFailure);
+        stream.on('error', (error: any) => {
+          void handleTerminalFailure(error);
+        });
       } else {
         for await (const chunk of stream) {
           const currentJob = this.jobs.get(jobId);
@@ -356,12 +428,12 @@ export class MigrationService {
         if (currentJob && currentJob.status !== 'failed') {
           await flushBuffer();
           this.logger.log(`Migration ${jobId}: completed (${currentJob.processedRows} rows)`);
-          this.completeJob(jobId);
+          await this.completeJob(jobId);
         }
       }
     } catch (error: any) {
       this.logger.error(`Migration ${jobId} PIPELINE EXCEPTION`, error);
-      this.failJob(jobId, error.message || 'Migration pipeline failed.');
+      await this.failJob(jobId, error.message || 'Migration pipeline failed.');
     } finally {
       await this.closeResources(context);
     }

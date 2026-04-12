@@ -14,7 +14,13 @@ async function bootstrap() {
     'http://localhost:4173',
     process.env.FRONTEND_URL,
   ].filter(Boolean) as string[];
-  const connectSrc = Array.from(new Set(["'self'", ...allowedOrigins, 'https:']));
+  const websocketOrigins = allowedOrigins.flatMap((origin) => {
+    if (origin.startsWith('https://')) return [origin.replace('https://', 'wss://')];
+    if (origin.startsWith('http://')) return [origin.replace('http://', 'ws://')];
+    return [];
+  });
+  const connectSrc = Array.from(new Set(["'self'", ...allowedOrigins, ...websocketOrigins]));
+  const imgSrc = Array.from(new Set(["'self'", 'data:', 'blob:', ...allowedOrigins]));
   const scriptSrc = isProduction
     ? ["'self'"]
     : ["'self'", "'unsafe-inline'", "'unsafe-eval'"];
@@ -29,7 +35,7 @@ async function bootstrap() {
         "form-action": ["'self'"],
         "frame-ancestors": ["'none'"],
         "object-src": ["'none'"],
-        "img-src": ["'self'", "data:", "https:"],
+        "img-src": imgSrc,
         "script-src": scriptSrc,
         "connect-src": connectSrc,
         "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],

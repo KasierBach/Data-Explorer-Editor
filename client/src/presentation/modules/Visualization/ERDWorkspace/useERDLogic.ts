@@ -10,7 +10,6 @@ import {
     type Edge,
 } from '@xyflow/react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import dagre from 'dagre';
 import { toast } from 'sonner';
 import { useAppStore } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
@@ -19,61 +18,14 @@ import { ErdWorkspaceService, type SaveErdWorkspacePayload } from '@/core/servic
 import { ApiError } from '@/core/services/api.service';
 import type { ErdWorkspaceEntity } from '@/core/domain/entities';
 import type { ForeignKeyData } from '../ForeignKeyDialog';
-
-export type DetailLevel = 'all' | 'keys' | 'name';
-type EdgeRouting = 'smoothstep' | 'step' | 'straight';
-type BackgroundVariant = 'dots' | 'lines' | 'cross';
-
-interface ErdWorkspaceLayout {
-    visibleTables: string[];
-    nodes: Node[];
-    edges: Edge[];
-    isSidebarCollapsed: boolean;
-    detailLevel: DetailLevel;
-    schemaFilter: string;
-    showMinimap: boolean;
-    performanceMode: boolean;
-    edgeRouting: EdgeRouting;
-    backgroundVariant: BackgroundVariant;
-    isEdgeAnimated: boolean;
-    isToolbarCollapsed: boolean;
-    collapsedTables: string[];
-}
-
-const defaultWorkspaceLayout = (): ErdWorkspaceLayout => ({
-    visibleTables: [],
-    nodes: [],
-    edges: [],
-    isSidebarCollapsed: false,
-    detailLevel: 'all',
-    schemaFilter: 'all',
-    showMinimap: true,
-    performanceMode: false,
-    edgeRouting: 'smoothstep',
-    backgroundVariant: 'dots',
-    isEdgeAnimated: true,
-    isToolbarCollapsed: false,
-    collapsedTables: [],
-});
-
-const normalizeWorkspaceLayout = (layout?: Record<string, any> | null): ErdWorkspaceLayout => {
-    const defaults = defaultWorkspaceLayout();
-    return {
-        visibleTables: Array.isArray(layout?.visibleTables) ? layout.visibleTables : defaults.visibleTables,
-        nodes: Array.isArray(layout?.nodes) ? layout.nodes : defaults.nodes,
-        edges: Array.isArray(layout?.edges) ? layout.edges : defaults.edges,
-        isSidebarCollapsed: Boolean(layout?.isSidebarCollapsed),
-        detailLevel: layout?.detailLevel || defaults.detailLevel,
-        schemaFilter: layout?.schemaFilter || defaults.schemaFilter,
-        showMinimap: layout?.showMinimap ?? defaults.showMinimap,
-        performanceMode: Boolean(layout?.performanceMode),
-        edgeRouting: layout?.edgeRouting || defaults.edgeRouting,
-        backgroundVariant: layout?.backgroundVariant || defaults.backgroundVariant,
-        isEdgeAnimated: layout?.isEdgeAnimated ?? defaults.isEdgeAnimated,
-        isToolbarCollapsed: Boolean(layout?.isToolbarCollapsed),
-        collapsedTables: Array.isArray(layout?.collapsedTables) ? layout.collapsedTables : defaults.collapsedTables,
-    };
-};
+import {
+    buildWorkspaceLayoutSnapshot,
+    normalizeWorkspaceLayout,
+    type BackgroundVariant,
+    type DetailLevel,
+    type EdgeRouting,
+} from './workspace-layout';
+import { applyAutoLayout } from './erd-auto-layout';
 
 export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: string) => {
     const {
@@ -138,10 +90,10 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         }
     }, [activeConnection, setActiveDatabase, setNosqlDatabase]);
 
-    const buildWorkspaceLayout = useCallback((): ErdWorkspaceLayout => ({
-        visibleTables: Array.from(visibleTableNames),
+    const buildWorkspaceLayout = useCallback(() => buildWorkspaceLayoutSnapshot({
+        visibleTables: visibleTableNames,
         nodes,
-        edges: edges.filter((edge) => !edge.id.startsWith('db-e-')),
+        edges,
         isSidebarCollapsed,
         detailLevel,
         schemaFilter,
@@ -151,7 +103,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         backgroundVariant,
         isEdgeAnimated,
         isToolbarCollapsed,
-        collapsedTables: Array.from(collapsedTables),
+        collapsedTables,
     }), [
         visibleTableNames,
         nodes,
@@ -545,85 +497,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     };
 
     const handleAutoLayout = useCallback((direction: 'TB' | 'LR' = 'LR') => {
-        const dagreGraph = new dagre.graphlib.Graph();
-        dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-        dagreGraph.setGraph({
-            rankdir: direction,
-            nodesep: direction === 'LR' ? 100 : 150,
-            ranksep: direction === 'LR' ? 200 : 150,
-            align: 'DL',
-            ranker: 'tight-tree',
-        });
-
-        const connectedNodeIds = new Set<string>();
-        edges.forEach((edge) => {
-            connectedNodeIds.add(edge.source);
-            connectedNodeIds.add(edge.target);
-        });
-
-        const connectedNodes = nodes.filter((node) => connectedNodeIds.has(node.id));
-        const standaloneNodes = nodes.filter((node) => !connectedNodeIds.has(node.id));
-
-        connectedNodes.forEach((node) => {
-            const tableInfo = node.data as any;
-            const columnCount = tableInfo.columns?.length || 0;
-            const isCollapsed = tableInfo.isCollapsed;
-            dagreGraph.setNode(node.id, {
-                width: 300,
-                height: isCollapsed ? 60 : 70 + (columnCount * 30),
-            });
-        });
-
-        edges.forEach((edge) => dagreGraph.setEdge(edge.source, edge.target));
-        dagre.layout(dagreGraph);
-
-        let maxX = -Infinity;
-        let minX = Infinity;
-        let maxY = -Infinity;
-        let minY = Infinity;
-
-        const laidOutNodes = nodes.map((node) => {
-            if (!connectedNodeIds.has(node.id)) return node;
-
-            const positionedNode = dagreGraph.node(node.id);
-            const x = positionedNode.x - 150;
-            const y = positionedNode.y - 25;
-
-            minX = Math.min(minX, x);
-            maxX = Math.max(maxX, x + 300);
-            minY = Math.min(minY, y);
-            maxY = Math.max(maxY, y + 100);
-
-            return {
-                ...node,
-                targetPosition: direction === 'LR' ? 'left' : 'top' as any,
-                sourcePosition: direction === 'LR' ? 'right' : 'bottom' as any,
-                position: { x, y },
-            };
-        });
-
-        if (standaloneNodes.length > 0) {
-            const startX = direction === 'LR' ? (maxX === -Infinity ? 0 : maxX + 200) : (minX === Infinity ? 0 : minX);
-            const startY = direction === 'LR' ? (minY === Infinity ? 0 : minY) : (maxY === -Infinity ? 0 : maxY + 200);
-            const cols = direction === 'LR' ? 3 : 5;
-
-            standaloneNodes.forEach((node, index) => {
-                const row = Math.floor(index / cols);
-                const col = index % cols;
-                const targetIndex = laidOutNodes.findIndex((entry) => entry.id === node.id);
-                if (targetIndex === -1) return;
-                laidOutNodes[targetIndex] = {
-                    ...laidOutNodes[targetIndex],
-                    position: {
-                        x: startX + (col * 350),
-                        y: startY + (row * 150),
-                    },
-                };
-            });
-        }
-
-        setNodes([...laidOutNodes]);
+        setNodes(applyAutoLayout(nodes, edges, direction));
     }, [edges, nodes, setNodes]);
 
     const toggleTable = (name: string) => {

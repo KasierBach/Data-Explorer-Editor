@@ -18,7 +18,7 @@ export const InteractiveBackground: React.FC = () => {
             <div className="absolute bottom-[25%] right-[15%] w-[35%] h-[35%] bg-purple-600/10 blur-[120px] rounded-full" />
 
             {/* Grain / Noise for premium feel */}
-            <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
+            <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ backgroundImage: 'url("/noise.svg")' }} />
         </div>
     );
 };
