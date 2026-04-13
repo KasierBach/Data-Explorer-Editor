@@ -9,7 +9,7 @@ import {
     DropdownMenuTrigger,
 } from "@/presentation/components/ui/dropdown-menu";
 import { Button } from '@/presentation/components/ui/button';
-import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
+import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 
 /** Translates default tab titles to the active language. */
 function getTabDisplayTitle(tab: { type: string; title: string }, lang: string): string {
@@ -28,7 +28,7 @@ function getTabDisplayTitle(tab: { type: string; title: string }, lang: string):
 
 export const TabsBar: React.FC = () => {
     const { tabs, activeTabId, setActiveTab, closeTab, reorderTabs, lang } = useAppStore();
-    const isMobile = useMediaQuery('(max-width: 768px)');
+    const { isCompactMobileLayout } = useResponsiveLayoutMode();
 
     // ── Drag & Drop State ──
     const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -85,7 +85,7 @@ export const TabsBar: React.FC = () => {
                         onDrop={(e) => handleDrop(e, index)}
                         className={cn(
                             "group flex items-center gap-1.5 px-3 h-full border-r text-sm cursor-pointer select-none transition-all duration-200",
-                            isMobile ? "min-w-[100px] max-w-[150px]" : "min-w-[120px] max-w-[200px]",
+                            isCompactMobileLayout ? "min-w-[100px] max-w-[150px]" : "min-w-[120px] max-w-[200px]",
                             activeTabId === tab.id
                                 ? "bg-background font-medium border-b-2 border-b-primary shadow-sm"
                                 : "hover:bg-muted/50 text-muted-foreground border-b border-b-transparent",

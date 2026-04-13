@@ -27,13 +27,14 @@ export function useVerticalResizablePanel({
     minHeightRef.current = minHeight;
     maxHeightRef.current = maxHeight;
 
-    const startResizing = useCallback((e: React.MouseEvent) => {
+    const startResizing = useCallback((e: React.MouseEvent | React.PointerEvent | React.TouchEvent) => {
         e.preventDefault();
         e.stopPropagation();
         isDraggingRef.current = true;
         setIsDragging(true);
         document.body.style.cursor = 'row-resize';
         document.body.style.userSelect = 'none';
+        document.body.style.touchAction = 'none';
     }, []);
 
     const stopResizing = useCallback(() => {
@@ -42,14 +43,25 @@ export function useVerticalResizablePanel({
         setIsDragging(false);
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
+        document.body.style.touchAction = '';
     }, []);
 
-    const resize = useCallback((e: MouseEvent) => {
+    const getClientY = (event: MouseEvent | PointerEvent | TouchEvent) => {
+        if ('touches' in event && event.touches.length > 0) {
+            return event.touches[0].clientY;
+        }
+        if ('changedTouches' in event && event.changedTouches.length > 0) {
+            return event.changedTouches[0].clientY;
+        }
+        return (event as MouseEvent | PointerEvent).clientY;
+    };
+
+    const resize = useCallback((e: MouseEvent | PointerEvent | TouchEvent) => {
         if (!isDraggingRef.current) return;
 
         // In a vertical split where this panel is at the bottom, 
         // the height is the distance from the bottom of the viewport.
-        let newHeight = window.innerHeight - e.clientY;
+        let newHeight = window.innerHeight - getClientY(e);
 
         newHeight = Math.max(minHeightRef.current, newHeight);
 
@@ -64,12 +76,28 @@ export function useVerticalResizablePanel({
     }, []);
 
     useEffect(() => {
+        const handleTouchMove = (event: TouchEvent) => {
+            resize(event);
+        };
+
+        window.addEventListener('pointermove', resize);
+        window.addEventListener('pointerup', stopResizing);
+        window.addEventListener('pointercancel', stopResizing);
         window.addEventListener('mousemove', resize);
         window.addEventListener('mouseup', stopResizing);
+        window.addEventListener('touchmove', handleTouchMove, { passive: false });
+        window.addEventListener('touchend', stopResizing);
+        window.addEventListener('touchcancel', stopResizing);
 
         return () => {
+            window.removeEventListener('pointermove', resize);
+            window.removeEventListener('pointerup', stopResizing);
+            window.removeEventListener('pointercancel', stopResizing);
             window.removeEventListener('mousemove', resize);
             window.removeEventListener('mouseup', stopResizing);
+            window.removeEventListener('touchmove', handleTouchMove);
+            window.removeEventListener('touchend', stopResizing);
+            window.removeEventListener('touchcancel', stopResizing);
         };
     }, [resize, stopResizing]);
 

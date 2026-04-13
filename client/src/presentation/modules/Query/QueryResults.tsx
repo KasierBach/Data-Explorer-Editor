@@ -9,7 +9,7 @@ import { Info, Table as TableIcon, Loader2, Play, GitBranch, X, Eraser, LayoutDa
 import type { QueryResult } from '@/core/domain/entities';
 import { ResultTable } from './ResultTable';
 import { QueryPlanVisualizer } from './QueryPlanVisualizer';
-import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
+import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/core/services/store';
 
@@ -41,8 +41,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
     onSaveToDashboard,
 }) => {
     const { lang } = useAppStore();
-    const isMobile = useMediaQuery('(max-width: 768px)');
-    const isSmallMobile = useMediaQuery('(max-width: 480px)');
+    const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
 
     // Determine content based on state
     const renderDataContent = () => {
@@ -91,14 +90,14 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                         className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-1 text-[10px] md:text-[11px] flex gap-1.5"
                     >
                         <TableIcon className="w-3 h-3" />
-                        {isMobile ? (lang === 'vi' ? "Dữ liệu" : "Data") : (lang === 'vi' ? "Kết quả dữ liệu" : "Data Output")}
+                        {isCompactMobileLayout ? (lang === 'vi' ? "Dữ liệu" : "Data") : (lang === 'vi' ? "Kết quả dữ liệu" : "Data Output")}
                     </TabsTrigger>
                     <TabsTrigger
                         value="messages"
                         className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-1 text-[10px] md:text-[11px] flex gap-1.5"
                     >
                         <Info className="w-3 h-3" />
-                        {isMobile ? (lang === 'vi' ? "T.Báo" : "Msgs") : (lang === 'vi' ? "Thông báo" : "Messages")}
+                        {isCompactMobileLayout ? (lang === 'vi' ? "T.Báo" : "Msgs") : (lang === 'vi' ? "Thông báo" : "Messages")}
                     </TabsTrigger>
                     {explainPlan && (
                         <TabsTrigger
@@ -106,7 +105,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                             className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-transparent shadow-none px-1 text-[10px] md:text-[11px] flex gap-1.5 text-orange-500"
                         >
                             <GitBranch className="w-3 h-3" />
-                            {isMobile ? (lang === 'vi' ? "Sơ đồ" : "Plan") : (lang === 'vi' ? "Sơ đồ truy vấn" : "Query Plan")}
+                            {isCompactMobileLayout ? (lang === 'vi' ? "Sơ đồ" : "Plan") : (lang === 'vi' ? "Sơ đồ truy vấn" : "Query Plan")}
                         </TabsTrigger>
                     )}
                 </TabsList>
@@ -115,10 +114,10 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                     {!isSmallMobile && (
                         <div className="text-[9px] md:text-[10px] text-muted-foreground font-mono flex gap-2 md:gap-3 items-center">
                             {results?.durationMs !== undefined && (
-                                <span>{isMobile ? "" : (lang === 'vi' ? "Thời gian: " : "Time: ")}{results.durationMs}ms</span>
+                                <span>{isCompactMobileLayout ? "" : (lang === 'vi' ? "Thời gian: " : "Time: ")}{results.durationMs}ms</span>
                             )}
                             {dataUpdatedAt > 0 && (
-                                <span className={cn(isMobile && "hidden")}>{new Date(dataUpdatedAt).toLocaleTimeString()}</span>
+                                <span className={cn(isCompactMobileLayout && "hidden")}>{new Date(dataUpdatedAt).toLocaleTimeString()}</span>
                             )}
                         </div>
                     )}

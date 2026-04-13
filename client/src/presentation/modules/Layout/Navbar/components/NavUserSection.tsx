@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-    Sparkles, Settings, User as UserIcon, CreditCard, LogOut, Shield 
+    Sparkles, Settings, User as UserIcon, CreditCard, LogOut, Shield, MonitorSmartphone
 } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { ModeToggle } from '@/presentation/components/mode-toggle';
@@ -24,6 +24,8 @@ interface NavUserSectionProps {
     toggleAiPanel: () => void;
     isMobile: boolean;
     isSmallMobile: boolean;
+    isDesktopModeOnMobile: boolean;
+    toggleDesktopModeOnMobile: () => void;
     lang: string;
     setActiveProfileTab: (tab: string) => void;
     setIsProfileOpen: (open: boolean) => void;
@@ -32,7 +34,7 @@ interface NavUserSectionProps {
 
 export const NavUserSection: React.FC<NavUserSectionProps> = ({
     user, logout, isAiPanelOpen, toggleAiPanel, isMobile, isSmallMobile, 
-    lang, setActiveProfileTab, setIsProfileOpen, navigate
+    isDesktopModeOnMobile, toggleDesktopModeOnMobile, lang, setActiveProfileTab, setIsProfileOpen, navigate
 }) => {
     return (
         <div className={cn("flex items-center gap-1 md:gap-2", isMobile && "pl-2")}>
@@ -134,6 +136,12 @@ export const NavUserSection: React.FC<NavUserSectionProps> = ({
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuGroup>
+                        {isMobile && (
+                            <DropdownMenuItem onClick={toggleDesktopModeOnMobile}>
+                                <MonitorSmartphone className="mr-2 h-4 w-4" />
+                                <span>{isDesktopModeOnMobile ? (lang === 'vi' ? 'Tắt chế độ máy tính' : 'Turn off desktop mode') : (lang === 'vi' ? 'Bật chế độ máy tính' : 'Turn on desktop mode')}</span>
+                            </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => { setActiveProfileTab('profile'); setIsProfileOpen(true); }}>
                             <UserIcon className="mr-2 h-4 w-4" />
                             <span>{lang === 'vi' ? 'Hồ sơ' : 'Profile'}</span>

@@ -3,7 +3,7 @@ import { useAppStore } from '@/core/services/store';
 import { Leaf, Database, Play, Filter, TreeDeciduous, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { useVerticalResizablePanel } from '@/presentation/hooks/useVerticalResizablePanel';
-import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
+import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
 import { useNoSqlQuery } from '@/presentation/hooks/useNoSqlQuery';
 import { JsonTreeView } from './JsonTreeView';
@@ -35,7 +35,7 @@ export const NoSqlMainContent: React.FC = () => {
             ? (lang === 'vi' ? 'Chế độ chỉ đọc đang bật. Chỉ cho phép find/aggregate.' : 'Read-only mode is enabled. Only find/aggregate actions are allowed.')
             : (lang === 'vi' ? 'Kết quả được giới hạn để bảo vệ hiệu năng và tránh quá tải.' : 'Results are guarded with execution limits to protect performance.');
 
-    const isMobile = useMediaQuery('(max-width: 768px)');
+    const { isCompactMobileLayout } = useResponsiveLayoutMode();
     const resizer = useVerticalResizablePanel({
         initialHeight: 300,
         minHeight: 150,
@@ -80,33 +80,33 @@ export const NoSqlMainContent: React.FC = () => {
                 </div>
             )}
             {/* Visual MQL Builder Banner */}
-            <div className={`h-14 border-b bg-card flex items-center px-4 justify-between shrink-0 ${hasPersistentGuardrail ? 'mt-4' : ''}`}>
-                <div className="flex items-center gap-2">
+            <div className={cn(`border-b bg-card px-4 py-3 shrink-0 flex items-center justify-between gap-3 ${hasPersistentGuardrail ? 'mt-4' : ''}`, isCompactMobileLayout && "flex-wrap items-start")}>
+                <div className="flex items-center gap-2 min-w-0">
                     <Database className="w-4 h-4 text-green-500" />
-                    <span className="font-semibold text-sm">db.{nosqlActiveCollection}</span>
+                    <span className="font-semibold text-sm truncate">db.{nosqlActiveCollection}</span>
                     {result && (
-                        <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                        <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full shrink-0">
                             {result.rowCount ?? result.rows.length} docs • {result.durationMs}ms
                         </span>
                     )}
                 </div>
                 
-                <div className="flex items-center bg-muted/50 rounded-md p-1 border">
+                <div className={cn("flex items-center bg-muted/50 rounded-md p-1 border", isCompactMobileLayout && "w-full")}>
                     <Button 
                         variant={nosqlViewMode === 'tree' ? 'secondary' : 'ghost'} 
                         size="sm" 
-                        className="h-7 px-3 text-xs gap-1.5"
+                        className={cn("h-7 px-3 text-xs gap-1.5", isCompactMobileLayout && "flex-1")}
                         onClick={() => setNosqlViewMode('tree')}
                     >
-                        <TreeDeciduous className="w-3.5 h-3.5 text-green-600" /> Tree (JSON)
+                        <TreeDeciduous className="w-3.5 h-3.5 text-green-600" /> {isCompactMobileLayout ? 'Tree' : 'Tree (JSON)'}
                     </Button>
                     <Button 
                         variant={nosqlViewMode === 'grid' ? 'secondary' : 'ghost'} 
                         size="sm" 
-                        className="h-7 px-3 text-xs gap-1.5"
+                        className={cn("h-7 px-3 text-xs gap-1.5", isCompactMobileLayout && "flex-1")}
                         onClick={() => setNosqlViewMode('grid')}
                     >
-                        <Filter className="w-3.5 h-3.5 text-blue-500" /> Auto-Flatten Grid
+                        <Filter className="w-3.5 h-3.5 text-blue-500" /> {isCompactMobileLayout ? 'Grid' : 'Auto-Flatten Grid'}
                     </Button>
                 </div>
             </div>
@@ -114,18 +114,18 @@ export const NoSqlMainContent: React.FC = () => {
             <div className="flex-1 flex flex-col min-h-0 relative">
                 {/* Visual Filter Area (Top) */}
                 <div className="flex-1 min-h-0 relative bg-muted/10 flex flex-col">
-                    <div className="p-2 border-b text-xs font-semibold text-muted-foreground bg-muted/30 uppercase tracking-widest flex items-center justify-between">
-                        <div className="flex items-center gap-2">
+                    <div className={cn("p-2 border-b text-xs font-semibold text-muted-foreground bg-muted/30 uppercase tracking-widest flex items-center justify-between gap-2", isCompactMobileLayout && "flex-wrap")}>
+                        <div className="flex items-center gap-2 min-w-0">
                             <span>{lang === 'vi' ? 'Trình thiết kế Truy vấn (MQL)' : 'Visual MQL Builder'}</span>
-                            <span className="text-[9px] font-normal lowercase bg-background border border-border/50 px-1.5 py-0.5 rounded text-muted-foreground tracking-normal">
+                            <span className={cn("text-[9px] font-normal lowercase bg-background border border-border/50 px-1.5 py-0.5 rounded text-muted-foreground tracking-normal", isCompactMobileLayout && "hidden")}>
                                 Shift + Alt + F to format
                             </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-normal lowercase bg-muted border px-1.5 py-0.5 rounded text-muted-foreground tracking-normal">Ctrl + Enter</span>
+                        <div className={cn("flex items-center gap-2", isCompactMobileLayout && "w-full justify-between")}>
+                            <span className={cn("text-[10px] font-normal lowercase bg-muted border px-1.5 py-0.5 rounded text-muted-foreground tracking-normal", isCompactMobileLayout && "hidden")}>Ctrl + Enter</span>
                             <Button 
                                 size="sm" 
-                                className="h-7 bg-green-600 hover:bg-green-700 text-white gap-1" 
+                                className={cn("h-7 bg-green-600 hover:bg-green-700 text-white gap-1", isCompactMobileLayout && "ml-auto")} 
                                 onClick={executeMql}
                                 disabled={isLoading || activeConnection?.allowQueryExecution === false}
                             >
@@ -148,9 +148,9 @@ export const NoSqlMainContent: React.FC = () => {
                 
                 {/* Resize Handle */}
                 <div 
-                    onMouseDown={resizer.startResizing}
+                    onPointerDown={resizer.startResizing}
                     className={cn(
-                        "h-1.5 bg-muted/20 border-y border-border/10 cursor-row-resize flex items-center justify-center group transition-colors select-none z-20",
+                        "h-1.5 bg-muted/20 border-y border-border/10 cursor-row-resize flex items-center justify-center group transition-colors select-none z-20 touch-none",
                         resizer.isDragging ? "bg-green-500/20" : "hover:bg-green-500/10"
                     )}
                 >
@@ -162,7 +162,7 @@ export const NoSqlMainContent: React.FC = () => {
                 
                 {/* Result Area (Bottom) */}
                 <div 
-                    style={{ height: isMobile ? '40vh' : `${resizer.height}px` }}
+                    style={{ height: `${resizer.height}px` }}
                     className={cn(
                         "flex flex-col overflow-hidden bg-background shrink-0 relative z-10",
                         resizer.isDragging ? "" : "transition-[height] duration-300 ease-in-out"

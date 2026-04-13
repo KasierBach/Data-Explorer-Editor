@@ -24,7 +24,7 @@ import {
 import type { QueryResult } from '@/core/domain/entities';
 import { QueryResults } from './QueryResults';
 import { useSchemaInfo } from '@/presentation/hooks/useSchemaInfo';
-import { useMediaQuery } from '@/presentation/hooks/useMediaQuery';
+import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { useVerticalResizablePanel } from '@/presentation/hooks/useVerticalResizablePanel';
 import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
@@ -441,8 +441,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         lang,
     ]);
 
-    const isMobile = useMediaQuery('(max-width: 768px)');
-    const isSmallMobile = useMediaQuery('(max-width: 480px)');
+    const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
 
     const handleRunRef = useRef(handleRun);
     handleRunRef.current = handleRun;
@@ -490,16 +489,16 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             disabled={isLoading || activeConnection?.allowQueryExecution === false}
                             className={cn(
                                 "h-8 gap-1.5 px-3 bg-green-600 hover:bg-green-700 text-white border-none shadow-sm transition-all",
-                                isMobile && "px-2"
+                                isCompactMobileLayout && "px-2"
                             )}
                         >
                             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
                             <span className="font-bold">
-                                {isMobile ? (lang === 'vi' ? "Chạy" : "Run") : (lang === 'vi' ? "Thực thi" : "Execute")}
+                                {isCompactMobileLayout ? (lang === 'vi' ? "Chạy" : "Run") : (lang === 'vi' ? "Thực thi" : "Execute")}
                             </span>
                         </Button>
 
-                        {!isMobile && (
+                        {!isCompactMobileLayout && (
                             <>
                                 <div className="h-4 w-[1px] bg-border mx-1" />
                                 <Button variant="ghost" size="sm" onClick={handleRefreshSchema} className="h-7 gap-1 px-2 text-xs" title={lang === 'vi' ? "Tải lại thanh bên" : "Refresh Sidebar"}>
@@ -510,7 +509,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             </>
                         )}
 
-                        {!isMobile ? (
+                        {!isCompactMobileLayout ? (
                             <>
                                 <Button variant="ghost" size="sm" onClick={handleFormat} className="h-7 gap-1 px-2 text-xs">
                                     <AlignLeft className="w-3.5 h-3.5" />
@@ -580,7 +579,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                         )}
 
                         <div className="flex items-center gap-1.5 px-2">
-                            {!isMobile && <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{lang === 'vi' ? 'Giới hạn' : 'Limit'}</span>}
+                            {!isCompactMobileLayout && <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{lang === 'vi' ? 'Giới hạn' : 'Limit'}</span>}
                             <Select value={limit} onValueChange={setLimit}>
                                 <SelectTrigger className="h-7 w-[80px] text-[10px] py-0 border-none bg-muted hover:bg-muted/80 focus:ring-0 shadow-none">
                                     <SelectValue placeholder={lang === 'vi' ? 'Giới hạn' : 'Limit'} />
@@ -649,9 +648,9 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
                     {/* Resize Handle - Custom Separator */}
                     <div 
-                        onMouseDown={resizer.startResizing}
+                        onPointerDown={resizer.startResizing}
                         className={cn(
-                            "h-1.5 bg-muted/20 border-y border-border/10 cursor-row-resize flex items-center justify-center group transition-colors select-none z-20",
+                            "h-1.5 bg-muted/20 border-y border-border/10 cursor-row-resize flex items-center justify-center group transition-colors select-none z-20 touch-none",
                             resizer.isDragging ? "bg-blue-500/20" : "hover:bg-blue-500/10",
                             !isResultPanelOpen && "hidden"
                         )}
@@ -664,7 +663,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
                     {/* Bottom Result Panel - with smooth transition */}
                     <div 
-                        style={{ height: isResultPanelOpen ? (isMobile ? '40vh' : `${resizer.height}px`) : '0px' }}
+                        style={{ height: isResultPanelOpen ? `${resizer.height}px` : '0px' }}
                         className={cn(
                             "flex flex-col overflow-hidden bg-card shrink-0 relative z-10",
                             resizer.isDragging ? "" : "transition-[height] duration-300 ease-in-out"

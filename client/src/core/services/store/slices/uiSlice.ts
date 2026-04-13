@@ -3,9 +3,12 @@ import type { StateCreator } from 'zustand';
 export interface UISlice {
     isSidebarOpen: boolean;
     sidebarWidth: number;
+    isDesktopModeOnMobile: boolean;
     toggleSidebar: () => void;
     setSidebarOpen: (isOpen: boolean) => void;
     setSidebarWidth: (width: number) => void;
+    toggleDesktopModeOnMobile: () => void;
+    setDesktopModeOnMobile: (enabled: boolean) => void;
     isAiPanelOpen: boolean;
     toggleAiPanel: () => void;
     setAiPanelOpen: (isOpen: boolean) => void;
@@ -22,9 +25,12 @@ export interface UISlice {
 export const createUISlice: StateCreator<UISlice> = (set) => ({
     isSidebarOpen: true,
     sidebarWidth: 20,
+    isDesktopModeOnMobile: false,
     toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
     setSidebarOpen: (isOpen) => set({ isSidebarOpen: isOpen }),
     setSidebarWidth: (width) => set({ sidebarWidth: width }),
+    toggleDesktopModeOnMobile: () => set((state) => ({ isDesktopModeOnMobile: !state.isDesktopModeOnMobile })),
+    setDesktopModeOnMobile: (enabled) => set({ isDesktopModeOnMobile: enabled }),
     isAiPanelOpen: false,
     toggleAiPanel: () => set((state) => ({ isAiPanelOpen: !state.isAiPanelOpen })),
     setAiPanelOpen: (isOpen) => set({ isAiPanelOpen: isOpen }),
