@@ -1,4 +1,5 @@
 import { apiService } from './api.service';
+import { useAppStore } from './store';
 
 export interface AuthResponse {
     access_token?: string;
@@ -24,6 +25,21 @@ export class AuthService {
 
     static async logout(): Promise<{ message: string }> {
         return await apiService.post<{ message: string }>('/auth/logout', {}, {}, false);
+    }
+
+    static async logoutAndRedirect(redirectTo = '/login'): Promise<void> {
+        apiService.beginLogout();
+        try {
+            await AuthService.logout();
+        } catch {
+            // Best effort. We still clear local auth state below.
+        } finally {
+            useAppStore.getState().logout();
+            window.location.replace(redirectTo);
+            setTimeout(() => {
+                apiService.endLogout();
+            }, 1000);
+        }
     }
 
     static async register(name: string, email: string, password: string): Promise<AuthResponse> {

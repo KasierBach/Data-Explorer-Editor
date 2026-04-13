@@ -16,7 +16,7 @@ const DocsCtaSection = lazy(() => import('../modules/LandingPage/components/Docs
 const LandingFooter = lazy(() => import('../modules/LandingPage/components/LandingFooter').then(m => ({ default: m.LandingFooter })));
 
 export const LandingPage: React.FC = () => {
-    const { isAuthenticated, logout, lang } = useAppStore();
+    const { isAuthenticated, lang } = useAppStore();
     const revealRefs = useRef<HTMLDivElement[]>([]);
     const observer = useRef<IntersectionObserver | null>(null);
     const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -50,13 +50,7 @@ export const LandingPage: React.FC = () => {
     };
 
     const handleLogout = async () => {
-        try {
-            await AuthService.logout();
-        } catch {
-            // Best effort. Local state still gets cleared below.
-        } finally {
-            logout();
-        }
+        await AuthService.logoutAndRedirect('/login');
     };
 
     return (

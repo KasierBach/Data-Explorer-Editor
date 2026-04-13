@@ -9,11 +9,12 @@ import { NavBrand } from './components/NavBrand';
 import { NavMainActions } from './components/NavMainActions';
 import { NavMenus } from './components/NavMenus';
 import { NavUserSection } from './components/NavUserSection';
+import { AuthService } from '@/core/services/AuthService';
 
 export const Navbar: React.FC = () => {
     const { 
         isSidebarOpen, setSidebarOpen, openQueryTab, openInsightsTab, 
-        activeConnectionId, user, logout, isAiPanelOpen, toggleAiPanel, lang 
+        activeConnectionId, user, isAiPanelOpen, toggleAiPanel, lang 
     } = useAppStore();
     
     const navigate = useNavigate();
@@ -23,6 +24,10 @@ export const Navbar: React.FC = () => {
     
     const isMobile = useMediaQuery('(max-width: 768px)');
     const isSmallMobile = useMediaQuery('(max-width: 480px)');
+
+    const handleLogout = async () => {
+        await AuthService.logoutAndRedirect('/login');
+    };
 
     return (
         <div className="h-14 border-b flex items-center px-4 bg-card justify-between select-none shrink-0 sticky top-0 z-[60]">
@@ -93,7 +98,7 @@ export const Navbar: React.FC = () => {
 
                 <NavUserSection 
                     user={user}
-                    logout={logout}
+                    logout={handleLogout}
                     isAiPanelOpen={isAiPanelOpen}
                     toggleAiPanel={toggleAiPanel}
                     isMobile={isMobile}

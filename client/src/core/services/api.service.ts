@@ -11,6 +11,16 @@ export class ApiError extends Error {
 class ApiService {
   private baseUrl = API_BASE_URL;
   private refreshPromise: Promise<boolean> | null = null;
+  private isLoggingOut = false;
+
+  beginLogout() {
+    this.isLoggingOut = true;
+    this.refreshPromise = null;
+  }
+
+  endLogout() {
+    this.isLoggingOut = false;
+  }
 
   public getHeaders(customHeaders: Record<string, string> = {}) {
     const token = useAppStore.getState().accessToken;
@@ -50,12 +60,20 @@ class ApiService {
   }
 
   private async tryRefreshSession() {
+    if (this.isLoggingOut) {
+      return false;
+    }
+
     if (this.refreshPromise) {
       return this.refreshPromise;
     }
 
     this.refreshPromise = (async () => {
       try {
+        if (this.isLoggingOut) {
+          return false;
+        }
+
         const response = await fetch(`${this.baseUrl}/auth/refresh`, {
           method: 'POST',
           headers: {
@@ -100,6 +118,10 @@ class ApiService {
     options: RequestInit,
     allowRefresh: boolean,
   ): Promise<T> {
+    if (this.isLoggingOut && endpoint !== '/auth/logout') {
+      throw new ApiError('Logout in progress');
+    }
+
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       credentials: 'include',
       ...options,

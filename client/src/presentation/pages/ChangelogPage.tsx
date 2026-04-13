@@ -9,16 +9,11 @@ import { Sparkles, Database, Code2, ShieldCheck, Zap } from 'lucide-react';
 import { AuthService } from '@/core/services/AuthService';
 
 export const ChangelogPage: React.FC = () => {
-    const { isAuthenticated, logout, lang } = useAppStore();
+    const { isAuthenticated, lang } = useAppStore();
     const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
     const handleLogout = async () => {
-        try {
-            await AuthService.logout();
-        } catch {
-        } finally {
-            logout();
-        }
+        await AuthService.logoutAndRedirect('/login');
     };
 
     const releases = [

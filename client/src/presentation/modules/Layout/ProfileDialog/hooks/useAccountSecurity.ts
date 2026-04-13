@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { AuthService } from '@/core/services/AuthService';
 
 export const useAccountSecurity = (onClose?: () => void) => {
-    const { logout: storeLogout, lang } = useAppStore();
+    const { lang } = useAppStore();
     const [isLoading, setIsLoading] = useState(false);
 
     // Security State
@@ -44,13 +44,7 @@ export const useAccountSecurity = (onClose?: () => void) => {
                 await apiService.delete('/users/me');
                 toast.success(successText);
                 onClose?.();
-                try {
-                    await AuthService.logout();
-                } catch {
-                    // Ignore logout cleanup failures after account deletion.
-                } finally {
-                    storeLogout();
-                }
+                await AuthService.logoutAndRedirect('/login');
                 return true;
             } catch (err: any) {
                 toast.error(err.message);

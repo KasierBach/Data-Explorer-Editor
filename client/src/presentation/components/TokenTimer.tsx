@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useAppStore } from '@/core/services/store';
 import { Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { AuthService } from '@/core/services/AuthService';
 
 export const TokenTimer: React.FC = () => {
-    const { tokenExp, logout, isAuthenticated } = useAppStore();
+    const { tokenExp, isAuthenticated } = useAppStore();
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
     const [hasWarned, setHasWarned] = useState(false);
 
@@ -21,8 +22,7 @@ export const TokenTimer: React.FC = () => {
 
             if (remaining <= 0) {
                 clearInterval(interval);
-                logout();
-                window.location.href = '/login';
+                void AuthService.logoutAndRedirect('/login');
                 return;
             }
 
@@ -43,7 +43,7 @@ export const TokenTimer: React.FC = () => {
         setTimeLeft(tokenExp - now);
 
         return () => clearInterval(interval);
-    }, [tokenExp, isAuthenticated, hasWarned, logout]);
+    }, [tokenExp, isAuthenticated, hasWarned]);
 
     if (!isAuthenticated || timeLeft === null) return null;
 
