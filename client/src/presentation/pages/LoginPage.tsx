@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
@@ -13,29 +13,52 @@ import { SEO } from '@/presentation/components/shared/Seo';
 export const LoginPage = () => {
     const navigate = useNavigate();
     const { login, lang } = useAppStore();
-    
-    // Auth Mode State
+    const t = (vi: string, en: string) => (lang === 'vi' ? vi : en);
+
     const [isRegister, setIsRegister] = useState(false);
-    
-    // Form State
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    
-    // Verification State
     const [verifyEmailStep, setVerifyEmailStep] = useState(false);
     const [registeredEmail, setRegisteredEmail] = useState('');
     const [otp, setOtp] = useState('');
-    
-    // UI State
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const title = isRegister 
-        ? (lang === 'vi' ? 'Đăng ký tài khoản' : 'Create Account')
-        : (lang === 'vi' ? 'Đăng nhập' : 'Login');
+    const title = isRegister
+        ? t('Đăng ký tài khoản', 'Create Account')
+        : t('Đăng nhập', 'Login');
 
-    // Handle OAuth Callback Redirect
+    const copy = {
+        home: t('Quay lại trang chủ', 'Back to home'),
+        verifyTitle: t('Xác minh email', 'Verify email'),
+        verifyDescription: t(
+            `Mã xác minh 6 số đã được gửi tới ${registeredEmail}`,
+            `A 6-digit code has been sent to ${registeredEmail}`,
+        ),
+        otpLabel: t('Mã OTP', 'OTP code'),
+        verifyButton: t('Xác minh tài khoản', 'Verify account'),
+        resendCode: t('Gửi lại mã', 'Resend code'),
+        backToLogin: t('Quay lại đăng nhập', 'Back to login'),
+        createAccount: t('Tạo tài khoản', 'Create account'),
+        welcomeBack: t('Chào mừng trở lại', 'Welcome back'),
+        registerIntro: t('Đăng ký tài khoản mới để bắt đầu', 'Register a new account to get started'),
+        loginIntro: t('Đăng nhập vào tài khoản để tiếp tục', 'Sign in to your account to continue'),
+        continueWith: t('Tiếp tục với', 'Or continue with'),
+        name: t('Tên', 'Name'),
+        yourName: t('Tên của bạn', 'Your name'),
+        email: 'Email',
+        password: t('Mật khẩu', 'Password'),
+        forgotPassword: t('Quên mật khẩu?', 'Forgot password?'),
+        minChars: t('Tối thiểu 6 ký tự', 'Min 6 characters'),
+        createWithEmail: t('Tạo tài khoản bằng Email', 'Create account with email'),
+        signInWithEmail: t('Đăng nhập bằng Email', 'Sign in with email'),
+        alreadyHaveAccount: t('Đã có tài khoản?', 'Already have an account?'),
+        signIn: t('Đăng nhập', 'Sign in'),
+        dontHaveAccount: t('Chưa có tài khoản?', "Don't have an account?"),
+        register: t('Đăng ký', 'Register'),
+    };
+
     useEffect(() => {
         const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
         const code = hashParams.get('code');
@@ -55,22 +78,20 @@ export const LoginPage = () => {
 
             login(data.access_token, data.user, data.accessTokenExpiresAt ?? null);
 
-            // Fetch global connections
             try {
                 const connections = await ConnectionService.getConnections();
                 useAppStore.getState().setConnections(connections);
-            } catch (ignored) {
+            } catch {
                 console.warn('Failed to fetch connections upon login');
             }
 
-            // Redirect based on onboarding status
             if (data.user.isOnboarded) {
                 navigate('/sql-explorer');
             } else {
                 navigate('/onboarding');
             }
-        } catch (err) {
-            setError('Social login failed. Please try again.');
+        } catch {
+            setError(t('Đăng nhập mạng xã hội thất bại. Vui lòng thử lại.', 'Social login failed. Please try again.'));
         } finally {
             setIsLoading(false);
         }
@@ -86,15 +107,16 @@ export const LoginPage = () => {
         setError('');
 
         try {
-            const data = isRegister 
+            const data = isRegister
                 ? await AuthService.register(name, email, password)
                 : await AuthService.login(email, password);
 
-            // Handle successful registration but unverified (OTP required)
             if (data.unverified) {
                 setRegisteredEmail(data.email || email);
                 setVerifyEmailStep(true);
-                toast.success(data.message || 'Mã xác minh đã được gửi đến email của bạn.');
+                toast.success(data.message || (lang === 'vi'
+                    ? 'Mã xác minh đã được gửi đến email của bạn.'
+                    : 'A verification code has been sent to your email.'));
                 setIsLoading(false);
                 return;
             }
@@ -105,14 +127,14 @@ export const LoginPage = () => {
                 try {
                     const connections = await ConnectionService.getConnections();
                     useAppStore.getState().setConnections(connections);
-                } catch (ignored) {
+                } catch {
                     console.warn('Failed to fetch connections upon login');
                 }
 
                 if (data.user?.isOnboarded === false) {
-                     navigate('/onboarding');
+                    navigate('/onboarding');
                 } else {
-                     navigate('/');
+                    navigate('/');
                 }
             }
         } catch (err: any) {
@@ -120,9 +142,9 @@ export const LoginPage = () => {
             if (data.unverified) {
                 setRegisteredEmail(data.email || email);
                 setVerifyEmailStep(true);
-                setError(data.message || (lang === 'vi' ? 'Vui lòng xác minh email' : 'Please verify email'));
+                setError(data.message || t('Vui lòng xác minh email', 'Please verify email'));
             } else {
-                setError(err.message || (lang === 'vi' ? 'Thông tin đăng nhập không hợp lệ' : 'Invalid credentials'));
+                setError(err.message || t('Thông tin đăng nhập không hợp lệ', 'Invalid credentials'));
             }
         } finally {
             setIsLoading(false);
@@ -136,19 +158,19 @@ export const LoginPage = () => {
 
         try {
             const data = await AuthService.verifyEmail(registeredEmail, otp);
-            toast.success(lang === 'vi' ? 'Xác minh thành công!' : 'Verification successful!');
-            
+            toast.success(t('Xác minh thành công!', 'Verification successful!'));
+
             if (data.access_token && data.user) {
                 login(data.access_token, data.user, data.accessTokenExpiresAt ?? null);
-                
+
                 if (data.user?.isOnboarded === false) {
-                     navigate('/onboarding');
+                    navigate('/onboarding');
                 } else {
-                     navigate('/');
+                    navigate('/');
                 }
             }
         } catch (err: any) {
-            setError(err.message || 'Invalid OTP');
+            setError(err.message || t('Mã OTP không hợp lệ', 'Invalid OTP'));
         } finally {
             setIsLoading(false);
         }
@@ -159,9 +181,9 @@ export const LoginPage = () => {
         setError('');
         try {
             const data = await AuthService.resendVerification(registeredEmail);
-            toast.success(data.message || (lang === 'vi' ? 'Đã gửi lại mã xác minh!' : 'Verification code resent!'));
+            toast.success(data.message || t('Đã gửi lại mã xác minh!', 'Verification code resent!'));
         } catch (err: any) {
-            setError(err.message || 'Error resending OTP');
+            setError(err.message || t('Không thể gửi lại mã', 'Error resending OTP'));
         } finally {
             setIsLoading(false);
         }
@@ -170,23 +192,35 @@ export const LoginPage = () => {
     if (verifyEmailStep) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
-                <SEO title={`${title} - ${lang === 'vi' ? 'Xác minh Email' : 'Verify Email'}`} />
+                <SEO title={`${title} - ${t('Xác minh Email', 'Verify Email')}`} />
                 <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
+                    <div className="mb-6">
+                        <Button
+                            variant="ghost"
+                            type="button"
+                            onClick={() => navigate('/')}
+                            className="h-auto px-0 text-muted-foreground hover:text-foreground"
+                        >
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            {copy.home}
+                        </Button>
+                    </div>
+
                     <div className="flex flex-col items-center mb-8 space-y-2">
                         <div className="bg-primary/10 p-3 rounded-xl mb-2">
                             <MailCheck className="w-8 h-8 text-primary" />
                         </div>
                         <h1 className="text-2xl font-semibold tracking-tight text-center">
-                            {lang === 'vi' ? 'Xác minh Email' : 'Verify Email'}
+                            {copy.verifyTitle}
                         </h1>
                         <p className="text-sm text-muted-foreground text-center">
-                            {lang === 'vi' ? `Mã xác minh 6 số đã được gửi tới ${registeredEmail}` : `A 6-digit code has been sent to ${registeredEmail}`}
+                            {copy.verifyDescription}
                         </p>
                     </div>
 
                     <form onSubmit={handleVerifyOtp} className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium" htmlFor="otp">Mã OTP / OTP Code</label>
+                            <label className="text-sm font-medium" htmlFor="otp">{copy.otpLabel}</label>
                             <Input
                                 id="otp"
                                 type="text"
@@ -207,27 +241,31 @@ export const LoginPage = () => {
 
                         <Button className="w-full gap-2" type="submit" disabled={isLoading}>
                             {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                            {lang === 'vi' ? 'Xác minh tài khoản' : 'Verify Account'}
+                            {copy.verifyButton}
                         </Button>
                     </form>
 
                     <div className="mt-6 space-y-3">
-                        <Button 
-                            variant="outline" 
-                            className="w-full" 
-                            type="button" 
-                            onClick={handleResendOtp} 
+                        <Button
+                            variant="outline"
+                            className="w-full"
+                            type="button"
+                            onClick={handleResendOtp}
                             disabled={isLoading}
                         >
-                            {lang === 'vi' ? 'Gửi lại mã' : 'Resend Code'}
+                            {copy.resendCode}
                         </Button>
-                        <button 
-                            type="button" 
-                            onClick={() => { setVerifyEmailStep(false); setOtp(''); setError(''); }} 
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setVerifyEmailStep(false);
+                                setOtp('');
+                                setError('');
+                            }}
                             className="text-sm text-muted-foreground hover:text-foreground flex items-center justify-center w-full gap-2 transition-colors"
                         >
                             <ArrowLeft className="w-4 h-4" />
-                            {lang === 'vi' ? 'Quay lại đăng nhập' : 'Back to login'}
+                            {copy.backToLogin}
                         </button>
                     </div>
                 </div>
@@ -235,24 +273,31 @@ export const LoginPage = () => {
         );
     }
 
-    // ─── Render Login/Register Step ──────────────────────────────────
     return (
         <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
             <SEO title={title} />
             <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
+                <div className="mb-6">
+                    <Button
+                        variant="ghost"
+                        type="button"
+                        onClick={() => navigate('/')}
+                        className="h-auto px-0 text-muted-foreground hover:text-foreground"
+                    >
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        {copy.home}
+                    </Button>
+                </div>
+
                 <div className="flex flex-col items-center mb-8 space-y-2">
                     <div className="bg-primary/10 p-3 rounded-xl">
                         <Database className="w-8 h-8 text-primary" />
                     </div>
-                    <h1 className="text-2xl font-semibold tracking-tight">
-                        {isRegister
-                            ? (lang === 'vi' ? 'Tạo Tài khoản' : 'Create Account')
-                            : (lang === 'vi' ? 'Chào mừng trở lại' : 'Welcome back')}
+                    <h1 className="text-2xl font-semibold tracking-tight text-center">
+                        {isRegister ? copy.createAccount : copy.welcomeBack}
                     </h1>
                     <p className="text-sm text-muted-foreground text-center">
-                        {isRegister
-                            ? (lang === 'vi' ? 'Đăng ký tài khoản mới để bắt đầu' : 'Register a new account to get started')
-                            : (lang === 'vi' ? 'Đăng nhập vào tài khoản để tiếp tục' : 'Sign in to your account to continue')}
+                        {isRegister ? copy.registerIntro : copy.loginIntro}
                     </p>
                 </div>
 
@@ -272,26 +317,27 @@ export const LoginPage = () => {
                         <span className="w-full border-t" />
                     </div>
                     <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                        <span className="bg-background px-2 text-muted-foreground">{copy.continueWith}</span>
                     </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {isRegister && (
                         <div className="space-y-2">
-                            <label className="text-sm font-medium" htmlFor="name">Name</label>
+                            <label className="text-sm font-medium" htmlFor="name">{copy.name}</label>
                             <Input
                                 id="name"
                                 type="text"
-                                placeholder="Your name"
+                                placeholder={copy.yourName}
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 required
                             />
                         </div>
                     )}
+
                     <div className="space-y-2">
-                        <label className="text-sm font-medium" htmlFor="email">Email</label>
+                        <label className="text-sm font-medium" htmlFor="email">{copy.email}</label>
                         <Input
                             id="email"
                             type="email"
@@ -301,19 +347,24 @@ export const LoginPage = () => {
                             required
                         />
                     </div>
+
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium" htmlFor="password">Password</label>
+                            <label className="text-sm font-medium" htmlFor="password">{copy.password}</label>
                             {!isRegister && (
-                                <button type="button" onClick={() => navigate('/forgot-password')} className="text-xs text-primary hover:underline font-medium">
-                                    {lang === 'vi' ? 'Quên mật khẩu?' : 'Forgot password?'}
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/forgot-password')}
+                                    className="text-xs text-primary hover:underline font-medium"
+                                >
+                                    {copy.forgotPassword}
                                 </button>
                             )}
                         </div>
                         <Input
                             id="password"
                             type="password"
-                            placeholder={isRegister ? 'Min 6 characters' : '••••••••'}
+                            placeholder={isRegister ? copy.minChars : '••••••••'}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
@@ -334,23 +385,35 @@ export const LoginPage = () => {
                         ) : (
                             <LogIn className="h-4 w-4" />
                         )}
-                        {isRegister
-                            ? (lang === 'vi' ? 'Tạo Tài khoản bằng Email' : 'Create Account with Email')
-                            : (lang === 'vi' ? 'Đăng Nhập bằng Email' : 'Sign In with Email')}
+                        {isRegister ? copy.createWithEmail : copy.signInWithEmail}
                     </Button>
                 </form>
 
                 <div className="mt-6 text-center text-sm text-muted-foreground">
                     {isRegister ? (
-                        <p>Already have an account?{' '}
-                            <button type="button" onClick={() => { setIsRegister(false); setError(''); }} className="text-primary hover:underline font-medium">
-                                Sign In
+                        <p>{copy.alreadyHaveAccount}{' '}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsRegister(false);
+                                    setError('');
+                                }}
+                                className="text-primary hover:underline font-medium"
+                            >
+                                {copy.signIn}
                             </button>
                         </p>
                     ) : (
-                        <p>Don't have an account?{' '}
-                            <button type="button" onClick={() => { setIsRegister(true); setError(''); }} className="text-primary hover:underline font-medium">
-                                Register
+                        <p>{copy.dontHaveAccount}{' '}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsRegister(true);
+                                    setError('');
+                                }}
+                                className="text-primary hover:underline font-medium"
+                            >
+                                {copy.register}
                             </button>
                         </p>
                     )}
