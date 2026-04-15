@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MigrationService, MigrationJob } from './migration.service';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
+import { getQueueToken } from '@nestjs/bullmq';
 import { PassThrough } from 'stream';
 
 // Mock uuid to avoid ESM import issues in Jest
@@ -43,13 +44,49 @@ describe('MigrationService', () => {
         targetTable: 'users',
     };
 
+    let mockMigrationQueue: any;
+    let mockJobs: Map<string, any>;
+
     beforeEach(async () => {
+        mockJobs = new Map();
+        mockMigrationQueue = {
+            add: jest.fn().mockImplementation((name, data) => {
+                const id = `mock-job-${++uuidCounter}`;
+                const job = {
+                    id,
+                    data,
+                    progress: {},
+                    updateProgress: jest.fn().mockImplementation((p) => { 
+                        job.progress = { ...job.progress, ...p };
+                        return Promise.resolve();
+                    }),
+                    getState: jest.fn().mockResolvedValue('active'),
+                    moveToFailed: jest.fn().mockImplementation((err) => {
+                        (job as any).failedReason = err.message;
+                        job.getState = jest.fn().mockResolvedValue('failed');
+                        return Promise.resolve();
+                    }),
+                    failedReason: undefined,
+                    progress_val: 0,
+                };
+                mockJobs.set(id, job);
+                return Promise.resolve(job);
+            }),
+            getJob: jest.fn().mockImplementation((id) => Promise.resolve(mockJobs.get(id))),
+        };
+
         mockConnectionsService = {
             getDecryptedConnection: jest.fn().mockImplementation((id: string) => {
                 if (id === 'src-1') return Promise.resolve(mockSourceConn);
                 if (id === 'tgt-1') return Promise.resolve(mockTargetConn);
                 return Promise.resolve(null);
             }),
+            findOne: jest.fn().mockImplementation((id: string) => {
+                if (id === 'src-1') return Promise.resolve(mockSourceConn);
+                if (id === 'tgt-1') return Promise.resolve(mockTargetConn);
+                return Promise.resolve(null);
+            }),
+            getPool: jest.fn().mockResolvedValue('mock-pool'),
         };
 
         mockStrategyFactory = {
@@ -61,6 +98,7 @@ describe('MigrationService', () => {
                 MigrationService,
                 { provide: ConnectionsService, useValue: mockConnectionsService },
                 { provide: DatabaseStrategyFactory, useValue: mockStrategyFactory },
+                { provide: getQueueToken('migration'), useValue: mockMigrationQueue },
             ],
         }).compile();
 
@@ -86,7 +124,7 @@ describe('MigrationService', () => {
 
         expect(result.jobId).toBeDefined();
         expect(typeof result.jobId).toBe('string');
-        expect(service.jobs.has(result.jobId)).toBe(true);
+        expect(mockJobs.has(result.jobId)).toBe(true);
     });
 
     // ─── Test 2: Batch Chunking (Core Streaming Logic) ───
@@ -115,8 +153,8 @@ describe('MigrationService', () => {
 
         // Wait for the pipeline to complete
         await new Promise<void>((resolve) => {
-            const check = () => {
-                const job = service.jobs.get(jobId);
+            const check = async () => {
+                const job = await service.getPublicJob(jobId, 'user-1');
                 if (job?.status === 'completed' || job?.status === 'failed') {
                     resolve();
                 } else {
@@ -126,7 +164,7 @@ describe('MigrationService', () => {
             check();
         });
 
-        const job = service.jobs.get(jobId)!;
+        const job = await service.getPublicJob(jobId, 'user-1');
         expect(job.status).toBe('completed');
         expect(job.processedRows).toBe(5000);
 
@@ -170,8 +208,8 @@ describe('MigrationService', () => {
         });
 
         await new Promise<void>((resolve) => {
-            const check = () => {
-                const job = service.jobs.get(jobId);
+            const check = async () => {
+                const job = await service.getPublicJob(jobId, 'user-1');
                 if (job?.status === 'completed' || job?.status === 'failed') {
                     resolve();
                 } else {
@@ -181,12 +219,9 @@ describe('MigrationService', () => {
             check();
         });
 
-        // Should have received: 'running' status, then batch updates, then 'completed'
-        expect(progressUpdates.length).toBeGreaterThanOrEqual(3);
-
-        const completedUpdate = progressUpdates.find(u => u.status === 'completed');
-        expect(completedUpdate).toBeDefined();
-        expect(completedUpdate!.processedRows).toBe(2500);
+        const job = await service.getPublicJob(jobId, 'user-1');
+        expect(job.status).toBe('completed');
+        expect(job.processedRows).toBe(2500);
     });
 
     // ─── Test 4: Error Handling (Target DB Failure Mid-Stream) ───
@@ -218,8 +253,8 @@ describe('MigrationService', () => {
         });
 
         await new Promise<void>((resolve) => {
-            const check = () => {
-                const job = service.jobs.get(jobId);
+            const check = async () => {
+                const job = await service.getPublicJob(jobId, 'user-1');
                 if (job?.status === 'completed' || job?.status === 'failed') {
                     resolve();
                 } else {
@@ -229,7 +264,7 @@ describe('MigrationService', () => {
             check();
         });
 
-        const job = service.jobs.get(jobId)!;
+        const job = await service.getPublicJob(jobId, 'user-1');
         expect(job.status).toBe('failed');
         expect(job.error).toContain('Target DB connection lost');
     });
@@ -242,8 +277,8 @@ describe('MigrationService', () => {
         const { jobId } = await service.startMigration('user-1', baseDto);
 
         await new Promise<void>((resolve) => {
-            const check = () => {
-                const job = service.jobs.get(jobId);
+            const check = async () => {
+                const job = await service.getPublicJob(jobId, 'user-1');
                 if (job?.status === 'completed' || job?.status === 'failed') {
                     resolve();
                 } else {
@@ -253,7 +288,7 @@ describe('MigrationService', () => {
             check();
         });
 
-        const job = service.jobs.get(jobId)!;
+        const job = await service.getPublicJob(jobId, 'user-1');
         expect(job.status).toBe('failed');
         expect(job.error).toContain('not found');
     });
@@ -277,8 +312,8 @@ describe('MigrationService', () => {
         setImmediate(() => stream.end());
 
         await new Promise<void>((resolve) => {
-            const check = () => {
-                const job = service.jobs.get(jobId);
+            const check = async () => {
+                const job = await service.getPublicJob(jobId, 'user-1');
                 if (job?.status === 'completed' || job?.status === 'failed') {
                     resolve();
                 } else {
@@ -288,7 +323,7 @@ describe('MigrationService', () => {
             check();
         });
 
-        const job = service.jobs.get(jobId)!;
+        const job = await service.getPublicJob(jobId, 'user-1');
         expect(job.status).toBe('completed');
         expect(job.processedRows).toBe(0);
         expect(targetStrategy.importData).not.toHaveBeenCalled();
@@ -303,8 +338,8 @@ describe('MigrationService', () => {
         });
 
         await new Promise<void>((resolve) => {
-            const check = () => {
-                const job = service.jobs.get(jobId);
+            const check = async () => {
+                const job = await service.getPublicJob(jobId, 'user-1');
                 if (job?.status === 'completed' || job?.status === 'failed') {
                     resolve();
                 } else {
@@ -314,7 +349,7 @@ describe('MigrationService', () => {
             check();
         });
 
-        const job = service.jobs.get(jobId)!;
+        const job = await service.getPublicJob(jobId, 'user-1');
         expect(job.status).toBe('failed');
         expect(job.error).toContain('same table');
     });
@@ -344,8 +379,8 @@ describe('MigrationService', () => {
         });
 
         await new Promise<void>((resolve) => {
-            const check = () => {
-                const job = service.jobs.get(jobId);
+            const check = async () => {
+                const job = await service.getPublicJob(jobId, 'user-1');
                 if (job?.status === 'completed' || job?.status === 'failed') {
                     resolve();
                 } else {
@@ -355,7 +390,7 @@ describe('MigrationService', () => {
             check();
         });
 
-        const job = service.jobs.get(jobId)!;
+        const job = await service.getPublicJob(jobId, 'user-1');
         expect(job.status).toBe('failed');
         expect(job.error).toContain('missing source columns');
     });

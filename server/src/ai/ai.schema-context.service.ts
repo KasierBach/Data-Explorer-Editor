@@ -1,18 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 
 @Injectable()
 export class AiSchemaContextService {
-    private schemaCache = new Map<string, { context: string; timestamp: number }>();
+    constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
     private readonly CACHE_TTL = 1000 * 60 * 15; // 15 minutes
 
     async gatherSchemaContext(pool: any, strategy: any, database?: string, connectionId?: string): Promise<string> {
-        const cacheKey = connectionId ? `${connectionId}:${database || 'default'}` : null;
+        const cacheKey = connectionId ? `aicache:${connectionId}:${database || 'default'}` : null;
 
         if (cacheKey) {
-            const cached = this.schemaCache.get(cacheKey);
-            if (cached && (Date.now() - cached.timestamp < this.CACHE_TTL)) {
-                return cached.context;
-            }
+            const cached = await this.cacheManager.get<string>(cacheKey);
+            if (cached) return cached;
         }
 
         let schemaContext = '';
@@ -55,10 +55,7 @@ export class AiSchemaContextService {
             schemaContext = this.buildSchemaContext(allTables, columnMap, relationships);
 
             if (cacheKey && schemaContext && !schemaContext.includes('Could not load')) {
-                this.schemaCache.set(cacheKey, {
-                    context: schemaContext,
-                    timestamp: Date.now(),
-                });
+                await this.cacheManager.set(cacheKey, schemaContext, this.CACHE_TTL);
             }
 
             console.log(`[AiSchemaContextService] Schema context built: ${allTables.length} tables found`);
@@ -70,17 +67,13 @@ export class AiSchemaContextService {
         return schemaContext;
     }
 
-    clearCache(connectionId: string, database?: string) {
+    async clearCache(connectionId: string, database?: string) {
         if (database) {
-            this.schemaCache.delete(`${connectionId}:${database}`);
+            await this.cacheManager.del(`aicache:${connectionId}:${database}`);
             return;
         }
-
-        for (const key of this.schemaCache.keys()) {
-            if (key.startsWith(`${connectionId}:`)) {
-                this.schemaCache.delete(key);
-            }
-        }
+        // Patterns are not easily supported in basic CacheManager, but we can delete the default one
+        await this.cacheManager.del(`aicache:${connectionId}:default`);
     }
 
     buildSchemaContext(tables: any[], columns: Map<string, any[]>, relationships: any[]): string {

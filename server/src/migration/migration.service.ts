@@ -1,8 +1,7 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit, Inject } from '@nestjs/common';
 import { EventEmitter } from 'events';
-import { promises as fs } from 'fs';
-import path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue, Job } from 'bullmq';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
 import { StartMigrationDto } from './dto/start-migration.dto';
@@ -41,131 +40,92 @@ interface ResolvedMigrationContext {
 }
 
 @Injectable()
-export class MigrationService implements OnModuleInit {
+export class MigrationService {
   private readonly logger = new Logger(MigrationService.name);
-  private readonly jobsFilePath = path.join(process.cwd(), 'storage', 'migration-jobs.json');
-
-  public readonly jobs = new Map<string, StoredMigrationJob>();
   public readonly eventEmitter = new EventEmitter();
 
   constructor(
     private connectionsService: ConnectionsService,
     private dbStrategiesFactory: DatabaseStrategyFactory,
+    @InjectQueue('migration') private migrationQueue: Queue,
   ) {}
 
   async onModuleInit() {
-    const persistedJobs = await this.loadPersistedJobs();
-    for (const job of persistedJobs.values()) {
-      if (job.status === 'pending' || job.status === 'running') {
-        job.status = 'failed';
-        job.stage = 'failed';
-        job.error = 'Migration server restarted before the job completed.';
-      }
-
-      this.jobs.set(job.id, job);
-    }
-
-    await this.persistAllJobs();
+    this.logger.log('Migration service initialized with BullMQ.');
   }
 
   async startMigration(userId: string, dto: StartMigrationDto): Promise<{ jobId: string }> {
-    const jobId = uuidv4();
-    const storedJob: StoredMigrationJob = {
-      id: jobId,
-      status: 'pending',
-      stage: 'queued',
-      processedRows: 0,
-      batchesProcessed: 0,
-      ownerId: userId,
-    };
-    this.jobs.set(jobId, storedJob);
-    await this.persistJob(storedJob);
+    const job = await this.migrationQueue.add(
+      'migration-job',
+      { userId, dto },
+      { 
+        removeOnComplete: false, 
+        removeOnFail: false,
+        attempts: 1, // Let's keep it simple for now
+      }
+    );
 
-    this.runMigrationPipeline(userId, jobId, dto).catch((err) => {
-      this.logger.error(`Migration ${jobId} failed to start or crashed:`, err);
-      void this.failJob(jobId, err.message || 'Background process crashed');
-    });
+    if (!job.id) throw new Error('Failed to create migration job ID');
 
-    return { jobId };
+    this.logger.log(`Migration job ${job.id} queued by user ${userId}`);
+    return { jobId: job.id };
   }
 
-  async assertJobOwnership(jobId: string, userId: string) {
-    const job = await this.getOwnedJob(jobId, userId);
+  async assertJobOwnership(jobId: string, userId: string): Promise<Job> {
+    const job = await this.migrationQueue.getJob(jobId);
     if (!job) {
       throw new NotFoundException('Job not found.');
+    }
+    if (job.data.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this migration job.');
     }
     return job;
   }
 
   async getPublicJob(jobId: string, userId: string): Promise<MigrationJob> {
-    return this.toPublicJob(await this.assertJobOwnership(jobId, userId));
+    const job = await this.assertJobOwnership(jobId, userId);
+    
+    // Convert BullMQ Job status and metadata back to MigrationJob format
+    const state = await job.getState();
+    const progress = job.progress as any;
+
+    return {
+      id: job.id!,
+      status: this.mapBullStatus(state),
+      stage: progress?.stage || (state === 'waiting' || state === 'delayed' ? 'queued' : 'streaming'),
+      processedRows: progress?.processedRows || 0,
+      batchesProcessed: progress?.batchesProcessed || 0,
+      error: job.failedReason,
+    };
   }
 
-  private async getOwnedJob(jobId: string, userId: string): Promise<StoredMigrationJob | null> {
-    if (this.jobs.size === 0) {
-      const persistedJobs = await this.loadPersistedJobs();
-      for (const job of persistedJobs.values()) {
-        this.jobs.set(job.id, job);
-      }
-    }
-
-    const inMemoryJob = this.jobs.get(jobId);
-    if (inMemoryJob) {
-      if (inMemoryJob.ownerId !== userId) {
-        throw new ForbiddenException('You do not have access to this migration job.');
-      }
-      return inMemoryJob;
-    }
-
-    return null;
-  }
-
-  private async loadPersistedJobs(): Promise<Map<string, StoredMigrationJob>> {
-    try {
-      const raw = await fs.readFile(this.jobsFilePath, 'utf8');
-      const jobs = JSON.parse(raw) as StoredMigrationJob[];
-      return new Map(jobs.map((job) => [job.id, job]));
-    } catch (error: any) {
-      if (error?.code === 'ENOENT') {
-        return new Map();
-      }
-
-      this.logger.warn(`Unable to read persisted migration jobs: ${error?.message || error}`);
-      return new Map();
+  private mapBullStatus(state: string): MigrationJob['status'] {
+    switch (state) {
+        case 'completed': return 'completed';
+        case 'failed': return 'failed';
+        case 'active': return 'running';
+        default: return 'pending';
     }
   }
 
-  private async persistAllJobs() {
-    try {
-      await fs.mkdir(path.dirname(this.jobsFilePath), { recursive: true });
-      await fs.writeFile(
-        this.jobsFilePath,
-        JSON.stringify(Array.from(this.jobs.values()), null, 2),
-        'utf8',
-      );
-    } catch (error: any) {
-      this.logger.warn(`Unable to persist migration jobs: ${error?.message || error}`);
-    }
-  }
+  private async updateJob(jobId: string, updater: Partial<MigrationJob> | ((job: any) => void)) {
+    const job = await this.migrationQueue.getJob(jobId);
+    if (!job) return;
 
-  private async persistJob(job: StoredMigrationJob) {
-    this.jobs.set(job.id, job);
-    await this.persistAllJobs();
-  }
-
-  private async updateJob(jobId: string, updater: Partial<MigrationJob> | ((job: StoredMigrationJob) => void)) {
-    const existing = this.jobs.get(jobId);
-    if (!existing) return;
-
+    let progress = (job.progress as any) || { processedRows: 0, batchesProcessed: 0, stage: 'streaming' };
+    
     if (typeof updater === 'function') {
-      updater(existing);
+      updater(progress);
     } else {
-      Object.assign(existing, updater);
+      Object.assign(progress, updater);
     }
 
-    this.jobs.set(jobId, existing);
-    await this.persistJob(existing);
-    this.eventEmitter.emit(`migration-${jobId}`, this.toPublicJob(existing));
+    await job.updateProgress(progress);
+    this.eventEmitter.emit(`migration-${jobId}`, {
+        id: jobId,
+        status: 'running',
+        ...progress
+    });
   }
 
   private async markStage(jobId: string, stage: MigrationStage, status?: MigrationJob['status']) {
@@ -176,23 +136,12 @@ export class MigrationService implements OnModuleInit {
   }
 
   private async failJob(jobId: string, error: string) {
-    const current = this.jobs.get(jobId);
-    if (!current || current.status === 'failed' || current.status === 'completed') return;
-    this.logger.error(`Migration ${jobId} failed`, error);
-    await this.updateJob(jobId, {
-      status: 'failed',
-      stage: 'failed',
-      error,
-    });
+    const job = await this.migrationQueue.getJob(jobId);
+    if (job) await job.moveToFailed(new Error(error), 'token-if-needed');
   }
 
   private async completeJob(jobId: string) {
-    const current = this.jobs.get(jobId);
-    if (!current || current.status === 'failed') return;
-    await this.updateJob(jobId, {
-      status: 'completed',
-      stage: 'completed',
-    });
+    // BullMQ handles completion via worker return value
   }
 
   private isMongoLike(type: string) {
@@ -325,7 +274,7 @@ export class MigrationService implements OnModuleInit {
     }
   }
 
-  private async runMigrationPipeline(userId: string, jobId: string, dto: StartMigrationDto) {
+  public async runMigrationPipeline(userId: string, jobId: string, dto: StartMigrationDto) {
     let context: Partial<ResolvedMigrationContext> | undefined;
 
     try {
@@ -402,12 +351,16 @@ export class MigrationService implements OnModuleInit {
         stream.on('row', enqueueChunk);
 
         stream.on('end', async () => {
-          const currentJob = this.jobs.get(jobId);
-          if (!currentJob || currentJob.status === 'failed') return;
+          const currentJob = await this.migrationQueue.getJob(jobId);
+          if (!currentJob) return;
+          const state = await currentJob.getState();
+          if (state === 'failed') return;
+
           try {
             await processing;
             await flushBuffer();
-            this.logger.log(`Migration ${jobId}: completed (${this.jobs.get(jobId)?.processedRows || 0} rows)`);
+            const finalizedProgress = currentJob.progress as any;
+            this.logger.log(`Migration ${jobId}: completed (${finalizedProgress?.processedRows || 0} rows)`);
             await this.completeJob(jobId);
           } catch (error: any) {
             await handleTerminalFailure(error);
@@ -419,16 +372,22 @@ export class MigrationService implements OnModuleInit {
         });
       } else {
         for await (const chunk of stream) {
-          const currentJob = this.jobs.get(jobId);
-          if (!currentJob || currentJob.status === 'failed') break;
+          const currentJob = await this.migrationQueue.getJob(jobId);
+          if (!currentJob) break;
+          const state = await currentJob.getState();
+          if (state === 'failed') break;
           await handleChunk(chunk);
         }
 
-        const currentJob = this.jobs.get(jobId);
-        if (currentJob && currentJob.status !== 'failed') {
-          await flushBuffer();
-          this.logger.log(`Migration ${jobId}: completed (${currentJob.processedRows} rows)`);
-          await this.completeJob(jobId);
+        const currentJob = await this.migrationQueue.getJob(jobId);
+        if (currentJob) {
+          const state = await currentJob.getState();
+          if (state !== 'failed') {
+            await flushBuffer();
+            const finalizedProgress = currentJob.progress as any;
+            this.logger.log(`Migration ${jobId}: completed (${finalizedProgress?.processedRows || 0} rows)`);
+            await this.completeJob(jobId);
+          }
         }
       }
     } catch (error: any) {

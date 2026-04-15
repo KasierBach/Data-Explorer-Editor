@@ -1,7 +1,12 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { LoggerMiddleware } from './common/middlewares/logger.middleware';
 import { CsrfMiddleware } from './common/middlewares/csrf.middleware';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { CacheModule } from '@nestjs/cache-manager';
+import { BullModule } from '@nestjs/bullmq';
+import { ThrottlerStorageRedisService } from 'nestjs-throttler-storage-redis';
+import { redisStore } from 'cache-manager-redis-yet';
+
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConnectionsModule } from './connections/connections.module';
@@ -28,10 +33,40 @@ import { ErdWorkspacesModule } from './erd-workspaces/erd-workspaces.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 100,
-    }]),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          url: configService.get<string>('REDIS_URL') || 'redis://localhost:6379',
+        },
+      }),
+    }),
+    CacheModule.registerAsync({
+      isGlobal: true,
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => {
+        const store = await redisStore({
+          url: configService.get<string>('REDIS_URL') || 'redis://localhost:6379',
+          ttl: 60000,
+        });
+        return { store };
+      },
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        throttlers: [{
+          ttl: 60000,
+          limit: 100,
+        }],
+        storage: new ThrottlerStorageRedisService(
+          configService.get<string>('REDIS_URL') || 'redis://localhost:6379',
+        ),
+      }),
+    }),
     MailModule,
     DatabaseStrategiesModule,
     PrismaModule,

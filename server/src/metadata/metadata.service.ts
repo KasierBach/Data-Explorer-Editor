@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 
@@ -7,6 +9,7 @@ export class MetadataService {
     constructor(
         private readonly connectionsService: ConnectionsService,
         private readonly strategyFactory: DatabaseStrategyFactory,
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) { }
 
     private parseNodeId(id: string) {
@@ -24,36 +27,17 @@ export class MetadataService {
         return { dbName, schemaName, tableName };
     }
 
-    // 1-minute TTL cache for metadata to prevent spamming the database when expanding/collapsing sidebar nodes
-    private readonly CACHE_TTL = 60 * 1000;
-    private cache = new Map<string, { data: any; expiry: number }>();
-
     private getCacheKey(prefix: string, connectionId: string, userId: string, identifier: string = 'default') {
         return `${prefix}:${userId}:${connectionId}:${identifier}`;
     }
 
-    private getCached<T>(key: string): T | null {
-        const item = this.cache.get(key);
-        if (item && Date.now() < item.expiry) {
-            return item.data as T;
-        }
-        if (item) {
-            this.cache.delete(key);
-        }
-        return null;
-    }
-
-    private setCached(key: string, data: any) {
-        this.cache.set(key, { data, expiry: Date.now() + this.CACHE_TTL });
-    }
-
     async getHierarchy(connectionId: string, parentId: string | null, userId: string) {
         const cacheKey = this.getCacheKey('hierarchy', connectionId, userId, parentId || 'root');
-        const cached = this.getCached(cacheKey);
+        const cached = await this.cacheManager.get(cacheKey);
         if (cached) return cached;
 
         const result = await this._getHierarchyUncached(connectionId, parentId, userId);
-        this.setCached(cacheKey, result);
+        await this.cacheManager.set(cacheKey, result);
         return result;
     }
 
@@ -141,7 +125,7 @@ export class MetadataService {
 
     async getDatabases(connectionId: string, userId: string) {
         const cacheKey = this.getCacheKey('databases', connectionId, userId);
-        const cached = this.getCached<string[]>(cacheKey);
+        const cached = await this.cacheManager.get<string[]>(cacheKey);
         if (cached) return cached;
 
         const connection = await this.connectionsService.findOne(connectionId, userId);
@@ -151,13 +135,13 @@ export class MetadataService {
         const nodes = await strategy.getDatabases(pool);
         const result = nodes.map(n => n.name);
         
-        this.setCached(cacheKey, result);
+        await this.cacheManager.set(cacheKey, result);
         return result;
     }
 
     async getRelationships(connectionId: string, userId: string, database?: string) {
         const cacheKey = this.getCacheKey('relationships', connectionId, userId, database);
-        const cached = this.getCached<any>(cacheKey);
+        const cached = await this.cacheManager.get<any>(cacheKey);
         if (cached) return cached;
 
         const connection = await this.connectionsService.findOne(connectionId, userId);
@@ -165,13 +149,13 @@ export class MetadataService {
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
         const result = await strategy.getRelationships(pool, database);
-        this.setCached(cacheKey, result);
+        await this.cacheManager.set(cacheKey, result);
         return result;
     }
 
     async getColumns(connectionId: string, tableId: string, userId: string) {
         const cacheKey = this.getCacheKey('columns', connectionId, userId, tableId);
-        const cached = this.getCached<any>(cacheKey);
+        const cached = await this.cacheManager.get<any>(cacheKey);
         if (cached) return cached;
 
         const connection = await this.connectionsService.findOne(connectionId, userId);
@@ -184,13 +168,13 @@ export class MetadataService {
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
         const result = await strategy.getColumns(pool, schema, table, parsed.dbName);
-        this.setCached(cacheKey, result);
+        await this.cacheManager.set(cacheKey, result);
         return result;
     }
 
     async getDatabaseMetrics(connectionId: string, userId: string, database?: string) {
         const cacheKey = this.getCacheKey('metrics', connectionId, userId, database);
-        const cached = this.getCached<any>(cacheKey);
+        const cached = await this.cacheManager.get<any>(cacheKey);
         if (cached) return cached;
 
         const connection = await this.connectionsService.findOne(connectionId, userId);
@@ -198,13 +182,13 @@ export class MetadataService {
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
         const result = await strategy.getDatabaseMetrics(pool);
-        this.setCached(cacheKey, result);
+        await this.cacheManager.set(cacheKey, result);
         return result;
     }
 
     async getFullMetadata(connectionId: string, tableId: string, userId: string) {
         const cacheKey = this.getCacheKey('fullmeta', connectionId, userId, tableId);
-        const cached = this.getCached<any>(cacheKey);
+        const cached = await this.cacheManager.get<any>(cacheKey);
         if (cached) return cached;
 
         const connection = await this.connectionsService.findOne(connectionId, userId);
@@ -217,7 +201,7 @@ export class MetadataService {
         const strategy = this.strategyFactory.getStrategy(connection.type);
 
         const result = await strategy.getFullMetadata(pool, schema, table, parsed.dbName);
-        this.setCached(cacheKey, result);
+        await this.cacheManager.set(cacheKey, result);
         return result;
     }
 }

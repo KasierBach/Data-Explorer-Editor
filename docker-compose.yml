@@ -12,6 +12,15 @@ services:
       - pgdata:/var/lib/postgresql/data
     restart: always
 
+  redis:
+    image: redis:7-alpine
+    container_name: data-explorer-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    restart: always
+
   backend:
     build:
       context: ./server
@@ -23,8 +32,10 @@ services:
       - ./server/.env
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/data_explorer
+      - REDIS_URL=redis://redis:6379
     depends_on:
       - db
+      - redis
     restart: always
 
   frontend:
@@ -42,6 +53,7 @@ services:
 
 volumes:
   pgdata:
+  redisdata:
 
 networks:
   default:
