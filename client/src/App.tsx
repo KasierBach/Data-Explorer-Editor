@@ -13,6 +13,7 @@ import { useSyncSavedQueries } from '@/presentation/hooks/useSyncSavedQueries'
 import { AuthService } from '@/core/services/AuthService'
 
 import { Toaster } from 'sonner';
+import { DestructiveQueryDialog } from '@/presentation/components/Dialogs/DestructiveQueryDialog';
 
 const AppShell = lazy(() => import('@/presentation/modules/Layout/AppShell').then((m) => ({ default: m.AppShell })))
 const NoSqlShell = lazy(() => import('@/presentation/modules/Layout/NoSqlShell').then((m) => ({ default: m.NoSqlShell })))
@@ -118,6 +119,7 @@ export function App() {
             </Routes>
           </Suspense>
           <Toaster richColors position="top-center" />
+          <DestructiveQueryDialog />
         </BrowserRouter>
     </QueryClientProvider>
   )

@@ -2,6 +2,7 @@ import type { IDatabaseAdapter } from '../domain/database-adapter.interface';
 import type { TableMetadata, TreeNode, QueryResult } from '../domain/entities';
 import { apiService } from '../services/api.service';
 import { API_BASE_URL } from '../config/env';
+import { useAppStore } from '../services/store';
 
 /**
  * Adapter that communicates with the backend API to perform database operations.
@@ -31,7 +32,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         });
     }
 
-    async executeQuery(sql: string, context?: { database?: string, limit?: number, offset?: number }): Promise<QueryResult> {
+    async executeQuery(sql: string, context?: { database?: string, limit?: number, offset?: number, confirmed?: boolean }): Promise<QueryResult> {
         if (!this.connectionId) throw new Error('Not connected');
 
         const body: any = {
@@ -42,8 +43,25 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         if (context?.database) body.database = context.database;
         if (context?.limit !== undefined) body.limit = context.limit;
         if (context?.offset !== undefined) body.offset = context.offset;
+        if (context?.confirmed) body.confirmed = true;
 
-        return await apiService.post<QueryResult>('/query', body);
+        try {
+            return await apiService.post<QueryResult>('/query', body);
+        } catch (error: any) {
+            // Intercept the destructive SQL confirmation flow
+// Add import at the top later
+            if (error.reason === 'DESTRUCTIVE_REQUIRES_CONFIRMATION') {
+                const analysis = error.details?.analysis || {};
+                const userConfirmed = await useAppStore.getState().requestDestructiveConfirm(analysis);
+
+                if (userConfirmed) {
+                    return this.executeQuery(sql, { ...context, confirmed: true });
+                }
+
+                throw new Error('Query cancelled by user.');
+            }
+            throw error;
+        }
     }
 
     async getMetadata(tableId: string): Promise<TableMetadata> {
