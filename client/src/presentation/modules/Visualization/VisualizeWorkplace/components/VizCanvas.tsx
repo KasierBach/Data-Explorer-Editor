@@ -1,9 +1,9 @@
 import React from 'react';
-import { 
-    BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, RadarChart, PolarGrid, 
-    PolarAngleAxis, PolarRadiusAxis, Radar, ScatterChart, Scatter, Treemap, FunnelChart, 
-    Funnel, LabelList, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip, 
-    ResponsiveContainer, Cell, Legend, Brush 
+import {
+    BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, RadarChart, PolarGrid,
+    PolarAngleAxis, PolarRadiusAxis, Radar, ScatterChart, Scatter, Treemap, FunnelChart,
+    Funnel, LabelList, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip,
+    ResponsiveContainer, Cell, Legend, Brush
 } from 'recharts';
 import { AlertCircle, BarChart3, PieChart as PieIcon, PanelLeft, RotateCcw } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
@@ -34,12 +34,12 @@ interface VizCanvasProps {
 }
 
 export const VizCanvas: React.FC<VizCanvasProps> = ({
-    chartData, error, refetch, chartType, xAxis, yAxis, showGrid, showLegend, showBrush, 
-    curveType, animationEnabled, labelVisible, palette, isLargeDataset, 
-    getChartData, chartRef, title, isSidebarCollapsed, setSidebarCollapsed, isLoading, 
+    chartData, error, refetch, chartType, xAxis, yAxis, showGrid, showLegend, showBrush,
+    curveType, animationEnabled, labelVisible, palette, isLargeDataset,
+    getChartData, chartRef, title, isSidebarCollapsed, setSidebarCollapsed, isLoading,
     selectedTable, chartTypeName
 }) => {
-    
+
     const tooltipStyle = {
         backgroundColor: 'hsl(var(--card))',
         borderRadius: '16px',

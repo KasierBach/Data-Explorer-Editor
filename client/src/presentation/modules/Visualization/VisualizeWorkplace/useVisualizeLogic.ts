@@ -86,11 +86,22 @@ export const useVisualizeLogic = () => {
             const results: TreeNode[] = [];
             const crawl = async (parentId: string | null) => {
                 const nodes = await adapter.getHierarchy(parentId);
+                const toCrawlIds = [];
                 for (const node of nodes) {
-                    if (node.type === 'table' || node.type === 'view') results.push(node);
-                    else if (node.type === 'database') {
-                        if (!currentDb || node.name === currentDb || node.id.includes(currentDb)) await crawl(node.id);
-                    } else if (node.type === 'schema' || node.type === 'folder') await crawl(node.id);
+                    if (node.type === 'table' || node.type === 'view') {
+                        results.push(node);
+                    } else if (node.type === 'database') {
+                        if (!currentDb || node.name === currentDb || node.id.includes(currentDb)) {
+                            toCrawlIds.push(node.id);
+                        }
+                    } else if (node.type === 'schema' || node.type === 'folder') {
+                        toCrawlIds.push(node.id);
+                    }
+                }
+                
+                // Execute strictly sequentially to prevent recursion concurrency explosion
+                for (const id of toCrawlIds) {
+                    await crawl(id);
                 }
             };
             await crawl(currentDb ? `db:${currentDb}` : null);
