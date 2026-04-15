@@ -44,7 +44,7 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
             toast.error(lang === 'vi' ? 'Vui lòng chọn file CSV' : 'Please select a CSV file');
             return;
         }
-
+        
         setFile(selectedFile);
         setError(null);
         

@@ -112,6 +112,7 @@ export class ConnectionsService implements OnModuleDestroy {
     const connection = await this.prisma.connection.create({
       data: {
         ...rest,
+        name,
         password: encryptedPassword,
         userId,
         readOnly: createConnectionDto.readOnly ?? false,
