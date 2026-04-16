@@ -62,25 +62,45 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                     </div>
                 </motion.div>
 
-                <motion.div variants={itemVariants} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-blue-400 text-[10px] font-black mb-4 md:mb-6 backdrop-blur-md uppercase tracking-[0.2em] shadow-xl">
-                    <Sparkles className="w-3 h-3" aria-hidden="true" />
-                    <span>v3.2: MULTI-ENGINE & GEMINI 3.1</span>
+                <motion.div 
+                    variants={itemVariants} 
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="relative inline-flex group items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.1] text-blue-400 text-[10px] font-bold mb-4 md:mb-8 backdrop-blur-xl uppercase tracking-[0.15em] cursor-pointer shadow-[0_0_15px_rgba(37,99,235,0.15)] overflow-hidden"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/20 to-blue-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out" />
+                    <Sparkles className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-300 transition-colors" aria-hidden="true" />
+                    <span className="text-white/90 group-hover:text-white transition-colors relative z-10">v3.2: MULTI-ENGINE & GEMINI 3.1</span>
                 </motion.div>
                 
                 <motion.h1 
                     variants={itemVariants}
-                    className="text-4xl md:text-7xl font-black tracking-tighter mb-4 md:mb-6 bg-gradient-to-b from-white via-white to-white/30 bg-clip-text text-transparent max-w-5xl mx-auto leading-none md:leading-[1.1] uppercase pb-2"
+                    className="text-5xl md:text-7xl font-extrabold tracking-tight mb-4 md:mb-8 bg-gradient-to-br from-white via-white to-white/40 bg-clip-text text-transparent max-w-5xl mx-auto leading-tight md:leading-[1.1] pb-2 cursor-default"
                 >
                     {lang === 'vi' ? (
-                        <>HỆ QUẢN TRỊ <br /> <span className="bg-gradient-to-r from-blue-400 to-indigo-600 bg-clip-text text-transparent">CƠ SỞ DỮ LIỆU BẰNG AI</span></>
+                        <>HỆ QUẢN TRỊ <br /> 
+                        <motion.span 
+                            animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                            transition={{ duration: 5, ease: "linear", repeat: Infinity }}
+                            className="bg-[length:200%_200%] bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 bg-clip-text text-transparent inline-block"
+                        >
+                            CƠ SỞ DỮ LIỆU BẰNG AI
+                        </motion.span></>
                     ) : (
-                        <>THE AI-POWERED <br /> <span className="bg-gradient-to-r from-blue-400 to-indigo-600 bg-clip-text text-transparent">DATABASE IDE</span></>
+                        <>THE AI-POWERED <br /> 
+                        <motion.span 
+                            animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                            transition={{ duration: 5, ease: "linear", repeat: Infinity }}
+                            className="bg-[length:200%_200%] bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 bg-clip-text text-transparent inline-block"
+                        >
+                            DATABASE IDE
+                        </motion.span></>
                     )}
                 </motion.h1>
                 
                 <motion.p 
                     variants={itemVariants}
-                    className="text-base md:text-lg text-muted-foreground/60 max-w-2xl mx-auto mb-8 md:mb-10 leading-relaxed font-medium"
+                    className="text-lg md:text-xl text-muted-foreground/80 max-w-2xl mx-auto mb-8 md:mb-12 leading-relaxed font-medium"
                 >
                     {lang === 'vi'
                         ? 'Thay thế các công cụ cũ kĩ. Kết nối SQL & NoSQL, bảo mật đa lớp chuẩn doanh nghiệp, và viết query siêu tốc cùng AI Assistant.'
@@ -88,21 +108,27 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                 </motion.p>
                 
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                    <Button 
-                        size="lg" 
-                        onClick={() => navigate(isAuthenticated ? '/sql-explorer' : '/login')} 
-                        className="h-12 px-8 text-[10px] font-black uppercase tracking-[0.2em] bg-blue-600 hover:bg-blue-700 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)] w-full sm:w-auto rounded-xl transition-all hover:scale-105 active:scale-95 group"
-                    >
-                        {isAuthenticated ? (lang === 'vi' ? 'Vào Workspace' : 'Open Workspace') : (lang === 'vi' ? 'Nhận quyền truy cập' : 'Claim Your Access')}
-                        <ArrowRight className="w-3.5 h-3.5 ml-2 group-hover:translate-x-1 transition-transform" />
-                    </Button>
+                    <div className="relative group w-full sm:w-auto">
+                        {/* Glow effect behind the button */}
+                        <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-xl blur-lg opacity-40 group-hover:opacity-100 transition duration-500 group-hover:duration-200 animate-pulse"></div>
+                        <Button 
+                            size="lg" 
+                            onClick={() => navigate(isAuthenticated ? '/sql-explorer' : '/login')} 
+                            className="relative h-12 px-8 text-[11px] font-bold uppercase tracking-[0.15em] bg-background/50 hover:bg-background/80 text-white backdrop-blur-xl border border-blue-400/30 w-full sm:w-auto rounded-xl transition-all hover:scale-[1.02] active:scale-95"
+                        >
+                            {isAuthenticated ? (lang === 'vi' ? 'Vào Workspace' : 'Open Workspace') : (lang === 'vi' ? 'Nhận quyền truy cập' : 'Claim Your Access')}
+                            <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1.5 transition-transform text-blue-400" />
+                        </Button>
+                    </div>
+                    
                     <Button 
                         size="lg" 
                         variant="outline" 
                         onClick={() => window.open('/docs', '_blank')} 
-                        className="h-12 px-8 text-[10px] font-black uppercase tracking-[0.2em] w-full sm:w-auto glass-panel hover:bg-white/10 rounded-xl border-white/10 backdrop-blur-md"
+                        className="relative overflow-hidden group h-12 px-8 text-[11px] font-bold uppercase tracking-[0.15em] w-full sm:w-auto glass-panel hover:bg-white/10 hover:text-white text-muted-foreground/90 rounded-xl border-white/[0.08] backdrop-blur-md transition-colors"
                     >
-                        {lang === 'vi' ? 'Tài liệu hướng dẫn' : 'Documentation'}
+                        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out" />
+                        <span className="relative z-10">{lang === 'vi' ? 'Tài liệu hướng dẫn' : 'Documentation'}</span>
                     </Button>
                 </motion.div>
             </motion.div>

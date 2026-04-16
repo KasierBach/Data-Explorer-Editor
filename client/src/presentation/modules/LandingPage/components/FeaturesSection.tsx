@@ -68,10 +68,10 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
                     viewport={{ once: true }}
                     className="text-center mb-16 md:mb-24 max-w-4xl mx-auto"
                 >
-                    <h2 className="text-4xl md:text-6xl font-black tracking-tighter mb-6 md:mb-8 uppercase bg-gradient-to-b from-white to-white/60 bg-clip-text text-transparent">
+                    <h2 className="text-5xl md:text-6xl font-extrabold tracking-tight mb-6 md:mb-8 bg-gradient-to-br from-white via-white to-white/40 bg-clip-text text-transparent">
                         {lang === 'vi' ? 'Trí tuệ hợp nhất' : 'Unified Intelligence'}
                     </h2>
-                    <p className="text-muted-foreground text-lg md:text-xl font-medium leading-relaxed max-w-2xl mx-auto">
+                    <p className="text-muted-foreground/80 text-lg md:text-xl font-medium leading-relaxed max-w-2xl mx-auto">
                         {lang === 'vi'
                             ? 'Không chỉ là một trình chỉnh sửa. Đó là trung tâm chỉ huy cho dữ liệu của bạn, được xây dựng với sự tinh xảo hiện đại.'
                             : 'Not just an editor. A command center for your data, built with modern craftsmanship.'}
@@ -83,28 +83,32 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-100px" }}
-                    className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10"
+                    className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 lg:gap-10"
                 >
                     {features.map((feature, idx) => (
                         <motion.div
                             key={idx}
                             variants={cardVariants}
                             whileHover={{ 
-                                scale: 1.02, 
-                                rotateX: 5, 
-                                rotateY: -5,
+                                scale: 1.03, 
                                 z: 50
                             }}
-                            className="glass-panel p-8 md:p-10 rounded-[2.5rem] border-white/5 hover:border-blue-500/30 transition-all duration-300 group relative overflow-hidden preserve-3d shadow-2xl"
+                            // Loại bỏ col-span-2 do thiếu ảnh Graphic phụ họa, dùng lưới 3 cột cân đối
+                            className="p-8 md:p-10 rounded-[2rem] border border-white/10 hover:border-blue-400/50 transition-all duration-300 group relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.4)] bg-[#0f111a]/60 backdrop-blur-3xl flex flex-col items-center text-center"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-purple-600/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="flex flex-col gap-8 relative z-10">
-                                <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-blue-600/10 group-hover:scale-110 transition-all duration-500 shadow-2xl">
+                            {/* Ánh sáng tĩnh dưới đáy card */}
+                            <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-48 h-48 bg-blue-600/20 blur-[60px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-full" />
+                            
+                            {/* Ánh sáng chạy viền lấp lánh (Sweep light) */}
+                            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-blue-400/10 to-transparent opacity-0 group-hover:opacity-100 translate-x-[-100%] group-hover:translate-x-[100%] transition-all duration-1000 ease-in-out" />
+                            
+                            <div className="relative z-10 flex flex-col items-center justify-center h-full gap-6">
+                                <div className="w-16 h-16 rounded-2xl bg-gradient-to-b from-white/10 to-white/5 border border-white/20 flex items-center justify-center group-hover:shadow-[0_0_30px_rgba(59,130,246,0.3)] group-hover:bg-blue-600/20 group-hover:scale-110 transition-all duration-500 shadow-xl text-white">
                                     {feature.icon}
                                 </div>
-                                <div>
-                                    <h3 className="font-black text-2xl uppercase tracking-tight mb-4 group-hover:text-blue-400 transition-colors">{feature.title}</h3>
-                                    <p className="text-muted-foreground/60 leading-relaxed text-sm font-medium group-hover:text-white/80 transition-colors">
+                                <div className="mt-2">
+                                    <h3 className="font-extrabold text-xl lg:text-2xl tracking-tight mb-3 text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-400 group-hover:to-cyan-300 transition-all">{feature.title}</h3>
+                                    <p className="text-muted-foreground/80 leading-relaxed text-sm lg:text-base font-medium group-hover:text-white/90 transition-colors">
                                         {feature.desc}
                                     </p>
                                 </div>

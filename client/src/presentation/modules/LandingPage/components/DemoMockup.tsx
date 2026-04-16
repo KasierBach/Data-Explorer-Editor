@@ -2,19 +2,41 @@ import React from 'react';
 import { Terminal, Database, Sparkles, ChevronRight } from 'lucide-react';
 import { Badge } from '@/presentation/components/ui/badge';
 
+import { motion } from 'framer-motion';
+
 interface DemoMockupProps {
     addToRevealRefs: (el: HTMLDivElement | null) => void;
 }
 
 export const DemoMockup: React.FC<DemoMockupProps> = ({ addToRevealRefs }) => {
     return (
-        <div id="demo" ref={addToRevealRefs} className="reveal container mx-auto px-4 sm:px-6 mt-10 md:mt-16 max-w-6xl">
-            <div className="relative group">
+        <div id="demo" ref={addToRevealRefs} className="reveal container mx-auto px-4 sm:px-6 mt-10 md:mt-16 max-w-6xl perspective-[2000px]">
+            <motion.div 
+                initial={{ rotateX: 10, y: 50, opacity: 0 }}
+                whileInView={{ rotateX: 0, y: 0, opacity: 1 }}
+                viewport={{ margin: "-100px", once: true }}
+                transition={{ duration: 1, type: "spring", bounce: 0.2 }}
+                className="relative group/mockup"
+            >
                 {/* Decorative Glows */}
-                <div className="absolute -top-20 -left-20 w-64 h-64 bg-blue-500/20 rounded-full blur-[100px] animate-pulse" />
-                <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-purple-500/20 rounded-full blur-[100px] animate-pulse [animation-delay:2s]" />
+                <div className="absolute -top-20 -left-20 w-80 h-80 bg-blue-500/10 rounded-full blur-[120px] animate-pulse" />
+                <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-purple-500/10 rounded-full blur-[120px] animate-pulse [animation-delay:2s]" />
 
-                <div className="relative rounded-2xl border border-white/10 bg-card/40 backdrop-blur-2xl shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden ring-1 ring-white/10 shimmer">
+                <div className="relative rounded-2xl border border-white/[0.08] bg-black/60 backdrop-blur-3xl shadow-[0_30px_100px_-15px_rgba(0,0,0,0.8)] overflow-hidden ring-1 ring-white/[0.02]">
+                    
+                    {/* Hover Laser Scanline */}
+                    <div className="absolute inset-0 z-50 pointer-events-none opacity-0 group-hover/mockup:opacity-100 transition-opacity duration-1000 mix-blend-screen overflow-hidden">
+                        <motion.div 
+                            animate={{ top: ["-10%", "110%"] }} 
+                            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                            className="absolute left-0 w-full h-[1px] bg-blue-400 shadow-[0_0_15px_rgba(59,130,246,1)]"
+                        />
+                        <motion.div 
+                            animate={{ top: ["-10%", "110%"] }} 
+                            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                            className="absolute left-0 w-full h-32 bg-gradient-to-b from-blue-500/5 to-transparent"
+                        />
+                    </div>
                     {/* Window Buttons */}
                     <div className="h-11 border-b border-white/5 flex items-center justify-between px-4 bg-muted/20">
                         <div className="flex items-center gap-2">
@@ -87,17 +109,21 @@ export const DemoMockup: React.FC<DemoMockupProps> = ({ addToRevealRefs }) => {
                                 </div>
 
                                 {/* Floating AI Bubble - Real Component style */}
-                                <div className="absolute bottom-6 right-6 max-w-[280px]">
-                                    <div className="glass-panel p-4 rounded-2xl glow-purple animate-float border-l-4 border-l-purple-500">
+                                <motion.div 
+                                    animate={{ y: [0, -10, 0] }}
+                                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                                    className="absolute bottom-6 right-6 max-w-[280px]"
+                                >
+                                    <div className="p-4 rounded-2xl bg-[#0a0a0f]/80 backdrop-blur-md shadow-[0_0_30px_rgba(168,85,247,0.15)] border border-purple-500/20 border-l-4 border-l-purple-500">
                                         <div className="flex items-center gap-2 mb-2">
-                                            <Sparkles className="w-3 h-3 text-purple-400" />
+                                            <Sparkles className="w-3.5 h-3.5 text-purple-400 glow-pulse" />
                                             <span className="text-[10px] font-bold uppercase tracking-widest text-purple-300">AI Assistant</span>
                                         </div>
                                         <p className="text-[11px] text-gray-300 leading-relaxed italic">
                                             "I've optimized your join. Removed redundant indexes and added a covering index hint for Postgres."
                                         </p>
                                     </div>
-                                </div>
+                                </motion.div>
                             </div>
 
                             {/* Real Results Preview */}
@@ -123,7 +149,7 @@ export const DemoMockup: React.FC<DemoMockupProps> = ({ addToRevealRefs }) => {
                         </div>
                     </div>
                 </div>
-            </div>
+            </motion.div>
         </div>
     );
 };

@@ -25,7 +25,7 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
     const navigate = useNavigate();
 
     return (
-        <header className="fixed top-0 w-full z-50 bg-background/60 backdrop-blur-xl border-b border-white/5 supports-[backdrop-filter]:bg-background/60">
+        <header className="fixed top-0 w-full z-50 bg-background/40 backdrop-blur-2xl border-b border-white/[0.04] supports-[backdrop-filter]:bg-background/40 transition-all duration-300">
             <div className="container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
                 <button 
                     className="flex items-center gap-2 font-bold text-xl tracking-tight cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-lg p-1" 
@@ -41,21 +41,21 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
                 <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground absolute left-1/2 -translate-x-1/2">
                     {!hideSectionLinks && (
                         <>
-                            <a href="#features" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                            <a href="#features" className="hover:text-white text-muted-foreground/80 transition-colors uppercase tracking-[0.15em] text-[10px] font-semibold">
                                 {lang === 'vi' ? 'Tính năng' : 'Features'}
                             </a>
-                            <a href="#demo" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                            <a href="#demo" className="hover:text-white text-muted-foreground/80 transition-colors uppercase tracking-[0.15em] text-[10px] font-semibold">
                                 {lang === 'vi' ? 'Bản demo' : 'Live Demo'}
                             </a>
-                            <a href="#pricing" className="hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                            <a href="#pricing" className="hover:text-white text-muted-foreground/80 transition-colors uppercase tracking-[0.15em] text-[10px] font-semibold">
                                 {lang === 'vi' ? 'Giá cả' : 'Pricing'}
                             </a>
                         </>
                     )}
-                    <button onClick={() => navigate('/docs')} className="relative group hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                    <button onClick={() => navigate('/docs')} className="relative group hover:text-white text-muted-foreground/80 transition-colors uppercase tracking-[0.15em] text-[10px] font-semibold">
                         {lang === 'vi' ? 'Tài liệu' : 'Docs'}
                     </button>
-                    <button onClick={() => navigate('/changelog')} className="relative group hover:text-blue-500 transition-colors uppercase tracking-widest text-[10px]">
+                    <button onClick={() => navigate('/changelog')} className="relative group hover:text-white text-muted-foreground/80 transition-colors uppercase tracking-[0.15em] text-[10px] font-semibold">
                         {lang === 'vi' ? 'Cập nhật' : 'Changelog'}
                         <span className="absolute -top-3 -right-4 bg-blue-600 text-[8px] px-1 rounded-sm text-white font-bold animate-pulse group-hover:scale-110 transition-transform">NEW</span>
                     </button>
@@ -74,7 +74,7 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
                             <Button variant="ghost" size="sm" onClick={() => { void logout(); navigate('/login'); }} className="hidden sm:flex hover:bg-red-500/10 hover:text-red-500 text-xs uppercase tracking-wider">
                                 Logout
                             </Button>
-                            <Button size="sm" onClick={() => navigate('/sql-explorer')} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-widest font-bold">
+                            <Button size="sm" onClick={() => navigate('/sql-explorer')} className="bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] border border-blue-400/20 transition-all hover:scale-105 active:scale-95 text-[10px] uppercase tracking-widest font-bold rounded-lg px-4 hidden sm:flex">
                                 Workspace
                             </Button>
                         </div>
@@ -83,7 +83,7 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
                             <Button variant="ghost" size="sm" onClick={() => navigate('/login')} className="hidden sm:flex hover:bg-blue-500/10 hover:text-blue-500 text-xs uppercase tracking-wider">
                                 {lang === 'vi' ? 'Đăng nhập' : 'Login'}
                             </Button>
-                            <Button size="sm" onClick={() => navigate('/login')} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/25 transition-all hover:scale-105 active:scale-95 text-xs uppercase tracking-widest font-bold px-3 sm:px-5">
+                            <Button size="sm" onClick={() => navigate('/login')} className="bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] border border-blue-400/20 transition-all hover:scale-105 active:scale-95 text-[10px] uppercase tracking-widest font-bold px-4 sm:px-5 rounded-lg">
                                 {lang === 'vi' ? 'Bắt đầu' : 'Start Analysis'}
                             </Button>
                         </>
