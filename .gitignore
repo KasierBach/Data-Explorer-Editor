@@ -10,3 +10,7 @@ coverage/
 .temp/
 .tmp/
 artifacts/
+.agents/
+.agent/
+agent/
+
