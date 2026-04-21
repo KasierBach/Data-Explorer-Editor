@@ -33,6 +33,7 @@ describe('SavedQueryService', () => {
       name: 'My Query',
       sql: 'SELECT * FROM orders',
       visibility: 'private',
+      tags: [],
     };
     const mockResult = { id: '1', ...payload };
     vi.spyOn(apiService, 'post').mockResolvedValue(mockResult as any);
@@ -69,6 +70,7 @@ describe('SavedQueryService', () => {
       visibility: 'private',
       connectionId: 'conn-1',
       database: 'mydb',
+      tags: [],
     };
     vi.spyOn(apiService, 'post').mockResolvedValue({ id: '1', ...payload } as any);
 
