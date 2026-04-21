@@ -17,6 +17,8 @@ export function useExplainPlan({ query }: UseExplainPlanOptions) {
         setIsExplaining(true);
         try {
             const explainQuery = `EXPLAIN ANALYZE ${query}`;
+            // Use ConnectionService API to execute explain query if available
+            // Fallback: execute via ConnectionService if available
             const result = await connectionService.executeQuery({
                 connectionId: activeConnectionId,
                 sql: explainQuery,

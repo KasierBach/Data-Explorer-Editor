@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore } from '@/core/services/store';
@@ -31,7 +31,7 @@ export function useQueryExecution({
         data: results,
         isLoading,
         error,
-        refetch,
+        // refetch intentionally not used in this lightweight flow
         dataUpdatedAt,
     } = useQuery<QueryResult | null, ApiError>({
         queryKey: ['query', tabId, runNonce],
@@ -40,7 +40,7 @@ export function useQueryExecution({
             
             onExecutionStart?.();
             try {
-                const result = await connectionService.executeQuery({
+            const result = await connectionService.executeQuery({
                     connectionId: activeConnectionId,
                     sql: query,
                     database: activeDatabase || undefined,
@@ -54,7 +54,7 @@ export function useQueryExecution({
                     connectionId: activeConnectionId,
                     database: activeDatabase || undefined,
                     executedAt: Date.now(),
-                    rowCount: result?.rowCount,
+                rowCount: result?.rowCount,
                     status: 'success',
                 });
                 

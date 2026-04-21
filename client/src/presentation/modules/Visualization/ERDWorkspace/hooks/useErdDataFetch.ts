@@ -17,7 +17,7 @@ export function useErdDataFetch({
     visibleTableNames,
     hierarchy,
 }: UseErdDataFetchOptions) {
-    const { data: hierarchy, isLoading: isLoadingHierarchy } = useQuery({
+    const { data: hierarchyData, isLoading: isLoadingHierarchy } = useQuery({
         queryKey: ['erd-hierarchy-v2', connectionId, selectedDatabase, !!activeConnection],
         queryFn: async () => {
             if (!connectionId || !activeConnection) return [];

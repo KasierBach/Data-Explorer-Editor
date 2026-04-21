@@ -22,8 +22,7 @@ interface QueryToolbarProps {
     isSmallMobile: boolean;
     limit: string;
     activeConnectionName?: string;
-    blockedReason?: string;
-    hasPersistentGuardrail?: boolean;
+    // blockedReason and hasPersistentGuardrail removed as unused
     onExecute: () => void;
     onClear: () => void;
     onFormat: () => void;
@@ -42,8 +41,6 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
     isSmallMobile,
     limit,
     activeConnectionName,
-    blockedReason,
-    hasPersistentGuardrail,
     onExecute,
     onClear,
     onFormat,
