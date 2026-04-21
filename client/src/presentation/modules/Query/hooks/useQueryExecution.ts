@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { connectionService } from '@/core/services/ConnectionService';
+import { apiService } from '@/core/services/api.service';
 import { useAppStore } from '@/core/services/store';
 import type { QueryResult } from '@/core/domain/entities';
 import { ApiError } from '@/core/services/api.service';
@@ -40,7 +40,7 @@ export function useQueryExecution({
             
             onExecutionStart?.();
             try {
-            const result = await connectionService.executeQuery({
+            const result = await apiService.post<QueryResult>('/query', {
                     connectionId: activeConnectionId,
                     sql: query,
                     database: activeDatabase || undefined,
@@ -51,10 +51,9 @@ export function useQueryExecution({
                 setExecutedQuery(query);
                 addQueryHistory({
                     sql: query,
-                    connectionId: activeConnectionId,
                     database: activeDatabase || undefined,
                     executedAt: Date.now(),
-                rowCount: result?.rowCount,
+                    rowCount: result?.rowCount,
                     status: 'success',
                 });
                 
@@ -62,11 +61,10 @@ export function useQueryExecution({
             } catch (err) {
                 addQueryHistory({
                     sql: query,
-                    connectionId: activeConnectionId!,
                     database: activeDatabase || undefined,
                     executedAt: Date.now(),
                     status: 'error',
-                    error: err instanceof Error ? err.message : 'Unknown error',
+                    errorMessage: err instanceof Error ? err.message : 'Unknown error',
                 });
                 throw err;
             } finally {

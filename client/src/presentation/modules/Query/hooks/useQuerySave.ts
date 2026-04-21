@@ -39,7 +39,7 @@ export function useQuerySave() {
 
     const handleSave = useCallback(async (query: string, values: SaveQueryFormValues) => {
         try {
-            const savedQuery = await SavedQueryService.create({
+            const savedQuery = await SavedQueryService.createSavedQuery({
                 name: values.name,
                 sql: query,
                 visibility: values.visibility,

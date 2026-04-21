@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { connectionService } from '@/core/services/ConnectionService';
+import { apiService } from '@/core/services/api.service';
 import { useAppStore } from '@/core/services/store';
 
 interface UseExplainPlanOptions {
@@ -19,7 +19,7 @@ export function useExplainPlan({ query }: UseExplainPlanOptions) {
             const explainQuery = `EXPLAIN ANALYZE ${query}`;
             // Use ConnectionService API to execute explain query if available
             // Fallback: execute via ConnectionService if available
-            const result = await connectionService.executeQuery({
+            const result = await apiService.post<any>('/query', {
                 connectionId: activeConnectionId,
                 sql: explainQuery,
                 database: activeDatabase || undefined,
