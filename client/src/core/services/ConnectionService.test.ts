@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiService } from './api.service';
-import { useAppStore } from './store';
 import { ConnectionService } from './ConnectionService';
 
 vi.mock('./api.service', () => ({
