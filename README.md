@@ -28,6 +28,7 @@
   - **MySQL** (PlanetScale, Local, TiDB)
   - **SQL Server** (Azure SQL, Local MSSQL)
   - **MongoDB** and **MongoDB Atlas (SRV)**
+  - **Redis** (for caching and session storage)
 - **Enterprise-Grade Credential Protection**: Saved connection passwords are encrypted using **AES-256-GCM** before persistence.
 - **Connection Safety Controls**: Each saved connection can now be configured as read-only and can independently allow or block query execution, schema changes, and import/export flows.
 - **Connection Health Visibility**: Saved connections track their last health-check result, latency, and last successful connection timestamp so operators can spot broken credentials or degraded endpoints faster.
@@ -214,6 +215,7 @@ This is the fastest way to run **Data Explorer** locally with PostgreSQL, the ba
   - user: `postgres`
   - password: `postgres`
   - database: `data_explorer`
+- **Redis**: `localhost:6379` (for caching and rate limiting)
 
 Note:
 - `docker-compose.yml` reads backend env vars from `server/.env`, not from the root `.env.example`.
@@ -277,6 +279,7 @@ The backend reads configuration from `server/.env`. The frontend reads `VITE_API
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | Yes | Connection string for the app's central PostgreSQL database. Docker default: `postgresql://postgres:postgres@db:5432/data_explorer`. |
+| `REDIS_URL` | No | Redis connection string for caching and throttling. Docker default: `redis://redis:6379`. |
 | `GEMINI_API_KEY` | No | Google Gemini API key used to enable AI features. |
 | `AI_PROVIDER_TIMEOUT_MS` | No | Timeout in milliseconds for AI provider requests. Default: `15000`. |
 | `AI_STREAM_IDLE_TIMEOUT_MS` | No | Idle timeout in milliseconds for streaming AI responses. Default: `15000`. |
