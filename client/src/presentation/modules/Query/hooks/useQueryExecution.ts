@@ -50,6 +50,7 @@ export function useQueryExecution({
                 
                 setExecutedQuery(query);
                 addQueryHistory({
+                    id: `hist-${Date.now()}`,
                     sql: query,
                     database: activeDatabase || undefined,
                     executedAt: Date.now(),
@@ -60,6 +61,7 @@ export function useQueryExecution({
                 return result;
             } catch (err) {
                 addQueryHistory({
+                    id: `hist-${Date.now()}`,
                     sql: query,
                     database: activeDatabase || undefined,
                     executedAt: Date.now(),

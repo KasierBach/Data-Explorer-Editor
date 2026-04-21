@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 
 interface SaveQueryFormValues {
     name: string;
-    visibility: 'private' | 'public';
+    visibility: 'private' | 'team' | 'workspace';
     folderId: string;
     tags: string;
     description: string;
@@ -23,12 +23,12 @@ export function useQuerySave() {
         description: '',
     });
 
-    const openSaveDialog = useCallback((query: string, existingId?: string) => {
+    const openSaveDialog = useCallback((_query: string, existingId?: string) => {
         const existing = existingId ? savedQueries.find(q => q.id === existingId) : null;
         
         setSaveDialogInitialValues({
             name: existing?.name || '',
-            visibility: (existing?.visibility as 'private' | 'public') || 'private',
+            visibility: (existing?.visibility as 'private' | 'team' | 'workspace') || 'private',
             folderId: existing?.folderId || '',
             tags: existing?.tags?.join(', ') || '',
             description: existing?.description || '',
@@ -39,12 +39,13 @@ export function useQuerySave() {
 
     const handleSave = useCallback(async (query: string, values: SaveQueryFormValues) => {
         try {
+            const tagArray = values.tags ? values.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
             const savedQuery = await SavedQueryService.createSavedQuery({
                 name: values.name,
                 sql: query,
                 visibility: values.visibility,
                 folderId: values.folderId || undefined,
-                tags: values.tags ? values.tags.split(',').map(t => t.trim()).filter(Boolean) : undefined,
+                tags: tagArray,
                 description: values.description || undefined,
             });
             
