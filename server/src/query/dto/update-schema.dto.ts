@@ -1,9 +1,11 @@
-import { IsString, IsNotEmpty, IsArray, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsArray, IsOptional, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { SchemaOperation } from './schema-operations.types';
 
 export class UpdateSchemaDto {
     @IsString()
     @IsNotEmpty()
-    connectionId: string;
+    connectionId!: string;
 
     @IsString()
     @IsOptional()
@@ -11,12 +13,14 @@ export class UpdateSchemaDto {
 
     @IsString()
     @IsNotEmpty()
-    schema: string;
+    schema!: string;
 
     @IsString()
     @IsNotEmpty()
-    table: string;
+    table!: string;
 
     @IsArray()
-    operations: any[];
+    @ValidateNested({ each: true })
+    @Type(() => Object)
+    operations!: SchemaOperation[];
 }

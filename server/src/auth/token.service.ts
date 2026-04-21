@@ -9,6 +9,10 @@ const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 export class TokenService {
     constructor(private readonly jwtService: JwtService) {}
 
+    // Allow a small amount of clock skew to avoid false negatives
+    // when multiple services/machines have slightly different times.
+    private readonly clockToleranceSeconds = 5;
+
     private getRefreshSecret() {
         const configured = (process.env.REFRESH_TOKEN_SECRET || '').trim();
         if (configured) {
@@ -102,7 +106,9 @@ export class TokenService {
         }
 
         try {
-            const payload = this.jwtService.verify(ticket) as {
+            const payload = this.jwtService.verify(ticket, {
+                clockTolerance: this.clockToleranceSeconds,
+            }) as {
                 sub?: string;
                 jobId?: string;
                 type?: string;
@@ -130,6 +136,7 @@ export class TokenService {
         try {
             const payload = this.jwtService.verify(token, {
                 secret: this.getRefreshSecret(),
+                clockTolerance: this.clockToleranceSeconds,
             }) as {
                 sub?: string;
                 type?: string;
@@ -167,7 +174,9 @@ export class TokenService {
         }
 
         try {
-            const payload = this.jwtService.verify(ticket) as {
+            const payload = this.jwtService.verify(ticket, {
+                clockTolerance: this.clockToleranceSeconds,
+            }) as {
                 sub?: string;
                 type?: string;
             };

@@ -6,18 +6,19 @@ import type {
     Relationship,
     DatabaseMetrics,
     UpdateRowParams,
+    ConnectionConfig,
 } from './database-strategy.interface';
+import { SchemaOperation } from '../query/dto/schema-operations.types';
+import { Injectable } from '@nestjs/common';
 import { Pool } from 'pg';
 import { SqlUtil } from '../utils/sql.util';
 
+@Injectable()
 export class PostgresStrategy implements IDatabaseStrategy {
 
-    // ─── Connection Management ───
-
-    createPool(connectionConfig: any, databaseOverride?: string): any {
+    createPool(connectionConfig: ConnectionConfig, databaseOverride?: string): Pool {
         const isLocalhost = connectionConfig.host === 'localhost' || connectionConfig.host === '127.0.0.1';
 
-        // Support timeout overrides for migration pools (default: 30s for normal queries)
         const stmtTimeout = connectionConfig.statementTimeout ?? 30000;
         const qryTimeout = connectionConfig.queryTimeout ?? 30000;
 
@@ -35,7 +36,6 @@ export class PostgresStrategy implements IDatabaseStrategy {
             query_timeout: qryTimeout,
         });
         
-        // Prevent background connection errors from crashing the whole Node.js process
         pool.on('error', (err: Error) => {
             console.error('Unexpected error on idle Postgres client:', err.message);
         });
@@ -43,11 +43,9 @@ export class PostgresStrategy implements IDatabaseStrategy {
         return pool;
     }
 
-    async closePool(pool: any): Promise<void> {
+    async closePool(pool: Pool): Promise<void> {
         await pool.end();
     }
-
-    // ─── Identifier Quoting ───
 
     quoteIdentifier(name: string): string {
         return `"${name}"`;
@@ -178,7 +176,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         return stream;
     }
 
-    buildAlterTableSql(quotedTable: string, op: any): string {
+    buildAlterTableSql(quotedTable: string, op: SchemaOperation): string {
         switch (op.type) {
             case 'add_column':
                 return `ALTER TABLE ${quotedTable} ADD COLUMN "${op.name}" ${op.dataType} ${op.isNullable === false ? 'NOT NULL' : ''}`;
@@ -189,7 +187,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
             case 'rename_column':
                 return `ALTER TABLE ${quotedTable} RENAME COLUMN "${op.name}" TO "${op.newName}"`;
             case 'add_pk': {
-                const cols = op.columns.map((c: string) => `"${c}"`).join(', ');
+                const cols = op.columns.map((c) => `"${c}"`).join(', ');
                 return `ALTER TABLE ${quotedTable} ADD PRIMARY KEY (${cols})`;
             }
             case 'drop_pk':
@@ -197,8 +195,8 @@ export class PostgresStrategy implements IDatabaseStrategy {
                     ? `ALTER TABLE ${quotedTable} DROP CONSTRAINT "${op.constraintName}"`
                     : `ALTER TABLE ${quotedTable} DROP PRIMARY KEY`;
             case 'add_fk': {
-                const fkCols = op.columns.map((c: string) => `"${c}"`).join(', ');
-                const refCols = op.refColumns.map((c: string) => `"${c}"`).join(', ');
+                const fkCols = op.columns.map((c) => `"${c}"`).join(', ');
+                const refCols = op.refColumns.map((c) => `"${c}"`).join(', ');
                 return `ALTER TABLE ${quotedTable} ADD CONSTRAINT ${op.name} FOREIGN KEY (${fkCols}) REFERENCES "${op.refTable}" (${refCols})`;
             }
             case 'drop_fk':
@@ -208,13 +206,11 @@ export class PostgresStrategy implements IDatabaseStrategy {
         }
     }
 
-    // ─── DDL Operations ───
-
-    async createDatabase(pool: any, name: string): Promise<void> {
+    async createDatabase(pool: Pool, name: string): Promise<void> {
         await pool.query(`CREATE DATABASE "${name}"`);
     }
 
-    async dropDatabase(pool: any, name: string): Promise<void> {
+    async dropDatabase(pool: Pool, name: string): Promise<void> {
         await pool.query(
             `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()`,
             [name],
@@ -222,9 +218,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         await pool.query(`DROP DATABASE "${name}"`);
     }
 
-    // ─── Metadata Operations ───
-
-    async getDatabases(pool: any): Promise<TreeNodeResult[]> {
+    async getDatabases(pool: Pool): Promise<TreeNodeResult[]> {
         const sql = `SELECT datname FROM pg_database WHERE datistemplate = false`;
         const result = await pool.query(sql);
         return result.rows.map((row: any) => ({

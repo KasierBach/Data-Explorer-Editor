@@ -6,37 +6,38 @@ import type {
     Relationship,
     DatabaseMetrics,
     UpdateRowParams,
+    ConnectionConfig,
+    InsertRowParams,
 } from './database-strategy.interface';
+import { SchemaOperation } from '../query/dto/schema-operations.types';
+import { Injectable } from '@nestjs/common';
 import * as mysql from 'mysql2/promise';
+import { Pool, RowDataPacket, FieldPacket, ResultSetHeader } from 'mysql2/promise';
 import { SqlUtil } from '../utils/sql.util';
 
+@Injectable()
 export class MysqlStrategy implements IDatabaseStrategy {
 
-    // ─── Connection Management ───
-
-    createPool(connectionConfig: any, databaseOverride?: string): any {
-        // Migration override: connectionConfig.statementTimeout/queryTimeout will be 0
+    createPool(connectionConfig: ConnectionConfig, databaseOverride?: string): Pool {
         const timeoutMs = connectionConfig.statementTimeout !== undefined ? connectionConfig.statementTimeout : 10000;
         
         return mysql.createPool({
-            host: connectionConfig.host,
-            port: connectionConfig.port,
-            user: connectionConfig.username,
+            host: connectionConfig.host || 'localhost',
+            port: connectionConfig.port || 3306,
+            user: connectionConfig.username || undefined,
             password: connectionConfig.password || undefined,
-            database: databaseOverride || connectionConfig.database,
+            database: databaseOverride || connectionConfig.database || undefined,
             waitForConnections: true,
             connectionLimit: 20,
             queueLimit: 0,
-            multipleStatements: true,
+            multipleStatements: false,
             connectTimeout: timeoutMs, 
         });
     }
 
-    async closePool(pool: any): Promise<void> {
+    async closePool(pool: Pool): Promise<void> {
         await pool.end();
     }
-
-    // ─── Identifier Quoting ───
 
     quoteIdentifier(name: string): string {
         return `\`${name}\``;
@@ -46,9 +47,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
         return `\`${table}\``;
     }
 
-    // ─── Query Operations ───
-
-    async executeQuery(pool: any, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
+    async executeQuery(pool: Pool, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
         let safeSql = sql;
         if (options?.limit !== undefined && options?.offset !== undefined) {
             safeSql = SqlUtil.injectPagination(sql, options.limit, options.offset, 'mysql');
@@ -56,37 +55,37 @@ export class MysqlStrategy implements IDatabaseStrategy {
             safeSql = SqlUtil.injectLimit(sql, 50000);
         }
 
-        // Execute using query option object to enforce application-level timeout
-        // (mysql2 supports timeout in the options object per query).
-        // Since we don't have pool-level query_timeout, we use the default 30s.
         const [result, fields] = await pool.query({
             sql: safeSql,
-            timeout: 30000 // 30 seconds query timeout
+            timeout: 30000
         });
 
-        // If multiple statements, result is an array of results. We usually return the last valid result or handle gracefully
-        const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[result.length - 1] : result;
-        const actualFields = Array.isArray(fields) && Array.isArray(fields[0]) ? fields[fields.length - 1] : fields;
+        const rows: Record<string, unknown>[] = Array.isArray(result) 
+            ? (result as RowDataPacket[]).map(r => r as Record<string, unknown>)
+            : [];
+        const actualFields = Array.isArray(fields) ? fields : [];
 
         return {
-            rows: Array.isArray(rows) ? rows.slice(0, 50000) : [], // Secondary array slice guard
-            columns: actualFields ? (actualFields as any[]).map(f => f.name) : [],
-            rowCount: !Array.isArray(rows) && (rows as any).affectedRows !== undefined ? (rows as any).affectedRows : undefined,
+            rows: rows.slice(0, 50000),
+            columns: actualFields.map(f => f.name),
+            rowCount: !Array.isArray(result) && (result as ResultSetHeader).affectedRows !== undefined 
+                ? (result as ResultSetHeader).affectedRows 
+                : undefined,
         };
     }
 
-    async updateRow(pool: any, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }> {
+    async updateRow(pool: Pool, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }> {
         const { table, pkColumn, pkValue, updates } = params;
         const updateCols = Object.keys(updates);
         const setClause = updateCols.map(col => `\`${col}\` = ?`).join(', ');
         const sql = `UPDATE \`${table}\` SET ${setClause} WHERE \`${pkColumn}\` = ?`;
         const values = [...updateCols.map(c => updates[c]), pkValue];
 
-        const [result] = await pool.execute(sql, values);
-        return { success: true, rowCount: (result as any).affectedRows };
+        const [result] = await pool.execute(sql, values) as [ResultSetHeader, FieldPacket[]];
+        return { success: true, rowCount: result.affectedRows };
     }
 
-    async insertRow(pool: any, params: any): Promise<{ success: boolean; rowCount: number }> {
+    async insertRow(pool: Pool, params: InsertRowParams): Promise<{ success: boolean; rowCount: number }> {
         const { schema, table, data } = params;
         const columns = Object.keys(data);
         if (columns.length === 0) return { success: false, rowCount: 0 };
@@ -97,8 +96,8 @@ export class MysqlStrategy implements IDatabaseStrategy {
         const sql = `INSERT INTO ${quotedTable} (${colNames}) VALUES (${placeholders})`;
         const values = columns.map(c => data[c]);
 
-        const [result] = await pool.execute(sql, values);
-        return { success: true, rowCount: (result as any).affectedRows };
+        const [result] = await pool.execute(sql, values) as [ResultSetHeader, FieldPacket[]];
+        return { success: true, rowCount: result.affectedRows };
     }
 
     async deleteRows(pool: any, params: any): Promise<{ success: boolean; rowCount: number }> {
@@ -155,7 +154,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
         return stream;
     }
 
-    buildAlterTableSql(quotedTable: string, op: any): string {
+    buildAlterTableSql(quotedTable: string, op: SchemaOperation): string {
         switch (op.type) {
             case 'add_column':
                 return `ALTER TABLE ${quotedTable} ADD COLUMN \`${op.name}\` ${op.dataType} ${op.isNullable === false ? 'NOT NULL' : ''}`;
@@ -166,14 +165,14 @@ export class MysqlStrategy implements IDatabaseStrategy {
             case 'rename_column':
                 return `ALTER TABLE ${quotedTable} RENAME COLUMN \`${op.name}\` TO \`${op.newName}\``;
             case 'add_pk': {
-                const cols = op.columns.map((c: string) => `\`${c}\``).join(', ');
+                const cols = op.columns.map((c) => `\`${c}\``).join(', ');
                 return `ALTER TABLE ${quotedTable} ADD PRIMARY KEY (${cols})`;
             }
             case 'drop_pk':
                 return `ALTER TABLE ${quotedTable} DROP PRIMARY KEY`;
             case 'add_fk': {
-                const fkCols = op.columns.map((c: string) => `\`${c}\``).join(', ');
-                const refCols = op.refColumns.map((c: string) => `\`${c}\``).join(', ');
+                const fkCols = op.columns.map((c) => `\`${c}\``).join(', ');
+                const refCols = op.refColumns.map((c) => `\`${c}\``).join(', ');
                 return `ALTER TABLE ${quotedTable} ADD CONSTRAINT ${op.name} FOREIGN KEY (${fkCols}) REFERENCES \`${op.refTable}\` (${refCols})`;
             }
             case 'drop_fk':
@@ -183,20 +182,16 @@ export class MysqlStrategy implements IDatabaseStrategy {
         }
     }
 
-    // ─── DDL Operations ───
-
-    async createDatabase(pool: any, name: string): Promise<void> {
+    async createDatabase(pool: Pool, name: string): Promise<void> {
         await pool.execute(`CREATE DATABASE \`${name}\``);
     }
 
-    async dropDatabase(pool: any, name: string): Promise<void> {
+    async dropDatabase(pool: Pool, name: string): Promise<void> {
         await pool.execute(`DROP DATABASE \`${name}\``);
     }
 
-    // ─── Metadata Operations ───
-
-    async getDatabases(pool: any): Promise<TreeNodeResult[]> {
-        const [rows]: any[] = await pool.query('SHOW DATABASES');
+    async getDatabases(pool: Pool): Promise<TreeNodeResult[]> {
+        const [rows] = await pool.query('SHOW DATABASES') as [RowDataPacket[], FieldPacket[]];
         return rows.map((row: any) => ({
             id: `schema:${row.Database}`,
             name: row.Database,

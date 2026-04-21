@@ -6,15 +6,17 @@ import type {
     Relationship,
     DatabaseMetrics,
     UpdateRowParams,
+    ConnectionConfig,
 } from './database-strategy.interface';
+import { SchemaOperation } from '../query/dto/schema-operations.types';
+import { Injectable } from '@nestjs/common';
 import * as mssql from 'mssql';
 import { SqlUtil } from '../utils/sql.util';
 
+@Injectable()
 export class MssqlStrategy implements IDatabaseStrategy {
 
-    // ─── Connection Management ───
-
-    async createPool(connectionConfig: any, databaseOverride?: string): Promise<any> {
+    async createPool(connectionConfig: ConnectionConfig, databaseOverride?: string): Promise<mssql.ConnectionPool> {
         // Migration override: connectionConfig.statementTimeout/queryTimeout will be 0
         const reqTimeout = connectionConfig.statementTimeout ?? 30000;
 

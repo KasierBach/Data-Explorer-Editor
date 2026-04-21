@@ -63,7 +63,7 @@ export function validateNoSqlPayload(payload: any) {
   const allowedActions = [
     'find', 'aggregate', 'insertOne', 'insertMany', 
     'updateOne', 'updateMany', 'deleteOne', 'deleteMany', 
-    'countDocuments', 'distinct'
+    'count', 'distinct'
   ];
 
   if (!payload.action || !allowedActions.includes(payload.action)) {

@@ -1,8 +1,4 @@
-/**
- * Defines the contract for all database-specific operations.
- * Each supported DB type (Postgres, MySQL, MSSQL) provides its own implementation.
- * Following OCP: adding a new DB type means adding a new strategy class, not modifying existing code.
- */
+import { SchemaOperation } from '../query/dto/schema-operations.types';
 
 export interface TreeNodeResult {
     id: string;
@@ -16,7 +12,7 @@ export interface ColumnInfo {
     name: string;
     type: string;
     isNullable: boolean;
-    defaultValue: any;
+    defaultValue: unknown;
     isPrimaryKey: boolean;
     pkConstraintName: string | null;
     comment?: string | null;
@@ -37,10 +33,10 @@ export interface FullTableMetadata {
 }
 
 export interface QueryResult {
-    rows: any[];
+    rows: Record<string, unknown>[];
     columns: string[];
     rowCount?: number;
-    totalCount?: number; // Total rows in the table/dataset for pagination
+    totalCount?: number;
 }
 
 export interface Relationship {
@@ -63,60 +59,63 @@ export interface UpdateRowParams {
     schema: string;
     table: string;
     pkColumn: string;
-    pkValue: any;
-    updates: Record<string, any>;
+    pkValue: unknown;
+    updates: Record<string, unknown>;
 }
 
 export interface InsertRowParams {
     schema: string;
     table: string;
-    data: Record<string, any>;
+    data: Record<string, unknown>;
 }
 
 export interface DeleteRowsParams {
     schema: string;
     table: string;
     pkColumn: string;
-    pkValues: any[];
+    pkValues: unknown[];
+}
+
+export interface ConnectionConfig {
+    host?: string | null;
+    port?: number | null;
+    username?: string | null;
+    password?: string;
+    database?: string | null;
+    statementTimeout?: number;
+    queryTimeout?: number;
 }
 
 export interface IDatabaseStrategy {
-    // ─── Connection Management ───
-    createPool(connectionConfig: any, databaseOverride?: string): Promise<any> | any;
-    closePool(pool: any): Promise<void>;
+    createPool(connectionConfig: ConnectionConfig, databaseOverride?: string): Promise<unknown> | unknown;
+    closePool(pool: unknown): Promise<void>;
 
-    // ─── Query Operations ───
-    executeQuery(pool: any, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult>;
-    updateRow(pool: any, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }>;
-    insertRow(pool: any, params: InsertRowParams): Promise<{ success: boolean; rowCount: number }>;
-    deleteRows(pool: any, params: DeleteRowsParams): Promise<{ success: boolean; rowCount: number }>;
-    buildAlterTableSql(quotedTable: string, op: any): string;
+    executeQuery(pool: unknown, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult>;
+    updateRow(pool: unknown, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }>;
+    insertRow(pool: unknown, params: InsertRowParams): Promise<{ success: boolean; rowCount: number }>;
+    deleteRows(pool: unknown, params: DeleteRowsParams): Promise<{ success: boolean; rowCount: number }>;
+    buildAlterTableSql(quotedTable: string, op: SchemaOperation): string;
 
-    // ─── Identifier Quoting ───
     quoteIdentifier(name: string): string;
     quoteTable(schema: string | undefined, table: string): string;
 
-    // ─── DDL Operations ───
-    createDatabase(pool: any, name: string): Promise<void>;
-    dropDatabase(pool: any, name: string): Promise<void>;
+    createDatabase(pool: unknown, name: string): Promise<void>;
+    dropDatabase(pool: unknown, name: string): Promise<void>;
 
-    // ─── Metadata Operations ───
-    getDatabases(pool: any): Promise<TreeNodeResult[]>;
-    getSchemas(pool: any, dbName?: string): Promise<TreeNodeResult[]>;
-    getTables(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
-    getViews(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
-    getFunctions(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
-    getFunctionParameters(pool: any, schema: string, func: string): Promise<ColumnInfo[]>;
-    getColumns(pool: any, schema: string, table: string, dbName?: string): Promise<ColumnInfo[]>;
-    getFullMetadata(pool: any, schema: string, table: string, dbName?: string): Promise<FullTableMetadata>;
-    getRelationships(pool: any, dbName?: string): Promise<Relationship[]>;
-    getDatabaseMetrics(pool: any): Promise<DatabaseMetrics>;
+    getDatabases(pool: unknown): Promise<TreeNodeResult[]>;
+    getSchemas(pool: unknown, dbName?: string): Promise<TreeNodeResult[]>;
+    getTables(pool: unknown, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
+    getViews(pool: unknown, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
+    getFunctions(pool: unknown, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
+    getFunctionParameters(pool: unknown, schema: string, func: string): Promise<ColumnInfo[]>;
+    getColumns(pool: unknown, schema: string, table: string, dbName?: string): Promise<ColumnInfo[]>;
+    getFullMetadata(pool: unknown, schema: string, table: string, dbName?: string): Promise<FullTableMetadata>;
+    getRelationships(pool: unknown, dbName?: string): Promise<Relationship[]>;
+    getDatabaseMetrics(pool: unknown): Promise<DatabaseMetrics>;
 
-    // ─── Bulk Operations ───
-    importData(pool: any, params: { schema: string; table: string; data: any[] }): Promise<{ success: boolean; rowCount: number }>;
-    exportStream(pool: any, schema: string, table: string): Promise<any>;
+    importData(pool: unknown, params: { schema: string; table: string; data: Record<string, unknown>[] }): Promise<{ success: boolean; rowCount: number }>;
+    exportStream(pool: unknown, schema: string, table: string): Promise<unknown>;
     
-    // ─── Polymorphic Tree & Seed ───
-    getHierarchyNodes(pool: any, parentId: string | null, parsedParams: any, connectionInfo: any): Promise<TreeNodeResult[]>;
-    seedData(pool: any): Promise<QueryResult>;
+    getHierarchyNodes(pool: unknown, parentId: string | null, parsedParams: unknown, connectionInfo: unknown): Promise<TreeNodeResult[]>;
+    seedData(pool: unknown): Promise<QueryResult>;
 }

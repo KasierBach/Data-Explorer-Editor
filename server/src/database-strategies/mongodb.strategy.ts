@@ -1,4 +1,5 @@
 import { MongoClient, ObjectId } from 'mongodb';
+import { Injectable } from '@nestjs/common';
 import {
     IDatabaseStrategy,
     QueryResult,
@@ -7,21 +8,24 @@ import {
     FullTableMetadata,
     Relationship,
     DatabaseMetrics,
-    UpdateRowParams
+    UpdateRowParams,
+    ConnectionConfig,
+    InsertRowParams,
 } from './database-strategy.interface';
 import { sanitizeNoSql, validateNoSqlPayload } from '../common/utils/nosql-sanitizer.util';
 
-const inferType = (value: any): string => {
+const inferType = (value: unknown): string => {
     if (value === null) return 'null';
     if (Array.isArray(value)) return 'array';
     if (value instanceof Date) return 'date';
     if (typeof value === 'object') {
-        if (value._bsontype === 'ObjectId') return 'objectId';
+        if ((value as { _bsontype?: string })._bsontype === 'ObjectId') return 'objectId';
         return 'object';
     }
     return typeof value;
 };
 
+@Injectable()
 export class MongoDbStrategy implements IDatabaseStrategy {
     async createPool(connectionConfig: any, databaseOverride?: string): Promise<MongoClient> {
         let uri = connectionConfig.url || '';
@@ -144,6 +148,14 @@ export class MongoDbStrategy implements IDatabaseStrategy {
                 result = await col.deleteMany(filter);
                 rows = [{ deletedCount: result.deletedCount }];
                 break;
+            case 'distinct':
+                const distinctField = payload.field;
+                if (!distinctField || typeof distinctField !== 'string') {
+                    throw new Error('Distinct action requires a "field" parameter.');
+                }
+                result = await col.distinct(distinctField, filter, payload.options || {});
+                rows = result.map((value: unknown) => ({ value }));
+                break;
             default:
                 throw new Error(`Unsupported MongoDB action: ${payload.action}`);
         }
@@ -172,12 +184,14 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         const db = client.db();
         const col = db.collection(params.table);
         
-        // Remove _id from updates to avoid immutable field error
         const updatesCpy = { ...params.updates };
         delete updatesCpy._id;
 
         try {
-            const filter = params.pkColumn === '_id' ? { _id: new ObjectId(params.pkValue) } : { [params.pkColumn]: params.pkValue };
+            const pkValue = params.pkValue;
+            const filter = params.pkColumn === '_id' 
+                ? { _id: new ObjectId(pkValue as string) } 
+                : { [params.pkColumn]: pkValue };
             const result = await col.updateOne(filter, { $set: updatesCpy });
             return {
                 success: result.acknowledged,
@@ -193,7 +207,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         }
     }
 
-    async insertRow(client: MongoClient, params: any): Promise<{ success: boolean; rowCount: number }> {
+    async insertRow(client: MongoClient, params: InsertRowParams): Promise<{ success: boolean; rowCount: number }> {
         const db = client.db();
         const col = db.collection(params.table);
         const res = await col.insertOne(params.data);

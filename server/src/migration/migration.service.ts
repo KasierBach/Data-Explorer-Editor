@@ -3,8 +3,21 @@ import { EventEmitter } from 'events';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, Job } from 'bullmq';
 import { ConnectionsService } from '../connections/connections.service';
-import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
+import { DatabaseStrategyFactory, IDatabaseStrategy, ConnectionConfig, FullTableMetadata } from '../database-strategies';
 import { StartMigrationDto } from './dto/start-migration.dto';
+
+type ConnectionType = 'postgres' | 'mysql' | 'mssql' | 'sqlite' | 'clickhouse' | 'mock' | 'mongodb' | 'mongodb+srv';
+
+interface MigrationConnection {
+  id: string;
+  name: string;
+  type: ConnectionType;
+  host?: string | null;
+  port?: number | null;
+  username?: string | null;
+  password?: string;
+  database?: string | null;
+}
 
 export type MigrationStage =
   | 'queued'
@@ -28,15 +41,28 @@ interface StoredMigrationJob extends MigrationJob {
   ownerId: string;
 }
 
+interface MigrationProgress {
+  processedRows: number;
+  batchesProcessed: number;
+  stage: MigrationStage;
+}
+
+interface MigrationStream extends AsyncIterable<Record<string, unknown>> {
+  on(event: 'data' | 'row' | 'end' | 'error' | 'close', listener: (...args: unknown[]) => void): this;
+  pause(): void;
+  resume(): void;
+  emit(event: string, ...args: unknown[]): boolean;
+}
+
 interface ResolvedMigrationContext {
-  sourceConn: any;
-  targetConn: any;
-  sourceStrategy: any;
-  targetStrategy: any;
-  sourcePool: any;
-  targetPool: any;
-  sourceMetadata: any;
-  targetMetadata: any;
+  sourceConn: MigrationConnection;
+  targetConn: MigrationConnection;
+  sourceStrategy: IDatabaseStrategy;
+  targetStrategy: IDatabaseStrategy;
+  sourcePool: unknown;
+  targetPool: unknown;
+  sourceMetadata: FullTableMetadata;
+  targetMetadata: FullTableMetadata;
 }
 
 @Injectable()
@@ -61,7 +87,7 @@ export class MigrationService {
       { 
         removeOnComplete: false, 
         removeOnFail: false,
-        attempts: 1, // Let's keep it simple for now
+        attempts: 1,
       }
     );
 
@@ -85,9 +111,8 @@ export class MigrationService {
   async getPublicJob(jobId: string, userId: string): Promise<MigrationJob> {
     const job = await this.assertJobOwnership(jobId, userId);
     
-    // Convert BullMQ Job status and metadata back to MigrationJob format
     const state = await job.getState();
-    const progress = job.progress as any;
+    const progress = job.progress as MigrationProgress | undefined;
 
     return {
       id: job.id!,
@@ -148,12 +173,15 @@ export class MigrationService {
     return type === 'mongodb' || type === 'mongodb+srv';
   }
 
-  private buildMigrationConnectionConfig(conn: any): any {
+  private buildMigrationConnectionConfig(conn: MigrationConnection): ConnectionConfig {
     return {
-      ...conn,
+      host: conn.host,
+      port: conn.port,
+      username: conn.username,
+      password: conn.password,
+      database: conn.database,
       statementTimeout: 0,
       queryTimeout: 0,
-      socketTimeout: 0,
     };
   }
 
@@ -174,16 +202,16 @@ export class MigrationService {
     );
   }
 
-  private async fetchMetadata(strategy: any, pool: any, schema: string, table: string, database?: string) {
+  private async fetchMetadata(strategy: IDatabaseStrategy, pool: unknown, schema: string, table: string, database?: string): Promise<FullTableMetadata> {
     return strategy.getFullMetadata(pool, schema, table, database);
   }
 
-  private validateTargetCompatibility(sourceConn: any, targetConn: any, sourceMetadata: any, targetMetadata: any) {
+  private validateTargetCompatibility(sourceConn: MigrationConnection, targetConn: MigrationConnection, sourceMetadata: FullTableMetadata, targetMetadata: FullTableMetadata) {
     if (this.isMongoLike(targetConn.type)) {
       return;
     }
 
-    const sourceColumns = new Set((sourceMetadata?.columns || []).map((column: any) => column.name));
+    const sourceColumns = new Set((sourceMetadata?.columns || []).map((column) => column.name));
     const targetColumns = Array.isArray(targetMetadata?.columns) ? targetMetadata.columns : [];
 
     if (targetColumns.length === 0) {
@@ -191,23 +219,23 @@ export class MigrationService {
     }
 
     const missingColumns = targetColumns
-      .filter((column: any) => !sourceColumns.has(column.name))
-      .filter((column: any) => !column.isNullable && column.defaultValue == null && !column.isPrimaryKey)
-      .map((column: any) => column.name);
+      .filter((column) => !sourceColumns.has(column.name))
+      .filter((column) => !column.isNullable && column.defaultValue == null && !column.isPrimaryKey)
+      .map((column) => column.name);
 
     if (missingColumns.length > 0) {
       throw new Error(`Target table is missing required values for columns: ${missingColumns.slice(0, 5).join(', ')}`);
     }
 
     const unsupportedSourceColumns = (sourceMetadata?.columns || [])
-      .map((column: any) => column.name)
-      .filter((columnName: string) => !targetColumns.some((targetColumn: any) => targetColumn.name === columnName));
+      .map((column) => column.name)
+      .filter((columnName) => !targetColumns.some((targetColumn) => targetColumn.name === columnName));
 
     if (unsupportedSourceColumns.length > 0) {
       throw new Error(`Target table is missing source columns: ${unsupportedSourceColumns.slice(0, 5).join(', ')}`);
     }
 
-    if (this.isMongoLike(sourceConn.type) && unsupportedSourceColumns.some((name: string) => name.includes('.') || name.includes('[]'))) {
+    if (this.isMongoLike(sourceConn.type) && unsupportedSourceColumns.some((name) => name.includes('.') || name.includes('[]'))) {
       throw new Error('MongoDB nested document fields are not compatible with the selected SQL target table.');
     }
   }
@@ -219,12 +247,21 @@ export class MigrationService {
 
     await this.markStage(jobId, 'validating', 'running');
 
-    const sourceConn = await this.connectionsService.getDecryptedConnection(dto.sourceConnectionId, userId);
-    const targetConn = await this.connectionsService.getDecryptedConnection(dto.targetConnectionId, userId);
+    const rawSourceConn = await this.connectionsService.getDecryptedConnection(dto.sourceConnectionId, userId);
+    const rawTargetConn = await this.connectionsService.getDecryptedConnection(dto.targetConnectionId, userId);
 
-    if (!sourceConn || !targetConn) {
+    if (!rawSourceConn || !rawTargetConn) {
       throw new Error('Source or target connection not found.');
     }
+
+    const sourceConn: MigrationConnection = {
+      ...rawSourceConn,
+      type: rawSourceConn.type as ConnectionType,
+    };
+    const targetConn: MigrationConnection = {
+      ...rawTargetConn,
+      type: rawTargetConn.type as ConnectionType,
+    };
 
     await this.markStage(jobId, 'connecting');
 
@@ -281,14 +318,16 @@ export class MigrationService {
       context = await this.resolveMigrationContext(userId, dto, jobId);
       await this.markStage(jobId, 'streaming');
 
-      const stream = await context.sourceStrategy!.exportStream(
+      const rawStream = await context.sourceStrategy!.exportStream(
         context.sourcePool,
         this.normalizeSchemaName(context.sourceConn!.type, dto.sourceSchema),
         this.normalizeTableName(dto.sourceTable),
       );
+      
+      const stream = rawStream as MigrationStream;
 
       const BATCH_SIZE = 2000;
-      let buffer: any[] = [];
+      let buffer: Record<string, unknown>[] = [];
       let isPaused = false;
 
       const flushBuffer = async () => {
@@ -311,7 +350,7 @@ export class MigrationService {
         this.logger.verbose(`Migration ${jobId}: flushed ${batch.length} rows`);
       };
 
-      const handleChunk = async (chunk: any) => {
+      const handleChunk = async (chunk: Record<string, unknown>) => {
         buffer.push(chunk);
         if (buffer.length < BATCH_SIZE) return;
 
@@ -322,8 +361,10 @@ export class MigrationService {
 
         try {
           await flushBuffer();
-        } catch (error: any) {
-          stream.emit?.('error', error);
+        } catch (error) {
+          if (error instanceof Error) {
+            stream.emit('error', error);
+          }
           return;
         }
 
@@ -333,22 +374,23 @@ export class MigrationService {
         }
       };
 
-      const handleTerminalFailure = async (error: any) => {
+      const handleTerminalFailure = async (error: unknown) => {
         this.logger.error(`Stream error in migration ${jobId}`, error);
-        await this.failJob(jobId, error?.message || 'Migration stream failed.');
+        const message = error instanceof Error ? error.message : 'Migration stream failed.';
+        await this.failJob(jobId, message);
       };
 
       if (typeof stream.on === 'function') {
         let processing = Promise.resolve();
-        const enqueueChunk = (chunk: any) => {
+        const enqueueChunk = (chunk: Record<string, unknown>) => {
           processing = processing.then(() => handleChunk(chunk));
           processing.catch((error) => {
             void handleTerminalFailure(error);
           });
         };
 
-        stream.on('data', enqueueChunk);
-        stream.on('row', enqueueChunk);
+        stream.on('data', enqueueChunk as (...args: unknown[]) => void);
+        stream.on('row', enqueueChunk as (...args: unknown[]) => void);
 
         stream.on('end', async () => {
           const currentJob = await this.migrationQueue.getJob(jobId);
@@ -359,15 +401,15 @@ export class MigrationService {
           try {
             await processing;
             await flushBuffer();
-            const finalizedProgress = currentJob.progress as any;
+            const finalizedProgress = currentJob.progress as MigrationProgress | undefined;
             this.logger.log(`Migration ${jobId}: completed (${finalizedProgress?.processedRows || 0} rows)`);
             await this.completeJob(jobId);
-          } catch (error: any) {
+          } catch (error) {
             await handleTerminalFailure(error);
           }
         });
 
-        stream.on('error', (error: any) => {
+        stream.on('error', (error: unknown) => {
           void handleTerminalFailure(error);
         });
       } else {
@@ -376,7 +418,7 @@ export class MigrationService {
           if (!currentJob) break;
           const state = await currentJob.getState();
           if (state === 'failed') break;
-          await handleChunk(chunk);
+          await handleChunk(chunk as Record<string, unknown>);
         }
 
         const currentJob = await this.migrationQueue.getJob(jobId);
@@ -384,15 +426,16 @@ export class MigrationService {
           const state = await currentJob.getState();
           if (state !== 'failed') {
             await flushBuffer();
-            const finalizedProgress = currentJob.progress as any;
+            const finalizedProgress = currentJob.progress as MigrationProgress | undefined;
             this.logger.log(`Migration ${jobId}: completed (${finalizedProgress?.processedRows || 0} rows)`);
             await this.completeJob(jobId);
           }
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error(`Migration ${jobId} PIPELINE EXCEPTION`, error);
-      await this.failJob(jobId, error.message || 'Migration pipeline failed.');
+      const message = error instanceof Error ? error.message : 'Migration pipeline failed.';
+      await this.failJob(jobId, message);
     } finally {
       await this.closeResources(context);
     }

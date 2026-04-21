@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ForbiddenException,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { CreateQueryDto } from './dto/create-query.dto';
 import { UpdateRowDto } from './dto/update-row.dto';
@@ -12,6 +13,7 @@ import { UpdateSchemaDto } from './dto/update-schema.dto';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 import { AuditService, AuditAction } from '../audit/audit.service';
+import { Connection } from '../connections/entities/connection.entity';
 import {
   analyzeDestructiveSql,
   containsMultipleStatements,
@@ -22,13 +24,13 @@ import {
 
 @Injectable()
 export class QueryService {
+  private readonly logger = new Logger(QueryService.name);
+  
   constructor(
     private readonly connectionsService: ConnectionsService,
     private readonly strategyFactory: DatabaseStrategyFactory,
     private readonly auditService: AuditService,
   ) { }
-
-  // ─── Shared Permission Helpers (DRY) ───
 
   private async blockOperation(
     userId: string,
@@ -39,7 +41,7 @@ export class QueryService {
       reason: string;
       message: string;
       sqlSnippet?: string;
-      extra?: Record<string, any>;
+      extra?: Record<string, unknown>;
     },
   ): Promise<never> {
     await this.auditService.log({
@@ -60,16 +62,12 @@ export class QueryService {
     });
   }
 
-  /**
-   * Validates that a mutation (insert, update, delete, schema change, etc.) is permitted.
-   * Centralizes the readOnly + permission flag checks that were previously duplicated.
-   */
   private async assertWritePermission(
-    connection: any,
+    connection: Connection,
     userId: string,
     action: string,
     permissionFlag: 'allowQueryExecution' | 'allowSchemaChanges' | 'allowImportExport',
-    extra?: Record<string, any>,
+    extra?: Record<string, unknown>,
   ): Promise<void> {
     const reasonMap = {
       allowQueryExecution: 'QUERY_EXECUTION_DISABLED',
@@ -248,11 +246,11 @@ export class QueryService {
             if (countResult.rows && countResult.rows.length > 0) {
               const firstRow = countResult.rows[0];
               const countVal = firstRow.total ?? firstRow.TOTAL ?? firstRow.count ?? firstRow[Object.keys(firstRow)[0]];
-              result.totalCount = parseInt(countVal, 10);
+              result.totalCount = parseInt(String(countVal), 10);
             }
           }
         } catch (countError) {
-          console.warn('Failed to fetch total row count:', countError.message);
+          this.logger.warn('Failed to fetch total row count:', countError instanceof Error ? countError.message : String(countError));
         }
       }
 
@@ -269,15 +267,12 @@ export class QueryService {
 
       return result;
     } catch (error) {
-      // Re-throw ForbiddenException (confirmation required) as-is
       if (error instanceof ForbiddenException) throw error;
 
-      console.error('Query Service Error:', error);
-      throw new InternalServerErrorException(`Query execution failed: ${error.message}`);
+      this.logger.error('Query Service Error:', error instanceof Error ? error.message : String(error));
+      throw new InternalServerErrorException(`Query execution failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-
-  // ─── Row Mutations (DRY-refactored) ───
 
   async updateRow(updateRowDto: UpdateRowDto, userId: string) {
     const { connectionId, database, schema, table, pkColumn, pkValue, updates } = updateRowDto;
@@ -292,8 +287,8 @@ export class QueryService {
       const strategy = this.strategyFactory.getStrategy(connection.type);
       return await strategy.updateRow(pool, { schema, table, pkColumn, pkValue, updates });
     } catch (error) {
-      console.error('Update Row Error:', error);
-      throw new InternalServerErrorException(`Update failed: ${error.message}`);
+      this.logger.error('Update Row Error:', error instanceof Error ? error.message : String(error));
+      throw new InternalServerErrorException(`Update failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -307,8 +302,8 @@ export class QueryService {
       const strategy = this.strategyFactory.getStrategy(connection.type);
       return await strategy.insertRow(pool, { schema, table, data });
     } catch (error) {
-      console.error('Insert Row Error:', error);
-      throw new InternalServerErrorException(`Insert failed: ${error.message}`);
+      this.logger.error('Insert Row Error:', error instanceof Error ? error.message : String(error));
+      throw new InternalServerErrorException(`Insert failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -322,8 +317,8 @@ export class QueryService {
       const strategy = this.strategyFactory.getStrategy(connection.type);
       return await strategy.deleteRows(pool, { schema, table, pkColumn, pkValues });
     } catch (error) {
-      console.error('Delete Rows Error:', error);
-      throw new InternalServerErrorException(`Delete failed: ${error.message}`);
+      this.logger.error('Delete Rows Error:', error instanceof Error ? error.message : String(error));
+      throw new InternalServerErrorException(`Delete failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -368,12 +363,10 @@ export class QueryService {
       return { success: true, results };
     } catch (error) {
       if (error instanceof ForbiddenException) throw error;
-      console.error('Update Schema Error:', error);
-      throw new InternalServerErrorException(`Schema update failed: ${error.message}`);
+      this.logger.error('Update Schema Error:', error instanceof Error ? error.message : String(error));
+      throw new InternalServerErrorException(`Schema update failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-
-  // ─── Seed & Database Management ───
 
   async seedData(connectionId: string, userId: string) {
     const connection = await this.connectionsService.findOne(connectionId, userId);
@@ -384,8 +377,8 @@ export class QueryService {
       const strategy = this.strategyFactory.getStrategy(connection.type);
       return await strategy.seedData(pool);
     } catch (error) {
-      console.error('Seed Data Error:', error);
-      throw new InternalServerErrorException(`Seed data failed: ${error.message}`);
+      this.logger.error('Seed Data Error:', error instanceof Error ? error.message : String(error));
+      throw new InternalServerErrorException(`Seed data failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -404,8 +397,8 @@ export class QueryService {
       await strategy.createDatabase(pool, databaseName);
       return { success: true, message: `Database ${databaseName} created successfully.` };
     } catch (error) {
-      console.error('Create Database Error:', error);
-      throw new InternalServerErrorException(`Failed to create database: ${error.message}`);
+      this.logger.error('Create Database Error:', error instanceof Error ? error.message : String(error));
+      throw new InternalServerErrorException(`Failed to create database: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -436,8 +429,8 @@ export class QueryService {
 
       return { success: true, message: `Database ${databaseName} dropped successfully.` };
     } catch (error) {
-      console.error('Drop Database Error:', error);
-      throw new InternalServerErrorException(`Failed to drop database: ${error.message}`);
+      this.logger.error('Drop Database Error:', error instanceof Error ? error.message : String(error));
+      throw new InternalServerErrorException(`Failed to drop database: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -471,8 +464,8 @@ export class QueryService {
 
       return result;
     } catch (error) {
-      console.error('Import Data Error:', error);
-      throw new InternalServerErrorException(`Import failed: ${error.message}`);
+      this.logger.error('Import Data Error:', error instanceof Error ? error.message : String(error));
+      throw new InternalServerErrorException(`Import failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
