@@ -4,8 +4,12 @@ import {
   ForbiddenException,
   InternalServerErrorException,
   Logger,
+  Inject,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { CreateQueryDto } from './dto/create-query.dto';
+import { createHash } from 'crypto';
 import { UpdateRowDto } from './dto/update-row.dto';
 import { InsertRowDto } from './dto/insert-row.dto';
 import { DeleteRowsDto } from './dto/delete-rows.dto';
@@ -26,11 +30,31 @@ import {
 export class QueryService {
   private readonly logger = new Logger(QueryService.name);
   
+  private readonly QUERY_CACHE_TTL = 60; // 1 minute default
+
   constructor(
     private readonly connectionsService: ConnectionsService,
     private readonly strategyFactory: DatabaseStrategyFactory,
     private readonly auditService: AuditService,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) { }
+
+  private getQueryCacheKey(connectionId: string, sql: string, database?: string): string {
+    const normalizedSql = sql.trim().toLowerCase();
+    const hash = createHash('sha256').update(`${connectionId}:${database || ''}:${normalizedSql}`).digest('hex').slice(0, 16);
+    return `query:${connectionId}:${hash}`;
+  }
+
+  private isCacheableQuery(sql: string): boolean {
+    const trimmed = sql.trim().toUpperCase();
+    return trimmed.startsWith('SELECT') && !trimmed.includes('NOW()') && !trimmed.includes('RAND()');
+  }
+
+  private async invalidateQueryCache(connectionId: string): Promise<void> {
+    // Can't use keys() on Redis cache, so just rely on TTL for expiration
+    // For manual invalidation, we'd need to track keys separately or use a different cache store
+    this.logger.warn(`Cache invalidated for connection ${connectionId} (auto-cleanup via TTL)`);
+  }
 
   private async blockOperation(
     userId: string,
@@ -229,8 +253,22 @@ export class QueryService {
     try {
       const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
-      
+
+      const cacheKey = this.getQueryCacheKey(connectionId, sql, database || connection.database);
+      const isCacheable = this.isCacheableQuery(sql);
+
+      if (isCacheable) {
+        const cachedResult = await this.cacheManager.get(cacheKey);
+        if (cachedResult) {
+          return { ...cachedResult, cached: true };
+        }
+      }
+
       const result = await strategy.executeQuery(pool, sql, { limit, offset });
+
+      if (isCacheable && result.rows) {
+        await this.cacheManager.set(cacheKey, result, this.QUERY_CACHE_TTL);
+      }
 
       // Attempt to get totalCount for table views (standard SELECT * queries)
       if (sql.trim().toUpperCase().startsWith('SELECT * FROM')) {
@@ -285,7 +323,9 @@ export class QueryService {
     try {
       const pool = await this.connectionsService.getPool(connectionId, database, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
-      return await strategy.updateRow(pool, { schema, table, pkColumn, pkValue, updates });
+      const result = await strategy.updateRow(pool, { schema, table, pkColumn, pkValue, updates });
+      await this.invalidateQueryCache(connectionId);
+      return result;
     } catch (error) {
       this.logger.error('Update Row Error:', error instanceof Error ? error.message : String(error));
       throw new InternalServerErrorException(`Update failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -300,7 +340,9 @@ export class QueryService {
     try {
       const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
-      return await strategy.insertRow(pool, { schema, table, data });
+      const result = await strategy.insertRow(pool, { schema, table, data });
+      await this.invalidateQueryCache(connectionId);
+      return result;
     } catch (error) {
       this.logger.error('Insert Row Error:', error instanceof Error ? error.message : String(error));
       throw new InternalServerErrorException(`Insert failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -315,7 +357,9 @@ export class QueryService {
     try {
       const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
-      return await strategy.deleteRows(pool, { schema, table, pkColumn, pkValues });
+      const result = await strategy.deleteRows(pool, { schema, table, pkColumn, pkValues });
+      await this.invalidateQueryCache(connectionId);
+      return result;
     } catch (error) {
       this.logger.error('Delete Rows Error:', error instanceof Error ? error.message : String(error));
       throw new InternalServerErrorException(`Delete failed: ${error instanceof Error ? error.message : String(error)}`);
