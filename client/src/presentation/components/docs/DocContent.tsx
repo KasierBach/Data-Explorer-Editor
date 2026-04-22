@@ -21,7 +21,10 @@ import {
     FaqSection,
     AiServiceSection,
     DeploymentSection,
-    CleanCodeSection
+    CleanCodeSection,
+    EnvVarsSection,
+    TestingSection,
+    RedisSection
 } from './sections';
 
 interface DocContentProps {
@@ -37,6 +40,7 @@ export function DocContent({ sectionId, lang }: DocContentProps) {
         'introduction': <IntroductionSection lang={lang} />,
         'installation': <InstallationSection lang={lang} />,
         'prerequisites': <PrerequisitesSection lang={lang} />,
+        'env-vars': <EnvVarsSection lang={lang} />,
 
         // Connections
         'postgres': <ConnectionSection lang={lang} engine="postgres" />,
@@ -63,8 +67,10 @@ export function DocContent({ sectionId, lang }: DocContentProps) {
         // Architecture & Tech
         'architecture': <ArchitectureSection lang={lang} />,
         'tech-stack': <TechStackSection lang={lang} />,
+        'redis': <RedisSection lang={lang} />,
         'security': <SecuritySection lang={lang} />,
         'deployment': <DeploymentSection lang={lang} />,
+        'testing': <TestingSection lang={lang} />,
         'clean-code': <CleanCodeSection lang={lang} />,
         'lifecycle': <LifecycleSection lang={lang} />,
         'faq': <FaqSection lang={lang} />

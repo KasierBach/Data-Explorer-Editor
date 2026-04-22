@@ -27,6 +27,8 @@ import { MigrationModule } from './migration/migration.module';
 import { SavedQueriesModule } from './saved-queries/saved-queries.module';
 import { DashboardsModule } from './dashboards/dashboards.module';
 import { ErdWorkspacesModule } from './erd-workspaces/erd-workspaces.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -83,6 +85,8 @@ import { ErdWorkspacesModule } from './erd-workspaces/erd-workspaces.module';
     SavedQueriesModule,
     DashboardsModule,
     ErdWorkspacesModule,
+    NotificationsModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [

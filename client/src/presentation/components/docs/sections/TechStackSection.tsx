@@ -28,12 +28,12 @@ export function TechStackSection({ lang }: Props) {
                                 { tech: 'Vite', ver: '7.x', role: t ? 'Dev server và build pipeline tốc độ cao.' : 'Fast dev server and build pipeline.' },
                                 { tech: 'TypeScript', ver: '5.9.x', role: t ? 'Type safety xuyên suốt frontend và backend.' : 'Type safety across frontend and backend.' },
                                 { tech: 'Tailwind CSS', ver: '4.x', role: t ? 'Styling utility-first cho toàn bộ surface UI.' : 'Utility-first styling across the whole UI surface.' },
+                                { tech: 'Framer Motion', ver: '12.x', role: t ? 'Thư viện animation cao cấp cho các hiệu ứng chuyển cảnh và tương tác.' : 'Premium animation library for transitions and interactions.' },
                                 { tech: 'Zustand', ver: '5.x', role: t ? 'State management dạng slice cho tabs, AI chat, connections và UI shell.' : 'Slice-based state management for tabs, AI chat, connections, and the shell.' },
-                                { tech: 'Monaco Editor', ver: '4.7+', role: t ? 'SQL editor chính với shortcut, formatting, và completions.' : 'Primary SQL editor with shortcuts, formatting, and completions.' },
+                                { tech: 'Monaco Editor', ver: '0.5.x', role: t ? 'SQL editor chính với shortcut, formatting, và completions.' : 'Primary SQL editor with shortcuts, formatting, and completions.' },
                                 { tech: '@tanstack/react-query', ver: '5.x', role: t ? 'Server state, caching, và request synchronization.' : 'Server state, caching, and request synchronization.' },
                                 { tech: '@xyflow/react', ver: '12.x', role: t ? 'Canvas engine cho ERD/visual diagram flow.' : 'Canvas engine for ERD and visual diagram flows.' },
-                                { tech: 'Recharts', ver: '3.x', role: t ? 'Chart rendering cho query results và dashboard widgets.' : 'Chart rendering for query results and dashboard widgets.' },
-                                { tech: 'Radix UI', ver: 'latest', role: t ? 'Headless primitives cho dialog, dropdown, tooltip, tabs và menus.' : 'Headless primitives for dialogs, dropdowns, tooltips, tabs, and menus.' },
+                                { tech: 'Lucide Icons', ver: '0.4.x', role: t ? 'Bộ icon vector hiện đại và linh hoạt.' : 'Modern and flexible vector icon set.' },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/20 transition-colors">
                                     <td className="p-4 font-bold text-primary">{row.tech}</td>
@@ -60,17 +60,44 @@ export function TechStackSection({ lang }: Props) {
                             {[
                                 { tech: 'NestJS', ver: '11.x', role: t ? 'Framework backend chính với module boundaries và DI.' : 'Primary backend framework with module boundaries and DI.' },
                                 { tech: 'Prisma', ver: '6.x', role: t ? 'ORM cho metadata app: users, connections, saved queries, dashboards.' : 'ORM for app metadata: users, connections, saved queries, and dashboards.' },
+                                { tech: 'BullMQ', ver: '5.x', role: t ? 'Quản lý hàng đợi tác vụ nền (background jobs) hiệu năng cao.' : 'High-performance background job queue management.' },
+                                { tech: 'ioredis', ver: '5.x', role: t ? 'Thư viện kết nối Redis mạnh mẽ và tin cậy.' : 'Robust and reliable Redis client library.' },
                                 { tech: 'Passport + JWT', ver: '11.x / 4.x', role: t ? 'Email login, Google/GitHub OAuth, JWT session flow.' : 'Email login, Google/GitHub OAuth, and JWT session flow.' },
-                                { tech: 'pg', ver: '8.x', role: t ? 'Native PostgreSQL driver cho SQL execution.' : 'Native PostgreSQL driver for SQL execution.' },
-                                { tech: 'mysql2', ver: '3.x', role: t ? 'MySQL/MariaDB driver.' : 'MySQL/MariaDB driver.' },
-                                { tech: 'mssql', ver: '12.x', role: t ? 'SQL Server driver.' : 'SQL Server driver.' },
-                                { tech: 'mongodb', ver: '7.x', role: t ? 'MongoDB / Atlas support cho NoSQL workspace.' : 'MongoDB / Atlas support for the NoSQL workspace.' },
-                                { tech: 'RxJS', ver: '7.x', role: t ? 'Streaming flows, especially cho AI SSE responses.' : 'Streaming flows, especially for AI SSE responses.' },
-                                { tech: 'helmet', ver: '8.x', role: t ? 'HTTP hardening headers trên backend.' : 'HTTP hardening headers on the backend.' },
+                                { tech: 'pg / mysql2 / mssql', ver: 'latest', role: t ? 'Native database drivers cho SQL execution linh hoạt.' : 'Native database drivers for flexible SQL execution.' },
+                                { tech: 'mongodb', ver: '6.x', role: t ? 'Driver MongoDB cho NoSQL workspace.' : 'MongoDB driver for NoSQL workspace.' },
+                                { tech: 'RxJS', ver: '7.x', role: t ? 'Xử lý luồng dữ liệu không đồng bộ, đặc biệt là AI SSE.' : 'Async stream processing, especially for AI SSE.' },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/20 transition-colors">
                                     <td className="p-4 font-bold text-primary">{row.tech}</td>
                                     <td className="p-4 font-mono text-xs">{row.ver}</td>
+                                    <td className="p-4 text-muted-foreground">{row.role}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </DocSection>
+
+            <DocSection title={t ? 'Hạ tầng & Middleware' : 'Infra & Middleware'}>
+                <div className="border rounded-2xl overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-cyan-500/10">
+                                <th className="text-left p-4 font-bold">{t ? 'Dịch vụ' : 'Service'}</th>
+                                <th className="text-left p-4 font-bold">{t ? 'Cung cấp' : 'Provider'}</th>
+                                <th className="text-left p-4 font-bold">{t ? 'Vai trò' : 'Purpose'}</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {[
+                                { tech: 'Redis', provider: 'Local / Upstash / AWS', role: t ? 'Caching, BullMQ backend, và Rate limiting.' : 'Caching, BullMQ backend, and Rate limiting.' },
+                                { tech: 'PostgreSQL', provider: 'Local / Neon / Supabase', role: t ? 'Metastore lưu trữ toàn bộ dữ liệu nội bộ của app.' : 'Metastore storing all internal app data.' },
+                                { tech: 'Docker', provider: 'Containerization', role: t ? 'Đóng gói toàn bộ ecosystem để triển khai một chạm.' : 'Packaging the entire ecosystem for one-click deployment.' },
+                                { tech: 'Nginx', provider: 'In Docker stack', role: t ? 'Reverse proxy và phục vụ frontend static files.' : 'Reverse proxy and serving frontend static files.' },
+                            ].map((row, i) => (
+                                <tr key={i} className="hover:bg-muted/20 transition-colors">
+                                    <td className="p-4 font-bold text-primary">{row.tech}</td>
+                                    <td className="p-4 text-xs font-medium">{row.provider}</td>
                                     <td className="p-4 text-muted-foreground">{row.role}</td>
                                 </tr>
                             ))}
@@ -93,12 +120,12 @@ export function TechStackSection({ lang }: Props) {
                             {[
                                 {
                                     service: 'Gemini premium lane',
-                                    model: 'gemini-3-flash-preview / selected Gemini model',
-                                    role: t ? 'Task khó hơn, image input, vision flows, và fallback chất lượng cao.' : 'Harder tasks, image input, vision flows, and higher-quality fallback.'
+                                    model: 'Gemini Suite (Pro/Flash 1.5, 2.0, 3.0, 3.1)',
+                                    role: t ? 'Luôn cập nhật và hỗ trợ các thế hệ model mới nhất của Google cho mọi nhu cầu xử lý dữ liệu.' : 'Always up-to-date with support for Google\'s latest model generations for all data processing needs.'
                                 },
                                 {
                                     service: 'Cerebras cheap lane',
-                                    model: 'llama3.1-8b',
+                                    model: 'llama3.1-8b / 70b',
                                     role: t ? 'General chat và prompt nhẹ để giảm tần suất gọi Gemini.' : 'General chat and light prompts to reduce Gemini usage.'
                                 },
                                 {
@@ -137,9 +164,9 @@ export function TechStackSection({ lang }: Props) {
                         </thead>
                         <tbody className="divide-y">
                             {[
-                                { tech: 'Vitest', ver: '4.x', role: t ? 'Frontend unit tests và component tests.' : 'Frontend unit tests and component tests.' },
+                                { tech: 'Vitest', ver: '3.x', role: t ? 'Frontend unit tests và component tests.' : 'Frontend unit tests and component tests.' },
                                 { tech: 'React Testing Library', ver: '16.x', role: t ? 'UI testing theo hành vi người dùng.' : 'User-behavior-oriented UI testing.' },
-                                { tech: 'Jest', ver: '30.x', role: t ? 'Backend test runner cho NestJS services/controllers.' : 'Backend test runner for NestJS services and controllers.' },
+                                { tech: 'Jest', ver: '29.x', role: t ? 'Backend test runner cho NestJS services/controllers.' : 'Backend test runner for NestJS services and controllers.' },
                                 { tech: 'ts-jest', ver: '29.x', role: t ? 'TypeScript transform cho backend test suite.' : 'TypeScript transform for the backend test suite.' },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/10 transition-colors">

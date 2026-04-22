@@ -11,6 +11,7 @@ import { useAppStore } from '@/core/services/store'
 import { useSyncConnections } from '@/presentation/hooks/useSyncConnections'
 import { useSyncSavedQueries } from '@/presentation/hooks/useSyncSavedQueries'
 import { AuthService } from '@/core/services/AuthService'
+import { useNotifications } from '@/presentation/hooks/useNotifications'
 
 import { Toaster } from 'sonner';
 import { DestructiveQueryDialog } from '@/presentation/components/Dialogs/DestructiveQueryDialog';
@@ -43,6 +44,7 @@ export function App() {
   // Auto-fetch connections from backend whenever user is authenticated
   useSyncConnections();
   useSyncSavedQueries();
+  useNotifications();
 
   const { theme: appTheme, setTheme: setAppTheme } = useTheme();
   const { user, restoreSession, setAuthBootstrapped } = useAppStore();

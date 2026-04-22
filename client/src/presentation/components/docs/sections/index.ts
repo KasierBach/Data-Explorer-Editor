@@ -19,4 +19,6 @@ export { FaqSection } from './FaqSection';
 export { AiServiceSection } from './AiServiceSection';
 export { DeploymentSection } from './DeploymentSection';
 export { CleanCodeSection } from './CleanCodeSection';
-
+export { EnvVarsSection } from './EnvVarsSection';
+export { TestingSection } from './TestingSection';
+export { RedisSection } from './RedisSection';

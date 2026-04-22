@@ -35,6 +35,7 @@ export const DOCS_STRUCTURE: DocSection[] = [
             { id: 'introduction', title: 'Giới thiệu', titleEn: 'Introduction' },
             { id: 'installation', title: 'Cài đặt', titleEn: 'Installation' },
             { id: 'prerequisites', title: 'Điều kiện tiên quyết', titleEn: 'Prerequisites' },
+            { id: 'env-vars', title: 'Biến môi trường', titleEn: 'Environment Variables' },
         ]
     },
     {
@@ -89,11 +90,13 @@ export const DOCS_STRUCTURE: DocSection[] = [
         titleEn: 'Architecture & Tech',
         icon: <Activity className="w-4 h-4" />,
         items: [
-            { id: 'clean-code', title: 'Clean Code & Refactor', titleEn: 'Clean Code & Refactor' },
             { id: 'architecture', title: 'Kiến trúc hệ thống', titleEn: 'System Architecture' },
             { id: 'tech-stack', title: 'Danh sách công nghệ', titleEn: 'Technology Stack' },
+            { id: 'redis', title: 'Redis & Caching', titleEn: 'Redis & Caching' },
             { id: 'security', title: 'Bảo mật & Quyền riêng tư', titleEn: 'Security & Privacy' },
             { id: 'deployment', title: 'Triển khai Production', titleEn: 'Production Deployment' },
+            { id: 'testing', title: 'Kiểm thử & Đóng góp', titleEn: 'Testing & Contribution' },
+            { id: 'clean-code', title: 'Clean Code & Refactor', titleEn: 'Clean Code & Refactor' },
             { id: 'lifecycle', title: 'Quy trình phát triển', titleEn: 'Dev Lifecycle' },
             { id: 'faq', title: 'FAQ & Khắc phục lỗi', titleEn: 'FAQ & Troubleshooting' },
         ]
