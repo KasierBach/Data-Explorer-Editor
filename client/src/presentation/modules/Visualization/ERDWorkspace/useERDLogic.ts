@@ -16,6 +16,7 @@ import { connectionService } from '@/core/services/ConnectionService';
 import { queryService } from '@/core/services/QueryService';
 import { ErdWorkspaceService, type SaveErdWorkspacePayload } from '@/core/services/ErdWorkspaceService';
 import { ApiError } from '@/core/services/api.service';
+import { SearchService, type SearchResult } from '@/core/services/SearchService';
 import type { ErdWorkspaceEntity } from '@/core/domain/entities';
 import type { ForeignKeyData } from '../ForeignKeyDialog';
 import {
@@ -74,6 +75,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     const [isOpenWorkspaceDialogOpen, setIsOpenWorkspaceDialogOpen] = useState(false);
     const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
     const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
+    const [globalSearchResults, setGlobalSearchResults] = useState<SearchResult[]>([]);
+    const [isSearchingGlobal, setIsSearchingGlobal] = useState(false);
 
     const isFirstLoad = useRef(true);
     const hasShownWorkspaceWarning = useRef(false);
@@ -302,6 +305,30 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         }
         return filtered;
     }, [hierarchy, schemaFilter, searchTerm]);
+
+    useEffect(() => {
+        const handler = setTimeout(async () => {
+            if (!searchTerm || searchTerm.length < 2) {
+                setGlobalSearchResults([]);
+                return;
+            }
+
+            setIsSearchingGlobal(true);
+            try {
+                const results = await SearchService.search(searchTerm);
+                // Filter out results that are already in the local hierarchy to avoid duplicates
+                const localNames = new Set(hierarchy?.map((h: any) => h.name.toLowerCase()) || []);
+                const globalOnly = results.filter((r: SearchResult) => !localNames.has(r.name.toLowerCase()));
+                setGlobalSearchResults(globalOnly);
+            } catch (error) {
+                console.error('[ERD] Global search failed', error);
+            } finally {
+                setIsSearchingGlobal(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(handler);
+    }, [searchTerm, hierarchy]);
 
     const fkConstraintMap = useMemo(() => {
         const map = new Map<string, string>();
@@ -560,8 +587,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                     pathOptions: { borderRadius: 40 },
                     style: {
                         stroke: 'hsl(var(--primary))',
-                        strokeWidth: 2,
-                        opacity: 0.5,
+                        strokeWidth: performanceMode ? 1.5 : 2,
+                        opacity: performanceMode ? 0.3 : 0.8,
                         transition: 'all 0.2s ease-in-out',
                     },
                     zIndex: 1,
@@ -649,15 +676,16 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
             const updatedStyle = {
                 ...edge.style,
-                strokeWidth: isHovered ? 4 : 2,
-                opacity: isHovered ? 1 : 0.5,
-                strokeDasharray: isVirtual ? (isHovered ? '8,8' : '5,5') : 'none',
+                strokeWidth: isHovered ? 4 : (performanceMode ? 1.5 : 2),
+                opacity: isHovered ? 1 : (performanceMode ? 0.3 : 0.8),
+                ...(isVirtual ? { strokeDasharray: isHovered ? '8,8' : '5,5' } : {}),
             };
 
             const baseEdgeProps = {
                 ...edge,
                 type: edgeRouting,
                 label: '',
+                animated: isEdgeAnimated,
                 ...(edgeRouting === 'smoothstep' ? { pathOptions: { borderRadius: 40 } } : {}),
             };
 
@@ -677,7 +705,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 zIndex: 1,
             };
         }));
-    }, [edgeRouting, hoveredEdgeId, setEdges]);
+    }, [edgeRouting, hoveredEdgeId, isEdgeAnimated, performanceMode, setEdges]);
 
     const handleExportPNG = useCallback(() => {
         import('html-to-image').then(({ toPng }) => {
@@ -790,6 +818,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             currentWorkspaceNotes,
             isSaveDialogOpen,
             isOpenWorkspaceDialogOpen,
+            globalSearchResults,
+            isSearchingGlobal,
         },
         actions: {
             setNodes,
@@ -798,41 +828,35 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             onEdgesChange,
             handleEdgesChange,
             onConnect,
-            setVisibleTableNames,
-            setSearchTerm,
-            setPendingConnection,
-            setSidebarCollapsed,
-            setDetailLevel,
-            setSchemaFilter,
-            setShowMinimap,
-            setCollapsedTables,
-            setSelectedDatabase: handleSetSelectedDatabase,
-            handleRemoveConstraint,
             handleCreateForeignKey,
             handleAutoLayout,
             toggleTable,
             handleSelectAll,
             handleDeselectAll,
+            handleToggleCollapse,
+            setSidebarCollapsed,
+            setDetailLevel,
+            setSchemaFilter,
+            setShowMinimap,
+            setSearchTerm,
+            setSelectedDatabase: handleSetSelectedDatabase,
             setPerformanceMode,
             setEdgeRouting,
             setBackgroundVariant,
             setIsEdgeAnimated,
             setIsToolbarCollapsed,
-            handleToggleCollapse,
             handleExportPNG,
             handleExportSQL,
-            handleEdgeMouseEnter,
-            handleEdgeMouseLeave,
-            setCurrentWorkspaceId,
-            setCurrentWorkspaceName,
-            setCurrentWorkspaceNotes,
-            setIsSaveDialogOpen,
-            setIsOpenWorkspaceDialogOpen,
+            openSaveDialog: () => setIsSaveDialogOpen(true),
+            openWorkspaceDialog: () => setIsOpenWorkspaceDialogOpen(true),
             saveWorkspace,
             loadWorkspace,
             deleteWorkspace,
-            openSaveDialog: () => setIsSaveDialogOpen(true),
-            openWorkspaceDialog: () => setIsOpenWorkspaceDialogOpen(true),
+            handleEdgeMouseEnter,
+            handleEdgeMouseLeave,
+            setPendingConnection,
+            setIsSaveDialogOpen,
+            setIsOpenWorkspaceDialogOpen,
         },
     };
 };

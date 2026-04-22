@@ -66,9 +66,11 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
             )}
             
             <div className={cn(
-                "bg-card/90 backdrop-blur-3xl border rounded-3xl h-full flex flex-col ring-1 ring-white/5 relative z-10",
-                !isPerf && "shadow-[0_25px_60px_-15px_rgba(0,0,0,0.4)] transition-all duration-500",
-                selected ? "border-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.2)]" : "border-white/10 group-hover:border-blue-500/30"
+                "border rounded-3xl h-full flex flex-col ring-1 ring-white/5 relative z-10",
+                isPerf 
+                    ? "bg-card/80 backdrop-blur-md transition-none" 
+                    : "bg-zinc-950 border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.4)] transition-all duration-500",
+                selected ? "border-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.2)]" : "group-hover:border-blue-500/30"
             )}>
                 {/* Header */}
                 <div 

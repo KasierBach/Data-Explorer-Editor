@@ -1,4 +1,4 @@
-import { Database, Zap, ShieldAlert, Cpu, Activity, Server, Bell, Search } from 'lucide-react';
+import { Database, Zap, ShieldAlert, Cpu, Activity, Server, Bell, Search, Share2 } from 'lucide-react';
 import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, CodeBlock, CodeComment, CodeLine } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
@@ -172,6 +172,33 @@ export function RedisSection({ lang }: Props) {
                                 ? 'Redis lưu trữ index metadata của tất cả các kết nối database. Điều này cho phép bạn tìm kiếm bảng hoặc view trên hàng chục database khác nhau chỉ trong vài mili giây.'
                                 : 'Redis stores metadata indexes for all database connections. This allows you to search for tables or views across dozens of different databases in just a few milliseconds.'}
                         </p>
+                    </div>
+                </div>
+
+                <div className="mt-6 p-8 rounded-[2rem] bg-gradient-to-br from-indigo-500/10 via-transparent to-transparent border border-indigo-500/20 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <Share2 className="w-32 h-32 text-indigo-500" />
+                    </div>
+                    <div className="relative z-10 max-w-2xl">
+                        <h4 className="text-xl font-bold text-white mb-4 flex items-center gap-3">
+                            <Zap className="w-6 h-6 text-yellow-400" />
+                            {t ? 'Tối ưu hóa ERD Designer' : 'ERD Designer Optimization'}
+                        </h4>
+                        <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
+                            <p>
+                                {t
+                                    ? 'Trang ERD hiện đã được tích hợp bộ lọc thông minh dựa trên Redis Index. Khi bạn tìm kiếm bảng để thêm vào sơ đồ:'
+                                    : 'The ERD page now integrates smart filtering based on the Redis Index. When searching for tables to add to your diagram:'}
+                            </p>
+                            <ul className="list-disc pl-5 space-y-2">
+                                <li>
+                                    <strong className="text-white">{t ? 'Smart Suggestions' : 'Smart Suggestions'}:</strong> {t ? 'Tự động gợi ý các bảng liên quan hoặc từ các database khác mà chưa được tải vào view hiện tại.' : 'Automatically suggests related tables or entities from other databases not yet loaded in the current view.'}
+                                </li>
+                                <li>
+                                    <strong className="text-white">{t ? 'Zero Latency' : 'Zero Latency'}:</strong> {t ? 'Việc tìm kiếm bảng diễn ra trên Redis thay vì query DB nguồn, đảm bảo trải nghiệm kéo thả không bị gián đoạn.' : 'Table lookups happen on Redis instead of querying the source DB, ensuring an uninterrupted drag-and-drop experience.'}
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </DocSection>

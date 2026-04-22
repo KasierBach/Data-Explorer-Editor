@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Table, PanelLeftClose, Search, CheckSquare, Square, X, Plus } from 'lucide-react';
+import { Table, PanelLeftClose, Search, CheckSquare, Square, X, Plus, Globe, Loader2 } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/presentation/components/ui/select";
@@ -24,10 +24,13 @@ interface ERDSidebarProps {
     handleSelectAll: () => void;
     handleDeselectAll: () => void;
     isLoadingHierarchy?: boolean;
+    globalSearchResults?: any[];
+    isSearchingGlobal?: boolean;
+    onAddGlobalTable?: (item: any) => void;
 }
 
 export const ERDSidebar: React.FC<ERDSidebarProps> = ({
-    isCollapsed, setCollapsed, lang, selectedDatabase, setSelectedDatabase, allDatabases, hierarchy, filteredHierarchy, visibleTableNames, toggleTable, searchTerm, setSearchTerm, schemaFilter, setSchemaFilter, handleSelectAll, handleDeselectAll, isLoadingHierarchy
+    isCollapsed, setCollapsed, lang, selectedDatabase, setSelectedDatabase, allDatabases, hierarchy, filteredHierarchy, visibleTableNames, toggleTable, searchTerm, setSearchTerm, schemaFilter, setSchemaFilter, handleSelectAll, handleDeselectAll, isLoadingHierarchy, globalSearchResults = [], isSearchingGlobal = false, onAddGlobalTable
 }) => {
     const hasDatabases = allDatabases && allDatabases.length > 0;
 
@@ -40,8 +43,6 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
         });
         return Array.from(schemaSet).sort();
     }, [hierarchy]);
-
-    // Filtering is now handled by useERDLogic and passed via filteredHierarchy prop
 
     return (
         <div className={cn(
@@ -99,9 +100,15 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                 )}
 
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground opacity-40" />
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        {isSearchingGlobal ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+                        ) : (
+                            <Search className="h-3 w-3 text-muted-foreground opacity-40" />
+                        )}
+                    </div>
                     <Input
-                        placeholder={lang === 'vi' ? "Lọc bảng..." : "Filter tables..."}
+                        placeholder={lang === 'vi' ? "Lọc hoặc tìm nhanh bảng..." : "Filter or quick find tables..."}
                         className="pl-8 bg-muted/20 border-border/20 h-8 text-[11px] rounded-lg"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -128,47 +135,77 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                             {lang === 'vi' ? 'Đang tải thực thể...' : 'Exploring Entities...'}
                         </p>
                     </div>
-                ) : filteredHierarchy.length === 0 ? (
-                    <div className="p-12 text-center space-y-4 opacity-60 group">
-                        <div className="w-12 h-12 bg-muted/20 rounded-2xl flex items-center justify-center mx-auto transition-transform group-hover:scale-110 duration-500">
-                             <Table className="w-6 h-6 text-muted-foreground/30" />
-                        </div>
-                        <p className="text-[11px] text-muted-foreground font-medium italic">
-                            {lang === 'vi' ? 'Không tìm thấy thực thể nào' : 'No entities discovered'}
-                        </p>
-                    </div>
                 ) : (
-                    <div className="p-4 space-y-1.5 animate-in fade-in duration-500">
-                        <div className="px-3 pb-2 text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] border-b border-border/10 mb-2">
-                             {lang === 'vi' ? 'Danh sách bảng' : 'Table List'}
-                        </div>
-                        {filteredHierarchy.map((t) => (
-                            <div
-                                key={t.id}
-                                className={cn(
-                                    "px-4 py-3 rounded-2xl cursor-pointer transition-all duration-300 flex items-center justify-between group relative overflow-hidden",
-                                    visibleTableNames.has(t.name)
-                                        ? "bg-blue-500/10 text-primary border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.1)]"
-                                        : "hover:bg-muted/40 text-muted-foreground border border-transparent hover:border-border/30"
-                                )}
-                                onClick={() => toggleTable(t.name)}
-                            >
-                                <div className="flex items-center gap-3 min-w-0 relative z-10">
-                                    <div className={cn(
-                                        "w-2 h-2 rounded-full",
-                                        visibleTableNames.has(t.name) ? "bg-blue-500 animate-pulse" : "bg-muted-foreground/20"
-                                    )} />
-                                    <span className="text-xs font-bold truncate tracking-tight">{t.name}</span>
+                    <div className="p-4 space-y-3">
+                        {/* Local Results */}
+                        <div className="space-y-1.5">
+                            <div className="px-3 pb-2 text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] border-b border-border/10 mb-2 flex justify-between items-center">
+                                <span>{lang === 'vi' ? 'Danh sách bảng' : 'Table List'}</span>
+                                {filteredHierarchy.length > 0 && <span className="opacity-50">{filteredHierarchy.length}</span>}
+                            </div>
+                            {filteredHierarchy.length === 0 && !isSearchingGlobal && (
+                                <div className="py-4 text-center text-[10px] text-muted-foreground italic">
+                                    {lang === 'vi' ? 'Không tìm thấy bảng cục bộ' : 'No local tables found'}
                                 </div>
-                                <div className="relative z-10 flex items-center">
-                                    {visibleTableNames.has(t.name) ? (
-                                        <X className="h-3.5 w-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
-                                    ) : (
-                                        <Plus className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
+                            )}
+                            {filteredHierarchy.map((t) => (
+                                <div
+                                    key={t.id}
+                                    className={cn(
+                                        "px-4 py-3 rounded-2xl cursor-pointer transition-all duration-300 flex items-center justify-between group relative overflow-hidden",
+                                        visibleTableNames.has(t.name)
+                                            ? "bg-blue-500/10 text-primary border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.1)]"
+                                            : "hover:bg-muted/40 text-muted-foreground border border-transparent hover:border-border/30"
                                     )}
+                                    onClick={() => toggleTable(t.name)}
+                                >
+                                    <div className="flex items-center gap-3 min-w-0 relative z-10">
+                                        <div className={cn(
+                                            "w-2 h-2 rounded-full",
+                                            visibleTableNames.has(t.name) ? "bg-blue-500 animate-pulse" : "bg-muted-foreground/20"
+                                        )} />
+                                        <span className="text-xs font-bold truncate tracking-tight">{t.name}</span>
+                                    </div>
+                                    <div className="relative z-10 flex items-center">
+                                        {visibleTableNames.has(t.name) ? (
+                                            <X className="h-3.5 w-3.5 opacity-50 group-hover:opacity-100 transition-opacity" />
+                                        ) : (
+                                            <Plus className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Global/Smart Suggestions */}
+                        {globalSearchResults.length > 0 && (
+                            <div className="space-y-1.5 pt-2 animate-in slide-in-from-bottom-2 duration-500">
+                                <div className="px-3 pb-2 text-[10px] font-black text-emerald-500/60 uppercase tracking-[0.2em] border-b border-emerald-500/10 mb-2 flex items-center gap-2">
+                                    <Globe className="w-3 h-3" />
+                                    <span>{lang === 'vi' ? 'Gợi ý thông minh' : 'Smart Suggestions'}</span>
+                                </div>
+                                {globalSearchResults.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="px-4 py-3 rounded-2xl cursor-pointer transition-all duration-300 flex flex-col gap-1 hover:bg-emerald-500/5 group border border-transparent hover:border-emerald-500/20"
+                                        onClick={() => onAddGlobalTable?.(item)}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors uppercase tracking-tight">{item.name}</span>
+                                            <Plus className="h-3 w-3 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </div>
+                                        <div className="flex items-center gap-2 opacity-50 text-[9px] font-medium italic">
+                                            <span className="truncate max-w-[100px]">{item.connectionName}</span>
+                                            <span>•</span>
+                                            <span>{item.database} {item.schema ? `• ${item.schema}` : ''}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                                <div className="px-4 py-2 text-[9px] text-muted-foreground/40 text-center italic">
+                                    {lang === 'vi' ? 'Kết quả từ Redis Global Index' : 'Results from Redis Global Index'}
                                 </div>
                             </div>
-                        ))}
+                        )}
                     </div>
                 )}
             </div>

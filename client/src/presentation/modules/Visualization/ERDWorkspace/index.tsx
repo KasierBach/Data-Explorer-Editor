@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useERDLogic } from './useERDLogic';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore } from '@/core/services/store';
+import { toast } from 'sonner';
 
 // UI Components
 import { ERDSidebar } from './components/ERDSidebar';
@@ -52,6 +53,14 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 handleSelectAll={actions.handleSelectAll}
                 handleDeselectAll={actions.handleDeselectAll}
                 isLoadingHierarchy={state.isLoadingHierarchy}
+                globalSearchResults={state.globalSearchResults}
+                isSearchingGlobal={state.isSearchingGlobal}
+                onAddGlobalTable={(item) => {
+                    // Logic to handle adding a table from another DB/Connection
+                    toast.info(`Smart Add: ${item.name} (${item.connectionName})`);
+                    // For now, toggle if it exists in local context, or show warning
+                    actions.toggleTable(item.name);
+                }}
             />
 
             <ERDCanvas

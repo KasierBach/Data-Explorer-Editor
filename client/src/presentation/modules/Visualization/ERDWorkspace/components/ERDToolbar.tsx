@@ -219,7 +219,9 @@ export const ERDToolbar: React.FC<ERDToolbarProps> = ({
                                 <DropdownMenuItem onClick={() => setPerformanceMode(!performanceMode)} className={performanceMode ? 'bg-primary/10 text-primary font-bold' : ''}>
                                     <div className="flex items-center gap-2">
                                         <Activity className="h-3.5 w-3.5 text-blue-400" />
-                                        {performanceMode ? t(lang, 'Đang bật tối ưu', 'Performance mode on') : t(lang, 'Hiệu năng cơ bản', 'Basic performance')}
+                                        {performanceMode 
+                                            ? t(lang, 'Giảm chi tiết (Tối ưu PIN/RAM)', 'Performance Mode (Low Detal)') 
+                                            : t(lang, 'Chi tiết cao (Đồ họa sắc nét)', 'High Fidelity (Crisp Detail)')}
                                     </div>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => setIsEdgeAnimated(!isEdgeAnimated)} className={isEdgeAnimated ? 'bg-primary/10 text-primary font-bold' : ''}>
