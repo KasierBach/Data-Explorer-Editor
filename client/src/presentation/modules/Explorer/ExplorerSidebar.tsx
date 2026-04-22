@@ -3,7 +3,7 @@ import { useDatabaseHierarchy } from '@/presentation/hooks/useDatabase';
 import { TreeNodeItem } from './TreeNodeItem';
 import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
-import { Plus, Search, RefreshCw, Layers, Database, ChevronDown, Globe, Loader2 } from 'lucide-react';
+import { Plus, Search, RefreshCw, Layers, Database, ChevronDown, Globe, Loader2, Sparkles } from 'lucide-react';
 import { ConnectionService, connectionService } from '@/core/services/ConnectionService';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,8 @@ export const ExplorerSidebar: React.FC = () => {
     
     // UI State
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchMode, setSearchMode] = useState<'local' | 'global'>('local');
+    const explorerSearchMode = useAppStore(state => state.explorerSearchMode);
+    const setExplorerSearchMode = useAppStore(state => state.setExplorerSearchMode);
     const [globalResults, setGlobalResults] = useState<any[]>([]);
     const [isSearchingGlobal, setIsSearchingGlobal] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -55,27 +56,33 @@ export const ExplorerSidebar: React.FC = () => {
         }
     };
 
-    // Global Search Effect
+    // Hybrid Search Effect (Deep Search for both Local & Global)
     useEffect(() => {
-        if (searchMode === 'global' && searchTerm.length >= 2) {
+        if (searchTerm.length >= 2) {
             const delayDebounceFn = setTimeout(async () => {
                 setIsSearchingGlobal(true);
                 try {
                     const { SearchService } = await import('@/core/services/SearchService');
-                    const results = await SearchService.search(searchTerm);
+                    let results = await SearchService.search(searchTerm);
+                    
+                    // If in Local mode, restrict results to the active connection
+                    if (explorerSearchMode === 'local') {
+                        results = results.filter(r => r.connectionId === activeConnectionId);
+                    }
+                    
                     setGlobalResults(results);
                 } catch (err) {
-                    console.error('Global search error:', err);
+                    console.error('Search error:', err);
                 } finally {
                     setIsSearchingGlobal(false);
                 }
             }, 300);
 
             return () => clearTimeout(delayDebounceFn);
-        } else if (searchMode === 'local' || searchTerm.length < 2) {
+        } else {
             setGlobalResults([]);
         }
-    }, [searchTerm, searchMode]);
+    }, [searchTerm, explorerSearchMode, activeConnectionId]);
 
     useEffect(() => {
         const handleTreeAction = (e: CustomEvent<{ action: string, nodeId: string, nodeType: string }>) => {
@@ -115,18 +122,18 @@ export const ExplorerSidebar: React.FC = () => {
 
     const filteredNodes = useMemo(() => {
         if (!rootNodes) return [];
-        if (!searchTerm || searchMode === 'global') return rootNodes;
+        if (!searchTerm || explorerSearchMode === 'global') return rootNodes;
         return rootNodes.filter(node =>
             node.name.toLowerCase().includes(searchTerm.toLowerCase())
         );
-    }, [rootNodes, searchTerm, searchMode]);
+    }, [rootNodes, searchTerm, explorerSearchMode]);
 
     const handleGlobalResultClick = (result: any) => {
         setActiveConnectionId(result.connectionId);
         // We could also trigger opening the entity here, but switching connection is the main part
         toast.info(lang === 'vi' ? `Đã chuyển sang kết nối ${result.connectionName}` : `Switched to ${result.connectionName}`);
         setSearchTerm('');
-        setSearchMode('local');
+        setExplorerSearchMode('local');
     };
 
     const triggerRefresh = handleRefresh;
@@ -181,7 +188,7 @@ export const ExplorerSidebar: React.FC = () => {
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70 transition-colors group-focus-within:text-blue-500" />
                             <Input
-                                placeholder={searchMode === 'local' 
+                                placeholder={explorerSearchMode === 'local' 
                                     ? (lang === 'vi' ? "Tìm thực thể..." : "Find entities...") 
                                     : (lang === 'vi' ? "Tìm kiếm toàn cầu..." : "Global search...")}
                                 className="h-9 text-xs pl-9 pr-8 bg-muted/40 border-none ring-1 ring-border/50 focus:ring-blue-500/30 transition-all rounded-xl placeholder:text-muted-foreground/50"
@@ -199,9 +206,9 @@ export const ExplorerSidebar: React.FC = () => {
                             size="icon"
                             className={cn(
                                 "h-9 w-9 rounded-xl transition-all border",
-                                searchMode === 'global' ? "bg-blue-500/10 border-blue-500/30 text-blue-500" : "bg-muted/40 border-transparent text-muted-foreground/70"
+                                explorerSearchMode === 'global' ? "bg-blue-500/10 border-blue-500/30 text-blue-500" : "bg-muted/40 border-transparent text-muted-foreground/70"
                             )}
-                            onClick={() => setSearchMode(prev => prev === 'local' ? 'global' : 'local')}
+                            onClick={() => setExplorerSearchMode(explorerSearchMode === 'local' ? 'global' : 'local')}
                             title={lang === 'vi' ? "Chế độ tìm kiếm toàn cầu" : "Global Search Mode"}
                         >
                             <Globe className="h-4 w-4" />
@@ -212,10 +219,15 @@ export const ExplorerSidebar: React.FC = () => {
 
             {/* Tree/Results Area */}
             <div className="flex-1 overflow-auto custom-scrollbar pt-2">
-                {searchMode === 'global' && searchTerm.length >= 2 ? (
+                {searchTerm.length >= 2 ? (
                     <div className="px-2 space-y-1">
-                        <div className="px-3 py-1 text-[10px] uppercase tracking-widest text-muted-foreground/50 font-bold">
-                            {lang === 'vi' ? 'Kết quả toàn cục' : 'Global Results'}
+                        <div className="px-3 py-1 text-[10px] uppercase tracking-widest text-muted-foreground/50 font-bold flex items-center justify-between">
+                            <span>
+                                {explorerSearchMode === 'local' 
+                                    ? (lang === 'vi' ? 'Kết quả nội bộ' : 'Local Results') 
+                                    : (lang === 'vi' ? 'Kết quả toàn cục' : 'Global Results')}
+                            </span>
+                            {globalResults.length > 0 && <span className="opacity-50">{globalResults.length}</span>}
                         </div>
                         {globalResults.length === 0 && !isSearchingGlobal && (
                             <div className="py-10 text-center opacity-30 text-[10px] uppercase font-bold tracking-widest">
@@ -226,24 +238,52 @@ export const ExplorerSidebar: React.FC = () => {
                             <div 
                                 key={`${result.id}-${idx}`}
                                 onClick={() => handleGlobalResultClick(result)}
-                                className="group flex flex-col p-3 rounded-xl hover:bg-blue-500/5 transition-all cursor-pointer border border-transparent hover:border-blue-500/10"
+                                className={cn(
+                                    "group flex flex-col p-3 rounded-xl transition-all cursor-pointer border border-transparent mb-1",
+                                    result.isAiSuggested 
+                                        ? "bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/20 shadow-sm" 
+                                        : "hover:bg-blue-500/5 hover:border-blue-500/10"
+                                )}
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <Database className="w-3.5 h-3.5 text-blue-500" />
-                                        <span className="text-xs font-bold text-foreground/90">{result.name}</span>
+                                        {result.isAiSuggested ? (
+                                            <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                                        ) : (
+                                            <Database className="w-3.5 h-3.5 text-blue-500" />
+                                        )}
+                                        <span className={cn(
+                                            "text-xs font-bold transition-colors",
+                                            result.isAiSuggested ? "text-purple-300 group-hover:text-purple-200" : "text-foreground/90 group-hover:text-blue-400"
+                                        )}>
+                                            {result.name}
+                                        </span>
                                     </div>
-                                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-black uppercase tracking-tighter">
-                                        {result.type}
-                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        {result.isAiSuggested && (
+                                            <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 font-black tracking-tighter">
+                                                AI
+                                            </span>
+                                        )}
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-black uppercase tracking-tighter">
+                                            {result.type}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground/60 whitespace-nowrap overflow-hidden">
-                                    <Globe className="w-3 h-3" />
+                                <div className="mt-1.5 flex items-center gap-2 text-[9px] text-muted-foreground/50 whitespace-nowrap overflow-hidden italic">
+                                    <Globe className="w-2.5 h-2.5 opacity-50" />
                                     <span className="truncate">{result.connectionName}</span>
                                     {result.schema && <span className="opacity-40">• {result.schema}</span>}
+                                    {result.database && result.database !== 'default' && <span className="opacity-40">({result.database})</span>}
                                 </div>
                             </div>
                         ))}
+                        <div className="px-4 py-3 text-[9px] text-muted-foreground/30 text-center italic border-t border-border/5 mt-2">
+                            {globalResults.some(r => r.isAiSuggested) 
+                                ? (lang === 'vi' ? 'Kết quả từ Redis Hybrid Search (AI + Index)' : 'Results from Redis Hybrid Search (AI + Index)')
+                                : (lang === 'vi' ? 'Sử dụng Redis Global Index' : 'Using Redis Global Index')
+                            }
+                        </div>
                     </div>
                 ) : (
                     <>

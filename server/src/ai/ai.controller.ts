@@ -163,4 +163,38 @@ export class AiController {
 
         return { completion };
     }
+
+    @Post('nlp-to-sql')
+    async nlpToSql(@Body() body: GenerateSqlDto, @Req() req: any) {
+        const { connectionId, database, prompt } = body;
+
+        console.log(`[AI:NLP2SQL] Request: connectionId=${connectionId}, database=${database}, query="${prompt}"`);
+
+        let connection: any;
+        try {
+            connection = await this.connectionsService.findOne(connectionId, req.user.id);
+        } catch (error) {
+            throw new BadRequestException(`Connection not found`);
+        }
+
+        let pool: any;
+        try {
+            pool = await this.connectionsService.getPool(connectionId, database, req.user.id);
+        } catch (error) {
+            throw new InternalServerErrorException(`Cannot connect to database`);
+        }
+
+        const strategy = this.strategyFactory.getStrategy(connection.type);
+        const schemaContext = await this.aiService.gatherSchemaContext(pool, strategy, database, connectionId);
+
+        try {
+            return await this.aiService.generateSql({
+                query: prompt,
+                databaseType: connection.type,
+                schemaContext,
+            });
+        } catch (error) {
+            throw new InternalServerErrorException(error.message);
+        }
+    }
 }

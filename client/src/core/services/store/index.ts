@@ -88,6 +88,7 @@ export const useAppStore = create<AppState>()(
                 nosqlViewMode: state.nosqlViewMode,
                 nosqlFilter: state.nosqlFilter,
                 nosqlMqlQuery: state.nosqlMqlQuery,
+                explorerSearchMode: state.explorerSearchMode,
             }),
         }
     )

@@ -14,12 +14,17 @@ import { AiProviderRunnerService } from './ai.provider-runner.service';
     imports: [ConnectionsModule, PrismaModule],
     controllers: [AiController, AiChatController],
     providers: [
-        AiService,
+        AiService,  
         AiChatService,
         AiPromptBuilderService,
         AiRoutingService,
         AiSchemaContextService,
         AiProviderRunnerService,
+    ],
+    exports: [
+        AiService,
+        AiChatService,
+        AiSchemaContextService,
     ],
 })
 export class AiModule { }

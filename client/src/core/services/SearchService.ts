@@ -8,6 +8,7 @@ export interface SearchResult {
     connectionName: string;
     database?: string;
     schema?: string;
+    isAiSuggested?: boolean;
 }
 
 export class SearchService {

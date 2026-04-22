@@ -20,6 +20,11 @@ export interface UISlice {
     setLang: (lang: 'vi' | 'en') => void;
     isResultPanelOpen: boolean;
     toggleResultPanel: () => void;
+    explorerSearchMode: 'local' | 'global';
+    setExplorerSearchMode: (mode: 'local' | 'global') => void;
+    isCommandPaletteOpen: boolean;
+    toggleCommandPalette: () => void;
+    setCommandPaletteOpen: (isOpen: boolean) => void;
     destructiveConfirm: { isOpen: boolean; analysis: any; resolve: ((val: boolean) => void) | null } | null;
     requestDestructiveConfirm: (analysis: any) => Promise<boolean>;
     closeDestructiveConfirm: (confirmed: boolean) => void;
@@ -57,6 +62,11 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
     },
     isResultPanelOpen: true,
     toggleResultPanel: () => set((state) => ({ isResultPanelOpen: !state.isResultPanelOpen })),
+    explorerSearchMode: 'local',
+    setExplorerSearchMode: (mode) => set({ explorerSearchMode: mode }),
+    isCommandPaletteOpen: false,
+    toggleCommandPalette: () => set((state) => ({ isCommandPaletteOpen: !state.isCommandPaletteOpen })),
+    setCommandPaletteOpen: (isOpen) => set({ isCommandPaletteOpen: isOpen }),
     destructiveConfirm: null,
     requestDestructiveConfirm: (analysis) => {
         return new Promise<boolean>((resolve) => {

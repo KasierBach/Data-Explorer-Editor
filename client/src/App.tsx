@@ -15,6 +15,7 @@ import { useNotifications } from '@/presentation/hooks/useNotifications'
 
 import { Toaster } from 'sonner';
 import { DestructiveQueryDialog } from '@/presentation/components/Dialogs/DestructiveQueryDialog';
+import { CommandPalette } from '@/presentation/components/shared/CommandPalette';
 
 const AppShell = lazy(() => import('@/presentation/modules/Layout/AppShell').then((m) => ({ default: m.AppShell })))
 const NoSqlShell = lazy(() => import('@/presentation/modules/Layout/NoSqlShell').then((m) => ({ default: m.NoSqlShell })))
@@ -122,6 +123,7 @@ export function App() {
           </Suspense>
           <Toaster richColors position="top-center" />
           <DestructiveQueryDialog />
+          <CommandPalette />
         </BrowserRouter>
     </QueryClientProvider>
   )

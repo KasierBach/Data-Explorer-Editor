@@ -4,6 +4,7 @@ import Redis from 'ioredis';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 import { NotificationsService } from '../notifications/notifications.service';
+import { AiService } from '../ai/ai.service';
 
 @Injectable()
 export class SearchService implements OnModuleInit, OnModuleDestroy {
@@ -15,6 +16,7 @@ export class SearchService implements OnModuleInit, OnModuleDestroy {
         private readonly connectionsService: ConnectionsService,
         private readonly strategyFactory: DatabaseStrategyFactory,
         private readonly notificationsService: NotificationsService,
+        private readonly aiService: AiService,
     ) { }
 
     onModuleInit() {
@@ -47,12 +49,25 @@ export class SearchService implements OnModuleInit, OnModuleDestroy {
                 const schemas = await strategy.getSchemas(pool);
                 
                 for (const schema of schemas) {
-                    const schemaParts = schema.id.split('.schema:');
-                    const schemaName = schemaParts[schemaParts.length - 1];
-                    const dbName = schema.id.split('.schema:')[0].replace('db:', '');
+                    // Robust parsing of schema and db names from ID
+                    // Format could be: "db:NAME.schema:NAME" or just "schema:NAME"
+                    let schemaName = schema.name;
+                    let dbName = '';
 
-                    const tables = await strategy.getTables(pool, schemaName, dbName);
-                    const views = await strategy.getViews(pool, schemaName, dbName);
+                    const id = schema.id;
+                    if (id.includes('db:')) {
+                        const dbPart = id.split('.schema:')[0] || '';
+                        dbName = dbPart.replace('db:', '');
+                        
+                        if (id.includes('.schema:')) {
+                            schemaName = id.split('.schema:')[1] || schema.name;
+                        }
+                    } else if (id.includes('schema:')) {
+                        schemaName = id.replace('schema:', '');
+                    }
+
+                    const tables = await strategy.getTables(pool, schemaName, dbName || undefined);
+                    const views = await strategy.getViews(pool, schemaName, dbName || undefined);
                     
                     const items = [...tables, ...views].map(node => ({
                         id: node.id,
@@ -60,7 +75,7 @@ export class SearchService implements OnModuleInit, OnModuleDestroy {
                         type: node.type,
                         connectionId: conn.id,
                         connectionName: conn.name,
-                        database: dbName,
+                        database: dbName || conn.database || 'default',
                         schema: schemaName
                     }));
 
@@ -85,11 +100,41 @@ export class SearchService implements OnModuleInit, OnModuleDestroy {
     async search(userId: string, query: string) {
         const indexKey = this.getIndexKey(userId);
         const allItems = await this.redis.smembers(indexKey);
+        const parsedItems = allItems.map(item => JSON.parse(item));
         
         const q = query.toLowerCase();
-        return allItems
-            .map(item => JSON.parse(item))
-            .filter(item => item.name.toLowerCase().includes(q) || (item.schema && item.schema.toLowerCase().includes(q)))
-            .slice(0, 50); // Limit to 50 results
+        
+        // 1. Keyword Search (Redis Index)
+        const keywordResults = parsedItems.filter(item => 
+            item.name.toLowerCase().includes(q) || 
+            (item.schema && item.schema.toLowerCase().includes(q))
+        );
+
+        // 2. Semantic Search (AI Fallback)
+        // If results are few and query is meaningful, call AI
+        if (keywordResults.length < 5 && query.length > 2) {
+            const tableNames = parsedItems.map(i => i.name);
+            const aiTableSuggestions = await this.aiService.suggestTablesBySemantic(query, tableNames);
+
+            if (aiTableSuggestions.length > 0) {
+                const aiResults = parsedItems
+                    .filter(item => aiTableSuggestions.includes(item.name))
+                    .map(item => ({ ...item, isAiSuggested: true }));
+
+                // Combine and deduplicate
+                const existingIds = new Set(keywordResults.map(r => r.id));
+                const finalResults = [...keywordResults];
+                
+                for (const aiItem of aiResults) {
+                    if (!existingIds.has(aiItem.id)) {
+                        finalResults.push(aiItem);
+                    }
+                }
+
+                return finalResults.slice(0, 50);
+            }
+        }
+
+        return keywordResults.sort((a, b) => a.name.length - b.name.length).slice(0, 50);
     }
 }

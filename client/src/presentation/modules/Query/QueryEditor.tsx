@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
-import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw, History, Zap } from 'lucide-react';
+import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw, History, Zap, Sparkles } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore, type SavedQuery } from '@/core/services/store';
@@ -14,6 +14,11 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/presentation/components/ui/dropdown-menu";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/presentation/components/ui/popover";
 import {
     Select,
     SelectContent,
@@ -34,6 +39,7 @@ import { SaveQueryDialog, type SaveQueryFormValues } from './SaveQueryDialog';
 import { toast } from 'sonner';
 import { DashboardService } from '@/core/services/DashboardService';
 import { SaveToDashboardDialog, type SaveToDashboardFormValues } from '@/presentation/modules/Dashboard/SaveToDashboardDialog';
+import { AiQueryBox } from './components/AiQueryBox';
 
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const queryClient = useQueryClient();
@@ -497,6 +503,33 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                                 {isCompactMobileLayout ? (lang === 'vi' ? "Chạy" : "Run") : (lang === 'vi' ? "Thực thi" : "Execute")}
                             </span>
                         </Button>
+
+                        <div className="h-4 w-[1px] bg-border mx-1" />
+
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-8 gap-1.5 px-3 border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-500 transition-all shadow-none"
+                                >
+                                    <Sparkles className="w-3.5 h-3.5 fill-blue-500/20" />
+                                    <span className="font-medium">AI SQL</span>
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[450px] p-0 border-white/10 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden" align="start" sideOffset={10}>
+                                <AiQueryBox 
+                                    currentConnectionId={activeConnectionId || ''}
+                                    currentDatabase={activeDatabase || undefined}
+                                    onGenerate={(generatedSql) => {
+                                        setQuery(generatedSql);
+                                        if (editorRef.current) {
+                                            editorRef.current.focus();
+                                        }
+                                    }}
+                                />
+                            </PopoverContent>
+                        </Popover>
 
                         {!isCompactMobileLayout && (
                             <>

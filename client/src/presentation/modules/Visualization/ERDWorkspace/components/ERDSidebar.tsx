@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Table, PanelLeftClose, Search, CheckSquare, Square, X, Plus, Globe, Loader2 } from 'lucide-react';
+import { Table, PanelLeftClose, Search, CheckSquare, Square, X, Plus, Globe, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/presentation/components/ui/select";
@@ -187,12 +187,33 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                                 {globalSearchResults.map((item) => (
                                     <div
                                         key={item.id}
-                                        className="px-4 py-3 rounded-2xl cursor-pointer transition-all duration-300 flex flex-col gap-1 hover:bg-emerald-500/5 group border border-transparent hover:border-emerald-500/20"
+                                        className={cn(
+                                            "px-4 py-3 rounded-2xl cursor-pointer transition-all duration-300 flex flex-col gap-1 group border border-transparent",
+                                            item.isAiSuggested 
+                                                ? "bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.05)]" 
+                                                : "hover:bg-emerald-500/5 hover:border-emerald-500/20"
+                                        )}
                                         onClick={() => onAddGlobalTable?.(item)}
                                     >
                                         <div className="flex items-center justify-between">
-                                            <span className="text-xs font-bold text-white group-hover:text-emerald-400 transition-colors uppercase tracking-tight">{item.name}</span>
-                                            <Plus className="h-3 w-3 text-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            <div className="flex items-center gap-2">
+                                                <span className={cn(
+                                                    "text-xs font-bold transition-colors uppercase tracking-tight",
+                                                    item.isAiSuggested ? "text-purple-400 group-hover:text-purple-300" : "text-white group-hover:text-emerald-400"
+                                                )}>
+                                                    {item.name}
+                                                </span>
+                                                {item.isAiSuggested && (
+                                                    <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-[8px] text-purple-400 font-black animate-pulse">
+                                                        <Sparkles className="w-2 h-2" />
+                                                        AI
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <Plus className={cn(
+                                                "h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity",
+                                                item.isAiSuggested ? "text-purple-500" : "text-emerald-500"
+                                            )} />
                                         </div>
                                         <div className="flex items-center gap-2 opacity-50 text-[9px] font-medium italic">
                                             <span className="truncate max-w-[100px]">{item.connectionName}</span>
@@ -201,8 +222,11 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                                         </div>
                                     </div>
                                 ))}
-                                <div className="px-4 py-2 text-[9px] text-muted-foreground/40 text-center italic">
-                                    {lang === 'vi' ? 'Kết quả từ Redis Global Index' : 'Results from Redis Global Index'}
+                                <div className="px-4 py-2 text-[9px] text-muted-foreground/30 text-center italic">
+                                    {globalSearchResults.some(i => i.isAiSuggested) 
+                                        ? (lang === 'vi' ? 'Kết quả từ Redis Hybrid Search (AI + Index)' : 'Results from Redis Hybrid Search (AI + Index)')
+                                        : (lang === 'vi' ? 'Kết quả từ Redis Global Index' : 'Results from Redis Global Index')
+                                    }
                                 </div>
                             </div>
                         )}
