@@ -1,4 +1,4 @@
-export type AiProvider = 'gemini' | 'cerebras' | 'openrouter';
+export type AiProvider = 'gemini' | 'cerebras' | 'openrouter' | 'zhipu';
 export type AiRoutingMode = 'auto' | 'fast' | 'best' | 'gemini-only';
 export type AiRecommendationType = 'query_fix' | 'index_suggestion' | 'schema_suggestion' | 'chart_suggestion';
 

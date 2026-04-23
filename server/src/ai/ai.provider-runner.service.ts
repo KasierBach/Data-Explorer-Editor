@@ -177,7 +177,9 @@ export class AiProviderRunnerService {
         }).finally(requestTimeout.clear);
 
         if (!response.ok) {
-            throw new Error(await response.text());
+            const errorBody = await response.text();
+            this.logger.error(`[${plan.provider}] API Error (${response.status}): ${errorBody}`);
+            throw new Error(`${plan.provider} API error [${response.status}]: ${errorBody.slice(0, 500)}`);
         }
 
         const data = await response.json();
@@ -291,7 +293,9 @@ export class AiProviderRunnerService {
         }).finally(requestTimeout.clear);
 
         if (!response.ok) {
-            throw new Error(response.statusText);
+            const errorBody = await response.text();
+            this.logger.error(`[${plan.provider}:Stream] API Error (${response.status}): ${errorBody}`);
+            throw new Error(`${plan.provider} Stream API error [${response.status}]: ${errorBody.slice(0, 500)}`);
         }
 
         const reader = response.body?.getReader();
@@ -373,6 +377,11 @@ export class AiProviderRunnerService {
         if (plan.provider === 'openrouter') {
             headers['HTTP-Referer'] = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
             headers['X-Title'] = 'Data Explorer';
+        }
+
+        if (plan.provider === 'zhipu') {
+            // Zhipu/BigModel uses Bearer token, but sometimes requires extra headers if not using standard SDK
+            // For now standard OpenAI headers are fine
         }
 
         return headers;

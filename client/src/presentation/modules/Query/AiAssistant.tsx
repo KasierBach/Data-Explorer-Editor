@@ -73,7 +73,10 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Balanced)' },
         { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Balanced)' },
         { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (Fast)' },
-        { id: 'gemma-3-27b', label: 'Gemma 3 27B (Local-like)', warning: true },
+        { id: 'minimax/minimax-m2.5:free', label: 'MiniMax 2.5 (Free)', isNew: true },
+        { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'NVIDIA Nemotron 120B (Free)', isNew: true },
+        { id: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B (Free)', isNew: true },
+        { id: 'z-ai/glm-4.5-air:free', label: 'GLM 4.5 Air (Free)', isNew: true },
     ];
 
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -392,11 +395,11 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                                 <DropdownMenuTrigger asChild>
                                     <button className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">
                                         <ChevronUp className="w-3 h-3 opacity-50" />
-                                        {MODELS.find(m => m.id === aiModel)?.label}
+                                        {MODELS.find(m => m.id === aiModel)?.label ?? 'Select Model'}
                                     </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent side="top" align="start" className="w-64 max-w-[calc(100vw-2rem)] max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border-border/10 rounded-xl shadow-2xl p-1.5 text-foreground">
-                                    <div className="px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground mb-1">Preferred Gemini model</div>
+                                    <div className="px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground mb-1">Select AI Model</div>
                                     <div className="flex flex-col gap-0.5">
                                         {MODELS.map(m => (
                                             <button

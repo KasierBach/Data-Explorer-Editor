@@ -84,20 +84,13 @@ export class AiRoutingService {
     }
 
     getLowCostPlans(): ProviderPlan[] {
-        const plans: ProviderPlan[] = [];
-
-        const cerebrasApiKey = this.configService.get<string>('CEREBRAS_API_KEY');
-        if (cerebrasApiKey) {
-            plans.push({
-                provider: 'cerebras',
-                apiKey: cerebrasApiKey,
-                baseUrl: this.configService.get<string>('CEREBRAS_BASE_URL') || 'https://api.cerebras.ai/v1',
-                model: this.configService.get<string>('CEREBRAS_CHAT_MODEL') || 'llama3.1-8b',
-            });
-        }
-
+        // Priority: OpenRouter first (most free models), Cerebras last (fewest models)
         const openRouterApiKey = this.configService.get<string>('OPENROUTER_API_KEY');
         const openRouterModel = this.configService.get<string>('OPENROUTER_CHAT_MODEL');
+        const cerebrasApiKey = this.configService.get<string>('CEREBRAS_API_KEY');
+
+        const plans: ProviderPlan[] = [];
+
         if (openRouterApiKey && openRouterModel) {
             plans.push({
                 provider: 'openrouter',
@@ -107,15 +100,52 @@ export class AiRoutingService {
             });
         }
 
+        if (cerebrasApiKey) {
+            plans.push({
+                provider: 'cerebras',
+                apiKey: cerebrasApiKey,
+                baseUrl: this.configService.get<string>('CEREBRAS_BASE_URL') || 'https://api.cerebras.ai/v1',
+                model: this.configService.get<string>('CEREBRAS_CHAT_MODEL') || 'llama3.1-8b',
+            });
+        }
+
         return plans;
     }
 
     buildPlanChain(params: ChatParams, geminiAvailable: boolean): { routingMode: AiRoutingMode; plans: ProviderPlan[] } {
         const routingMode = this.normalizeRoutingMode(params.routingMode);
         const lowCostPlans = this.getLowCostPlans();
+
+        // Detect if user explicitly picked a non-Gemini model from the UI
+        let requestedPlan: ProviderPlan | null = null;
+        if (params.model) {
+            if (params.model.includes('/') || params.model.includes(':')) {
+                // OpenRouter model format: "provider/model-name" or "model:variant"
+                const orConfig = lowCostPlans.find(p => p.provider === 'openrouter');
+                if (orConfig) {
+                    requestedPlan = { ...orConfig, model: params.model };
+                }
+            } else if (params.model.startsWith('llama')) {
+                const cerConfig = lowCostPlans.find(p => p.provider === 'cerebras');
+                if (cerConfig) {
+                    requestedPlan = { ...cerConfig, model: params.model };
+                }
+            }
+        }
+
+        // Build Gemini plans — always available as fallback unless gemini-only is off and model is locked
         const geminiPlans = geminiAvailable
-            ? this.getGeminiModelList(params.model).map((model) => ({ provider: 'gemini' as const, model }))
+            ? this.getGeminiModelList(requestedPlan ? undefined : params.model).map((model) => ({ provider: 'gemini' as const, model }))
             : [];
+
+        // Cerebras-only plan for fallback
+        const cerebrasPlans = lowCostPlans.filter(p => p.provider === 'cerebras');
+
+        // OpenRouter default plan (only if no explicit requestedPlan overrides it)
+        const openRouterDefaultPlans = requestedPlan?.provider === 'openrouter'
+            ? [] // skip default OR since requestedPlan IS the OR model
+            : lowCostPlans.filter(p => p.provider === 'openrouter');
+
         const routeDecision = this.detectPromptNeeds(params.prompt, params.context, params.schemaContext, params.mode, params.image);
 
         if (params.image && geminiPlans.length === 0) {
@@ -123,23 +153,32 @@ export class AiRoutingService {
         }
 
         const orderedPlans: ProviderPlan[] = [];
-        const pushAll = (plans: ProviderPlan[]) => {
-            for (const plan of plans) {
-                if (!orderedPlans.some((existing) => existing.provider === plan.provider && existing.model === plan.model)) {
-                    orderedPlans.push(plan);
-                }
+        const push = (plan: ProviderPlan) => {
+            if (!orderedPlans.some(e => e.provider === plan.provider && e.model === plan.model)) {
+                orderedPlans.push(plan);
             }
         };
+        const pushAll = (plans: ProviderPlan[]) => plans.forEach(push);
 
-        if (routingMode === 'gemini-only' || routingMode === 'best') {
+        if (routingMode === 'gemini-only') {
+            // Gemini only — no cheap fallbacks unless no Gemini available
             pushAll(geminiPlans);
-            pushAll(lowCostPlans);
-        } else if (params.image || routeDecision.preferGemini) {
+            if (orderedPlans.length === 0) pushAll(lowCostPlans); // safety net
+        } else if (requestedPlan) {
+            // User explicitly picked a model → run it first, Gemini as fallback, Cerebras last
+            push(requestedPlan);
             pushAll(geminiPlans);
-            pushAll(lowCostPlans);
+            pushAll(cerebrasPlans);
+        } else if (routingMode === 'best' || params.image || routeDecision.preferGemini) {
+            // Complex tasks: Gemini → OpenRouter → Cerebras
+            pushAll(geminiPlans);
+            pushAll(openRouterDefaultPlans);
+            pushAll(cerebrasPlans);
         } else {
-            pushAll(lowCostPlans);
+            // Default auto / fast: OpenRouter → Gemini → Cerebras
+            pushAll(openRouterDefaultPlans);
             pushAll(geminiPlans);
+            pushAll(cerebrasPlans);
         }
 
         if (orderedPlans.length === 0) {
