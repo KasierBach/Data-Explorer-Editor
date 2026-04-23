@@ -263,18 +263,18 @@ export class AiProviderRunnerService {
         };
     }
 
-    async * streamOpenAiCompatible(plan: ProviderPlan, params: ChatParams, routingMode: AiRoutingMode): AsyncGenerator<StreamEvent> {
-        if (!plan.apiKey || !plan.baseUrl) {
-            throw new Error(`${plan.provider} provider is not configured`);
-        }
-
-        const systemPrompt = this.promptBuilder.buildSystemPrompt({
+    private buildSystemPrompt(params: ChatParams): string {
+        return this.promptBuilder.buildSystemPrompt({
             prompt: params.prompt,
             context: params.context,
             mode: params.mode,
             schemaContext: params.schemaContext,
             databaseType: params.databaseType,
         });
+    }
+
+    async * streamOpenAiCompatible(plan: ProviderPlan, params: ChatParams, routingMode: AiRoutingMode): AsyncGenerator<StreamEvent> {
+        const systemPrompt = this.buildSystemPrompt(params);
 
         const requestTimeout = this.createAbortController(`${plan.provider} stream request (${plan.model})`);
         const response = await fetch(`${plan.baseUrl}/chat/completions`, {
@@ -291,7 +291,7 @@ export class AiProviderRunnerService {
         }).finally(requestTimeout.clear);
 
         if (!response.ok) {
-            throw new Error(await response.text());
+            throw new Error(response.statusText);
         }
 
         const reader = response.body?.getReader();
@@ -303,6 +303,30 @@ export class AiProviderRunnerService {
         let buffer = '';
         let fullText = '';
 
+        const processEvents = (data: string): StreamEvent[] => {
+            const events: StreamEvent[] = [];
+            const lines = data.split('\n\n');
+            for (const event of lines) {
+                const line = event.split('\n').find((entry) => entry.startsWith('data: '));
+                if (!line) continue;
+
+                const jsonData = line.slice(6).trim();
+                if (!jsonData || jsonData === '[DONE]') continue;
+
+                try {
+                    const payload = JSON.parse(jsonData);
+                    const text = this.promptBuilder.extractOpenAiStreamText(payload);
+                    if (text) {
+                        fullText += text;
+                        events.push({ type: 'chunk', text });
+                    }
+                } catch {
+                    // Skip malformed events
+                }
+            }
+            return events;
+        };
+
         while (true) {
             const { value, done } = await this.readWithTimeout(
                 reader,
@@ -311,26 +335,11 @@ export class AiProviderRunnerService {
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
+            for (const event of processEvents(buffer)) {
+                yield event;
+            }
             const events = buffer.split('\n\n');
             buffer = events.pop() || '';
-
-            for (const event of events) {
-                const line = event
-                    .split('\n')
-                    .find((entry) => entry.startsWith('data: '));
-
-                if (!line) continue;
-
-                const data = line.slice(6).trim();
-                if (!data || data === '[DONE]') continue;
-
-                const payload = JSON.parse(data);
-                const deltaText = this.promptBuilder.extractOpenAiStreamText(payload);
-                if (deltaText) {
-                    fullText += deltaText;
-                    yield { type: 'chunk', text: deltaText };
-                }
-            }
         }
 
         const finalChunk = decoder.decode();
@@ -338,25 +347,8 @@ export class AiProviderRunnerService {
             buffer += finalChunk;
         }
 
-        if (buffer.trim()) {
-            const events = buffer.split('\n\n');
-            for (const event of events) {
-                const line = event
-                    .split('\n')
-                    .find((entry) => entry.startsWith('data: '));
-
-                if (!line) continue;
-
-                const data = line.slice(6).trim();
-                if (!data || data === '[DONE]') continue;
-
-                const payload = JSON.parse(data);
-                const deltaText = this.promptBuilder.extractOpenAiStreamText(payload);
-                if (deltaText) {
-                    fullText += deltaText;
-                    yield { type: 'chunk', text: deltaText };
-                }
-            }
+        for (const event of processEvents(buffer)) {
+            yield event;
         }
 
         const parsed = this.promptBuilder.parseAiResponse(fullText);

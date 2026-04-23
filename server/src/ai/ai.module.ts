@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AiService } from './ai.service';
 import { AiController } from './ai.controller';
+import { AiChatCompletionService } from './ai.chat-completion.service';
 import { AiChatService } from './ai.chat.service';
 import { AiChatController } from './ai.chat.controller';
 import { ConnectionsModule } from '../connections/connections.module';
@@ -9,22 +10,31 @@ import { AiPromptBuilderService } from './ai.prompt-builder.service';
 import { AiRoutingService } from './ai.routing.service';
 import { AiSchemaContextService } from './ai.schema-context.service';
 import { AiProviderRunnerService } from './ai.provider-runner.service';
+import { AiSchemaService } from './ai.schema-service';
+import { AiAutocompleteService } from './ai.autocomplete-service';
+import { AiConnectionService } from './ai.connection-service';
 
 @Module({
     imports: [ConnectionsModule, PrismaModule],
     controllers: [AiController, AiChatController],
     providers: [
-        AiService,  
+        AiService,
+        AiChatCompletionService,
         AiChatService,
         AiPromptBuilderService,
         AiRoutingService,
         AiSchemaContextService,
         AiProviderRunnerService,
+        AiSchemaService,
+        AiAutocompleteService,
+        AiConnectionService,
     ],
     exports: [
         AiService,
-        AiChatService,
+        AiChatCompletionService,
         AiSchemaContextService,
+        AiSchemaService,
+        AiAutocompleteService,
     ],
 })
 export class AiModule { }

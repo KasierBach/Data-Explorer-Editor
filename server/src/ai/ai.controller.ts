@@ -1,8 +1,7 @@
 import { Controller, Post, Body, UseGuards, BadRequestException, InternalServerErrorException, Res, Req } from '@nestjs/common';
 import type { Response } from 'express';
 import { AiService } from './ai.service';
-import { ConnectionsService } from '../connections/connections.service';
-import { DatabaseStrategyFactory } from '../database-strategies';
+import { AiConnectionService } from './ai.connection-service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GenerateSqlDto } from './dto/generate-sql.dto';
 import { AutocompleteDto } from './dto/autocomplete.dto';
@@ -12,8 +11,7 @@ import { AutocompleteDto } from './dto/autocomplete.dto';
 export class AiController {
     constructor(
         private readonly aiService: AiService,
-        private readonly connectionsService: ConnectionsService,
-        private readonly strategyFactory: DatabaseStrategyFactory,
+        private readonly connectionService: AiConnectionService,
     ) { }
 
     @Post('generate-sql')
@@ -22,32 +20,16 @@ export class AiController {
 
         console.log(`[AI] generate-sql request: connectionId=${connectionId}, database=${database}, routingMode=${routingMode || 'auto'}, mode=${mode || 'planning'}, prompt="${prompt}"`);
 
-        // Step 1: Get connection info
-        let connection: any;
-        try {
-            connection = await this.connectionsService.findOne(connectionId, req.user.id);
-            console.log(`[AI] Found connection: ${connection.name} (${connection.type})`);
-        } catch (error) {
-            console.error(`[AI] Connection lookup failed for ID "${connectionId}":`, error.message);
-            throw new BadRequestException(`Connection "${connectionId}" not found. Please re-select your connection.`);
-        }
+        const { connection, schemaContext } = await this.connectionService.getConnectionContext(
+            connectionId,
+            database,
+            req.user.id,
+            (pool, strategy, db, connId) => this.aiService.gatherSchemaContext(pool, strategy, db, connId),
+        );
 
-        // Step 2: Get database pool
-        let pool: any;
-        try {
-            pool = await this.connectionsService.getPool(connectionId, database, req.user.id);
-            console.log(`[AI] Pool acquired for database: ${database || connection.database}`);
-        } catch (error) {
-            console.error(`[AI] Failed to get pool:`, error.message);
-            throw new InternalServerErrorException(`Cannot connect to database: ${error.message}`);
-        }
+        console.log(`[AI] Found connection: ${connection.name} (${connection.type})`);
+        console.log(`[AI] Pool acquired for database: ${database || connection.database}`);
 
-        const strategy = this.strategyFactory.getStrategy(connection.type);
-
-        // Step 3: Gather schema context
-        const schemaContext = await this.aiService.gatherSchemaContext(pool, strategy, database, connectionId);
-
-        // Step 4: Call AI (chat - can handle both SQL and general questions)
         try {
             const result = await this.aiService.chat({
                 model,
@@ -73,43 +55,33 @@ export class AiController {
 
         console.log(`[AI:Stream] generate-sql-stream request: routingMode=${routingMode || 'auto'}, mode=${mode || 'planning'}, prompt="${prompt}"`);
 
-        // Setup SSE headers
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('X-Accel-Buffering', 'no');
         res.flushHeaders();
 
-        let connection: any;
-        try {
-            connection = await this.connectionsService.findOne(connectionId, req.user.id);
-        } catch (error) {
-            res.write(`data: ${JSON.stringify({ type: 'error', text: `Connection not found: ${error.message}` })}\n\n`);
+        const ctx = await this.connectionService.getConnectionContextForStream(
+            connectionId,
+            database,
+            req.user.id,
+            (pool, strategy, db, connId) => this.aiService.gatherSchemaContext(pool, strategy, db, connId),
+        );
+
+        if (!ctx) {
+            res.write(`data: ${JSON.stringify({ type: 'error', text: 'Connection not found' })}\n\n`);
             res.write('data: [DONE]\n\n');
             res.end();
             return;
         }
-
-        let pool: any;
-        try {
-            pool = await this.connectionsService.getPool(connectionId, database, req.user.id);
-        } catch (error) {
-            res.write(`data: ${JSON.stringify({ type: 'error', text: `Cannot connect: ${error.message}` })}\n\n`);
-            res.write('data: [DONE]\n\n');
-            res.end();
-            return;
-        }
-
-        const strategy = this.strategyFactory.getStrategy(connection.type);
-        const schemaContext = await this.aiService.gatherSchemaContext(pool, strategy, database, connectionId);
 
         try {
             const stream = this.aiService.chatStream({
                 model,
                 mode,
                 prompt,
-                schemaContext,
-                databaseType: connection.type,
+                schemaContext: ctx.schemaContext,
+                databaseType: ctx.connection.type,
                 image,
                 context,
                 routingMode,
@@ -133,24 +105,12 @@ export class AiController {
 
         console.log(`[AI:Autocomplete] Request received. Text ending with: "${beforeCursor.slice(-15)}"`);
 
-        let connection: any;
-        try {
-            connection = await this.connectionsService.findOne(connectionId, req.user.id);
-        } catch (error) {
-            console.error(`[AI:Autocomplete] Connection lookup failed for ID "${connectionId}"`);
-            throw new BadRequestException(`Connection not found`);
-        }
-
-
-        let pool: any;
-        try {
-            pool = await this.connectionsService.getPool(connectionId, database, req.user.id);
-        } catch (error) {
-            throw new InternalServerErrorException(`Cannot connect to database`);
-        }
-
-        const strategy = this.strategyFactory.getStrategy(connection.type);
-        const schemaContext = await this.aiService.gatherSchemaContext(pool, strategy, database, connectionId);
+        const { connection, schemaContext } = await this.connectionService.getConnectionContext(
+            connectionId,
+            database,
+            req.user.id,
+            (pool, strategy, db, connId) => this.aiService.gatherSchemaContext(pool, strategy, db, connId),
+        );
 
         const completion = await this.aiService.autocomplete({
             beforeCursor,
@@ -170,22 +130,12 @@ export class AiController {
 
         console.log(`[AI:NLP2SQL] Request: connectionId=${connectionId}, database=${database}, query="${prompt}"`);
 
-        let connection: any;
-        try {
-            connection = await this.connectionsService.findOne(connectionId, req.user.id);
-        } catch (error) {
-            throw new BadRequestException(`Connection not found`);
-        }
-
-        let pool: any;
-        try {
-            pool = await this.connectionsService.getPool(connectionId, database, req.user.id);
-        } catch (error) {
-            throw new InternalServerErrorException(`Cannot connect to database`);
-        }
-
-        const strategy = this.strategyFactory.getStrategy(connection.type);
-        const schemaContext = await this.aiService.gatherSchemaContext(pool, strategy, database, connectionId);
+        const { connection, schemaContext } = await this.connectionService.getConnectionContext(
+            connectionId,
+            database,
+            req.user.id,
+            (pool, strategy, db, connId) => this.aiService.gatherSchemaContext(pool, strategy, db, connId),
+        );
 
         try {
             return await this.aiService.generateSql({

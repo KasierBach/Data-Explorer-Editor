@@ -43,19 +43,16 @@ export const createConnectionSlice: StateCreator<ConnectionSlice> = (set) => ({
     isConnectionDialogOpen: false,
     openConnectionDialog: () => set({ isConnectionDialogOpen: true }),
     closeConnectionDialog: () => set({ isConnectionDialogOpen: false }),
-    setActiveConnectionId: (id) => set({ activeConnectionId: id, activeDatabase: null, isSidebarOpen: true } as any),
+    setActiveConnectionId: (id) => set({ activeConnectionId: id, activeDatabase: null } as any),
     setActiveDatabase: (db) => set({ activeDatabase: db }),
     addConnection: (connection) => set((state) => ({
         connections: [...state.connections, connection],
     })),
-    updateConnection: (id, updatedFields) => set((state) => ({
-        connections: state.connections.map(c =>
-            c.id === id ? { ...c, ...updatedFields } : c
-        ),
-        activeConnectionId: (updatedFields as any).id && state.activeConnectionId === id
-            ? (updatedFields as any).id
-            : state.activeConnectionId,
-    })),
+    updateConnection: (id, updatedFields) => set((state) => {
+        const newConnections = state.connections.map(c => c.id === id ? { ...c, ...updatedFields } : c);
+        const newActiveId = updatedFields.id && state.activeConnectionId === id ? updatedFields.id : state.activeConnectionId;
+        return { connections: newConnections, activeConnectionId: newActiveId };
+    }),
     removeConnection: (id) => set((state) => {
         const newConnections = state.connections.filter(c => c.id !== id);
         const newActiveId = state.activeConnectionId === id ? null : state.activeConnectionId;
