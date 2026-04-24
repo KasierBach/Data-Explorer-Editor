@@ -44,7 +44,7 @@ export class MailTemplates {
                 <tr>
                     <td style="padding:24px;background-color:#020617;text-align:center;border-top:1px solid #1e293b;">
                         <p style="margin:0 0 8px;color:#475569;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;">
-                            Data Explorer v3.0 • Premium Module
+                            Data Explorer v3.3 • Premium Module
                         </p>
                         <p style="margin:0;color:#334155;font-size:11px;">
                             © ${year} KasierBach. All rights reserved.<br/>
