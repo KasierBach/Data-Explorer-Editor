@@ -84,10 +84,9 @@ export class ConnectionsService implements OnModuleDestroy {
             if (typeof pool.close === 'function') await pool.close();
           }
         } catch (err) {
-          console.error(`Error closing idle pool ${key}:`, err);
+          // Silently ignore pool close errors during cleanup
         } finally {
           this.pools.delete(key);
-          console.log(`Cleaned up idle pool: ${key}`);
         }
       }
     }

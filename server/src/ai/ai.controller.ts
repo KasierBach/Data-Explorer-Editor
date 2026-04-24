@@ -1,10 +1,11 @@
-import { Controller, Post, Body, UseGuards, BadRequestException, InternalServerErrorException, Res, Req } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, InternalServerErrorException, Res, Req } from '@nestjs/common';
 import type { Response } from 'express';
 import { AiService } from './ai.service';
 import { AiConnectionService } from './ai.connection-service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GenerateSqlDto } from './dto/generate-sql.dto';
 import { AutocompleteDto } from './dto/autocomplete.dto';
+import type { AuthenticatedRequest } from '../auth/auth-request.types';
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard)
@@ -15,10 +16,8 @@ export class AiController {
     ) { }
 
     @Post('generate-sql')
-    async generateSql(@Body() body: GenerateSqlDto, @Req() req: any) {
+    async generateSql(@Body() body: GenerateSqlDto, @Req() req: AuthenticatedRequest) {
         const { connectionId, database, prompt, image, context, model, mode, routingMode } = body;
-
-        console.log(`[AI] generate-sql request: connectionId=${connectionId}, database=${database}, routingMode=${routingMode || 'auto'}, mode=${mode || 'planning'}, prompt="${prompt}"`);
 
         const { connection, schemaContext } = await this.connectionService.getConnectionContext(
             connectionId,
@@ -27,11 +26,8 @@ export class AiController {
             (pool, strategy, db, connId) => this.aiService.gatherSchemaContext(pool, strategy, db, connId),
         );
 
-        console.log(`[AI] Found connection: ${connection.name} (${connection.type})`);
-        console.log(`[AI] Pool acquired for database: ${database || connection.database}`);
-
         try {
-            const result = await this.aiService.chat({
+            return await this.aiService.chat({
                 model,
                 mode,
                 prompt,
@@ -41,19 +37,15 @@ export class AiController {
                 context,
                 routingMode,
             });
-            console.log(`[AI] Response generated successfully`);
-            return result;
         } catch (error) {
-            console.error(`[AI] AI provider call failed:`, error.message);
-            throw new InternalServerErrorException(`AI generation failed: ${error.message}`);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new InternalServerErrorException(`AI generation failed: ${message}`);
         }
     }
 
     @Post('generate-sql-stream')
-    async generateSqlStream(@Body() body: GenerateSqlDto, @Res() res: Response, @Req() req: any) {
+    async generateSqlStream(@Body() body: GenerateSqlDto, @Res() res: Response, @Req() req: AuthenticatedRequest) {
         const { connectionId, database, prompt, image, context, model, mode, routingMode } = body;
-
-        console.log(`[AI:Stream] generate-sql-stream request: routingMode=${routingMode || 'auto'}, mode=${mode || 'planning'}, prompt="${prompt}"`);
 
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
@@ -91,8 +83,8 @@ export class AiController {
                 res.write(`data: ${JSON.stringify(event)}\n\n`);
             }
         } catch (error) {
-            console.error(`[AI:Stream] Stream error:`, (error as any).message);
-            res.write(`data: ${JSON.stringify({ type: 'error', text: (error as any).message })}\n\n`);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            res.write(`data: ${JSON.stringify({ type: 'error', text: message })}\n\n`);
         }
 
         res.write('data: [DONE]\n\n');
@@ -100,10 +92,8 @@ export class AiController {
     }
 
     @Post('autocomplete')
-    async autocomplete(@Body() body: AutocompleteDto, @Req() req: any) {
+    async autocomplete(@Body() body: AutocompleteDto, @Req() req: AuthenticatedRequest) {
         const { connectionId, database, beforeCursor, afterCursor } = body;
-
-        console.log(`[AI:Autocomplete] Request received. Text ending with: "${beforeCursor.slice(-15)}"`);
 
         const { connection, schemaContext } = await this.connectionService.getConnectionContext(
             connectionId,
@@ -119,16 +109,12 @@ export class AiController {
             databaseType: connection.type,
         });
 
-        console.log(`[AI:Autocomplete] Completion result: "${completion?.slice(0, 80) || '(empty)'}"`);
-
         return { completion };
     }
 
     @Post('nlp-to-sql')
-    async nlpToSql(@Body() body: GenerateSqlDto, @Req() req: any) {
+    async nlpToSql(@Body() body: GenerateSqlDto, @Req() req: AuthenticatedRequest) {
         const { connectionId, database, prompt } = body;
-
-        console.log(`[AI:NLP2SQL] Request: connectionId=${connectionId}, database=${database}, query="${prompt}"`);
 
         const { connection, schemaContext } = await this.connectionService.getConnectionContext(
             connectionId,
@@ -144,7 +130,8 @@ export class AiController {
                 schemaContext,
             });
         } catch (error) {
-            throw new InternalServerErrorException(error.message);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new InternalServerErrorException(message);
         }
     }
 }

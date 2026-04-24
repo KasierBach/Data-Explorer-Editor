@@ -1,11 +1,14 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import * as crypto from 'crypto';
 import { AiProviderRunnerService } from './ai.provider-runner.service';
+import { AI_CONSTANTS } from './ai.constants';
 
 @Injectable()
 export class AiAutocompleteService {
+    private readonly logger = new Logger(AiAutocompleteService.name);
+
     constructor(
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private readonly providerRunner: AiProviderRunnerService,
@@ -47,7 +50,7 @@ SCHEMA:
 ${schemaContext || 'Empty'}
 
 BEFORE CURSOR:
-${beforeCursor.length > 1500 ? beforeCursor.slice(-1500) : beforeCursor}
+${beforeCursor.length > AI_CONSTANTS.AUTOCOMPLETE_CURSOR_MAX_LENGTH ? beforeCursor.slice(-AI_CONSTANTS.AUTOCOMPLETE_CURSOR_MAX_LENGTH) : beforeCursor}
 
 AFTER CURSOR:
 ${afterCursor.length > 300 ? afterCursor.slice(0, 300) : afterCursor}
@@ -57,19 +60,19 @@ NEXT CHARACTERS (START IMMEDIATELY):`;
             const responseText = await this.providerRunner.completeGeminiText({
                 model: 'gemini-3.1-flash-lite-preview',
                 prompt: systemPrompt,
-                temperature: 0.1,
-                maxOutputTokens: 32,
+                temperature: AI_CONSTANTS.TEMPERATURE_PRECISE,
+                maxOutputTokens: AI_CONSTANTS.AUTOCOMPLETE_MAX_OUTPUT_TOKENS,
             });
 
             const suggestion = responseText.replace(/^```sql\n?|```$/g, '').replace(/^SQL\s+/i, '').trim();
 
             if (suggestion) {
-                await this.cacheManager.set(cacheKey, suggestion, 3600000);
+                await this.cacheManager.set(cacheKey, suggestion, AI_CONSTANTS.AUTOCOMPLETE_CACHE_TTL_MS);
             }
 
             return suggestion;
         } catch (error) {
-            console.warn('[AiAutocompleteService] Autocomplete failed:', (error as any).message);
+            this.logger.warn('[AiAutocompleteService] Autocomplete failed:', error instanceof Error ? error.message : 'Unknown error');
             return '';
         }
     }
@@ -111,8 +114,8 @@ JSON RESPONSE:`;
             const responseText = await this.providerRunner.completeGeminiText({
                 model: 'gemini-3.1-flash-lite-preview',
                 prompt: systemPrompt,
-                temperature: 0.1,
-                maxOutputTokens: 1000,
+                temperature: AI_CONSTANTS.TEMPERATURE_PRECISE,
+                maxOutputTokens: AI_CONSTANTS.AUTOCOMPLETE_NLP_MAX_OUTPUT_TOKENS,
             });
 
             const cleaned = responseText.replace(/```json\n?|```/g, '').trim();
@@ -123,8 +126,8 @@ JSON RESPONSE:`;
                 explanation: result.explanation?.trim() || 'Done.'
             };
         } catch (error) {
-            console.error('[AiAutocompleteService] NLP to SQL failed:', error);
-            throw new Error(`Failed to generate SQL: ${(error as any).message}`);
+            this.logger.error('[AiAutocompleteService] NLP to SQL failed:', error);
+            throw new Error(`Failed to generate SQL: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 }

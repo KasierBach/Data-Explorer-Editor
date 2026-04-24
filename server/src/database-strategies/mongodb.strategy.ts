@@ -1,5 +1,5 @@
 import { MongoClient, ObjectId } from 'mongodb';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
     IDatabaseStrategy,
     QueryResult,
@@ -27,6 +27,7 @@ const inferType = (value: unknown): string => {
 
 @Injectable()
 export class MongoDbStrategy implements IDatabaseStrategy {
+    private readonly logger = new Logger(MongoDbStrategy.name);
     async createPool(connectionConfig: any, databaseOverride?: string): Promise<MongoClient> {
         let uri = connectionConfig.url || '';
         if (!uri && connectionConfig.host && connectionConfig.host.includes('://')) {
@@ -64,7 +65,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
                 : `${protocol}://${auth}${host}:${port}${dbName}${queryString}`;
         }
 
-        console.log(`[MongoDbStrategy] Connecting to: ${uri.replace(/\/\/[^@]+@/, '//***:***@')}`);
+        this.logger.log(`[MongoDbStrategy] Connecting to: ${uri.replace(/\/\/[^@]+@/, '//***:***@')}`);
 
         // Support timeout overrides for migration pools (0 = unlimited)
         const socketTimeout = connectionConfig.socketTimeout ?? 30000;
@@ -76,7 +77,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         });
 
         await client.connect();
-        console.log(`[MongoDbStrategy] Connected successfully.`);
+        this.logger.log(`[MongoDbStrategy] Connected successfully.`);
         return client;
     }
 
@@ -278,7 +279,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
                 hasChildren: true
             }));
         } catch (error) {
-            console.error('[MongoDbStrategy] listDatabases failed, falling back to current db:', error);
+            this.logger.warn('[MongoDbStrategy] listDatabases failed, falling back to current db:', error instanceof Error ? error.message : 'Unknown error');
             const currentDb = client.db().databaseName;
             return [{
                 id: `db:${currentDb}`,
@@ -401,7 +402,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
             count = await db.collection(table).estimatedDocumentCount();
             indexes = await db.collection(table).indexes();
         } catch (e) {
-            // ignore
+            // Collection may not exist or be inaccessible; proceed with defaults
         }
 
         return {
@@ -462,7 +463,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
                 }));
             }
         } catch (e) {
-            console.error('[MongoDbStrategy] Failed to infer MongoDB relationships', e);
+            this.logger.warn('[MongoDbStrategy] Failed to infer MongoDB relationships', e instanceof Error ? e.message : 'Unknown error');
         }
 
         return relationships;
@@ -476,7 +477,9 @@ export class MongoDbStrategy implements IDatabaseStrategy {
              const stats = await db.command({ dbStats: 1 });
              tableCount = stats.collections || 0;
              sizeBytes = stats.dataSize || 0;
-        } catch (e) {}
+        } catch (e) {
+            // dbStats may fail on restricted databases; keep defaults
+        }
 
         return {
             tableCount,

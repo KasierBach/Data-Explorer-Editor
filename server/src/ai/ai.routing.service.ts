@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { AI_CONSTANTS } from './ai.constants';
 import type { AiRoutingMode, ChatParams, ProviderPlan, RouteDecision } from './ai.types';
 
 @Injectable()
@@ -37,47 +38,47 @@ export class AiRoutingService {
         const complexDataPattern = /\b(index|join|execution plan|explain|schema design|normalization|aggregation|pipeline|relationship|foreign key)\b/i;
 
         if (image) {
-            complexityScore += 6;
+            complexityScore += AI_CONSTANTS.COMPLEXITY_IMAGE_WEIGHT;
             reasons.push('image-attached');
         }
 
         if (currentInfoPattern.test(combined)) {
-            complexityScore += 4;
+            complexityScore += AI_CONSTANTS.COMPLEXITY_CURRENT_INFO_WEIGHT;
             reasons.push('current-info');
         }
 
         if (deepReasoningPattern.test(combined)) {
-            complexityScore += 3;
+            complexityScore += AI_CONSTANTS.COMPLEXITY_DEEP_REASONING_WEIGHT;
             reasons.push('deep-reasoning');
         }
 
         if (complexDataPattern.test(combined)) {
-            complexityScore += 2;
+            complexityScore += AI_CONSTANTS.COMPLEXITY_COMPLEX_DATA_WEIGHT;
             reasons.push('complex-db-task');
         }
 
-        if ((prompt?.length || 0) > 1200) {
-            complexityScore += 2;
+        if ((prompt?.length || 0) > AI_CONSTANTS.PROMPT_LENGTH_FAST) {
+            complexityScore += AI_CONSTANTS.COMPLEXITY_LONG_PROMPT_WEIGHT;
             reasons.push('long-prompt');
         }
 
-        if ((context?.length || 0) > 2500) {
-            complexityScore += 2;
+        if ((context?.length || 0) > AI_CONSTANTS.CONTEXT_LENGTH_MEDIUM) {
+            complexityScore += AI_CONSTANTS.COMPLEXITY_LARGE_CONTEXT_WEIGHT;
             reasons.push('large-context');
         }
 
-        if ((schemaContext?.length || 0) > 6000) {
-            complexityScore += 1;
+        if ((schemaContext?.length || 0) > AI_CONSTANTS.SCHEMA_CONTEXT_LENGTH_LARGE) {
+            complexityScore += AI_CONSTANTS.COMPLEXITY_LARGE_SCHEMA_WEIGHT;
             reasons.push('large-schema');
         }
 
         if (mode === 'planning') {
-            complexityScore += 1;
+            complexityScore += AI_CONSTANTS.COMPLEXITY_PLANNING_MODE_WEIGHT;
             reasons.push('planning-mode');
         }
 
         return {
-            preferGemini: complexityScore >= 5,
+            preferGemini: complexityScore >= AI_CONSTANTS.COMPLEXITY_GEMINI_THRESHOLD,
             complexityScore,
             reasons,
         };

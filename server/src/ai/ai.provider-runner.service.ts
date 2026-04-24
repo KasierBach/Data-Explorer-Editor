@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AiPromptBuilderService } from './ai.prompt-builder.service';
+import { AI_CONSTANTS } from './ai.constants';
 import type { AiRoutingMode, ChatParams, ChatResult, ProviderPlan, StreamEvent } from './ai.types';
 
 @Injectable()
@@ -27,8 +28,8 @@ export class AiProviderRunnerService {
     }
 
     private getProviderTimeoutMs(): number {
-        const raw = Number(this.configService.get<string>('AI_PROVIDER_TIMEOUT_MS') || 15000);
-        return Number.isFinite(raw) && raw > 0 ? raw : 15000;
+        const raw = Number(this.configService.get<string>('AI_PROVIDER_TIMEOUT_MS') || AI_CONSTANTS.DEFAULT_PROVIDER_TIMEOUT_MS);
+        return Number.isFinite(raw) && raw > 0 ? raw : AI_CONSTANTS.DEFAULT_PROVIDER_TIMEOUT_MS;
     }
 
     private getStreamIdleTimeoutMs(): number {
@@ -97,8 +98,8 @@ export class AiProviderRunnerService {
         const model = this.genAI.getGenerativeModel({
             model: params.model,
             generationConfig: {
-                temperature: params.temperature ?? 0.1,
-                maxOutputTokens: params.maxOutputTokens ?? 32,
+                temperature: params.temperature ?? AI_CONSTANTS.TEMPERATURE_PRECISE,
+                maxOutputTokens: params.maxOutputTokens ?? AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
             },
         });
 
@@ -125,13 +126,16 @@ export class AiProviderRunnerService {
 
         const model = this.genAI.getGenerativeModel({
             model: plan.model,
-            tools: [{ googleSearch: {} } as any],
+            tools: [{ googleSearch: {} } as Record<string, unknown>],
         });
 
         const result = await this.withTimeout(
             model.generateContent({
                 contents: [{ role: 'user', parts }],
-                generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+                generationConfig: {
+                    temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
+                    maxOutputTokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+                },
             }),
             `Gemini request (${plan.model})`,
         );
@@ -170,8 +174,8 @@ export class AiProviderRunnerService {
             body: JSON.stringify({
                 model: plan.model,
                 messages: this.promptBuilder.buildOpenAiMessages(params.prompt, systemPrompt, params.context),
-                temperature: 0.7,
-                max_tokens: 8192,
+                temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
+                max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
             }),
             signal: requestTimeout.signal,
         }).finally(requestTimeout.clear);
@@ -185,7 +189,7 @@ export class AiProviderRunnerService {
         const data = await response.json();
         const content = data?.choices?.[0]?.message?.content;
         const text = Array.isArray(content)
-            ? content.map((item: any) => item?.text || '').join('')
+            ? content.map((item: { text?: string }) => item?.text || '').join('')
             : (content || '');
         const parsed = this.promptBuilder.parseAiResponse(text);
         this.promptBuilder.assertUsableStructuredResponse(parsed, text, `${plan.provider} (${plan.model})`);
@@ -214,13 +218,16 @@ export class AiProviderRunnerService {
 
         const model = this.genAI.getGenerativeModel({
             model: plan.model,
-            tools: [{ googleSearch: {} } as any],
+            tools: [{ googleSearch: {} } as Record<string, unknown>],
         });
 
         const result = await this.withTimeout(
             model.generateContentStream({
                 contents: [{ role: 'user', parts }],
-                generationConfig: { temperature: 0.7, maxOutputTokens: 8192 },
+                generationConfig: {
+                    temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
+                    maxOutputTokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+                },
             }),
             `Gemini stream bootstrap (${plan.model})`,
         );
@@ -265,18 +272,14 @@ export class AiProviderRunnerService {
         };
     }
 
-    private buildSystemPrompt(params: ChatParams): string {
-        return this.promptBuilder.buildSystemPrompt({
+    async * streamOpenAiCompatible(plan: ProviderPlan, params: ChatParams, routingMode: AiRoutingMode): AsyncGenerator<StreamEvent> {
+        const systemPrompt = this.promptBuilder.buildSystemPrompt({
             prompt: params.prompt,
             context: params.context,
             mode: params.mode,
             schemaContext: params.schemaContext,
             databaseType: params.databaseType,
         });
-    }
-
-    async * streamOpenAiCompatible(plan: ProviderPlan, params: ChatParams, routingMode: AiRoutingMode): AsyncGenerator<StreamEvent> {
-        const systemPrompt = this.buildSystemPrompt(params);
 
         const requestTimeout = this.createAbortController(`${plan.provider} stream request (${plan.model})`);
         const response = await fetch(`${plan.baseUrl}/chat/completions`, {
@@ -285,8 +288,8 @@ export class AiProviderRunnerService {
             body: JSON.stringify({
                 model: plan.model,
                 messages: this.promptBuilder.buildOpenAiMessages(params.prompt, systemPrompt, params.context),
-                temperature: 0.7,
-                max_tokens: 8192,
+                temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
+                max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
                 stream: true,
             }),
             signal: requestTimeout.signal,

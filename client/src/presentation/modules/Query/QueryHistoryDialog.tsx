@@ -40,14 +40,16 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
     const serverHistory = useMemo(() => {
         if (!serverLogs) return [];
         return serverLogs.map((log: any) => {
-            let details = {};
-            try { details = JSON.parse(log.details || '{}'); } catch (e) {}
+            let details: Record<string, unknown> = {};
+            try { details = JSON.parse(log.details || '{}'); } catch (e) {
+                // details may be malformed JSON; use empty object fallback
+            }
             
             return {
                 id: log.id,
-                sql: (details as any).sqlSnippet || (details as any).sql || 'Unknown Query',
-                database: (details as any).database,
-                connectionName: (details as any).connectionName || 'Database',
+                sql: String((details as Record<string, unknown>).sqlSnippet || (details as Record<string, unknown>).sql || 'Unknown Query'),
+                database: String((details as Record<string, unknown>).database || ''),
+                connectionName: String((details as Record<string, unknown>).connectionName || 'Database'),
                 executedAt: new Date(log.createdAt).getTime(),
                 status: 'success' as const, // For now assume successful if in logs
                 isServerPersisted: true
@@ -172,7 +174,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                                             </span>
                                         )}
                                         {entry.database && <span>({entry.database})</span>}
-                                        {(entry as any).isServerPersisted && (
+                                        {(entry as { isServerPersisted?: boolean }).isServerPersisted && (
                                             <span className="bg-green-500/10 text-green-600 px-1 rounded border border-green-500/20 text-[9px]">Synced</span>
                                         )}
                                         {entry.errorMessage && (

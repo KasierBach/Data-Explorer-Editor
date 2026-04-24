@@ -3,6 +3,7 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import type { AuthenticatedRequest } from '../auth/auth-request.types';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { OnboardingDto } from './dto/onboarding.dto';
@@ -17,37 +18,37 @@ export class UsersController {
     constructor(private readonly usersService: UsersService) { }
 
     @Get('me')
-    async getProfile(@Request() req: any) {
+    async getProfile(@Request() req: AuthenticatedRequest) {
         return this.usersService.findById(req.user.id);
     }
 
     @Patch('profile/onboarding')
-    async onboarding(@Request() req: any, @Body() dto: OnboardingDto) {
+    async onboarding(@Request() req: AuthenticatedRequest, @Body() dto: OnboardingDto) {
         return this.usersService.onboarding(req.user.id, dto);
     }
 
     @Patch('profile')
-    async updateProfile(@Request() req: any, @Body() dto: UpdateProfileDto) {
+    async updateProfile(@Request() req: AuthenticatedRequest, @Body() dto: UpdateProfileDto) {
         return this.usersService.updateProfile(req.user.id, dto);
     }
 
     @Patch('settings')
-    async updateSettings(@Request() req: any, @Body() dto: UpdateSettingsDto) {
+    async updateSettings(@Request() req: AuthenticatedRequest, @Body() dto: UpdateSettingsDto) {
         return this.usersService.updateSettings(req.user.id, dto);
     }
 
     @Patch('billing')
-    async updateBilling(@Request() req: any, @Body() dto: UpdateBillingDto) {
+    async updateBilling(@Request() req: AuthenticatedRequest, @Body() dto: UpdateBillingDto) {
         return this.usersService.updateBilling(req.user.id, dto);
     }
 
     @Post('change-password')
-    async changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
+    async changePassword(@Request() req: AuthenticatedRequest, @Body() dto: ChangePasswordDto) {
         return this.usersService.changePassword(req.user.id, dto);
     }
 
     @Delete('me')
-    async deleteAccount(@Request() req: any) {
+    async deleteAccount(@Request() req: AuthenticatedRequest) {
         return this.usersService.deleteAccount(req.user.id);
     }
 

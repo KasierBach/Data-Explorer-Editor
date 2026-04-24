@@ -2,6 +2,7 @@ import { Controller, Post, Body, HttpCode, HttpStatus, Get, UseGuards, Req, Res,
 import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
+import type { AuthenticatedRequest } from './auth-request.types';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -140,7 +141,7 @@ export class AuthController {
 
     @Get('google/callback')
     @UseGuards(AuthGuard('google'))
-    async googleAuthRedirect(@Req() req: any, @Res() res: Response) {
+    async googleAuthRedirect(@Req() req: AuthenticatedRequest, @Res() res: Response) {
         const code = this.tokenService.createOauthExchangeToken(req.user.id);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         res.redirect(`${frontendUrl}/login#code=${encodeURIComponent(code)}`);
@@ -154,7 +155,7 @@ export class AuthController {
 
     @Get('github/callback')
     @UseGuards(AuthGuard('github'))
-    async githubAuthRedirect(@Req() req: any, @Res() res: Response) {
+    async githubAuthRedirect(@Req() req: AuthenticatedRequest, @Res() res: Response) {
         const code = this.tokenService.createOauthExchangeToken(req.user.id);
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         res.redirect(`${frontendUrl}/login#code=${encodeURIComponent(code)}`);

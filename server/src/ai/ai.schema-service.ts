@@ -1,13 +1,16 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import * as crypto from 'crypto';
 import { AiSchemaContextService } from './ai.schema-context.service';
 import { AiProviderRunnerService } from './ai.provider-runner.service';
+import { AI_CONSTANTS } from './ai.constants';
 import type { StreamEvent } from './ai.types';
 
 @Injectable()
 export class AiSchemaService {
+    private readonly logger = new Logger(AiSchemaService.name);
+
     constructor(
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private readonly schemaContextService: AiSchemaContextService,
@@ -35,7 +38,7 @@ Rules:
             const response = await this.providerRunner.completeGeminiText({
                 model: 'gemini-3.1-flash-lite-preview',
                 prompt,
-                temperature: 0.1,
+                temperature: AI_CONSTANTS.TEMPERATURE_PRECISE,
                 maxOutputTokens: 100,
             });
 
@@ -46,11 +49,11 @@ Rules:
                 .slice(0, 5);
 
             if (suggestions.length > 0) {
-                await this.cacheManager.set(cacheKey, suggestions, 3600000);
+                await this.cacheManager.set(cacheKey, suggestions, AI_CONSTANTS.AUTOCOMPLETE_CACHE_TTL_MS);
             }
             return suggestions;
         } catch (error) {
-            console.warn('[AiSchemaService] Semantic suggestion failed:', (error as any).message);
+            this.logger.warn('[AiSchemaService] Semantic suggestion failed:', error instanceof Error ? error.message : 'Unknown error');
             return [];
         }
     }

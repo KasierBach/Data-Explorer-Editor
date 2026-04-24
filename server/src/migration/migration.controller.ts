@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MigrationService } from './migration.service';
 import { StartMigrationDto } from './dto/start-migration.dto';
 import { TokenService } from '../auth/token.service';
+import type { AuthenticatedRequest } from '../auth/auth-request.types';
 
 @Controller('migration')
 export class MigrationController {
@@ -15,15 +16,14 @@ export class MigrationController {
 
     @Post('start')
     @UseGuards(JwtAuthGuard)
-    async startMigration(@Req() req: any, @Body() dto: StartMigrationDto) {
-        const userId = (req.user as any).id;
-        return this.migrationService.startMigration(userId, dto);
+    async startMigration(@Req() req: AuthenticatedRequest, @Body() dto: StartMigrationDto) {
+        return this.migrationService.startMigration(req.user.id, dto);
     }
 
     @Post('progress-ticket/:jobId')
     @UseGuards(JwtAuthGuard)
-    async createProgressTicket(@Param('jobId') jobId: string, @Req() req: any) {
-        const userId = (req.user as any).id;
+    async createProgressTicket(@Param('jobId') jobId: string, @Req() req: AuthenticatedRequest) {
+        const userId = req.user.id;
         await this.migrationService.assertJobOwnership(jobId, userId);
 
         return {

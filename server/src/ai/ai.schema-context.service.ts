@@ -1,11 +1,12 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
+import { AI_CONSTANTS } from './ai.constants';
 
 @Injectable()
 export class AiSchemaContextService {
+    private readonly logger = new Logger(AiSchemaContextService.name);
     constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
-    private readonly CACHE_TTL = 1000 * 60 * 15; // 15 minutes
 
     async gatherSchemaContext(pool: any, strategy: any, database?: string, connectionId?: string): Promise<string> {
         const cacheKey = connectionId ? `aicache:${connectionId}:${database || 'default'}` : null;
@@ -55,12 +56,12 @@ export class AiSchemaContextService {
             schemaContext = this.buildSchemaContext(allTables, columnMap, relationships);
 
             if (cacheKey && schemaContext && !schemaContext.includes('Could not load')) {
-                await this.cacheManager.set(cacheKey, schemaContext, this.CACHE_TTL);
+                await this.cacheManager.set(cacheKey, schemaContext, AI_CONSTANTS.SCHEMA_CACHE_TTL_MS);
             }
 
-            console.log(`[AiSchemaContextService] Schema context built: ${allTables.length} tables found`);
-        } catch (error: any) {
-            console.error('[AiSchemaContextService] Schema gathering failed:', error.message);
+            this.logger.log(`[AiSchemaContextService] Schema context built: ${allTables.length} tables found`);
+        } catch (error) {
+            this.logger.error('[AiSchemaContextService] Schema gathering failed:', error instanceof Error ? error.message : 'Unknown error');
             schemaContext = '(Could not load schema information)';
         }
 
