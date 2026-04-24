@@ -1,7 +1,7 @@
-export function getField<T, K extends keyof T>(obj: T, key: K): T[K] {
+export function getField<T extends object, K extends keyof T>(obj: T, key: K): T[K] {
     return obj[key];
 }
 
-export function hasField<T>(obj: T, key: keyof T): boolean {
+export function hasField<T extends object>(obj: T, key: keyof T): boolean {
     return key in obj;
 }
