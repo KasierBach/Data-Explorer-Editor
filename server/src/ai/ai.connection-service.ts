@@ -3,12 +3,21 @@ import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 import type { IDatabaseStrategy } from '../database-strategies/database-strategy.interface';
 
+import type { Connection } from '../connections/entities/connection.entity';
+
 export interface ConnectionContext {
-    connection: any;
-    pool: any;
+    connection: Connection;
+    pool: unknown;
     strategy: IDatabaseStrategy;
     schemaContext: string;
 }
+
+export type SchemaContextGatherer = (
+    pool: unknown,
+    strategy: IDatabaseStrategy,
+    database?: string,
+    connectionId?: string,
+) => Promise<string>;
 
 @Injectable()
 export class AiConnectionService {
@@ -21,20 +30,21 @@ export class AiConnectionService {
         connectionId: string,
         database: string | undefined,
         userId: string,
-        gatherSchemaContext: (pool: any, strategy: any, database?: string, connectionId?: string) => Promise<string>,
+        gatherSchemaContext: SchemaContextGatherer,
     ): Promise<ConnectionContext> {
-        let connection: any;
+        let connection: Connection;
         try {
             connection = await this.connectionsService.findOne(connectionId, userId);
-        } catch (error) {
+        } catch {
             throw new BadRequestException(`Connection "${connectionId}" not found. Please re-select your connection.`);
         }
 
-        let pool: any;
+        let pool: unknown;
         try {
             pool = await this.connectionsService.getPool(connectionId, database, userId);
         } catch (error) {
-            throw new InternalServerErrorException(`Cannot connect to database: ${(error as any).message}`);
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            throw new InternalServerErrorException(`Cannot connect to database: ${message}`);
         }
 
         const strategy = this.strategyFactory.getStrategy(connection.type);
@@ -47,16 +57,16 @@ export class AiConnectionService {
         connectionId: string,
         database: string | undefined,
         userId: string,
-        gatherSchemaContext: (pool: any, strategy: any, database?: string, connectionId?: string) => Promise<string>,
+        gatherSchemaContext: SchemaContextGatherer,
     ): Promise<ConnectionContext | null> {
-        let connection: any;
+        let connection: Connection;
         try {
             connection = await this.connectionsService.findOne(connectionId, userId);
         } catch {
             return null;
         }
 
-        let pool: any;
+        let pool: unknown;
         try {
             pool = await this.connectionsService.getPool(connectionId, database, userId);
         } catch {

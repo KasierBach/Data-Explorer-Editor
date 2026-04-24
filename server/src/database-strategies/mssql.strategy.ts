@@ -6,15 +6,19 @@ import type {
     Relationship,
     DatabaseMetrics,
     UpdateRowParams,
+    InsertRowParams,
+    DeleteRowsParams,
     ConnectionConfig,
+    FullTableMetadata,
 } from './database-strategy.interface';
 import { SchemaOperation } from '../query/dto/schema-operations.types';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as mssql from 'mssql';
 import { SqlUtil } from '../utils/sql.util';
 
 @Injectable()
 export class MssqlStrategy implements IDatabaseStrategy {
+    private readonly logger = new Logger(MssqlStrategy.name);
 
     async createPool(connectionConfig: ConnectionConfig, databaseOverride?: string): Promise<mssql.ConnectionPool> {
         // Migration override: connectionConfig.statementTimeout/queryTimeout will be 0
@@ -40,7 +44,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
         return await new mssql.ConnectionPool(config).connect();
     }
 
-    async closePool(pool: any): Promise<void> {
+    async closePool(pool: mssql.ConnectionPool): Promise<void> {
         await pool.close();
     }
 
@@ -56,7 +60,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
 
     // ─── Query Operations ───
 
-    async executeQuery(pool: any, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
+    async executeQuery(pool: mssql.ConnectionPool, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
         let safeSql = sql;
         if (options?.limit !== undefined && options?.offset !== undefined) {
             safeSql = SqlUtil.injectPagination(sql, options.limit, options.offset, 'mssql');
@@ -72,7 +76,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
         };
     }
 
-    async updateRow(pool: any, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }> {
+    async updateRow(pool: mssql.ConnectionPool, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }> {
         const { schema, table, pkColumn, pkValue, updates } = params;
         const updateCols = Object.keys(updates);
         const quotedTable = this.quoteTable(schema, table);
@@ -87,7 +91,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: result.rowsAffected?.[0] ?? 0 };
     }
 
-    async insertRow(pool: any, params: any): Promise<{ success: boolean; rowCount: number }> {
+    async insertRow(pool: mssql.ConnectionPool, params: InsertRowParams): Promise<{ success: boolean; rowCount: number }> {
         const { schema, table, data } = params;
         const columns = Object.keys(data);
         if (columns.length === 0) return { success: false, rowCount: 0 };
@@ -104,7 +108,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: result.rowsAffected?.[0] ?? 0 };
     }
 
-    async deleteRows(pool: any, params: any): Promise<{ success: boolean; rowCount: number }> {
+    async deleteRows(pool: mssql.ConnectionPool, params: DeleteRowsParams): Promise<{ success: boolean; rowCount: number }> {
         const { schema, table, pkColumn, pkValues } = params;
         if (pkValues.length === 0) return { success: true, rowCount: 0 };
 
@@ -119,7 +123,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: result.rowsAffected?.[0] ?? 0 };
     }
 
-    async importData(pool: any, params: { schema: string; table: string; data: any[] }): Promise<{ success: boolean; rowCount: number }> {
+    async importData(pool: mssql.ConnectionPool, params: { schema: string; table: string; data: Record<string, unknown>[] }): Promise<{ success: boolean; rowCount: number }> {
         const { schema, table, data } = params;
         if (!data || data.length === 0) return { success: true, rowCount: 0 };
 
@@ -134,7 +138,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: totalAffected };
     }
 
-    async exportStream(pool: any, schema: string, table: string): Promise<any> {
+    async exportStream(pool: mssql.ConnectionPool, schema: string, table: string): Promise<unknown> {
         const quotedTable = this.quoteTable(schema, table);
         const sql = `SELECT * FROM ${quotedTable}`;
         
@@ -145,9 +149,9 @@ export class MssqlStrategy implements IDatabaseStrategy {
         const { PassThrough } = await import('stream');
         const pt = new PassThrough({ objectMode: true });
         
-        request.on('row', (row: any) => pt.write(row));
+        request.on('row', (row: Record<string, unknown>) => pt.write(row));
         request.on('done', () => pt.end());
-        request.on('error', (err: any) => pt.destroy(err));
+        request.on('error', (err: Error | unknown) => pt.destroy(err instanceof Error ? err : new Error(String(err))));
         
         // Start the query
         request.query(sql);
@@ -155,7 +159,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
         return pt;
     }
 
-    buildAlterTableSql(quotedTable: string, op: any): string {
+    buildAlterTableSql(quotedTable: string, op: SchemaOperation): string {
         switch (op.type) {
             case 'add_column':
                 return `ALTER TABLE ${quotedTable} ADD [${op.name}] ${op.dataType} ${op.isNullable === false ? 'NOT NULL' : ''}`;
@@ -188,22 +192,22 @@ export class MssqlStrategy implements IDatabaseStrategy {
 
     // ─── DDL Operations ───
 
-    async createDatabase(pool: any, name: string): Promise<void> {
+    async createDatabase(pool: mssql.ConnectionPool, name: string): Promise<void> {
         await pool.request().query(`CREATE DATABASE [${name}]`);
     }
 
-    async dropDatabase(pool: any, name: string): Promise<void> {
+    async dropDatabase(pool: mssql.ConnectionPool, name: string): Promise<void> {
         await pool.request().query(`ALTER DATABASE [${name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE`);
         await pool.request().query(`DROP DATABASE [${name}]`);
     }
 
     // ─── Metadata Operations ───
 
-    async getDatabases(pool: any): Promise<TreeNodeResult[]> {
+    async getDatabases(pool: mssql.ConnectionPool): Promise<TreeNodeResult[]> {
         const result = await pool.request().query(
             `SELECT name FROM sys.databases WHERE name NOT IN ('master','tempdb','model','msdb') ORDER BY name`,
         );
-        return result.recordset.map((row: any) => ({
+        return result.recordset.map((row: { name: string }) => ({
             id: `db:${row.name}`,
             name: row.name,
             type: 'database',
@@ -212,11 +216,11 @@ export class MssqlStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getSchemas(pool: any, dbName?: string): Promise<TreeNodeResult[]> {
+    async getSchemas(pool: mssql.ConnectionPool, dbName?: string): Promise<TreeNodeResult[]> {
         const result = await pool.request().query(
             `SELECT name FROM sys.schemas WHERE name NOT IN ('sys','INFORMATION_SCHEMA','guest','db_owner','db_accessadmin','db_securityadmin','db_ddladmin','db_backupoperator','db_datareader','db_datawriter','db_denydatareader','db_denydatawriter') ORDER BY name`,
         );
-        return result.recordset.map((row: any) => ({
+        return result.recordset.map((row: { name: string }) => ({
             id: dbName ? `db:${dbName}.schema:${row.name}` : `schema:${row.name}`,
             name: row.name,
             type: 'schema',
@@ -225,11 +229,11 @@ export class MssqlStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getTables(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
+    async getTables(pool: mssql.ConnectionPool, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
         const result = await pool.request()
             .input('schema', mssql.NVarChar, schema)
             .query(`SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = @schema AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME`);
-        return result.recordset.map((row: any) => ({
+        return result.recordset.map((row: { TABLE_NAME: string }) => ({
             id: dbName ? `db:${dbName}.schema:${schema}.table:${row.TABLE_NAME}` : `schema:${schema}.table:${row.TABLE_NAME}`,
             name: row.TABLE_NAME,
             type: 'table',
@@ -238,11 +242,11 @@ export class MssqlStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getViews(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
+    async getViews(pool: mssql.ConnectionPool, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
         const result = await pool.request()
             .input('schema', mssql.NVarChar, schema)
             .query(`SELECT TABLE_NAME FROM INFORMATION_SCHEMA.VIEWS WHERE TABLE_SCHEMA = @schema ORDER BY TABLE_NAME`);
-        return result.recordset.map((row: any) => ({
+        return result.recordset.map((row: { TABLE_NAME: string }) => ({
             id: dbName ? `db:${dbName}.schema:${schema}.view:${row.TABLE_NAME}` : `schema:${schema}.view:${row.TABLE_NAME}`,
             name: row.TABLE_NAME,
             type: 'view',
@@ -251,11 +255,11 @@ export class MssqlStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getFunctions(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
+    async getFunctions(pool: mssql.ConnectionPool, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
         const result = await pool.request()
             .input('schema', mssql.NVarChar, schema)
             .query(`SELECT name, type_desc FROM sys.objects WHERE schema_id = SCHEMA_ID(@schema) AND type IN ('FN','IF','TF','P') ORDER BY name`);
-        return result.recordset.map((row: any) => ({
+        return result.recordset.map((row: { name: string }) => ({
             id: dbName ? `db:${dbName}.schema:${schema}.func:${row.name}` : `schema:${schema}.func:${row.name}`,
             name: row.name,
             type: 'function',
@@ -264,11 +268,11 @@ export class MssqlStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getFunctionParameters(_pool: any, _schema: string, _func: string): Promise<ColumnInfo[]> {
+    async getFunctionParameters(_pool: mssql.ConnectionPool, _schema: string, _func: string): Promise<ColumnInfo[]> {
         return [];
     }
 
-    async getColumns(pool: any, schema: string, table: string): Promise<ColumnInfo[]> {
+    async getColumns(pool: mssql.ConnectionPool, schema: string, table: string): Promise<ColumnInfo[]> {
         const sql = `
             SELECT 
                 c.COLUMN_NAME, c.DATA_TYPE, c.IS_NULLABLE, c.COLUMN_DEFAULT,
@@ -286,7 +290,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
             .input('table', mssql.NVarChar, table)
             .input('schema', mssql.NVarChar, schema)
             .query(sql);
-        return result.recordset.map((row: any) => ({
+        return result.recordset.map((row: { COLUMN_NAME: string; DATA_TYPE: string; IS_NULLABLE: string; COLUMN_DEFAULT: unknown; pk_constraint_name: string | null }) => ({
             name: row.COLUMN_NAME,
             type: row.DATA_TYPE,
             isNullable: row.IS_NULLABLE === 'YES',
@@ -296,7 +300,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getFullMetadata(pool: any, schema: string, table: string): Promise<any> {
+    async getFullMetadata(pool: mssql.ConnectionPool, schema: string, table: string): Promise<FullTableMetadata> {
         const columns = await this.getColumns(pool, schema, table);
         return {
             columns,
@@ -306,7 +310,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
         };
     }
 
-    async getRelationships(pool: any): Promise<Relationship[]> {
+    async getRelationships(pool: mssql.ConnectionPool): Promise<Relationship[]> {
         const sql = `
             SELECT 
                 fk.name AS constraint_name,
@@ -322,10 +326,10 @@ export class MssqlStrategy implements IDatabaseStrategy {
             JOIN sys.columns cr ON fkc.referenced_object_id = cr.object_id AND fkc.referenced_column_id = cr.column_id
         `;
         const result = await pool.request().query(sql);
-        return result.recordset;
+        return result.recordset as Relationship[];
     }
 
-    async getDatabaseMetrics(pool: any): Promise<DatabaseMetrics> {
+    async getDatabaseMetrics(pool: mssql.ConnectionPool): Promise<DatabaseMetrics> {
         const statsSql = `
             SELECT 
                 (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE') as table_count,
@@ -351,27 +355,27 @@ export class MssqlStrategy implements IDatabaseStrategy {
             pool.request().query(typesSql),
         ]);
 
-        const stats = statsRes.recordset[0];
+        const stats = statsRes.recordset[0] as { table_count: string; size_bytes: string; active_connections: string };
         return {
             tableCount: parseInt(stats.table_count),
             sizeBytes: parseInt(stats.size_bytes) || 0,
             activeConnections: parseInt(stats.active_connections),
-            topTables: tablesRes.recordset.map((r: any) => ({ name: r.name, sizeBytes: parseInt(r.size_bytes) })),
-            tableTypes: typesRes.recordset.map((r: any) => ({ type: r.type, count: parseInt(r.count) })),
+            topTables: tablesRes.recordset.map((r: { name: string; size_bytes: string }) => ({ name: r.name, sizeBytes: parseInt(r.size_bytes) })),
+            tableTypes: typesRes.recordset.map((r: { type: string; count: string }) => ({ type: r.type, count: parseInt(r.count) })),
         };
     }
 
     // ─── Polymorphic Tree & Seed ───
 
-    async getHierarchyNodes(pool: any, parentId: string | null, parsedParams: any, connectionInfo: any): Promise<TreeNodeResult[]> {
+    async getHierarchyNodes(pool: mssql.ConnectionPool, parentId: string | null, parsedParams: unknown, connectionInfo: unknown): Promise<TreeNodeResult[]> {
         if (!parentId) {
-            if (connectionInfo.showAllDatabases) return this.getDatabases(pool);
+            if ((connectionInfo as { showAllDatabases?: boolean }).showAllDatabases) return this.getDatabases(pool);
             return this.getSchemas(pool);
         }
         return [];
     }
 
-    async seedData(pool: any): Promise<QueryResult> {
+    async seedData(pool: mssql.ConnectionPool): Promise<QueryResult> {
         const sql = `
             IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
             CREATE TABLE users (

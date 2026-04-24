@@ -1,10 +1,51 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditAction, AuditService } from '../audit/audit.service';
 import { ConnectionsService } from '../connections/connections.service';
 import { CreateDashboardDto } from './dto/create-dashboard.dto';
 import { AddDashboardWidgetDto } from './dto/add-dashboard-widget.dto';
 import { DashboardEntity } from './entities/dashboard.entity';
+
+interface RawDashboardUser {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+}
+
+interface RawDashboardWidget {
+  id: string;
+  title: string;
+  chartType: string;
+  queryText: string | null;
+  connectionId: string | null;
+  database: string | null;
+  columns: string[];
+  xAxis: string | null;
+  yAxis: string[];
+  orderIndex: number;
+  config: unknown;
+  dataSnapshot: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+  [key: string]: unknown;
+}
+
+interface RawDashboard {
+  id: string;
+  name: string;
+  description: string | null;
+  visibility: string;
+  connectionId: string | null;
+  database: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  userId: string;
+  user: RawDashboardUser;
+  widgets: RawDashboardWidget[];
+  [key: string]: unknown;
+}
 
 @Injectable()
 export class DashboardsService {
@@ -15,11 +56,11 @@ export class DashboardsService {
   ) {}
 
   private get dashboards() {
-    return (this.prisma as any).dashboard;
+    return this.prisma.dashboard;
   }
 
   private get dashboardWidgets() {
-    return (this.prisma as any).dashboardWidget;
+    return this.prisma.dashboardWidget;
   }
 
   private getEmailDomain(email?: string | null) {
@@ -34,7 +75,7 @@ export class DashboardsService {
     await this.connectionsService.findOne(connectionId, userId);
   }
 
-  private toEntity(dashboard: any, currentUserId: string): DashboardEntity {
+  private toEntity(dashboard: RawDashboard, currentUserId: string): DashboardEntity {
     return {
       id: dashboard.id,
       name: dashboard.name,
@@ -53,8 +94,8 @@ export class DashboardsService {
       isOwner: dashboard.userId === currentUserId,
       widgets: (dashboard.widgets ?? [])
         .slice()
-        .sort((a: any, b: any) => a.orderIndex - b.orderIndex || a.createdAt.getTime() - b.createdAt.getTime())
-        .map((widget: any) => ({
+        .sort((a, b) => a.orderIndex - b.orderIndex || a.createdAt.getTime() - b.createdAt.getTime())
+        .map((widget) => ({
           id: widget.id,
           title: widget.title,
           chartType: widget.chartType,
@@ -91,7 +132,7 @@ export class DashboardsService {
                 user: {
                   email: {
                     endsWith: `@${domain}`,
-                    mode: 'insensitive',
+                    mode: 'insensitive' as Prisma.QueryMode,
                   },
                 },
               }]
@@ -114,7 +155,7 @@ export class DashboardsService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return dashboards.map((dashboard: any) => this.toEntity(dashboard, userId));
+    return dashboards.map((dashboard) => this.toEntity(dashboard as unknown as RawDashboard, userId));
   }
 
   async findOne(id: string, userId: string): Promise<DashboardEntity> {
@@ -200,7 +241,7 @@ export class DashboardsService {
         xAxis: dto.xAxis?.trim() || null,
         yAxis: dto.yAxis ?? [],
         orderIndex: dto.orderIndex ?? widgetCount,
-        config: dto.config ?? null,
+        config: (dto.config ?? Prisma.JsonNull) as Prisma.InputJsonValue,
         dataSnapshot: dto.dataSnapshot ?? [],
       },
     });
@@ -232,6 +273,10 @@ export class DashboardsService {
         },
       },
     });
+
+    if (!updated) {
+      throw new NotFoundException('Dashboard not found.');
+    }
 
     return this.toEntity(updated, userId);
   }

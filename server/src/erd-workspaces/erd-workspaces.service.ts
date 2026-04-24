@@ -5,7 +5,29 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+
+interface RawErdWorkspaceUser {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+}
+
+interface RawErdWorkspace {
+  id: string;
+  name: string;
+  notes: string | null;
+  connectionId: string | null;
+  database: string | null;
+  layout: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+  userId: string;
+  user: RawErdWorkspaceUser;
+  [key: string]: unknown;
+}
 import { AuditAction, AuditService } from '../audit/audit.service';
 import { ConnectionsService } from '../connections/connections.service';
 import { CreateErdWorkspaceDto } from './dto/create-erd-workspace.dto';
@@ -23,13 +45,13 @@ export class ErdWorkspacesService {
   ) {}
 
   private get erdWorkspaces() {
-    return (this.prisma as any).erdWorkspace;
+    return this.prisma.erdWorkspace;
   }
 
   private isWorkspaceStoreUnavailable(error: unknown) {
     if (!error || typeof error !== 'object') return false;
 
-    const maybeCode = 'code' in error ? String((error as any).code) : '';
+    const maybeCode = 'code' in error ? String((error as { code: unknown }).code) : '';
     if (maybeCode === 'P2021') return true;
 
     const message = error instanceof Error ? error.message : String(error);
@@ -65,32 +87,33 @@ export class ErdWorkspacesService {
     return value ? value.slice(0, 5000) : null;
   }
 
-  private normalizeLayout(layout: Record<string, any>) {
+  private normalizeLayout(layout: unknown) {
+    const l = typeof layout === 'object' && layout !== null ? layout as Record<string, unknown> : {};
     return {
-      visibleTables: Array.isArray(layout?.visibleTables) ? layout.visibleTables : [],
-      nodes: Array.isArray(layout?.nodes) ? layout.nodes : [],
-      edges: Array.isArray(layout?.edges) ? layout.edges : [],
-      isSidebarCollapsed: !!layout?.isSidebarCollapsed,
-      detailLevel: layout?.detailLevel || 'all',
-      schemaFilter: layout?.schemaFilter || 'all',
-      showMinimap: layout?.showMinimap ?? true,
-      performanceMode: !!layout?.performanceMode,
-      edgeRouting: layout?.edgeRouting || 'smoothstep',
-      backgroundVariant: layout?.backgroundVariant || 'dots',
-      isEdgeAnimated: layout?.isEdgeAnimated ?? true,
-      isToolbarCollapsed: !!layout?.isToolbarCollapsed,
-      collapsedTables: Array.isArray(layout?.collapsedTables) ? layout.collapsedTables : [],
+      visibleTables: Array.isArray(l.visibleTables) ? l.visibleTables : [],
+      nodes: Array.isArray(l.nodes) ? l.nodes : [],
+      edges: Array.isArray(l.edges) ? l.edges : [],
+      isSidebarCollapsed: !!l.isSidebarCollapsed,
+      detailLevel: l.detailLevel || 'all',
+      schemaFilter: l.schemaFilter || 'all',
+      showMinimap: l.showMinimap ?? true,
+      performanceMode: !!l.performanceMode,
+      edgeRouting: l.edgeRouting || 'smoothstep',
+      backgroundVariant: l.backgroundVariant || 'dots',
+      isEdgeAnimated: l.isEdgeAnimated ?? true,
+      isToolbarCollapsed: !!l.isToolbarCollapsed,
+      collapsedTables: Array.isArray(l.collapsedTables) ? l.collapsedTables : [],
     };
   }
 
-  private toEntity(workspace: any, currentUserId: string): ErdWorkspaceEntity {
+  private toEntity(workspace: RawErdWorkspace, currentUserId: string): ErdWorkspaceEntity {
     return {
       id: workspace.id,
       name: workspace.name,
       notes: workspace.notes,
       connectionId: workspace.connectionId,
       database: workspace.database,
-      layout: (workspace.layout ?? {}) as Record<string, any>,
+      layout: (workspace.layout ?? {}) as Record<string, unknown>,
       createdAt: workspace.createdAt,
       updatedAt: workspace.updatedAt,
       owner: {
@@ -123,7 +146,7 @@ export class ErdWorkspacesService {
         orderBy: { updatedAt: 'desc' },
       });
 
-      return workspaces.map((workspace: any) => this.toEntity(workspace, userId));
+      return workspaces.map((workspace) => this.toEntity(workspace as unknown as RawErdWorkspace, userId));
     } catch (error) {
       if (this.isWorkspaceStoreUnavailable(error)) {
         this.logger.warn('ERD workspace storage is unavailable. Returning an empty workspace list.');
@@ -158,7 +181,7 @@ export class ErdWorkspacesService {
   async create(dto: CreateErdWorkspaceDto, userId: string): Promise<ErdWorkspaceEntity> {
     await this.validateConnectionOwnership(dto.connectionId, userId);
 
-    let workspace: any;
+    let workspace: RawErdWorkspace;
     try {
       workspace = await this.erdWorkspaces.create({
         data: {
@@ -202,7 +225,7 @@ export class ErdWorkspacesService {
   }
 
   async update(id: string, dto: UpdateErdWorkspaceDto, userId: string): Promise<ErdWorkspaceEntity> {
-    let existing: any;
+    let existing: RawErdWorkspace | null;
     try {
       existing = await this.erdWorkspaces.findFirst({
         where: { id, userId },
@@ -230,7 +253,7 @@ export class ErdWorkspacesService {
 
     await this.validateConnectionOwnership(dto.connectionId ?? existing.connectionId ?? undefined, userId);
 
-    let updated: any;
+    let updated: RawErdWorkspace;
     try {
       updated = await this.erdWorkspaces.update({
         where: { id },

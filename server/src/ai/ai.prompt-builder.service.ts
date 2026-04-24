@@ -47,12 +47,12 @@ ${responseFormat}`;
         ];
     }
 
-    prepareGeminiParts(prompt: string, systemPrompt: string, context?: string, image?: string): any[] {
+    prepareGeminiParts(prompt: string, systemPrompt: string, context?: string, image?: string): Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> {
         const userText = context
             ? `${systemPrompt}\n\nUser: ${prompt}\n\nAdditional context:\n${context}`
             : `${systemPrompt}\n\nUser: ${prompt}`;
 
-        const parts: any[] = [{ text: userText }];
+        const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [{ text: userText }];
 
         if (image) {
             const match = image.match(/^data:(.*?);base64,(.*)$/);
@@ -101,34 +101,33 @@ ${responseFormat}`;
         }
     }
 
-    extractSources(response: any): string {
+    extractSources(response: { candidates?: Array<{ groundingMetadata?: { groundingChunks?: Array<{ web?: { title?: string; uri?: string } }> } }> }): string {
         const candidate = response.candidates?.[0];
         if (!candidate?.groundingMetadata?.groundingChunks) return '';
 
         const urls = candidate.groundingMetadata.groundingChunks
-            .filter((c: any) => c.web?.uri && c.web?.title)
-            .map((c: any) => ({
+            .filter((c): c is { web: { title: string; uri: string } } => !!c.web?.uri && !!c.web?.title)
+            .map((c) => ({
                 title: c.web.title,
                 url: c.web.uri,
             }));
 
         const uniqueUrls = urls.filter(
-            (item: { title: string; url: string }, index: number, array: { title: string; url: string }[]) =>
-                array.findIndex((entry) => entry.url === item.url) === index,
+            (item, index, array) => array.findIndex((entry) => entry.url === item.url) === index,
         );
 
         if (uniqueUrls.length === 0) return '';
 
         return `\n\n---\n**Nguon tham khao**\n${uniqueUrls
-            .map((item: { title: string; url: string }) => `- [${item.title}](${item.url})`)
+            .map((item) => `- [${item.title}](${item.url})`)
             .join('\n')}`;
     }
 
-    extractOpenAiStreamText(payload: any): string {
-        const delta = payload?.choices?.[0]?.delta?.content;
+    extractOpenAiStreamText(payload: { choices?: Array<{ delta?: { content?: string | Array<{ text?: string }> } }> }): string {
+        const delta = payload.choices?.[0]?.delta?.content;
         if (typeof delta === 'string') return delta;
         if (Array.isArray(delta)) {
-            return delta.map((item: any) => item?.text || '').join('');
+            return delta.map((item) => item?.text || '').join('');
         }
         return '';
     }

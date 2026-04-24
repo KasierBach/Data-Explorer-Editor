@@ -6,15 +6,20 @@ import type {
     Relationship,
     DatabaseMetrics,
     UpdateRowParams,
+    InsertRowParams,
+    DeleteRowsParams,
     ConnectionConfig,
+    FullTableMetadata,
+    IndexInfo,
 } from './database-strategy.interface';
 import { SchemaOperation } from '../query/dto/schema-operations.types';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Pool } from 'pg';
 import { SqlUtil } from '../utils/sql.util';
 
 @Injectable()
 export class PostgresStrategy implements IDatabaseStrategy {
+    private readonly logger = new Logger(PostgresStrategy.name);
 
     createPool(connectionConfig: ConnectionConfig, databaseOverride?: string): Pool {
         const isLocalhost = connectionConfig.host === 'localhost' || connectionConfig.host === '127.0.0.1';
@@ -37,7 +42,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         });
         
         pool.on('error', (err: Error) => {
-            console.error('Unexpected error on idle Postgres client:', err.message);
+            this.logger.error('Unexpected error on idle Postgres client: ' + err.message);
         });
         
         return pool;
@@ -57,7 +62,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
 
     // ─── Query Operations ───
 
-    async executeQuery(pool: any, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
+    async executeQuery(pool: Pool, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
         let safeSql = sql;
         if (options?.limit !== undefined && options?.offset !== undefined) {
             safeSql = SqlUtil.injectPagination(sql, options.limit, options.offset, 'postgres');
@@ -71,7 +76,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
             const queryResult = Array.isArray(result) ? result[result.length - 1] : result;
             return {
                 rows: queryResult.rows ? queryResult.rows.slice(0, 50000) : [],
-                columns: queryResult.fields ? queryResult.fields.map((f: any) => f.name) : [],
+                columns: queryResult.fields ? queryResult.fields.map((f: { name: string }) => f.name) : [],
                 rowCount: queryResult.rowCount,
             };
         } finally {
@@ -79,7 +84,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         }
     }
 
-    async updateRow(pool: any, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }> {
+    async updateRow(pool: Pool, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }> {
         const { schema, table, pkColumn, pkValue, updates } = params;
         const updateCols = Object.keys(updates);
         const quotedTable = this.quoteTable(schema, table);
@@ -91,7 +96,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: res.rowCount };
     }
 
-    async insertRow(pool: any, params: any): Promise<{ success: boolean; rowCount: number }> {
+    async insertRow(pool: Pool, params: InsertRowParams): Promise<{ success: boolean; rowCount: number }> {
         const { schema, table, data } = params;
         const columns = Object.keys(data);
         if (columns.length === 0) return { success: false, rowCount: 0 };
@@ -106,7 +111,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: res.rowCount };
     }
 
-    async deleteRows(pool: any, params: any): Promise<{ success: boolean; rowCount: number }> {
+    async deleteRows(pool: Pool, params: DeleteRowsParams): Promise<{ success: boolean; rowCount: number }> {
         const { schema, table, pkColumn, pkValues } = params;
         if (pkValues.length === 0) return { success: true, rowCount: 0 };
 
@@ -118,7 +123,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: res.rowCount };
     }
 
-    async importData(pool: any, params: { schema: string; table: string; data: any[] }): Promise<{ success: boolean; rowCount: number }> {
+    async importData(pool: Pool, params: { schema: string; table: string; data: Record<string, unknown>[] }): Promise<{ success: boolean; rowCount: number }> {
         const { schema, table, data } = params;
         if (!data || data.length === 0) return { success: true, rowCount: 0 };
 
@@ -127,7 +132,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         const colNames = columns.map(c => `"${c}"`).join(', ');
 
         const valuePlaceholders: string[] = [];
-        const flatValues: any[] = [];
+        const flatValues: unknown[] = [];
 
         data.forEach((row, rowIndex) => {
             const rowPlaceholders = columns.map((col, colIndex) => {
@@ -143,7 +148,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: res.rowCount };
     }
 
-    async exportStream(pool: any, schema: string, table: string): Promise<any> {
+    async exportStream(pool: Pool, schema: string, table: string): Promise<unknown> {
         // Dynamic import because pg-query-stream might only be used here
         const QueryStream = (await import('pg-query-stream')).default || (await import('pg-query-stream'));
         
@@ -221,7 +226,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
     async getDatabases(pool: Pool): Promise<TreeNodeResult[]> {
         const sql = `SELECT datname FROM pg_database WHERE datistemplate = false`;
         const result = await pool.query(sql);
-        return result.rows.map((row: any) => ({
+        return result.rows.map((row: { datname: string }) => ({
             id: `db:${row.datname}`,
             name: row.datname,
             type: 'database',
@@ -230,10 +235,10 @@ export class PostgresStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getSchemas(pool: any, dbName?: string): Promise<TreeNodeResult[]> {
+    async getSchemas(pool: Pool, dbName?: string): Promise<TreeNodeResult[]> {
         const sql = `SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('information_schema', 'pg_catalog') AND schema_name NOT LIKE 'pg_temp_%' AND schema_name NOT LIKE 'pg_toast%'`;
         const result = await pool.query(sql);
-        return result.rows.map((row: any) => ({
+        return result.rows.map((row: { schema_name: string }) => ({
             id: dbName ? `db:${dbName}.schema:${row.schema_name}` : `schema:${row.schema_name}`,
             name: row.schema_name,
             type: 'schema',
@@ -242,10 +247,10 @@ export class PostgresStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getTables(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
+    async getTables(pool: Pool, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
         const sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = $1 AND table_type = 'BASE TABLE'`;
         const result = await pool.query(sql, [schema]);
-        return result.rows.map((row: any) => ({
+        return result.rows.map((row: { table_name: string }) => ({
             id: dbName ? `db:${dbName}.schema:${schema}.table:${row.table_name}` : `schema:${schema}.table:${row.table_name}`,
             name: row.table_name,
             type: 'table',
@@ -254,10 +259,10 @@ export class PostgresStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getViews(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
+    async getViews(pool: Pool, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
         const sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = $1 AND table_type = 'VIEW'`;
         const result = await pool.query(sql, [schema]);
-        return result.rows.map((row: any) => ({
+        return result.rows.map((row: { table_name: string }) => ({
             id: dbName ? `db:${dbName}.schema:${schema}.view:${row.table_name}` : `schema:${schema}.view:${row.table_name}`,
             name: row.table_name,
             type: 'view',
@@ -266,10 +271,10 @@ export class PostgresStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getFunctions(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
+    async getFunctions(pool: Pool, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
         const sql = `SELECT routine_name FROM information_schema.routines WHERE routine_schema = $1`;
         const result = await pool.query(sql, [schema]);
-        return result.rows.map((row: any) => ({
+        return result.rows.map((row: { routine_name: string }) => ({
             id: dbName ? `db:${dbName}.schema:${schema}.func:${row.routine_name}` : `schema:${schema}.func:${row.routine_name}`,
             name: row.routine_name,
             type: 'function',
@@ -278,7 +283,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getFunctionParameters(pool: any, schema: string, func: string): Promise<ColumnInfo[]> {
+    async getFunctionParameters(pool: Pool, schema: string, func: string): Promise<ColumnInfo[]> {
         const sql = `
             SELECT p.parameter_name, p.data_type, p.parameter_mode 
             FROM information_schema.parameters p
@@ -287,7 +292,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
             ORDER BY p.ordinal_position
         `;
         const result = await pool.query(sql, [schema, func]);
-        return result.rows.map((row: any) => ({
+        return result.rows.map((row: { parameter_name: string | null; data_type: string | null; parameter_mode: string | null }) => ({
             name: row.parameter_name || '(unnamed)',
             type: `${row.parameter_mode || 'IN'} ${row.data_type}`,
             isNullable: true,
@@ -297,7 +302,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getColumns(pool: any, schema: string, table: string): Promise<ColumnInfo[]> {
+    async getColumns(pool: Pool, schema: string, table: string): Promise<ColumnInfo[]> {
         const sql = `
             SELECT 
                 c.column_name, c.data_type, c.is_nullable, c.column_default,
@@ -313,7 +318,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
             ORDER BY c.ordinal_position
         `;
         const result = await pool.query(sql, [table, schema]);
-        return result.rows.map((row: any) => ({
+        return result.rows.map((row: { column_name: string; data_type: string; is_nullable: string; column_default: unknown; pk_constraint_name: string | null; comment: string | null }) => ({
             name: row.column_name,
             type: row.data_type,
             isNullable: row.is_nullable === 'YES',
@@ -324,7 +329,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getFullMetadata(pool: any, schema: string, table: string): Promise<any> {
+    async getFullMetadata(pool: Pool, schema: string, table: string): Promise<FullTableMetadata> {
         const columns = await this.getColumns(pool, schema, table);
         
         // Fetch indices
@@ -343,8 +348,8 @@ export class PostgresStrategy implements IDatabaseStrategy {
         `;
         
         const indicesRes = await pool.query(indicesSql, [table, schema]);
-        const indexMap = new Map<string, any>();
-        indicesRes.rows.forEach((row: any) => {
+        const indexMap = new Map<string, IndexInfo>();
+        indicesRes.rows.forEach((row: { index_name: string; column_name: string; is_unique: boolean; is_primary: boolean }) => {
             if (!indexMap.has(row.index_name)) {
                 indexMap.set(row.index_name, {
                     name: row.index_name,
@@ -353,7 +358,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
                     isPrimary: row.is_primary
                 });
             }
-            indexMap.get(row.index_name).columns.push(row.column_name);
+            indexMap.get(row.index_name)!.columns.push(row.column_name);
         });
 
         // Fetch table comment
@@ -377,7 +382,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
         };
     }
 
-    async getRelationships(pool: any): Promise<Relationship[]> {
+    async getRelationships(pool: Pool): Promise<Relationship[]> {
         const sql = `
             SELECT
                 tc.constraint_name,
@@ -394,10 +399,10 @@ export class PostgresStrategy implements IDatabaseStrategy {
             WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = 'public'
         `;
         const res = await pool.query(sql);
-        return res.rows;
+        return res.rows as Relationship[];
     }
 
-    async getDatabaseMetrics(pool: any): Promise<DatabaseMetrics> {
+    async getDatabaseMetrics(pool: Pool): Promise<DatabaseMetrics> {
         const statsSql = `
             SELECT 
                 (SELECT count(*) FROM information_schema.tables WHERE table_schema NOT IN ('information_schema', 'pg_catalog')) as table_count,
@@ -422,27 +427,27 @@ export class PostgresStrategy implements IDatabaseStrategy {
             pool.query(typesSql),
         ]);
 
-        const stats = statsRes.rows[0];
+        const stats = statsRes.rows[0] as { table_count: string; size_bytes: string; active_connections: string };
         return {
             tableCount: parseInt(stats.table_count),
             sizeBytes: parseInt(stats.size_bytes),
             activeConnections: parseInt(stats.active_connections),
-            topTables: tablesRes.rows.map((r: any) => ({ name: r.name, sizeBytes: parseInt(r.size_bytes) })),
-            tableTypes: typesRes.rows.map((r: any) => ({ type: r.type, count: parseInt(r.count) })),
+            topTables: tablesRes.rows.map((r: { name: string; size_bytes: string }) => ({ name: r.name, sizeBytes: parseInt(r.size_bytes) })),
+            tableTypes: typesRes.rows.map((r: { type: string; count: string }) => ({ type: r.type, count: parseInt(r.count) })),
         };
     }
 
     // ─── Polymorphic Tree & Seed ───
 
-    async getHierarchyNodes(pool: any, parentId: string | null, parsedParams: any, connectionInfo: any): Promise<TreeNodeResult[]> {
+    async getHierarchyNodes(pool: Pool, parentId: string | null, parsedParams: unknown, connectionInfo: unknown): Promise<TreeNodeResult[]> {
         if (!parentId) {
-            if (connectionInfo.showAllDatabases) return this.getDatabases(pool);
+            if ((connectionInfo as { showAllDatabases?: boolean }).showAllDatabases) return this.getDatabases(pool);
             return this.getSchemas(pool);
         }
         return [];
     }
 
-    async seedData(pool: any): Promise<QueryResult> {
+    async seedData(pool: Pool): Promise<QueryResult> {
         const sql = `
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,

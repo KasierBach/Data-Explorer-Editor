@@ -6,17 +6,20 @@ import type {
     Relationship,
     DatabaseMetrics,
     UpdateRowParams,
+    DeleteRowsParams,
     ConnectionConfig,
     InsertRowParams,
+    FullTableMetadata,
 } from './database-strategy.interface';
 import { SchemaOperation } from '../query/dto/schema-operations.types';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as mysql from 'mysql2/promise';
 import { Pool, RowDataPacket, FieldPacket, ResultSetHeader } from 'mysql2/promise';
 import { SqlUtil } from '../utils/sql.util';
 
 @Injectable()
 export class MysqlStrategy implements IDatabaseStrategy {
+    private readonly logger = new Logger(MysqlStrategy.name);
 
     createPool(connectionConfig: ConnectionConfig, databaseOverride?: string): Pool {
         const timeoutMs = connectionConfig.statementTimeout !== undefined ? connectionConfig.statementTimeout : 10000;
@@ -100,7 +103,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
         return { success: true, rowCount: result.affectedRows };
     }
 
-    async deleteRows(pool: any, params: any): Promise<{ success: boolean; rowCount: number }> {
+    async deleteRows(pool: Pool, params: DeleteRowsParams): Promise<{ success: boolean; rowCount: number }> {
         const { schema, table, pkColumn, pkValues } = params;
         if (pkValues.length === 0) return { success: true, rowCount: 0 };
 
@@ -108,11 +111,11 @@ export class MysqlStrategy implements IDatabaseStrategy {
         const placeholders = pkValues.map(() => `?`).join(', ');
         const sql = `DELETE FROM ${quotedTable} WHERE \`${pkColumn}\` IN (${placeholders})`;
 
-        const [result] = await pool.execute(sql, pkValues);
-        return { success: true, rowCount: (result as any).affectedRows };
+        const [result] = await pool.execute(sql, pkValues) as [ResultSetHeader, FieldPacket[]];
+        return { success: true, rowCount: result.affectedRows };
     }
 
-    async importData(pool: any, params: { schema: string; table: string; data: any[] }): Promise<{ success: boolean; rowCount: number }> {
+    async importData(pool: Pool, params: { schema: string; table: string; data: Record<string, unknown>[] }): Promise<{ success: boolean; rowCount: number }> {
         const { schema, table, data } = params;
         if (!data || data.length === 0) return { success: true, rowCount: 0 };
 
@@ -121,7 +124,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
         const colNames = columns.map(c => `\`${c}\``).join(', ');
 
         const valuePlaceholders: string[] = [];
-        const flatValues: any[] = [];
+        const flatValues: unknown[] = [];
 
         data.forEach((row) => {
             const rowPlaceholders = columns.map((col) => {
@@ -133,11 +136,11 @@ export class MysqlStrategy implements IDatabaseStrategy {
 
         const sql = `INSERT INTO ${quotedTable} (${colNames}) VALUES ${valuePlaceholders.join(', ')}`;
         
-        const [result] = await pool.execute(sql, flatValues);
-        return { success: true, rowCount: (result as any).affectedRows };
+        const [result] = await pool.execute(sql, flatValues) as [ResultSetHeader, FieldPacket[]];
+        return { success: true, rowCount: result.affectedRows };
     }
 
-    async exportStream(pool: any, schema: string, table: string): Promise<any> {
+    async exportStream(pool: Pool, schema: string, table: string): Promise<unknown> {
         const quotedTable = this.quoteTable(schema, table);
         const sql = `SELECT * FROM ${quotedTable}`;
         
@@ -145,7 +148,8 @@ export class MysqlStrategy implements IDatabaseStrategy {
         const connection = await pool.getConnection();
         
         // .connection accesses the underlying non-promise mysql2 connection
-        const stream = connection.connection.query(sql).stream();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const stream = (connection as any).connection.query(sql).stream();
         
         stream.on('end', () => connection.release());
         stream.on('error', () => connection.release());
@@ -192,7 +196,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
 
     async getDatabases(pool: Pool): Promise<TreeNodeResult[]> {
         const [rows] = await pool.query('SHOW DATABASES') as [RowDataPacket[], FieldPacket[]];
-        return rows.map((row: any) => ({
+        return (rows as Array<{ Database: string }>).map((row) => ({
             id: `schema:${row.Database}`,
             name: row.Database,
             type: 'schema',
@@ -201,15 +205,15 @@ export class MysqlStrategy implements IDatabaseStrategy {
         }));
     }
 
-    async getSchemas(_pool: any, _dbName?: string): Promise<TreeNodeResult[]> {
+    async getSchemas(_pool: Pool, _dbName?: string): Promise<TreeNodeResult[]> {
         // MySQL uses databases as schemas, so this is a no-op
         return [];
     }
 
-    async getTables(pool: any, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
+    async getTables(pool: Pool, schema: string, dbName?: string): Promise<TreeNodeResult[]> {
         const sql = `SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE'`;
-        const [rows]: any[] = await pool.query(sql, [schema]);
-        return rows.map((row: any) => {
+        const [rows] = await pool.query(sql, [schema]) as [RowDataPacket[], FieldPacket[]];
+        return (rows as Array<{ TABLE_NAME: string }>).map((row) => {
             const tableName = row.TABLE_NAME;
             return {
                 id: dbName ? `db:${dbName}.schema:${schema}.table:${tableName}` : `schema:${schema}.table:${tableName}`,
@@ -221,19 +225,19 @@ export class MysqlStrategy implements IDatabaseStrategy {
         });
     }
 
-    async getViews(_pool: any, _schema: string, _dbName?: string): Promise<TreeNodeResult[]> {
+    async getViews(_pool: Pool, _schema: string, _dbName?: string): Promise<TreeNodeResult[]> {
         return [];
     }
 
-    async getFunctions(_pool: any, _schema: string, _dbName?: string): Promise<TreeNodeResult[]> {
+    async getFunctions(_pool: Pool, _schema: string, _dbName?: string): Promise<TreeNodeResult[]> {
         return [];
     }
 
-    async getFunctionParameters(_pool: any, _schema: string, _func: string): Promise<ColumnInfo[]> {
+    async getFunctionParameters(_pool: Pool, _schema: string, _func: string): Promise<ColumnInfo[]> {
         return [];
     }
 
-    async getColumns(pool: any, schema: string, table: string): Promise<ColumnInfo[]> {
+    async getColumns(pool: Pool, schema: string, table: string): Promise<ColumnInfo[]> {
         const sql = `
             SELECT COLUMN_NAME as Field, COLUMN_TYPE as Type, IS_NULLABLE as \`Null\`, 
                    COLUMN_DEFAULT as \`Default\`, COLUMN_KEY as \`Key\` 
@@ -241,14 +245,18 @@ export class MysqlStrategy implements IDatabaseStrategy {
             WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
             ORDER BY ORDINAL_POSITION
         `;
-        const [rows]: any[] = await pool.query(sql, [schema, table]);
-        return rows.map((row: any) => ({
+        const [rows] = await pool.query(sql, [schema, table]) as [RowDataPacket[], FieldPacket[]];
+        return (rows as Array<{ Field: string; Type: string; Null: string; Default: unknown; Key: string }>).map((row) => ({
+            name: row.Field,
+            type: row.Type,
+            isNullable: row.Null === 'YES',
+            defaultValue: row.Default,
             isPrimaryKey: row.Key === 'PRI',
             pkConstraintName: row.Key === 'PRI' ? 'PRIMARY' : null,
         }));
     }
 
-    async getFullMetadata(pool: any, schema: string, table: string): Promise<any> {
+    async getFullMetadata(pool: Pool, schema: string, table: string): Promise<FullTableMetadata> {
         const columns = await this.getColumns(pool, schema, table);
         return {
             columns,
@@ -258,7 +266,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
         };
     }
 
-    async getRelationships(pool: any): Promise<Relationship[]> {
+    async getRelationships(pool: Pool): Promise<Relationship[]> {
         const sql = `
             SELECT 
                 CONSTRAINT_NAME as constraint_name,
@@ -269,11 +277,11 @@ export class MysqlStrategy implements IDatabaseStrategy {
             FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
             WHERE REFERENCED_TABLE_NAME IS NOT NULL AND TABLE_SCHEMA = DATABASE()
         `;
-        const [rows]: any[] = await pool.query(sql);
-        return rows;
+        const [rows] = await pool.query(sql) as [RowDataPacket[], FieldPacket[]];
+        return rows as Relationship[];
     }
 
-    async getDatabaseMetrics(pool: any): Promise<DatabaseMetrics> {
+    async getDatabaseMetrics(pool: Pool): Promise<DatabaseMetrics> {
         const statsSql = `
             SELECT 
                 count(*) as table_count,
@@ -291,32 +299,32 @@ export class MysqlStrategy implements IDatabaseStrategy {
             FROM information_schema.tables WHERE table_schema = DATABASE() GROUP BY table_type
         `;
 
-        const [[statsRows], [tableRows], [typeRows]]: any[] = await Promise.all([
-            pool.query(statsSql),
-            pool.query(tablesSql),
-            pool.query(typesSql),
+        const [[statsRows], [tableRows], [typeRows]] = await Promise.all([
+            pool.query(statsSql) as Promise<[RowDataPacket[], FieldPacket[]]>,
+            pool.query(tablesSql) as Promise<[RowDataPacket[], FieldPacket[]]>,
+            pool.query(typesSql) as Promise<[RowDataPacket[], FieldPacket[]]>,
         ]);
 
-        const stats = statsRows[0];
+        const stats = statsRows[0] as { table_count: string; size_bytes: string; active_connections: string };
         return {
             tableCount: parseInt(stats.table_count),
             sizeBytes: parseInt(stats.size_bytes),
             activeConnections: parseInt(stats.active_connections),
-            topTables: tableRows.map((r: any) => ({ name: r.name, sizeBytes: parseInt(r.size_bytes) })),
-            tableTypes: typeRows.map((r: any) => ({ type: r.type, count: parseInt(r.count) })),
+            topTables: (tableRows as Array<{ name: string; size_bytes: string }>).map((r) => ({ name: r.name, sizeBytes: parseInt(r.size_bytes) })),
+            tableTypes: (typeRows as Array<{ type: string; count: string }>).map((r) => ({ type: r.type, count: parseInt(r.count) })),
         };
     }
 
     // ─── Polymorphic Tree & Seed ───
 
-    async getHierarchyNodes(pool: any, parentId: string | null, parsedParams: any, connectionInfo: any): Promise<TreeNodeResult[]> {
+    async getHierarchyNodes(pool: Pool, parentId: string | null, parsedParams: unknown, connectionInfo: unknown): Promise<TreeNodeResult[]> {
         if (!parentId) {
             return this.getDatabases(pool);
         }
         return [];
     }
 
-    async seedData(pool: any): Promise<QueryResult> {
+    async seedData(pool: Pool): Promise<QueryResult> {
         const sql = `
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,

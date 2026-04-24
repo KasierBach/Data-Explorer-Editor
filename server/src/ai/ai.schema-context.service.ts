@@ -2,13 +2,19 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { AI_CONSTANTS } from './ai.constants';
+import type { IDatabaseStrategy, ColumnInfo, TreeNodeResult, Relationship } from '../database-strategies/database-strategy.interface';
+
+interface SchemaTable {
+    name: string;
+    schema: string;
+}
 
 @Injectable()
 export class AiSchemaContextService {
     private readonly logger = new Logger(AiSchemaContextService.name);
     constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
 
-    async gatherSchemaContext(pool: any, strategy: any, database?: string, connectionId?: string): Promise<string> {
+    async gatherSchemaContext(pool: unknown, strategy: IDatabaseStrategy, database?: string, connectionId?: string): Promise<string> {
         const cacheKey = connectionId ? `aicache:${connectionId}:${database || 'default'}` : null;
 
         if (cacheKey) {
@@ -19,18 +25,18 @@ export class AiSchemaContextService {
         let schemaContext = '';
         try {
             const schemas = await strategy.getSchemas(pool, database);
-            const allTables: any[] = [];
-            const columnMap = new Map<string, any[]>();
+            const allTables: SchemaTable[] = [];
+            const columnMap = new Map<string, ColumnInfo[]>();
             const skipSchemas = ['pg_catalog', 'information_schema', 'pg_toast'];
 
             for (const schema of schemas) {
-                const schemaName = typeof schema === 'string' ? schema : (schema as any).name;
+                const schemaName = typeof schema === 'string' ? schema : (schema as { name?: string }).name;
                 if (!schemaName || skipSchemas.includes(schemaName)) continue;
 
                 try {
                     const tables = await strategy.getTables(pool, schemaName, database);
                     for (const table of tables) {
-                        const tableName = typeof table === 'string' ? table : (table as any).name;
+                        const tableName = typeof table === 'string' ? table : (table as { name?: string }).name;
                         if (!tableName) continue;
                         allTables.push({ name: tableName, schema: schemaName });
 
@@ -46,7 +52,7 @@ export class AiSchemaContextService {
                 }
             }
 
-            let relationships: any[] = [];
+            let relationships: Relationship[] = [];
             try {
                 relationships = await strategy.getRelationships(pool);
             } catch {
@@ -77,19 +83,19 @@ export class AiSchemaContextService {
         await this.cacheManager.del(`aicache:${connectionId}:default`);
     }
 
-    buildSchemaContext(tables: any[], columns: Map<string, any[]>, relationships: any[]): string {
+    buildSchemaContext(tables: SchemaTable[], columns: Map<string, ColumnInfo[]>, relationships: Relationship[]): string {
         let context = '';
 
         for (const table of tables) {
-            const tableName = table.name || table;
-            const schema = table.schema || 'public';
+            const tableName = table.name;
+            const schema = table.schema;
             const cols = columns.get(`${schema}.${tableName}`) || [];
 
             context += `\nTABLE: "${schema}"."${tableName}"\n`;
             context += '  Columns:\n';
 
             for (const col of cols) {
-                const nullable = col.nullable ? 'NULL' : 'NOT NULL';
+                const nullable = col.isNullable ? 'NULL' : 'NOT NULL';
                 const pk = col.isPrimaryKey ? ' [PRIMARY KEY]' : '';
                 const def = col.defaultValue ? ` DEFAULT ${col.defaultValue}` : '';
                 context += `    - ${col.name} ${col.type} ${nullable}${pk}${def}\n`;
@@ -99,7 +105,7 @@ export class AiSchemaContextService {
         if (relationships && relationships.length > 0) {
             context += '\nRELATIONSHIPS (Foreign Keys):\n';
             for (const rel of relationships) {
-                context += `  ${rel.sourceTable}.${rel.sourceColumn} -> ${rel.targetTable}.${rel.targetColumn}\n`;
+                context += `  ${rel.source_table}.${rel.source_column} -> ${rel.target_table}.${rel.target_column}\n`;
             }
         }
 

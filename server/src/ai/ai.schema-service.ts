@@ -6,6 +6,12 @@ import { AiSchemaContextService } from './ai.schema-context.service';
 import { AiProviderRunnerService } from './ai.provider-runner.service';
 import { AI_CONSTANTS } from './ai.constants';
 import type { StreamEvent } from './ai.types';
+import type { IDatabaseStrategy, ColumnInfo, Relationship } from '../database-strategies/database-strategy.interface';
+
+interface SchemaTable {
+    name: string;
+    schema: string;
+}
 
 @Injectable()
 export class AiSchemaService {
@@ -58,7 +64,7 @@ Rules:
         }
     }
 
-    async gatherSchemaContext(pool: any, strategy: any, database?: string, connectionId?: string): Promise<string> {
+    async gatherSchemaContext(pool: unknown, strategy: IDatabaseStrategy, database?: string, connectionId?: string): Promise<string> {
         return this.schemaContextService.gatherSchemaContext(pool, strategy, database, connectionId);
     }
 
@@ -66,7 +72,7 @@ Rules:
         this.schemaContextService.clearCache(connectionId, database);
     }
 
-    buildSchemaContext(tables: any[], columns: Map<string, any[]>, relationships: any[]): string {
+    buildSchemaContext(tables: SchemaTable[], columns: Map<string, ColumnInfo[]>, relationships: Relationship[]): string {
         return this.schemaContextService.buildSchemaContext(tables, columns, relationships);
     }
 }

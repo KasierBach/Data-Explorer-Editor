@@ -6,6 +6,20 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+
+interface SessionUser {
+    id: string;
+    email: string;
+    role: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    provider?: string;
+    password?: string | null;
+    isBanned?: boolean;
+    isEmailVerified?: boolean;
+    lastLoginIp?: string | null;
+    securityAlerts?: boolean;
+}
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { OtpService } from '../otp/otp.service';
@@ -39,7 +53,7 @@ export class AuthService implements OnModuleInit {
         await this.seedService.seedAdmin();
     }
 
-    private async issueSession(user: any) {
+    private async issueSession(user: SessionUser) {
         const session = this.tokenService.generateSessionTokens(user);
         const refreshTokenHash = await bcrypt.hash(session.refreshToken, this.SALT_ROUNDS);
 
