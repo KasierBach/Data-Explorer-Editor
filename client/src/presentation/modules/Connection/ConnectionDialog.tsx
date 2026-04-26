@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { useAppStore, type Connection } from '@/core/services/store';
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/presentation/components/ui/dialog';
+import { Dialog, DialogContent } from '@/presentation/components/ui/dialog';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/presentation/components/ui/select';
 import { Label } from '@/presentation/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/presentation/components/ui/tabs';
-import { ShieldAlert, Database, Lock, Globe, Wand2, ShieldCheck, FileWarning, Users, Activity, CheckCircle2, XCircle, Info } from 'lucide-react';
+import { ShieldAlert, Database, Lock, Globe, Wand2, ShieldCheck, Shield, FileWarning, Upload, Users, CheckCircle2, XCircle } from 'lucide-react';
+
 import { ConnectionService } from '@/core/services/ConnectionService';
 import { OrganizationService, type OrganizationEntity } from '@/core/services/OrganizationService';
-
 
 export const ConnectionDialog: React.FC = () => {
     const { isConnectionDialogOpen, closeConnectionDialog, addConnection, lang } = useAppStore();
@@ -32,6 +32,7 @@ export const ConnectionDialog: React.FC = () => {
     const [isTesting, setIsTesting] = useState(false);
     const [testResult, setTestResult] = useState<{ status: 'healthy' | 'error'; latency?: number; error?: string } | null>(null);
     const [error, setError] = useState<string | null>(null);
+
     const [teams, setTeams] = useState<OrganizationEntity[]>([]);
     const [organizationId, setOrganizationId] = useState<string>('none');
 
@@ -53,6 +54,7 @@ export const ConnectionDialog: React.FC = () => {
             setError(null);
             setTestResult(null);
             setIsSaving(false);
+
             setOrganizationId('none');
             // Load teams
             OrganizationService.getMyOrganizations()
@@ -69,11 +71,12 @@ export const ConnectionDialog: React.FC = () => {
             if (!connectionString.trim()) return;
             const raw = connectionString.trim();
 
+            // Detect MongoDB URI before URL parsing (mongodb+srv uses non-standard protocol)
             if (raw.startsWith('mongodb+srv://')) {
                 setType('mongodb+srv');
                 const url = new URL(raw.replace('mongodb+srv://', 'http://'));
                 if (url.hostname) setHost(url.hostname);
-                setPort('');
+                setPort(''); // SRV doesn't use port
                 if (url.username) setUsername(decodeURIComponent(url.username));
                 if (url.password) setPassword(decodeURIComponent(url.password));
                 if (url.pathname && url.pathname.length > 1) setDatabase(decodeURIComponent(url.pathname.substring(1)));
@@ -95,6 +98,7 @@ export const ConnectionDialog: React.FC = () => {
             }
 
             const url = new URL(raw);
+
             let parsedType: 'postgres' | 'mysql' | 'mssql' | 'clickhouse' = 'postgres';
             if (url.protocol.includes('postgres')) {
                 parsedType = 'postgres';
@@ -111,8 +115,9 @@ export const ConnectionDialog: React.FC = () => {
             }
 
             if (url.hostname) setHost(url.hostname);
-            if (url.port) setPort(url.port);
-            else {
+            if (url.port) {
+                setPort(url.port);
+            } else {
                 if (parsedType === 'postgres') setPort('5432');
                 if (parsedType === 'mysql') setPort('3306');
                 if (parsedType === 'mssql') setPort('1433');
@@ -121,16 +126,18 @@ export const ConnectionDialog: React.FC = () => {
 
             if (url.username) setUsername(decodeURIComponent(url.username));
             if (url.password) setPassword(decodeURIComponent(url.password));
-            if (url.pathname && url.pathname.length > 1) setDatabase(decodeURIComponent(url.pathname.substring(1)));
+            if (url.pathname && url.pathname.length > 1) {
+                setDatabase(decodeURIComponent(url.pathname.substring(1)));
+            }
             if (!name) setName(`${parsedType} @ ${url.hostname}`);
             setError(null);
         } catch (err) {
-            setError(t ? "Sai định dạng Connection String." : "Invalid Connection String format.");
+            setError(t ? "Sai định dạng Connection String. VD: postgresql://user:pass@localhost:5432/mydb" : "Invalid Connection String format. Example: postgresql://user:pass@localhost:5432/mydb");
         }
     };
 
     const getConnectionData = () => {
-        const data: any = {
+        const connectionData: any = {
             name: name || `${type}@${host}`,
             type,
             host: isFileType ? undefined : host,
@@ -145,14 +152,15 @@ export const ConnectionDialog: React.FC = () => {
         };
 
         const parsedPort = parseInt(port);
-        if (!isNaN(parsedPort)) data.port = parsedPort;
-        if (database && database.trim() !== '') data.database = database.trim();
-        return data;
+        if (!isNaN(parsedPort)) connectionData.port = parsedPort;
+        if (database && database.trim() !== '') connectionData.database = database.trim();
+        return connectionData;
     };
 
     const handleTest = async () => {
         setIsTesting(true);
         setTestResult(null);
+        setError(null);
         try {
             const data = getConnectionData();
             const result = await ConnectionService.testConnection(data);
@@ -164,7 +172,7 @@ export const ConnectionDialog: React.FC = () => {
         } catch (err: any) {
             setTestResult({
                 status: 'error',
-                error: err.message || 'Unknown error'
+                error: err.message || 'Connection failed'
             });
         } finally {
             setIsTesting(false);
@@ -174,13 +182,32 @@ export const ConnectionDialog: React.FC = () => {
     const handleSave = async () => {
         setIsSaving(true);
         setError(null);
+
+        const connectionData = getConnectionData();
+
+
         try {
-            const connectionData = getConnectionData();
             const savedConnection = await ConnectionService.createConnection(connectionData);
             
             const newConnection: Connection = {
-                ...savedConnection,
                 id: savedConnection.id,
+                name: savedConnection.name,
+                type: savedConnection.type,
+                host: savedConnection.host,
+                port: savedConnection.port,
+                username: savedConnection.username,
+                password: savedConnection.password,
+                database: savedConnection.database,
+                showAllDatabases: savedConnection.showAllDatabases,
+                readOnly: savedConnection.readOnly,
+                allowSchemaChanges: savedConnection.allowSchemaChanges,
+                allowImportExport: savedConnection.allowImportExport,
+                allowQueryExecution: savedConnection.allowQueryExecution,
+                lastHealthCheckAt: savedConnection.lastHealthCheckAt,
+                lastHealthStatus: savedConnection.lastHealthStatus,
+                lastHealthError: savedConnection.lastHealthError,
+                lastConnectedAt: savedConnection.lastConnectedAt,
+                lastConnectionLatencyMs: savedConnection.lastConnectionLatencyMs,
             };
             addConnection(newConnection);
             closeConnectionDialog();
@@ -196,79 +223,91 @@ export const ConnectionDialog: React.FC = () => {
 
     return (
         <Dialog open={isConnectionDialogOpen} onOpenChange={closeConnectionDialog}>
-            <DialogContent className="max-w-[600px] p-0 overflow-hidden bg-background border-border/50 shadow-2xl rounded-2xl flex flex-col max-h-[90vh]">
-                <div className="bg-gradient-to-r from-violet-600/10 via-transparent to-transparent px-6 py-5 border-b shrink-0 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-8 opacity-5 scale-150 rotate-12">
-                        <Database className="w-16 h-16" />
+            <DialogContent className="max-w-[520px] p-0 overflow-hidden bg-background border-border/50 shadow-2xl rounded-xl">
+                <div className="flex flex-col max-h-[80vh]">
+                    {/* Header */}
+                    <div className="px-6 pt-5 pb-4 border-b shrink-0">
+                        <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
+                            <Database className="w-5 h-5 text-violet-500" />
+                            {t ? 'Thêm kết nối mới' : 'Add New Connection'}
+                        </h2>
+                        <p className="text-xs text-muted-foreground mt-0.5">{t ? 'Cấu hình thông tin để truy cập database.' : 'Configure credentials to access your database.'}</p>
                     </div>
-                    <DialogTitle className="text-xl font-bold tracking-tight flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center text-white shadow-lg shadow-violet-500/20">
-                            <Activity className="w-4 h-4" />
-                        </div>
-                        {t ? 'Thiết lập kết nối' : 'Connection Setup'}
-                    </DialogTitle>
-                    <DialogDescription className="text-xs text-muted-foreground mt-1 text-balance">
-                        {t ? 'Khởi tạo luồng truy cập mới tới cơ sở dữ liệu của bạn. Chúng tôi bảo mật mọi thông tin bằng AES-256.' : 'Initialize a new connection to your database. We secure all information using AES-256 standard.'}
-                    </DialogDescription>
-                </div>
 
-                <div className="flex-1 overflow-y-auto px-6 py-6 scrollbar-hide">
-                    {/* Error Notification */}
-                    {error && (
-                        <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-                            <ShieldAlert className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
-                            <div className="text-xs text-red-600 dark:text-red-400">
-                                <span className="font-bold block mb-0.5">{t ? 'Lưu kết nối thất bại' : 'Failed to Save'}</span>
-                                {error}
-                            </div>
-                        </div>
-                    )}
-
-                    <Tabs defaultValue="form" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 mb-6 h-10 p-1 bg-muted/50 rounded-xl">
-                            <TabsTrigger value="form" className="text-xs font-semibold rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                                <Wand2 className="w-3.5 h-3.5 mr-2" />
-                                {t ? 'Form Chuẩn' : 'Standard Form'}
-                            </TabsTrigger>
-                            <TabsTrigger value="string" className="text-xs font-semibold rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                                <Lock className="w-3.5 h-3.5 mr-2" />
-                                {t ? 'Chuỗi kết nối' : 'Connection String'}
-                            </TabsTrigger>
-                        </TabsList>
-
-                        <TabsContent value="string" className="space-y-4 animate-in fade-in-50">
-                            <div className="space-y-2">
-                                <Label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{t ? 'Dán URI / Connection String' : 'Paste URI / Connection String'}</Label>
-                                <textarea
-                                    className="w-full h-32 rounded-xl border border-input bg-muted/20 px-4 py-3 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/20 focus-visible:border-violet-500/50 font-mono transition-all resize-none"
-                                    placeholder={isMongoType ? "mongodb+srv://user:pass@cluster0.abc.mongodb.net/mydb" : isFileType ? "/path/to/database.sqlite" : "postgresql://user:password@localhost:5432/mydatabase"}
-                                    value={connectionString}
-                                    onChange={(e) => setConnectionString(e.target.value)}
-                                />
-                                <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/10 flex gap-2.5">
-                                    <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                                    <p className="text-[10px] text-blue-600/80 leading-relaxed italic">
-                                        {t ? 'Chúng tôi sẽ tự động tách các trường Host, User, Password... để bạn dễ dàng quản lý.' : 'We will automatically extract Host, User, Password... fields for better management.'}
-                                    </p>
+                    {/* Scrollable Body */}
+                    <div className="flex-1 overflow-y-auto px-6 py-4">
+                        {error && (
+                            <div className="mb-4 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-2.5">
+                                <ShieldAlert className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                                <div className="text-xs text-red-600 dark:text-red-400">
+                                    <span className="font-semibold block mb-0.5">{t ? 'Lỗi hệ thống' : 'System Error'}</span>
+                                    {error}
                                 </div>
                             </div>
-                            <Button type="button" variant="outline" className="w-full font-bold text-xs h-10 rounded-xl border-dashed hover:border-violet-500 hover:bg-violet-50/50" onClick={parseConnectionString}>
-                                <Activity className="w-3.5 h-3.5 mr-2 text-violet-500" />
-                                {t ? 'Phân tích & Tự động điền' : 'Analyze & Auto-fill'}
-                            </Button>
-                        </TabsContent>
+                        )}
 
-                        <TabsContent value="form" className="space-y-6 m-0 animate-in fade-in-50">
-                            {/* Section: Identity */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <h3 className="text-xs font-bold uppercase tracking-widest text-violet-600/80">{t ? 'Thông tin cơ bản' : 'General Identity'}</h3>
-                                    <div className="h-px bg-border/60 flex-1" />
+                        {testResult && (
+                            <div className={`mb-4 p-3 rounded-lg border flex items-start gap-3 animate-in fade-in zoom-in-95 ${testResult.status === 'healthy' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700' : 'bg-red-500/10 border-red-500/20 text-red-700'}`}>
+                                {testResult.status === 'healthy' ? <CheckCircle2 className="w-5 h-5 mt-0.5 shrink-0" /> : <XCircle className="w-5 h-5 mt-0.5 shrink-0" />}
+                                <div className="text-xs">
+                                    <span className="font-bold block mb-0.5">
+                                        {testResult.status === 'healthy' ? (t ? 'Kết nối thành công!' : 'Connection Successful!') : (t ? 'Kết nối thất bại' : 'Connection Failed')}
+                                    </span>
+                                    {testResult.status === 'healthy' ? `Latency: ${testResult.latency}ms` : testResult.error}
                                 </div>
+                            </div>
+                        )}
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1.5">
-                                        <Label className="text-[10px] font-semibold text-muted-foreground uppercase">{t ? 'Loại Database' : 'Database Type'}</Label>
+
+                        <Tabs defaultValue="form" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 mb-4 h-9">
+                                <TabsTrigger value="form" className="text-xs">{t ? 'Form Chuẩn' : 'Standard Form'}</TabsTrigger>
+                                <TabsTrigger value="string" className="text-xs">{t ? 'Chuỗi kết nối' : 'Connection String'}</TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="string" className="space-y-3">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="connectionString" className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Dán URI / Connection String' : 'Paste URI / Connection String'}</Label>
+                                    <textarea
+                                        id="connectionString"
+                                        className="w-full h-24 rounded-md border border-input bg-background px-3 py-2 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono whitespace-pre-wrap"
+                                        placeholder={isMongoType ? "mongodb+srv://user:pass@cluster0.abc.mongodb.net/mydb" : isFileType ? "/path/to/database.sqlite" : "postgresql://user:password@localhost:5432/mydatabase"}
+                                        value={connectionString}
+                                        onChange={(e) => setConnectionString(e.target.value)}
+                                    />
+                                </div>
+                                <Button type="button" variant="secondary" size="sm" className="w-full font-medium text-xs h-8" onClick={parseConnectionString}>
+                                    <Wand2 className="w-3.5 h-3.5 mr-1.5 text-violet-500" />
+                                    {t ? 'Tự động điền Form' : 'Parse & Fill Form'}
+                                </Button>
+                            </TabsContent>
+
+                            <TabsContent value="form" className="space-y-4 m-0">
+                                {/* Team + Type + Name */}
+                                {teams.length > 0 && (
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Team (Tùy chọn)' : 'Team (Optional)'}</Label>
+                                        <Select value={organizationId} onValueChange={(v: string) => setOrganizationId(v)}>
+                                            <SelectTrigger className="h-9 text-xs">
+                                                <SelectValue placeholder={t ? 'Chỉ của tôi' : 'Personal'} />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-muted" />{t ? 'Chỉ của tôi' : 'Personal'}</div></SelectItem>
+                                                {teams.map((team) => (
+                                                    <SelectItem key={team.id} value={team.id}>
+                                                        <div className="flex items-center gap-2 text-xs">
+                                                            <Users className="w-3 h-3 text-blue-500" />
+                                                            {team.name}
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Loại Database' : 'Database Type'}</Label>
                                         <Select value={type} onValueChange={(v: any) => {
                                             setType(v);
                                             if (v === 'postgres') { setPort('5432'); setUsername('postgres'); setHost('localhost'); }
@@ -278,239 +317,202 @@ export const ConnectionDialog: React.FC = () => {
                                             else if (v === 'mongodb+srv') { setPort(''); setUsername(''); setHost(''); }
                                             else if (v === 'sqlite') { setPort(''); setUsername(''); setHost(''); setDatabase(''); }
                                             else if (v === 'clickhouse') { setPort('8123'); setUsername('default'); setHost('localhost'); }
-                                            setTestResult(null);
                                         }}>
-                                            <SelectTrigger className="h-10 text-xs rounded-xl font-medium">
+                                            <SelectTrigger className="h-9 text-xs">
                                                 <SelectValue />
                                             </SelectTrigger>
-                                            <SelectContent className="rounded-xl overflow-hidden">
-                                                <SelectItem value="postgres"><div className="flex items-center gap-2.5 px-1 py-1"><div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm" />PostgreSQL</div></SelectItem>
-                                                <SelectItem value="mysql"><div className="flex items-center gap-2.5 px-1 py-1"><div className="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-sm" />MySQL</div></SelectItem>
-                                                <SelectItem value="mssql"><div className="flex items-center gap-2.5 px-1 py-1"><div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-sm" />SQL Server</div></SelectItem>
-                                                <SelectItem value="clickhouse"><div className="flex items-center gap-2.5 px-1 py-1"><div className="w-2.5 h-2.5 rounded-full bg-yellow-500 shadow-sm" />ClickHouse</div></SelectItem>
-                                                <SelectItem value="sqlite"><div className="flex items-center gap-2.5 px-1 py-1"><div className="w-2.5 h-2.5 rounded-full bg-slate-400 shadow-sm" />SQLite</div></SelectItem>
-                                                <SelectItem value="mongodb"><div className="flex items-center gap-2.5 px-1 py-1"><div className="w-2.5 h-2.5 rounded-full bg-green-500 shadow-sm" />MongoDB Native</div></SelectItem>
-                                                <SelectItem value="mongodb+srv"><div className="flex items-center gap-2.5 px-1 py-1"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" />MongoDB Atlas</div></SelectItem>
+                                            <SelectContent>
+                                                <SelectItem value="postgres"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-blue-500" />PostgreSQL</div></SelectItem>
+                                                <SelectItem value="mysql"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-orange-500" />MySQL</div></SelectItem>
+                                                <SelectItem value="mssql"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-red-500" />SQL Server</div></SelectItem>
+                                                <SelectItem value="clickhouse"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-yellow-500" />ClickHouse</div></SelectItem>
+                                                <SelectItem value="sqlite"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-gray-400" />SQLite</div></SelectItem>
+                                                <SelectItem value="mongodb"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-green-500" />MongoDB</div></SelectItem>
+                                                <SelectItem value="mongodb+srv"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-emerald-500" />MongoDB Atlas (SRV)</div></SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <Label className="text-[10px] font-semibold text-muted-foreground uppercase">{t ? 'Team' : 'Workgroup'}</Label>
-                                        <Select value={organizationId} onValueChange={setOrganizationId}>
-                                            <SelectTrigger className="h-10 text-xs rounded-xl font-medium">
-                                                <SelectValue placeholder={t ? 'Chỉ của tôi' : 'Personal'} />
-                                            </SelectTrigger>
-                                            <SelectContent className="rounded-xl">
-                                                <SelectItem value="none"><div className="flex items-center gap-2.5 px-1 py-1"><div className="w-2.5 h-2.5 rounded-full bg-slate-200" />{t ? 'Chỉ cá nhân' : 'Personal Space'}</div></SelectItem>
-                                                {teams.map((team) => (
-                                                    <SelectItem key={team.id} value={team.id}>
-                                                        <div className="flex items-center gap-2.5 px-1 py-1 text-blue-600 font-semibold">
-                                                            <Users className="w-3.5 h-3.5" />
-                                                            {team.name}
-                                                        </div>
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Tên hiển thị' : 'Display Name'}</Label>
+                                        <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Production DB" className="h-9 text-xs" />
                                     </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <Label className="text-[10px] font-semibold text-muted-foreground uppercase">{t ? 'Tên hiển thị' : 'Label Name'}</Label>
-                                    <Input value={name} onChange={e => setName(e.target.value)} placeholder={t ? "VD: Production DB" : "e.g. Master Cluster"} className="h-10 text-xs rounded-xl font-medium" />
-                                </div>
-                            </div>
 
-                            {/* Section: Network Details */}
-                            {!isFileType && (
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="text-xs font-bold uppercase tracking-widest text-violet-600/80">{t ? 'Kết nối mạng' : 'Network Credentials'}</h3>
-                                        <div className="h-px bg-border/60 flex-1" />
-                                    </div>
+                                <div className="h-px bg-border/40 w-full" />
 
-                                    <div className={`grid gap-4 ${type === 'mongodb+srv' ? 'grid-cols-1' : 'grid-cols-3'}`}>
-                                        <div className={type === 'mongodb+srv' ? '' : 'col-span-2'}>
-                                            <div className="space-y-1.5">
-                                                <Label className="text-[10px] font-semibold text-muted-foreground uppercase">{isMongoType ? 'Cluster URL' : 'Host Address'}</Label>
-                                                <div className="relative">
-                                                    <Globe className="absolute left-3 top-3 w-4 h-4 text-muted-foreground/50" />
-                                                    <Input value={host} onChange={e => setHost(e.target.value)} placeholder={isMongoType ? 'cluster0.xxxxx.mongodb.net' : 'localhost'} className="h-10 pl-10 font-mono text-xs rounded-xl" />
+                                {/* Network */}
+                                {!isFileType && (
+                                    <div className="space-y-2.5">
+                                        <div className="flex items-center gap-1.5 text-xs font-medium"><Globe className="w-3.5 h-3.5 text-muted-foreground" /> {t ? 'Chi tiết mạng' : 'Network Details'}</div>
+                                        <div className={`grid gap-3 ${type === 'mongodb+srv' ? 'grid-cols-1' : 'grid-cols-3'}`}>
+                                            <div className={type === 'mongodb+srv' ? '' : 'col-span-2'}>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] text-muted-foreground">{isMongoType ? 'Hostname / Cluster' : 'Host'}</Label>
+                                                    <Input value={host} onChange={e => setHost(e.target.value)} placeholder={isMongoType ? 'cluster0.xxxxx.mongodb.net' : 'localhost'} className="h-9 font-mono text-xs" />
                                                 </div>
                                             </div>
+                                            {type !== 'mongodb+srv' && (
+                                                <div className="col-span-1 space-y-1">
+                                                    <Label className="text-[10px] text-muted-foreground">Port</Label>
+                                                    <Input value={port} onChange={e => setPort(e.target.value)} className="h-9 font-mono text-xs" />
+                                                </div>
+                                            )}
                                         </div>
-                                        {type !== 'mongodb+srv' && (
-                                            <div className="col-span-1 space-y-1.5">
-                                                <Label className="text-[10px] font-semibold text-muted-foreground uppercase">Port</Label>
-                                                <Input value={port} onChange={e => setPort(e.target.value)} className="h-10 font-mono text-xs rounded-xl text-center" />
+                                        {isMongoType && (
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] text-muted-foreground">{t ? 'Database (Tùy chọn)' : 'Database (Optional)'}</Label>
+                                                <Input value={database} onChange={e => setDatabase(e.target.value)} placeholder="mydb" className="h-9 font-mono text-xs" />
                                             </div>
                                         )}
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {/* Section: SQLite Path */}
-                            {isFileType && (
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="text-xs font-bold uppercase tracking-widest text-violet-600/80">{t ? 'Dữ liệu File' : 'Local Data Storage'}</h3>
-                                        <div className="h-px bg-border/60 flex-1" />
-                                    </div>
-
-                                    <div className="space-y-1.5 p-4 rounded-xl border border-dashed border-violet-500/30 bg-violet-500/5">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center">
-                                                <Database className="w-4 h-4 text-violet-600" />
-                                            </div>
-                                            <div>
-                                                <Label className="text-[10px] font-bold text-muted-foreground uppercase">{t ? 'Đường dẫn file SQLite' : 'SQLite Database Path'}</Label>
-                                            </div>
-                                        </div>
-                                        <Input value={database} onChange={e => setDatabase(e.target.value)} placeholder={t ? "/đường/dẫn/đến/file.sqlite hoặc :memory:" : "/abs/path/to/db.sqlite or :memory:"} className="h-10 font-mono text-xs rounded-lg border-violet-500/10 focus:border-violet-500/40" />
-                                        <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
-                                            <span className="font-bold text-violet-600 mr-1">HINT:</span> 
-                                            {t ? 'Lưu ý Server phải có quyền đọc/ghi vào thư mục chứa file này. Dùng :memory: để tạo DB tạm thời.' : 'Ensure the server process has read/write permissions for the selected file/folder. Use :memory: for temporary storage.'}
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Section: Authentication */}
-                            {!isFileType && (
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="text-xs font-bold uppercase tracking-widest text-violet-600/80">{t ? 'Xác thực & Bảo mật' : 'Authentication Scope'}</h3>
-                                        <div className="h-px bg-border/60 flex-1" />
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-semibold text-muted-foreground uppercase">{t ? 'Tên đăng nhập' : 'Master User'}</Label>
-                                            <div className="relative">
-                                                <Users className="absolute left-3 top-3 w-4 h-4 text-muted-foreground/50" />
-                                                <Input value={username} onChange={e => setUsername(e.target.value)} className="h-10 pl-10 text-xs rounded-xl" />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-semibold text-muted-foreground uppercase">{t ? 'Mật khẩu' : 'Secret Token'}</Label>
-                                            <div className="relative">
-                                                <Lock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground/50" />
-                                                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} className="h-10 pl-10 text-xs rounded-xl" />
-                                            </div>
+                                {isFileType && (
+                                    <div className="space-y-2.5">
+                                        <div className="flex items-center gap-1.5 text-xs font-medium"><Database className="w-3.5 h-3.5 text-muted-foreground" /> {t ? 'Đường dẫn file' : 'File Path'}</div>
+                                        <div className="space-y-1">
+                                            <Label className="text-[10px] text-muted-foreground">{t ? 'Đường dẫn SQLite' : 'SQLite File Path'}</Label>
+                                            <Input value={database} onChange={e => setDatabase(e.target.value)} placeholder="/path/to/database.sqlite or :memory:" className="h-9 font-mono text-xs" />
                                         </div>
                                     </div>
-                                    {!isMongoType && (
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-semibold text-muted-foreground uppercase">{t ? 'Database Mặc định' : 'Default Target Database'}</Label>
-                                            <Input value={database} onChange={e => setDatabase(e.target.value)} placeholder="mydatabase" className="h-10 font-mono text-xs rounded-xl" />
+                                )}
+
+                                <div className="h-px bg-border/40 w-full" />
+
+                                {/* Auth */}
+                                {!isFileType && (
+                                    <div className="space-y-2.5">
+                                        <div className="flex items-center gap-1.5 text-xs font-medium"><Lock className="w-3.5 h-3.5 text-muted-foreground" /> {t ? 'Xác thực' : 'Authentication'}</div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] text-muted-foreground">{t ? 'Tên đăng nhập' : 'Username'}</Label>
+                                                <Input value={username} onChange={e => setUsername(e.target.value)} className="h-9 text-xs" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] text-muted-foreground">{t ? 'Mật khẩu' : 'Password'}</Label>
+                                                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} className="h-9 text-xs" />
+                                            </div>
                                         </div>
-                                    )}
-                                    <div className="flex items-center gap-3 p-3 rounded-xl border bg-muted/30 shadow-inner">
-                                        <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                                            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                                        </div>
-                                        <div>
-                                            <span className="text-[10px] font-bold text-emerald-700 block uppercase tracking-tight">Security Protocol ACTIVE</span>
-                                            <span className="text-[10px] text-muted-foreground font-medium italic">
-                                                {t ? 'Mã hóa AES-256-GCM • SSL tự động được kích hoạt' : 'AES-256-GCM Level Encryption • Auto SSL/TLS Handshake'}
+                                        {!isMongoType && (
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] text-muted-foreground">Database</Label>
+                                                <Input value={database} onChange={e => setDatabase(e.target.value)} placeholder="mydatabase" className="h-9 font-mono text-xs" />
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-2 p-2 rounded-md border bg-muted/30">
+                                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                            <span className="text-[10px] font-medium text-muted-foreground">
+                                                {t ? 'Mã hóa AES-256-GCM • SSL Mode tự động' : 'AES-256-GCM Encrypted • Auto SSL Mode'}
                                             </span>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {/* Section: Permissions */}
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <h3 className="text-xs font-bold uppercase tracking-widest text-violet-600/80">{t ? 'Quyền & Chính sách' : 'Governance & Safety'}</h3>
-                                    <div className="h-px bg-border/60 flex-1" />
-                                </div>
+                                <div className="h-px bg-border/40 w-full" />
 
-                                <div className="grid grid-cols-1 gap-2">
-                                    <label className={`group flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${readOnly ? 'bg-amber-500/5 border-amber-500/20 shadow-sm' : 'hover:bg-muted/50 border-transparent hover:border-border'}`}>
-                                        <div className="flex gap-3">
-                                            <FileWarning className={`w-4 h-4 mt-0.5 ${readOnly ? 'text-amber-500' : 'text-muted-foreground/40'}`} />
-                                            <div>
-                                                <div className="text-[11px] font-bold uppercase">{t ? 'Chế độ an toàn (Chỉ đọc)' : 'Isolated Safety Mode (Read-only)'}</div>
-                                                <div className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{t ? 'Vô hiệu hóa mọi thao tác ghi, xóa hoặc thay đổi cấu trúc.' : 'Blocks all write, delete, and DDL schema modifications.'}</div>
+                                <div className="space-y-2.5">
+                                    <div className="flex items-center gap-1.5 text-xs font-medium">
+                                        <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+                                        {t ? 'Quyền & An toàn' : 'Access & Safety'}
+                                    </div>
+
+                                    <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                                        <label className="flex items-start gap-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={readOnly}
+                                                onChange={(e) => setReadOnly(e.target.checked)}
+                                                className="mt-0.5"
+                                            />
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 text-xs font-semibold">
+                                                    <FileWarning className="w-3.5 h-3.5 text-amber-500" />
+                                                    {t ? 'Chế độ chỉ đọc' : 'Read-only mode'}
+                                                </div>
+                                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                    {t
+                                                        ? 'Chặn mọi thao tác sửa dữ liệu, đổi schema, import và tạo/xóa database.'
+                                                        : 'Blocks data edits, schema changes, imports, and database create/drop actions.'}
+                                                </p>
                                             </div>
-                                        </div>
-                                        <input type="checkbox" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} className="peer hidden" />
-                                        <div className="w-10 h-5 rounded-full bg-muted relative transition-all peer-checked:bg-amber-500 shrink-0">
-                                            <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${readOnly ? 'left-6' : 'left-1'}`} />
-                                        </div>
-                                    </label>
-                                    
-                                    {!readOnly && (
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <label className="flex items-center gap-3 p-3 rounded-xl border hover:bg-muted/50 transition-all cursor-pointer border-transparent hover:border-border">
-                                                <input type="checkbox" checked={allowSchemaChanges} onChange={(e) => setAllowSchemaChanges(e.target.checked)} className="accent-violet-500" />
-                                                <div className="text-[10px] font-semibold">{t ? 'Thay đổi Schema' : 'Schema Changes'}</div>
-                                            </label>
-                                            <label className="flex items-center gap-3 p-3 rounded-xl border hover:bg-muted/50 transition-all cursor-pointer border-transparent hover:border-border">
-                                                <input type="checkbox" checked={allowImportExport} onChange={(e) => setAllowImportExport(e.target.checked)} className="accent-violet-500" />
-                                                <div className="text-[10px] font-semibold">{t ? 'Import / Export' : 'Mass Data Operations'}</div>
-                                            </label>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                                        </label>
 
-                            {/* Section: Test Connection Result */}
-                            {testResult && (
-                                <div className={`p-4 rounded-xl border flex items-start gap-4 animate-in zoom-in-95 ${testResult.status === 'healthy' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700' : 'bg-red-500/10 border-red-500/20 text-red-700'}`}>
-                                    {testResult.status === 'healthy' ? (
-                                        <CheckCircle2 className="w-6 h-6 mt-0.5 shrink-0" />
-                                    ) : (
-                                        <XCircle className="w-6 h-6 mt-0.5 shrink-0" />
-                                    )}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-[11px] font-bold uppercase tracking-wider mb-1">
-                                            {testResult.status === 'healthy' ? (t ? 'Kết nối thành công!' : 'Connection Successful!') : (t ? 'Kết nối thất bại' : 'Connection Refused')}
-                                        </div>
-                                        <div className="text-[10px] leading-relaxed break-words font-medium">
-                                            {testResult.status === 'healthy' 
-                                                ? (t ? `Đã xác thực OK. Độ trễ: ${testResult.latency}ms` : `Handshake verified. Latency: ${testResult.latency}ms`)
-                                                : testResult.error
-                                            }
-                                        </div>
+                                        <label className="flex items-start gap-3 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={allowQueryExecution}
+                                                onChange={(e) => setAllowQueryExecution(e.target.checked)}
+                                                className="mt-0.5"
+                                            />
+                                            <div className="min-w-0">
+                                                <div className="text-xs font-semibold">
+                                                    {t ? 'Cho phép chạy truy vấn' : 'Allow query execution'}
+                                                </div>
+                                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                    {t
+                                                        ? 'Tắt tùy chọn này nếu chỉ muốn lưu kết nối để xem metadata hoặc kiểm tra sức khỏe.'
+                                                        : 'Turn this off if the connection should be discoverable but not runnable.'}
+                                                </p>
+                                            </div>
+                                        </label>
+
+                                        <label className={`flex items-start gap-3 ${readOnly ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={!readOnly && allowSchemaChanges}
+                                                onChange={(e) => setAllowSchemaChanges(e.target.checked)}
+                                                disabled={readOnly}
+                                                className="mt-0.5"
+                                            />
+                                            <div className="min-w-0">
+                                                <div className="text-xs font-semibold">
+                                                    {t ? 'Cho phép đổi schema' : 'Allow schema changes'}
+                                                </div>
+                                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                    {t
+                                                        ? 'Bao gồm table designer, create/drop database và các thay đổi DDL.'
+                                                        : 'Includes table designer, create/drop database, and other DDL actions.'}
+                                                </p>
+                                            </div>
+                                        </label>
+
+                                        <label className={`flex items-start gap-3 ${readOnly ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                            <input
+                                                type="checkbox"
+                                                checked={!readOnly && allowImportExport}
+                                                onChange={(e) => setAllowImportExport(e.target.checked)}
+                                                disabled={readOnly}
+                                                className="mt-0.5"
+                                            />
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 text-xs font-semibold">
+                                                    <Upload className="w-3.5 h-3.5 text-blue-500" />
+                                                    {t ? 'Cho phép import/export' : 'Allow import/export'}
+                                                </div>
+                                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                    {t
+                                                        ? 'Kiểm soát bulk import và các thao tác copy dữ liệu khối lượng lớn.'
+                                                        : 'Controls bulk import and other heavy data transfer workflows.'}
+                                                </p>
+                                            </div>
+                                        </label>
                                     </div>
                                 </div>
-                            )}
-                        </TabsContent>
-                    </Tabs>
-                </div>
+                            </TabsContent>
+                        </Tabs>
+                    </div>
 
-                {/* Footer Actions */}
-                <div className="px-6 py-4 border-t border-border flex items-center justify-between gap-3 shrink-0 bg-muted/10">
-                    <Button 
-                        type="button" 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-xs font-bold text-muted-foreground hover:bg-red-500/5 hover:text-red-500 rounded-xl"
-                        onClick={handleTest}
-                        disabled={isTesting || isSaving}
-                    >
-                        {isTesting ? (t ? 'Đang kiểm tra...' : 'Testing...') : (t ? 'Kiểm tra kết nối' : 'Test Connection')}
-                    </Button>
-                    <div className="flex gap-2">
-                        <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            onClick={closeConnectionDialog} 
-                            disabled={isSaving} 
-                            className="text-xs font-bold h-10 px-6 rounded-xl"
-                        >
-                            {t ? 'Bỏ qua' : 'Discard'}
+                    {/* Footer */}
+                    <div className="px-6 py-3 border-t border-border flex justify-end gap-2.5 shrink-0 bg-muted/20">
+                        <Button variant="ghost" size="sm" onClick={handleTest} disabled={isTesting || isSaving} className="text-xs h-8 mr-auto font-semibold">
+                            {isTesting ? (t ? 'Đang test...' : 'Testing...') : (t ? 'Kiểm tra kết nối' : 'Test Connection')}
                         </Button>
-                        <Button 
-                            size="sm" 
-                            onClick={handleSave} 
-                            disabled={isSaving} 
-                            className="bg-violet-600 hover:bg-violet-700 text-white font-bold h-10 px-8 rounded-xl shadow-lg shadow-violet-500/20 transition-all hover:scale-[1.02]"
-                        >
-                            {isSaving ? (t ? 'Đang lưu...' : 'Preserving...') : (t ? 'Lưu Kết nối' : 'Establish Connection')}
+                        <Button variant="ghost" size="sm" onClick={closeConnectionDialog} disabled={isSaving} className="text-xs h-8">{t ? 'Hủy' : 'Cancel'}</Button>
+                        <Button size="sm" onClick={handleSave} disabled={isSaving} className="bg-violet-600 hover:bg-violet-700 text-white min-w-[120px] text-xs h-8">
+                            {isSaving ? (t ? 'Đang kết nối...' : 'Connecting...') : (t ? 'Lưu & Kết nối' : 'Save & Connect')}
                         </Button>
                     </div>
+
                 </div>
             </DialogContent>
         </Dialog>
