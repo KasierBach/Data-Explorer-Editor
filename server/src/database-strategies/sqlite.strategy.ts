@@ -6,20 +6,20 @@ import type {
 } from './database-strategy.interface';
 import { SchemaOperation } from '../query/dto/schema-operations.types';
 import { Injectable } from '@nestjs/common';
-import { Database } from 'sqlite3';
+import Database from 'better-sqlite3';
 
 @Injectable()
 export class SqliteStrategy implements IDatabaseStrategy {
-  createPool(connectionConfig: ConnectionConfig): Database {
+  createPool(connectionConfig: ConnectionConfig): Database.Database {
     const path = connectionConfig.database || ':memory:';
     return new Database(path);
   }
 
-  async closePool(pool: Database): Promise<void> {
-    await new Promise<void>((resolve, reject) => {
-      pool.close((err) => (err ? reject(err) : resolve()));
-    });
+
+  async closePool(pool: Database.Database): Promise<void> {
+    pool.close();
   }
+
 
   quoteIdentifier(name: string): string {
     return `"${name.replace(/"/g, '""')}"`;
@@ -29,7 +29,7 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return this.quoteIdentifier(table);
   }
 
-  async executeQuery(pool: Database, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
+  async executeQuery(pool: Database.Database, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
     let safeSql = sql;
     if (options?.limit !== undefined) {
       safeSql += ` LIMIT ${options.limit}`;
@@ -38,15 +38,14 @@ export class SqliteStrategy implements IDatabaseStrategy {
       safeSql += ' LIMIT 50000';
     }
 
-    const rows = await new Promise<Record<string, unknown>[]>((resolve, reject) => {
-      pool.all(safeSql, (err, r) => (err ? reject(err) : resolve(r as Record<string, unknown>[])));
-    });
+    const rows = pool.prepare(safeSql).all() as Record<string, unknown>[];
 
     const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
     return { rows: rows.slice(0, 50000), columns, rowCount: rows.length };
   }
 
-  async updateRow(pool: Database, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }> {
+
+  async updateRow(pool: Database.Database, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }> {
     const { table, pkColumn, pkValue, updates } = params;
     const cols = Object.keys(updates);
     if (cols.length === 0) return { success: false, rowCount: 0 };
@@ -58,7 +57,7 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return this.runChange(pool, sql, values);
   }
 
-  async insertRow(pool: Database, params: InsertRowParams): Promise<{ success: boolean; rowCount: number }> {
+  async insertRow(pool: Database.Database, params: InsertRowParams): Promise<{ success: boolean; rowCount: number }> {
     const { table, data } = params;
     const cols = Object.keys(data);
     if (cols.length === 0) return { success: false, rowCount: 0 };
@@ -68,7 +67,7 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return this.runChange(pool, sql, cols.map((c) => data[c]));
   }
 
-  async deleteRows(pool: Database, params: DeleteRowsParams): Promise<{ success: boolean; rowCount: number }> {
+  async deleteRows(pool: Database.Database, params: DeleteRowsParams): Promise<{ success: boolean; rowCount: number }> {
     const { table, pkColumn, pkValues } = params;
     if (pkValues.length === 0) return { success: true, rowCount: 0 };
 
@@ -77,16 +76,14 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return this.runChange(pool, sql, pkValues);
   }
 
-  private async runChange(pool: Database, sql: string, values: unknown[]): Promise<{ success: boolean; rowCount: number }> {
-    return new Promise((resolve, reject) => {
-      pool.run(sql, values, function (err) {
-        if (err) return reject(err);
-        resolve({ success: true, rowCount: this.changes });
-      });
-    });
+  private async runChange(pool: Database.Database, sql: string, values: unknown[]): Promise<{ success: boolean; rowCount: number }> {
+
+    const result = pool.prepare(sql).run(...values);
+    return { success: true, rowCount: result.changes };
   }
 
-  async importData(pool: Database, params: { schema: string; table: string; data: Record<string, unknown>[] }): Promise<{ success: boolean; rowCount: number }> {
+
+  async importData(pool: Database.Database, params: { schema: string; table: string; data: Record<string, unknown>[] }): Promise<{ success: boolean; rowCount: number }> {
     const { table, data } = params;
     if (!data || data.length === 0) return { success: true, rowCount: 0 };
 
@@ -98,13 +95,12 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return { success: true, rowCount: total };
   }
 
-  async exportStream(pool: Database, _schema: string, table: string): Promise<unknown> {
+  async exportStream(pool: Database.Database, _schema: string, table: string): Promise<unknown> {
     const sql = `SELECT * FROM ${this.quoteIdentifier(table)}`;
-    const rows = await new Promise<unknown[]>((resolve, reject) => {
-      pool.all(sql, (err, r) => (err ? reject(err) : resolve(r as unknown[])));
-    });
+    const rows = pool.prepare(sql).all();
     return { [Symbol.asyncIterator]: async function* () { for (const row of rows) yield row; } };
   }
+
 
   buildAlterTableSql(quotedTable: string, op: SchemaOperation): string {
     switch (op.type) {
@@ -119,37 +115,35 @@ export class SqliteStrategy implements IDatabaseStrategy {
     }
   }
 
-  async createDatabase(_pool: Database, _name: string): Promise<void> {
+  async createDatabase(_pool: Database.Database, _name: string): Promise<void> {
     throw new Error('SQLite createDatabase not supported via SQL');
   }
 
-  async dropDatabase(_pool: Database, _name: string): Promise<void> {
+  async dropDatabase(_pool: Database.Database, _name: string): Promise<void> {
     throw new Error('SQLite dropDatabase not supported via SQL');
   }
 
-  async getDatabases(_pool: Database): Promise<TreeNodeResult[]> {
+  async getDatabases(_pool: Database.Database): Promise<TreeNodeResult[]> {
     return [{ id: 'db:main', name: 'main', type: 'database', parentId: 'root', hasChildren: true }];
   }
 
-  async getSchemas(_pool: Database, _dbName?: string): Promise<TreeNodeResult[]> {
+  async getSchemas(_pool: Database.Database, _dbName?: string): Promise<TreeNodeResult[]> {
     return [{ id: 'schema:main', name: 'main', type: 'schema', parentId: 'root', hasChildren: true }];
   }
 
-  async getTables(pool: Database, _schema: string, _dbName?: string): Promise<TreeNodeResult[]> {
+  async getTables(pool: Database.Database, _schema: string, _dbName?: string): Promise<TreeNodeResult[]> {
     const sql = `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`;
-    const rows = await new Promise<{ name: string }[]>((resolve, reject) => {
-      pool.all(sql, (err, r) => (err ? reject(err) : resolve(r as { name: string }[])));
-    });
+    const rows = pool.prepare(sql).all() as { name: string }[];
     return rows.map((r) => ({ id: `table:${r.name}`, name: r.name, type: 'table', parentId: 'schema:main', hasChildren: true }));
   }
 
-  async getViews(pool: Database, _schema: string, _dbName?: string): Promise<TreeNodeResult[]> {
+
+  async getViews(pool: Database.Database, _schema: string, _dbName?: string): Promise<TreeNodeResult[]> {
     const sql = `SELECT name FROM sqlite_master WHERE type='view'`;
-    const rows = await new Promise<{ name: string }[]>((resolve, reject) => {
-      pool.all(sql, (err, r) => (err ? reject(err) : resolve(r as { name: string }[])));
-    });
+    const rows = pool.prepare(sql).all() as { name: string }[];
     return rows.map((r) => ({ id: `view:${r.name}`, name: r.name, type: 'view', parentId: 'schema:main', hasChildren: true }));
   }
+
 
   async getFunctions(): Promise<TreeNodeResult[]> {
     return [];
@@ -159,11 +153,9 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return [];
   }
 
-  async getColumns(pool: Database, _schema: string, table: string): Promise<ColumnInfo[]> {
+  async getColumns(pool: Database.Database, _schema: string, table: string): Promise<ColumnInfo[]> {
     const sql = `PRAGMA table_info(${this.quoteIdentifier(table)})`;
-    const rows = await new Promise<{ name: string; type: string; notnull: number; dflt_value: unknown; pk: number }[]>((resolve, reject) => {
-      pool.all(sql, (err, r) => (err ? reject(err) : resolve(r as any[])));
-    });
+    const rows = pool.prepare(sql).all() as any[];
     return rows.map((r) => ({
       name: r.name,
       type: r.type,
@@ -174,19 +166,16 @@ export class SqliteStrategy implements IDatabaseStrategy {
     }));
   }
 
-  async getFullMetadata(pool: Database, _schema: string, table: string): Promise<FullTableMetadata> {
+
+  async getFullMetadata(pool: Database.Database, _schema: string, table: string): Promise<FullTableMetadata> {
     const columns = await this.getColumns(pool, '', table);
     const indexSql = `PRAGMA index_list(${this.quoteIdentifier(table)})`;
-    const indicesRaw = await new Promise<{ name: string; unique: number; origin: string }[]>((resolve, reject) => {
-      pool.all(indexSql, (err, r) => (err ? reject(err) : resolve(r as any[])));
-    });
+    const indicesRaw = pool.prepare(indexSql).all() as any[];
 
     const indices: IndexInfo[] = [];
     for (const idx of indicesRaw) {
       const infoSql = `PRAGMA index_info(${this.quoteIdentifier(idx.name)})`;
-      const info = await new Promise<{ name: string }[]>((resolve, reject) => {
-        pool.all(infoSql, (err, r) => (err ? reject(err) : resolve(r as any[])));
-      });
+      const info = pool.prepare(infoSql).all() as any[];
       indices.push({
         name: idx.name,
         columns: info.map((i) => i.name),
@@ -196,19 +185,19 @@ export class SqliteStrategy implements IDatabaseStrategy {
     }
 
     const countSql = `SELECT COUNT(*) as cnt FROM ${this.quoteIdentifier(table)}`;
-    const countRow = await new Promise<{ cnt: number }>((resolve, reject) => {
-      pool.get(countSql, (err, r) => (err ? reject(err) : resolve(r as { cnt: number })));
-    });
+    const countRow = pool.prepare(countSql).get() as { cnt: number };
 
     return { columns, indices, rowCount: countRow.cnt };
   }
+
 
   async getRelationships(): Promise<Relationship[]> {
     return [];
   }
 
-  async getDatabaseMetrics(pool: Database): Promise<DatabaseMetrics> {
+  async getDatabaseMetrics(pool: Database.Database): Promise<DatabaseMetrics> {
     const tables = await this.getTables(pool, '', '');
+
     return {
       tableCount: tables.length,
       sizeBytes: 0,
@@ -218,14 +207,14 @@ export class SqliteStrategy implements IDatabaseStrategy {
     };
   }
 
-  async getHierarchyNodes(pool: Database, parentId: string | null): Promise<TreeNodeResult[]> {
+  async getHierarchyNodes(pool: Database.Database, parentId: string | null): Promise<TreeNodeResult[]> {
     if (!parentId) return this.getSchemas(pool);
     if (parentId === 'schema:main') return this.getTables(pool, '');
     if (parentId.startsWith('schema:main.folder:tables')) return this.getTables(pool, '');
     return [];
   }
 
-  async seedData(pool: Database): Promise<QueryResult> {
+  async seedData(pool: Database.Database): Promise<QueryResult> {
     const sql = `
       CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT, email TEXT UNIQUE);
       CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, name TEXT, price REAL, stock INTEGER);
