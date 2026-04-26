@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore, type Connection } from '@/core/services/store';
-import { Dialog, DialogContent } from '@/presentation/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/presentation/components/ui/dialog';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/presentation/components/ui/select';
@@ -145,8 +145,9 @@ export const ConnectionDialog: React.FC = () => {
             allowSchemaChanges: readOnly ? false : allowSchemaChanges,
             allowImportExport: readOnly ? false : allowImportExport,
             allowQueryExecution,
-            ...(organizationId ? { organizationId } : {}),
+            ...(organizationId && organizationId !== 'none' ? { organizationId } : {}),
         };
+
 
         const parsedPort = parseInt(port);
         if (!isNaN(parsedPort)) connectionData.port = parsedPort;
@@ -193,12 +194,15 @@ export const ConnectionDialog: React.FC = () => {
                 <div className="flex flex-col max-h-[80vh]">
                     {/* Header */}
                     <div className="px-6 pt-5 pb-4 border-b shrink-0">
-                        <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
+                        <DialogTitle className="text-lg font-bold tracking-tight flex items-center gap-2">
                             <Database className="w-5 h-5 text-violet-500" />
                             {t ? 'Thêm kết nối mới' : 'Add New Connection'}
-                        </h2>
-                        <p className="text-xs text-muted-foreground mt-0.5">{t ? 'Cấu hình thông tin để truy cập database.' : 'Configure credentials to access your database.'}</p>
+                        </DialogTitle>
+                        <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                            {t ? 'Cấu hình thông tin để truy cập database.' : 'Configure credentials to access your database.'}
+                        </DialogDescription>
                     </div>
+
 
                     {/* Scrollable Body */}
                     <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -240,12 +244,13 @@ export const ConnectionDialog: React.FC = () => {
                                 {teams.length > 0 && (
                                     <div className="space-y-1">
                                         <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Team (Tùy chọn)' : 'Team (Optional)'}</Label>
-                                        <Select value={organizationId} onValueChange={(v: string) => setOrganizationId(v)}>
+                                        <Select value={organizationId || 'none'} onValueChange={(v: string) => setOrganizationId(v)}>
                                             <SelectTrigger className="h-9 text-xs">
                                                 <SelectValue placeholder={t ? 'Chỉ của tôi' : 'Personal'} />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value=""><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-muted" />{t ? 'Chỉ của tôi' : 'Personal'}</div></SelectItem>
+                                                <SelectItem value="none"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-muted" />{t ? 'Chỉ của tôi' : 'Personal'}</div></SelectItem>
+
                                                 {teams.map((team) => (
                                                     <SelectItem key={team.id} value={team.id}>
                                                         <div className="flex items-center gap-2 text-xs">
