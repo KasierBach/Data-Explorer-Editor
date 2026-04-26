@@ -24,6 +24,7 @@ const ERDPage = lazy(() => import('@/presentation/pages/ERDPage').then((m) => ({
 const VisualizePage = lazy(() => import('@/presentation/pages/VisualizePage').then((m) => ({ default: m.VisualizePage })))
 const AdminDashboardPage = lazy(() => import('@/presentation/pages/Admin/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })))
 const ChangelogPage = lazy(() => import('@/presentation/pages/ChangelogPage').then((m) => ({ default: m.ChangelogPage })))
+const TeamPage = lazy(() => import('@/presentation/pages/TeamPage').then((m) => ({ default: m.TeamPage })))
 
 function RouteFallback() {
   return (
@@ -93,6 +94,7 @@ export function App() {
               <Route path="/onboarding" element={<RequireAuth><OnboardingPage /></RequireAuth>} />
               <Route path="/docs" element={<DocumentationPage />} />
               <Route path="/changelog" element={<ChangelogPage />} />
+              <Route path="/teams" element={<RequireAuth><TeamPage /></RequireAuth>} />
 
               <Route path="/admin" element={<RequireAuth requireAdmin={true}><AdminDashboardPage /></RequireAuth>} />
 

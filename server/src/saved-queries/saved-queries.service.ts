@@ -89,6 +89,7 @@ export class SavedQueriesService {
                 },
               ]
             : []),
+          { organization: { members: { some: { userId } } } },
         ],
       },
       include: {

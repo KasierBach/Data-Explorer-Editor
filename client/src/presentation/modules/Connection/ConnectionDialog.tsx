@@ -6,14 +6,15 @@ import { Input } from '@/presentation/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/presentation/components/ui/select';
 import { Label } from '@/presentation/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/presentation/components/ui/tabs';
-import { ShieldAlert, Database, Lock, Globe, Wand2, ShieldCheck, Shield, FileWarning, Upload } from 'lucide-react';
+import { ShieldAlert, Database, Lock, Globe, Wand2, ShieldCheck, Shield, FileWarning, Upload, Users } from 'lucide-react';
 import { ConnectionService } from '@/core/services/ConnectionService';
+import { OrganizationService, type OrganizationEntity } from '@/core/services/OrganizationService';
 
 export const ConnectionDialog: React.FC = () => {
     const { isConnectionDialogOpen, closeConnectionDialog, addConnection, lang } = useAppStore();
     const t = lang === 'vi';
 
-    const [type, setType] = useState<'postgres' | 'mysql' | 'mssql' | 'mongodb' | 'mongodb+srv'>('postgres');
+    const [type, setType] = useState<'postgres' | 'mysql' | 'mssql' | 'mongodb' | 'mongodb+srv' | 'sqlite' | 'clickhouse'>('postgres');
     const [name, setName] = useState('');
     const [host, setHost] = useState('localhost');
     const [port, setPort] = useState('5432');
@@ -28,6 +29,8 @@ export const ConnectionDialog: React.FC = () => {
     const [connectionString, setConnectionString] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [teams, setTeams] = useState<OrganizationEntity[]>([]);
+    const [organizationId, setOrganizationId] = useState<string>('');
 
     // Reset form states when dialog opens
     React.useEffect(() => {
@@ -46,10 +49,16 @@ export const ConnectionDialog: React.FC = () => {
             setConnectionString('');
             setError(null);
             setIsSaving(false);
+            setOrganizationId('');
+            // Load teams
+            OrganizationService.getMyOrganizations()
+                .then(setTeams)
+                .catch(() => setTeams([]));
         }
     }, [isConnectionDialogOpen]);
 
     const isMongoType = type === 'mongodb' || type === 'mongodb+srv';
+    const isFileType = type === 'sqlite';
 
     const parseConnectionString = () => {
         try {
@@ -84,7 +93,7 @@ export const ConnectionDialog: React.FC = () => {
 
             const url = new URL(raw);
 
-            let parsedType: 'postgres' | 'mysql' | 'mssql' = 'postgres';
+            let parsedType: 'postgres' | 'mysql' | 'mssql' | 'clickhouse' = 'postgres';
             if (url.protocol.includes('postgres')) {
                 parsedType = 'postgres';
                 setType('postgres');
@@ -94,6 +103,9 @@ export const ConnectionDialog: React.FC = () => {
             } else if (url.protocol.includes('mssql') || url.protocol.includes('sqlserver')) {
                 parsedType = 'mssql';
                 setType('mssql');
+            } else if (url.protocol.includes('clickhouse')) {
+                parsedType = 'clickhouse';
+                setType('clickhouse');
             }
 
             if (url.hostname) setHost(url.hostname);
@@ -103,6 +115,7 @@ export const ConnectionDialog: React.FC = () => {
                 if (parsedType === 'postgres') setPort('5432');
                 if (parsedType === 'mysql') setPort('3306');
                 if (parsedType === 'mssql') setPort('1433');
+                if (parsedType === 'clickhouse') setPort('8123');
             }
 
             if (url.username) setUsername(decodeURIComponent(url.username));
@@ -124,14 +137,15 @@ export const ConnectionDialog: React.FC = () => {
         const connectionData: any = {
             name: name || `${type}@${host}`,
             type,
-            host,
-            username,
-            password,
+            host: isFileType ? undefined : host,
+            username: isFileType ? undefined : username,
+            password: isFileType ? undefined : password,
             showAllDatabases,
             readOnly,
             allowSchemaChanges: readOnly ? false : allowSchemaChanges,
             allowImportExport: readOnly ? false : allowImportExport,
             allowQueryExecution,
+            ...(organizationId ? { organizationId } : {}),
         };
 
         const parsedPort = parseInt(port);
@@ -210,7 +224,7 @@ export const ConnectionDialog: React.FC = () => {
                                     <textarea
                                         id="connectionString"
                                         className="w-full h-24 rounded-md border border-input bg-background px-3 py-2 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono whitespace-pre-wrap"
-                                        placeholder={isMongoType ? "mongodb+srv://user:pass@cluster0.abc.mongodb.net/mydb" : "postgresql://user:password@localhost:5432/mydatabase"}
+                                        placeholder={isMongoType ? "mongodb+srv://user:pass@cluster0.abc.mongodb.net/mydb" : isFileType ? "/path/to/database.sqlite" : "postgresql://user:password@localhost:5432/mydatabase"}
                                         value={connectionString}
                                         onChange={(e) => setConnectionString(e.target.value)}
                                     />
@@ -222,7 +236,28 @@ export const ConnectionDialog: React.FC = () => {
                             </TabsContent>
 
                             <TabsContent value="form" className="space-y-4 m-0">
-                                {/* Type + Name */}
+                                {/* Team + Type + Name */}
+                                {teams.length > 0 && (
+                                    <div className="space-y-1">
+                                        <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Team (Tùy chọn)' : 'Team (Optional)'}</Label>
+                                        <Select value={organizationId} onValueChange={(v: string) => setOrganizationId(v)}>
+                                            <SelectTrigger className="h-9 text-xs">
+                                                <SelectValue placeholder={t ? 'Chỉ của tôi' : 'Personal'} />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value=""><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-muted" />{t ? 'Chỉ của tôi' : 'Personal'}</div></SelectItem>
+                                                {teams.map((team) => (
+                                                    <SelectItem key={team.id} value={team.id}>
+                                                        <div className="flex items-center gap-2 text-xs">
+                                                            <Users className="w-3 h-3 text-blue-500" />
+                                                            {team.name}
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                         <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Loại Database' : 'Database Type'}</Label>
@@ -233,6 +268,8 @@ export const ConnectionDialog: React.FC = () => {
                                             else if (v === 'mssql') { setPort('1433'); setUsername('sa'); setHost('localhost'); }
                                             else if (v === 'mongodb') { setPort('27017'); setUsername(''); setHost('localhost'); }
                                             else if (v === 'mongodb+srv') { setPort(''); setUsername(''); setHost(''); }
+                                            else if (v === 'sqlite') { setPort(''); setUsername(''); setHost(''); setDatabase(''); }
+                                            else if (v === 'clickhouse') { setPort('8123'); setUsername('default'); setHost('localhost'); }
                                         }}>
                                             <SelectTrigger className="h-9 text-xs">
                                                 <SelectValue />
@@ -241,6 +278,8 @@ export const ConnectionDialog: React.FC = () => {
                                                 <SelectItem value="postgres"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-blue-500" />PostgreSQL</div></SelectItem>
                                                 <SelectItem value="mysql"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-orange-500" />MySQL</div></SelectItem>
                                                 <SelectItem value="mssql"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-red-500" />SQL Server</div></SelectItem>
+                                                <SelectItem value="clickhouse"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-yellow-500" />ClickHouse</div></SelectItem>
+                                                <SelectItem value="sqlite"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-gray-400" />SQLite</div></SelectItem>
                                                 <SelectItem value="mongodb"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-green-500" />MongoDB</div></SelectItem>
                                                 <SelectItem value="mongodb+srv"><div className="flex items-center gap-2 text-xs"><div className="w-2 h-2 rounded-full bg-emerald-500" />MongoDB Atlas (SRV)</div></SelectItem>
                                             </SelectContent>
@@ -255,52 +294,72 @@ export const ConnectionDialog: React.FC = () => {
                                 <div className="h-px bg-border/40 w-full" />
 
                                 {/* Network */}
-                                <div className="space-y-2.5">
-                                    <div className="flex items-center gap-1.5 text-xs font-medium"><Globe className="w-3.5 h-3.5 text-muted-foreground" /> {t ? 'Chi tiết mạng' : 'Network Details'}</div>
-                                    <div className={`grid gap-3 ${type === 'mongodb+srv' ? 'grid-cols-1' : 'grid-cols-3'}`}>
-                                        <div className={type === 'mongodb+srv' ? '' : 'col-span-2'}>
-                                            <div className="space-y-1">
-                                                <Label className="text-[10px] text-muted-foreground">{isMongoType ? 'Hostname / Cluster' : 'Host'}</Label>
-                                                <Input value={host} onChange={e => setHost(e.target.value)} placeholder={isMongoType ? 'cluster0.xxxxx.mongodb.net' : 'localhost'} className="h-9 font-mono text-xs" />
+                                {!isFileType && (
+                                    <div className="space-y-2.5">
+                                        <div className="flex items-center gap-1.5 text-xs font-medium"><Globe className="w-3.5 h-3.5 text-muted-foreground" /> {t ? 'Chi tiết mạng' : 'Network Details'}</div>
+                                        <div className={`grid gap-3 ${type === 'mongodb+srv' ? 'grid-cols-1' : 'grid-cols-3'}`}>
+                                            <div className={type === 'mongodb+srv' ? '' : 'col-span-2'}>
+                                                <div className="space-y-1">
+                                                    <Label className="text-[10px] text-muted-foreground">{isMongoType ? 'Hostname / Cluster' : 'Host'}</Label>
+                                                    <Input value={host} onChange={e => setHost(e.target.value)} placeholder={isMongoType ? 'cluster0.xxxxx.mongodb.net' : 'localhost'} className="h-9 font-mono text-xs" />
+                                                </div>
                                             </div>
+                                            {type !== 'mongodb+srv' && (
+                                                <div className="col-span-1 space-y-1">
+                                                    <Label className="text-[10px] text-muted-foreground">Port</Label>
+                                                    <Input value={port} onChange={e => setPort(e.target.value)} className="h-9 font-mono text-xs" />
+                                                </div>
+                                            )}
                                         </div>
-                                        {type !== 'mongodb+srv' && (
-                                            <div className="col-span-1 space-y-1">
-                                                <Label className="text-[10px] text-muted-foreground">Port</Label>
-                                                <Input value={port} onChange={e => setPort(e.target.value)} className="h-9 font-mono text-xs" />
+                                        {isMongoType && (
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] text-muted-foreground">{t ? 'Database (Tùy chọn)' : 'Database (Optional)'}</Label>
+                                                <Input value={database} onChange={e => setDatabase(e.target.value)} placeholder="mydb" className="h-9 font-mono text-xs" />
                                             </div>
                                         )}
                                     </div>
-                                    {isMongoType && (
+                                )}
+
+                                {isFileType && (
+                                    <div className="space-y-2.5">
+                                        <div className="flex items-center gap-1.5 text-xs font-medium"><Database className="w-3.5 h-3.5 text-muted-foreground" /> {t ? 'Đường dẫn file' : 'File Path'}</div>
                                         <div className="space-y-1">
-                                            <Label className="text-[10px] text-muted-foreground">{t ? 'Database (Tùy chọn)' : 'Database (Optional)'}</Label>
-                                            <Input value={database} onChange={e => setDatabase(e.target.value)} placeholder="mydb" className="h-9 font-mono text-xs" />
+                                            <Label className="text-[10px] text-muted-foreground">{t ? 'Đường dẫn SQLite' : 'SQLite File Path'}</Label>
+                                            <Input value={database} onChange={e => setDatabase(e.target.value)} placeholder="/path/to/database.sqlite or :memory:" className="h-9 font-mono text-xs" />
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
 
                                 <div className="h-px bg-border/40 w-full" />
 
                                 {/* Auth */}
-                                <div className="space-y-2.5">
-                                    <div className="flex items-center gap-1.5 text-xs font-medium"><Lock className="w-3.5 h-3.5 text-muted-foreground" /> {t ? 'Xác thực' : 'Authentication'}</div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1">
-                                            <Label className="text-[10px] text-muted-foreground">{t ? 'Tên đăng nhập' : 'Username'}</Label>
-                                            <Input value={username} onChange={e => setUsername(e.target.value)} className="h-9 text-xs" />
+                                {!isFileType && (
+                                    <div className="space-y-2.5">
+                                        <div className="flex items-center gap-1.5 text-xs font-medium"><Lock className="w-3.5 h-3.5 text-muted-foreground" /> {t ? 'Xác thực' : 'Authentication'}</div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] text-muted-foreground">{t ? 'Tên đăng nhập' : 'Username'}</Label>
+                                                <Input value={username} onChange={e => setUsername(e.target.value)} className="h-9 text-xs" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] text-muted-foreground">{t ? 'Mật khẩu' : 'Password'}</Label>
+                                                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} className="h-9 text-xs" />
+                                            </div>
                                         </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-[10px] text-muted-foreground">{t ? 'Mật khẩu' : 'Password'}</Label>
-                                            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} className="h-9 text-xs" />
+                                        {!isMongoType && (
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] text-muted-foreground">Database</Label>
+                                                <Input value={database} onChange={e => setDatabase(e.target.value)} placeholder="mydatabase" className="h-9 font-mono text-xs" />
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-2 p-2 rounded-md border bg-muted/30">
+                                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                            <span className="text-[10px] font-medium text-muted-foreground">
+                                                {t ? 'Mã hóa AES-256-GCM • SSL Mode tự động' : 'AES-256-GCM Encrypted • Auto SSL Mode'}
+                                            </span>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 p-2 rounded-md border bg-muted/30">
-                                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                                        <span className="text-[10px] font-medium text-muted-foreground">
-                                            {t ? 'Mã hóa AES-256-GCM • SSL Mode tự động' : 'AES-256-GCM Encrypted • Auto SSL Mode'}
-                                        </span>
-                                    </div>
-                                </div>
+                                )}
 
                                 <div className="h-px bg-border/40 w-full" />
 

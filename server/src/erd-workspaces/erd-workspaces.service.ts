@@ -130,7 +130,10 @@ export class ErdWorkspacesService {
     try {
       const workspaces = await this.erdWorkspaces.findMany({
         where: {
-          userId,
+          OR: [
+            { userId },
+            { organization: { members: { some: { userId } } } },
+          ],
           ...(connectionId ? { connectionId } : {}),
         },
         include: {
@@ -158,7 +161,13 @@ export class ErdWorkspacesService {
 
   async findOne(id: string, userId: string): Promise<ErdWorkspaceEntity> {
     const workspace = await this.erdWorkspaces.findFirst({
-      where: { id, userId },
+      where: {
+        id,
+        OR: [
+          { userId },
+          { organization: { members: { some: { userId } } } },
+        ],
+      },
       include: {
         user: {
           select: {

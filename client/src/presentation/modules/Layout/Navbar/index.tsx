@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, Database, Leaf } from 'lucide-react';
+import { Menu, X, Database, Leaf, Users } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { useAppStore } from '@/core/services/store';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
@@ -117,6 +117,18 @@ export const Navbar: React.FC = () => {
                         setSidebarOpen={setSidebarOpen}
                         isNoSql={isNoSqlRoute}
                     />
+                )}
+
+                {!isActualMobile && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-muted-foreground hover:text-foreground"
+                        onClick={() => navigate('/teams')}
+                    >
+                        <Users className="w-4 h-4 mr-1.5" />
+                        Teams
+                    </Button>
                 )}
 
                 <NavUserSection 

@@ -19,6 +19,7 @@ export interface Connection {
     lastHealthError?: string | null;
     lastConnectedAt?: string;
     lastConnectionLatencyMs?: number | null;
+    organizationId?: string | null;
 }
 
 export interface ConnectionSlice {

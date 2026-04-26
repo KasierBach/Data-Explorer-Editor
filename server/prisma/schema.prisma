@@ -10,10 +10,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Enums ───
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum ResourceType {
+  CONNECTION
+  QUERY
+  DASHBOARD
+  ERD
+}
+
+// ─── Core Models ───
+
 model Connection {
   id               String   @id @default(uuid())
   name             String
-  type             String // 'postgres' or 'mysql'
+  type             String // 'postgres', 'mysql', 'mssql', 'mongodb', 'mongodb+srv'
   host             String?
   port             Int?
   username         String?
@@ -31,34 +49,44 @@ model Connection {
   lastConnectionLatencyMs Int?
   createdAt        DateTime @default(now())
 
+  sshHost          String?
+  sshPort          Int     @default(22)
+  sshUsername      String?
+  sshPrivateKey    String?
+  sshPassphrase    String?
+
   userId           String
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   @@unique([name, userId])
+  @@index([organizationId])
 }
 
 model User {
   id          String   @id @default(uuid())
   email       String   @unique
   password    String?  // Optional for social logins
-  
+
   // Auth Providers
   provider    String   @default("local") // "local", "google", "github"
   providerId  String?  // ID from OAuth provider
-  
+
   // Basic Profile
   firstName   String?
   lastName    String?
   avatarUrl   String?
   bio         String?
-  
+
   // Application Data
   role        String   @default("user")
-  
+
   // Preferences
   theme       String   @default("dark") // "light", "dark", "system"
   language    String   @default("vi")   // "vi", "en"
-  
+
   // Notifications
   emailNotifications Boolean @default(true)
   failedQueryAlerts  Boolean @default(true)
@@ -76,7 +104,7 @@ model User {
   jobRole     String?  // e.g., "Data Engineer", "Analyst"
   phoneNumber String?
   address     String?
-  
+
   // Password Reset
   resetOtp       String?
   resetOtpExpiry DateTime?
@@ -94,13 +122,14 @@ model User {
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   auditLogs   AuditLog[]
   connections Connection[]
   aiChats     AiChat[]
   savedQueries SavedQuery[]
   dashboards  Dashboard[]
   erdWorkspaces ErdWorkspace[]
+  organizationMembers OrganizationMember[]
 }
 
 model AiChat {
@@ -108,13 +137,13 @@ model AiChat {
   title            String
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
-  
+
   userId           String
   user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   connectionId     String?
   database         String?
-  
+
   messages         AiMessage[]
 }
 
@@ -122,14 +151,14 @@ model AiMessage {
   id               String   @id @default(uuid())
   chatId           String
   chat             AiChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  
+
   role             String   // "user" or "ai"
   content          String
   sql              String?
   explanation      String?
   error            Boolean  @default(false)
   attachments      Json?
-  
+
   createdAt        DateTime @default(now())
 }
 
@@ -140,9 +169,10 @@ model AuditLog {
   details   String? // JSON stringified details
   ipAddress String?
   createdAt DateTime @default(now())
+  
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
-  // Optional relation if we want to tie logs strictly to users, 
-  // though nullable since some actions (like failed logins) might not have a hard user ID link
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 }
 
@@ -162,8 +192,12 @@ model SavedQuery {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   @@index([userId, updatedAt])
   @@index([visibility, updatedAt])
+  @@index([organizationId])
 }
 
 model Dashboard {
@@ -180,8 +214,12 @@ model Dashboard {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   widgets      DashboardWidget[]
 
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   @@index([userId, updatedAt])
   @@index([visibility, updatedAt])
+  @@index([organizationId])
 }
 
 model DashboardWidget {
@@ -219,6 +257,63 @@ model ErdWorkspace {
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  organizationId   String?
+  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
   @@index([userId, updatedAt])
   @@index([connectionId, updatedAt])
+  @@index([organizationId])
+}
+
+// ─── Organization / Team Collaboration ───
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  settings  Json?    @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members   OrganizationMember[]
+  resources OrganizationResource[]
+  auditLogs AuditLog[]
+  connections Connection[]
+  savedQueries SavedQuery[]
+  dashboards Dashboard[]
+  erdWorkspaces ErdWorkspace[]
+}
+
+model OrganizationMember {
+  id             String           @id @default(uuid())
+  role           OrganizationRole @default(MEMBER)
+  invitedBy      String?
+  invitedAt      DateTime         @default(now())
+  joinedAt       DateTime?
+
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId         String
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model OrganizationResource {
+  id             String       @id @default(uuid())
+  resourceType   ResourceType
+  resourceId     String
+  permissions    Json         @default("{}")
+  createdAt      DateTime     @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceType, resourceId, organizationId])
+  @@index([organizationId])
+  @@index([resourceType, resourceId])
 }

@@ -4,6 +4,8 @@ import { PostgresStrategy } from './postgres.strategy';
 import { MysqlStrategy } from './mysql.strategy';
 import { MssqlStrategy } from './mssql.strategy';
 import { MongoDbStrategy } from './mongodb.strategy';
+import { SqliteStrategy } from './sqlite.strategy';
+import { ClickHouseStrategy } from './clickhouse.strategy';
 
 export const DATABASE_STRATEGIES = 'DATABASE_STRATEGIES';
 
@@ -21,6 +23,8 @@ export class DatabaseStrategyFactory {
         mysqlStrategy: MysqlStrategy,
         mssqlStrategy: MssqlStrategy,
         mongoDbStrategy: MongoDbStrategy,
+        sqliteStrategy: SqliteStrategy,
+        clickHouseStrategy: ClickHouseStrategy,
     ) {
         this.strategies = new Map<string, IDatabaseStrategy>([
             ['postgres', postgresStrategy],
@@ -28,6 +32,8 @@ export class DatabaseStrategyFactory {
             ['mssql', mssqlStrategy],
             ['mongodb', mongoDbStrategy],
             ['mongodb+srv', mongoDbStrategy],
+            ['sqlite', sqliteStrategy],
+            ['clickhouse', clickHouseStrategy],
         ]);
     }
 

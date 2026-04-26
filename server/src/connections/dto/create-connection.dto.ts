@@ -49,4 +49,8 @@ export class CreateConnectionDto {
     @IsBoolean()
     @IsOptional()
     allowQueryExecution?: boolean;
+
+    @IsString()
+    @IsOptional()
+    organizationId?: string;
 }

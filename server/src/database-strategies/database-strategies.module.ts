@@ -4,6 +4,8 @@ import { PostgresStrategy } from './postgres.strategy';
 import { MysqlStrategy } from './mysql.strategy';
 import { MssqlStrategy } from './mssql.strategy';
 import { MongoDbStrategy } from './mongodb.strategy';
+import { SqliteStrategy } from './sqlite.strategy';
+import { ClickHouseStrategy } from './clickhouse.strategy';
 
 @Global()
 @Module({
@@ -12,6 +14,8 @@ import { MongoDbStrategy } from './mongodb.strategy';
         MysqlStrategy,
         MssqlStrategy,
         MongoDbStrategy,
+        SqliteStrategy,
+        ClickHouseStrategy,
         DatabaseStrategyFactory,
     ],
     exports: [
@@ -19,6 +23,8 @@ import { MongoDbStrategy } from './mongodb.strategy';
         MysqlStrategy,
         MssqlStrategy,
         MongoDbStrategy,
+        SqliteStrategy,
+        ClickHouseStrategy,
         DatabaseStrategyFactory,
     ],
 })

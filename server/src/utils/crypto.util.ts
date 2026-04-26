@@ -2,16 +2,24 @@ import * as crypto from 'crypto';
 import { getRequiredSecret } from '../common/utils/secret.util';
 
 const ALGORITHM = 'aes-256-gcm';
-const ENCRYPTION_KEY = Buffer.from(
-    getRequiredSecret('ENCRYPTION_KEY', {
-        exactLength: 32,
-        disallowValues: ['12345678901234567890123456789012', 'your-32-char-encryption-key'],
-    }),
-    'utf-8',
-);
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 const LEGACY_DEV_FALLBACK_KEY = Buffer.from('12345678901234567890123456789012', 'utf-8');
+
+let _encryptionKey: Buffer | null = null;
+
+function getEncryptionKey(): Buffer {
+    if (!_encryptionKey) {
+        _encryptionKey = Buffer.from(
+            getRequiredSecret('ENCRYPTION_KEY', {
+                exactLength: 32,
+                disallowValues: ['12345678901234567890123456789012', 'your-32-char-encryption-key'],
+            }),
+            'utf-8',
+        );
+    }
+    return _encryptionKey;
+}
 
 function isProduction() {
     return process.env.NODE_ENV === 'production';
@@ -57,7 +65,7 @@ export function encryptAttribute(text: string): string {
     if (!text) return text;
     try {
         const iv = crypto.randomBytes(IV_LENGTH);
-        const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
+        const cipher = crypto.createCipheriv(ALGORITHM, getEncryptionKey(), iv);
 
         let encrypted = cipher.update(text, 'utf8', 'hex');
         encrypted += cipher.final('hex');
@@ -95,10 +103,10 @@ export function decryptAttribute(encryptedPayload: string): string {
         const encryptedText = buffer.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
 
         try {
-            return decryptWithKey(encryptedText, iv, authTag, ENCRYPTION_KEY);
+            return decryptWithKey(encryptedText, iv, authTag, getEncryptionKey());
         } catch (primaryError) {
             for (const legacyKey of getLegacyKeys()) {
-                if (legacyKey.equals(ENCRYPTION_KEY)) {
+                if (legacyKey.equals(getEncryptionKey())) {
                     continue;
                 }
 

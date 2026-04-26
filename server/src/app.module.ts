@@ -29,6 +29,8 @@ import { DashboardsModule } from './dashboards/dashboards.module';
 import { ErdWorkspacesModule } from './erd-workspaces/erd-workspaces.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { SearchModule } from './search/search.module';
+import { OrganizationsModule } from './organizations/organizations.module';
+import { PermissionsModule } from './permissions/permissions.module';
 
 @Module({
   imports: [
@@ -87,6 +89,8 @@ import { SearchModule } from './search/search.module';
     ErdWorkspacesModule,
     NotificationsModule,
     SearchModule,
+    OrganizationsModule,
+    PermissionsModule,
   ],
   controllers: [AppController],
   providers: [

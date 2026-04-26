@@ -137,6 +137,7 @@ export class DashboardsService {
                 },
               }]
             : []),
+          { organization: { members: { some: { userId } } } },
         ],
       },
       include: {

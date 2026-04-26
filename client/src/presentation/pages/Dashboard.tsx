@@ -1,20 +1,58 @@
 import React, { useState } from 'react';
 import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
-import { Plus, Database, Search, Clock, FileText, BarChart3, ArrowLeft, Trash, Loader2 } from 'lucide-react';
 import { InsightsDashboard } from '../modules/Dashboard/InsightsDashboard';
+import { Plus, Database, Search, Clock, FileText, BarChart3, ArrowLeft, Trash, Loader2, Share2 } from 'lucide-react';
 import { ConnectionService } from '@/core/services/ConnectionService';
 import { LanguageSwitcher } from '@/presentation/components/shared/LanguageSwitcher';
 import { useQuery } from '@tanstack/react-query';
 import { DashboardService } from '@/core/services/DashboardService';
+import { OrganizationService } from '@/core/services/OrganizationService';
+import { ShareConnectionDialog } from '../modules/Connection/ShareConnectionDialog';
+import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/avatar';
+
+interface ActivityLog {
+    id: string;
+    action: string;
+    createdAt: string;
+    userId?: string;
+    organizationId?: string;
+    detail?: any;
+    details?: any;
+    user?: {
+        firstName?: string;
+        lastName?: string;
+        avatarUrl?: string;
+    };
+}
 
 export const Dashboard: React.FC = () => {
     const { connections, openQueryTab, setSidebarOpen, openConnectionDialog, activeConnectionId, removeConnection, setActiveConnectionId, openDashboardTab, lang } = useAppStore();
     const [view, setView] = useState<'welcome' | 'insights'>('welcome');
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
+    const [shareConnectionId, setShareConnectionId] = useState<string | null>(null);
     const { data: dashboards = [] } = useQuery({
         queryKey: ['dashboards'],
         queryFn: () => DashboardService.getDashboards(),
+    });
+
+    const { data: organizations = [] } = useQuery({
+        queryKey: ['organizations'],
+        queryFn: () => OrganizationService.getMyOrganizations(),
+    });
+
+    const { data: teamActivities = [] } = useQuery<ActivityLog[]>({
+        queryKey: ['team-activities', organizations.map((o: any) => o.id)],
+        queryFn: async () => {
+            if (organizations.length === 0) return [];
+            const allActivities = await Promise.all(
+                organizations.map((org: any) => OrganizationService.getTeamActivities(org.id))
+            );
+            return (allActivities.flat() as ActivityLog[])
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .slice(0, 10);
+        },
+        enabled: organizations.length > 0,
     });
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -31,6 +69,11 @@ export const Dashboard: React.FC = () => {
         } finally {
             setIsDeleting(null);
         }
+    };
+
+    const openShareDialog = (e: React.MouseEvent, connId: string) => {
+        e.stopPropagation();
+        setShareConnectionId(connId);
     };
 
     const queryHistory = useAppStore(state => state.queryHistory);
@@ -181,6 +224,15 @@ export const Dashboard: React.FC = () => {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
+                                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-600 hover:bg-blue-500/10 h-8 w-8"
+                                                    onClick={(e) => openShareDialog(e, conn.id)}
+                                                    title={lang === 'vi' ? 'Chia sẻ với Team' : 'Share with Team'}
+                                                >
+                                                    <Share2 className="w-4 h-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
                                                     className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8 w-8"
                                                     onClick={(e) => handleDelete(e, conn.id)}
                                                     disabled={isDeleting === conn.id}
@@ -230,41 +282,107 @@ export const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="space-y-4">
-                    <h2 className="text-xl font-semibold flex items-center gap-2">
-                        <BarChart3 className="h-5 w-5 text-muted-foreground" />
-                        {lang === 'vi' ? 'Dashboards gần đây' : 'Recent Dashboards'}
-                    </h2>
-                    <div className="rounded-lg border bg-card">
-                        {dashboards.length > 0 ? (
-                            <div className="divide-y">
-                                {dashboards.slice(0, 6).map((dashboard) => (
-                                    <button
-                                        key={dashboard.id}
-                                        onClick={() => openDashboardTab(dashboard.id, dashboard.name)}
-                                        className="w-full text-left p-4 hover:bg-muted/40 transition-colors"
-                                    >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="font-medium truncate">{dashboard.name}</div>
-                                                <div className="text-xs text-muted-foreground truncate">
-                                                    {dashboard.widgets.length} {dashboard.widgets.length === 1 ? 'widget' : 'widgets'} • {dashboard.visibility}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Recent Dashboards */}
+                    <div className="lg:col-span-2 space-y-4">
+                        <h2 className="text-xl font-semibold flex items-center gap-2">
+                            <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                            {lang === 'vi' ? 'Dashboards gần đây' : 'Recent Dashboards'}
+                        </h2>
+                        <div className="rounded-lg border bg-card">
+                            {dashboards.length > 0 ? (
+                                <div className="divide-y">
+                                    {dashboards.slice(0, 6).map((dashboard: any) => (
+                                        <button
+                                            key={dashboard.id}
+                                            onClick={() => openDashboardTab(dashboard.id, dashboard.name)}
+                                            className="w-full text-left p-4 hover:bg-muted/40 transition-colors"
+                                        >
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="font-medium truncate">{dashboard.name}</div>
+                                                    <div className="text-xs text-muted-foreground truncate">
+                                                        {dashboard.widgets.length} {dashboard.widgets.length === 1 ? 'widget' : 'widgets'} • {dashboard.visibility}
+                                                    </div>
+                                                </div>
+                                                <div className="text-[10px] uppercase tracking-widest text-muted-foreground shrink-0">
+                                                    {new Date(dashboard.updatedAt).toLocaleDateString()}
                                                 </div>
                                             </div>
-                                            <div className="text-[10px] uppercase tracking-widest text-muted-foreground shrink-0">
-                                                {new Date(dashboard.updatedAt).toLocaleDateString()}
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="p-8 text-center text-muted-foreground">
+                                    {lang === 'vi' ? 'Chưa có dashboard nào. Hãy lưu chart đầu tiên từ Query Results.' : 'No dashboards yet. Save your first chart from query results.'}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Team Activity Feed */}
+                    <div className="space-y-4">
+                        <h2 className="text-xl font-semibold flex items-center gap-2">
+                            <Share2 className="h-5 w-5 text-muted-foreground" />
+                            {lang === 'vi' ? 'Hoạt động Team' : 'Team Activity'}
+                        </h2>
+                        <div className="rounded-lg border bg-card p-4">
+                            {teamActivities.length > 0 ? (
+                                <div className="space-y-6">
+                                    {teamActivities.map((log: ActivityLog) => {
+                                        const user = log.user;
+                                        const initials = user ? `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}` || 'U' : 'U';
+                                        return (
+                                            <div key={log.id} className="relative flex gap-3">
+                                                <div className="relative z-10 shrink-0">
+                                                    <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
+                                                        {user?.avatarUrl && <AvatarImage src={user.avatarUrl} />}
+                                                        <AvatarFallback className="bg-blue-500/10 text-blue-600 text-[10px] font-bold">
+                                                            {initials}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                </div>
+                                                <div className="flex flex-col gap-1 min-w-0 pt-0.5">
+                                                    <p className="text-xs leading-relaxed text-foreground">
+                                                        <span className="font-bold">{user?.firstName} {user?.lastName}</span>
+                                                        {' '}
+                                                        <span className="text-muted-foreground lowercase">
+                                                            {log.action.replace('TEAM:', '').replace('DB:', '').replace('_', ' ')}
+                                                        </span>
+                                                        {log.details?.resourceName && (
+                                                            <> <span className="font-semibold text-blue-500">"{log.details.resourceName}"</span></>
+                                                        )}
+                                                        {log.details?.name && (
+                                                            <> <span className="font-semibold text-blue-500">"{log.details.name}"</span></>
+                                                        )}
+                                                    </p>
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        {new Date(log.createdAt).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', { 
+                                                            hour: '2-digit', 
+                                                            minute: '2-digit',
+                                                            day: '2-digit',
+                                                            month: '2-digit'
+                                                        })}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="p-8 text-center text-muted-foreground">
-                                {lang === 'vi' ? 'Chưa có dashboard nào. Hãy lưu chart đầu tiên từ Query Results.' : 'No dashboards yet. Save your first chart from query results.'}
-                            </div>
-                        )}
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="p-4 text-center text-muted-foreground text-xs italic">
+                                    {lang === 'vi' ? 'Chưa có hoạt động nào trong team.' : 'No team activity yet.'}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
+
+                <ShareConnectionDialog 
+                    connectionId={shareConnectionId} 
+                    open={!!shareConnectionId} 
+                    onOpenChange={(open) => !open && setShareConnectionId(null)} 
+                />
 
             </div>
         </div>

@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
 import { encryptAttribute, decryptAttribute } from '../utils/crypto.util';
 import { AuditService, AuditAction } from '../audit/audit.service';
+import { SshTunnelService } from './ssh-tunnel.service';
 
 @Injectable()
 export class ConnectionsService implements OnModuleDestroy {
@@ -17,6 +18,7 @@ export class ConnectionsService implements OnModuleDestroy {
     private prisma: PrismaService,
     private strategyFactory: DatabaseStrategyFactory,
     private auditService: AuditService,
+    private sshTunnelService: SshTunnelService,
   ) {
     // Run cleanup every minute
     this.cleanupInterval = setInterval(() => this.cleanupPools(), 60000);
@@ -104,22 +106,23 @@ export class ConnectionsService implements OnModuleDestroy {
     }
   }
 
-  async create(createConnectionDto: CreateConnectionDto, userId: string): Promise<Connection> {
-    const { name, password, ...rest } = createConnectionDto;
-    const encryptedPassword = password ? encryptAttribute(password) : undefined;
+    async create(createConnectionDto: CreateConnectionDto, userId: string): Promise<Connection> {
+        const { name, password, organizationId, ...rest } = createConnectionDto;
+        const encryptedPassword = password ? encryptAttribute(password) : undefined;
 
-    const connection = await this.prisma.connection.create({
-      data: {
-        ...rest,
-        name,
-        password: encryptedPassword,
-        userId,
-        readOnly: createConnectionDto.readOnly ?? false,
-        allowSchemaChanges: createConnectionDto.readOnly ? false : (createConnectionDto.allowSchemaChanges ?? true),
-        allowImportExport: createConnectionDto.readOnly ? false : (createConnectionDto.allowImportExport ?? true),
-        allowQueryExecution: createConnectionDto.allowQueryExecution ?? true,
-      } as any,
-    });
+        const connection = await this.prisma.connection.create({
+            data: {
+                ...rest,
+                name,
+                password: encryptedPassword,
+                userId,
+                readOnly: createConnectionDto.readOnly ?? false,
+                allowSchemaChanges: createConnectionDto.readOnly ? false : (createConnectionDto.allowSchemaChanges ?? true),
+                allowImportExport: createConnectionDto.readOnly ? false : (createConnectionDto.allowImportExport ?? true),
+                allowQueryExecution: createConnectionDto.allowQueryExecution ?? true,
+                ...(organizationId ? { organizationId } : {}),
+            } as any,
+        });
     const safeConnection = this.sanitizeConnection(connection);
 
     await this.auditService.log({
@@ -132,13 +135,26 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   async findAll(userId: string): Promise<Connection[]> {
-    const connections = await this.prisma.connection.findMany({ where: { userId } });
+    const connections = await this.prisma.connection.findMany({
+      where: {
+        OR: [
+          { userId },
+          { organization: { members: { some: { userId } } } },
+        ],
+      },
+    });
     return connections.map(c => this.sanitizeConnection(c)) as unknown as Connection[];
   }
 
   private async findRawOne(id: string, userId: string) {
     const connection = await this.prisma.connection.findFirst({
-      where: { id, userId },
+      where: {
+        id,
+        OR: [
+          { userId },
+          { organization: { members: { some: { userId } } } },
+        ],
+      },
     });
     if (!connection) {
       throw new NotFoundException(`Connection with ID ${id} not found or you don't have permission`);
@@ -182,7 +198,25 @@ export class ConnectionsService implements OnModuleDestroy {
     }
 
     const decryptedPassword = connection.password ? decryptAttribute(connection.password) : undefined;
-    const connectionWithDecryptedPassword = { ...connection, password: decryptedPassword };
+    let connectionWithDecryptedPassword = { ...connection, password: decryptedPassword };
+
+    const connAny = connection as any;
+    if (connAny.sshHost && connAny.sshUsername) {
+      const localPort = await this.sshTunnelService.openTunnel(poolKey, {
+        sshHost: connAny.sshHost,
+        sshPort: connAny.sshPort || 22,
+        sshUsername: connAny.sshUsername,
+        sshPrivateKey: connAny.sshPrivateKey || undefined,
+        sshPassphrase: connAny.sshPassphrase || undefined,
+        dbHost: connection.host || 'localhost',
+        dbPort: connection.port || 5432,
+      });
+      connectionWithDecryptedPassword = {
+        ...connectionWithDecryptedPassword,
+        host: '127.0.0.1',
+        port: localPort,
+      };
+    }
 
     const strategy = this.strategyFactory.getStrategy(connection.type);
     try {
@@ -231,6 +265,15 @@ export class ConnectionsService implements OnModuleDestroy {
       where: { id },
       data: dataToUpdate,
     });
+
+    if (updateConnectionDto.organizationId && updateConnectionDto.organizationId !== connection.organizationId) {
+        await this.auditService.log({
+            action: AuditAction.TEAM_RESOURCE_SHARE,
+            userId,
+            organizationId: updateConnectionDto.organizationId,
+            details: { resourceType: 'CONNECTION', resourceId: id, resourceName: updatedConnection.name }
+        });
+    }
 
     const safeConnection = this.sanitizeConnection(updatedConnection);
     return safeConnection as unknown as Connection;

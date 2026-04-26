@@ -35,12 +35,21 @@ export enum AuditAction {
     USER_UNBAN = 'USER:UNBAN',
     
     // System Actions
-    SYSTEM_CONFIG_UPDATE = 'SYSTEM:CONFIG_UPDATE'
+    SYSTEM_CONFIG_UPDATE = 'SYSTEM:CONFIG_UPDATE',
+    
+    // Team Actions
+    TEAM_CREATE = 'TEAM:CREATE',
+    TEAM_MEMBER_INVITE = 'TEAM:MEMBER_INVITE',
+    TEAM_MEMBER_REMOVE = 'TEAM:MEMBER_REMOVE',
+    TEAM_MEMBER_ROLE_CHANGE = 'TEAM:MEMBER_ROLE_CHANGE',
+    TEAM_RESOURCE_SHARE = 'TEAM:RESOURCE_SHARE',
+    TEAM_RESOURCE_UNSHARE = 'TEAM:RESOURCE_UNSHARE'
 }
 
 export interface CreateLogParams {
     action: AuditAction | string;
     userId?: string;
+    organizationId?: string;
     details?: any;
     ipAddress?: string;
 }
@@ -55,6 +64,7 @@ export class AuditService {
                 data: {
                     action: params.action,
                     userId: params.userId,
+                    organizationId: params.organizationId,
                     details: params.details ? JSON.stringify(params.details) : null,
                     ipAddress: params.ipAddress,
                 }
@@ -92,6 +102,28 @@ export class AuditService {
             orderBy: {
                 createdAt: 'desc'
             },
+        });
+    }
+
+    async getOrganizationLogs(organizationId: string, limit: number = 50) {
+        return this.prisma.auditLog.findMany({
+            where: {
+                organizationId
+            },
+            take: limit,
+            orderBy: {
+                createdAt: 'desc'
+            },
+            include: {
+                user: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        avatarUrl: true,
+                    }
+                }
+            }
         });
     }
 }
