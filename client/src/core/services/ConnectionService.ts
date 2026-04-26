@@ -62,6 +62,11 @@ export class ConnectionService {
         return await apiService.get<any[]>('/connections');
     }
 
+    public static async testConnection(data: any): Promise<{ status: 'healthy' | 'error'; latencyMs: number; error: string | null }> {
+        return await apiService.post<any>('/connections/test', data);
+
+    }
+
     public static async createConnection(data: any): Promise<any> {
         return await apiService.post<any>('/connections', data);
     }

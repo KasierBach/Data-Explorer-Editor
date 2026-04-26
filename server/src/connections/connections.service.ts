@@ -134,6 +134,34 @@ export class ConnectionsService implements OnModuleDestroy {
     return safeConnection as unknown as Connection;
   }
 
+  async test(createConnectionDto: CreateConnectionDto): Promise<{ status: string; latencyMs: number; error: string | null }> {
+    const strategy = this.strategyFactory.getStrategy(createConnectionDto.type);
+    const startedAt = Date.now();
+    let pool: any;
+
+    try {
+      pool = await strategy.createPool(createConnectionDto);
+      await this.pingPool(pool, createConnectionDto.type);
+
+      return {
+        status: 'healthy',
+        latencyMs: Date.now() - startedAt,
+        error: null,
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        latencyMs: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : 'Connection failed',
+      };
+    } finally {
+      if (pool) {
+        await strategy.closePool(pool).catch(() => undefined);
+      }
+    }
+  }
+
+
   async findAll(userId: string): Promise<Connection[]> {
     const connections = await this.prisma.connection.findMany({
       where: {

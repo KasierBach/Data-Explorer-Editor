@@ -15,6 +15,12 @@ export class ConnectionsController {
     return this.connectionsService.create(createConnectionDto, req.user.id);
   }
 
+  @Post('test')
+  test(@Body() createConnectionDto: CreateConnectionDto) {
+    return this.connectionsService.test(createConnectionDto);
+  }
+
+
   @Get()
   findAll(@Req() req: AuthenticatedRequest) {
     return this.connectionsService.findAll(req.user.id);
