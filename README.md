@@ -27,6 +27,7 @@
   - **PostgreSQL** (Neon, Supabase, RDS, Local)
   - **MySQL** (PlanetScale, Local, TiDB)
   - **SQL Server** (Azure SQL, Local MSSQL)
+  - **ClickHouse**
   - **MongoDB** and **MongoDB Atlas (SRV)**
   - **Redis** (for caching and session storage)
 - **Enterprise-Grade Credential Protection**: Saved connection passwords are encrypted using **AES-256-GCM** before persistence.
@@ -35,6 +36,20 @@
 - **Centralized Persistence**: Connections are stored in the app database so they survive client refreshes and redeployments.
 - **Real-time Discovery**: Fast schema inspection for tables, columns, views, indexes, and metadata.
 - **Cross-DB Browsing**: Jump between databases and schemas in a single workspace.
+
+### Redis Infrastructure
+- **Caching Layer**: Redis backs repeated metadata reads and query results so the app stays responsive under load.
+- **Notification Bus**: SSE notifications are broadcast through Redis Pub/Sub for progress updates and system messages.
+- **Rate Limiting**: Redis keeps API throttling consistent across multiple backend instances.
+- **Background Work**: Export, sync, and other long-running tasks can be queued without blocking the UI.
+- **Search Indexing**: Global search and metadata lookups use Redis-backed indexing for fast workspace navigation.
+
+### Team Collaboration
+- **Team Workspace**: Create teams, invite members, and manage roles from the Team page.
+- **Shared Resources**: Teams can share connections, queries, and dashboards.
+- **Role-Based Membership**: Invite users as viewers, members, or admins depending on how much control they need.
+- **Mobile Entry Point**: Teams can be opened directly from the mobile avatar menu.
+- **Activity Visibility**: Shared dashboard activity and team-level usage signals help collaborators see what changed.
 
 ### Entity Relationship Diagrams (ERD)
 - **Intelligent Auto-Layout**: Dynamic graph generation using React Flow with automatic node positioning.
@@ -73,6 +88,7 @@
 ## Tech Stack and Ecosystem
 
 ### Frontend (Client-Side)
+
 | Layer | Technologies |
 |---|---|
 | **Core Framework** | React 19, Vite, TypeScript |
@@ -83,13 +99,15 @@
 | **Animations** | Framer Motion, CSS Keyframes, Intersection Observer |
 
 ### Backend (Server-Side)
+
 | Layer | Technologies |
 |---|---|
 | **Architecture** | NestJS |
 | **ORM / Persistence** | Prisma |
 | **AI Engine** | Google Generative AI (Gemini API), SSE Streaming |
-| **Engines Support** | `pg`, `mysql2`, `mssql`, `mongodb` |
+| **Engines Support** | `pg`, `mysql2`, `mssql`, `mongodb`, `@clickhouse/client` |
 | **Security** | JWT, Passport.js, AES-256-GCM encryption |
+| **Infrastructure** | Redis for caching, notifications, rate limiting, search, and background jobs |
 
 ---
 
@@ -98,54 +116,42 @@
 ```bash
 Data Explorer/
 ├── client/                                # React + Vite frontend application
-│   ├── src/
-│   │   ├── assets/                        # Static frontend assets and bundled icons
-│   │   ├── core/                          # Client-side domain layer and shared app logic
-│   │   │   ├── adapters/                  # API/database adapter implementations
-│   │   │   ├── config/                    # Frontend environment and runtime config
-│   │   │   ├── domain/                    # Core entities and interfaces
-│   │   │   ├── services/                  # Zustand store, API services, orchestration
-│   │   │   └── utils/                     # Client-side utility helpers
-│   │   ├── infrastructure/                # Infra-specific frontend plumbing and bootstrapping
-│   │   ├── lib/                           # Small shared utilities such as class merging helpers
-│   │   ├── presentation/                  # UI layer and feature composition
-│   │   │   ├── components/                # Reusable UI pieces, docs primitives, code editor pieces
-│   │   │   ├── hooks/                     # UI/data hooks such as schema sync and media queries
-│   │   │   ├── modules/                   # Feature-driven application modules
-│   │   │   │   ├── Connection/            # Connection dialog and connection management flows
-│   │   │   │   ├── Dashboard/             # Insights and analytics dashboards
-│   │   │   │   ├── DataGrid/              # Result grid, export, import, and table data tools
-│   │   │   │   ├── Explorer/              # Sidebar tree, navigation, and database explorer UX
-│   │   │   │   ├── LandingPage/           # Marketing/landing page sections
-│   │   │   │   ├── Layout/                # AppShell, navbar, profile dialog, and shell composition
-│   │   │   │   ├── Migration/             # Migration workflow UI and progress surfaces
-│   │   │   │   ├── NoSqlExplorer/         # MongoDB-focused workspace and JSON exploration
-│   │   │   │   ├── Query/                 # SQL editor, AI assistant, history, results, explain plans
-│   │   │   │   └── Visualization/         # ERD and visual exploration workspaces
-│   │   │   └── pages/                     # Route-level entry pages such as login, docs, admin
-│   │   └── test/                          # Frontend tests and test setup
+│   └── src/
+│       ├── core/                          # Client-side domain layer and shared app logic
+│       ├── infrastructure/                # Infra-specific frontend plumbing and bootstrapping
+│       ├── lib/                           # Small shared utilities such as class merging helpers
+│       ├── presentation/                  # UI layer and feature composition
+│       │   ├── components/                # Reusable UI pieces, docs primitives, code editor pieces
+│       │   ├── hooks/                     # UI/data hooks such as schema sync and media queries
+│       │   ├── modules/                   # Feature-driven application modules
+│       │   │   ├── Connection/            # Connection dialog and connection management flows
+│       │   │   ├── Dashboard/             # Insights and analytics dashboards
+│       │   │   ├── DataGrid/              # Result grid, export, import, and table data tools
+│       │   │   ├── Explorer/              # Sidebar tree, navigation, and database explorer UX
+│       │   │   ├── LandingPage/           # Marketing/landing page sections
+│       │   │   ├── Layout/                # AppShell, navbar, profile dialog, and shell composition
+│       │   │   ├── Migration/             # Migration workflow UI and progress surfaces
+│       │   │   ├── NoSqlExplorer/         # MongoDB-focused workspace and JSON exploration
+│       │   │   ├── Query/                 # SQL editor, AI assistant, history, results, explain plans
+│       │   │   └── Visualization/         # ERD and visual exploration workspaces
+│       │   └── pages/                     # Route-level entry pages such as login, docs, admin, teams
 ├── server/                                # NestJS backend API
 │   ├── prisma/                            # Prisma schema, migrations/config, and generated setup inputs
-│   ├── src/
-│   │   ├── ai/                            # Gemini integration, prompts, chat, streaming, autocomplete
-│   │   ├── audit/                         # Audit logging and audit history APIs
-│   │   ├── auth/                          # JWT auth, OAuth, token exchange, guards, roles
-│   │   ├── common/                        # Shared decorators, filters, middlewares, interceptors, utils
-│   │   ├── connections/                   # Saved connection lifecycle and persistence
-│   │   ├── database-strategies/           # Per-engine query/metadata/export strategy implementations
-│   │   ├── mail/                          # Mail sending services and templates
-│   │   ├── metadata/                      # Schema discovery and metadata aggregation
-│   │   ├── migration/                     # Cross-database migration orchestration and progress streaming
-│   │   ├── otp/                           # OTP flows for verification and recovery
-│   │   ├── prisma/                        # Prisma service/module wiring for NestJS
-│   │   ├── query/                         # Query execution, DML helpers, and result APIs
-│   │   ├── seed/                          # Seed/bootstrap services
-│   │   ├── tests/                         # Strategy and service unit tests
-│   │   ├── users/                         # User profile, settings, roles, billing, onboarding
-│   │   └── utils/                         # Encryption, SQL guards, and backend utility helpers
+│   └── src/
+│       ├── ai/                            # Gemini integration, prompts, chat, streaming, autocomplete
+│       ├── audit/                         # Audit logging and audit history APIs
+│       ├── auth/                          # JWT auth, OAuth, token exchange, guards, roles
+│       ├── connections/                   # Saved connection lifecycle and persistence
+│       ├── database-strategies/           # Per-engine query/metadata/export strategy implementations
+│       ├── migration/                     # Cross-database migration orchestration and progress streaming
+│       ├── notifications/                 # SSE notification streaming and Redis pub/sub
+│       ├── query/                         # Query execution, DML helpers, and result APIs
+│       ├── search/                        # Redis-backed search and metadata indexing
+│       ├── users/                         # User profile, settings, roles, billing, onboarding
+│       └── utils/                         # Encryption, SQL guards, and backend utility helpers
 ├── docker-compose.yml                     # Local container orchestration for db + backend + frontend
 ├── package.json                           # Root dev scripts for running client and server together
-├── .env.example                           # Root Docker-oriented example values
+├── .env.example                           # Root Docker-friendly example values
 ├── server/.env.example                    # Backend env template for local/dev/prod setup
 └── README.md                              # Project overview and setup guide
 ```
@@ -155,7 +161,7 @@ Data Explorer/
 ## Comprehensive User Guide
 
 ### 1. Connection Management
-- **Universal Drivers**: Click the `+` in the Explorer sidebar to add a new connection. The main UI currently exposes **PostgreSQL**, **MySQL**, **SQL Server**, **MongoDB**, and **MongoDB Atlas (SRV)**.
+- **Universal Drivers**: Click the `+` in the Explorer sidebar to add a new connection. The main UI currently exposes **PostgreSQL**, **MySQL**, **SQL Server**, **ClickHouse**, **MongoDB**, and **MongoDB Atlas (SRV)**.
 - **Metadata Sync**: After connecting, the app crawls your schema and builds the tree view.
 - **Switching Context**: Move between saved connections and databases from the same workspace.
 
@@ -164,18 +170,31 @@ Data Explorer/
 - **Smart IntelliSense**: Schema-aware suggestions are available inside the editor.
 - **Explain and Analyze**: Use the explain action to inspect query plans directly in the results panel.
 - **Saved Queries and History**: Save reusable queries and reopen recent executions quickly.
+- **Query Guardrails**: Read-only and restricted connections are enforced at both UI and server levels.
 
-### 3. Using the AI Assistant
+### 3. Team Collaboration
+- **Invite and Manage Members**: Create teams, invite members by email, and assign roles.
+- **Share Work**: Connections, queries, and dashboards can be shared to a team from the Team page.
+- **Track Team Activity**: Team dashboards and activity feeds help you see what the group has been using recently.
+- **Open on Mobile**: Teams is available from the avatar menu on mobile, even when the desktop navigation is collapsed.
+
+### 4. Using the AI Assistant
 - **Contextual Knowledge**: The assistant is aware of your active connection, schema context, and current workspace state.
 - **Vision Features**: Drop in screenshots or reference material for AI-assisted schema and SQL help.
 - **Prompt Engineering**: Ask practical questions like:
   - `"Summarize the relationship between orders and customers"`
   - `"Find the top 5 customers with high churn risk based on transaction volume"`
 
-### 4. Interactive Visualizations
+### 5. Interactive Visualizations
 - **ERD Exploration**: Open the ERD module to inspect table relationships visually.
 - **Insights Dashboard**: Review health signals, charts, and high-level usage indicators.
 - **NoSQL Workspace**: MongoDB-oriented flows are available through the NoSQL explorer modules.
+
+### 6. Redis Infrastructure
+- **Redis-backed Search**: The backend keeps a fast metadata index in Redis so global search and workspace lookups stay responsive.
+- **Notification Streaming**: Long-running operations publish progress through Redis Pub/Sub and SSE.
+- **Shared Throttling**: If you run multiple backend instances, Redis keeps rate limits aligned across the cluster.
+- **Job Processing**: Export and sync flows rely on Redis-backed queues so the UI stays responsive while work happens in the background.
 
 ---
 
@@ -184,6 +203,8 @@ Data Explorer/
 ### Requirements
 - **Node.js 20+**
 - **npm**
+- **PostgreSQL** for the app metadata database
+- **Redis** for caching, notifications, search, and background jobs
 - **Google Gemini API Key** (optional, only needed for AI features)
 - **Docker and Docker Compose** (optional, for the containerized path)
 
@@ -191,7 +212,7 @@ Data Explorer/
 
 ## One-Click Docker Deployment (Recommended)
 
-This is the fastest way to run **Data Explorer** locally with PostgreSQL, the backend API, and an Nginx-served frontend.
+This is the fastest way to run **Data Explorer** locally with PostgreSQL, Redis, the backend API, and an Nginx-served frontend.
 
 1. **Environment Setup**
    - Copy `server/.env.example` to `server/.env`.
@@ -215,10 +236,13 @@ This is the fastest way to run **Data Explorer** locally with PostgreSQL, the ba
   - user: `postgres`
   - password: `postgres`
   - database: `data_explorer`
-- **Redis**: `localhost:6379` (for caching and rate limiting)
+- **Redis**: `localhost:6379` (for caching, notifications, and rate limiting)
 
 Note:
 - `docker-compose.yml` reads backend env vars from `server/.env`, not from the root `.env.example`.
+- The backend container listens on port `3001`.
+- The frontend build arg defaults to `VITE_API_URL=http://localhost:3001/api`.
+- The Docker stack starts Redis automatically, so no separate Redis install is needed in that path.
 
 ---
 
@@ -243,7 +267,9 @@ Note:
    Recommended local values in `server/.env`:
    ```env
    DATABASE_URL=postgresql://postgres:postgres@localhost:5435/data_explorer
+   REDIS_URL=redis://localhost:6379
    FRONTEND_URL=http://localhost:5173
+   PORT=3001
    JWT_SECRET=replace-with-a-random-secret-at-least-32-bytes-long
    ENCRYPTION_KEY=replace-with-exactly-32-random-characters
    ```
@@ -279,7 +305,7 @@ The backend reads configuration from `server/.env`. The frontend reads `VITE_API
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | Yes | Connection string for the app's central PostgreSQL database. Docker default: `postgresql://postgres:postgres@db:5432/data_explorer`. |
-| `REDIS_URL` | No | Redis connection string for caching and throttling. Docker default: `redis://redis:6379`. |
+| `REDIS_URL` | No | Redis connection string for caching, notifications, and throttling. Docker default: `redis://redis:6379`. |
 | `GEMINI_API_KEY` | No | Google Gemini API key used to enable AI features. |
 | `AI_PROVIDER_TIMEOUT_MS` | No | Timeout in milliseconds for AI provider requests. Default: `15000`. |
 | `AI_STREAM_IDLE_TIMEOUT_MS` | No | Idle timeout in milliseconds for streaming AI responses. Default: `15000`. |
@@ -363,7 +389,7 @@ cd client
 npm run build
 
 cd ../server
-npx nest build
+npm run build
 ```
 
 ### Test
