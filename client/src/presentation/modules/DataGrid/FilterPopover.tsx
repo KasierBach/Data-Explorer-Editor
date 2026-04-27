@@ -22,7 +22,7 @@ export const FilterPopover: React.FC<FilterPopoverProps> = ({ currentFilter, onF
                     {currentFilter ? 'Filtered' : 'Filter'}
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-80 p-3" align="start">
+            <PopoverContent className="w-[min(20rem,calc(100vw-1rem))] p-3" align="start">
                 <div className="space-y-4">
                     <h4 className="font-medium text-xs text-muted-foreground uppercase">Global Search</h4>
                     <div className="flex gap-2">

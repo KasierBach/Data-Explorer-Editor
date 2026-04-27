@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-    Sparkles, Settings, User as UserIcon, CreditCard, LogOut, Shield, MonitorSmartphone
+    Sparkles, Settings, User as UserIcon, CreditCard, LogOut, Shield, MonitorSmartphone, Users
 } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { ModeToggle } from '@/presentation/components/mode-toggle';
@@ -156,6 +156,10 @@ export const NavUserSection: React.FC<NavUserSectionProps> = ({
                             <Settings className="mr-2 h-4 w-4" />
                             <span>{lang === 'vi' ? 'Cài đặt' : 'Settings'}</span>
                             {!isMobile && <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => navigate('/teams')}>
+                            <Users className="mr-2 h-4 w-4" />
+                            <span>{lang === 'vi' ? 'Nhóm / Team' : 'Teams'}</span>
                         </DropdownMenuItem>
                     </DropdownMenuGroup>
 

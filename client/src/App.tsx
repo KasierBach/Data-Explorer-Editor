@@ -28,7 +28,7 @@ const TeamPage = lazy(() => import('@/presentation/pages/TeamPage').then((m) => 
 
 function RouteFallback() {
   return (
-    <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">
+    <div className="flex h-dvh min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
       Loading...
     </div>
   )

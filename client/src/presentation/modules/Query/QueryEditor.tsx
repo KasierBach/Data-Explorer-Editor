@@ -487,7 +487,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         <>
             <div className="flex flex-col h-full bg-background">
                 {/* Toolbar */}
-                <div className="p-1 px-2 border-b flex items-center justify-between bg-muted/30 min-h-[40px] flex-wrap gap-y-1">
+                <div className="p-1 px-2 border-b flex items-center justify-between bg-muted/30 min-h-[40px] flex-wrap gap-x-2 gap-y-1">
                     <div className="flex items-center gap-1 flex-wrap min-w-0">
                         <Button
                             size="sm"
@@ -514,10 +514,10 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                                     className="h-8 gap-1.5 px-3 border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-500 transition-all shadow-none"
                                 >
                                     <Sparkles className="w-3.5 h-3.5 fill-blue-500/20" />
-                                    <span className="font-medium">AI SQL</span>
+                                    <span className="font-medium">{isSmallMobile ? 'AI' : 'AI SQL'}</span>
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[450px] p-0 border-white/10 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden" align="start" sideOffset={10}>
+                            <PopoverContent className="w-[min(450px,calc(100vw-1rem))] p-0 border-white/10 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden" align="start" sideOffset={10}>
                                 <AiQueryBox 
                                     currentConnectionId={activeConnectionId || ''}
                                     currentDatabase={activeDatabase || undefined}

@@ -66,7 +66,7 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-md rounded-xl">
+            <DialogContent className="max-w-[calc(100vw-1rem)] rounded-xl sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Users className="h-5 w-5 text-blue-500" />

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useAppStore } from '@/core/services/store';
+import { API_BASE_URL } from '@/core/config/env';
 import { toast } from 'sonner';
 
 export function useNotifications() {
@@ -8,7 +9,7 @@ export function useNotifications() {
     useEffect(() => {
         if (!isAuthenticated || !accessToken) return;
 
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+        const baseUrl = API_BASE_URL;
         const sseUrl = `${baseUrl}/notifications/stream?token=${accessToken}`;
         
         const eventSource = new EventSource(sseUrl);

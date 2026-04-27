@@ -126,7 +126,7 @@ export const SaveToDashboardDialog: React.FC<SaveToDashboardDialogProps> = ({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Save to Dashboard</DialogTitle>
                 </DialogHeader>
@@ -138,7 +138,7 @@ export const SaveToDashboardDialog: React.FC<SaveToDashboardDialogProps> = ({
                         </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
                             <Label>Target</Label>
                             <Select
@@ -199,7 +199,7 @@ export const SaveToDashboardDialog: React.FC<SaveToDashboardDialogProps> = ({
                             </Select>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="space-y-1.5">
                                 <Label>Dashboard name</Label>
                                 <Input
@@ -246,7 +246,7 @@ export const SaveToDashboardDialog: React.FC<SaveToDashboardDialogProps> = ({
                     </div>
 
                     {form.chartType !== 'table' && (
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="space-y-1.5">
                                 <Label>X axis</Label>
                                 <Select value={form.xAxis} onValueChange={(value) => setForm((prev) => ({ ...prev, xAxis: value }))}>

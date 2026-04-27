@@ -87,7 +87,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+            <DialogContent className="max-w-[calc(100vw-1rem)] max-h-[80vh] flex flex-col sm:max-w-3xl">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Clock className="w-4 h-4" />
@@ -183,7 +183,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                     <Button
                                         variant="ghost"
                                         size="icon"

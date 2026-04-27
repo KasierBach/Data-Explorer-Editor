@@ -80,7 +80,7 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0 gap-0 overflow-hidden">
+            <DialogContent className="max-w-[calc(100vw-1rem)] max-h-[80vh] flex flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
                 <DialogHeader className="p-4 pb-2 border-b">
                     <DialogTitle className="flex items-center gap-2 text-base">
                         <FolderOpen className="w-4 h-4 text-blue-500" />
@@ -101,9 +101,9 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                     </div>
                 </div>
 
-                <div className="flex flex-1 overflow-hidden min-h-[300px]">
+                <div className="flex min-h-[300px] flex-1 flex-col overflow-hidden md:flex-row">
                     {/* List */}
-                    <div className="w-1/2 border-r overflow-y-auto">
+                    <div className="w-full overflow-y-auto border-b md:w-1/2 md:border-b-0 md:border-r">
                         {sorted.length === 0 ? (
                             <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 px-4">
                                 <FileCode className="w-8 h-8 opacity-40" />
@@ -167,7 +167,7 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                     </div>
 
                     {/* Preview */}
-                    <div className="w-1/2 flex flex-col overflow-hidden">
+                    <div className="flex w-full flex-col overflow-hidden md:w-1/2">
                         {selectedQuery ? (
                             <>
                                 <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">

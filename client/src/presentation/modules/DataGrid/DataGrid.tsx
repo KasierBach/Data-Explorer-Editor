@@ -12,7 +12,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/presentation/components/ui/button';
 import { 
     RefreshCw, LayoutGrid, Download, Plus, Trash2, 
-    FileJson, FileText, FileCode, Check, X, Upload, ArrowRightLeft 
+    FileJson, FileText, FileCode, Check, X, Upload, ArrowRightLeft, MoreHorizontal, PencilLine
 } from 'lucide-react';
 import { FilterPopover } from './FilterPopover';
 import { TableDesigner } from './TableDesigner';
@@ -29,6 +29,8 @@ import { useDataGridEditing } from './useDataGridEditing';
 import { exportCSV, exportJSON, exportSQL, copyRowAsSQL, type ExportContext } from './DataGridExport';
 import { BulkImportDialog } from './BulkImportDialog';
 import { MigrationHubDialog } from '../Migration/MigrationHubDialog';
+import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
+import { cn } from '@/lib/utils';
 
 interface DataGridProps {
     tableId: string;
@@ -45,6 +47,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const { tabs, activeTabId, setTabPagination, connections, activeConnectionId } = useAppStore();
     const activeTab = tabs.find((t: Tab) => t.id === activeTabId);
     const activeConnection = connections.find((connection) => connection.id === activeConnectionId);
+    const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
     const readOnlyConnection = activeConnection?.readOnly === true;
     const queryExecutionDisabled = activeConnection?.allowQueryExecution === false;
     const schemaChangesDisabled = activeConnection?.allowSchemaChanges === false || readOnlyConnection;
@@ -155,6 +158,10 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         dialect,
     };
 
+    const mobileActionLabel = editing.selectedRows.size > 0
+        ? `Delete (${editing.selectedRows.size})`
+        : 'Actions';
+
     // --- Loading state ---
     if (isLoadingMeta) return (
         <div className="p-4 text-xs text-muted-foreground italic flex items-center gap-2">
@@ -179,95 +186,193 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     return (
         <div className="flex flex-col h-full bg-background relative font-sans">
             {/* Toolbar */}
-            <div className="p-1 border-b flex items-center gap-1 bg-muted/20 px-2 h-9">
-                {/* View Mode Switches */}
-                <div className="flex bg-muted/50 rounded p-0.5 border">
-                    <Button variant={viewMode === 'grid' ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode('grid')} className="h-6 px-2 text-[11px] gap-1.5 rounded-sm">
-                        <LayoutGrid className="w-3 h-3" /> Grid
-                    </Button>
-                    <Button variant={viewMode === 'design' ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode('design')} className="h-6 px-2 text-[11px] gap-1.5 rounded-sm">
-                        <LayoutGrid className="w-3 h-3" /> Design
-                    </Button>
-                </div>
+            <div className={cn(
+                "border-b bg-muted/20 px-2",
+                isCompactMobileLayout ? "py-2 space-y-2" : "p-1 h-9 flex items-center gap-1"
+            )}>
+                {isCompactMobileLayout ? (
+                    <>
+                        <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
+                            <div className="flex bg-muted/50 rounded p-0.5 border shrink-0">
+                                <Button variant={viewMode === 'grid' ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode('grid')} className="h-7 px-2 text-[11px] gap-1 rounded-sm">
+                                    <LayoutGrid className="w-3 h-3" />
+                                    {!isSmallMobile && 'Grid'}
+                                </Button>
+                                <Button variant={viewMode === 'design' ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode('design')} className="h-7 px-2 text-[11px] gap-1 rounded-sm">
+                                    <PencilLine className="w-3 h-3" />
+                                    {!isSmallMobile && 'Design'}
+                                </Button>
+                            </div>
 
-                <div className="h-4 w-[1px] bg-border mx-1" />
+                            <Button
+                                variant={editing.isEditMode ? "secondary" : "ghost"}
+                                size="sm"
+                                onClick={editing.toggleEditMode}
+                                disabled={dataEditsDisabled}
+                                className={cn(
+                                    "h-7 px-2 text-[11px] gap-1.5 shrink-0",
+                                    editing.isEditMode && "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
+                                )}
+                            >
+                                <PencilLine className="w-3 h-3" />
+                                {editing.isEditMode ? 'Cancel' : 'Edit'}
+                            </Button>
 
-                {/* Edit Mode */}
-                <div className="flex bg-muted/30 rounded p-0.5 border">
-                    <Button
-                        variant={editing.isEditMode ? "secondary" : "ghost"}
-                        size="sm"
-                        onClick={editing.toggleEditMode}
-                        disabled={dataEditsDisabled}
-                        className={`h-6 px-2 text-[11px] gap-1.5 rounded-sm ${editing.isEditMode ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' : ''}`}
-                    >
-                        {editing.isEditMode ? 'Cancel Edit' : 'Edit Data'}
-                    </Button>
-                </div>
+                            {Object.keys(editing.pendingChanges).length > 0 && (
+                                <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={editing.handleSaveData}
+                                    disabled={editing.isSaving || dataEditsDisabled}
+                                    className="h-7 px-3 text-[11px] bg-green-600 hover:bg-green-700 text-white shrink-0"
+                                >
+                                    {editing.isSaving ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : null}
+                                    Save ({Object.keys(editing.pendingChanges).length})
+                                </Button>
+                            )}
+                        </div>
 
-                {Object.keys(editing.pendingChanges).length > 0 && (
-                    <Button variant="default" size="sm" onClick={editing.handleSaveData} disabled={editing.isSaving || dataEditsDisabled} className="h-6 px-3 text-[11px] bg-green-600 hover:bg-green-700 text-white ml-2">
-                        {editing.isSaving ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : null}
-                        Save Changes ({Object.keys(editing.pendingChanges).length})
-                    </Button>
-                )}
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <Button variant="ghost" size="sm" onClick={() => refetch()} className="h-8 px-2 text-[11px] gap-1 shrink-0" disabled={editing.isEditMode}>
+                                    <RefreshCw className="w-3.5 h-3.5" />
+                                    {!isSmallMobile && 'Refresh'}
+                                </Button>
 
-                <div className="h-4 w-[1px] bg-border mx-1" />
+                                <FilterPopover onFilterChange={setGlobalFilter} currentFilter={globalFilter} />
 
-                <Button variant="ghost" size="sm" onClick={() => refetch()} className="h-7 text-[11px] gap-1 px-2" disabled={editing.isEditMode}>
-                    <RefreshCw className="w-3 h-3" /> Refresh
-                </Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="h-8 px-2 text-[11px] gap-1 shrink-0">
+                                            <MoreHorizontal className="w-3.5 h-3.5" />
+                                            {!isSmallMobile && mobileActionLabel}
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-52">
+                                        <DropdownMenuItem onClick={() => exportCSV(exportCtx)} className="gap-2 text-xs">
+                                            <FileText className="w-3 h-3" /> CSV
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => exportJSON(exportCtx)} className="gap-2 text-xs">
+                                            <FileJson className="w-3 h-3" /> JSON
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => exportSQL(exportCtx)} className="gap-2 text-xs">
+                                            <FileCode className="w-3 h-3" /> SQL (INSERT)
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={editing.toggleInsertMode} disabled={dataEditsDisabled} className="gap-2 text-xs">
+                                            <Plus className="w-3 h-3" /> {editing.isInserting ? 'Cancel Insert' : 'Insert Row'}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)} disabled={importExportDisabled} className="gap-2 text-xs">
+                                            <Upload className="w-3 h-3" /> Import
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setIsMigrationDialogOpen(true)} disabled={queryExecutionDisabled} className="gap-2 text-xs">
+                                            <ArrowRightLeft className="w-3 h-3" /> Transfer
+                                        </DropdownMenuItem>
+                                        {editing.selectedRows.size > 0 && (
+                                            <DropdownMenuItem onClick={editing.handleDeleteRows} disabled={editing.isSaving || dataEditsDisabled} className="gap-2 text-xs text-red-500 focus:text-red-500">
+                                                <Trash2 className="w-3 h-3" /> Delete ({editing.selectedRows.size})
+                                            </DropdownMenuItem>
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
 
-                {/* Export */}
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-7 text-[11px] gap-1 px-2">
-                            <Download className="w-3 h-3" /> Export
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono uppercase shrink-0">
+                                <span className="bg-muted px-1.5 py-1 rounded border border-border/50">
+                                    {queryResult?.totalCount?.toLocaleString() || rows.length.toLocaleString()} rows
+                                </span>
+                                {queryResult?.durationMs && <span className="opacity-70">{queryResult.durationMs}ms</span>}
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <div className="flex bg-muted/50 rounded p-0.5 border">
+                            <Button variant={viewMode === 'grid' ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode('grid')} className="h-6 px-2 text-[11px] gap-1.5 rounded-sm">
+                                <LayoutGrid className="w-3 h-3" /> Grid
+                            </Button>
+                            <Button variant={viewMode === 'design' ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode('design')} className="h-6 px-2 text-[11px] gap-1.5 rounded-sm">
+                                <LayoutGrid className="w-3 h-3" /> Design
+                            </Button>
+                        </div>
+
+                        <div className="h-4 w-[1px] bg-border mx-1" />
+
+                        <div className="flex bg-muted/30 rounded p-0.5 border">
+                            <Button
+                                variant={editing.isEditMode ? "secondary" : "ghost"}
+                                size="sm"
+                                onClick={editing.toggleEditMode}
+                                disabled={dataEditsDisabled}
+                                className={`h-6 px-2 text-[11px] gap-1.5 rounded-sm ${editing.isEditMode ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' : ''}`}
+                            >
+                                {editing.isEditMode ? 'Cancel Edit' : 'Edit Data'}
+                            </Button>
+                        </div>
+
+                        {Object.keys(editing.pendingChanges).length > 0 && (
+                            <Button variant="default" size="sm" onClick={editing.handleSaveData} disabled={editing.isSaving || dataEditsDisabled} className="h-6 px-3 text-[11px] bg-green-600 hover:bg-green-700 text-white ml-2">
+                                {editing.isSaving ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : null}
+                                Save Changes ({Object.keys(editing.pendingChanges).length})
+                            </Button>
+                        )}
+
+                        <div className="h-4 w-[1px] bg-border mx-1" />
+
+                        <Button variant="ghost" size="sm" onClick={() => refetch()} className="h-7 text-[11px] gap-1 px-2" disabled={editing.isEditMode}>
+                            <RefreshCw className="w-3 h-3" /> Refresh
                         </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => exportCSV(exportCtx)} className="gap-2 text-xs">
-                            <FileText className="w-3 h-3" /> CSV
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => exportJSON(exportCtx)} className="gap-2 text-xs">
-                            <FileJson className="w-3 h-3" /> JSON
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => exportSQL(exportCtx)} className="gap-2 text-xs">
-                            <FileCode className="w-3 h-3" /> SQL (INSERT)
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
 
-                <div className="h-4 w-[1px] bg-border mx-1" />
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-7 text-[11px] gap-1 px-2">
+                                    <Download className="w-3 h-3" /> Export
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuItem onClick={() => exportCSV(exportCtx)} className="gap-2 text-xs">
+                                    <FileText className="w-3 h-3" /> CSV
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => exportJSON(exportCtx)} className="gap-2 text-xs">
+                                    <FileJson className="w-3 h-3" /> JSON
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => exportSQL(exportCtx)} className="gap-2 text-xs">
+                                    <FileCode className="w-3 h-3" /> SQL (INSERT)
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
 
-                <Button variant="ghost" size="sm" onClick={editing.toggleInsertMode} disabled={dataEditsDisabled} className={`h-7 text-[11px] gap-1 px-2 ${editing.isInserting ? 'text-green-500' : ''}`}>
-                    <Plus className="w-3 h-3" /> Insert Row
-                </Button>
+                        <div className="h-4 w-[1px] bg-border mx-1" />
 
-                <Button variant="ghost" size="sm" onClick={() => setIsImportDialogOpen(true)} disabled={importExportDisabled} className="h-7 text-[11px] gap-1 px-2 text-blue-500 hover:text-blue-600">
-                    <Upload className="w-3 h-3" /> Import
-                </Button>
+                        <Button variant="ghost" size="sm" onClick={editing.toggleInsertMode} disabled={dataEditsDisabled} className={`h-7 text-[11px] gap-1 px-2 ${editing.isInserting ? 'text-green-500' : ''}`}>
+                            <Plus className="w-3 h-3" /> Insert Row
+                        </Button>
 
-                <Button variant="ghost" size="sm" onClick={() => setIsMigrationDialogOpen(true)} disabled={queryExecutionDisabled} className="h-7 text-[11px] gap-1 px-2 text-purple-500 hover:text-purple-600">
-                    <ArrowRightLeft className="w-3 h-3" /> Transfer
-                </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setIsImportDialogOpen(true)} disabled={importExportDisabled} className="h-7 text-[11px] gap-1 px-2 text-blue-500 hover:text-blue-600">
+                            <Upload className="w-3 h-3" /> Import
+                        </Button>
 
-                {editing.selectedRows.size > 0 && (
-                    <Button variant="ghost" size="sm" onClick={editing.handleDeleteRows} disabled={editing.isSaving || dataEditsDisabled} className="h-7 text-[11px] gap-1 px-2 text-red-500 hover:text-red-600 hover:bg-red-500/10">
-                        <Trash2 className="w-3 h-3" /> Delete ({editing.selectedRows.size})
-                    </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setIsMigrationDialogOpen(true)} disabled={queryExecutionDisabled} className="h-7 text-[11px] gap-1 px-2 text-purple-500 hover:text-purple-600">
+                            <ArrowRightLeft className="w-3 h-3" /> Transfer
+                        </Button>
+
+                        {editing.selectedRows.size > 0 && (
+                            <Button variant="ghost" size="sm" onClick={editing.handleDeleteRows} disabled={editing.isSaving || dataEditsDisabled} className="h-7 text-[11px] gap-1 px-2 text-red-500 hover:text-red-600 hover:bg-red-500/10">
+                                <Trash2 className="w-3 h-3" /> Delete ({editing.selectedRows.size})
+                            </Button>
+                        )}
+
+                        <div className="h-4 w-[1px] bg-border mx-1" />
+
+                        <FilterPopover onFilterChange={setGlobalFilter} currentFilter={globalFilter} />
+
+                        <div className="text-[10px] text-muted-foreground ml-auto flex items-center gap-3 pr-2 font-mono uppercase">
+                            <span className="bg-muted px-1.5 rounded border border-border/50">
+                                {queryResult?.totalCount?.toLocaleString() || rows.length.toLocaleString()} TOTAL ROWS
+                            </span>
+                            {queryResult?.durationMs && <span className="opacity-70">{queryResult.durationMs}MS</span>}
+                        </div>
+                    </>
                 )}
-
-                <div className="h-4 w-[1px] bg-border mx-1" />
-
-                <FilterPopover onFilterChange={setGlobalFilter} currentFilter={globalFilter} />
-
-                <div className="text-[10px] text-muted-foreground ml-auto flex items-center gap-3 pr-2 font-mono uppercase">
-                    <span className="bg-muted px-1.5 rounded border border-border/50">
-                        {queryResult?.totalCount?.toLocaleString() || rows.length.toLocaleString()} TOTAL ROWS
-                    </span>
-                    {queryResult?.durationMs && <span className="opacity-70">{queryResult.durationMs}MS</span>}
-                </div>
             </div>
 
             {activeConnection && (readOnlyConnection || queryExecutionDisabled || schemaChangesDisabled || importExportDisabled) && (

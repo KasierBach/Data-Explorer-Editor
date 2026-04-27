@@ -40,7 +40,7 @@ export function ERDPage() {
     // No connections matches context → prompt to add or go back
     if (filteredConnections.length === 0) {
         return (
-            <div className="h-screen w-full flex items-center justify-center bg-background page-enter">
+            <div className="h-dvh min-h-screen w-full flex items-center justify-center bg-background page-enter">
                 <div className="text-center space-y-4">
                     <Database className="w-12 h-12 text-muted-foreground mx-auto" />
                     <h2 className="text-xl font-bold">No {isNoSql ? 'NoSQL' : 'SQL'} Connections</h2>
@@ -60,7 +60,7 @@ export function ERDPage() {
     // Has connections but none active (or active is wrong type) → auto-select first, or let user pick
     if (!hasValidActiveConnection) {
         return (
-            <div className="h-screen w-full flex items-center justify-center bg-background page-enter">
+            <div className="h-dvh min-h-screen w-full flex items-center justify-center bg-background page-enter">
                 <div className="text-center space-y-4 max-w-sm">
                     <Wifi className="w-12 h-12 text-muted-foreground mx-auto" />
                     <h2 className="text-xl font-bold">Select {isNoSql ? 'NoSQL' : 'SQL'} Connection</h2>
@@ -87,7 +87,7 @@ export function ERDPage() {
     }
 
     return (
-        <div className="h-screen w-full bg-background flex flex-col overflow-hidden page-enter">
+        <div className="h-dvh min-h-screen w-full bg-background flex flex-col overflow-hidden page-enter">
             {/* Header with connection selector */}
             <header className="h-12 border-b bg-card flex items-center px-3 md:px-4 justify-between shrink-0 select-none">
                 <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">

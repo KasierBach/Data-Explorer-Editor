@@ -75,7 +75,7 @@ export function DocumentationPage() {
     };
 
     return (
-        <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
+        <div className="h-dvh min-h-screen bg-background text-foreground flex flex-col overflow-hidden">
             <SEO 
                 lang={lang}
                 title={`${lang === 'vi' ? (navInfo.currentItem?.title || 'Tài liệu') : (navInfo.currentItem?.titleEn || navInfo.currentItem?.title || 'Docs')}`}

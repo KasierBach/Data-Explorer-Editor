@@ -57,7 +57,7 @@ export const SaveErdWorkspaceDialog: React.FC<SaveErdWorkspaceDialogProps> = ({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-xl">
+            <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-xl">
                 <DialogHeader>
                     <DialogTitle>
                         {currentWorkspaceName

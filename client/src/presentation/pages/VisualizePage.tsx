@@ -16,7 +16,7 @@ export function VisualizePage() {
     // No connections at all
     if (connections.length === 0) {
         return (
-            <div className="h-screen w-full flex items-center justify-center bg-background page-enter">
+            <div className="h-dvh min-h-screen w-full flex items-center justify-center bg-background page-enter">
                 <div className="text-center space-y-4">
                     <PieChart className="w-12 h-12 text-muted-foreground mx-auto" />
                     <h2 className="text-xl font-bold">No Connections</h2>
@@ -36,7 +36,7 @@ export function VisualizePage() {
     // Has connections but none active
     if (!activeConnectionId) {
         return (
-            <div className="h-screen w-full flex items-center justify-center bg-background page-enter">
+            <div className="h-dvh min-h-screen w-full flex items-center justify-center bg-background page-enter">
                 <div className="text-center space-y-4 max-w-sm">
                     <Wifi className="w-12 h-12 text-muted-foreground mx-auto" />
                     <h2 className="text-xl font-bold">Select Connection</h2>
@@ -63,7 +63,7 @@ export function VisualizePage() {
     }
 
     return (
-        <div className="h-screen w-full bg-background flex flex-col overflow-hidden page-enter">
+        <div className="h-dvh min-h-screen w-full bg-background flex flex-col overflow-hidden page-enter">
             {/* Header with connection selector */}
             <header className="h-12 border-b bg-card flex items-center px-3 md:px-4 justify-between shrink-0 select-none">
                 <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">

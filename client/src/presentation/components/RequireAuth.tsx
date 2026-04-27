@@ -7,7 +7,7 @@ export const RequireAuth = ({ children, requireAdmin = false }: { children: Reac
     const location = useLocation();
 
     if (!isAuthBootstrapped) {
-        return <div className="flex h-screen items-center justify-center bg-background text-sm text-muted-foreground">Loading session...</div>;
+        return <div className="flex h-dvh min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">Loading session...</div>;
     }
 
     if (!isAuthenticated || !accessToken) {

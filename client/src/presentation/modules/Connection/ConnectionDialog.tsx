@@ -223,7 +223,7 @@ export const ConnectionDialog: React.FC = () => {
 
     return (
         <Dialog open={isConnectionDialogOpen} onOpenChange={closeConnectionDialog}>
-            <DialogContent className="max-w-[520px] p-0 overflow-hidden bg-background border-border/50 shadow-2xl rounded-xl">
+            <DialogContent className="max-w-[calc(100vw-1rem)] rounded-xl border-border/50 bg-background p-0 shadow-2xl overflow-hidden sm:max-w-[520px]">
                 <div className="flex flex-col max-h-[80vh]">
                     {/* Header */}
                     <div className="px-6 pt-5 pb-4 border-b shrink-0">
@@ -305,7 +305,7 @@ export const ConnectionDialog: React.FC = () => {
                                         </Select>
                                     </div>
                                 )}
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <div className="space-y-1">
                                         <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Loại Database' : 'Database Type'}</Label>
                                         <Select value={type} onValueChange={(v: any) => {
@@ -344,7 +344,7 @@ export const ConnectionDialog: React.FC = () => {
                                 {!isFileType && (
                                     <div className="space-y-2.5">
                                         <div className="flex items-center gap-1.5 text-xs font-medium"><Globe className="w-3.5 h-3.5 text-muted-foreground" /> {t ? 'Chi tiết mạng' : 'Network Details'}</div>
-                                        <div className={`grid gap-3 ${type === 'mongodb+srv' ? 'grid-cols-1' : 'grid-cols-3'}`}>
+                                        <div className={`grid gap-3 ${type === 'mongodb+srv' ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-3'}`}>
                                             <div className={type === 'mongodb+srv' ? '' : 'col-span-2'}>
                                                 <div className="space-y-1">
                                                     <Label className="text-[10px] text-muted-foreground">{isMongoType ? 'Hostname / Cluster' : 'Host'}</Label>
@@ -383,7 +383,7 @@ export const ConnectionDialog: React.FC = () => {
                                 {!isFileType && (
                                     <div className="space-y-2.5">
                                         <div className="flex items-center gap-1.5 text-xs font-medium"><Lock className="w-3.5 h-3.5 text-muted-foreground" /> {t ? 'Xác thực' : 'Authentication'}</div>
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                             <div className="space-y-1">
                                                 <Label className="text-[10px] text-muted-foreground">{t ? 'Tên đăng nhập' : 'Username'}</Label>
                                                 <Input value={username} onChange={e => setUsername(e.target.value)} className="h-9 text-xs" />
@@ -503,7 +503,7 @@ export const ConnectionDialog: React.FC = () => {
                     </div>
 
                     {/* Footer */}
-                    <div className="px-6 py-3 border-t border-border flex justify-end gap-2.5 shrink-0 bg-muted/20">
+                    <div className="px-6 py-3 border-t border-border flex flex-wrap justify-end gap-2.5 shrink-0 bg-muted/20">
                         <Button variant="ghost" size="sm" onClick={handleTest} disabled={isTesting || isSaving} className="text-xs h-8 mr-auto font-semibold">
                             {isTesting ? (t ? 'Đang test...' : 'Testing...') : (t ? 'Kiểm tra kết nối' : 'Test Connection')}
                         </Button>

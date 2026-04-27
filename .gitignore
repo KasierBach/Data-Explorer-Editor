@@ -13,4 +13,6 @@ artifacts/
 .agents/
 .agent/
 agent/
-
+mobile-audit/
+/plans/phase-1-implementation-plan.md
+/plans/team-collaboration-analysis.md
