@@ -17,12 +17,49 @@ export const ChangelogPage: React.FC = () => {
     };
 
     const releases = [
+        // v3.3.1 - Late April 2026
+        {
+            version: 'v3.3.1',
+            date: lang === 'vi' ? 'Cuối Tháng 4, 2026' : 'Late April 2026',
+            title: lang === 'vi' ? 'Team Collaboration & Mobile Polish' : 'Team Collaboration & Mobile Polish',
+            badge: 'LATEST',
+            features: [
+                {
+                    icon: <Sparkles className="w-5 h-5 text-purple-400" />,
+                    title: lang === 'vi' ? 'Organizations & Shared Workspaces' : 'Organizations & Shared Workspaces',
+                    desc: lang === 'vi'
+                        ? 'Thêm nền tảng team collaboration với organizations, members, roles, và shared connections / queries / dashboards.'
+                        : 'Add the collaboration base for organizations, members, roles, and shared connections / queries / dashboards.'
+                },
+                {
+                    icon: <Globe className="w-5 h-5 text-cyan-400" />,
+                    title: lang === 'vi' ? 'Mobile Collaboration Access' : 'Mobile Collaboration Access',
+                    desc: lang === 'vi'
+                        ? 'Teams giờ có thể mở từ menu avatar trên mobile, và các màn workspace, dialog, admin được siết lại để thân thiện hơn trên màn nhỏ.'
+                        : 'Teams is now reachable from the mobile avatar menu, while workspace, dialog, and admin screens are tuned for smaller displays.'
+                },
+                {
+                    icon: <TestTube className="w-5 h-5 text-amber-400" />,
+                    title: lang === 'vi' ? 'Connection Diagnostics' : 'Connection Diagnostics',
+                    desc: lang === 'vi'
+                        ? 'ConnectionDialog có Test Connection, đi kèm sửa lỗi UI và tinh chỉnh lại trải nghiệm thiết lập kết nối.'
+                        : 'ConnectionDialog gains Test Connection, plus UI fixes and a smoother connection setup flow.'
+                },
+                {
+                    icon: <Database className="w-5 h-5 text-emerald-400" />,
+                    title: lang === 'vi' ? 'Realtime Stability' : 'Realtime Stability',
+                    desc: lang === 'vi'
+                        ? 'Thông báo SSE, cache, và luồng cập nhật nền được đồng bộ lại với backend API và hạ tầng Redis hiện tại.'
+                        : 'SSE notifications, cache, and background update flows are aligned with the current backend API and Redis infrastructure.'
+                }
+            ]
+        },
         // v3.3.0 - April 2026
         {
             version: 'v3.3.0',
             date: lang === 'vi' ? 'Giữa Tháng 4, 2026' : 'Mid April 2026',
             title: lang === 'vi' ? 'AI Thế Hệ Mới & Type Safety Toàn Diện' : 'Next-Gen AI & Comprehensive Type Safety',
-            badge: 'LATEST',
+            badge: '',
             features: [
                 {
                     icon: <Sparkles className="w-5 h-5 text-purple-400" />,
