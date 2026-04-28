@@ -17,5 +17,7 @@ export interface IOrganizationsRepository {
 
   findResource(resourceType: ResourceType, resourceId: string, organizationId: string): Promise<any>;
   addResource(data: Prisma.OrganizationResourceCreateInput): Promise<any>;
+  upsertResource(data: Prisma.OrganizationResourceCreateInput): Promise<any>;
+  findResources(organizationId: string, resourceType?: ResourceType): Promise<any[]>;
   removeResource(resourceType: ResourceType, resourceId: string, organizationId: string): Promise<void>;
 }

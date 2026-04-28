@@ -99,16 +99,15 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         fetchAiChats();
     }, [fetchAiChats]);
 
-    // Auto-create first chat if none exists after fetch, or load messages for active chat
+    // Load messages and ensure at least one chat exists
     useEffect(() => {
         if (aiChats.length === 0) {
-            // Wait for fetch to finish, if still 0, create it
-            // Small timeout to avoid creating before fetch finishes if it's fast
+            // Create first chat only if none exist after fetch
             const timer = setTimeout(() => {
                 if (useAppStore.getState().aiChats.length === 0) {
                     createAiChat();
                 }
-            }, 500);
+            }, 1000);
             return () => clearTimeout(timer);
         } else if (!activeAiChatId) {
             setActiveAiChat(aiChats[0].id);

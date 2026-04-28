@@ -1,5 +1,50 @@
 import { apiService } from './api.service';
 
+export type TeamResourcePermissionPolicy = Record<string, string[]> | null;
+
+export interface TeamConnectionEntity {
+  id: string;
+  name: string;
+  type: string;
+  host: string;
+  port?: number | null;
+  database?: string | null;
+  readOnly?: boolean | null;
+  lastHealthStatus?: string | null;
+  permissions?: TeamResourcePermissionPolicy;
+}
+
+export interface TeamQueryEntity {
+  id: string;
+  name: string;
+  sql: string;
+  permissions?: TeamResourcePermissionPolicy;
+}
+
+export interface TeamDashboardEntity {
+  id: string;
+  name: string;
+  description?: string | null;
+  permissions?: TeamResourcePermissionPolicy;
+}
+
+export interface TeamActivityEntity {
+  id: string;
+  action: string;
+  createdAt: string;
+  userId?: string;
+  organizationId?: string;
+  details?: any;
+  user?: {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    email: string;
+    username?: string | null;
+    avatarUrl?: string | null;
+  };
+}
+
 export interface OrganizationEntity {
   id: string;
   name: string;
@@ -28,6 +73,20 @@ export interface OrganizationMemberEntity {
   };
 }
 
+export interface OrganizationInvitationEntity {
+  id: string;
+  email: string;
+  role: string;
+  invitedBy?: string | null;
+  invitedAt: string;
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl?: string | null;
+  };
+}
+
 export interface CreateOrganizationPayload {
   name: string;
   logoUrl?: string;
@@ -42,6 +101,18 @@ export interface UpdateOrganizationPayload {
 export interface InviteMemberPayload {
   email: string;
   role: string;
+}
+
+export interface InviteMemberResult {
+  status: 'invitation-sent';
+  email: string;
+  role: string;
+  invitation?: {
+    id: string;
+    email: string;
+    role: string;
+    organizationId: string;
+  };
 }
 
 export class OrganizationService {
@@ -69,8 +140,30 @@ export class OrganizationService {
     return apiService.get<OrganizationMemberEntity[]>(`/organizations/${id}/members`);
   }
 
-  static async inviteMember(id: string, payload: InviteMemberPayload): Promise<OrganizationMemberEntity> {
-    return apiService.post<OrganizationMemberEntity>(`/organizations/${id}/members`, payload);
+  static async getMyInvitations(): Promise<OrganizationInvitationEntity[]> {
+    return apiService.get<OrganizationInvitationEntity[]>('/organizations/invitations/me');
+  }
+
+  static async inviteMember(id: string, payload: InviteMemberPayload): Promise<InviteMemberResult> {
+    return apiService.post<InviteMemberResult>(`/organizations/${id}/members`, payload);
+  }
+
+  static async acceptInvitation(invitationId: string): Promise<{
+    id: string;
+    organizationId: string;
+    organizationName: string;
+    role: string;
+  }> {
+    return apiService.post<{
+      id: string;
+      organizationId: string;
+      organizationName: string;
+      role: string;
+    }>(`/organizations/invitations/${invitationId}/accept`, {});
+  }
+
+  static async declineInvitation(invitationId: string): Promise<void> {
+    await apiService.delete<void>(`/organizations/invitations/${invitationId}`);
   }
 
   static async updateMemberRole(id: string, userId: string, role: string): Promise<OrganizationMemberEntity> {
@@ -81,19 +174,19 @@ export class OrganizationService {
     await apiService.delete<void>(`/organizations/${id}/members/${userId}`);
   }
 
-  static async getTeamConnections(id: string): Promise<any[]> {
-    return apiService.get<any[]>(`/organizations/${id}/connections`);
+  static async getTeamConnections(id: string): Promise<TeamConnectionEntity[]> {
+    return apiService.get<TeamConnectionEntity[]>(`/organizations/${id}/connections`);
   }
 
-  static async getTeamQueries(id: string): Promise<any[]> {
-    return apiService.get<any[]>(`/organizations/${id}/queries`);
+  static async getTeamQueries(id: string): Promise<TeamQueryEntity[]> {
+    return apiService.get<TeamQueryEntity[]>(`/organizations/${id}/queries`);
   }
 
-  static async getTeamDashboards(id: string): Promise<any[]> {
-    return apiService.get<any[]>(`/organizations/${id}/dashboards`);
+  static async getTeamDashboards(id: string): Promise<TeamDashboardEntity[]> {
+    return apiService.get<TeamDashboardEntity[]>(`/organizations/${id}/dashboards`);
   }
 
-  static async getTeamActivities(id: string): Promise<any[]> {
-    return apiService.get<any[]>(`/organizations/${id}/activities`);
+  static async getTeamActivities(id: string): Promise<TeamActivityEntity[]> {
+    return apiService.get<TeamActivityEntity[]>(`/organizations/${id}/activities`);
   }
 }

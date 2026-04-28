@@ -277,6 +277,7 @@ model Organization {
   updatedAt DateTime @updatedAt
 
   members   OrganizationMember[]
+  invitations OrganizationInvitation[]
   resources OrganizationResource[]
   auditLogs AuditLog[]
   connections Connection[]
@@ -301,6 +302,24 @@ model OrganizationMember {
   @@unique([organizationId, userId])
   @@index([organizationId])
   @@index([userId])
+}
+
+model OrganizationInvitation {
+  id               String           @id @default(uuid())
+  email            String
+  role             OrganizationRole @default(MEMBER)
+  invitedBy        String?
+  invitedAt        DateTime         @default(now())
+  acceptedAt       DateTime?
+  acceptedByUserId String?
+
+  organizationId   String
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@index([email])
+  @@index([acceptedAt])
 }
 
 model OrganizationResource {

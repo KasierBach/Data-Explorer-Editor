@@ -40,10 +40,14 @@ export enum AuditAction {
     // Team Actions
     TEAM_CREATE = 'TEAM:CREATE',
     TEAM_MEMBER_INVITE = 'TEAM:MEMBER_INVITE',
+    TEAM_MEMBER_ACCEPT = 'TEAM:MEMBER_ACCEPT',
     TEAM_MEMBER_REMOVE = 'TEAM:MEMBER_REMOVE',
     TEAM_MEMBER_ROLE_CHANGE = 'TEAM:MEMBER_ROLE_CHANGE',
     TEAM_RESOURCE_SHARE = 'TEAM:RESOURCE_SHARE',
-    TEAM_RESOURCE_UNSHARE = 'TEAM:RESOURCE_UNSHARE'
+    TEAM_RESOURCE_UNSHARE = 'TEAM:RESOURCE_UNSHARE',
+    TEAM_COMMENT_CREATE = 'TEAM:COMMENT_CREATE',
+    TEAM_COMMENT_REPLY = 'TEAM:COMMENT_REPLY',
+    TEAM_COMMENT_RESOLVE = 'TEAM:COMMENT_RESOLVE',
 }
 
 export interface CreateLogParams {
@@ -52,6 +56,12 @@ export interface CreateLogParams {
     organizationId?: string;
     details?: any;
     ipAddress?: string;
+}
+
+export interface OrganizationLogQueryOptions {
+    limit?: number;
+    actions?: string[];
+    order?: 'asc' | 'desc';
 }
 
 @Injectable()
@@ -83,9 +93,12 @@ export class AuditService {
             include: {
                 user: {
                     select: {
+                        id: true,
                         firstName: true,
                         lastName: true,
                         email: true,
+                        username: true,
+                        avatarUrl: true,
                     }
                 }
             }
@@ -106,20 +119,27 @@ export class AuditService {
     }
 
     async getOrganizationLogs(organizationId: string, limit: number = 50) {
+        return this.findOrganizationLogs(organizationId, { limit });
+    }
+
+    async findOrganizationLogs(organizationId: string, options: OrganizationLogQueryOptions = {}) {
         return this.prisma.auditLog.findMany({
             where: {
-                organizationId
+                organizationId,
+                ...(options.actions?.length ? { action: { in: options.actions } } : {}),
             },
-            take: limit,
+            take: options.limit ?? 50,
             orderBy: {
-                createdAt: 'desc'
+                createdAt: options.order ?? 'desc'
             },
             include: {
                 user: {
                     select: {
+                        id: true,
                         firstName: true,
                         lastName: true,
                         email: true,
+                        username: true,
                         avatarUrl: true,
                     }
                 }

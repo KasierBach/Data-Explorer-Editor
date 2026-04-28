@@ -81,4 +81,9 @@ export class MailService {
         const html = MailTemplates.getSecurityAlertEmail(name, ip, time);
         await this.send(to, '🚨 Cảnh báo bảo mật - Đăng nhập từ IP mới', html);
     }
+
+    async sendTeamInvitationEmail(to: string, teamName: string, inviterName: string, role: string, loginUrl: string): Promise<void> {
+        const html = MailTemplates.getTeamInvitationEmail(teamName, inviterName, role, loginUrl);
+        await this.send(to, `Lời mời tham gia team ${teamName}`, html);
+    }
 }

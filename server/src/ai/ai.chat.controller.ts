@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateAiChatDto, UpdateAiChatDto, AddMessageDto } from './dto/ai-chat.dto';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
 
-@Controller('api/ai/chats')
+@Controller('ai/chats')
 @UseGuards(JwtAuthGuard)
 export class AiChatController {
     constructor(private readonly aiChatService: AiChatService) {}

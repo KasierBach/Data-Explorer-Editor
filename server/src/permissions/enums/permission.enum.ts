@@ -3,4 +3,6 @@ export enum Permission {
   WRITE = 'write',
   DELETE = 'delete',
   MANAGE = 'manage',
+  COMMENT = 'comment',
+  SHARE = 'share',
 }

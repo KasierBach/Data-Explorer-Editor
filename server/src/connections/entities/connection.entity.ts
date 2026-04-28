@@ -18,4 +18,5 @@ export class Connection {
     lastConnectedAt?: Date;
     lastConnectionLatencyMs?: number | null;
     createdAt: Date;
+    organizationId?: string | null;
 }

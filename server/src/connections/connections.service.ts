@@ -7,6 +7,8 @@ import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory
 import { encryptAttribute, decryptAttribute } from '../utils/crypto.util';
 import { AuditService, AuditAction } from '../audit/audit.service';
 import { SshTunnelService } from './ssh-tunnel.service';
+import { OrganizationsService } from '../organizations/services/organizations.service';
+import { ResourceType } from '../permissions/enums/resource-type.enum';
 
 @Injectable()
 export class ConnectionsService implements OnModuleDestroy {
@@ -19,6 +21,7 @@ export class ConnectionsService implements OnModuleDestroy {
     private strategyFactory: DatabaseStrategyFactory,
     private auditService: AuditService,
     private sshTunnelService: SshTunnelService,
+    private organizationsService: OrganizationsService,
   ) {
     // Run cleanup every minute
     this.cleanupInterval = setInterval(() => this.cleanupPools(), 60000);
@@ -106,30 +109,51 @@ export class ConnectionsService implements OnModuleDestroy {
     }
   }
 
-    async create(createConnectionDto: CreateConnectionDto, userId: string): Promise<Connection> {
-        const { name, password, organizationId, ...rest } = createConnectionDto;
-        const encryptedPassword = password ? encryptAttribute(password) : undefined;
+  async create(createConnectionDto: CreateConnectionDto, userId: string): Promise<Connection> {
+    const { name, password, organizationId, ...rest } = createConnectionDto;
+    const encryptedPassword = password ? encryptAttribute(password) : undefined;
+    const teamOrganizationId = organizationId?.trim() || null;
 
-        const connection = await this.prisma.connection.create({
-            data: {
-                ...rest,
-                name,
-                password: encryptedPassword,
-                userId,
-                readOnly: createConnectionDto.readOnly ?? false,
-                allowSchemaChanges: createConnectionDto.readOnly ? false : (createConnectionDto.allowSchemaChanges ?? true),
-                allowImportExport: createConnectionDto.readOnly ? false : (createConnectionDto.allowImportExport ?? true),
-                allowQueryExecution: createConnectionDto.allowQueryExecution ?? true,
-                ...(organizationId ? { organizationId } : {}),
-            } as any,
-        });
+    const connection = await this.prisma.connection.create({
+      data: {
+        ...rest,
+        name,
+        password: encryptedPassword,
+        userId,
+        readOnly: createConnectionDto.readOnly ?? false,
+        allowSchemaChanges: createConnectionDto.readOnly ? false : (createConnectionDto.allowSchemaChanges ?? true),
+        allowImportExport: createConnectionDto.readOnly ? false : (createConnectionDto.allowImportExport ?? true),
+        allowQueryExecution: createConnectionDto.allowQueryExecution ?? true,
+        ...(teamOrganizationId ? { organizationId: teamOrganizationId } : {}),
+      } as any,
+    });
     const safeConnection = this.sanitizeConnection(connection);
 
     await this.auditService.log({
       action: AuditAction.DB_CONNECTION_CREATE,
       userId,
-      details: { name: connection.name, type: connection.type, database: connection.database }
+      organizationId: teamOrganizationId ?? undefined,
+      details: { name: connection.name, type: connection.type, database: connection.database },
     });
+
+    if (teamOrganizationId) {
+      await this.organizationsService.ensureResourcePolicy(
+        ResourceType.CONNECTION,
+        connection.id,
+        teamOrganizationId,
+      );
+
+      await this.auditService.log({
+        action: AuditAction.TEAM_RESOURCE_SHARE,
+        userId,
+        organizationId: teamOrganizationId,
+        details: {
+          resourceType: ResourceType.CONNECTION,
+          resourceId: connection.id,
+          resourceName: connection.name,
+        },
+      });
+    }
 
     return safeConnection as unknown as Connection;
   }
@@ -276,6 +300,10 @@ export class ConnectionsService implements OnModuleDestroy {
 
     const { password, ...rest } = updateConnectionDto;
     const encryptedPassword = password !== undefined && password !== null ? encryptAttribute(password) : undefined;
+    const hasOrganizationId = Object.prototype.hasOwnProperty.call(updateConnectionDto, 'organizationId');
+    const nextOrganizationId = hasOrganizationId
+      ? (updateConnectionDto.organizationId?.trim() || null)
+      : connection.organizationId ?? null;
     const readOnly =
       updateConnectionDto.readOnly !== undefined
         ? updateConnectionDto.readOnly
@@ -287,6 +315,7 @@ export class ConnectionsService implements OnModuleDestroy {
       allowSchemaChanges: readOnly ? false : (updateConnectionDto.allowSchemaChanges ?? connection.allowSchemaChanges),
       allowImportExport: readOnly ? false : (updateConnectionDto.allowImportExport ?? connection.allowImportExport),
       allowQueryExecution: updateConnectionDto.allowQueryExecution ?? connection.allowQueryExecution,
+      ...(hasOrganizationId ? { organizationId: nextOrganizationId } : {}),
     };
 
     const updatedConnection = await this.prisma.connection.update({
@@ -294,13 +323,44 @@ export class ConnectionsService implements OnModuleDestroy {
       data: dataToUpdate,
     });
 
-    if (updateConnectionDto.organizationId && updateConnectionDto.organizationId !== connection.organizationId) {
+    if (connection.organizationId && connection.organizationId !== nextOrganizationId) {
+      await this.organizationsService.removeResourcePolicy(
+        ResourceType.CONNECTION,
+        id,
+        connection.organizationId,
+      );
+
+      await this.auditService.log({
+        action: AuditAction.TEAM_RESOURCE_UNSHARE,
+        userId,
+        organizationId: connection.organizationId,
+        details: {
+          resourceType: ResourceType.CONNECTION,
+          resourceId: id,
+          resourceName: updatedConnection.name,
+        },
+      });
+    }
+
+    if (nextOrganizationId) {
+      await this.organizationsService.ensureResourcePolicy(
+        ResourceType.CONNECTION,
+        id,
+        nextOrganizationId,
+      );
+
+      if (nextOrganizationId !== connection.organizationId) {
         await this.auditService.log({
-            action: AuditAction.TEAM_RESOURCE_SHARE,
-            userId,
-            organizationId: updateConnectionDto.organizationId,
-            details: { resourceType: 'CONNECTION', resourceId: id, resourceName: updatedConnection.name }
+          action: AuditAction.TEAM_RESOURCE_SHARE,
+          userId,
+          organizationId: nextOrganizationId,
+          details: {
+            resourceType: ResourceType.CONNECTION,
+            resourceId: id,
+            resourceName: updatedConnection.name,
+          },
         });
+      }
     }
 
     const safeConnection = this.sanitizeConnection(updatedConnection);

@@ -11,22 +11,104 @@ import {
 import {
   OrganizationService,
   type OrganizationEntity,
+  type OrganizationInvitationEntity,
   type OrganizationMemberEntity,
+  type InviteMemberResult,
+  type TeamActivityEntity,
+  type TeamConnectionEntity,
+  type TeamDashboardEntity,
+  type TeamQueryEntity,
+  type TeamResourcePermissionPolicy,
 } from '@/core/services/OrganizationService';
+import { ApiError } from '@/core/services/api.service';
+import {
+  CollaborationService,
+  type CollaborationResourceType,
+} from '@/core/services/CollaborationService';
+import { useAppStore } from '@/core/services/store';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
+import { TeamActivityTab } from './TeamPage/components/TeamActivityTab';
+import { TeamCommentsDrawer } from './TeamPage/components/TeamCommentsDrawer';
 import {
   ArrowLeft, Database, FileText, LayoutDashboard, Mail,
-  Plus, Shield, Trash2, User, Users,
+  MessageSquare, Plus, Shield, Trash2, User, Users,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
-type TeamTab = 'members' | 'connections' | 'queries' | 'dashboards';
+type TeamTab = 'members' | 'connections' | 'queries' | 'dashboards' | 'activity';
+
+interface TeamCommentTarget {
+  resourceType: CollaborationResourceType;
+  resourceId: string;
+  resourceName: string;
+}
+
+function getDisplayName(person?: { firstName?: string | null; lastName?: string | null; email?: string | null }) {
+  if (!person) {
+    return 'Unknown';
+  }
+
+  const fullName = [person.firstName, person.lastName].filter(Boolean).join(' ').trim();
+  return fullName || person.email || 'Unknown';
+}
+
+function getPermissionLabel(role: string | undefined, permissions?: TeamResourcePermissionPolicy) {
+  if (!role) {
+    return 'Shared';
+  }
+
+  const normalizedRole = role.toUpperCase();
+  const allowed = permissions?.[normalizedRole] ?? [];
+
+  if (allowed.includes('manage')) return 'Manage';
+  if (allowed.includes('write')) return 'Edit';
+  if (allowed.includes('comment')) return 'Comment';
+  if (allowed.includes('read')) return 'Read';
+  return 'Shared';
+}
+
+function canCommentResource(role: string | undefined, permissions?: TeamResourcePermissionPolicy) {
+  if (!role) {
+    return false;
+  }
+
+  const normalizedRole = role.toUpperCase();
+  const allowed = permissions?.[normalizedRole] ?? [];
+  return allowed.includes('comment') || allowed.includes('write') || allowed.includes('manage');
+}
+
+function ResourceActions({
+  permissionLabel,
+  canComment,
+  onCommentClick,
+}: {
+  permissionLabel: string;
+  canComment: boolean;
+  onCommentClick: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+        {permissionLabel}
+      </span>
+      {canComment && (
+        <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={onCommentClick}>
+          <MessageSquare className="mr-1 h-3.5 w-3.5" />
+          Comments
+        </Button>
+      )}
+    </div>
+  );
+}
 
 export function TeamPage() {
   const navigate = useNavigate();
+  const { lang } = useAppStore();
   const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
   const [orgs, setOrgs] = useState<OrganizationEntity[]>([]);
+  const [invitations, setInvitations] = useState<OrganizationInvitationEntity[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<OrganizationEntity | null>(null);
   const [members, setMembers] = useState<OrganizationMemberEntity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,33 +117,57 @@ export function TeamPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('MEMBER');
   const [activeTab, setActiveTab] = useState<TeamTab>('members');
-  const [teamConnections, setTeamConnections] = useState<any[]>([]);
-  const [teamQueries, setTeamQueries] = useState<any[]>([]);
-  const [teamDashboards, setTeamDashboards] = useState<any[]>([]);
+  const [teamConnections, setTeamConnections] = useState<TeamConnectionEntity[]>([]);
+  const [teamQueries, setTeamQueries] = useState<TeamQueryEntity[]>([]);
+  const [teamDashboards, setTeamDashboards] = useState<TeamDashboardEntity[]>([]);
+  const [teamActivities, setTeamActivities] = useState<TeamActivityEntity[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [commentTarget, setCommentTarget] = useState<TeamCommentTarget | null>(null);
+  const selectedOrgId = selectedOrg?.id ?? null;
 
   useEffect(() => {
     loadOrgs();
+    loadInvitations();
   }, []);
 
   useEffect(() => {
-    if (selectedOrg) {
-      loadMembers(selectedOrg.id);
-      loadResources(selectedOrg.id);
+    if (selectedOrgId) {
+      loadMembers(selectedOrgId);
+      loadResources(selectedOrgId);
     }
-  }, [selectedOrg]);
+  }, [selectedOrgId]);
+
+  useEffect(() => {
+    if (selectedOrgId && activeTab === 'activity') {
+      loadActivity(selectedOrgId);
+    }
+  }, [activeTab, selectedOrgId]);
+
+  useEffect(() => {
+    setCommentTarget(null);
+  }, [selectedOrgId]);
 
   async function loadOrgs() {
     try {
       const data = await OrganizationService.getMyOrganizations();
       setOrgs(data);
-      if (data.length > 0 && !selectedOrg) {
-        setSelectedOrg(data[0]);
+      if (data.length > 0) {
+        setSelectedOrg((current) => current ?? data[0]);
       }
     } catch {
       toast.error('Failed to load teams');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadInvitations() {
+    try {
+      const data = await OrganizationService.getMyInvitations();
+      setInvitations(data);
+    } catch {
+      toast.error('Failed to load team invitations');
     }
   }
 
@@ -78,15 +184,27 @@ export function TeamPage() {
     setResourcesLoading(true);
     try {
       const [connections, queries, dashboards] = await Promise.all([
-        OrganizationService.getTeamConnections(orgId).catch(() => []),
-        OrganizationService.getTeamQueries(orgId).catch(() => []),
-        OrganizationService.getTeamDashboards(orgId).catch(() => []),
+        OrganizationService.getTeamConnections(orgId).catch(() => [] as TeamConnectionEntity[]),
+        OrganizationService.getTeamQueries(orgId).catch(() => [] as TeamQueryEntity[]),
+        OrganizationService.getTeamDashboards(orgId).catch(() => [] as TeamDashboardEntity[]),
       ]);
       setTeamConnections(connections);
       setTeamQueries(queries);
       setTeamDashboards(dashboards);
     } finally {
       setResourcesLoading(false);
+    }
+  }
+
+  async function loadActivity(orgId: string) {
+    setActivityLoading(true);
+    try {
+      const data = await CollaborationService.getOrganizationActivity(orgId, 50);
+      setTeamActivities(data);
+    } catch {
+      toast.error('Failed to load team activity');
+    } finally {
+      setActivityLoading(false);
     }
   }
 
@@ -103,18 +221,46 @@ export function TeamPage() {
   }
 
   async function handleInvite() {
-    if (!selectedOrg || !inviteEmail) return;
+    if (!selectedOrg || !inviteEmail.trim()) return;
+    const normalizedEmail = inviteEmail.trim().toLowerCase();
     try {
-      await OrganizationService.inviteMember(selectedOrg.id, {
-        email: inviteEmail,
+      const result: InviteMemberResult = await OrganizationService.inviteMember(selectedOrg.id, {
+        email: normalizedEmail,
         role: inviteRole,
       });
       setInviteEmail('');
       setShowInvite(false);
-      await loadMembers(selectedOrg.id);
-      toast.success('Invitation sent');
-    } catch {
-      toast.error('Failed to invite member');
+      await loadInvitations();
+      toast.success(
+        result.status === 'invitation-sent'
+          ? `Invitation sent to ${normalizedEmail}`
+          : `Invitation sent to ${normalizedEmail}`,
+      );
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Failed to invite member';
+      toast.error(message);
+    }
+  }
+
+  async function handleAcceptInvitation(invitationId: string) {
+    try {
+      await OrganizationService.acceptInvitation(invitationId);
+      await Promise.all([loadOrgs(), loadInvitations()]);
+      toast.success('Invitation accepted');
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Failed to accept invitation';
+      toast.error(message);
+    }
+  }
+
+  async function handleDeclineInvitation(invitationId: string) {
+    try {
+      await OrganizationService.declineInvitation(invitationId);
+      await loadInvitations();
+      toast.success('Invitation declined');
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Failed to decline invitation';
+      toast.error(message);
     }
   }
 
@@ -143,13 +289,27 @@ export function TeamPage() {
   async function handleDeleteOrg() {
     if (!selectedOrg) return;
     try {
+      const nextOrg = orgs.find((org) => org.id !== selectedOrg.id) || null;
       await OrganizationService.deleteOrganization(selectedOrg.id);
       setOrgs((prev) => prev.filter((org) => org.id !== selectedOrg.id));
-      setSelectedOrg(orgs.find((org) => org.id !== selectedOrg.id) || null);
+      setSelectedOrg(nextOrg);
+      if (!nextOrg) {
+        setMembers([]);
+        setTeamConnections([]);
+        setTeamQueries([]);
+        setTeamDashboards([]);
+        setTeamActivities([]);
+        setCommentTarget(null);
+      }
       toast.success('Team deleted');
     } catch {
       toast.error('Failed to delete team');
     }
+  }
+
+  function openCommentsFor(resourceType: CollaborationResourceType, resourceId: string, resourceName: string) {
+    if (!selectedOrg) return;
+    setCommentTarget({ resourceType, resourceId, resourceName });
   }
 
   const canManage = selectedOrg?.currentUserRole === 'OWNER' || selectedOrg?.currentUserRole === 'ADMIN';
@@ -157,7 +317,7 @@ export function TeamPage() {
   const TabButton = ({ value, label, icon: Icon, count }: {
     value: TeamTab;
     label: string;
-    icon: any;
+    icon: LucideIcon;
     count?: number;
   }) => (
     <button
@@ -190,6 +350,34 @@ export function TeamPage() {
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-3">
             <aside className="space-y-3">
+              {invitations.length > 0 && (
+                <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h2 className="text-sm font-medium uppercase text-muted-foreground">Pending Invites</h2>
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                      {invitations.length}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {invitations.map((invitation) => (
+                      <div key={invitation.id} className="rounded-md border bg-background p-3">
+                        <div className="text-sm font-medium">{invitation.organization.name}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {invitation.email} · {invitation.role}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button size="sm" onClick={() => handleAcceptInvitation(invitation.id)}>
+                            Accept
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => handleDeclineInvitation(invitation.id)}>
+                            Decline
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-medium uppercase text-muted-foreground">Your Teams</h2>
                 <Button size="sm" variant="outline" onClick={() => setShowCreate(true)}>
@@ -251,6 +439,7 @@ export function TeamPage() {
                       <TabButton value="connections" label="Connections" icon={Database} count={teamConnections.length} />
                       <TabButton value="queries" label="Queries" icon={FileText} count={teamQueries.length} />
                       <TabButton value="dashboards" label="Dashboards" icon={LayoutDashboard} count={teamDashboards.length} />
+                      <TabButton value="activity" label="Activity" icon={MessageSquare} count={teamActivities.length} />
                     </div>
                   </div>
 
@@ -264,9 +453,7 @@ export function TeamPage() {
                                 <User className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                                 <div className="min-w-0 flex-1">
                                   <div className="break-words font-medium">
-                                    {member.user.firstName || member.user.lastName
-                                      ? `${member.user.firstName || ''} ${member.user.lastName || ''}`.trim()
-                                      : member.user.email}
+                                    {getDisplayName(member.user)}
                                   </div>
                                   <div className="break-all text-xs text-muted-foreground">{member.user.email}</div>
                                 </div>
@@ -327,9 +514,7 @@ export function TeamPage() {
                                     <User className="h-4 w-4 text-muted-foreground" />
                                     <div className="min-w-0">
                                       <div className="font-medium">
-                                        {member.user.firstName || member.user.lastName
-                                          ? `${member.user.firstName || ''} ${member.user.lastName || ''}`.trim()
-                                          : member.user.email}
+                                        {getDisplayName(member.user)}
                                       </div>
                                       <div className="text-xs text-muted-foreground">{member.user.email}</div>
                                     </div>
@@ -408,16 +593,23 @@ export function TeamPage() {
                                   </div>
                                 </div>
                               </div>
-                              <div className="flex flex-wrap items-center gap-2">
-                                {connection.lastHealthStatus === 'healthy' && (
-                                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-600">Healthy</span>
-                                )}
-                                {connection.lastHealthStatus === 'error' && (
-                                  <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] text-red-600">Error</span>
-                                )}
-                                {connection.readOnly && (
-                                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-600">Read-only</span>
-                                )}
+                              <div className="flex flex-col items-start gap-2 sm:items-end">
+                                <ResourceActions
+                                  permissionLabel={getPermissionLabel(selectedOrg?.currentUserRole, connection.permissions)}
+                                  canComment={canCommentResource(selectedOrg?.currentUserRole, connection.permissions)}
+                                  onCommentClick={() => openCommentsFor('CONNECTION', connection.id, connection.name)}
+                                />
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {connection.lastHealthStatus === 'healthy' && (
+                                    <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-600">Healthy</span>
+                                  )}
+                                  {connection.lastHealthStatus === 'error' && (
+                                    <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] text-red-600">Error</span>
+                                  )}
+                                  {connection.readOnly && (
+                                    <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-600">Read-only</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -437,7 +629,7 @@ export function TeamPage() {
                       ) : (
                         <div className="divide-y">
                           {teamQueries.map((query) => (
-                            <div key={query.id} className="px-4 py-3 hover:bg-muted/30">
+                            <div key={query.id} className="flex flex-col gap-3 px-4 py-3 hover:bg-muted/30 sm:flex-row sm:items-start sm:justify-between">
                               <div className="flex min-w-0 items-start gap-3">
                                 <FileText className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
                                 <div className="min-w-0 flex-1">
@@ -452,6 +644,11 @@ export function TeamPage() {
                                   </div>
                                 </div>
                               </div>
+                              <ResourceActions
+                                permissionLabel={getPermissionLabel(selectedOrg?.currentUserRole, query.permissions)}
+                                canComment={canCommentResource(selectedOrg?.currentUserRole, query.permissions)}
+                                onCommentClick={() => openCommentsFor('QUERY', query.id, query.name)}
+                              />
                             </div>
                           ))}
                         </div>
@@ -470,7 +667,7 @@ export function TeamPage() {
                       ) : (
                         <div className="divide-y">
                           {teamDashboards.map((dashboard) => (
-                            <div key={dashboard.id} className="px-4 py-3 hover:bg-muted/30">
+                            <div key={dashboard.id} className="flex flex-col gap-3 px-4 py-3 hover:bg-muted/30 sm:flex-row sm:items-start sm:justify-between">
                               <div className="flex min-w-0 items-start gap-3">
                                 <LayoutDashboard className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
                                 <div className="min-w-0 flex-1">
@@ -480,9 +677,24 @@ export function TeamPage() {
                                   )}
                                 </div>
                               </div>
+                              <ResourceActions
+                                permissionLabel={getPermissionLabel(selectedOrg?.currentUserRole, dashboard.permissions)}
+                                canComment={canCommentResource(selectedOrg?.currentUserRole, dashboard.permissions)}
+                                onCommentClick={() => openCommentsFor('DASHBOARD', dashboard.id, dashboard.name)}
+                              />
                             </div>
                           ))}
                         </div>
+                      )}
+                    </div>
+                  )}
+
+                  {activeTab === 'activity' && (
+                    <div className="overflow-hidden rounded-lg border">
+                      {activityLoading ? (
+                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading activity...</div>
+                      ) : (
+                        <TeamActivityTab activities={teamActivities} lang={lang} />
                       )}
                     </div>
                   )}
@@ -498,6 +710,20 @@ export function TeamPage() {
       </main>
 
       <CreateTeamDialog open={showCreate} onClose={() => setShowCreate(false)} onCreate={handleCreate} />
+      {selectedOrg && commentTarget && (
+        <TeamCommentsDrawer
+          open={Boolean(commentTarget)}
+          onOpenChange={(open) => {
+            if (!open) {
+              setCommentTarget(null);
+            }
+          }}
+          organizationId={selectedOrg.id}
+          resourceType={commentTarget.resourceType}
+          resourceId={commentTarget.resourceId}
+          resourceName={commentTarget.resourceName}
+        />
+      )}
 
       <Dialog open={showInvite} onOpenChange={setShowInvite}>
         <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md">

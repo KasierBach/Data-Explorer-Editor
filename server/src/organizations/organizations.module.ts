@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { OrganizationsController } from './organizations.controller';
 import { OrganizationsService } from './services/organizations.service';
 import { AuditModule } from '../audit/audit.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, PermissionsModule],
   controllers: [OrganizationsController],
   providers: [OrganizationsService],
   exports: [OrganizationsService],

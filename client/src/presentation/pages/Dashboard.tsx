@@ -20,10 +20,33 @@ interface ActivityLog {
     detail?: any;
     details?: any;
     user?: {
+        id?: string;
         firstName?: string;
         lastName?: string;
+        email?: string;
+        username?: string;
         avatarUrl?: string;
     };
+}
+
+function getActivityActorName(user?: ActivityLog['user']) {
+    if (!user) {
+        return 'System';
+    }
+
+    const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+    return name || user.email || user.username || 'System';
+}
+
+function formatActivityAction(action: string) {
+    return action
+        .replace(/^TEAM:/, '')
+        .replace(/^DB:/, '')
+        .replace(/^AUTH:/, '')
+        .replace(/^USER:/, '')
+        .replace(/^SYSTEM:/, '')
+        .replace(/_/g, ' ')
+        .toLowerCase();
 }
 
 export const Dashboard: React.FC = () => {
@@ -42,11 +65,11 @@ export const Dashboard: React.FC = () => {
     });
 
     const { data: teamActivities = [] } = useQuery<ActivityLog[]>({
-        queryKey: ['team-activities', organizations.map((o: any) => o.id)],
+        queryKey: ['team-activities', organizations.map((org) => org.id)],
         queryFn: async () => {
             if (organizations.length === 0) return [];
             const allActivities = await Promise.all(
-                organizations.map((org: any) => OrganizationService.getTeamActivities(org.id))
+                organizations.map((org) => OrganizationService.getTeamActivities(org.id))
             );
             return (allActivities.flat() as ActivityLog[])
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -292,7 +315,7 @@ export const Dashboard: React.FC = () => {
                         <div className="rounded-lg border bg-card">
                             {dashboards.length > 0 ? (
                                 <div className="divide-y">
-                                    {dashboards.slice(0, 6).map((dashboard: any) => (
+                                    {dashboards.slice(0, 6).map((dashboard) => (
                                         <button
                                             key={dashboard.id}
                                             onClick={() => openDashboardTab(dashboard.id, dashboard.name)}
@@ -331,7 +354,9 @@ export const Dashboard: React.FC = () => {
                                 <div className="space-y-6">
                                     {teamActivities.map((log: ActivityLog) => {
                                         const user = log.user;
-                                        const initials = user ? `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}` || 'U' : 'U';
+                                        const initials = user
+                                            ? `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}` || user.email?.[0]?.toUpperCase() || 'U'
+                                            : 'U';
                                         return (
                                             <div key={log.id} className="relative flex gap-3">
                                                 <div className="relative z-10 shrink-0">
@@ -344,10 +369,10 @@ export const Dashboard: React.FC = () => {
                                                 </div>
                                                 <div className="flex flex-col gap-1 min-w-0 pt-0.5">
                                                     <p className="text-xs leading-relaxed text-foreground">
-                                                        <span className="font-bold">{user?.firstName} {user?.lastName}</span>
+                                                        <span className="font-bold">{getActivityActorName(user)}</span>
                                                         {' '}
                                                         <span className="text-muted-foreground lowercase">
-                                                            {log.action.replace('TEAM:', '').replace('DB:', '').replace('_', ' ')}
+                                                            {formatActivityAction(log.action)}
                                                         </span>
                                                         {log.details?.resourceName && (
                                                             <> <span className="font-semibold text-blue-500">"{log.details.resourceName}"</span></>

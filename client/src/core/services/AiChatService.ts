@@ -23,7 +23,7 @@ function normalizeAttachmentPayload(payload: any): {
 
 export class AiChatService {
     static async fetchChats(): Promise<AiChat[]> {
-        const data = await apiService.get<any[]>('/api/ai/chats');
+        const data = await apiService.get<any[]>('/ai/chats');
         return data.map(chat => ({
             id: chat.id,
             title: chat.title,
@@ -34,7 +34,7 @@ export class AiChatService {
     }
 
     static async loadMessages(chatId: string): Promise<AiMessage[]> {
-        const data = await apiService.get<any>(`/api/ai/chats/${chatId}`);
+        const data = await apiService.get<any>(`/ai/chats/${chatId}`);
         if (!data.messages) return [];
         
         return data.messages.map((m: any) => ({
@@ -50,11 +50,11 @@ export class AiChatService {
     }
 
     static async createChat(title: string = 'Cuộc trò chuyện mới'): Promise<any> {
-        return await apiService.post<any>('/api/ai/chats', { title });
+        return await apiService.post<any>('/ai/chats', { title });
     }
 
     static async deleteChat(id: string): Promise<void> {
-        await apiService.delete(`/api/ai/chats/${id}`);
+        await apiService.delete(`/ai/chats/${id}`);
     }
 
     static async saveMessage(chatId: string, message: Partial<AiMessage>): Promise<void> {
@@ -66,7 +66,7 @@ export class AiChatService {
             }
             : message.attachments;
 
-        await apiService.post(`/api/ai/chats/${chatId}/messages`, {
+        await apiService.post(`/ai/chats/${chatId}/messages`, {
             role: message.role,
             content: message.content,
             sql: message.sql,
@@ -77,6 +77,6 @@ export class AiChatService {
     }
 
     static async updateChat(chatId: string, updates: { title?: string }): Promise<void> {
-        await apiService.patch(`/api/ai/chats/${chatId}`, updates);
+        await apiService.patch(`/ai/chats/${chatId}`, updates);
     }
 }

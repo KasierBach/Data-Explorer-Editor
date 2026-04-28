@@ -57,6 +57,11 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         await this.pubClient.publish('notifications', JSON.stringify(payload));
     }
 
+    async emitMany(userIds: string[], type: string, message: string, extra?: any) {
+        const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)));
+        await Promise.all(uniqueUserIds.map((userId) => this.emit(userId, type, message, extra)));
+    }
+
     eventStream(userId: string): Observable<any> {
         return this.notificationSubject.asObservable().pipe(
             map((payload) => {

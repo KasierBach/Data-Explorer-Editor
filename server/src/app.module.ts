@@ -31,6 +31,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { SearchModule } from './search/search.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PermissionsModule } from './permissions/permissions.module';
+import { CollaborationModule } from './collaboration/collaboration.module';
 
 @Module({
   imports: [
@@ -91,6 +92,7 @@ import { PermissionsModule } from './permissions/permissions.module';
     SearchModule,
     OrganizationsModule,
     PermissionsModule,
+    CollaborationModule,
   ],
   controllers: [AppController],
   providers: [

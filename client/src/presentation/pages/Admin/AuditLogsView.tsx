@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { adminService } from '@/core/services/AdminService';
 import { useAppStore } from '@/core/services/store';
 import {
-    Activity, Database, Eye, Info, Search, Settings, Shield, Users,
+    Activity, Database, Eye, Info, MessageSquare, Search, Settings, Shield, Users,
 } from 'lucide-react';
 import { Input } from '@/presentation/components/ui/input';
 import { Button } from '@/presentation/components/ui/button';
@@ -16,13 +16,20 @@ import {
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
 
+function getLogUserName(log: any) {
+    if (!log.user) return '';
+
+    const name = [log.user.firstName, log.user.lastName].filter(Boolean).join(' ').trim();
+    return name || log.user.username || log.user.email || '';
+}
+
 export function AuditLogsView() {
     const { lang } = useAppStore();
     const { isCompactMobileLayout } = useResponsiveLayoutMode();
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [categoryFilter, setCategoryFilter] = useState<'all' | 'AUTH' | 'DB' | 'USER' | 'SYSTEM'>('all');
+    const [categoryFilter, setCategoryFilter] = useState<'all' | 'AUTH' | 'DB' | 'TEAM' | 'USER' | 'SYSTEM'>('all');
     const [selectedLog, setSelectedLog] = useState<any>(null);
 
     const fetchLogs = async () => {
@@ -44,6 +51,7 @@ export function AuditLogsView() {
     const getLogMetadata = (action: string) => {
         if (action.startsWith('AUTH:')) return { color: 'text-blue-500', bg: 'bg-blue-500/10', icon: Shield, label: lang === 'vi' ? 'Bao mat' : 'Security' };
         if (action.startsWith('DB:')) return { color: 'text-emerald-500', bg: 'bg-emerald-500/10', icon: Database, label: lang === 'vi' ? 'Du lieu' : 'Data' };
+        if (action.startsWith('TEAM:')) return { color: 'text-cyan-500', bg: 'bg-cyan-500/10', icon: MessageSquare, label: lang === 'vi' ? 'Nhom' : 'Team' };
         if (action.startsWith('USER:')) return { color: 'text-orange-500', bg: 'bg-orange-500/10', icon: Users, label: lang === 'vi' ? 'Nguoi dung' : 'User' };
         if (action.startsWith('SYSTEM:')) return { color: 'text-purple-500', bg: 'bg-purple-500/10', icon: Settings, label: lang === 'vi' ? 'He thong' : 'System' };
         return { color: 'text-muted-foreground', bg: 'bg-muted/10', icon: Activity, label: lang === 'vi' ? 'Khac' : 'Other' };
@@ -52,7 +60,7 @@ export function AuditLogsView() {
     const filteredLogs = useMemo(() => (
         logs.filter((log) => {
             const matchesSearch = log.action.toLowerCase().includes(searchTerm.toLowerCase())
-                || (log.user && `${log.user.firstName} ${log.user.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()));
+                || getLogUserName(log).toLowerCase().includes(searchTerm.toLowerCase());
             const matchesCategory = categoryFilter === 'all' || log.action.startsWith(`${categoryFilter}:`);
             return matchesSearch && matchesCategory;
         })
@@ -82,7 +90,7 @@ export function AuditLogsView() {
                     />
                 </div>
                 <div className="no-scrollbar flex w-full gap-2 overflow-x-auto pb-1 sm:w-auto">
-                    {(['all', 'AUTH', 'DB', 'USER', 'SYSTEM'] as const).map((cat) => (
+                    {(['all', 'AUTH', 'DB', 'TEAM', 'USER', 'SYSTEM'] as const).map((cat) => (
                         <Button
                             key={cat}
                             variant={categoryFilter === cat ? 'secondary' : 'ghost'}
@@ -134,7 +142,7 @@ export function AuditLogsView() {
                                                 {log.user ? (
                                                     <div className="mt-1">
                                                         <div className="font-medium text-foreground">
-                                                            {log.user.firstName} {log.user.lastName}
+                                                            {getLogUserName(log)}
                                                         </div>
                                                         <div className="break-all text-xs text-muted-foreground/70">{log.user.email}</div>
                                                     </div>
@@ -210,7 +218,7 @@ export function AuditLogsView() {
                                                 <td className="px-6 py-4">
                                                     {log.user ? (
                                                         <div className="space-y-0.5">
-                                                            <div className="font-medium text-foreground">{log.user.firstName} {log.user.lastName}</div>
+                                                            <div className="font-medium text-foreground">{getLogUserName(log)}</div>
                                                             <div className="text-[10px] text-muted-foreground/60">{log.user.email}</div>
                                                         </div>
                                                     ) : (

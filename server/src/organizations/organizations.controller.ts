@@ -1,7 +1,6 @@
 import {
   Controller, Get, Post, Put, Delete, Body, Param, UseGuards, HttpCode, HttpStatus, Req,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationsService } from './services/organizations.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -13,10 +12,7 @@ import type { AuthenticatedRequest } from '../auth/auth-request.types';
 @Controller('organizations')
 @UseGuards(JwtAuthGuard)
 export class OrganizationsController {
-  constructor(
-    private readonly organizationsService: OrganizationsService,
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly organizationsService: OrganizationsService) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -27,6 +23,28 @@ export class OrganizationsController {
   @Get('me')
   async findMy(@Req() req: AuthenticatedRequest) {
     return this.organizationsService.findMyOrganizations(req.user.id);
+  }
+
+  @Get('invitations/me')
+  async listMyInvitations(@Req() req: AuthenticatedRequest) {
+    return this.organizationsService.listMyInvitations(req.user.id);
+  }
+
+  @Post('invitations/:invitationId/accept')
+  async acceptInvitation(
+    @Req() req: AuthenticatedRequest,
+    @Param('invitationId') invitationId: string,
+  ) {
+    return this.organizationsService.acceptInvitation(invitationId, req.user.id);
+  }
+
+  @Delete('invitations/:invitationId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async declineInvitation(
+    @Req() req: AuthenticatedRequest,
+    @Param('invitationId') invitationId: string,
+  ) {
+    await this.organizationsService.declineInvitation(invitationId, req.user.id);
   }
 
   @Get(':id')
@@ -82,41 +100,21 @@ export class OrganizationsController {
 
   @Get(':id/connections')
   async listConnections(@Req() req: AuthenticatedRequest, @Param('id') organizationId: string) {
-    await this.organizationsService.findById(organizationId, req.user.id);
-    return this.prisma.connection.findMany({
-      where: { organizationId },
-      select: {
-        id: true, name: true, type: true, host: true, port: true, database: true,
-        readOnly: true, allowQueryExecution: true, lastHealthStatus: true,
-        createdAt: true, userId: true,
-      },
-    });
+    return this.organizationsService.listConnections(organizationId, req.user.id);
   }
 
   @Get(':id/queries')
   async listQueries(@Req() req: AuthenticatedRequest, @Param('id') organizationId: string) {
-    await this.organizationsService.findById(organizationId, req.user.id);
-    return this.prisma.savedQuery.findMany({
-      where: { organizationId },
-      select: { id: true, name: true, sql: true, database: true, visibility: true, createdAt: true, userId: true },
-    });
+    return this.organizationsService.listQueries(organizationId, req.user.id);
   }
 
   @Get(':id/dashboards')
   async listDashboards(@Req() req: AuthenticatedRequest, @Param('id') organizationId: string) {
-    await this.organizationsService.findById(organizationId, req.user.id);
-    return this.prisma.dashboard.findMany({
-      where: { organizationId },
-      select: { id: true, name: true, description: true, visibility: true, createdAt: true, userId: true },
-    });
+    return this.organizationsService.listDashboards(organizationId, req.user.id);
   }
 
   @Get(':id/activities')
   async listActivities(@Req() req: AuthenticatedRequest, @Param('id') organizationId: string) {
-    // AuditService logic for org logs
-    const org = await this.organizationsService.findById(organizationId, req.user.id);
-    // Since AuditService is injected in OrganizationsService, I can call it from there or inject it here.
-    // I'll call it via a new method in OrganizationsService for better encapsulation.
     return this.organizationsService.getActivityLogs(organizationId, req.user.id);
   }
 }

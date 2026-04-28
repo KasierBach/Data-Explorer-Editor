@@ -138,4 +138,28 @@ export class MailTemplates {
             </p>`;
         return this.wrap('Cảnh báo bảo mật hệ thống', bodyContent);
     }
+
+    static getTeamInvitationEmail(teamName: string, inviterName: string, role: string, loginUrl: string): string {
+        const bodyContent = `
+            <p style="margin-bottom:24px;">
+                Xin chào,
+            </p>
+            <p>
+                <strong style="color:#f1f5f9;">${inviterName}</strong> đã mời bạn tham gia team
+                <strong style="color:#f1f5f9;">${teamName}</strong> với vai trò <strong style="color:#f1f5f9;">${role}</strong>.
+            </p>
+            <div style="margin:32px 0;text-align:center;">
+                <a href="${loginUrl}" style="display:inline-block;padding:14px 28px;background:linear-gradient(135deg,#3b82f6,#6366f1);border-radius:14px;color:#fff;text-decoration:none;font-weight:800;">
+                    Mở Data Explorer
+                </a>
+            </div>
+            <p style="padding:12px 16px;background-color:#1e293b;border-radius:12px;color:#cbd5e1;font-size:13px;line-height:1.6;">
+                Nếu bạn đã có tài khoản với email này, chỉ cần đăng nhập là team sẽ xuất hiện tự động.
+                Nếu chưa có tài khoản, hãy đăng ký bằng đúng email này để được thêm vào team sau khi đăng nhập.
+            </p>
+            <p style="margin-top:24px;font-size:13px;color:#64748b;">
+                Nếu bạn không mong đợi email này, có thể bỏ qua.
+            </p>`;
+        return this.wrap('Lời mời tham gia team', bodyContent);
+    }
 }

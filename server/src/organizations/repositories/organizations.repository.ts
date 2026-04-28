@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { IOrganizationsRepository } from '../interfaces/organizations.repository.interface';
 import { OrganizationRole } from '../entities/organization-role.enum';
 import { ResourceType } from '../../permissions/enums/resource-type.enum';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class OrganizationsRepository implements IOrganizationsRepository {
@@ -96,6 +97,45 @@ export class OrganizationsRepository implements IOrganizationsRepository {
 
   async addResource(data: any) {
     return this.prisma.organizationResource.create({ data });
+  }
+
+  async upsertResource(data: Prisma.OrganizationResourceCreateInput) {
+    const payload = data as any;
+    const organizationId = payload.organizationId ?? payload.organization?.connect?.id;
+    if (!organizationId) {
+      throw new Error('organizationId is required to upsert an organization resource');
+    }
+
+    return this.prisma.organizationResource.upsert({
+      where: {
+        resourceType_resourceId_organizationId: {
+          resourceType: payload.resourceType as any,
+          resourceId: payload.resourceId,
+          organizationId,
+        },
+      },
+      create: {
+        resourceType: payload.resourceType as any,
+        resourceId: payload.resourceId,
+        organization: {
+          connect: { id: organizationId },
+        },
+        permissions: payload.permissions as any,
+      } as any,
+      update: {
+        permissions: payload.permissions as any,
+      },
+    });
+  }
+
+  async findResources(organizationId: string, resourceType?: ResourceType) {
+    return this.prisma.organizationResource.findMany({
+      where: {
+        organizationId,
+        ...(resourceType ? { resourceType: resourceType as any } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async removeResource(resourceType: ResourceType, resourceId: string, organizationId: string) {

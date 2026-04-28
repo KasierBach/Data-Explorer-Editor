@@ -3,6 +3,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { Permission } from '../enums/permission.enum';
 import { ResourceType } from '../enums/resource-type.enum';
 import { OrganizationRole } from '../../organizations/entities/organization-role.enum';
+import {
+  RESOURCE_PERMISSION_ROLES,
+  isResourcePermissionPolicy,
+  normalizePermissionList,
+  type ResourcePermissionPolicy,
+} from '../types/resource-permission-policy';
 
 @Injectable()
 export class PermissionsService {
@@ -32,73 +38,104 @@ export class PermissionsService {
     resourceId: string,
     permission: Permission,
   ): Promise<boolean> {
-    const orgId = await this.findResourceOrganizationId(resourceType, resourceId);
+    const record = await this.findResourceRecord(resourceType, resourceId);
+    const orgId = record?.organizationId ?? null;
 
     if (orgId) {
-      return this.checkOrgPermission(userId, orgId, permission);
+      return this.checkOrgPermission(userId, orgId, resourceType, resourceId, permission);
     }
 
-    const ownerId = await this.findResourceOwnerId(resourceType, resourceId);
-
-    return ownerId === userId;
+    return record?.userId === userId;
   }
 
   private async checkOrgPermission(
     userId: string,
     orgId: string,
+    resourceType: ResourceType,
+    resourceId: string,
     permission: Permission,
   ): Promise<boolean> {
-    const member = await this.prisma.organizationMember.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId: orgId,
-          userId,
+    const [member, policy] = await Promise.all([
+      this.prisma.organizationMember.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId: orgId,
+            userId,
+          },
         },
-      },
-    });
+      }),
+      this.getResourcePolicy(resourceType, resourceId, orgId),
+    ]);
 
     if (!member) return false;
 
-    return this.roleHasPermission(member.role as OrganizationRole, permission);
+    return this.getPermissionsForRole(member.role as OrganizationRole, policy).includes(permission);
   }
 
-  private roleHasPermission(role: OrganizationRole, permission: Permission): boolean {
+  getRolePermissions(role: OrganizationRole): Permission[] {
     const map: Record<OrganizationRole, Permission[]> = {
       [OrganizationRole.OWNER]: [
         Permission.READ,
         Permission.WRITE,
         Permission.DELETE,
         Permission.MANAGE,
+        Permission.COMMENT,
+        Permission.SHARE,
       ],
       [OrganizationRole.ADMIN]: [
         Permission.READ,
         Permission.WRITE,
         Permission.DELETE,
         Permission.MANAGE,
+        Permission.COMMENT,
+        Permission.SHARE,
       ],
-      [OrganizationRole.MEMBER]: [Permission.READ, Permission.WRITE],
+      [OrganizationRole.MEMBER]: [
+        Permission.READ,
+        Permission.WRITE,
+        Permission.COMMENT,
+      ],
       [OrganizationRole.VIEWER]: [Permission.READ],
     };
 
-    return map[role]?.includes(permission) ?? false;
+    return map[role] ?? [];
   }
 
-  private async findResourceOrganizationId(
-    type: ResourceType,
-    id: string,
-  ): Promise<string | null> {
-    const record = await this.findResourceRecord(type, id);
-
-    return record?.organizationId ?? null;
+  buildDefaultResourcePolicy(): ResourcePermissionPolicy {
+    return RESOURCE_PERMISSION_ROLES.reduce((policy, role) => {
+      policy[role] = [...this.getRolePermissions(role)];
+      return policy;
+    }, {} as ResourcePermissionPolicy);
   }
 
-  private async findResourceOwnerId(
+  private getPermissionsForRole(
+    role: OrganizationRole,
+    policy: ResourcePermissionPolicy | null,
+  ): Permission[] {
+    if (policy && policy[role]) {
+      return normalizePermissionList(policy[role]);
+    }
+
+    return this.getRolePermissions(role);
+  }
+
+  private async getResourcePolicy(
     type: ResourceType,
     id: string,
-  ): Promise<string | null> {
-    const record = await this.findResourceRecord(type, id);
+    orgId: string,
+  ): Promise<ResourcePermissionPolicy | null> {
+    const record = await this.prisma.organizationResource.findUnique({
+      where: {
+        resourceType_resourceId_organizationId: {
+          resourceType: type,
+          resourceId: id,
+          organizationId: orgId,
+        },
+      },
+      select: { permissions: true },
+    });
 
-    return record?.userId ?? null;
+    return isResourcePermissionPolicy(record?.permissions) ? record.permissions : null;
   }
 
   private findResourceRecord(type: ResourceType, id: string): Promise<any> {
