@@ -31,7 +31,7 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
         {
             icon: <Lock className="w-6 h-6 text-amber-500" aria-hidden="true" />,
             title: lang === 'vi' ? "Bảo mật & Phân Quyền" : "Enterprise Security",
-            desc: lang === 'vi' ? "Phân quyền cực sâu bằng RBAC. Mã hóa mật khẩu DB bằng AES-256-GCM. Hỗ trợ đăng nhập Single Sign On (SSO)." : "Deep RBAC, AES-256-GCM encrypted connections, and seamless OAuth (SSO) integration."
+            desc: lang === 'vi' ? "Bảo mật đa lớp: Chặn đứng SQL injection lồng nhau, triệt phá SSRF qua Tunnel, siết chặt riêng tư Team và mã hóa AES-256-GCM toàn diện." : "Multi-layer security: Reinforced SQL Guard, SSRF tunnel protection, strict team privacy, and AES-256-GCM encryption."
         },
         {
             icon: <PieChart className="w-6 h-6 text-cyan-400" aria-hidden="true" />,

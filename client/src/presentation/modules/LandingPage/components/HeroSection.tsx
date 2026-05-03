@@ -70,7 +70,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                 >
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/20 to-blue-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out" />
                     <Sparkles className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-300 transition-colors" aria-hidden="true" />
-                    <span className="text-white/90 group-hover:text-white transition-colors relative z-10">v3.3: NEXT-GEN AI & TYPE SAFETY</span>
+                    <span className="text-white/90 group-hover:text-white transition-colors relative z-10">v3.4: ADVANCED SECURITY & INFRA HARDENING</span>
                 </motion.div>
                 
                 <motion.h1 
@@ -103,8 +103,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                     className="text-lg md:text-xl text-muted-foreground/80 max-w-2xl mx-auto mb-8 md:mb-12 leading-relaxed font-medium"
                 >
                     {lang === 'vi'
-                        ? 'Thay thế các công cụ cũ kĩ. Kết nối SQL & NoSQL, bảo mật đa lớp chuẩn doanh nghiệp, và viết query siêu tốc cùng AI Assistant.'
-                        : 'Ditch the legacy tools. Connect to SQL & NoSQL simultaneously, secure your workflows, and write queries at lightspeed with AI.'}
+                        ? 'Thay thế các công cụ cũ kĩ. Kết nối SQL & NoSQL, bảo mật đa lớp chuẩn doanh nghiệp (SSRF & SQL Guard), và viết query siêu tốc cùng AI Assistant.'
+                        : 'Ditch the legacy tools. Connect to SQL & NoSQL simultaneously, secure your workflows with Enterprise-grade guardrails, and write queries at lightspeed.'}
                 </motion.p>
                 
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-6">

@@ -307,8 +307,8 @@ export class QueryService {
     } catch (error) {
       if (error instanceof ForbiddenException) throw error;
 
-      this.logger.error('Query Service Error:', error instanceof Error ? error.message : String(error));
-      throw new InternalServerErrorException(`Query execution failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error('Query Service Error Details:', error instanceof Error ? error.message : String(error));
+      throw new InternalServerErrorException('Query execution failed. Please check your syntax or connection permissions.');
     }
   }
 

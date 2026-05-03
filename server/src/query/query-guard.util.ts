@@ -27,6 +27,13 @@ const SQL_DESTRUCTIVE_KEYWORDS = [
   'COMMENT',
   'ATTACH',
   'DETACH',
+  'EXEC',
+  'EXECUTE',
+  'RENAME',
+  'BACKUP',
+  'RESTORE',
+  'USE',
+  'KILL',
 ];
 
 /** High-severity keywords that destroy data or structure irreversibly */

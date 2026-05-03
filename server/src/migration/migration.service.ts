@@ -180,8 +180,8 @@ export class MigrationService {
       username: conn.username,
       password: conn.password,
       database: conn.database,
-      statementTimeout: 0,
-      queryTimeout: 0,
+      statementTimeout: 3600000, // 1 hour safety timeout
+      queryTimeout: 3600000,
     };
   }
 

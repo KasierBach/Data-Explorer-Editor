@@ -341,9 +341,13 @@ Recent hardening introduced a few important changes:
 - **Safer OAuth flow**: Google and GitHub login no longer return bearer tokens in the query string. The frontend now receives `/login#code=...` and exchanges it for a normal token.
 - **Stronger secret enforcement**: Weak or placeholder `JWT_SECRET` values prevent the backend from starting.
 - **Encrypted connection credentials**: Saved DB connection passwords are encrypted with **AES-256-GCM**, and the backend supports `LEGACY_ENCRYPTION_KEYS` to preserve older saved connections.
-- **Localhost still works in development**: The SSRF validator is fail-closed for unsafe hosts, while local development still allows `localhost`, `127.0.0.1`, and `::1`.
+- **Advanced Guardrails**: Read-only connections now block `EXEC/EXECUTE` bypasses and similar custom execution commands.
+- **SSH Tunnel SSRF protection**: The system blocks unsafe `dbHost` targets (localhost, 127.0.0.1, and internal IP ranges) within SSH tunnels to prevent intranet scanning.
+- **Tightened Team Privacy**: Shared resources are strictly isolated, removing insecure domain-based auto-sharing (e.g., preventing data leaks between different users on public domains like gmail.com).
+- **Resource Safety**: Data migration processes now include mandatory safety timeouts to prevent resource exhaustion (DoS).
 - **Reduced XSS exposure**: AI markdown no longer renders raw HTML in the client.
 - **Safer session handling**: Refresh tokens now live in `httpOnly` cookies, while access tokens stay in memory and are re-bootstrapped through `/auth/refresh`.
+- **Sanitized DB Errors**: Database error messages are sanitized before being sent to the client to prevent infrastructure information leakage.
 - **AI request guardrails**: Provider calls now use request timeouts and streaming idle timeouts so a slow lane cannot hang the backend indefinitely.
 
 ---

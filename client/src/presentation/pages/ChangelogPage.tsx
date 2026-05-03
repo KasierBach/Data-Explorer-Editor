@@ -17,12 +17,49 @@ export const ChangelogPage: React.FC = () => {
     };
 
     const releases = [
+        // v3.4.0 - Early May 2026
+        {
+            version: 'v3.4.0',
+            date: lang === 'vi' ? 'Đầu Tháng 5, 2026' : 'Early May 2026',
+            title: lang === 'vi' ? 'Advanced Security & Infrastructure Hardening' : 'Advanced Security & Infrastructure Hardening',
+            badge: 'LATEST',
+            features: [
+                {
+                    icon: <ShieldCheck className="w-5 h-5 text-red-400" />,
+                    title: lang === 'vi' ? 'Enterprise-Grade Security Hardening' : 'Enterprise-Grade Security Hardening',
+                    desc: lang === 'vi'
+                        ? 'Khóa chặt SQL Guard chống lách luật EXEC, chặn đứng lỗ hổng SSRF qua SSH Tunnel và siết chặt quyền riêng tư team.'
+                        : 'Reinforced SQL Guard against EXEC bypasses, neutralized SSH Tunnel SSRF, and tightened team privacy logic.'
+                },
+                {
+                    icon: <Sparkles className="w-5 h-5 text-blue-400" />,
+                    title: lang === 'vi' ? 'Advanced Data Privacy' : 'Advanced Data Privacy',
+                    desc: lang === 'vi'
+                        ? 'Sanitize lỗi database chi tiết để tránh rò rỉ thông tin hạ tầng và bảo mật lại thông tin xác thực admin mặc định.'
+                        : 'Sanitized detailed DB errors to prevent infrastructure leakage and secured default admin credentials.'
+                },
+                {
+                    icon: <Settings className="w-5 h-5 text-amber-400" />,
+                    title: lang === 'vi' ? 'Migration Guardrails' : 'Migration Guardrails',
+                    desc: lang === 'vi'
+                        ? 'Áp dụng timeout an toàn cho các tiến trình migration lớn để tránh treo tài nguyên hệ thống.'
+                        : 'Applied safety timeouts for large migration processes to prevent resource exhaustion.'
+                },
+                {
+                    icon: <Zap className="w-5 h-5 text-purple-400" />,
+                    title: lang === 'vi' ? 'Pentest & Security Validation' : 'Pentest & Security Validation',
+                    desc: lang === 'vi'
+                        ? 'Hoàn thành đợt kiểm tra an ninh nâng cao (Pentest Level 2) với các kịch bản tấn công logic thực tế.'
+                        : 'Completed Advanced Security Audit (Pentest Level 2) with real-world logic attack scenarios.'
+                }
+            ]
+        },
         // v3.3.1 - Late April 2026
         {
             version: 'v3.3.1',
             date: lang === 'vi' ? 'Cuối Tháng 4, 2026' : 'Late April 2026',
             title: lang === 'vi' ? 'Team Collaboration & Mobile Polish' : 'Team Collaboration & Mobile Polish',
-            badge: 'LATEST',
+            badge: '',
             features: [
                 {
                     icon: <Sparkles className="w-5 h-5 text-purple-400" />,

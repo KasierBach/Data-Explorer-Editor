@@ -23,7 +23,32 @@ export class SshTunnelService {
   private readonly logger = new Logger(SshTunnelService.name);
   private readonly tunnels = new Map<string, ActiveTunnel>();
 
+  private isInternalIp(host: string): boolean {
+    const h = host.toLowerCase().trim();
+    if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '0.0.0.0') {
+      return true;
+    }
+
+    // Basic check for RFC1918 and other internal ranges
+    // 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16 (Link-local)
+    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = h.match(ipv4Regex);
+    if (match) {
+      const octets = match.slice(1).map(Number);
+      if (octets[0] === 10) return true;
+      if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) return true;
+      if (octets[0] === 192 && octets[1] === 168) return true;
+      if (octets[0] === 169 && octets[1] === 254) return true;
+    }
+
+    return false;
+  }
+
   async openTunnel(key: string, config: SshTunnelConfig): Promise<number> {
+    if (this.isInternalIp(config.dbHost)) {
+      throw new Error(`Connection to internal host ${config.dbHost} is forbidden for security reasons.`);
+    }
+
     const existing = this.tunnels.get(key);
     if (existing) return existing.localPort;
 

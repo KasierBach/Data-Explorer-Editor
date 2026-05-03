@@ -29,13 +29,6 @@ export class SavedQueriesService {
     );
   }
 
-  private getEmailDomain(email?: string | null) {
-    if (!email || !email.includes('@')) {
-      return null;
-    }
-    return email.split('@')[1].toLowerCase();
-  }
-
   private toEntity(savedQuery: any, currentUserId: string): SavedQueryEntity {
     return {
       id: savedQuery.id,
@@ -65,30 +58,11 @@ export class SavedQueriesService {
   }
 
   async findAllAvailable(userId: string): Promise<SavedQueryEntity[]> {
-    const currentUser = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    const domain = this.getEmailDomain(currentUser?.email);
-
     const availableQueries = await this.savedQueries.findMany({
       where: {
         OR: [
           { userId },
           { visibility: 'workspace' },
-          ...(domain
-            ? [
-                {
-                  visibility: 'team',
-                  user: {
-                    email: {
-                      endsWith: `@${domain}`,
-                      mode: 'insensitive',
-                    },
-                  },
-                },
-              ]
-            : []),
           { organization: { members: { some: { userId } } } },
         ],
       },
