@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
+import { Textarea } from '@/presentation/components/ui/textarea';
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/presentation/components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -20,6 +21,10 @@ import {
   type TeamQueryEntity,
   type TeamResourcePermissionPolicy,
 } from '@/core/services/OrganizationService';
+import {
+  TeamspaceService,
+  type TeamspaceEntity,
+} from '@/core/services/TeamspaceService';
 import { ApiError } from '@/core/services/api.service';
 import {
   CollaborationService,
@@ -44,6 +49,13 @@ interface TeamCommentTarget {
   resourceId: string;
   resourceName: string;
 }
+
+type TeamspaceGroupedResource<T> = {
+  teamspace: TeamspaceEntity | null;
+  items: T[];
+};
+
+const TEAMSPACE_UNASSIGNED = '__unassigned__';
 
 function getDisplayName(person?: { firstName?: string | null; lastName?: string | null; email?: string | null }) {
   if (!person) {
@@ -103,6 +115,93 @@ function ResourceActions({
   );
 }
 
+function groupResourcesByTeamspace<T extends { id: string; teamspaceId?: string | null }>(
+  items: T[],
+  teamspaces: TeamspaceEntity[],
+) {
+  const grouped = new Map<string | null, T[]>();
+
+  for (const item of items) {
+    const key = item.teamspaceId ?? null;
+    const current = grouped.get(key) ?? [];
+    current.push(item);
+    grouped.set(key, current);
+  }
+
+  const sections: TeamspaceGroupedResource<T>[] = [];
+
+  for (const teamspace of teamspaces) {
+    const teamspaceItems = grouped.get(teamspace.id);
+    if (teamspaceItems && teamspaceItems.length > 0) {
+      sections.push({ teamspace, items: teamspaceItems });
+      grouped.delete(teamspace.id);
+    }
+  }
+
+  const unassignedItems = grouped.get(null);  
+  if (unassignedItems && unassignedItems.length > 0) {
+    sections.push({ teamspace: null, items: unassignedItems });
+  }
+
+  return sections;
+}
+
+function renderTeamspaceOptions(teamspaces: TeamspaceEntity[]) {
+  return teamspaces.map((teamspace) => (
+    <SelectItem key={teamspace.id} value={teamspace.id} className="text-xs">
+      {teamspace.name}
+    </SelectItem>
+  ));
+}
+
+function TeamspaceResourceGroups<T extends { id: string; teamspaceId?: string | null }>({
+  items,
+  teamspaces,
+  loading,
+  emptyMessage,
+  renderItem,
+}: {
+  items: T[];
+  teamspaces: TeamspaceEntity[];
+  loading: boolean;
+  emptyMessage: string;
+  renderItem: (item: T) => React.ReactNode;
+}) {
+  if (loading) {
+    return <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</div>;
+  }
+
+  if (items.length === 0) {
+    return <div className="px-4 py-8 text-center text-sm text-muted-foreground">{emptyMessage}</div>;
+  }
+
+  const sections = groupResourcesByTeamspace(items, teamspaces);
+
+  return (
+    <div className="space-y-4">
+      {sections.map((section) => (
+        <section key={section.teamspace?.id ?? 'unassigned'} className="overflow-hidden rounded-lg border">
+          <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-4 py-2">
+            <div className="min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                {section.teamspace?.name ?? 'Unassigned'}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {section.items.length} resource{section.items.length === 1 ? '' : 's'}
+              </div>
+            </div>
+          </div>
+          <div className="divide-y">
+            {section.items.map((item) => (
+              <React.Fragment key={item.id}>{renderItem(item)}</React.Fragment>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
 export function TeamPage() {
   const navigate = useNavigate();
   const { lang } = useAppStore();
@@ -113,6 +212,7 @@ export function TeamPage() {
   const [members, setMembers] = useState<OrganizationMemberEntity[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [showCreateTeamspace, setShowCreateTeamspace] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('MEMBER');
@@ -120,6 +220,7 @@ export function TeamPage() {
   const [teamConnections, setTeamConnections] = useState<TeamConnectionEntity[]>([]);
   const [teamQueries, setTeamQueries] = useState<TeamQueryEntity[]>([]);
   const [teamDashboards, setTeamDashboards] = useState<TeamDashboardEntity[]>([]);
+  const [teamspaces, setTeamspaces] = useState<TeamspaceEntity[]>([]);
   const [teamActivities, setTeamActivities] = useState<TeamActivityEntity[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -134,6 +235,7 @@ export function TeamPage() {
   useEffect(() => {
     if (selectedOrgId) {
       loadMembers(selectedOrgId);
+      loadTeamspaces(selectedOrgId);
       loadResources(selectedOrgId);
     }
   }, [selectedOrgId]);
@@ -196,6 +298,15 @@ export function TeamPage() {
     }
   }
 
+  async function loadTeamspaces(orgId: string) {
+    try {
+      const data = await TeamspaceService.getTeamspaces(orgId);
+      setTeamspaces(data);
+    } catch {
+      toast.error('Failed to load teamspaces');
+    }
+  }
+
   async function loadActivity(orgId: string) {
     setActivityLoading(true);
     try {
@@ -217,6 +328,54 @@ export function TeamPage() {
       toast.success('Team created');
     } catch {
       toast.error('Failed to create team');
+    }
+  }
+
+  async function handleCreateTeamspace(name: string, description?: string) {
+    if (!selectedOrg) return;
+
+    try {
+      const teamspace = await TeamspaceService.createTeamspace(selectedOrg.id, {
+        name,
+        description,
+      });
+      setTeamspaces((prev) => [...prev, teamspace]);
+      setShowCreateTeamspace(false);
+      toast.success('Teamspace created');
+    } catch {
+      toast.error('Failed to create teamspace');
+    }
+  }
+
+  async function handleDeleteTeamspace(teamspaceId: string) {
+    if (!selectedOrg) return;
+
+    try {
+      await TeamspaceService.deleteTeamspace(selectedOrg.id, teamspaceId);
+      setTeamspaces((prev) => prev.filter((teamspace) => teamspace.id !== teamspaceId));
+      await loadResources(selectedOrg.id);
+      toast.success('Teamspace deleted');
+    } catch {
+      toast.error('Failed to delete teamspace');
+    }
+  }
+
+  async function handleAssignResourceTeamspace(
+    resourceType: CollaborationResourceType,
+    resourceId: string,
+    teamspaceId: string | null,
+  ) {
+    if (!selectedOrg) return;
+
+    try {
+      await TeamspaceService.assignResourceTeamspace(selectedOrg.id, resourceType, resourceId, {
+        teamspaceId,
+      });
+      await loadResources(selectedOrg.id);
+      await loadTeamspaces(selectedOrg.id);
+      toast.success(teamspaceId ? 'Resource moved to teamspace' : 'Resource unassigned');
+    } catch {
+      toast.error('Failed to update teamspace');
     }
   }
 
@@ -298,6 +457,7 @@ export function TeamPage() {
         setTeamConnections([]);
         setTeamQueries([]);
         setTeamDashboards([]);
+        setTeamspaces([]);
         setTeamActivities([]);
         setCommentTarget(null);
       }
@@ -401,6 +561,70 @@ export function TeamPage() {
                   </div>
                 </button>
               ))}
+              {selectedOrg && (
+                <div className="rounded-lg border bg-card p-3">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <div>
+                      <h2 className="text-sm font-medium uppercase text-muted-foreground">Teamspaces</h2>
+                      <p className="text-[11px] text-muted-foreground">
+                        Group shared resources by project or workflow.
+                      </p>
+                    </div>
+                    {canManage && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => setShowCreateTeamspace(true)}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {teamspaces.length > 0 ? (
+                      teamspaces.map((teamspace) => (
+                        <div
+                          key={teamspace.id}
+                          className="rounded-md border border-border/60 bg-background px-3 py-2"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-medium">{teamspace.name}</div>
+                              {teamspace.description && (
+                                <div className="mt-1 max-h-10 overflow-hidden text-xs text-muted-foreground">
+                                  {teamspace.description}
+                                </div>
+                              )}
+                            </div>
+                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+                              {teamspace.resourceCount}
+                            </span>
+                          </div>
+                          {canManage && (
+                            <div className="mt-2 flex justify-end">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-[11px] text-destructive"
+                                onClick={() => handleDeleteTeamspace(teamspace.id)}
+                              >
+                                <Trash2 className="mr-1 h-3.5 w-3.5" />
+                                Delete
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-md border border-dashed px-3 py-4 text-xs text-muted-foreground">
+                        No teamspaces yet.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               {orgs.length === 0 && (
                 <div className="px-2 text-sm text-muted-foreground">
                   No teams yet. Create one to get started.
@@ -569,123 +793,178 @@ export function TeamPage() {
 
                   {activeTab === 'connections' && (
                     <div className="overflow-hidden rounded-lg border">
-                      {resourcesLoading ? (
-                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</div>
-                      ) : teamConnections.length === 0 ? (
-                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                          No shared connections yet. Create one from the SQL Explorer and select this team.
-                        </div>
-                      ) : (
-                        <div className="divide-y">
-                          {teamConnections.map((connection) => (
-                            <div
-                              key={connection.id}
-                              className="flex flex-col gap-3 px-4 py-3 hover:bg-muted/30 sm:flex-row sm:items-center sm:justify-between"
-                            >
-                              <div className="flex min-w-0 items-center gap-3">
-                                <Database className="h-4 w-4 shrink-0 text-blue-500" />
-                                <div className="min-w-0">
-                                  <div className="text-sm font-medium">{connection.name}</div>
-                                  <div className="break-all text-xs text-muted-foreground">
-                                    {connection.type} - {connection.host}
-                                    {connection.port ? `:${connection.port}` : ''}
-                                    {connection.database ? `/${connection.database}` : ''}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex flex-col items-start gap-2 sm:items-end">
-                                <ResourceActions
-                                  permissionLabel={getPermissionLabel(selectedOrg?.currentUserRole, connection.permissions)}
-                                  canComment={canCommentResource(selectedOrg?.currentUserRole, connection.permissions)}
-                                  onCommentClick={() => openCommentsFor('CONNECTION', connection.id, connection.name)}
-                                />
-                                <div className="flex flex-wrap items-center gap-2">
-                                  {connection.lastHealthStatus === 'healthy' && (
-                                    <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-600">Healthy</span>
-                                  )}
-                                  {connection.lastHealthStatus === 'error' && (
-                                    <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] text-red-600">Error</span>
-                                  )}
-                                  {connection.readOnly && (
-                                    <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-600">Read-only</span>
-                                  )}
+                      <TeamspaceResourceGroups
+                        items={teamConnections}
+                        teamspaces={teamspaces}
+                        loading={resourcesLoading}
+                        emptyMessage="No shared connections yet. Create one from the SQL Explorer and select this team."
+                        renderItem={(connection) => (
+                          <div className="flex flex-col gap-3 px-4 py-3 hover:bg-muted/30 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <Database className="h-4 w-4 shrink-0 text-blue-500" />
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium">{connection.name}</div>
+                                <div className="break-all text-xs text-muted-foreground">
+                                  {connection.type} - {connection.host}
+                                  {connection.port ? `:${connection.port}` : ''}
+                                  {connection.database ? `/${connection.database}` : ''}
                                 </div>
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            <div className="flex flex-col items-start gap-2 sm:items-end">
+                              {canManage && (
+                                <Select
+                                  value={connection.teamspaceId ?? TEAMSPACE_UNASSIGNED}
+                                  onValueChange={(value) =>
+                                    handleAssignResourceTeamspace(
+                                      'CONNECTION',
+                                      connection.id,
+                                      value === TEAMSPACE_UNASSIGNED ? null : value,
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 w-full text-xs sm:w-40">
+                                    <SelectValue placeholder="Teamspace" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value={TEAMSPACE_UNASSIGNED} className="text-xs">
+                                      Unassigned
+                                    </SelectItem>
+                                    {renderTeamspaceOptions(teamspaces)}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                              <ResourceActions
+                                permissionLabel={getPermissionLabel(selectedOrg?.currentUserRole, connection.permissions)}
+                                canComment={canCommentResource(selectedOrg?.currentUserRole, connection.permissions)}
+                                onCommentClick={() => openCommentsFor('CONNECTION', connection.id, connection.name)}
+                              />
+                              <div className="flex flex-wrap items-center gap-2">
+                                {connection.lastHealthStatus === 'healthy' && (
+                                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-600">Healthy</span>
+                                )}
+                                {connection.lastHealthStatus === 'error' && (
+                                  <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] text-red-600">Error</span>
+                                )}
+                                {connection.readOnly && (
+                                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-600">Read-only</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      />
                     </div>
                   )}
 
                   {activeTab === 'queries' && (
                     <div className="overflow-hidden rounded-lg border">
-                      {resourcesLoading ? (
-                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</div>
-                      ) : teamQueries.length === 0 ? (
-                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                          No shared queries yet.
-                        </div>
-                      ) : (
-                        <div className="divide-y">
-                          {teamQueries.map((query) => (
-                            <div key={query.id} className="flex flex-col gap-3 px-4 py-3 hover:bg-muted/30 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="flex min-w-0 items-start gap-3">
-                                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-medium">{query.name}</div>
-                                  <div
-                                    className={cn(
-                                      'font-mono text-xs text-muted-foreground',
-                                      isSmallMobile ? 'break-words whitespace-pre-wrap' : 'max-w-md truncate'
-                                    )}
-                                  >
-                                    {query.sql}
-                                  </div>
+                      <TeamspaceResourceGroups
+                        items={teamQueries}
+                        teamspaces={teamspaces}
+                        loading={resourcesLoading}
+                        emptyMessage="No shared queries yet."
+                        renderItem={(query) => (
+                          <div className="flex flex-col gap-3 px-4 py-3 hover:bg-muted/30 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="flex min-w-0 items-start gap-3">
+                              <FileText className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium">{query.name}</div>
+                                <div
+                                  className={cn(
+                                    'font-mono text-xs text-muted-foreground',
+                                    isSmallMobile ? 'break-words whitespace-pre-wrap' : 'max-w-md truncate'
+                                  )}
+                                >
+                                  {query.sql}
                                 </div>
                               </div>
+                            </div>
+                            <div className="flex flex-col items-start gap-2 sm:items-end">
+                              {canManage && (
+                                <Select
+                                  value={query.teamspaceId ?? TEAMSPACE_UNASSIGNED}
+                                  onValueChange={(value) =>
+                                    handleAssignResourceTeamspace(
+                                      'QUERY',
+                                      query.id,
+                                      value === TEAMSPACE_UNASSIGNED ? null : value,
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 w-full text-xs sm:w-40">
+                                    <SelectValue placeholder="Teamspace" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value={TEAMSPACE_UNASSIGNED} className="text-xs">
+                                      Unassigned
+                                    </SelectItem>
+                                    {renderTeamspaceOptions(teamspaces)}
+                                  </SelectContent>
+                                </Select>
+                              )}
                               <ResourceActions
                                 permissionLabel={getPermissionLabel(selectedOrg?.currentUserRole, query.permissions)}
                                 canComment={canCommentResource(selectedOrg?.currentUserRole, query.permissions)}
                                 onCommentClick={() => openCommentsFor('QUERY', query.id, query.name)}
                               />
                             </div>
-                          ))}
-                        </div>
-                      )}
+                          </div>
+                        )}
+                      />
                     </div>
                   )}
 
                   {activeTab === 'dashboards' && (
                     <div className="overflow-hidden rounded-lg border">
-                      {resourcesLoading ? (
-                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</div>
-                      ) : teamDashboards.length === 0 ? (
-                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                          No shared dashboards yet.
-                        </div>
-                      ) : (
-                        <div className="divide-y">
-                          {teamDashboards.map((dashboard) => (
-                            <div key={dashboard.id} className="flex flex-col gap-3 px-4 py-3 hover:bg-muted/30 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="flex min-w-0 items-start gap-3">
-                                <LayoutDashboard className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-medium">{dashboard.name}</div>
-                                  {dashboard.description && (
-                                    <div className="break-words text-xs text-muted-foreground">{dashboard.description}</div>
-                                  )}
-                                </div>
+                      <TeamspaceResourceGroups
+                        items={teamDashboards}
+                        teamspaces={teamspaces}
+                        loading={resourcesLoading}
+                        emptyMessage="No shared dashboards yet."
+                        renderItem={(dashboard) => (
+                          <div className="flex flex-col gap-3 px-4 py-3 hover:bg-muted/30 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="flex min-w-0 items-start gap-3">
+                              <LayoutDashboard className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium">{dashboard.name}</div>
+                                {dashboard.description && (
+                                  <div className="break-words text-xs text-muted-foreground">{dashboard.description}</div>
+                                )}
                               </div>
+                            </div>
+                            <div className="flex flex-col items-start gap-2 sm:items-end">
+                              {canManage && (
+                                <Select
+                                  value={dashboard.teamspaceId ?? TEAMSPACE_UNASSIGNED}
+                                  onValueChange={(value) =>
+                                    handleAssignResourceTeamspace(
+                                      'DASHBOARD',
+                                      dashboard.id,
+                                      value === TEAMSPACE_UNASSIGNED ? null : value,
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 w-full text-xs sm:w-40">
+                                    <SelectValue placeholder="Teamspace" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value={TEAMSPACE_UNASSIGNED} className="text-xs">
+                                      Unassigned
+                                    </SelectItem>
+                                    {renderTeamspaceOptions(teamspaces)}
+                                  </SelectContent>
+                                </Select>
+                              )}
                               <ResourceActions
                                 permissionLabel={getPermissionLabel(selectedOrg?.currentUserRole, dashboard.permissions)}
                                 canComment={canCommentResource(selectedOrg?.currentUserRole, dashboard.permissions)}
                                 onCommentClick={() => openCommentsFor('DASHBOARD', dashboard.id, dashboard.name)}
                               />
                             </div>
-                          ))}
-                        </div>
-                      )}
+                          </div>
+                        )}
+                      />
                     </div>
                   )}
 
@@ -710,6 +989,11 @@ export function TeamPage() {
       </main>
 
       <CreateTeamDialog open={showCreate} onClose={() => setShowCreate(false)} onCreate={handleCreate} />
+      <CreateTeamspaceDialog
+        open={showCreateTeamspace}
+        onClose={() => setShowCreateTeamspace(false)}
+        onCreate={handleCreateTeamspace}
+      />
       {selectedOrg && commentTarget && (
         <TeamCommentsDrawer
           open={Boolean(commentTarget)}
@@ -729,6 +1013,9 @@ export function TeamPage() {
         <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Invite Member</DialogTitle>
+            <DialogDescription>
+              Send a pending invitation so the person can accept it from their team inbox.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
@@ -787,6 +1074,9 @@ function CreateTeamDialog({
       <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Create New Team</DialogTitle>
+          <DialogDescription>
+            Create a new organization workspace for shared resources and collaboration.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           <div>
@@ -796,6 +1086,64 @@ function CreateTeamDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               autoFocus
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit">Create</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreateTeamspaceDialog({
+  open,
+  onClose,
+  onCreate,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreate: (name: string, description?: string) => void;
+}) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onCreate(name.trim(), description.trim() || undefined);
+    setName('');
+    setDescription('');
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create Teamspace</DialogTitle>
+          <DialogDescription>
+            Group shared connections, queries, and dashboards into a lightweight workspace.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 py-2">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Name</label>
+            <Input
+              placeholder="Data Platform"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Description</label>
+            <Textarea
+              placeholder="Optional note about this teamspace"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
             />
           </div>
           <DialogFooter className="gap-2">

@@ -32,6 +32,7 @@ import { SearchModule } from './search/search.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { CollaborationModule } from './collaboration/collaboration.module';
+import { TeamspacesModule } from './teamspaces/teamspaces.module';
 
 @Module({
   imports: [
@@ -93,6 +94,7 @@ import { CollaborationModule } from './collaboration/collaboration.module';
     OrganizationsModule,
     PermissionsModule,
     CollaborationModule,
+    TeamspacesModule,
   ],
   controllers: [AppController],
   providers: [

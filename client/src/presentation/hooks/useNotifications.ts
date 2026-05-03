@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useAppStore } from '@/core/services/store';
 import { API_BASE_URL } from '@/core/config/env';
 import { toast } from 'sonner';
+import { apiService } from '@/core/services/api.service';
 
 export function useNotifications() {
     const { isAuthenticated, accessToken, user } = useAppStore();
@@ -10,15 +11,14 @@ export function useNotifications() {
         if (!isAuthenticated || !accessToken) return;
 
         const baseUrl = API_BASE_URL;
-        const sseUrl = `${baseUrl}/notifications/stream?token=${accessToken}`;
-        
-        const eventSource = new EventSource(sseUrl);
+        let cancelled = false;
+        let eventSource: EventSource | null = null;
+        let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
-        eventSource.onmessage = (event) => {
+        const handleMessage = (event: MessageEvent) => {
             try {
                 const payload = JSON.parse(event.data);
-                
-                // Handle different types of notifications
+
                 switch (payload.type) {
                     case 'success':
                         toast.success(payload.message);
@@ -46,13 +46,54 @@ export function useNotifications() {
             }
         };
 
-        eventSource.onerror = (err) => {
-            console.error('SSE connection error', err);
-            // eventSource.close(); // Browser will auto-reconnect usually
+        const cleanupSource = () => {
+            eventSource?.close();
+            eventSource = null;
         };
 
+        const connect = async () => {
+            if (cancelled) return;
+
+            if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+            }
+
+            cleanupSource();
+
+            try {
+                const response = await apiService.post<{ ticket: string }>('/notifications/stream-ticket', {});
+                if (cancelled) return;
+
+                const sseUrl = `${baseUrl}/notifications/stream?ticket=${encodeURIComponent(response.ticket)}`;
+                eventSource = new EventSource(sseUrl);
+                eventSource.onmessage = handleMessage;
+                eventSource.onerror = (err) => {
+                    console.error('SSE connection error', err);
+                    cleanupSource();
+
+                    if (!cancelled) {
+                        reconnectTimeout = setTimeout(() => {
+                            void connect();
+                        }, 3000);
+                    }
+                };
+            } catch (err) {
+                console.error('Failed to open notifications stream', err);
+                if (!cancelled) {
+                    reconnectTimeout = setTimeout(() => {
+                        void connect();
+                    }, 5000);
+                }
+            }
+        };
+
+        void connect();
+
         return () => {
-            eventSource.close();
+            cancelled = true;
+            if (reconnectTimeout) clearTimeout(reconnectTimeout);
+            cleanupSource();
         };
     }, [isAuthenticated, accessToken, user?.id]);
 }

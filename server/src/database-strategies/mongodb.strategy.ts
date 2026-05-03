@@ -35,13 +35,17 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         }
 
         if (!uri) {
+            let host = connectionConfig.host?.trim();
+            if (!host) {
+                throw new Error('Host is required for MongoDB connections.');
+            }
+
             // DB schema stores 'username', not 'user'
             const user = connectionConfig.username || connectionConfig.user;
             const auth = user 
                 ? `${encodeURIComponent(user)}:${encodeURIComponent(connectionConfig.password || '')}@` 
                 : '';
             
-            let host = connectionConfig.host || 'localhost';
             // Strip protocol if present in host field (common error with Atlas URIs)
             if (host.includes('://')) {
                 host = host.split('://')[1];

@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsOptional, IsIn, IsNotEmpty, IsBoolean } from 'class-validator';
+import { IsString, IsInt, IsOptional, IsIn, IsNotEmpty, IsBoolean, ValidateIf } from 'class-validator';
 import { IsValidHost } from '../../common/decorators/is-valid-host.decorator';
 
 export class CreateConnectionDto {
@@ -10,8 +10,9 @@ export class CreateConnectionDto {
     @IsIn(['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse', 'mock', 'mongodb', 'mongodb+srv'])
     type: 'postgres' | 'mysql' | 'mssql' | 'sqlite' | 'clickhouse' | 'mock' | 'mongodb' | 'mongodb+srv';
 
+    @ValidateIf((dto: CreateConnectionDto) => dto.type !== 'sqlite' && dto.type !== 'mock')
     @IsString()
-    @IsOptional()
+    @IsNotEmpty()
     @IsValidHost({ message: 'Host address is not allowed for security reasons (SSRF).' })
     host?: string;
 

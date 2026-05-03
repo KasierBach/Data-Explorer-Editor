@@ -22,10 +22,15 @@ export class MysqlStrategy implements IDatabaseStrategy {
     private readonly logger = new Logger(MysqlStrategy.name);
 
     createPool(connectionConfig: ConnectionConfig, databaseOverride?: string): Pool {
+        const host = connectionConfig.host?.trim();
+        if (!host) {
+            throw new Error('Host is required for MySQL connections.');
+        }
+
         const timeoutMs = connectionConfig.statementTimeout !== undefined ? connectionConfig.statementTimeout : 10000;
         
         return mysql.createPool({
-            host: connectionConfig.host || 'localhost',
+            host,
             port: connectionConfig.port || 3306,
             user: connectionConfig.username || undefined,
             password: connectionConfig.password || undefined,

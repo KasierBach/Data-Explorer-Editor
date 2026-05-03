@@ -22,13 +22,18 @@ export class PostgresStrategy implements IDatabaseStrategy {
     private readonly logger = new Logger(PostgresStrategy.name);
 
     createPool(connectionConfig: ConnectionConfig, databaseOverride?: string): Pool {
-        const isLocalhost = connectionConfig.host === 'localhost' || connectionConfig.host === '127.0.0.1';
+        const host = connectionConfig.host?.trim();
+        if (!host) {
+            throw new Error('Host is required for Postgres connections.');
+        }
+
+        const isLocalhost = host === 'localhost' || host === '127.0.0.1';
 
         const stmtTimeout = connectionConfig.statementTimeout ?? 30000;
         const qryTimeout = connectionConfig.queryTimeout ?? 30000;
 
         const pool = new Pool({
-            host: connectionConfig.host,
+            host,
             port: connectionConfig.port,
             user: connectionConfig.username,
             password: connectionConfig.password || undefined,

@@ -130,6 +130,7 @@ model User {
   dashboards  Dashboard[]
   erdWorkspaces ErdWorkspace[]
   organizationMembers OrganizationMember[]
+  createdTeamspaces Teamspace[]
 }
 
 model AiChat {
@@ -279,11 +280,32 @@ model Organization {
   members   OrganizationMember[]
   invitations OrganizationInvitation[]
   resources OrganizationResource[]
+  teamspaces Teamspace[]
   auditLogs AuditLog[]
   connections Connection[]
   savedQueries SavedQuery[]
   dashboards Dashboard[]
   erdWorkspaces ErdWorkspace[]
+}
+
+model Teamspace {
+  id             String        @id @default(uuid())
+  name           String
+  slug           String
+  description    String?
+  createdBy      String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  creator        User?         @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  resources      OrganizationResource[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@index([createdBy])
 }
 
 model OrganizationMember {
@@ -327,12 +349,15 @@ model OrganizationResource {
   resourceType   ResourceType
   resourceId     String
   permissions    Json         @default("{}")
+  teamspaceId    String?
   createdAt      DateTime     @default(now())
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  teamspace      Teamspace?   @relation(fields: [teamspaceId], references: [id], onDelete: SetNull)
 
   @@unique([resourceType, resourceId, organizationId])
   @@index([organizationId])
   @@index([resourceType, resourceId])
+  @@index([teamspaceId])
 }

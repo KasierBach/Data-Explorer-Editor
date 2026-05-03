@@ -4,6 +4,7 @@ import { getRequiredSecret } from '../common/utils/secret.util';
 
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
+const NOTIFICATIONS_STREAM_TICKET_TTL_SECONDS = 15 * 60;
 
 @Injectable()
 export class TokenService {
@@ -98,6 +99,45 @@ export class TokenService {
                 expiresIn: '2m',
             },
         );
+    }
+
+    createNotificationsStreamTicket(userId: string) {
+        return this.jwtService.sign(
+            {
+                sub: userId,
+                type: 'notifications-stream',
+            },
+            {
+                expiresIn: `${NOTIFICATIONS_STREAM_TICKET_TTL_SECONDS}s`,
+            },
+        );
+    }
+
+    verifyNotificationsStreamTicket(ticket?: string) {
+        if (!ticket) {
+            throw new UnauthorizedException('Missing notifications stream ticket.');
+        }
+
+        try {
+            const payload = this.jwtService.verify(ticket, {
+                clockTolerance: this.clockToleranceSeconds,
+            }) as {
+                sub?: string;
+                type?: string;
+            };
+
+            if (payload.type !== 'notifications-stream' || !payload.sub) {
+                throw new UnauthorizedException('Invalid notifications stream ticket.');
+            }
+
+            return payload;
+        } catch (error) {
+            if (error instanceof UnauthorizedException) {
+                throw error;
+            }
+
+            throw new UnauthorizedException('Notifications stream ticket is invalid or expired.');
+        }
     }
 
     verifyMigrationProgressTicket(ticket?: string) {

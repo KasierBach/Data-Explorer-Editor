@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleDestroy, BadRequestException } from '@nestjs/common';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { Connection } from './entities/connection.entity';
@@ -30,6 +30,25 @@ export class ConnectionsService implements OnModuleDestroy {
   private sanitizeConnection<T extends { password?: string | null }>(connection: T) {
     const { password: _, ...safe } = connection;
     return safe;
+  }
+
+  private requiresExplicitHost(type: string) {
+    return !['sqlite', 'mock'].includes(type);
+  }
+
+  private normalizeHost(host?: string | null) {
+    const normalized = host?.trim();
+    return normalized ? normalized : null;
+  }
+
+  private ensureHostConfigured(type: string, host?: string | null) {
+    if (this.requiresExplicitHost(type) && !this.normalizeHost(host)) {
+      throw new BadRequestException('Host is required for this connection type.');
+    }
+  }
+
+  private async ensureOrganizationMembership(organizationId: string, userId: string) {
+    await this.organizationsService.ensureMemberAccess(organizationId, userId);
   }
 
   private async updateHealthState(
@@ -113,10 +132,19 @@ export class ConnectionsService implements OnModuleDestroy {
     const { name, password, organizationId, ...rest } = createConnectionDto;
     const encryptedPassword = password ? encryptAttribute(password) : undefined;
     const teamOrganizationId = organizationId?.trim() || null;
+    this.ensureHostConfigured(createConnectionDto.type, createConnectionDto.host);
+
+    if (teamOrganizationId) {
+      await this.ensureOrganizationMembership(teamOrganizationId, userId);
+    }
+
+    const normalizedHost = this.normalizeHost(createConnectionDto.host);
+    const hasHost = Object.prototype.hasOwnProperty.call(createConnectionDto, 'host');
 
     const connection = await this.prisma.connection.create({
       data: {
         ...rest,
+        ...(hasHost ? { host: normalizedHost } : {}),
         name,
         password: encryptedPassword,
         userId,
@@ -159,6 +187,7 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   async test(createConnectionDto: CreateConnectionDto): Promise<{ status: string; latencyMs: number; error: string | null }> {
+    this.ensureHostConfigured(createConnectionDto.type, createConnectionDto.host);
     const strategy = this.strategyFactory.getStrategy(createConnectionDto.type);
     const startedAt = Date.now();
     let pool: any;
@@ -254,13 +283,18 @@ export class ConnectionsService implements OnModuleDestroy {
 
     const connAny = connection as any;
     if (connAny.sshHost && connAny.sshUsername) {
+      const dbHost = this.normalizeHost(connection.host);
+      if (!dbHost) {
+        throw new BadRequestException('Host is required for SSH tunnel connections.');
+      }
+
       const localPort = await this.sshTunnelService.openTunnel(poolKey, {
         sshHost: connAny.sshHost,
         sshPort: connAny.sshPort || 22,
         sshUsername: connAny.sshUsername,
         sshPrivateKey: connAny.sshPrivateKey || undefined,
         sshPassphrase: connAny.sshPassphrase || undefined,
-        dbHost: connection.host || 'localhost',
+        dbHost,
         dbPort: connection.port || 5432,
       });
       connectionWithDecryptedPassword = {
@@ -304,12 +338,20 @@ export class ConnectionsService implements OnModuleDestroy {
     const nextOrganizationId = hasOrganizationId
       ? (updateConnectionDto.organizationId?.trim() || null)
       : connection.organizationId ?? null;
+    const hasHost = Object.prototype.hasOwnProperty.call(updateConnectionDto, 'host');
+    const nextType = updateConnectionDto.type ?? connection.type;
+    const nextHost = hasHost ? updateConnectionDto.host : connection.host;
+    this.ensureHostConfigured(nextType, nextHost);
+    if (hasOrganizationId && nextOrganizationId && nextOrganizationId !== connection.organizationId) {
+      await this.ensureOrganizationMembership(nextOrganizationId, userId);
+    }
     const readOnly =
       updateConnectionDto.readOnly !== undefined
         ? updateConnectionDto.readOnly
         : connection.readOnly;
     const dataToUpdate = {
       ...rest,
+      ...(hasHost ? { host: this.normalizeHost(nextHost) } : {}),
       ...(password !== undefined && password !== null ? { password: encryptedPassword } : {}),
       readOnly,
       allowSchemaChanges: readOnly ? false : (updateConnectionDto.allowSchemaChanges ?? connection.allowSchemaChanges),

@@ -11,6 +11,7 @@ export interface TeamConnectionEntity {
   database?: string | null;
   readOnly?: boolean | null;
   lastHealthStatus?: string | null;
+  teamspaceId?: string | null;
   permissions?: TeamResourcePermissionPolicy;
 }
 
@@ -18,6 +19,7 @@ export interface TeamQueryEntity {
   id: string;
   name: string;
   sql: string;
+  teamspaceId?: string | null;
   permissions?: TeamResourcePermissionPolicy;
 }
 
@@ -25,6 +27,7 @@ export interface TeamDashboardEntity {
   id: string;
   name: string;
   description?: string | null;
+  teamspaceId?: string | null;
   permissions?: TeamResourcePermissionPolicy;
 }
 

@@ -14,6 +14,11 @@ import { UserUtils } from '../../users/user.utils';
 @Injectable()
 export class OrganizationsService {
   private readonly repository: OrganizationsRepository;
+  private readonly invitableRoles = new Set<OrganizationRole>([
+    OrganizationRole.ADMIN,
+    OrganizationRole.MEMBER,
+    OrganizationRole.VIEWER,
+  ]);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -82,6 +87,7 @@ export class OrganizationsService {
   async inviteMember(organizationId: string, inviterId: string, dto: { email: string; role: OrganizationRole }) {
     await this.ensureOwnerOrAdminAccess(organizationId, inviterId);
     const normalizedEmail = this.normalizeEmail(dto.email);
+    const role = this.ensureInvitableRole(dto.role);
     const organization = await this.repository.findById(organizationId);
     if (!organization) throw new NotFoundException('Organization not found');
 
@@ -111,11 +117,11 @@ export class OrganizationsService {
       create: {
         organizationId,
         email: normalizedEmail,
-        role: dto.role,
+        role,
         invitedBy: inviterId,
       },
       update: {
-        role: dto.role,
+        role,
         invitedBy: inviterId,
         invitedAt: new Date(),
         acceptedAt: null,
@@ -127,20 +133,20 @@ export class OrganizationsService {
       action: AuditAction.TEAM_MEMBER_INVITE,
       userId: inviterId,
       organizationId,
-      details: { memberEmail: normalizedEmail, role: dto.role, status: 'invitation-sent' }
+      details: { memberEmail: normalizedEmail, role, status: 'invitation-sent' }
     });
 
     void this.mailService.sendTeamInvitationEmail(
       normalizedEmail,
       organization.name,
       inviterName,
-      dto.role,
+      role,
       this.getInvitationLoginUrl(),
     ).catch((error) => {
       console.warn('[OrganizationsService] Failed to send invitation email', error);
     });
 
-    return { status: 'invitation-sent', email: normalizedEmail, role: dto.role, invitation };
+    return { status: 'invitation-sent', email: normalizedEmail, role, invitation };
   }
 
   async listMyInvitations(userId: string) {
@@ -206,13 +212,14 @@ export class OrganizationsService {
       throw new ForbiddenException('This invitation does not belong to your account');
     }
 
+    const role = this.ensureInvitableRole(invitation.role as OrganizationRole);
     const existingMember = await this.repository.findMember(invitation.organizationId, user.id);
     if (!existingMember) {
       await this.prisma.organizationMember.create({
         data: {
           organizationId: invitation.organizationId,
           userId: user.id,
-          role: invitation.role as OrganizationRole,
+          role,
           invitedBy: invitation.invitedBy,
           joinedAt: new Date(),
         },
@@ -233,7 +240,7 @@ export class OrganizationsService {
       organizationId: invitation.organizationId,
       details: {
         memberEmail: invitation.email,
-        role: invitation.role,
+        role,
         invitedBy: invitation.invitedBy,
       },
     });
@@ -243,7 +250,7 @@ export class OrganizationsService {
       id: invitation.id,
       organizationId: invitation.organizationId,
       organizationName: organization?.name ?? 'Team',
-      role: invitation.role,
+      role,
     };
   }
 
@@ -429,7 +436,7 @@ export class OrganizationsService {
     return `${frontendUrl}/login`;
   }
 
-  private async ensureMemberAccess(organizationId: string, userId: string) {
+  async ensureMemberAccess(organizationId: string, userId: string) {
     const member = await this.repository.findMember(organizationId, userId);
     if (!member) throw new ForbiddenException('You are not a member');
   }
@@ -451,15 +458,32 @@ export class OrganizationsService {
     }
   }
 
+  private ensureInvitableRole(role: OrganizationRole) {
+    if (!this.invitableRoles.has(role)) {
+      throw new ForbiddenException('Owner roles cannot be assigned through invitations.');
+    }
+
+    return role;
+  }
+
   private attachResourcePolicies<T extends { id: string }>(
     items: T[],
-    resourcePolicies: Array<{ resourceId: string; permissions: unknown }>,
+    resourcePolicies: Array<{ resourceId: string; permissions: unknown; teamspaceId?: string | null }>,
   ) {
-    const policyMap = new Map(resourcePolicies.map((resource) => [resource.resourceId, resource.permissions]));
+    const policyMap = new Map(
+      resourcePolicies.map((resource) => [
+        resource.resourceId,
+        {
+          permissions: resource.permissions,
+          teamspaceId: resource.teamspaceId ?? null,
+        },
+      ]),
+    );
 
     return items.map((item) => ({
       ...item,
-      permissions: policyMap.get(item.id) ?? null,
+      permissions: policyMap.get(item.id)?.permissions ?? null,
+      teamspaceId: policyMap.get(item.id)?.teamspaceId ?? null,
     }));
   }
 

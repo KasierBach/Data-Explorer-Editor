@@ -1,4 +1,4 @@
-import { Activity, MessageSquare, Share2, User } from 'lucide-react';
+import { Activity, Layers, MessageSquare, Share2, User } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/presentation/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import type { CollaborationActivityLog } from '@/core/services/CollaborationService';
@@ -20,6 +20,7 @@ function getParticipantName(user?: CollaborationActivityLog['user']) {
 function getActivityIcon(action: string) {
   if (action.includes('COMMENT')) return MessageSquare;
   if (action.includes('RESOURCE')) return Share2;
+  if (action.includes('TEAMSPACE')) return Layers;
   if (action.includes('TEAM')) return User;
   return Activity;
 }

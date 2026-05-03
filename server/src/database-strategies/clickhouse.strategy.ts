@@ -11,8 +11,13 @@ import { createClient, ClickHouseClient } from '@clickhouse/client';
 @Injectable()
 export class ClickHouseStrategy implements IDatabaseStrategy {
   createPool(connectionConfig: ConnectionConfig): ClickHouseClient {
+    const host = connectionConfig.host?.trim();
+    if (!host) {
+      throw new Error('Host is required for ClickHouse connections.');
+    }
+
     return createClient({
-      host: `http://${connectionConfig.host}:${connectionConfig.port || 8123}`,
+      host: `http://${host}:${connectionConfig.port || 8123}`,
       username: connectionConfig.username || 'default',
       password: connectionConfig.password || '',
       database: connectionConfig.database || 'default',

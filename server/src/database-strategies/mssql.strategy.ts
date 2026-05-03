@@ -21,11 +21,16 @@ export class MssqlStrategy implements IDatabaseStrategy {
     private readonly logger = new Logger(MssqlStrategy.name);
 
     async createPool(connectionConfig: ConnectionConfig, databaseOverride?: string): Promise<mssql.ConnectionPool> {
+        const host = connectionConfig.host?.trim();
+        if (!host) {
+            throw new Error('Host is required for SQL Server connections.');
+        }
+
         // Migration override: connectionConfig.statementTimeout/queryTimeout will be 0
         const reqTimeout = connectionConfig.statementTimeout ?? 30000;
 
         const config: mssql.config = {
-            server: connectionConfig.host || 'localhost',
+            server: host,
             port: connectionConfig.port || 1433,
             user: connectionConfig.username,
             password: connectionConfig.password || undefined,
