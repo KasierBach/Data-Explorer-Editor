@@ -31,8 +31,15 @@ export function SecuritySection({ lang }: Props) {
                 <InfoCard icon={<KeyRound className="w-6 h-6 text-amber-500" />} title={t ? 'Secret enforcement' : 'Secret enforcement'} color="amber">
                     <p>
                         {t
-                            ? 'Backend từ chối khởi động nếu JWT secret hoặc refresh-token secret quá yếu hay đang dùng placeholder. Điều này giúp tránh deploy production với config mặc định nguy hiểm.'
-                            : 'The backend refuses to boot if the JWT secret or refresh-token secret is too weak or still using a placeholder. This helps prevent dangerous default production deployments.'}
+                            ? 'Backend từ chối khởi động nếu JWT secret quá yếu. Mật khẩu admin mặc định được thay thế bằng chuỗi ngẫu nhiên nếu không có cấu hình môi trường.'
+                            : 'The backend refuses to boot if the JWT secret is too weak. Default admin credentials are replaced with random strings if environment variables are missing.'}
+                    </p>
+                </InfoCard>
+                <InfoCard icon={<AlertTriangle className="w-6 h-6 text-red-500" />} title={t ? 'SSRF & Tunnel Guard' : 'SSRF & Tunnel Guard'} color="red">
+                    <p>
+                        {t
+                            ? 'SSH Tunnel và các kết nối outbound được kiểm tra nghiêm ngặt, chặn đứng truy cập trái phép vào mạng nội bộ (127.0.0.1, dải IP RFC1918).'
+                            : 'SSH Tunnels and outbound connections are strictly validated, blocking unauthorized access to internal networks (127.0.0.1, RFC1918 ranges).'}
                     </p>
                 </InfoCard>
             </FeatureGrid>
@@ -40,10 +47,11 @@ export function SecuritySection({ lang }: Props) {
             <DocSection title={t ? 'Những gì app đang bảo vệ tốt' : 'What the app protects well today'}>
                 <ul className="grid gap-3 mt-2">
                     {[
-                        t ? 'Credential lưu trong app database được mã hóa thay vì để plain text.' : 'Credentials stored in the app database are encrypted instead of kept in plaintext.',
-                        t ? 'OAuth login không còn trả bearer token trực tiếp trên URL query string.' : 'OAuth login no longer returns bearer tokens directly in the URL query string.',
-                        t ? 'Host validation và SSRF guard chặn tốt hơn các target nội bộ hoặc nguy hiểm, kể cả MongoDB Atlas SRV flows.' : 'Host validation and SSRF guards better block dangerous or internal targets, including MongoDB Atlas SRV flows.',
-                        t ? 'Connection health checks giúp phát hiện credential hỏng hoặc endpoint bị degrade sớm hơn.' : 'Connection health checks help surface broken credentials or degraded endpoints earlier.',
+                        t ? 'Credential lưu trong app database được mã hóa bằng AES-256-GCM.' : 'Credentials stored in the app database are encrypted with AES-256-GCM.',
+                        t ? 'SQL Guard chặn đứng các kỹ thuật bypass nâng cao như EXEC, EXECUTE trong kết nối Read-only.' : 'SQL Guard blocks advanced bypass techniques like EXEC, EXECUTE in Read-only connections.',
+                        t ? 'SSRF guard chặn tuyệt đối các target nội bộ hoặc localhost (chống quét mạng nội bộ qua Tunnel).' : 'SSRF guard strictly blocks internal or localhost targets (preventing intranet scanning via Tunnels).',
+                        t ? 'Quyền riêng tư Team được cô lập, không còn chia sẻ tự động dựa trên domain email công cộng.' : 'Team privacy is isolated, removing insecure auto-sharing based on public email domains.',
+                        t ? 'Thông báo lỗi Database được làm sạch (Sanitize) để tránh rò rỉ thông tin hạ tầng nhạy cảm.' : 'Database error messages are sanitized to prevent sensitive infrastructure information leakage.',
                     ].map((item) => (
                         <li key={item} className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
                             {item}
@@ -100,10 +108,10 @@ export function SecuritySection({ lang }: Props) {
             <DocSection title={t ? 'Best practices khuyến nghị' : 'Recommended best practices'}>
                 <ul className="grid gap-3">
                     {[
-                        t ? 'Dùng JWT_SECRET mạnh ít nhất 32 bytes, REFRESH_TOKEN_SECRET riêng nếu có thể, và ENCRYPTION_KEY đúng 32 ký tự.' : 'Use a strong JWT_SECRET of at least 32 bytes, a separate REFRESH_TOKEN_SECRET when possible, and an ENCRYPTION_KEY that is exactly 32 characters.',
-                        t ? 'Ưu tiên read-only connection cho production analytics hoặc tài khoản chỉ xem dữ liệu.' : 'Prefer read-only connections for production analytics or accounts that only need to inspect data.',
-                        t ? 'Bật SSL/TLS với database cloud và xác nhận callback URL thật kỹ nếu dùng Google/GitHub login.' : 'Enable SSL/TLS for cloud databases and verify callback URLs carefully when using Google/GitHub login.',
-                        t ? 'Không commit file .env và luôn rotate secret nếu chúng từng bị lộ trong git history hoặc logs.' : 'Never commit your .env file and always rotate secrets if they were ever exposed in git history or logs.',
+                        t ? 'Dùng JWT_SECRET mạnh ít nhất 32 bytes và ENCRYPTION_KEY đúng 32 ký tự.' : 'Use a strong JWT_SECRET of at least 32 bytes and an ENCRYPTION_KEY that is exactly 32 characters.',
+                        t ? 'Thiết lập ADMIN_EMAIL và ADMIN_PASSWORD trong .env để tránh việc hệ thống dùng mật khẩu ngẫu nhiên tạm thời.' : 'Set ADMIN_EMAIL and ADMIN_PASSWORD in .env to prevent the system from using temporary random passwords.',
+                        t ? 'Ưu tiên read-only connection cho các truy vấn phân tích để kích hoạt lớp bảo vệ SQL Guard.' : 'Prefer read-only connections for analytic queries to enable the SQL Guard protection layer.',
+                        t ? 'Luôn cấu hình timeout cho các database lớn để tránh chiếm dụng tài nguyên hệ thống.' : 'Always configure timeouts for large databases to prevent system resource exhaustion.',
                     ].map((item) => (
                         <li key={item} className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 px-4 py-3 text-xs text-muted-foreground">
                             {item}

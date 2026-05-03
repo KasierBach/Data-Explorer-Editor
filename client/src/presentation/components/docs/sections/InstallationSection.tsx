@@ -57,6 +57,8 @@ export function InstallationSection({ lang }: Props) {
                         <CodeComment>{t ? 'Tùy chọn cho compatibility / local rules' : 'Optional compatibility / local rules'}</CodeComment>
                         <CodeLine>LEGACY_ENCRYPTION_KEYS=</CodeLine>
                         <CodeLine>ALLOW_INTERNAL_IPS=false</CodeLine>
+                        <CodeLine>ADMIN_EMAIL=admin@example.com</CodeLine>
+                        <CodeLine>ADMIN_PASSWORD=your-secure-password</CodeLine>
                         <p className="mt-3" />
                         <CodeComment>{t ? 'Tùy chọn cho AI routing' : 'Optional for AI routing'}</CodeComment>
                         <CodeLine>GEMINI_API_KEY=...</CodeLine>

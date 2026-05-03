@@ -72,6 +72,18 @@ export function FaqSection({ lang }: Props) {
                 ? 'Connection hiện có policy flags như readOnly, allowSchemaChanges, allowImportExport và allowQueryExecution. Backend sẽ enforce các guardrails này kể cả khi frontend bị bypass. Nếu một câu lệnh bị chặn, UI sẽ hiển thị lý do thay vì chỉ thất bại mơ hồ.'
                 : 'Connections now carry policy flags such as readOnly, allowSchemaChanges, allowImportExport, and allowQueryExecution. The backend enforces these guardrails even if the frontend is bypassed. When a statement is blocked, the UI shows a clear reason instead of failing vaguely.',
         },
+        {
+            q: t ? 'Tại sao tôi không thấy query của đồng nghiệp mặc dù cả hai đều dùng @gmail.com?' : 'Why can\'t I see my colleague\'s queries if we both use @gmail.com?',
+            a: t
+                ? 'Bảo mật quyền riêng tư của bạn là ưu tiên hàng đầu. Data Explorer đã loại bỏ việc tự động chia sẻ query dựa trên domain email công cộng (như @gmail.com, @outlook.com) để tránh rò rỉ dữ liệu giữa những người dùng không liên quan. Để chia sẻ, hãy tạo một Organization và mời đồng nghiệp vào.'
+                : 'Your privacy is our priority. Data Explorer has removed automatic query sharing based on public email domains (like @gmail.com, @outlook.com) to prevent data leaks between unrelated users. To share, create an Organization and invite your colleagues.',
+        },
+        {
+            q: t ? 'Tại sao đích đến (host) của SSH tunnel của tôi bị chặn?' : 'Why is my SSH tunnel destination host blocked?',
+            a: t
+                ? 'SshTunnelService hiện áp dụng SSRF validation nghiêm ngặt. Hệ thống chặn các kết nối tới localhost, 127.0.0.1 và các dải IP nội bộ RFC1918 thông qua tunnel để bảo vệ mạng nội bộ của bạn khỏi các hành vi thám thính hoặc tấn công SSRF.'
+                : 'SshTunnelService now applies strict SSRF validation. The system blocks connections to localhost, 127.0.0.1, and RFC1918 internal IP ranges through tunnels to protect your internal network from reconnaissance or SSRF attacks.',
+        },
     ];
 
     return (

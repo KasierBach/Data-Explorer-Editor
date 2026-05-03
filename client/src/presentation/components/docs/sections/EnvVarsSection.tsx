@@ -16,6 +16,16 @@ export function EnvVarsSection({ lang }: Props) {
                 { name: 'JWT_SECRET', desc: t ? 'Khóa bí mật để ký JWT access token (Min 32 chars)' : 'Secret key for signing JWT access tokens (Min 32 chars)', example: 'super-secret-long-string' },
                 { name: 'REFRESH_TOKEN_SECRET', desc: t ? 'Khóa bí mật cho refresh token' : 'Secret key for refresh tokens', example: 'another-very-long-secret' },
                 { name: 'ENCRYPTION_KEY', desc: t ? 'Khóa 32 ký tự để mã hóa mật khẩu DB (AES-256)' : '32-char key for DB password encryption (AES-256)', example: '12345678901234567890123456789012' },
+                { name: 'REDIS_URL', desc: t ? 'URL kết nối tới Redis (Caching, Notifications, Jobs)' : 'Redis connection URL (Caching, Notifications, Jobs)', example: 'redis://localhost:6379' },
+            ]
+        },
+        {
+            title: t ? 'Bảo mật & Quản trị (Security & Admin)' : 'Security & Admin',
+            icon: <Shield className="w-5 h-5 text-red-500" />,
+            vars: [
+                { name: 'ALLOW_INTERNAL_IPS', desc: t ? 'Cho phép kết nối tới IP nội bộ (localhost/private) - Mặc định false' : 'Allow connections to internal IPs (localhost/private) - Defaults to false', example: 'true | false' },
+                { name: 'ADMIN_EMAIL', desc: t ? 'Email khởi tạo cho tài khoản admin đầu tiên' : 'Initial email for the first admin account', example: 'admin@example.com' },
+                { name: 'ADMIN_PASSWORD', desc: t ? 'Mật khẩu admin (Nếu trống, hệ thống sẽ log mật khẩu ngẫu nhiên)' : 'Admin password (If empty, system logs a random one)', example: 'strong-password' },
             ]
         },
         {

@@ -175,6 +175,38 @@ export function ConnectionSection({ lang, engine }: Props) {
                             </div>
                         ))}
                     </div>
+
+                    <div className="mt-8">
+                        <h5 className="font-bold text-xs mb-3 text-foreground uppercase tracking-widest">{t ? 'Connection Guardrails' : 'Connection Guardrails'}</h5>
+                        <Prose>{t
+                            ? 'Mỗi kết nối có thể đi kèm với một bộ chính sách bảo vệ (Guardrails) để hạn chế rủi ro thao tác sai trên dữ liệu thật.'
+                            : 'Each connection can be enhanced with a set of protection policies (Guardrails) to mitigate risks of accidental data modification.'}</Prose>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                            {[
+                                { title: t ? 'Read Only' : 'Read Only', desc: t ? 'Chỉ cho phép SELECT. Chặn mọi thay đổi dữ liệu.' : 'Allows only SELECT. Blocks all data modifications.' },
+                                { title: t ? 'Block Schema' : 'Block Schema', desc: t ? 'Ngăn chặn các lệnh ALTER, DROP hoặc RENAME bảng.' : 'Prevents ALTER, DROP, or RENAME table commands.' },
+                                { title: t ? 'Safe Guard' : 'Safe Guard', desc: t ? 'Kích hoạt bộ lọc SQL Guard chuyên sâu của backend.' : 'Enables backend-grade deep SQL Guard filtering.' },
+                                { title: t ? 'Restricted IO' : 'Restricted IO', desc: t ? 'Cấm các thao tác Import/Export dữ liệu thô.' : 'Disallows raw data Import/Export operations.' },
+                            ].map((g, i) => (
+                                <div key={i} className="p-3 border rounded-xl bg-blue-500/5 group hover:bg-blue-500/10 transition-colors">
+                                    <div className="text-xs font-bold text-blue-600 mb-1">{g.title}</div>
+                                    <div className="text-[10px] text-muted-foreground">{g.desc}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="mt-8">
+                        <h5 className="font-bold text-xs mb-3 text-foreground uppercase tracking-widest">{t ? 'SSH Tunneling (Bảo mật)' : 'SSH Tunneling (Secure)'}</h5>
+                        <Prose>{t
+                            ? 'Nếu database của bạn nằm sau firewall, bạn có thể sử dụng SSH Tunnel. Data Explorer hiện tích hợp SSRF Guard để chặn các kết nối tới IP nội bộ nguy hiểm thông qua tunnel.'
+                            : 'If your database is behind a firewall, you can use an SSH Tunnel. Data Explorer now integrates SSRF Guard to block dangerous internal IP connections through the tunnel.'}</Prose>
+                        <ul className="mt-4 space-y-2 text-xs text-muted-foreground list-disc pl-5">
+                            <li>{t ? 'Hỗ trợ xác thực bằng mật khẩu hoặc Private Key (OpenSSH format).' : 'Supports authentication via password or Private Key (OpenSSH format).'}</li>
+                            <li>{t ? 'Tự động kiểm tra IP đích (SSRF Protection).' : 'Automatic destination IP validation (SSRF Protection).'}</li>
+                            <li>{t ? 'Kiểm tra sức khỏe tunnel định kỳ để duy trì kết nối.' : 'Periodic tunnel health checks to maintain connectivity.'}</li>
+                        </ul>
+                    </div>
                 </DocSubSection>
             </DocSection>
 

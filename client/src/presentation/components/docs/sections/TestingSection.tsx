@@ -1,4 +1,4 @@
-import { Beaker, FlaskConical, Github, CheckCircle, Terminal } from 'lucide-react';
+import { Beaker, FlaskConical, Github, CheckCircle, Terminal, ShieldCheck } from 'lucide-react';
 import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, CodeBlock, CodeComment, CodeLine } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
@@ -70,6 +70,31 @@ export function TestingSection({ lang }: Props) {
                         <CodeComment>{t ? 'Chạy test frontend' : 'Run frontend tests'}</CodeComment>
                         <CodeLine>cd client && npm run test</CodeLine>
                     </CodeBlock>
+                </div>
+            </DocSection>
+
+            {/* Security Audits */}
+            <DocSection title={t ? 'Kiểm tra An ninh (Security Audits)' : 'Security Audits'}>
+                <Prose>
+                    {t
+                        ? 'Định kỳ, Data Explorer trải qua các đợt kiểm tra an ninh (Pentest) chuyên sâu để phát hiện các rủi ro về logic phân quyền, SSRF và Injection.'
+                        : 'Periodically, Data Explorer undergoes in-depth Security Audits (Pentest) to identify risks in authorization logic, SSRF, and Injections.'}
+                </Prose>
+                <div className="mt-6 grid md:grid-cols-2 gap-4">
+                    <InfoCard icon={<ShieldCheck className="w-5 h-5 text-red-500" />} title={t ? 'Logic Hardening' : 'Logic Hardening'} color="red">
+                        <p className="text-xs">
+                            {t
+                                ? 'Mọi bản vá bảo mật đều dựa trên các kịch bản tấn công thực tế (như IDOR visibilty hay SQL bypass).'
+                                : 'All security patches are based on real-world attack scenarios (like IDOR visibility or SQL bypass).'}
+                        </p>
+                    </InfoCard>
+                    <InfoCard icon={<Terminal className="w-5 h-5 text-blue-500" />} title={t ? 'Manual Validation' : 'Manual Validation'} color="blue">
+                        <p className="text-xs">
+                            {t
+                                ? 'Các lỗ hổng logic phức tạp được kiểm tra thủ công bởi đội ngũ phát triển trước khi tích hợp vào core.'
+                                : 'Complex logic vulnerabilities are manually validated by the dev team before core integration.'}
+                        </p>
+                    </InfoCard>
                 </div>
             </DocSection>
 

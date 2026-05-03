@@ -66,7 +66,10 @@ export function DeploymentSection({ lang }: Props) {
                         { icon: <KeyRound className="w-4 h-4" />, key: 'JWT_SECRET', descVi: 'Secret mạnh để ký access token. Placeholder sẽ bị backend từ chối.', descEn: 'A strong secret used to sign access tokens. Placeholder values will be rejected by the backend.' },
                         { icon: <Shield className="w-4 h-4" />, key: 'REFRESH_TOKEN_SECRET', descVi: 'Khuyến nghị dùng secret riêng cho refresh token cookie. Nếu để trống, app sẽ fallback về JWT_SECRET.', descEn: 'Recommended separate secret for the refresh-token cookie. If omitted, the app falls back to JWT_SECRET.' },
                         { icon: <Shield className="w-4 h-4" />, key: 'ENCRYPTION_KEY', descVi: 'Phải đúng 32 ký tự để mã hóa saved connection passwords.', descEn: 'Must be exactly 32 characters to encrypt saved connection passwords.' },
-                        { icon: <Globe className="w-4 h-4" />, key: 'FRONTEND_URL', descVi: 'Origin frontend thật dùng cho CORS và OAuth redirects.', descEn: 'The real frontend origin used for CORS and OAuth redirects.' }
+                        { icon: <Globe className="w-4 h-4" />, key: 'FRONTEND_URL', descVi: 'Origin frontend thật dùng cho CORS và OAuth redirects.', descEn: 'The real frontend origin used for CORS and OAuth redirects.' },
+                        { icon: <Database className="w-4 h-4" />, key: 'REDIS_URL', descVi: 'URL kết nối Redis cho caching và rate-limiting.', descEn: 'Redis connection URL for caching and rate-limiting.' },
+                        { icon: <KeyRound className="w-4 h-4" />, key: 'ADMIN_EMAIL', descVi: 'Email admin khởi tạo (Seeding).', descEn: 'Initial admin email (Seeding).' },
+                        { icon: <KeyRound className="w-4 h-4" />, key: 'ADMIN_PASSWORD', descVi: 'Mật khẩu admin khởi tạo. Khuyên dùng mật khẩu mạnh.', descEn: 'Initial admin password. Strong password recommended.' }
                     ].map((env) => (
                         <div key={env.key} className="flex items-center justify-between gap-4 rounded-2xl border bg-muted/10 px-4 py-4">
                             <div className="flex items-center gap-3">
