@@ -2,6 +2,7 @@ export class SavedQueryEntity {
   id: string;
   name: string;
   sql: string;
+  organizationId: string;
   database?: string | null;
   connectionId?: string | null;
   visibility: 'private' | 'team' | 'workspace';

@@ -5,6 +5,8 @@ import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
 import { Plus, Search, RefreshCw, Layers, Database, ChevronDown, Globe, Loader2, Sparkles } from 'lucide-react';
 import { ConnectionService, connectionService } from '@/core/services/ConnectionService';
+import { MetadataService } from '@/core/services/MetadataService';
+import { SearchService } from '@/core/services/SearchService';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ConnectionSelector } from './ConnectionSelector';
@@ -38,7 +40,16 @@ export const ExplorerSidebar: React.FC = () => {
 
     const handleRefresh = async () => {
         const t = toast.loading(lang === 'vi' ? 'Đang làm mới dữ liệu...' : 'Refreshing hierarchy...');
-        await queryClient.resetQueries({ queryKey: ['hierarchy'] });
+        if (activeConnectionId) {
+            await MetadataService.refresh(activeConnectionId, effectiveDatabase || undefined).catch((err) => {
+                console.warn('Failed to refresh metadata freshness', err);
+            });
+        }
+        await queryClient.invalidateQueries({ queryKey: ['hierarchy'] });
+        await queryClient.invalidateQueries({ queryKey: ['metadata'] });
+        void SearchService.syncIndex().catch((err) => {
+            console.warn('Failed to sync search index', err);
+        });
         toast.success(lang === 'vi' ? 'Đã cập nhật' : 'Refreshed', { id: t });
     };
 

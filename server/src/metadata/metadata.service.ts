@@ -4,6 +4,7 @@ import type { Cache } from 'cache-manager';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 import type { IDatabaseStrategy } from '../database-strategies/database-strategy.interface';
+import { FreshnessService } from '../common/freshness/freshness.service';
 
 interface ConnectionContext {
     connection: any;
@@ -16,11 +17,16 @@ export class MetadataService {
     constructor(
         private readonly connectionsService: ConnectionsService,
         private readonly strategyFactory: DatabaseStrategyFactory,
+        private readonly freshnessService: FreshnessService,
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) { }
 
-    private getCacheKey(prefix: string, connectionId: string, userId: string, identifier: string = 'default') {
-        return `${prefix}:${userId}:${connectionId}:${identifier}`;
+    private async getCacheKey(prefix: string, connectionId: string, identifier: string = 'default') {
+        return this.freshnessService.buildKey(
+            prefix,
+            [connectionId],
+            [identifier],
+        );
     }
 
     private async withCache<T>(cacheKey: string, fetchFn: () => Promise<T>, ttl?: number): Promise<T> {
@@ -48,7 +54,7 @@ export class MetadataService {
     }
 
     async getHierarchy(connectionId: string, parentId: string | null, userId: string) {
-        const cacheKey = this.getCacheKey('hierarchy', connectionId, userId, parentId || 'root');
+        const cacheKey = await this.getCacheKey('hierarchy', connectionId, parentId || 'root');
         return this.withCache(cacheKey, () => this._getHierarchyUncached(connectionId, parentId, userId));
     }
 
@@ -116,7 +122,7 @@ export class MetadataService {
     }
 
     async getDatabases(connectionId: string, userId: string) {
-        const cacheKey = this.getCacheKey('databases', connectionId, userId);
+        const cacheKey = await this.getCacheKey('databases', connectionId);
         return this.withCache(cacheKey, async () => {
             const { pool, strategy } = await this.getConnectionContext(connectionId, userId);
             const nodes = await strategy.getDatabases(pool);
@@ -125,7 +131,7 @@ export class MetadataService {
     }
 
     async getRelationships(connectionId: string, userId: string, database?: string) {
-        const cacheKey = this.getCacheKey('relationships', connectionId, userId, database);
+        const cacheKey = await this.getCacheKey('relationships', connectionId, database);
         return this.withCache(cacheKey, async () => {
             const { pool, strategy } = await this.getConnectionContext(connectionId, userId, database);
             return strategy.getRelationships(pool, database);
@@ -133,7 +139,7 @@ export class MetadataService {
     }
 
     async getColumns(connectionId: string, tableId: string, userId: string) {
-        const cacheKey = this.getCacheKey('columns', connectionId, userId, tableId);
+        const cacheKey = await this.getCacheKey('columns', connectionId, tableId);
         return this.withCache(cacheKey, async () => {
             const { connection, strategy } = await this.getConnectionContext(connectionId, userId);
             const parsed = this.parseNodeId(tableId);
@@ -145,7 +151,7 @@ export class MetadataService {
     }
 
     async getDatabaseMetrics(connectionId: string, userId: string, database?: string) {
-        const cacheKey = this.getCacheKey('metrics', connectionId, userId, database);
+        const cacheKey = await this.getCacheKey('metrics', connectionId, database);
         return this.withCache(cacheKey, async () => {
             const { pool, strategy } = await this.getConnectionContext(connectionId, userId, database);
             return strategy.getDatabaseMetrics(pool);
@@ -153,7 +159,7 @@ export class MetadataService {
     }
 
     async getFullMetadata(connectionId: string, tableId: string, userId: string) {
-        const cacheKey = this.getCacheKey('fullmeta', connectionId, userId, tableId);
+        const cacheKey = await this.getCacheKey('fullmeta', connectionId, tableId);
         return this.withCache(cacheKey, async () => {
             const { connection, strategy } = await this.getConnectionContext(connectionId, userId);
             const parsed = this.parseNodeId(tableId);
@@ -162,5 +168,17 @@ export class MetadataService {
             const pool = await this.connectionsService.getPool(connectionId, parsed.dbName, userId);
             return strategy.getFullMetadata(pool, schema, table, parsed.dbName);
         });
+    }
+
+    async refresh(connectionId: string, userId: string, database?: string) {
+        await this.connectionsService.findOne(connectionId, userId);
+        await this.freshnessService.bump('hierarchy', [connectionId]);
+        await this.freshnessService.bump('databases', [connectionId]);
+        await this.freshnessService.bump('relationships', [connectionId]);
+        await this.freshnessService.bump('columns', [connectionId]);
+        await this.freshnessService.bump('metrics', [connectionId]);
+        await this.freshnessService.bump('fullmeta', [connectionId]);
+        await this.freshnessService.bump('ai-schema', [connectionId, database || 'default']);
+        return { success: true };
     }
 }

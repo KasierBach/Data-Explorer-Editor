@@ -48,9 +48,18 @@ if (!shouldGenerateClient()) {
 
 const result = spawnSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['prisma', 'generate'], {
   cwd: repoRoot,
-  stdio: 'inherit',
+  stdio: 'pipe',
+  encoding: 'utf8',
   env: process.env,
 });
+
+if (result.stdout) {
+  process.stdout.write(result.stdout);
+}
+
+if (result.stderr) {
+  process.stderr.write(result.stderr);
+}
 
 if (result.status === 0) {
   process.exit(0);

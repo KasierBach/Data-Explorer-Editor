@@ -69,6 +69,7 @@ export const useAppStore = create<AppState>()(
                 sidebarWidth: state.sidebarWidth,
                 isDesktopModeOnMobile: state.isDesktopModeOnMobile,
                 savedQueries: state.savedQueries,
+                pinnedQueryIds: state.pinnedQueryIds,
                 queryHistory: state.queryHistory,
                 aiChats: state.aiChats.map(chat => ({
                     ...chat,

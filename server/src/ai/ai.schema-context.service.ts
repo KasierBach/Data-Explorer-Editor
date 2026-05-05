@@ -3,6 +3,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { AI_CONSTANTS } from './ai.constants';
 import type { IDatabaseStrategy, ColumnInfo, TreeNodeResult, Relationship } from '../database-strategies/database-strategy.interface';
+import { FreshnessService } from '../common/freshness/freshness.service';
 
 interface SchemaTable {
     name: string;
@@ -12,10 +13,15 @@ interface SchemaTable {
 @Injectable()
 export class AiSchemaContextService {
     private readonly logger = new Logger(AiSchemaContextService.name);
-    constructor(@Inject(CACHE_MANAGER) private cacheManager: Cache) {}
+    constructor(
+        @Inject(CACHE_MANAGER) private cacheManager: Cache,
+        private readonly freshnessService: FreshnessService,
+    ) {}
 
     async gatherSchemaContext(pool: unknown, strategy: IDatabaseStrategy, database?: string, connectionId?: string): Promise<string> {
-        const cacheKey = connectionId ? `aicache:${connectionId}:${database || 'default'}` : null;
+        const cacheKey = connectionId
+            ? await this.freshnessService.buildKey('ai-schema', [connectionId, database || 'default'], ['schema-context'])
+            : null;
 
         if (cacheKey) {
             const cached = await this.cacheManager.get<string>(cacheKey);
@@ -75,12 +81,7 @@ export class AiSchemaContextService {
     }
 
     async clearCache(connectionId: string, database?: string) {
-        if (database) {
-            await this.cacheManager.del(`aicache:${connectionId}:${database}`);
-            return;
-        }
-        // Patterns are not easily supported in basic CacheManager, but we can delete the default one
-        await this.cacheManager.del(`aicache:${connectionId}:default`);
+        await this.freshnessService.bump('ai-schema', [connectionId, database || 'default']);
     }
 
     buildSchemaContext(tables: SchemaTable[], columns: Map<string, ColumnInfo[]>, relationships: Relationship[]): string {

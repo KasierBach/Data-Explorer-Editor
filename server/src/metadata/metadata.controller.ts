@@ -57,4 +57,13 @@ export class MetadataController {
     ) {
         return this.metadataService.getFullMetadata(connectionId, tableId, req.user.id);
     }
+
+    @Post('refresh')
+    refresh(
+        @Body('connectionId') connectionId: string,
+        @Body('database') database: string | undefined,
+        @Req() req: AuthenticatedRequest,
+    ) {
+        return this.metadataService.refresh(connectionId, req.user.id, database);
+    }
 }

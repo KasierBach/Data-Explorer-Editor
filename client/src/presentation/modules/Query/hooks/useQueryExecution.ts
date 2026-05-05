@@ -4,6 +4,7 @@ import { apiService } from '@/core/services/api.service';
 import { useAppStore } from '@/core/services/store';
 import type { QueryResult } from '@/core/domain/entities';
 import { ApiError } from '@/core/services/api.service';
+import { SearchService } from '@/core/services/SearchService';
 
 interface UseQueryExecutionOptions {
     tabId: string;
@@ -11,6 +12,11 @@ interface UseQueryExecutionOptions {
     limit: string;
     onExecutionStart?: () => void;
     onExecutionEnd?: () => void;
+}
+
+function shouldSyncSearchIndex(sql: string) {
+    const trimmed = sql.trim();
+    return /^(CREATE|ALTER|DROP|TRUNCATE|RENAME|COMMENT|REFRESH)\b/i.test(trimmed);
 }
 
 export function useQueryExecution({
@@ -57,6 +63,12 @@ export function useQueryExecution({
                     rowCount: result?.rowCount,
                     status: 'success',
                 });
+
+                if (shouldSyncSearchIndex(query)) {
+                    void SearchService.syncIndex().catch((error) => {
+                        console.warn('useQueryExecution: search sync failed', error);
+                    });
+                }
                 
                 return result;
             } catch (err) {

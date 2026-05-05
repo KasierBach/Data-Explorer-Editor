@@ -9,7 +9,6 @@ import {
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { CreateQueryDto } from './dto/create-query.dto';
-import { createHash } from 'crypto';
 import { UpdateRowDto } from './dto/update-row.dto';
 import { InsertRowDto } from './dto/insert-row.dto';
 import { DeleteRowsDto } from './dto/delete-rows.dto';
@@ -18,6 +17,7 @@ import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 import { AuditService, AuditAction } from '../audit/audit.service';
 import { Connection } from '../connections/entities/connection.entity';
+import { FreshnessService } from '../common/freshness/freshness.service';
 import {
   analyzeDestructiveSql,
   containsMultipleStatements,
@@ -29,20 +29,22 @@ import {
 @Injectable()
 export class QueryService {
   private readonly logger = new Logger(QueryService.name);
-  
-  private readonly QUERY_CACHE_TTL = 60; // 1 minute default
+  private readonly QUERY_CACHE_TTL_MS = 60_000;
 
   constructor(
     private readonly connectionsService: ConnectionsService,
     private readonly strategyFactory: DatabaseStrategyFactory,
     private readonly auditService: AuditService,
+    private readonly freshnessService: FreshnessService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) { }
 
-  private getQueryCacheKey(connectionId: string, sql: string, database?: string): string {
-    const normalizedSql = sql.trim().toLowerCase();
-    const hash = createHash('sha256').update(`${connectionId}:${database || ''}:${normalizedSql}`).digest('hex').slice(0, 16);
-    return `query:${connectionId}:${hash}`;
+  private async getQueryCacheKey(connectionId: string, sql: string, database?: string): Promise<string> {
+    return this.freshnessService.buildKey(
+      'query',
+      [connectionId, database || 'default'],
+      [sql.trim().toLowerCase()],
+    );
   }
 
   private isCacheableQuery(sql: string): boolean {
@@ -50,10 +52,11 @@ export class QueryService {
     return trimmed.startsWith('SELECT') && !trimmed.includes('NOW()') && !trimmed.includes('RAND()');
   }
 
-  private async invalidateQueryCache(connectionId: string): Promise<void> {
-    // Can't use keys() on Redis cache, so just rely on TTL for expiration
-    // For manual invalidation, we'd need to track keys separately or use a different cache store
-    this.logger.warn(`Cache invalidated for connection ${connectionId} (auto-cleanup via TTL)`);
+  private async invalidateQueryCache(connectionId: string, database?: string): Promise<void> {
+    await this.freshnessService.bump('query', [connectionId, database || 'default']);
+    await this.freshnessService.bump('metadata', [connectionId]);
+    await this.freshnessService.bump('ai-schema', [connectionId, database || 'default']);
+    this.logger.debug(`Freshness bumped for connection ${connectionId}`);
   }
 
   private async blockOperation(
@@ -254,7 +257,7 @@ export class QueryService {
       const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
 
-      const cacheKey = this.getQueryCacheKey(connectionId, sql, database || connection.database);
+      const cacheKey = await this.getQueryCacheKey(connectionId, sql, database || connection.database);
       const isCacheable = this.isCacheableQuery(sql);
 
       if (isCacheable) {
@@ -267,7 +270,7 @@ export class QueryService {
       const result = await strategy.executeQuery(pool, sql, { limit, offset });
 
       if (isCacheable && result.rows) {
-        await this.cacheManager.set(cacheKey, result, this.QUERY_CACHE_TTL);
+        await this.cacheManager.set(cacheKey, result, this.QUERY_CACHE_TTL_MS);
       }
 
       // Attempt to get totalCount for table views (standard SELECT * queries)
@@ -324,7 +327,7 @@ export class QueryService {
       const pool = await this.connectionsService.getPool(connectionId, database, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
       const result = await strategy.updateRow(pool, { schema, table, pkColumn, pkValue, updates });
-      await this.invalidateQueryCache(connectionId);
+      await this.invalidateQueryCache(connectionId, database || connection.database);
       return result;
     } catch (error) {
       this.logger.error('Update Row Error:', error instanceof Error ? error.message : String(error));
@@ -341,7 +344,7 @@ export class QueryService {
       const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
       const result = await strategy.insertRow(pool, { schema, table, data });
-      await this.invalidateQueryCache(connectionId);
+      await this.invalidateQueryCache(connectionId, database || connection.database);
       return result;
     } catch (error) {
       this.logger.error('Insert Row Error:', error instanceof Error ? error.message : String(error));
@@ -358,7 +361,7 @@ export class QueryService {
       const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
       const result = await strategy.deleteRows(pool, { schema, table, pkColumn, pkValues });
-      await this.invalidateQueryCache(connectionId);
+      await this.invalidateQueryCache(connectionId, database || connection.database);
       return result;
     } catch (error) {
       this.logger.error('Delete Rows Error:', error instanceof Error ? error.message : String(error));
@@ -391,6 +394,7 @@ export class QueryService {
       for (const sql of sqlStatements) {
         results.push(await this.executeQuery({ connectionId, sql, database, confirmed: true }, userId));
       }
+      await this.invalidateQueryCache(connectionId, database || connection.database);
       await this.auditService.log({
         action: AuditAction.DB_SCHEMA_CHANGE,
         userId,
@@ -419,7 +423,9 @@ export class QueryService {
     try {
       const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
-      return await strategy.seedData(pool);
+      const result = await strategy.seedData(pool);
+      await this.invalidateQueryCache(connectionId, connection.database || undefined);
+      return result;
     } catch (error) {
       this.logger.error('Seed Data Error:', error instanceof Error ? error.message : String(error));
       throw new InternalServerErrorException(`Seed data failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -439,6 +445,7 @@ export class QueryService {
       const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
       await strategy.createDatabase(pool, databaseName);
+      await this.invalidateQueryCache(connectionId, databaseName);
       return { success: true, message: `Database ${databaseName} created successfully.` };
     } catch (error) {
       this.logger.error('Create Database Error:', error instanceof Error ? error.message : String(error));
@@ -470,6 +477,7 @@ export class QueryService {
 
       const droppedPoolKey = `${connectionId}:${databaseName}`;
       await this.connectionsService.removePool(droppedPoolKey, userId);
+      await this.invalidateQueryCache(connectionId, databaseName);
 
       return { success: true, message: `Database ${databaseName} dropped successfully.` };
     } catch (error) {
@@ -494,6 +502,7 @@ export class QueryService {
       const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
       const result = await strategy.importData(pool, { schema, table, data });
+      await this.invalidateQueryCache(connectionId, connection.database || undefined);
 
       await this.auditService.log({
         action: AuditAction.DB_IMPORT,

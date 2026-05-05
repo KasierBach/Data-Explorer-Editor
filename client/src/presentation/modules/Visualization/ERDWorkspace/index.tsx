@@ -132,6 +132,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 workspaces={state.erdWorkspaces}
                 onOpenWorkspace={actions.loadWorkspace}
                 onDeleteWorkspace={actions.deleteWorkspace}
+                onRestoreWorkspace={actions.loadWorkspace}
             />
         </div>
     );

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiService } from './api.service';
 import { ConnectionService } from './ConnectionService';
+import { SearchService } from './SearchService';
 
 vi.mock('./api.service', () => ({
   apiService: {
@@ -8,6 +9,12 @@ vi.mock('./api.service', () => ({
     post: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn(),
+  },
+}));
+
+vi.mock('./SearchService', () => ({
+  SearchService: {
+    syncIndex: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -43,6 +50,7 @@ describe('ConnectionService', () => {
       const result = await ConnectionService.createConnection({ name: 'New DB', type: 'postgres' });
 
       expect(apiService.post).toHaveBeenCalledWith('/connections', { name: 'New DB', type: 'postgres' });
+      expect(SearchService.syncIndex).toHaveBeenCalled();
       expect(result).toEqual(mockConnection);
     });
 
@@ -52,6 +60,7 @@ describe('ConnectionService', () => {
       await ConnectionService.updateConnection('1', { name: 'Updated' });
 
       expect(apiService.patch).toHaveBeenCalledWith('/connections/1', { name: 'Updated' });
+      expect(SearchService.syncIndex).toHaveBeenCalled();
     });
 
     it('should delete connection via API', async () => {
@@ -60,6 +69,7 @@ describe('ConnectionService', () => {
       await ConnectionService.deleteConnection('1');
 
       expect(apiService.delete).toHaveBeenCalledWith('/connections/1');
+      expect(SearchService.syncIndex).toHaveBeenCalled();
     });
 
     it('should check connection health via API', async () => {

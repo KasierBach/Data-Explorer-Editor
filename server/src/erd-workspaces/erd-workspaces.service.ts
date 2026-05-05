@@ -19,6 +19,7 @@ interface RawErdWorkspace {
   id: string;
   name: string;
   notes: string | null;
+  organizationId: string | null;
   connectionId: string | null;
   database: string | null;
   layout: unknown;
@@ -33,6 +34,7 @@ import { ConnectionsService } from '../connections/connections.service';
 import { CreateErdWorkspaceDto } from './dto/create-erd-workspace.dto';
 import { UpdateErdWorkspaceDto } from './dto/update-erd-workspace.dto';
 import { ErdWorkspaceEntity } from './entities/erd-workspace.entity';
+import { VersionHistoryService } from '../version-history/version-history.service';
 
 @Injectable()
 export class ErdWorkspacesService {
@@ -42,6 +44,7 @@ export class ErdWorkspacesService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly connectionsService: ConnectionsService,
+    private readonly versionHistoryService: VersionHistoryService,
   ) {}
 
   private get erdWorkspaces() {
@@ -111,6 +114,7 @@ export class ErdWorkspacesService {
       id: workspace.id,
       name: workspace.name,
       notes: workspace.notes,
+      organizationId: workspace.organizationId,
       connectionId: workspace.connectionId,
       database: workspace.database,
       layout: (workspace.layout ?? {}) as Record<string, unknown>,
@@ -230,6 +234,8 @@ export class ErdWorkspacesService {
       },
     });
 
+    await this.versionHistoryService.recordErdWorkspaceVersion(workspace, userId);
+
     return this.toEntity(workspace, userId);
   }
 
@@ -301,6 +307,8 @@ export class ErdWorkspacesService {
         database: updated.database,
       },
     });
+
+    await this.versionHistoryService.recordErdWorkspaceVersion(updated, userId);
 
     return this.toEntity(updated, userId);
   }

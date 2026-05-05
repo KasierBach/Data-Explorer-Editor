@@ -100,6 +100,20 @@ function getTextBeforeCursor(model: editor.ITextModel, position: Position): stri
     return lines.join(' ');
 }
 
+function shouldShowAiGhostText(textBeforeCursor: string): boolean {
+    const trimmed = textBeforeCursor.trimEnd();
+    if (trimmed.length < 3) {
+        return false;
+    }
+
+    const lastChar = textBeforeCursor.slice(-1);
+    if (lastChar && /[A-Za-z0-9_]/.test(lastChar)) {
+        return false;
+    }
+
+    return /[\s,([=<>:+\-*/]$/.test(lastChar) || lastChar === '';
+}
+
 // ─── Helper: extract table names from SQL text ───
 
 function extractReferencedTables(textBefore: string): string[] {
@@ -322,6 +336,9 @@ export function createAiInlineCompletionProvider(
             // This lets the standard popup show table/column names instead.
             // But if user is mid-typing (no trailing space), let everything work normally.
             const textBeforeCursor = lineContent.substring(0, position.column - 1);
+            if (!shouldShowAiGhostText(textBeforeCursor)) {
+                return { items: [] };
+            }
             const endsWithSpace = textBeforeCursor.endsWith(' ');
             
             if (endsWithSpace) {

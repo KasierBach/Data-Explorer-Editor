@@ -4,6 +4,7 @@ export interface SavedQuery {
     id: string;
     name: string;
     sql: string;
+    organizationId?: string | null;
     connectionId?: string | null;
     database?: string;
     visibility: 'private' | 'team' | 'workspace';
@@ -35,10 +36,12 @@ export interface QueryHistoryEntry {
 
 export interface QuerySlice {
     savedQueries: SavedQuery[];
+    pinnedQueryIds: string[];
     setSavedQueries: (queries: SavedQuery[]) => void;
     saveQuery: (query: SavedQuery) => void;
     updateSavedQuery: (id: string, updates: Partial<SavedQuery>) => void;
     deleteSavedQuery: (id: string) => void;
+    togglePinnedQuery: (queryId: string) => void;
     queryHistory: QueryHistoryEntry[];
     addQueryHistory: (entry: QueryHistoryEntry) => void;
     clearQueryHistory: () => void;
@@ -46,6 +49,7 @@ export interface QuerySlice {
 
 export const createQuerySlice: StateCreator<QuerySlice> = (set) => ({
     savedQueries: [],
+    pinnedQueryIds: [],
     setSavedQueries: (queries) => set({ savedQueries: queries }),
     saveQuery: (query) => set((state) => ({
         savedQueries: [query, ...state.savedQueries.filter(existing => existing.id !== query.id)],
@@ -57,6 +61,12 @@ export const createQuerySlice: StateCreator<QuerySlice> = (set) => ({
     })),
     deleteSavedQuery: (id) => set((state) => ({
         savedQueries: state.savedQueries.filter(q => q.id !== id),
+        pinnedQueryIds: state.pinnedQueryIds.filter((queryId) => queryId !== id),
+    })),
+    togglePinnedQuery: (queryId) => set((state) => ({
+        pinnedQueryIds: state.pinnedQueryIds.includes(queryId)
+            ? state.pinnedQueryIds.filter((id) => id !== queryId)
+            : [queryId, ...state.pinnedQueryIds],
     })),
     queryHistory: [],
     addQueryHistory: (entry) => set((state) => ({

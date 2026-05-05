@@ -94,6 +94,7 @@ export interface ErdWorkspaceEntity {
     id: string;
     name: string;
     notes?: string | null;
+    organizationId?: string | null;
     connectionId?: string | null;
     database?: string | null;
     layout: Record<string, any>;
@@ -106,4 +107,33 @@ export interface ErdWorkspaceEntity {
         lastName?: string | null;
     };
     isOwner: boolean;
+}
+
+export type VersionedResourceType = 'QUERY' | 'ERD';
+
+export interface VersionHistoryAuthor {
+    id: string;
+    email: string;
+    firstName?: string | null;
+    lastName?: string | null;
+}
+
+export interface VersionHistoryEntry {
+    id: string;
+    resourceType: VersionedResourceType;
+    resourceId: string;
+    versionNumber: number;
+    createdAt: string;
+    author: VersionHistoryAuthor;
+}
+
+export interface VersionHistoryDetail<TSnapshot = Record<string, unknown>> extends VersionHistoryEntry {
+    snapshot: TSnapshot;
+}
+
+export interface RestoreVersionResponse<TResource> {
+    resource: TResource;
+    restoredFromVersionId: string;
+    restoredFromVersionNumber: number;
+    newVersionNumber: number | null;
 }

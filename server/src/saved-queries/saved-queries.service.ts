@@ -5,6 +5,7 @@ import { CreateSavedQueryDto } from './dto/create-saved-query.dto';
 import { UpdateSavedQueryDto } from './dto/update-saved-query.dto';
 import { ConnectionsService } from '../connections/connections.service';
 import { SavedQueryEntity } from './entities/saved-query.entity';
+import { VersionHistoryService } from '../version-history/version-history.service';
 
 @Injectable()
 export class SavedQueriesService {
@@ -12,6 +13,7 @@ export class SavedQueriesService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly connectionsService: ConnectionsService,
+    private readonly versionHistoryService: VersionHistoryService,
   ) {}
 
   private get savedQueries() {
@@ -34,6 +36,7 @@ export class SavedQueriesService {
       id: savedQuery.id,
       name: savedQuery.name,
       sql: savedQuery.sql,
+      organizationId: savedQuery.organizationId,
       database: savedQuery.database,
       connectionId: savedQuery.connectionId,
       visibility: savedQuery.visibility,
@@ -120,6 +123,8 @@ export class SavedQueriesService {
       },
     });
 
+    await this.versionHistoryService.recordSavedQueryVersion(savedQuery, userId);
+
     return this.toEntity(savedQuery, userId);
   }
 
@@ -177,6 +182,8 @@ export class SavedQueriesService {
         visibility: updated.visibility,
       },
     });
+
+    await this.versionHistoryService.recordSavedQueryVersion(updated, userId);
 
     return this.toEntity(updated, userId);
   }

@@ -33,6 +33,9 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { CollaborationModule } from './collaboration/collaboration.module';
 import { TeamspacesModule } from './teamspaces/teamspaces.module';
+import { FreshnessModule } from './common/freshness/freshness.module';
+import { VersionHistoryModule } from './version-history/version-history.module';
+import { PresenceModule } from './presence/presence.module';
 
 @Module({
   imports: [
@@ -95,6 +98,9 @@ import { TeamspacesModule } from './teamspaces/teamspaces.module';
     PermissionsModule,
     CollaborationModule,
     TeamspacesModule,
+    FreshnessModule,
+    VersionHistoryModule,
+    PresenceModule,
   ],
   controllers: [AppController],
   providers: [

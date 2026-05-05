@@ -32,6 +32,8 @@ import {
 } from '@/core/services/CollaborationService';
 import { useAppStore } from '@/core/services/store';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
+import { useResourcePresence } from '@/presentation/hooks/useResourcePresence';
+import { PresenceBadge } from '@/presentation/components/presence/PresenceBadge';
 import { cn } from '@/lib/utils';
 import { TeamActivityTab } from './TeamPage/components/TeamActivityTab';
 import { TeamCommentsDrawer } from './TeamPage/components/TeamCommentsDrawer';
@@ -152,6 +154,74 @@ function renderTeamspaceOptions(teamspaces: TeamspaceEntity[]) {
       {teamspace.name}
     </SelectItem>
   ));
+}
+
+function TeamspaceCard({
+  organizationId,
+  teamspace,
+  canManage,
+  lang,
+  onDelete,
+}: {
+  organizationId: string;
+  teamspace: TeamspaceEntity;
+  canManage: boolean;
+  lang: 'vi' | 'en';
+  onDelete: (teamspaceId: string) => void;
+}) {
+  const presence = useResourcePresence(
+    organizationId
+      ? {
+          organizationId,
+          teamspaceId: teamspace.id,
+        }
+      : null,
+    {
+      enabled: Boolean(organizationId),
+      intervalMs: 20_000,
+    },
+  );
+
+  return (
+    <div className="rounded-md border border-border/60 bg-background px-3 py-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-medium">{teamspace.name}</div>
+          {teamspace.description && (
+            <div className="mt-1 max-h-10 overflow-hidden text-xs text-muted-foreground">
+              {teamspace.description}
+            </div>
+          )}
+        </div>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+          {teamspace.resourceCount}
+        </span>
+      </div>
+      <div className="mt-2">
+        <PresenceBadge
+          entries={presence.entries}
+          isLoading={presence.isLoading}
+          label={lang === 'vi' ? 'Teamspace live' : 'Teamspace live'}
+          emptyLabel={lang === 'vi' ? 'Chua co ai dang hoat dong' : 'No one active yet'}
+          className="w-full justify-between"
+        />
+      </div>
+      {canManage && (
+        <div className="mt-2 flex justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-[11px] text-destructive"
+            onClick={() => onDelete(teamspace.id)}
+          >
+            <Trash2 className="mr-1 h-3.5 w-3.5" />
+            {lang === 'vi' ? 'Xoa' : 'Delete'}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function TeamspaceResourceGroups<T extends { id: string; teamspaceId?: string | null }>({
@@ -584,38 +654,14 @@ export function TeamPage() {
                   <div className="space-y-2">
                     {teamspaces.length > 0 ? (
                       teamspaces.map((teamspace) => (
-                        <div
+                        <TeamspaceCard
                           key={teamspace.id}
-                          className="rounded-md border border-border/60 bg-background px-3 py-2"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-medium">{teamspace.name}</div>
-                              {teamspace.description && (
-                                <div className="mt-1 max-h-10 overflow-hidden text-xs text-muted-foreground">
-                                  {teamspace.description}
-                                </div>
-                              )}
-                            </div>
-                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-                              {teamspace.resourceCount}
-                            </span>
-                          </div>
-                          {canManage && (
-                            <div className="mt-2 flex justify-end">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-[11px] text-destructive"
-                                onClick={() => handleDeleteTeamspace(teamspace.id)}
-                              >
-                                <Trash2 className="mr-1 h-3.5 w-3.5" />
-                                Delete
-                              </Button>
-                            </div>
-                          )}
-                        </div>
+                          organizationId={selectedOrg.id}
+                          teamspace={teamspace}
+                          canManage={canManage}
+                          lang={lang}
+                          onDelete={handleDeleteTeamspace}
+                        />
                       ))
                     ) : (
                       <div className="rounded-md border border-dashed px-3 py-4 text-xs text-muted-foreground">

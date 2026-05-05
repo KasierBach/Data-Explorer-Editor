@@ -129,6 +129,7 @@ model User {
   savedQueries SavedQuery[]
   dashboards  Dashboard[]
   erdWorkspaces ErdWorkspace[]
+  versionHistories VersionHistory[]
   organizationMembers OrganizationMember[]
   createdTeamspaces Teamspace[]
 }
@@ -267,6 +268,22 @@ model ErdWorkspace {
 }
 
 // ─── Organization / Team Collaboration ───
+
+model VersionHistory {
+  id            String       @id @default(uuid())
+  resourceType  ResourceType
+  resourceId    String
+  versionNumber Int
+  snapshot      Json
+  createdAt     DateTime     @default(now())
+
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceType, resourceId, versionNumber])
+  @@index([resourceType, resourceId, createdAt])
+  @@index([userId, createdAt])
+}
 
 model Organization {
   id        String   @id @default(uuid())

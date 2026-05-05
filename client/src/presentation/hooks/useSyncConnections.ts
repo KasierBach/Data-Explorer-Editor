@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '@/core/services/store';
 import { ConnectionService } from '@/core/services/ConnectionService';
+import { SearchService } from '@/core/services/SearchService';
 
 /**
  * Automatically fetches the user's saved connections from the backend
@@ -29,6 +30,9 @@ export function useSyncConnections() {
                 const data = await ConnectionService.getConnections();
                 if (Array.isArray(data)) {
                     setConnections(data);
+                    void SearchService.syncIndex().catch((err) => {
+                        console.warn('useSyncConnections: Failed to sync search index', err);
+                    });
                 }
             } catch (err) {
                 console.warn('useSyncConnections: Failed to fetch connections', err);

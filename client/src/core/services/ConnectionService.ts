@@ -2,6 +2,7 @@ import type { IDatabaseAdapter } from "../domain/database-adapter.interface";
 
 import { ApiDatabaseAdapter } from "../adapters/ApiDatabaseAdapter";
 import { apiService } from "./api.service";
+import { SearchService } from "./SearchService";
 import type { Connection } from "./store/slices/connectionSlice";
 
 /**
@@ -68,11 +69,14 @@ export class ConnectionService {
     }
 
     public static async createConnection(data: any): Promise<any> {
-        return await apiService.post<any>('/connections', data);
+        const result = await apiService.post<any>('/connections', data);
+        void SearchService.syncIndex().catch(() => undefined);
+        return result;
     }
 
     public static async updateConnection(id: string, updates: any): Promise<void> {
         await apiService.patch(`/connections/${id}`, updates);
+        void SearchService.syncIndex().catch(() => undefined);
     }
 
     public static async checkConnectionHealth(id: string): Promise<{
@@ -86,6 +90,7 @@ export class ConnectionService {
 
     public static async deleteConnection(id: string): Promise<void> {
         await apiService.delete(`/connections/${id}`);
+        void SearchService.syncIndex().catch(() => undefined);
     }
 }
 

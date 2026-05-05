@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
-import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw, History, Zap, Sparkles } from 'lucide-react';
+import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw, History, Zap, Sparkles, PanelRightOpen } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore, type SavedQuery } from '@/core/services/store';
@@ -40,6 +40,9 @@ import { toast } from 'sonner';
 import { DashboardService } from '@/core/services/DashboardService';
 import { SaveToDashboardDialog, type SaveToDashboardFormValues } from '@/presentation/modules/Dashboard/SaveToDashboardDialog';
 import { AiQueryBox } from './components/AiQueryBox';
+import { QueryProjectPanel } from './QueryProjectPanel';
+import { useResourcePresence } from '@/presentation/hooks/useResourcePresence';
+import { PresenceBadge } from '@/presentation/components/presence/PresenceBadge';
 
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const queryClient = useQueryClient();
@@ -75,6 +78,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const [isSavedDialogOpen, setIsSavedDialogOpen] = useState(false);
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
     const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+    const [isProjectPanelOpen, setIsProjectPanelOpen] = useState(true);
     const [currentSavedQueryId, setCurrentSavedQueryId] = useState<string | null>(initialMetadata.savedQueryId || null);
     const [explainPlan, setExplainPlan] = useState<any>(null);
     const [saveDialogInitialValues, setSaveDialogInitialValues] = useState<SaveQueryFormValues>({
@@ -103,8 +107,30 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const effectiveLimit = limit === 'all' ? undefined : Number.parseInt(limit, 10);
     const requestLimit = Number.isInteger(effectiveLimit) ? effectiveLimit : undefined;
 
-    const { saveQuery, openTab, addQueryHistory, savedQueries, openDashboardTab } = useAppStore();
+    const {
+        saveQuery,
+        openTab,
+        addQueryHistory,
+        savedQueries,
+        queryHistory,
+        pinnedQueryIds,
+        togglePinnedQuery,
+        openDashboardTab,
+    } = useAppStore();
     const currentSavedQuery = savedQueries.find((savedQuery) => savedQuery.id === currentSavedQueryId) || null;
+    const queryPresence = useResourcePresence(
+        currentSavedQuery?.organizationId && currentSavedQueryId
+            ? {
+                organizationId: currentSavedQuery.organizationId,
+                resourceType: 'QUERY',
+                resourceId: currentSavedQueryId,
+            }
+            : null,
+        {
+            enabled: Boolean(currentSavedQuery?.organizationId && currentSavedQueryId),
+            intervalMs: 20_000,
+        },
+    );
 
     // Persist SQL query to store
     useEffect(() => {
@@ -449,6 +475,12 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
     const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
 
+    useEffect(() => {
+        if (isCompactMobileLayout) {
+            setIsProjectPanelOpen(false);
+        }
+    }, [isCompactMobileLayout]);
+
     const handleRunRef = useRef(handleRun);
     handleRunRef.current = handleRun;
 
@@ -531,6 +563,17 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             </PopoverContent>
                         </Popover>
 
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsProjectPanelOpen((current) => !current)}
+                            className="h-7 gap-1 px-2 text-xs"
+                            title={lang === 'vi' ? 'Project query' : 'Query project'}
+                        >
+                            <PanelRightOpen className="w-3.5 h-3.5" />
+                            {isCompactMobileLayout ? 'Project' : (lang === 'vi' ? 'Project' : 'Project')}
+                        </Button>
+
                         {!isCompactMobileLayout && (
                             <>
                                 <div className="h-4 w-[1px] bg-border mx-1" />
@@ -593,6 +636,10 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                                         <FolderOpen className="mr-2 h-4 w-4" />
                                         <span>{lang === 'vi' ? 'Mở đã lưu' : 'Open Saved'}</span>
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setIsProjectPanelOpen((current) => !current)}>
+                                        <PanelRightOpen className="mr-2 h-4 w-4" />
+                                        <span>{lang === 'vi' ? 'Project query' : 'Query project'}</span>
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => setIsHistoryDialogOpen(true)}>
                                         <History className="mr-2 h-4 w-4" />
                                         <span>{lang === 'vi' ? 'Lịch sử' : 'History'}</span>
@@ -629,6 +676,15 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                     </div>
 
                     <div className="flex items-center gap-3 min-w-0">
+                        {currentSavedQuery?.organizationId && (
+                            <PresenceBadge
+                                entries={queryPresence.entries}
+                                isLoading={queryPresence.isLoading}
+                                label={lang === 'vi' ? 'Query live' : 'Query live'}
+                                emptyLabel={lang === 'vi' ? 'Chua ai mo query nay' : 'No one on this query'}
+                                className="max-w-[280px]"
+                            />
+                        )}
                         {activeConnection && !isSmallMobile && (
                             <div className="flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-100 dark:border-blue-900/50 min-w-0">
                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
@@ -666,6 +722,25 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
 
                 <div className="flex-1 flex flex-col min-h-0 relative">
+                    {isProjectPanelOpen && (
+                        <div className="border-b border-border/60 bg-muted/20 px-2 py-2">
+                            <QueryProjectPanel
+                                lang={lang}
+                                savedQueries={savedQueries}
+                                queryHistory={queryHistory}
+                                pinnedQueryIds={pinnedQueryIds}
+                                currentSavedQueryId={currentSavedQueryId}
+                                onOpenQuery={handleOpenSavedQuery}
+                                onRunQuery={(sql) => {
+                                    setQuery(sql);
+                                    handleRun(sql);
+                                }}
+                                onTogglePinnedQuery={togglePinnedQuery}
+                                onOpenSavedQueries={() => setIsSavedDialogOpen(true)}
+                            />
+                        </div>
+                    )}
+
                     {/* Top Editor - takes remaining space */}
                     <div className="flex-1 min-h-0 relative">
                         <SqlEditor
@@ -725,6 +800,16 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 open={isSavedDialogOpen}
                 onOpenChange={setIsSavedDialogOpen}
                 onOpenQuery={handleOpenSavedQuery}
+                onRestoreQuery={(restoredQuery) => {
+                    saveQuery(restoredQuery);
+                    if (currentSavedQueryId === restoredQuery.id) {
+                        setQuery(restoredQuery.sql);
+                        updateTabMetadata(tabId, {
+                            savedQueryId: restoredQuery.id,
+                            sql: restoredQuery.sql,
+                        });
+                    }
+                }}
             />
             <QueryHistoryDialog
                 open={isHistoryDialogOpen}

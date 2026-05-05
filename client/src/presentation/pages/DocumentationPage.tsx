@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Database, Search, Menu, X, Github, ArrowLeft } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -47,24 +47,36 @@ export function DocumentationPage() {
         return { currentItem, currentSection, prev, next };
     }, [activeSection, lang]);
 
-    // Scan for headings whenever activeSection or content changes
-    useMemo(() => {
-        setTimeout(() => {
+    useEffect(() => {
+        let cancelled = false;
+        let frameId = window.requestAnimationFrame(() => {
+            if (cancelled) return;
+
             const contentElement = document.querySelector('main');
-            if (contentElement) {
-                const foundHeadings = Array.from(contentElement.querySelectorAll('h2, h3')).map((heading, index) => {
-                    if (!heading.id) {
-                        heading.id = `heading-${index}`;
-                    }
-                    return {
-                        id: heading.id,
-                        text: heading.textContent || '',
-                        level: heading.tagName === 'H2' ? 2 : 3
-                    };
-                });
-                setHeadings(foundHeadings);
+            if (!contentElement) {
+                setHeadings([]);
+                return;
             }
-        }, 100);
+
+            const foundHeadings = Array.from(contentElement.querySelectorAll('h2, h3')).map((heading, index) => {
+                if (!heading.id) {
+                    heading.id = `heading-${index}`;
+                }
+
+                return {
+                    id: heading.id,
+                    text: heading.textContent || '',
+                    level: heading.tagName === 'H2' ? 2 : 3,
+                };
+            });
+
+            setHeadings(foundHeadings);
+        });
+
+        return () => {
+            cancelled = true;
+            window.cancelAnimationFrame(frameId);
+        };
     }, [activeSection, lang]);
 
     const scrollToHeading = (id: string) => {
