@@ -15,6 +15,8 @@ import {
   type OrganizationInvitationEntity,
   type OrganizationMemberEntity,
   type InviteMemberResult,
+  type OrganizationBackupPackage,
+  type OrganizationBackupRestoreResult,
   type TeamActivityEntity,
   type TeamConnectionEntity,
   type TeamDashboardEntity,
@@ -39,12 +41,12 @@ import { TeamActivityTab } from './TeamPage/components/TeamActivityTab';
 import { TeamCommentsDrawer } from './TeamPage/components/TeamCommentsDrawer';
 import {
   ArrowLeft, Database, FileText, LayoutDashboard, Mail,
-  MessageSquare, Plus, Shield, Trash2, User, Users,
+  MessageSquare, Plus, Shield, Trash2, User, Users, Download, Upload,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
-type TeamTab = 'members' | 'connections' | 'queries' | 'dashboards' | 'activity';
+type TeamTab = 'members' | 'connections' | 'queries' | 'dashboards' | 'activity' | 'backups';
 
 interface TeamCommentTarget {
   resourceType: CollaborationResourceType;
@@ -154,6 +156,16 @@ function renderTeamspaceOptions(teamspaces: TeamspaceEntity[]) {
       {teamspace.name}
     </SelectItem>
   ));
+}
+
+function downloadJsonFile(filename: string, content: unknown) {
+  const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function TeamspaceCard({
@@ -292,6 +304,10 @@ export function TeamPage() {
   const [teamDashboards, setTeamDashboards] = useState<TeamDashboardEntity[]>([]);
   const [teamspaces, setTeamspaces] = useState<TeamspaceEntity[]>([]);
   const [teamActivities, setTeamActivities] = useState<TeamActivityEntity[]>([]);
+  const [backupJson, setBackupJson] = useState('');
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backupRestoring, setBackupRestoring] = useState(false);
+  const [backupSummary, setBackupSummary] = useState<OrganizationBackupRestoreResult | null>(null);
   const [resourcesLoading, setResourcesLoading] = useState(false);
   const [activityLoading, setActivityLoading] = useState(false);
   const [commentTarget, setCommentTarget] = useState<TeamCommentTarget | null>(null);
@@ -318,6 +334,8 @@ export function TeamPage() {
 
   useEffect(() => {
     setCommentTarget(null);
+    setBackupJson('');
+    setBackupSummary(null);
   }, [selectedOrgId]);
 
   async function loadOrgs() {
@@ -386,6 +404,55 @@ export function TeamPage() {
       toast.error('Failed to load team activity');
     } finally {
       setActivityLoading(false);
+    }
+  }
+
+  async function handleExportBackup() {
+    if (!selectedOrg) return;
+
+    setBackupLoading(true);
+    try {
+      const backup = await OrganizationService.exportOrganizationBackup(selectedOrg.id);
+      setBackupJson(JSON.stringify(backup, null, 2));
+      downloadJsonFile(`data-explorer-backup-${selectedOrg.slug}.json`, backup);
+      toast.success('Backup exported');
+    } catch (error) {
+      const message = error instanceof ApiError ? error.message : 'Failed to export backup';
+      toast.error(message);
+    } finally {
+      setBackupLoading(false);
+    }
+  }
+
+  async function handleRestoreBackup() {
+    if (!selectedOrg || !backupJson.trim()) return;
+
+    setBackupRestoring(true);
+    setBackupSummary(null);
+    try {
+      const parsed = JSON.parse(backupJson) as OrganizationBackupPackage;
+      const result = await OrganizationService.restoreOrganizationBackup(selectedOrg.id, parsed);
+      setBackupSummary(result);
+
+      const [orgsData] = await Promise.all([
+        OrganizationService.getMyOrganizations(),
+        loadResources(selectedOrg.id),
+        loadTeamspaces(selectedOrg.id),
+        loadMembers(selectedOrg.id),
+      ]);
+
+      setOrgs(orgsData);
+      setSelectedOrg(orgsData.find((org) => org.id === selectedOrg.id) ?? selectedOrg);
+      toast.success('Backup restored');
+    } catch (error) {
+      const message = error instanceof SyntaxError
+        ? 'Backup JSON is invalid'
+        : error instanceof ApiError
+          ? error.message
+          : 'Failed to restore backup';
+      toast.error(message);
+    } finally {
+      setBackupRestoring(false);
     }
   }
 
@@ -709,6 +776,7 @@ export function TeamPage() {
                       <TabButton value="connections" label="Connections" icon={Database} count={teamConnections.length} />
                       <TabButton value="queries" label="Queries" icon={FileText} count={teamQueries.length} />
                       <TabButton value="dashboards" label="Dashboards" icon={LayoutDashboard} count={teamDashboards.length} />
+                      <TabButton value="backups" label="Backups" icon={Download} />
                       <TabButton value="activity" label="Activity" icon={MessageSquare} count={teamActivities.length} />
                     </div>
                   </div>
@@ -1011,6 +1079,69 @@ export function TeamPage() {
                           </div>
                         )}
                       />
+                    </div>
+                  )}
+
+                  {activeTab === 'backups' && (
+                    <div className="overflow-hidden rounded-lg border">
+                      <div className="grid gap-4 p-4 lg:grid-cols-[1fr_1.2fr]">
+                        <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                          <div className="flex items-center gap-2">
+                            <Download className="h-4 w-4 text-muted-foreground" />
+                            <div className="font-medium">Export backup</div>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Download a JSON package with teamspaces, saved queries, dashboards, and ERD workspaces for this organization.
+                          </p>
+                          <ul className="space-y-1 text-xs text-muted-foreground">
+                            <li>Connection secrets are not included.</li>
+                            <li>Restore recreates resources and reattaches team metadata.</li>
+                            <li>Review the JSON before restoring into a live workspace.</li>
+                          </ul>
+                          <Button type="button" onClick={handleExportBackup} disabled={backupLoading}>
+                            {backupLoading ? 'Exporting...' : 'Export backup'}
+                          </Button>
+                        </div>
+
+                        <div className="space-y-3 rounded-lg border bg-background p-4">
+                          <div className="flex items-center gap-2">
+                            <Upload className="h-4 w-4 text-muted-foreground" />
+                            <div className="font-medium">Restore backup</div>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Paste the JSON package you exported, then confirm the restore to recreate the saved artifacts.
+                          </p>
+                          <Textarea
+                            value={backupJson}
+                            onChange={(event) => setBackupJson(event.target.value)}
+                            placeholder="Paste backup JSON here..."
+                            className="min-h-56 font-mono text-xs"
+                          />
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button type="button" variant="outline" onClick={() => setBackupJson('')} disabled={!backupJson}>
+                              Clear
+                            </Button>
+                            <Button type="button" onClick={handleRestoreBackup} disabled={!backupJson.trim() || backupRestoring}>
+                              {backupRestoring ? 'Restoring...' : 'Restore backup'}
+                            </Button>
+                          </div>
+                          {backupSummary && (
+                            <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+                              <div className="font-medium text-foreground">Restore complete</div>
+                              <div className="mt-1">
+                                Teamspaces: {backupSummary.created.teamspaces}, Queries: {backupSummary.created.savedQueries}, Dashboards: {backupSummary.created.dashboards}, ERD: {backupSummary.created.erdWorkspaces}
+                              </div>
+                              {backupSummary.warnings.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {backupSummary.warnings.map((warning) => (
+                                    <div key={warning}>• {warning}</div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
 

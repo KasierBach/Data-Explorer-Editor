@@ -8,11 +8,15 @@ import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
+import { OrganizationBackupService, type OrganizationBackupPackage } from './services/organization-backup.service';
 
 @Controller('organizations')
 @UseGuards(JwtAuthGuard)
 export class OrganizationsController {
-  constructor(private readonly organizationsService: OrganizationsService) {}
+  constructor(
+    private readonly organizationsService: OrganizationsService,
+    private readonly organizationBackupService: OrganizationBackupService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -116,5 +120,19 @@ export class OrganizationsController {
   @Get(':id/activities')
   async listActivities(@Req() req: AuthenticatedRequest, @Param('id') organizationId: string) {
     return this.organizationsService.getActivityLogs(organizationId, req.user.id);
+  }
+
+  @Get(':id/backup')
+  async exportBackup(@Req() req: AuthenticatedRequest, @Param('id') organizationId: string) {
+    return this.organizationBackupService.exportOrganizationBackup(organizationId, req.user.id);
+  }
+
+  @Post(':id/backup/restore')
+  async restoreBackup(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') organizationId: string,
+    @Body() body: { backup: OrganizationBackupPackage },
+  ) {
+    return this.organizationBackupService.restoreOrganizationBackup(organizationId, req.user.id, body.backup);
   }
 }

@@ -122,10 +122,11 @@ export class AiProviderRunnerService {
             schemaContext: params.schemaContext,
             databaseType: params.databaseType,
         });
-        const parts = this.promptBuilder.prepareGeminiParts(params.prompt, systemPrompt, params.context, params.image);
+        const parts = this.promptBuilder.prepareGeminiParts(params.prompt, params.context, params.image);
 
         const model = this.genAI.getGenerativeModel({
             model: plan.model,
+            systemInstruction: systemPrompt,
             tools: [{ googleSearch: {} } as Record<string, unknown>],
         });
 
@@ -214,10 +215,11 @@ export class AiProviderRunnerService {
             schemaContext: params.schemaContext,
             databaseType: params.databaseType,
         });
-        const parts = this.promptBuilder.prepareGeminiParts(params.prompt, systemPrompt, params.context, params.image);
+        const parts = this.promptBuilder.prepareGeminiParts(params.prompt, params.context, params.image);
 
         const model = this.genAI.getGenerativeModel({
             model: plan.model,
+            systemInstruction: systemPrompt,
             tools: [{ googleSearch: {} } as Record<string, unknown>],
         });
 

@@ -77,6 +77,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'NVIDIA Nemotron 120B (Free)', isNew: true },
         { id: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B (Free)', isNew: true },
         { id: 'z-ai/glm-4.5-air:free', label: 'GLM 4.5 Air (Free)', isNew: true },
+        { id: 'tencent/hy3-preview:free', label: 'Tencent Hunyuan 3 (Free)', isNew: true },
     ];
 
     const inputRef = useRef<HTMLTextAreaElement>(null);

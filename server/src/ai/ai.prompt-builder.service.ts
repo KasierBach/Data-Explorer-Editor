@@ -47,10 +47,10 @@ ${responseFormat}`;
         ];
     }
 
-    prepareGeminiParts(prompt: string, systemPrompt: string, context?: string, image?: string): Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> {
+    prepareGeminiParts(prompt: string, context?: string, image?: string): Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> {
         const userText = context
-            ? `${systemPrompt}\n\nUser: ${prompt}\n\nAdditional context:\n${context}`
-            : `${systemPrompt}\n\nUser: ${prompt}`;
+            ? `${prompt}\n\nAdditional context:\n${context}`
+            : prompt;
 
         const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [{ text: userText }];
 

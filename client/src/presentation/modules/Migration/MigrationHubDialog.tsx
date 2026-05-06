@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowRightLeft, Loader2, CheckCircle2, XCircle, Database, ArrowRight } from 'lucide-react';
+import { ArrowRightLeft, Loader2, CheckCircle2, XCircle, Database, ArrowRight, AlertTriangle, RefreshCw, GitCompareArrows } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { useAppStore } from '@/core/services/store';
-import { migrationService, type MigrationJob, type StartMigrationPayload } from '@/core/services/MigrationService';
+import { migrationService, type MigrationJob, type MigrationReviewSummary, type StartMigrationPayload } from '@/core/services/MigrationService';
 
 interface MigrationHubDialogProps {
     isOpen: boolean;
@@ -35,6 +35,9 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
     // Job tracking
     const [job, setJob] = useState<MigrationJob | null>(null);
     const [isStarting, setIsStarting] = useState(false);
+    const [review, setReview] = useState<MigrationReviewSummary | null>(null);
+    const [isReviewing, setIsReviewing] = useState(false);
+    const [reviewError, setReviewError] = useState<string | null>(null);
 
     // Prefill source from props
     useEffect(() => {
@@ -42,6 +45,67 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
         if (sourceSchema) setSrcSchema(sourceSchema);
         if (sourceTable) setSrcTable(sourceTable);
     }, [sourceConnectionId, sourceSchema, sourceTable]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setReview(null);
+            setReviewError(null);
+            setIsReviewing(false);
+            setJob(null);
+            return;
+        }
+
+        const normalizedSourceSchema = srcSchema.trim();
+        const normalizedTargetSchema = tgtSchema.trim();
+        const normalizedSourceTable = srcTable.trim();
+        const normalizedTargetTable = tgtTable.trim();
+        const sameEndpoint = !!srcConnId && !!tgtConnId &&
+            srcConnId === tgtConnId &&
+            normalizedSourceSchema === normalizedTargetSchema &&
+            normalizedSourceTable !== '' &&
+            normalizedSourceTable === normalizedTargetTable;
+
+        if (!srcConnId || !normalizedSourceTable || !tgtConnId || !normalizedTargetTable || sameEndpoint) {
+            setReview(null);
+            setReviewError(null);
+            setIsReviewing(false);
+            return;
+        }
+
+        let cancelled = false;
+        const timer = window.setTimeout(() => {
+            if (cancelled) return;
+            setIsReviewing(true);
+            setReviewError(null);
+
+            void migrationService.previewMigration({
+                sourceConnectionId: srcConnId,
+                sourceSchema: normalizedSourceSchema,
+                sourceTable: normalizedSourceTable,
+                targetConnectionId: tgtConnId,
+                targetSchema: normalizedTargetSchema,
+                targetTable: normalizedTargetTable,
+            }).then((summary) => {
+                if (!cancelled) {
+                    setReview(summary);
+                }
+            }).catch((error) => {
+                if (!cancelled) {
+                    setReview(null);
+                    setReviewError(error instanceof Error ? error.message : 'Failed to preview migration');
+                }
+            }).finally(() => {
+                if (!cancelled) {
+                    setIsReviewing(false);
+                }
+            });
+        }, 450);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
+    }, [isOpen, srcConnId, srcSchema, srcTable, tgtConnId, tgtSchema, tgtTable]);
 
     const handleStart = useCallback(async () => {
         if (!srcConnId || !srcTable || !tgtConnId || !tgtTable) return;
@@ -101,7 +165,7 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
         tgtConn.allowSchemaChanges === false ||
         tgtConn.allowQueryExecution === false
     );
-    const canStart = srcConnId && srcTable && tgtConnId && tgtTable && !isRunning && !isStarting && !sourceBlocked && !targetBlocked && !sameEndpoint;
+    const canStart = srcConnId && srcTable && tgtConnId && tgtTable && !isRunning && !isStarting && !sourceBlocked && !targetBlocked && !sameEndpoint && !isReviewing && review?.canProceed === true;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
@@ -218,6 +282,121 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
                             {sourceBlocked
                                 ? 'Source connection must allow query execution before transfer can start.'
                                 : 'Target connection must allow query execution, schema changes, and import/export to receive transferred data.'}
+                        </div>
+                    )}
+
+                    {(reviewError || review || isReviewing) && (
+                        <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+                            <div className="flex items-center gap-2">
+                                <GitCompareArrows className="w-4 h-4 text-indigo-400" />
+                                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                    Migration review
+                                </span>
+                                {isReviewing && <RefreshCw className="ml-auto h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                            </div>
+
+                            {reviewError && (
+                                <div className="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                                    {reviewError}
+                                </div>
+                            )}
+
+                            {review && (
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <div className="rounded-md border border-border/60 bg-background p-3 text-xs">
+                                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Source</div>
+                                            <div className="mt-1 font-medium">{review.source.connectionName}</div>
+                                            <div className="text-muted-foreground">{review.source.schema}.{review.source.table}</div>
+                                            <div className="mt-1 text-[11px] text-muted-foreground">
+                                                {review.source.columnCount} columns · {review.source.indexCount} indices
+                                                {review.source.rowCount !== null && ` · ${review.source.rowCount.toLocaleString()} rows`}
+                                            </div>
+                                        </div>
+                                        <div className="rounded-md border border-border/60 bg-background p-3 text-xs">
+                                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Target</div>
+                                            <div className="mt-1 font-medium">{review.target.connectionName}</div>
+                                            <div className="text-muted-foreground">{review.target.schema}.{review.target.table}</div>
+                                            <div className="mt-1 text-[11px] text-muted-foreground">
+                                                {review.target.columnCount} columns · {review.target.indexCount} indices
+                                                {review.target.rowCount !== null && ` · ${review.target.rowCount.toLocaleString()} rows`}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
+                                        {[
+                                            ['Added columns', review.estimatedImpact.addedColumns],
+                                            ['Removed columns', review.estimatedImpact.removedColumns],
+                                            ['Changed columns', review.estimatedImpact.changedColumns],
+                                            ['Added indices', review.estimatedImpact.addedIndices],
+                                            ['Removed indices', review.estimatedImpact.removedIndices],
+                                            ['Changed indices', review.estimatedImpact.changedIndices],
+                                        ].map(([label, value]) => (
+                                            <div key={label as string} className="rounded-md border border-border/60 bg-background px-2 py-2 text-center">
+                                                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label as string}</div>
+                                                <div className="mt-1 text-base font-semibold">{value as number}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {review.blockers.length > 0 && (
+                                        <div className="space-y-2 rounded-md border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300">
+                                            <div className="flex items-center gap-1.5 font-semibold uppercase tracking-wider text-red-200">
+                                                <AlertTriangle className="h-3.5 w-3.5" />
+                                                Blockers
+                                            </div>
+                                            <ul className="space-y-1">
+                                                {review.blockers.map((blocker) => (
+                                                    <li key={blocker}>• {blocker}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {review.warnings.length > 0 && (
+                                        <div className="space-y-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300">
+                                            <div className="flex items-center gap-1.5 font-semibold uppercase tracking-wider text-amber-200">
+                                                <AlertTriangle className="h-3.5 w-3.5" />
+                                                Warnings
+                                            </div>
+                                            <ul className="space-y-1">
+                                                {review.warnings.map((warning) => (
+                                                    <li key={warning}>• {warning}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-2">
+                                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Column diff</div>
+                                        <div className="max-h-36 space-y-1 overflow-auto">
+                                            {review.columnDiffs.slice(0, 8).map((diff) => (
+                                                <div key={diff.name} className="flex items-start justify-between gap-3 rounded-md border border-border/60 bg-background px-3 py-2 text-xs">
+                                                    <div className="min-w-0">
+                                                        <div className="font-medium">{diff.name}</div>
+                                                        <div className="text-muted-foreground">
+                                                            {diff.changes.length > 0 ? diff.changes.join(' · ') : 'No structural change'}
+                                                        </div>
+                                                    </div>
+                                                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+                                                        {diff.status}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2 text-xs text-muted-foreground">
+                                        <div className="text-[10px] uppercase tracking-wider">Rollback caveats</div>
+                                        <ul className="space-y-1">
+                                            {review.rollbackCaveats.map((caveat) => (
+                                                <li key={caveat}>• {caveat}</li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 

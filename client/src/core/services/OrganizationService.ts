@@ -31,6 +31,97 @@ export interface TeamDashboardEntity {
   permissions?: TeamResourcePermissionPolicy;
 }
 
+export interface OrganizationBackupPackage {
+  version: 1;
+  exportedAt: string;
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+    settings: Record<string, unknown> | null;
+  };
+  notes: string[];
+  teamspaces: Array<{
+    sourceId: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    createdBy: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  resourcePolicies: Array<{
+    resourceType: string;
+    resourceId: string;
+    permissions: unknown;
+    teamspaceId: string | null;
+  }>;
+  savedQueries: Array<{
+    sourceId: string;
+    name: string;
+    sql: string;
+    database: string | null;
+    connectionId: string | null;
+    visibility: string;
+    folderId: string | null;
+    tags: string[];
+    description: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  dashboards: Array<{
+    sourceId: string;
+    name: string;
+    description: string | null;
+    visibility: string;
+    connectionId: string | null;
+    database: string | null;
+    createdAt: string;
+    updatedAt: string;
+    widgets: Array<{
+      sourceId: string;
+      title: string;
+      chartType: string;
+      queryText: string | null;
+      connectionId: string | null;
+      database: string | null;
+      columns: string[];
+      xAxis: string | null;
+      yAxis: string[];
+      orderIndex: number;
+      config: unknown;
+      dataSnapshot: unknown;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  }>;
+  erdWorkspaces: Array<{
+    sourceId: string;
+    name: string;
+    notes: string | null;
+    connectionId: string | null;
+    database: string | null;
+    layout: unknown;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+}
+
+export interface OrganizationBackupRestoreResult {
+  organizationId: string;
+  restoredAt: string;
+  created: {
+    teamspaces: number;
+    savedQueries: number;
+    dashboards: number;
+    dashboardWidgets: number;
+    erdWorkspaces: number;
+    resourcePolicies: number;
+  };
+  warnings: string[];
+}
+
 export interface TeamActivityEntity {
   id: string;
   action: string;
@@ -191,5 +282,13 @@ export class OrganizationService {
 
   static async getTeamActivities(id: string): Promise<TeamActivityEntity[]> {
     return apiService.get<TeamActivityEntity[]>(`/organizations/${id}/activities`);
+  }
+
+  static async exportOrganizationBackup(id: string): Promise<OrganizationBackupPackage> {
+    return apiService.get<OrganizationBackupPackage>(`/organizations/${id}/backup`);
+  }
+
+  static async restoreOrganizationBackup(id: string, backup: OrganizationBackupPackage): Promise<OrganizationBackupRestoreResult> {
+    return apiService.post<OrganizationBackupRestoreResult>(`/organizations/${id}/backup/restore`, { backup });
   }
 }

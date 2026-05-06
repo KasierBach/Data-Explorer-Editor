@@ -25,6 +25,8 @@ export interface UISlice {
     isCommandPaletteOpen: boolean;
     toggleCommandPalette: () => void;
     setCommandPaletteOpen: (isOpen: boolean) => void;
+    defaultResultHeight: number;
+    setDefaultResultHeight: (height: number) => void;
     destructiveConfirm: { isOpen: boolean; analysis: any; resolve: ((val: boolean) => void) | null } | null;
     requestDestructiveConfirm: (analysis: any) => Promise<boolean>;
     closeDestructiveConfirm: (confirmed: boolean) => void;
@@ -67,6 +69,8 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
     isCommandPaletteOpen: false,
     toggleCommandPalette: () => set((state) => ({ isCommandPaletteOpen: !state.isCommandPaletteOpen })),
     setCommandPaletteOpen: (isOpen) => set({ isCommandPaletteOpen: isOpen }),
+    defaultResultHeight: 300,
+    setDefaultResultHeight: (height) => set({ defaultResultHeight: height }),
     destructiveConfirm: null,
     requestDestructiveConfirm: (analysis) => {
         return new Promise<boolean>((resolve) => {

@@ -10,6 +10,53 @@ export interface StartMigrationPayload {
     targetTable: string;
 }
 
+export interface MigrationColumnDiff {
+    name: string;
+    status: 'added' | 'removed' | 'changed' | 'unchanged';
+    changes: string[];
+}
+
+export interface MigrationIndexDiff {
+    name: string;
+    status: 'added' | 'removed' | 'changed' | 'unchanged';
+    changes: string[];
+}
+
+export interface MigrationReviewSummary {
+    canProceed: boolean;
+    blockers: string[];
+    warnings: string[];
+    rollbackCaveats: string[];
+    estimatedImpact: {
+        addedColumns: number;
+        removedColumns: number;
+        changedColumns: number;
+        addedIndices: number;
+        removedIndices: number;
+        changedIndices: number;
+    };
+    source: {
+        connectionId: string;
+        connectionName: string;
+        schema: string;
+        table: string;
+        rowCount: number | null;
+        columnCount: number;
+        indexCount: number;
+    };
+    target: {
+        connectionId: string;
+        connectionName: string;
+        schema: string;
+        table: string;
+        rowCount: number | null;
+        columnCount: number;
+        indexCount: number;
+    };
+    columnDiffs: MigrationColumnDiff[];
+    indexDiffs: MigrationIndexDiff[];
+}
+
 export interface MigrationJob {
     id: string;
     status: 'pending' | 'running' | 'completed' | 'failed';
@@ -25,6 +72,10 @@ const BASE_RETRY_DELAY_MS = 2000;
 export const migrationService = {
     startMigration: async (payload: StartMigrationPayload): Promise<{ jobId: string }> => {
         return await apiService.post<{ jobId: string }>('/migration/start', payload);
+    },
+
+    previewMigration: async (payload: StartMigrationPayload): Promise<MigrationReviewSummary> => {
+        return await apiService.post<MigrationReviewSummary>('/migration/preview', payload);
     },
 
     /**

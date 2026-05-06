@@ -20,6 +20,12 @@ export class MigrationController {
         return this.migrationService.startMigration(req.user.id, dto);
     }
 
+    @Post('preview')
+    @UseGuards(JwtAuthGuard)
+    async previewMigration(@Req() req: AuthenticatedRequest, @Body() dto: StartMigrationDto) {
+        return this.migrationService.previewMigration(req.user.id, dto);
+    }
+
     @Post('progress-ticket/:jobId')
     @UseGuards(JwtAuthGuard)
     async createProgressTicket(@Param('jobId') jobId: string, @Req() req: AuthenticatedRequest) {

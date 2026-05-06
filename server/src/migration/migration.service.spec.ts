@@ -44,6 +44,14 @@ describe('MigrationService', () => {
         targetTable: 'users',
     };
 
+    const startPipeline = async (jobId: string, dto = baseDto) => {
+        await service.runMigrationPipeline('user-1', jobId, dto);
+        const job = mockJobs.get(jobId);
+        if (job && !job.failedReason) {
+            job.getState = jest.fn().mockResolvedValue('completed');
+        }
+    };
+
     let mockMigrationQueue: any;
     let mockJobs: Map<string, any>;
 
@@ -142,27 +150,16 @@ describe('MigrationService', () => {
             .mockReturnValueOnce(targetStrategy);
 
         const { jobId } = await service.startMigration('user-1', baseDto);
+        const pipeline = startPipeline(jobId, baseDto);
 
-        // Push 5000 rows asynchronously
-        setImmediate(() => {
-            for (let i = 0; i < 5000; i++) {
-                stream.write({ id: i, name: `user_${i}`, email: `user${i}@test.com` });
-            }
-            stream.end();
-        });
+        await new Promise<void>((resolve) => setImmediate(resolve));
 
-        // Wait for the pipeline to complete
-        await new Promise<void>((resolve) => {
-            const check = async () => {
-                const job = await service.getPublicJob(jobId, 'user-1');
-                if (job?.status === 'completed' || job?.status === 'failed') {
-                    resolve();
-                } else {
-                    setTimeout(check, 50);
-                }
-            };
-            check();
-        });
+        for (let i = 0; i < 5000; i++) {
+            stream.write({ id: i, name: `user_${i}`, email: `user${i}@test.com` });
+        }
+        stream.end();
+
+        await pipeline;
 
         const job = await service.getPublicJob(jobId, 'user-1');
         expect(job.status).toBe('completed');
@@ -193,31 +190,21 @@ describe('MigrationService', () => {
             .mockReturnValueOnce(targetStrategy);
 
         const { jobId } = await service.startMigration('user-1', baseDto);
+        const pipeline = startPipeline(jobId, baseDto);
 
         const progressUpdates: MigrationJob[] = [];
         service.eventEmitter.on(`migration-${jobId}`, (job: MigrationJob) => {
             progressUpdates.push({ ...job });
         });
 
-        // Push 2500 rows
-        setImmediate(() => {
-            for (let i = 0; i < 2500; i++) {
-                stream.write({ id: i });
-            }
-            stream.end();
-        });
+        await new Promise<void>((resolve) => setImmediate(resolve));
 
-        await new Promise<void>((resolve) => {
-            const check = async () => {
-                const job = await service.getPublicJob(jobId, 'user-1');
-                if (job?.status === 'completed' || job?.status === 'failed') {
-                    resolve();
-                } else {
-                    setTimeout(check, 50);
-                }
-            };
-            check();
-        });
+        for (let i = 0; i < 2500; i++) {
+            stream.write({ id: i });
+        }
+        stream.end();
+
+        await pipeline;
 
         const job = await service.getPublicJob(jobId, 'user-1');
         expect(job.status).toBe('completed');
@@ -243,26 +230,16 @@ describe('MigrationService', () => {
             .mockReturnValueOnce(targetStrategy);
 
         const { jobId } = await service.startMigration('user-1', baseDto);
+        const pipeline = startPipeline(jobId, baseDto);
 
-        // Push 4000 rows (will trigger 2 batches, second will fail)
-        setImmediate(() => {
-            for (let i = 0; i < 4000; i++) {
-                stream.write({ id: i });
-            }
-            stream.end();
-        });
+        await new Promise<void>((resolve) => setImmediate(resolve));
 
-        await new Promise<void>((resolve) => {
-            const check = async () => {
-                const job = await service.getPublicJob(jobId, 'user-1');
-                if (job?.status === 'completed' || job?.status === 'failed') {
-                    resolve();
-                } else {
-                    setTimeout(check, 50);
-                }
-            };
-            check();
-        });
+        for (let i = 0; i < 4000; i++) {
+            stream.write({ id: i });
+        }
+        stream.end();
+
+        await pipeline;
 
         const job = await service.getPublicJob(jobId, 'user-1');
         expect(job.status).toBe('failed');
@@ -275,18 +252,7 @@ describe('MigrationService', () => {
         mockConnectionsService.getDecryptedConnection.mockResolvedValue(null);
 
         const { jobId } = await service.startMigration('user-1', baseDto);
-
-        await new Promise<void>((resolve) => {
-            const check = async () => {
-                const job = await service.getPublicJob(jobId, 'user-1');
-                if (job?.status === 'completed' || job?.status === 'failed') {
-                    resolve();
-                } else {
-                    setTimeout(check, 50);
-                }
-            };
-            check();
-        });
+        await startPipeline(jobId, baseDto);
 
         const job = await service.getPublicJob(jobId, 'user-1');
         expect(job.status).toBe('failed');
@@ -307,21 +273,13 @@ describe('MigrationService', () => {
             .mockReturnValueOnce(targetStrategy);
 
         const { jobId } = await service.startMigration('user-1', baseDto);
+        const pipeline = startPipeline(jobId, baseDto);
 
-        // Stream ends immediately (no data)
-        setImmediate(() => stream.end());
+        await new Promise<void>((resolve) => setImmediate(resolve));
 
-        await new Promise<void>((resolve) => {
-            const check = async () => {
-                const job = await service.getPublicJob(jobId, 'user-1');
-                if (job?.status === 'completed' || job?.status === 'failed') {
-                    resolve();
-                } else {
-                    setTimeout(check, 50);
-                }
-            };
-            check();
-        });
+        stream.end();
+
+        await pipeline;
 
         const job = await service.getPublicJob(jobId, 'user-1');
         expect(job.status).toBe('completed');
@@ -336,17 +294,11 @@ describe('MigrationService', () => {
             targetSchema: 'public',
             targetTable: 'users',
         });
-
-        await new Promise<void>((resolve) => {
-            const check = async () => {
-                const job = await service.getPublicJob(jobId, 'user-1');
-                if (job?.status === 'completed' || job?.status === 'failed') {
-                    resolve();
-                } else {
-                    setTimeout(check, 25);
-                }
-            };
-            check();
+        await startPipeline(jobId, {
+            ...baseDto,
+            targetConnectionId: 'src-1',
+            targetSchema: 'public',
+            targetTable: 'users',
         });
 
         const job = await service.getPublicJob(jobId, 'user-1');
@@ -377,21 +329,93 @@ describe('MigrationService', () => {
             targetSchema: 'public',
             targetTable: 'users_copy',
         });
-
-        await new Promise<void>((resolve) => {
-            const check = async () => {
-                const job = await service.getPublicJob(jobId, 'user-1');
-                if (job?.status === 'completed' || job?.status === 'failed') {
-                    resolve();
-                } else {
-                    setTimeout(check, 25);
-                }
-            };
-            check();
+        await startPipeline(jobId, {
+            ...baseDto,
+            targetConnectionId: 'src-1',
+            targetSchema: 'public',
+            targetTable: 'users_copy',
         });
 
         const job = await service.getPublicJob(jobId, 'user-1');
         expect(job.status).toBe('failed');
         expect(job.error).toContain('missing source columns');
+    });
+
+    it('should preview schema differences before running a migration', async () => {
+        const sourceStrategy = createMockStrategy();
+        const targetStrategy = createMockStrategy();
+
+        mockTargetConn.type = 'postgres';
+        sourceStrategy.getFullMetadata.mockResolvedValue({
+            columns: [
+                { name: 'id', isNullable: false, defaultValue: null, isPrimaryKey: true, pkConstraintName: 'users_pkey' },
+                { name: 'name', isNullable: true, defaultValue: null, isPrimaryKey: false, pkConstraintName: null },
+                { name: 'email', isNullable: true, defaultValue: null, isPrimaryKey: false, pkConstraintName: null },
+            ],
+            indices: [
+                { name: 'users_email_idx', columns: ['email'], isUnique: false, isPrimary: false },
+            ],
+            rowCount: 125_000,
+        });
+        targetStrategy.getFullMetadata.mockResolvedValue({
+            columns: [
+                { name: 'id', isNullable: false, defaultValue: null, isPrimaryKey: true, pkConstraintName: 'users_pkey' },
+                { name: 'name', isNullable: false, defaultValue: null, isPrimaryKey: false, pkConstraintName: null },
+                { name: 'email', isNullable: true, defaultValue: null, isPrimaryKey: false, pkConstraintName: null },
+                { name: 'created_at', isNullable: false, defaultValue: 'now()', isPrimaryKey: false, pkConstraintName: null },
+            ],
+            indices: [
+                { name: 'users_email_idx', columns: ['email'], isUnique: true, isPrimary: false },
+                { name: 'users_created_at_idx', columns: ['created_at'], isUnique: false, isPrimary: false },
+            ],
+            rowCount: 80_000,
+        });
+
+        mockStrategyFactory.getStrategy
+            .mockReturnValueOnce(sourceStrategy)
+            .mockReturnValueOnce(targetStrategy);
+
+        const review = await service.previewMigration('user-1', {
+            ...baseDto,
+            targetConnectionId: 'tgt-1',
+            targetSchema: 'public',
+            targetTable: 'users_shadow',
+        });
+
+        expect(review.canProceed).toBe(true);
+        expect(review.blockers).toHaveLength(0);
+        expect(review.estimatedImpact.changedColumns).toBeGreaterThan(0);
+        expect(review.estimatedImpact.addedColumns).toBeGreaterThan(0);
+        expect(review.estimatedImpact.changedIndices).toBeGreaterThan(0);
+        expect(review.warnings.some((warning) => warning.includes('Large source table'))).toBe(true);
+    });
+
+    it('should report blockers in a migration preview when the target is not compatible', async () => {
+        const sourceStrategy = createMockStrategy();
+        const targetStrategy = createMockStrategy();
+
+        mockTargetConn.type = 'postgres';
+        targetStrategy.getFullMetadata.mockResolvedValue({
+            columns: [
+                { name: 'id', isNullable: false, defaultValue: null, isPrimaryKey: true, pkConstraintName: 'users_pkey' },
+                { name: 'name', isNullable: false, defaultValue: null, isPrimaryKey: false, pkConstraintName: null },
+            ],
+            indices: [],
+            rowCount: 10,
+        });
+
+        mockStrategyFactory.getStrategy
+            .mockReturnValueOnce(sourceStrategy)
+            .mockReturnValueOnce(targetStrategy);
+
+        const review = await service.previewMigration('user-1', {
+            ...baseDto,
+            targetConnectionId: 'tgt-1',
+            targetSchema: 'public',
+            targetTable: 'users_shadow',
+        });
+
+        expect(review.canProceed).toBe(false);
+        expect(review.blockers.join(' ')).toContain('missing source columns');
     });
 });

@@ -73,8 +73,8 @@ export const TabsBar: React.FC = () => {
     if (tabs.length === 0) return null;
 
     return (
-        <div className="flex items-center border-b bg-muted/20 h-9 shrink-0">
-            <div className="flex-1 flex items-center overflow-x-auto hide-scrollbar scroll-smooth">
+        <div className="flex items-center border-b bg-muted/10 h-10 shrink-0 backdrop-blur-sm">
+            <div className="flex-1 flex items-center overflow-x-auto hide-scrollbar scroll-smooth h-full">
                 {tabs.map((tab, index) => (
                     <div
                         key={tab.id}
@@ -84,20 +84,20 @@ export const TabsBar: React.FC = () => {
                         onDragOver={(e) => handleDragOver(e, index)}
                         onDrop={(e) => handleDrop(e, index)}
                         className={cn(
-                            "group flex items-center gap-1.5 px-3 h-full border-r text-sm cursor-pointer select-none transition-all duration-200",
-                            isCompactMobileLayout ? "min-w-[100px] max-w-[150px]" : "min-w-[120px] max-w-[200px]",
+                            "group flex items-center gap-2 px-3.5 h-full border-r text-[13px] font-medium cursor-pointer select-none transition-all duration-200 relative",
+                            isCompactMobileLayout ? "min-w-[120px] max-w-[160px]" : "min-w-[140px] max-w-[220px]",
                             activeTabId === tab.id
-                                ? "bg-background font-medium border-b-2 border-b-primary shadow-sm"
-                                : "hover:bg-muted/50 text-muted-foreground border-b border-b-transparent",
+                                ? "bg-background text-foreground shadow-[inset_0_-2px_0_0_hsl(var(--primary))] z-10"
+                                : "hover:bg-muted/40 text-muted-foreground border-b border-b-transparent",
                             dragIndex === index && "opacity-40",
                             dropTargetIndex === index && dragIndex !== index && "border-l-2 border-l-primary"
                         )}
                         onClick={() => setActiveTab(tab.id)}
                     >
                         {/* Drag Handle */}
-                        <GripVertical className="w-3 h-3 text-muted-foreground/30 shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <GripVertical className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity" />
 
-                        <Database className="w-3 h-3 text-blue-500 opacity-70 shrink-0" />
+                        <Database className="w-4 h-4 text-blue-500/80 shrink-0" />
 
                         <span className="truncate flex-1">
                             {getTabDisplayTitle(tab, lang)}
@@ -105,7 +105,7 @@ export const TabsBar: React.FC = () => {
 
                         <button
                             className={cn(
-                                "p-0.5 hover:bg-muted rounded text-muted-foreground transition-opacity",
+                                "p-1 hover:bg-muted rounded-md text-muted-foreground transition-all active:scale-95 ml-1",
                                 activeTabId === tab.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                             )}
                             onClick={(e) => {
@@ -113,7 +113,7 @@ export const TabsBar: React.FC = () => {
                                 closeTab(tab.id);
                             }}
                         >
-                            <X className="w-3 h-3" />
+                            <X className="w-3.5 h-3.5" />
                         </button>
                     </div>
                 ))}
@@ -121,18 +121,18 @@ export const TabsBar: React.FC = () => {
 
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-full w-9 border-l rounded-none hover:bg-muted/50">
+                    <Button variant="ghost" size="icon" className="h-full w-10 border-l rounded-none hover:bg-muted/50 transition-colors">
                         <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 max-h-[70vh] overflow-y-auto">
+                <DropdownMenuContent align="end" className="w-64 max-h-[70vh] overflow-y-auto" sideOffset={5}>
                     {tabs.map(tab => (
                         <DropdownMenuItem
                             key={`menu-${tab.id}`}
                             onClick={() => setActiveTab(tab.id)}
-                            className={cn(activeTabId === tab.id && "bg-muted font-medium")}
+                            className={cn("h-10", activeTabId === tab.id && "bg-muted font-medium")}
                         >
-                            <Database className="w-3.5 h-3.5 mr-2 text-blue-500" />
+                            <Database className="w-4 h-4 mr-3 text-blue-500/80" />
                             <span className="truncate flex-1">
                                 {getTabDisplayTitle(tab, lang)}
                             </span>

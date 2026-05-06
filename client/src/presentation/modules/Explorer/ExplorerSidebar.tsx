@@ -374,7 +374,7 @@ export const ExplorerSidebar: React.FC = () => {
                         <span className="truncate max-w-[100px]">{effectiveDatabase}</span>
                     </div>
                 )}
-                <span className="opacity-50">V3.3.0</span>
+                <span className="opacity-50">V3.4.0</span>
             </div>
 
             {/* Dialogs */}

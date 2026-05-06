@@ -14,6 +14,7 @@ artifacts/
 .agent/
 agent/
 mobile-audit/
+docs/
 /plans/phase-1-implementation-plan.md
 /plans/team-collaboration-analysis.md
 docs/superpowers/specs/2026-05-03-feature-matrix.md
