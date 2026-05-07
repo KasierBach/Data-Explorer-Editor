@@ -61,6 +61,8 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                     // For now, toggle if it exists in local context, or show warning
                     actions.toggleTable(item.name);
                 }}
+                isRefreshing={state.isRefreshing}
+                onRefresh={actions.handleRefreshMetadata}
             />
 
             <ERDCanvas

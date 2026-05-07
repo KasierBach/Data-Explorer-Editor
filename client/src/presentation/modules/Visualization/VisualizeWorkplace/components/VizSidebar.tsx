@@ -7,6 +7,7 @@ import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/presentation/components/ui/select";
 import { cn } from '@/lib/utils';
+import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import type { DataMode } from '../useVisualizeLogic';
 
 interface VizSidebarProps {
@@ -68,6 +69,7 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
     chartTypes, curveType, setCurveType, curveTypes, options, handleExportPNG, 
     handleExportCSV, chartData
 }) => {
+    const { isActualMobile } = useResponsiveLayoutMode();
     const sidebarSections = [
         { id: 'source', label: 'Data Source', icon: Database },
         { id: 'chart', label: 'Chart Type', icon: BarChart3 },
@@ -79,9 +81,12 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
     return (
         <div className={cn(
             "border-r bg-card/30 backdrop-blur-3xl flex flex-col shrink-0 transition-all duration-300",
-            isCollapsed ? "w-0 overflow-hidden border-none" : "w-80"
+            isCollapsed ? "w-0 overflow-hidden border-none" : (isActualMobile ? "w-full" : "w-80")
         )}>
-            <div className="w-80 h-full flex flex-col">
+            <div className={cn(
+                "h-full flex flex-col",
+                isActualMobile ? "w-full" : "w-80"
+            )}>
                 <div className="p-5 border-b bg-muted/5 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-emerald-500 rounded-xl shadow-lg shadow-emerald-500/20 text-white">
@@ -112,7 +117,10 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
                     ))}
                 </div>
 
-                <div className="flex-1 overflow-auto custom-scrollbar p-5 space-y-5">
+                <div className={cn(
+                    "flex-1 overflow-auto custom-scrollbar space-y-5",
+                    isActualMobile ? "p-3" : "p-5"
+                )}>
                     {activeSection === 'source' && (
                         <>
                             <div className="flex gap-1 bg-muted/10 rounded-xl p-1">

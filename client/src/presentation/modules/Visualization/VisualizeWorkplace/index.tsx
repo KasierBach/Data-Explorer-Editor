@@ -7,6 +7,8 @@ import {
 import { useVisualizeLogic } from './useVisualizeLogic';
 import { VizSidebar } from './components/VizSidebar';
 import { VizCanvas } from './components/VizCanvas';
+import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
+import { cn } from '@/lib/utils';
 
 const CHART_TYPES = [
     { id: 'bar', name: 'Bar', icon: BarChart3 },
@@ -58,8 +60,20 @@ export const VisualizeWorkplace: React.FC = () => {
         { label: 'Brush Zoom', value: state.showBrush, set: actions.setShowBrush, icon: Maximize2 },
     ];
 
+    const { isActualMobile } = useResponsiveLayoutMode();
+
+    // Auto-collapse sidebar on mobile on mount
+    React.useEffect(() => {
+        if (isActualMobile) {
+            actions.setSidebarCollapsed(true);
+        }
+    }, [isActualMobile]);
+
     return (
-        <div className="h-full flex bg-background overflow-hidden font-sans">
+        <div className={cn(
+            "h-full flex bg-background overflow-hidden font-sans",
+            isActualMobile ? "flex-col" : "flex-row"
+        )}>
             <VizSidebar
                 isCollapsed={state.isSidebarCollapsed}
                 setCollapsed={actions.setSidebarCollapsed}

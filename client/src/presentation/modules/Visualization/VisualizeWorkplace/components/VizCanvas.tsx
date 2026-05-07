@@ -6,6 +6,8 @@ import {
     ResponsiveContainer, Cell, Legend, Brush
 } from 'recharts';
 import { AlertCircle, BarChart3, PieChart as PieIcon, PanelLeft, RotateCcw } from 'lucide-react';
+import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
+import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
 
 interface VizCanvasProps {
@@ -39,6 +41,8 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
     getChartData, chartRef, title, isSidebarCollapsed, setSidebarCollapsed, isLoading,
     selectedTable, chartTypeName
 }) => {
+    const { isActualMobile } = useResponsiveLayoutMode();
+
 
     const tooltipStyle = {
         backgroundColor: 'hsl(var(--card))',
@@ -316,7 +320,10 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                 </div>
             )}
 
-            <div className="px-8 pt-8 pb-4 flex items-end justify-between">
+            <div className={cn(
+                "pb-4 flex items-end justify-between",
+                isActualMobile ? "px-4 pt-4" : "px-8 pt-8"
+            )}>
                 <div className="space-y-2">
                     <div className="flex items-center gap-3">
                         <span className="px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-lg text-[8px] font-black uppercase tracking-widest border border-emerald-500/20">
@@ -328,7 +335,10 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                             </span>
                         )}
                     </div>
-                    <h1 className="text-3xl font-black tracking-tight">{title}</h1>
+                    <h1 className={cn(
+                        "font-black tracking-tight",
+                        isActualMobile ? "text-xl" : "text-3xl"
+                    )}>{title}</h1>
                 </div>
                 <div className="flex gap-2">
                     <div className="px-4 py-2 bg-card/40 backdrop-blur-xl border rounded-xl text-[9px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
@@ -338,12 +348,18 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                 </div>
             </div>
 
-            <div className="flex-1 px-8 pb-8 min-h-0">
+            <div className={cn(
+                "flex-1 pb-8 min-h-0",
+                isActualMobile ? "px-2" : "px-8"
+            )}>
                 <div ref={chartRef} className="h-full relative group rounded-3xl overflow-hidden">
                     <div className="absolute -top-24 -right-24 w-[400px] h-[400px] bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none group-hover:bg-emerald-500/8 transition-colors duration-1000" />
                     <div className="absolute -bottom-24 -left-24 w-[400px] h-[400px] bg-blue-500/5 blur-[120px] rounded-full pointer-events-none group-hover:bg-blue-500/8 transition-colors duration-1000" />
 
-                    <div className="h-full border border-border/10 bg-card/30 backdrop-blur-xl rounded-3xl p-8 shadow-2xl ring-1 ring-white/5">
+                    <div className={cn(
+                        "h-full border border-border/10 bg-card/30 backdrop-blur-xl rounded-3xl shadow-2xl ring-1 ring-white/5",
+                        isActualMobile ? "p-2" : "p-8"
+                    )}>
                         {renderChart()}
                     </div>
                 </div>

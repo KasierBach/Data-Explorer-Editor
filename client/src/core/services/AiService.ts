@@ -14,6 +14,7 @@ class AiService {
         database?: string;
         beforeCursor: string;
         afterCursor?: string;
+        context?: string;
     }, signal?: AbortSignal): Promise<string> {
         try {
             const data = await apiService.request<AutocompleteResponse>('/ai/autocomplete', {

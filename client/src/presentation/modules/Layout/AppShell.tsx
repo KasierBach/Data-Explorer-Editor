@@ -150,7 +150,7 @@ export function AppShell() {
                     }}
                     className={cn(
                         "h-full border-r bg-card flex-shrink-0 overflow-hidden",
-                        isCompactMobileLayout ? "absolute left-0 shadow-2xl" : "relative",
+                        isCompactMobileLayout ? "absolute left-0 shadow-2xl z-50" : "relative flex-shrink-0",
                         !isSidebarOpen && "border-none",
                         leftPanel.isDragging ? "" : "transition-[width,transform] duration-300 ease-in-out",
                         isCompactMobileLayout && !isSidebarOpen && "-translate-x-full"
@@ -181,7 +181,7 @@ export function AppShell() {
                 )}
 
                 {/* Main Content */}
-                <main className="flex-1 h-full min-w-0 bg-background relative z-10">
+                <main className="flex-1 h-full min-w-0 bg-background relative z-10 flex-shrink flex-grow">
                     <MainContent />
                     {anyDragging && <div className="absolute inset-0 z-20" />}
                 </main>
@@ -217,11 +217,10 @@ export function AppShell() {
                 <aside
                     className={cn(
                         "h-full border-l bg-card flex-shrink-0 overflow-hidden",
-                        isCompactMobileLayout ? "absolute right-0 shadow-2xl" : "relative",
+                        isCompactMobileLayout ? "absolute right-0 shadow-2xl z-50" : "relative flex-shrink-0",
                         !isAiPanelOpen && "border-none",
                         rightPanel.isDragging ? "" : "transition-[width,transform] duration-300 ease-in-out",
-                        isCompactMobileLayout && !isAiPanelOpen && "translate-x-full",
-                        isCompactMobileLayout ? "z-50" : "z-10"
+                        isCompactMobileLayout && !isAiPanelOpen && "translate-x-full"
                     )}
                     style={{
                         width: isAiPanelOpen ? `${rightPanel.width}px` : '0px'

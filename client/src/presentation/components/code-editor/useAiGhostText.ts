@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { aiService } from '@/core/services/AiService';
+import { useAppStore } from '@/core/services/store';
 
 /**
  * Custom hook that registers an AI-powered Inline Completions Provider for Monaco.
@@ -13,6 +14,8 @@ export function useAiGhostText(
     activeDatabase: string | undefined,
     language: string = 'sql'
 ) {
+    const store = useAppStore();
+    
     useEffect(() => {
         if (!monaco || !activeConnectionId) return;
 
@@ -30,9 +33,6 @@ export function useAiGhostText(
                 // 1. Basic Validation
                 const lineContent = model.getLineContent(position.lineNumber);
                 const textBefore = lineContent.substring(0, position.column - 1);
-                
-                // Don't trigger if user just started typing a new line or it's just whitespace
-                if (lineContent.trim().length < 2) return;
 
                 // 2. Intelligence: Don't trigger if we're in the middle of a word unless at the end
                 const charAfter = lineContent[position.column - 1] || '';
@@ -66,11 +66,20 @@ export function useAiGhostText(
                 try {
                     // Pass the Monaco CancellationToken converted to AbortSignal if needed,
                     // but AiService just needs it to check during processing.
+                    // 5. Build Context (including NoSQL schema if available)
+                    let contextStr = undefined;
+                    const isNoSql = language === 'json';
+                    if (isNoSql && store.nosqlActiveCollection && store.nosqlSchemaStats) {
+                        contextStr = `[NOSQL SCHEMA] Collection: ${store.nosqlActiveCollection}\nFields: ` + 
+                                     store.nosqlSchemaStats.map((s: any) => `${s.name} (${Object.keys(s.types).join('/')})`).join(', ');
+                    }
+
                     const completion = await aiService.getAutocomplete({
                         connectionId: activeConnectionId,
                         database: activeDatabase,
                         beforeCursor,
                         afterCursor,
+                        context: contextStr,
                     });
 
                     if (!completion || token.isCancellationRequested) return;

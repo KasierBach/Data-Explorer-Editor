@@ -49,7 +49,7 @@ async function readPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const content = await page.getTextContent();
-            const text = content.items.map((item) => ('str' in item ? item.str : '')).join(' ');
+            const text = content.items.map((item: any) => ('str' in item ? item.str : '')).join(' ');
             pages.push(`--- Page ${i} ---\n${text}`);
         }
         return pages.join('\n\n');
@@ -76,17 +76,14 @@ async function readExcelAsText(arrayBuffer: ArrayBuffer, fileName: string): Prom
 
 // Extract the "message" field content from partial JSON streaming output
 function extractMessageFromPartialJson(raw: string): string {
-    // Try to find "message": "..." and extract content so far
     const msgMatch = raw.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"?/s);
     if (msgMatch) {
-        // Unescape JSON string
         try {
             return JSON.parse('"' + msgMatch[1] + '"');
         } catch {
             return msgMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
         }
     }
-    // If no message field found yet, show raw text cleaned of JSON syntax
     return raw.replace(/^\s*\{\s*"message"\s*:\s*"?/, '').replace(/"?\s*\}\s*$/, '');
 }
 
@@ -95,7 +92,6 @@ export function useAiChat() {
     const [isLoading, setIsLoading] = useState(false);
     const [attachments, setAttachments] = useState<Attachment[]>([]);
 
-    // Refs for scrolling and inputs
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -112,11 +108,10 @@ export function useAiChat() {
     const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        e.target.value = ''; // reset immediately
+        e.target.value = '';
 
         const ext = getFileExtension(file.name);
 
-        // 1. Images → base64 preview
         if (file.type.startsWith('image/')) {
             const reader = new FileReader();
             reader.onload = () => {
@@ -131,7 +126,6 @@ export function useAiChat() {
             return;
         }
 
-        // 2. PDF → extract text
         if (ext === 'pdf' || file.type === 'application/pdf') {
             const buffer = await file.arrayBuffer();
             const text = await readPdfText(buffer);
@@ -144,7 +138,6 @@ export function useAiChat() {
             return;
         }
 
-        // 3. Excel → extract as CSV text
         if (EXCEL_EXTENSIONS.has(ext)) {
             const buffer = await file.arrayBuffer();
             const text = await readExcelAsText(buffer, file.name);
@@ -157,8 +150,7 @@ export function useAiChat() {
             return;
         }
 
-        // 4. Text/Code/CSV files → read as text
-        if (TEXT_EXTENSIONS.has(ext) || file.type.startsWith('text/') || ext === '' && file.size < 1024 * 1024) {
+        if (TEXT_EXTENSIONS.has(ext) || file.type.startsWith('text/') || (ext === '' && file.size < 1024 * 1024)) {
             const text = await file.text();
             const truncated = text.length > 50000 ? text.slice(0, 50000) + '\n\n[... truncated at 50,000 chars]' : text;
             const emoji = getFileEmoji(ext);
@@ -171,7 +163,6 @@ export function useAiChat() {
             return;
         }
 
-        // 5. Unknown → try reading as text anyway if small enough
         if (file.size < 512 * 1024) {
             try {
                 const text = await file.text();
@@ -216,11 +207,26 @@ export function useAiChat() {
 
     const handleMentionTable = () => {
         if (activeConnection && activeDatabase) {
-            setAttachments(prev => [...prev, {
-                type: 'table',
-                label: `DB: ${activeDatabase}`,
-                data: `Database đang kết nối: ${activeConnection.name}, Database: ${activeDatabase}, Type: ${activeConnection.type}`,
-            }]);
+            const isNoSql = activeConnection.type === 'mongodb' || activeConnection.type === 'mongodb+srv';
+            
+            if (isNoSql && store.nosqlActiveCollection) {
+                const schemaStr = store.nosqlSchemaStats ? 
+                    `Schema cho collection "${store.nosqlActiveCollection}":\n` + 
+                    store.nosqlSchemaStats.map((s: any) => `- ${s.name}: ${Object.keys(s.types).join('/')} (${s.probability}% xuất hiện)`).join('\n')
+                    : `Collection đang mở: ${store.nosqlActiveCollection} (Chưa chạy phân tích Schema)`;
+
+                setAttachments(prev => [...prev, {
+                    type: 'table',
+                    label: `Schema: ${store.nosqlActiveCollection}`,
+                    data: schemaStr,
+                }]);
+            } else {
+                setAttachments(prev => [...prev, {
+                    type: 'table',
+                    label: `DB: ${activeDatabase}`,
+                    data: `Database đang kết nối: ${activeConnection.name}, Database: ${activeDatabase}, Type: ${activeConnection.type}`,
+                }]);
+            }
         }
     };
 
@@ -230,22 +236,17 @@ export function useAiChat() {
 
     const processSseLine = useCallback((chatId: string, aiMessageId: string, raw: string, line: string) => {
         if (!line.startsWith('data: ')) return raw;
-
         const data = line.slice(6).trim();
         if (!data || data === '[DONE]') return raw;
 
         try {
             const event = JSON.parse(data);
-
             if (event.type === 'chunk' && event.text) {
                 const nextRaw = raw + event.text;
                 const displayText = extractMessageFromPartialJson(nextRaw);
-                updateAiMessage(chatId, aiMessageId, {
-                    content: displayText,
-                });
+                updateAiMessage(chatId, aiMessageId, { content: displayText });
                 return nextRaw;
             }
-
             if (event.type === 'done' && event.data) {
                 const finalMsgContent = event.data.message || raw;
                 updateAiMessage(chatId, aiMessageId, {
@@ -259,7 +260,6 @@ export function useAiChat() {
                         routingMode: event.data.routingMode,
                     },
                 });
-
                 store.syncAiMessage(chatId, {
                     id: aiMessageId,
                     role: 'ai',
@@ -274,20 +274,15 @@ export function useAiChat() {
                     },
                     timestamp: Date.now()
                 } as any);
-
                 return raw;
             }
-
             if (event.type === 'error') {
                 updateAiMessage(chatId, aiMessageId, {
                     content: `❌ ${event.text}`,
                     error: true,
                 });
             }
-        } catch {
-            // Skip malformed SSE lines
-        }
-
+        } catch { /* skip malformed */ }
         return raw;
     }, [store, updateAiMessage]);
 
@@ -305,71 +300,57 @@ export function useAiChat() {
             return;
         }
 
-        // Build display content for user message
         const attachmentLabels = attachments.map(a => {
-            if (a.type === 'image') return ''; // We will render the image itself, so don't add text
+            if (a.type === 'image') return '';
             if (a.type === 'sql') return `📋 SQL đính kèm`;
             if (a.type === 'table') return `📊 ${a.label}`;
-            if (a.type === 'file') return a.label; // already has emoji
             return a.label;
         });
-        const displayContent = [
-            input.trim(),
-            ...attachmentLabels
-        ].filter(Boolean).join('\n');
+
+        const displayContent = [input.trim(), ...attachmentLabels].filter(Boolean).join('\n');
 
         const userMsg: AiMessage = {
             id: `msg-${Date.now()}`,
             role: 'user',
             content: displayContent,
             timestamp: Date.now(),
-            attachments: attachments.map(a => ({
-                type: a.type,
-                label: a.label,
-                preview: a.preview
-            }))
+            attachments: attachments.map(a => ({ type: a.type, label: a.label, preview: a.preview }))
         };
         addAiMessage(activeAiChatId, userMsg);
 
-        // Build context from attachments
         const contextParts: string[] = [];
         let imageData: string | undefined;
 
         for (const att of attachments) {
-            if (att.type === 'image') {
-                imageData = att.data;
-            } else {
-                contextParts.push(`[${att.type.toUpperCase()}] ${att.label}:\n${att.data}`);
-            }
+            if (att.type === 'image') imageData = att.data;
+            else contextParts.push(`[${att.type.toUpperCase()}] ${att.label}:\n${att.data}`);
         }
-
-        const contextStr = contextParts.length > 0 ? contextParts.join('\n\n') : undefined;
 
         setInput('');
         setAttachments([]);
         setIsLoading(true);
 
-        // Create streaming AI message immediately
         const aiMsgId = `msg-${Date.now()}-ai`;
-        addAiMessage(activeAiChatId, {
-            id: aiMsgId,
-            role: 'ai',
-            content: '',
-            timestamp: Date.now(),
-        });
+        addAiMessage(activeAiChatId, { id: aiMsgId, role: 'ai', content: '', timestamp: Date.now() });
 
         try {
             const adapter = connectionService.getActiveAdapter();
+            if (!adapter || !(adapter as any).generateSqlStream) throw new Error("API Adapter does not support AI streaming.");
 
-            if (!adapter || !(adapter as any).generateSqlStream) {
-                throw new Error("API Adapter does not support AI streaming.");
+            const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';
+            if (isNoSql && store.nosqlActiveCollection && !attachments.some(a => a.type === 'table')) {
+                const schemaSummary = store.nosqlSchemaStats ? 
+                     `[NOSQL SCHEMA] Collection: ${store.nosqlActiveCollection}\nFields: ` + 
+                     store.nosqlSchemaStats.map((s: any) => `${s.name} (${Object.keys(s.types).join('/')})`).join(', ')
+                     : `[NOSQL CONTEXT] Collection: ${store.nosqlActiveCollection}`;
+                contextParts.unshift(schemaSummary);
             }
 
             const response = await (adapter as any).generateSqlStream({
                 database: activeDatabase || undefined,
                 prompt: input || '(xem hình/context đính kèm)',
                 image: imageData,
-                context: contextStr,
+                context: contextParts.length > 0 ? contextParts.join('\n\n') : undefined,
                 model: aiModel,
                 mode: aiMode,
                 routingMode: aiRoutingMode,
@@ -390,76 +371,15 @@ export function useAiChat() {
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) break;
-
                 buffer += decoder.decode(value, { stream: true });
-
-                // Parse SSE events from buffer
                 const lines = buffer.split(/\r?\n/);
                 buffer = lines.pop() || '';
-
                 for (const line of lines) {
                     rawText = processSseLine(activeAiChatId, aiMsgId, rawText, line.trimEnd());
-                    continue;
-
-                    if (!line.startsWith('data: ')) continue;
-                    const data = line.slice(6).trim();
-                    if (data === '[DONE]') continue;
-
-                    try {
-                        const event = JSON.parse(data);
-
-                        if (event.type === 'chunk' && event.text) {
-                            rawText += event.text;
-                            // Show raw streamed text progressively
-                            // Try to extract "message" field content for display
-                            const displayText = extractMessageFromPartialJson(rawText);
-                            updateAiMessage(activeAiChatId!, aiMsgId, {
-                                content: displayText,
-                            });
-                        } else if (event.type === 'done' && event.data) {
-                            // Final parsed result with SQL/citations
-                            const finalMsgContent = event.data.message || rawText;
-                            updateAiMessage(activeAiChatId!, aiMsgId, {
-                                content: finalMsgContent,
-                                sql: event.data.sql || undefined,
-                                explanation: event.data.explanation || undefined,
-                                recommendations: event.data.recommendations || undefined,
-                                modelInfo: {
-                                    provider: event.data.provider,
-                                    model: event.data.model,
-                                    routingMode: event.data.routingMode,
-                                },
-                            });
-                            
-                            // Sync completed message to backend
-                            store.syncAiMessage(activeAiChatId!, {
-                                id: aiMsgId,
-                                role: 'ai',
-                                content: finalMsgContent,
-                                sql: event.data.sql,
-                                explanation: event.data.explanation,
-                                recommendations: event.data.recommendations,
-                                modelInfo: {
-                                    provider: event.data.provider,
-                                    model: event.data.model,
-                                    routingMode: event.data.routingMode,
-                                },
-                                timestamp: Date.now()
-                            } as any);
-                        } else if (event.type === 'error') {
-                            updateAiMessage(activeAiChatId!, aiMsgId, {
-                                content: `❌ ${event.text}`,
-                                error: true,
-                            });
-                        }
-                    } catch {
-                        // Skip unparseable lines
-                    }
                 }
             }
 
             buffer += decoder.decode();
-
             if (buffer) {
                 const remainingLines = buffer.split(/\r?\n/);
                 for (const line of remainingLines) {
@@ -467,10 +387,7 @@ export function useAiChat() {
                 }
             }
         } catch (error: any) {
-            updateAiMessage(activeAiChatId, aiMsgId, {
-                content: `❌ Lỗi: ${error.message}`,
-                error: true,
-            });
+            updateAiMessage(activeAiChatId, aiMsgId, { content: `❌ Lỗi: ${error.message}`, error: true });
         } finally {
             setIsLoading(false);
         }
@@ -486,24 +403,12 @@ export function useAiChat() {
     const formatTime = (ts: number) => {
         const d = new Date(ts);
         const now = new Date();
-        const isToday = d.toDateString() === now.toDateString();
-        if (isToday) return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
         return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
     };
 
     return {
-        input,
-        setInput,
-        isLoading,
-        attachments,
-        messagesEndRef,
-        fileInputRef,
-        handleFileSelected,
-        handlePasteQuery,
-        handleMentionTable,
-        removeAttachment,
-        handleSend,
-        handleKeyDown,
-        formatTime
+        input, setInput, isLoading, attachments, messagesEndRef, fileInputRef,
+        handleFileSelected, handlePasteQuery, handleMentionTable, removeAttachment, handleSend, handleKeyDown, formatTime
     };
 }

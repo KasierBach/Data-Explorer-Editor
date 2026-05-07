@@ -6,6 +6,8 @@ import {
 } from '@tanstack/react-table';
 import type { QueryResult } from '@/core/domain/entities';
 import { Info } from 'lucide-react';
+import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
+import { cn } from '@/lib/utils';
 
 interface ResultTableProps {
     results: QueryResult | null;
@@ -31,6 +33,8 @@ export const ResultTable: React.FC<ResultTableProps> = ({ results }) => {
         columns,
         getCoreRowModel: getCoreRowModel(),
     });
+
+    const { isCompactMobileLayout } = useResponsiveLayoutMode();
 
     if (!results || results.rows.length === 0) {
         return (
@@ -63,7 +67,10 @@ export const ResultTable: React.FC<ResultTableProps> = ({ results }) => {
                                 {idx + 1}
                             </td>
                             {row.getVisibleCells().map(cell => (
-                                <td key={cell.id} className="p-1.5 px-3 border-r last:border-r-0 whitespace-nowrap truncate max-w-[400px]">
+                                <td key={cell.id} className={cn(
+                                    "p-1.5 px-3 border-r last:border-r-0 whitespace-nowrap truncate",
+                                    isCompactMobileLayout ? "max-w-[200px]" : "max-w-[400px]"
+                                )}>
                                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                 </td>
                             ))}

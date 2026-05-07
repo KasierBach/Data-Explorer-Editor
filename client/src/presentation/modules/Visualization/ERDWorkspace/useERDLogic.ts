@@ -16,6 +16,7 @@ import { connectionService } from '@/core/services/ConnectionService';
 import { queryService } from '@/core/services/QueryService';
 import { ErdWorkspaceService, type SaveErdWorkspacePayload } from '@/core/services/ErdWorkspaceService';
 import { ApiError } from '@/core/services/api.service';
+import { MetadataService } from '@/core/services/MetadataService';
 import { SearchService, type SearchResult } from '@/core/services/SearchService';
 import type { ErdWorkspaceEntity } from '@/core/domain/entities';
 import type { ForeignKeyData } from '../ForeignKeyDialog';
@@ -77,6 +78,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
     const [globalSearchResults, setGlobalSearchResults] = useState<SearchResult[]>([]);
     const [isSearchingGlobal, setIsSearchingGlobal] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const isFirstLoad = useRef(true);
     const hasShownWorkspaceWarning = useRef(false);
@@ -250,8 +252,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         queryFn: async () => {
             if (!connectionId || !activeConnection) return [];
             const adapter = connectionService.getAdapter(connectionId, activeConnection.type as any);
-            const entries = await adapter.getHierarchy(null);
-            return entries.filter((entry: any) => entry.type === 'database');
+            const dbs = await adapter.getDatabases();
+            return dbs.map(db => ({ id: `db:${db}`, name: db, type: 'database' }));
         },
         enabled: !!connectionId && !!activeConnection,
         placeholderData: (prev) => prev,
@@ -294,15 +296,28 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     });
 
     const filteredHierarchy = useMemo(() => {
-        if (!hierarchy) return [];
-        let filtered = hierarchy;
-        if (schemaFilter !== 'all') {
-            filtered = filtered.filter((entry) => entry.id?.includes(`schema:${schemaFilter}`));
+        if (!hierarchy || !Array.isArray(hierarchy)) return [];
+        
+        let filtered = [...hierarchy];
+
+        // 1. Schema Filter
+        if (schemaFilter && schemaFilter !== 'all') {
+            const schemaPrefix = `schema:${schemaFilter}`;
+            filtered = filtered.filter((entry) => 
+                entry.id?.includes(schemaPrefix) || 
+                entry.schema === schemaFilter
+            );
         }
-        if (searchTerm.trim()) {
-            const term = searchTerm.toLowerCase();
-            filtered = filtered.filter((entry) => entry.name.toLowerCase().includes(term));
+
+        // 2. Text Search Term
+        const term = searchTerm?.trim()?.toLowerCase();
+        if (term) {
+            filtered = filtered.filter((entry) => {
+                const name = (entry.name || '').toLowerCase();
+                return name.includes(term);
+            });
         }
+
         return filtered;
     }, [hierarchy, schemaFilter, searchTerm]);
 
@@ -391,6 +406,24 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         await queryClient.invalidateQueries({ queryKey: ['erd-workspaces', connectionId] });
         toast.success(lang === 'vi' ? 'Đã xóa workspace ERD' : 'ERD workspace deleted');
     }, [connectionId, currentWorkspaceId, lang, queryClient]);
+
+    const handleRefreshMetadata = useCallback(async () => {
+        if (!connectionId) return;
+        setIsRefreshing(true);
+        try {
+            await MetadataService.refresh(connectionId, selectedDatabase);
+            toast.success(lang === 'vi' ? 'Đã làm mới metadata' : 'Metadata refreshed');
+            await queryClient.invalidateQueries({ queryKey: ['erd-hierarchy-v2'] });
+            await queryClient.invalidateQueries({ queryKey: ['erd-databases'] });
+            await queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
+        } catch (error: any) {
+            toast.error(lang === 'vi' ? 'Không thể làm mới metadata' : 'Failed to refresh metadata', {
+                description: error.message
+            });
+        } finally {
+            setIsRefreshing(false);
+        }
+    }, [connectionId, queryClient, selectedDatabase, lang]);
 
     const handleRemoveConstraint = useCallback(async (tableName: string, type: 'pk' | 'fk', constraintName: string) => {
         const confirmed = window.confirm(
@@ -820,6 +853,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             isOpenWorkspaceDialogOpen,
             globalSearchResults,
             isSearchingGlobal,
+            isRefreshing,
         },
         actions: {
             setNodes,
@@ -839,6 +873,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             setSchemaFilter,
             setShowMinimap,
             setSearchTerm,
+            handleRefreshMetadata,
             setSelectedDatabase: handleSetSelectedDatabase,
             setPerformanceMode,
             setEdgeRouting,

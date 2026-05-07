@@ -36,6 +36,8 @@ import { TeamspacesModule } from './teamspaces/teamspaces.module';
 import { FreshnessModule } from './common/freshness/freshness.module';
 import { VersionHistoryModule } from './version-history/version-history.module';
 import { PresenceModule } from './presence/presence.module';
+import { RedisModule } from './redis/redis.module';
+import { NoSqlModule } from './nosql/nosql.module';
 
 @Module({
   imports: [
@@ -101,6 +103,8 @@ import { PresenceModule } from './presence/presence.module';
     FreshnessModule,
     VersionHistoryModule,
     PresenceModule,
+    RedisModule,
+    NoSqlModule,
   ],
   controllers: [AppController],
   providers: [

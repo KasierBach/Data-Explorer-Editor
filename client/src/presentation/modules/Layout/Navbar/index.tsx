@@ -56,57 +56,60 @@ export const Navbar: React.FC = () => {
             </div>
 
             {/* 🎯 CENTER: Consolidated Ribbon (Tools + Switcher + Menus) */}
-            {!isActualMobile && (
-                <div className="flex-none flex items-center justify-center gap-2 px-6">
-                    {/* 1. Tools: immediately to the LEFT of the switcher */}
-                    {(isSqlRoute || isNoSqlRoute) && (
-                        <div className="flex items-center border-r border-border/30 pr-2">
-                            <NavMainActions
-                                activeConnectionId={activeConnectionId}
-                                openInsightsTab={openInsightsTab}
-                                onNavigate={navigate}
-                                lang={lang}
-                                isNoSql={isNoSqlRoute}
-                            />
-                        </div>
-                    )}
-
-                    {/* 2. SQL / NoSQL pill */}
-                    <div className="relative flex items-center bg-muted/40 p-1 rounded-xl border border-border/40 gap-1 shadow-inner mx-1">
-                        <motion.div
-                            className={cn(
-                                "absolute h-[calc(100%-8px)] rounded-lg shadow-sm z-0",
-                                isSqlRoute ? "bg-gradient-to-r from-blue-600 to-indigo-600" : "bg-gradient-to-r from-emerald-600 to-green-600"
-                            )}
-                            initial={false}
-                            animate={{ x: isSqlRoute ? 0 : 81, width: 78 }}
-                            transition={{ type: "spring", stiffness: 500, damping: 35 }}
+            <div className="flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6">
+                {/* 1. Tools: immediately to the LEFT of the switcher */}
+                {!isActualMobile && (isSqlRoute || isNoSqlRoute) && (
+                    <div className="flex items-center border-r border-border/30 pr-2">
+                        <NavMainActions
+                            activeConnectionId={activeConnectionId}
+                            openInsightsTab={openInsightsTab}
+                            onNavigate={navigate}
+                            lang={lang}
+                            isNoSql={isNoSqlRoute}
                         />
-                        <button
-                            onClick={() => navigate('/sql-explorer')}
-                            className={cn(
-                                "relative z-10 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                                isSqlRoute ? "text-white" : "text-muted-foreground hover:text-foreground"
-                            )}
-                            style={{ width: 78 }}
-                        >
-                            <Database className={cn("w-3.5 h-3.5", isSqlRoute && "scale-110")} />
-                            <span>SQL</span>
-                        </button>
-                        <button
-                            onClick={() => navigate('/nosql-explorer')}
-                            className={cn(
-                                "relative z-10 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                                isNoSqlRoute ? "text-white" : "text-muted-foreground hover:text-foreground"
-                            )}
-                            style={{ width: 78 }}
-                        >
-                            <Leaf className={cn("w-3.5 h-3.5", isNoSqlRoute && "scale-110")} />
-                            <span>NoSQL</span>
-                        </button>
                     </div>
+                )}
 
-                    {/* 3. Menus: immediately to the RIGHT of the switcher (Moved from Right Section) */}
+                {/* 2. SQL / NoSQL pill - Compact on Mobile */}
+                <div className="relative flex items-center bg-muted/40 p-0.5 md:p-1 rounded-xl border border-border/40 gap-0.5 md:gap-1 shadow-inner mx-0.5 md:mx-1">
+                    <motion.div
+                        className={cn(
+                            "absolute h-[calc(100%-4px)] md:h-[calc(100%-8px)] rounded-lg shadow-sm z-0",
+                            isSqlRoute ? "bg-gradient-to-r from-blue-600 to-indigo-600" : "bg-gradient-to-r from-emerald-600 to-green-600"
+                        )}
+                        initial={false}
+                        animate={{ 
+                            x: isSqlRoute ? 0 : (isActualMobile ? 40 : 81), 
+                            width: isActualMobile ? 40 : 78 
+                        }}
+                        transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                    />
+                    <button
+                        onClick={() => navigate('/sql-explorer')}
+                        className={cn(
+                            "relative z-10 flex items-center justify-center gap-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all",
+                            isSqlRoute ? "text-white" : "text-muted-foreground hover:text-foreground",
+                            isActualMobile ? "w-10 h-8" : "w-[78px] py-1.5"
+                        )}
+                    >
+                        <Database className={cn("w-3.5 h-3.5", isSqlRoute && "scale-110")} />
+                        {!isActualMobile && <span>SQL</span>}
+                    </button>
+                    <button
+                        onClick={() => navigate('/nosql-explorer')}
+                        className={cn(
+                            "relative z-10 flex items-center justify-center gap-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all",
+                            isNoSqlRoute ? "text-white" : "text-muted-foreground hover:text-foreground",
+                            isActualMobile ? "w-10 h-8" : "w-[78px] py-1.5"
+                        )}
+                    >
+                        <Leaf className={cn("w-3.5 h-3.5", isNoSqlRoute && "scale-110")} />
+                        {!isActualMobile && <span>NoSQL</span>}
+                    </button>
+                </div>
+
+                {/* 3. Menus: immediately to the RIGHT of the switcher */}
+                {!isActualMobile && (
                     <div className="flex items-center border-l border-border/30 pl-2">
                         <NavMenus
                             lang={lang}
@@ -116,24 +119,26 @@ export const Navbar: React.FC = () => {
                             isNoSql={isNoSqlRoute}
                         />
                     </div>
-                </div>
-            )}
+                )}
+            </div>
 
             {/* ➡️ RIGHT: Profile & Status Section */}
             <div className="flex-1 flex items-center justify-end gap-3">
                 <div className="flex items-center gap-2">
                     {!isActualMobile && <div className="h-4 w-px bg-border mx-1" />}
-                    {!isActualMobile && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 text-muted-foreground hover:text-foreground px-3 gap-1.5"
-                            onClick={() => navigate('/teams')}
-                        >
-                            <span className="font-semibold">{lang === 'vi' ? 'Nhóm' : 'Teams'}</span>
-                            <Users className="w-4 h-4" />
-                        </Button>
-                    )}
+                    <Button
+                        variant="ghost"
+                        size={isActualMobile ? "icon" : "sm"}
+                        className={cn(
+                            "h-8 text-muted-foreground hover:text-foreground transition-colors",
+                            isActualMobile ? "w-8" : "px-3 gap-1.5"
+                        )}
+                        onClick={() => navigate('/teams')}
+                        title={lang === 'vi' ? 'Nhóm' : 'Teams'}
+                    >
+                        {!isActualMobile && <span className="font-semibold">{lang === 'vi' ? 'Nhóm' : 'Teams'}</span>}
+                        <Users className={cn("w-4 h-4", isActualMobile && "text-primary")} />
+                    </Button>
  
                     <NavUserSection
                         user={user} logout={handleLogout} isAiPanelOpen={isAiPanelOpen}

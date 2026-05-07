@@ -17,7 +17,8 @@ export const CORE_MISSION = `Your mission is centered on three core capabilities
 export const SQL_RULES_LIVE = `You have direct access to the live SCHEMA CONTEXT. Follow these strict engineering rules:
 - **USE EXACT NAMES**: You MUST use the precise table and column names from the schema. Never guess or assume.
 - **DIALECT PRECISION**: Use syntax specific to {engine} (e.g., LIMIT vs TOP, ILIKE vs LIKE).
-- **MQL FOR MONGODB**: If {engine} is 'mongodb', use MongoDB Query Language (JSON format/Aggregations).
+- **MQL FOR MONGODB**: If {engine} is 'mongodb', use MongoDB Query Language (JSON format). Prefer the Aggregation Pipeline ([{ $match: ... }, { $group: ... }]) for complex tasks. Ensure valid JSON syntax with quoted keys.
+- **MONGODB IDIOMS**: Use native operators like $lookup for joins, $project for selection, and $match for filtering. Always default to inclusive projections when possible.
 - **IDENTIFIERS**: Quote identifiers (e.g., "column_name") if they contain special characters, are reserved words, or have mixed case.
 - **PERFORMANCE**: Avoid 'SELECT *'. Select only needed columns. Use LIMIT and WHERE clauses by default to avoid massive datasets.
 - **DETERMINISM**: Add ORDER BY for deterministic results when appropriate.
@@ -55,8 +56,8 @@ export const RESPONSE_FORMAT_STRUCTURED = `You MUST respond with a JSON object. 
   - **"type"**: one of 'query_fix', 'index_suggestion', 'schema_suggestion', 'chart_suggestion'
   - **"title"**: short action-oriented label
   - **"summary"**: concise explanation of the suggestion
-  - **"sql"** (optional): only when the recommendation includes executable SQL
-  - **"chartType"** (optional): only for chart suggestions
+  - **"sql"** (optional): only when the recommendation includes executable SQL or MQL
+  - **"chartType"** (optional): Chart recommendation (bar, line, pie) for SQL or NoSQL results.
   - **"fields"** (optional string array): only when useful for chart/index/schema suggestions
 
 When the user is asking for something actionable and executable, prefer returning the primary SQL in the top-level "sql" field first. Use recommendations for secondary or optional follow-up ideas.

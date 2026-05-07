@@ -10,15 +10,19 @@ export interface NoSqlSlice {
     nosqlActiveConnectionId: string | null;
     nosqlActiveDatabase: string | null;
     nosqlActiveCollection: string | null;
-    nosqlViewMode: 'tree' | 'grid';
+    nosqlViewMode: 'tree' | 'grid' | 'charts' | 'schema' | 'aggregation';
     nosqlFilter: NoSqlFilterState;
     nosqlMqlQuery: string;
     nosqlResult: any | null;
     nosqlIsQueryRunning: boolean;
+    nosqlPipelineStages: Array<{ id: string, type: string, value: string, enabled: boolean }>;
+    nosqlSchemaStats: any | null;
     setNosqlActiveConnectionId: (id: string | null) => void;
     setNosqlDatabase: (db: string | null) => void;
     setNosqlCollection: (col: string | null) => void;
-    setNosqlViewMode: (mode: 'tree' | 'grid') => void;
+    setNosqlViewMode: (mode: 'tree' | 'grid' | 'charts' | 'schema' | 'aggregation') => void;
+    setNosqlPipelineStages: (stages: Array<{ id: string, type: string, value: string, enabled: boolean }>) => void;
+    setNosqlSchemaStats: (stats: any) => void;
     setNosqlFilter: (filter: Partial<NoSqlFilterState>) => void;
     setNosqlMqlQuery: (query: string) => void;
     setNosqlResult: (result: any) => void;
@@ -45,6 +49,8 @@ export const createNoSqlSlice: StateCreator<NoSqlSlice> = (set) => ({
     nosqlMqlQuery: buildDefaultMqlQuery(null),
     nosqlResult: null,
     nosqlIsQueryRunning: false,
+    nosqlPipelineStages: [{ id: '1', type: '$match', value: '{\n  \n}', enabled: true }],
+    nosqlSchemaStats: null,
 
     setNosqlActiveConnectionId: (id) => set({ nosqlActiveConnectionId: id }),
     setNosqlDatabase: (db) => set({ nosqlActiveDatabase: db, nosqlActiveCollection: null, nosqlResult: null }),
@@ -54,6 +60,8 @@ export const createNoSqlSlice: StateCreator<NoSqlSlice> = (set) => ({
         nosqlMqlQuery: buildDefaultMqlQuery(col),
     }),
     setNosqlViewMode: (mode) => set({ nosqlViewMode: mode }),
+    setNosqlPipelineStages: (stages) => set({ nosqlPipelineStages: stages }),
+    setNosqlSchemaStats: (stats) => set({ nosqlSchemaStats: stats }),
     setNosqlFilter: (filter) => set((state) => ({ nosqlFilter: { ...state.nosqlFilter, ...filter } })),
     setNosqlMqlQuery: (query) => set({ nosqlMqlQuery: query }),
     setNosqlResult: (result) => set({ nosqlResult: result }),

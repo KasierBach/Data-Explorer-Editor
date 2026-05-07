@@ -93,8 +93,8 @@ export class AiController {
 
     @Post('autocomplete')
     async autocomplete(@Body() body: AutocompleteDto, @Req() req: AuthenticatedRequest) {
-        const { connectionId, database, beforeCursor, afterCursor } = body;
-
+        const { connectionId, database, beforeCursor, afterCursor, context } = body;
+        
         const { connection, schemaContext } = await this.connectionService.getConnectionContext(
             connectionId,
             database,
@@ -105,7 +105,7 @@ export class AiController {
         const completion = await this.aiService.autocomplete({
             beforeCursor,
             afterCursor,
-            schemaContext,
+            schemaContext: context ? `${context}\n\n${schemaContext}` : schemaContext,
             databaseType: connection.type,
         });
 

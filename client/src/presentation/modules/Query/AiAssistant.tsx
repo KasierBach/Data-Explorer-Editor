@@ -266,8 +266,8 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                     />
 
                     {/* Toolbar */}
-                    <div className="flex items-center justify-between p-2 pt-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex items-center justify-between p-2 pt-0 gap-1 flex-nowrap">
+                        <div className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto scrollbar-none flex-nowrap">
                             {/* Paperclip */}
                             <div className="relative" ref={contextMenuRef}>
                                 <Button
@@ -323,9 +323,9 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                                 }}
                             >
                                 <DropdownMenuTrigger asChild>
-                                    <button className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">
-                                        <ChevronUp className="w-3 h-3 opacity-50" />
-                                        {ROUTING_MODES.find(m => m.id === aiRoutingMode)?.label}
+                                    <button className="flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                                        <ChevronUp className="w-3 h-3 opacity-50 shrink-0" />
+                                        <span>{ROUTING_MODES.find(m => m.id === aiRoutingMode)?.label}</span>
                                     </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent side="top" align="start" className="w-[18rem] max-w-[calc(100vw-2rem)] max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border-border/10 rounded-xl shadow-2xl p-1.5 text-foreground">
@@ -358,9 +358,9 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                                 }}
                             >
                                 <DropdownMenuTrigger asChild>
-                                    <button className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">
-                                        <ChevronUp className="w-3 h-3 opacity-50" />
-                                        {MODES.find(m => m.id === aiMode)?.label}
+                                    <button className="flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">
+                                        <ChevronUp className="w-3 h-3 opacity-50 shrink-0" />
+                                        <span>{MODES.find(m => m.id === aiMode)?.label}</span>
                                     </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent side="top" align="start" className="w-[17rem] max-w-[calc(100vw-2rem)] max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border-border/10 rounded-xl shadow-2xl p-1.5 text-foreground">
@@ -393,9 +393,11 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                                 }}
                             >
                                 <DropdownMenuTrigger asChild>
-                                    <button className="flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">
-                                        <ChevronUp className="w-3 h-3 opacity-50" />
-                                        {MODELS.find(m => m.id === aiModel)?.label ?? 'Select Model'}
+                                    <button className="flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors min-w-0 flex-1 overflow-hidden">
+                                        <ChevronUp className="w-3 h-3 opacity-50 shrink-0" />
+                                        <span className="truncate">
+                                            {MODELS.find(m => m.id === aiModel)?.label ?? 'Select Model'}
+                                        </span>
                                     </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent side="top" align="start" className="w-64 max-w-[calc(100vw-2rem)] max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border-border/10 rounded-xl shadow-2xl p-1.5 text-foreground">

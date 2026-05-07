@@ -516,8 +516,8 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         <>
             <div className="flex flex-col h-full bg-background">
                 {/* Toolbar */}
-                <div className="p-1 px-2 border-b flex items-center justify-between bg-muted/30 min-h-[40px] flex-wrap gap-x-2 gap-y-1">
-                    <div className="flex items-center gap-1 flex-wrap min-w-0">
+                <div className="p-1 px-1.5 border-b flex items-center justify-between bg-muted/30 min-h-[40px] overflow-hidden flex-nowrap">
+                    <div className="flex items-center gap-0.5 min-w-0 flex-1 overflow-x-auto scrollbar-none py-0.5 flex-nowrap">
                         <Button
                             size="sm"
                             onClick={() => handleRun()}
@@ -564,42 +564,42 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
                         {!isCompactMobileLayout && (
                             <>
-                                <div className="h-4 w-[1px] bg-border mx-1" />
-                                <Button variant="ghost" size="sm" onClick={handleRefreshSchema} className="h-7 gap-1 px-2 text-xs" title={lang === 'vi' ? "Tải lại thanh bên" : "Refresh Sidebar"}>
+                                <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
+                                <Button variant="ghost" size="sm" onClick={handleRefreshSchema} className="h-7 gap-1 px-1.5 text-xs shrink-0" title={lang === 'vi' ? "Tải lại thanh bên" : "Refresh Sidebar"}>
                                     <RefreshCw className="w-3.5 h-3.5" />
-                                    {lang === 'vi' ? 'Tải lại' : 'Refresh'}
+                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Tải lại' : 'Refresh'}</span>
                                 </Button>
-                                <div className="h-4 w-[1px] bg-border mx-1" />
+                                <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
                             </>
                         )}
 
                         {!isCompactMobileLayout ? (
                             <>
-                                <Button variant="ghost" size="sm" onClick={handleFormat} className="h-7 gap-1 px-2 text-xs">
+                                <Button variant="ghost" size="sm" onClick={handleFormat} className="h-7 gap-1 px-1.5 text-xs shrink-0">
                                     <AlignLeft className="w-3.5 h-3.5" />
-                                    {lang === 'vi' ? 'Định dạng' : 'Format'}
+                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Định dạng' : 'Format'}</span>
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={handleClear} className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive">
+                                <Button variant="ghost" size="sm" onClick={handleClear} className="h-7 gap-1 px-1.5 text-xs text-muted-foreground hover:text-destructive shrink-0">
                                     <Eraser className="w-3.5 h-3.5" />
-                                    {lang === 'vi' ? 'Xóa' : 'Clear'}
+                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Xóa' : 'Clear'}</span>
                                 </Button>
-                                <div className="h-4 w-[1px] bg-border mx-1" />
-                                <Button variant="ghost" size="sm" onClick={handleSave} className="h-7 gap-1 px-2 text-xs" title="Ctrl+S">
+                                <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
+                                <Button variant="ghost" size="sm" onClick={handleSave} className="h-7 gap-1 px-1.5 text-xs shrink-0" title="Ctrl+S">
                                     <Save className="w-3.5 h-3.5" />
-                                    {lang === 'vi' ? 'Lưu' : 'Save'}
+                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Lưu' : 'Save'}</span>
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={() => setIsSavedDialogOpen(true)} className="h-7 gap-1 px-2 text-xs" title="Ctrl+O">
+                                <Button variant="ghost" size="sm" onClick={() => setIsSavedDialogOpen(true)} className="h-7 gap-1 px-1.5 text-xs shrink-0" title="Ctrl+O">
                                     <FolderOpen className="w-3.5 h-3.5" />
-                                    {lang === 'vi' ? 'Mở' : 'Open'}
+                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Mở' : 'Open'}</span>
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={() => setIsHistoryDialogOpen(true)} className="h-7 gap-1 px-2 text-xs" title="Ctrl+H">
+                                <Button variant="ghost" size="sm" onClick={() => setIsHistoryDialogOpen(true)} className="h-7 gap-1 px-1.5 text-xs shrink-0" title="Ctrl+H">
                                     <History className="w-3.5 h-3.5" />
-                                    {lang === 'vi' ? 'Lịch sử' : 'History'}
+                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Lịch sử' : 'History'}</span>
                                 </Button>
-                                <div className="h-4 w-[1px] bg-border mx-1" />
-                                <Button variant="ghost" size="sm" onClick={handleExplain} disabled={isLoading || activeConnection?.allowQueryExecution === false} className="h-7 gap-1 px-2 text-xs text-orange-500 hover:text-orange-600" title="EXPLAIN ANALYZE">
+                                <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
+                                <Button variant="ghost" size="sm" onClick={handleExplain} disabled={isLoading || activeConnection?.allowQueryExecution === false} className="h-7 gap-1 px-1.5 text-xs text-orange-500 hover:text-orange-600 shrink-0" title="EXPLAIN ANALYZE">
                                     <Zap className="w-3.5 h-3.5" />
-                                    {lang === 'vi' ? 'Giải thích' : 'Explain'}
+                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Giải thích' : 'Explain'}</span>
                                 </Button>
                             </>
                         ) : (
@@ -643,7 +643,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             </DropdownMenu>
                         )}
 
-                        <div className="flex items-center gap-1.5 px-2">
+                        <div className="flex items-center gap-1 px-1 shrink-0">
                             {!isCompactMobileLayout && <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{lang === 'vi' ? 'Giới hạn' : 'Limit'}</span>}
                             <Select value={limit} onValueChange={setLimit}>
                                 <SelectTrigger className="h-7 w-[80px] text-[10px] py-0 border-none bg-muted hover:bg-muted/80 focus:ring-0 shadow-none">

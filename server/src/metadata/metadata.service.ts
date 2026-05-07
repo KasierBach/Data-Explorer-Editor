@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { ConnectionsService } from '../connections/connections.service';
@@ -33,7 +33,8 @@ export class MetadataService {
         const cached = await this.cacheManager.get<T>(cacheKey);
         if (cached) return cached;
         const result = await fetchFn();
-        await this.cacheManager.set(cacheKey, result, ttl);
+        // TTL is in milliseconds for redisStore in recent versions
+        await this.cacheManager.set(cacheKey, result, ttl as any);
         return result;
     }
 
@@ -45,22 +46,21 @@ export class MetadataService {
     }
 
     private parseNodeId(id: string) {
-        const parts = id.split(':');
         return {
-            dbName: parts.find(p => p.startsWith('db'))?.split(':')[1],
-            schemaName: parts.find(p => p.startsWith('schema'))?.split(':')[1],
-            tableName: parts.find(p => p.startsWith('table') || p.startsWith('view') || p.startsWith('collection'))?.split(':')[1],
+            dbName: id.match(/db:([^.]+)/)?.[1],
+            schemaName: id.match(/schema:([^.]+)/)?.[1],
+            tableName: id.match(/(?:table|view|collection):([^.]+)/)?.[1],
         };
     }
 
     async getHierarchy(connectionId: string, parentId: string | null, userId: string) {
         const cacheKey = await this.getCacheKey('hierarchy', connectionId, parentId || 'root');
-        return this.withCache(cacheKey, () => this._getHierarchyUncached(connectionId, parentId, userId));
+        return this.withCache(cacheKey, () => this._getHierarchyUncached(connectionId, parentId, userId), 3600000);
     }
 
     private async _getHierarchyUncached(connectionId: string, parentId: string | null, userId: string) {
-        const { connection, pool, strategy } = await this.getConnectionContext(connectionId, userId);
         const parsed = this.parseNodeId(parentId || '');
+        const { connection, pool, strategy } = await this.getConnectionContext(connectionId, userId, parsed.dbName);
 
         if (!parentId) {
             return strategy.getHierarchyNodes(pool, null, parsed, connection);
@@ -127,15 +127,15 @@ export class MetadataService {
             const { pool, strategy } = await this.getConnectionContext(connectionId, userId);
             const nodes = await strategy.getDatabases(pool);
             return nodes.map(n => n.name);
-        });
+        }, 3600000);
     }
 
     async getRelationships(connectionId: string, userId: string, database?: string) {
-        const cacheKey = await this.getCacheKey('relationships', connectionId, database);
+        const cacheKey = await this.getCacheKey('relationships', connectionId, database || 'default');
         return this.withCache(cacheKey, async () => {
             const { pool, strategy } = await this.getConnectionContext(connectionId, userId, database);
             return strategy.getRelationships(pool, database);
-        });
+        }, 3600000);
     }
 
     async getColumns(connectionId: string, tableId: string, userId: string) {
@@ -147,15 +147,15 @@ export class MetadataService {
             const table = parsed.tableName || tableId;
             const pool = await this.connectionsService.getPool(connectionId, parsed.dbName, userId);
             return strategy.getColumns(pool, schema, table, parsed.dbName);
-        });
+        }, 3600000);
     }
 
     async getDatabaseMetrics(connectionId: string, userId: string, database?: string) {
-        const cacheKey = await this.getCacheKey('metrics', connectionId, database);
+        const cacheKey = await this.getCacheKey('metrics', connectionId, database || 'default');
         return this.withCache(cacheKey, async () => {
             const { pool, strategy } = await this.getConnectionContext(connectionId, userId, database);
             return strategy.getDatabaseMetrics(pool);
-        });
+        }, 300000); // 5 mins
     }
 
     async getFullMetadata(connectionId: string, tableId: string, userId: string) {
@@ -167,7 +167,7 @@ export class MetadataService {
             const table = parsed.tableName || tableId;
             const pool = await this.connectionsService.getPool(connectionId, parsed.dbName, userId);
             return strategy.getFullMetadata(pool, schema, table, parsed.dbName);
-        });
+        }, 3600000);
     }
 
     async refresh(connectionId: string, userId: string, database?: string) {

@@ -14,4 +14,8 @@ export class AutocompleteDto {
     @IsOptional()
     @IsString()
     afterCursor?: string;
+
+    @IsOptional()
+    @IsString()
+    context?: string;
 }

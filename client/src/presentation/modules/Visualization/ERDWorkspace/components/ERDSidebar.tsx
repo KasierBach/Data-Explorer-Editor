@@ -27,22 +27,30 @@ interface ERDSidebarProps {
     globalSearchResults?: any[];
     isSearchingGlobal?: boolean;
     onAddGlobalTable?: (item: any) => void;
+    isRefreshing?: boolean;
+    onRefresh?: () => void;
 }
 
 export const ERDSidebar: React.FC<ERDSidebarProps> = ({
-    isCollapsed, setCollapsed, lang, selectedDatabase, setSelectedDatabase, allDatabases, hierarchy, filteredHierarchy, visibleTableNames, toggleTable, searchTerm, setSearchTerm, schemaFilter, setSchemaFilter, handleSelectAll, handleDeselectAll, isLoadingHierarchy, globalSearchResults = [], isSearchingGlobal = false, onAddGlobalTable
+    isCollapsed, setCollapsed, lang, selectedDatabase, setSelectedDatabase, allDatabases, hierarchy, filteredHierarchy, visibleTableNames, toggleTable, searchTerm, setSearchTerm, schemaFilter, setSchemaFilter, handleSelectAll, handleDeselectAll, isLoadingHierarchy, globalSearchResults = [], isSearchingGlobal = false, onAddGlobalTable, isRefreshing, onRefresh
 }) => {
-    const hasDatabases = allDatabases && allDatabases.length > 0;
+    const hasMultipleDatabases = allDatabases && allDatabases.length > 1;
 
     const schemas = useMemo(() => {
         if (!hierarchy) return [];
         const schemaSet = new Set<string>();
         hierarchy.forEach(h => {
-            const match = h.id?.match(/schema:([^.]+)/);
-            if (match) schemaSet.add(match[1]);
+            if (h.schema) {
+                schemaSet.add(h.schema);
+            } else {
+                const match = h.id?.match(/schema:([^.]+)/);
+                if (match) schemaSet.add(match[1]);
+            }
         });
         return Array.from(schemaSet).sort();
     }, [hierarchy]);
+
+    const showSchemaSelector = schemas.length > 0;
 
     return (
         <div className={cn(
@@ -56,10 +64,20 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                             <Table className="h-4 w-4" />
                         </div>
                         <div>
-                            <h2 className="font-black text-sm uppercase tracking-widest">{lang === 'vi' ? 'Thực thể' : 'Entities'}</h2>
-                            <span className="text-[9px] text-muted-foreground">
-                                {visibleTableNames.size}/{hierarchy?.length || 0} {lang === 'vi' ? 'đã chọn' : 'selected'}
-                            </span>
+                            <h2 className="font-black text-sm uppercase tracking-widest leading-none mb-1">{lang === 'vi' ? 'Thực thể' : 'Entities'}</h2>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[9px] text-muted-foreground">
+                                    {visibleTableNames.size}/{hierarchy?.length || 0} {lang === 'vi' ? 'đã chọn' : 'selected'}
+                                </span>
+                                <button
+                                    onClick={onRefresh}
+                                    disabled={isRefreshing}
+                                    className="p-1 hover:bg-muted rounded-md transition-colors disabled:opacity-50"
+                                    title={lang === 'vi' ? 'Làm mới metadata' : 'Refresh Metadata'}
+                                >
+                                    <Loader2 className={cn("h-2.5 w-2.5 text-blue-500", isRefreshing && "animate-spin")} />
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsed(true)}>
@@ -67,7 +85,7 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                     </Button>
                 </div>
 
-                {hasDatabases && (
+                {hasMultipleDatabases && (
                     <div className="mb-3">
                         <Select value={selectedDatabase} onValueChange={setSelectedDatabase}>
                             <SelectTrigger className="h-8 text-xs bg-muted/20 border-border/20">
@@ -82,12 +100,12 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                     </div>
                 )}
 
-                {schemas.length > 1 && (
+                {showSchemaSelector && (
                     <div className="mb-3">
                         <Select value={schemaFilter} onValueChange={setSchemaFilter}>
                             <SelectTrigger className="h-8 text-xs bg-muted/20 border-border/20">
                                 <Layers className="w-3 h-3 mr-1" />
-                                <SelectValue placeholder={lang === 'vi' ? 'Tất cả Schema' : 'All Schemas'} />
+                                <SelectValue placeholder={lang === 'vi' ? 'Chọn Schema' : 'Select Schema'} />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all" className="text-xs">{lang === 'vi' ? 'Tất cả Schema' : 'All Schemas'}</SelectItem>
@@ -99,17 +117,17 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                     </div>
                 )}
 
-                <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <div className="relative group">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none z-10">
                         {isSearchingGlobal ? (
                             <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
                         ) : (
-                            <Search className="h-3 w-3 text-muted-foreground opacity-40" />
+                            <Search className="h-3 w-3 text-muted-foreground opacity-40 group-focus-within:opacity-100 transition-opacity" />
                         )}
                     </div>
                     <Input
                         placeholder={lang === 'vi' ? "Lọc hoặc tìm nhanh bảng..." : "Filter or quick find tables..."}
-                        className="pl-8 bg-muted/20 border-border/20 h-8 text-[11px] rounded-lg"
+                        className="pl-9 bg-muted/20 border-border/20 h-9 text-xs rounded-xl focus-visible:ring-blue-500/20 focus-visible:border-blue-500/50 transition-all font-medium"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />

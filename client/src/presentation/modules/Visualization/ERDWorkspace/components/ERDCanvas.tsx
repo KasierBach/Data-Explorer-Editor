@@ -12,7 +12,6 @@ import {
     type OnConnect,
     BackgroundVariant,
 } from '@xyflow/react';
-import { Database } from 'lucide-react';
 import TableNode from '../../TableNode';
 import { ForeignKeyDialog, type ForeignKeyData } from '../../ForeignKeyDialog';
 
@@ -42,7 +41,7 @@ interface ERDCanvasProps {
 }
 
 export const ERDCanvas: React.FC<ERDCanvasProps> = ({
-    nodes, edges, onNodesChange, onEdgesChange, onConnect, isLoading, effectiveDatabase, lang, showMinimap, pendingConnection, setPendingConnection, handleCreateForeignKey,
+    nodes, edges, onNodesChange, onEdgesChange, onConnect, isLoading, lang, showMinimap, pendingConnection, setPendingConnection, handleCreateForeignKey,
     handleEdgeMouseEnter, handleEdgeMouseLeave, hoverPosition, hoveredEdgeId, backgroundVariant = 'dots', toolbar
 }) => {
     const reactFlowRef = useRef<any>(null);
@@ -57,19 +56,6 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
                 </div>
             )}
 
-            {!effectiveDatabase && !isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
-                    <div className="text-center">
-                        <div className="w-12 h-12 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce">
-                            <Database className="w-6 h-6 text-muted-foreground" />
-                        </div>
-                        <h3 className="font-bold text-lg mb-2">{lang === 'vi' ? 'Chọn Cơ sở dữ liệu' : 'Select a Database'}</h3>
-                        <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                            {lang === 'vi' ? 'Chọn một cơ sở dữ liệu từ thanh bên để bắt đầu trực quan hóa sơ đồ.' : 'Choose a database from the sidebar to start visualizing your schema.'}
-                        </p>
-                    </div>
-                </div>
-            )}
 
             <ReactFlow
                 ref={reactFlowRef}
