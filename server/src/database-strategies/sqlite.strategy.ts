@@ -167,6 +167,43 @@ export class SqliteStrategy implements IDatabaseStrategy {
   }
 
 
+  async getIndexes(pool: Database.Database, _schema: string, table: string): Promise<TreeNodeResult[]> {
+    const rows = pool.prepare(`PRAGMA index_list(${this.quoteIdentifier(table)})`).all() as any[];
+    const parentId = `table:${table}.folder:indexes`;
+    return rows.map((r) => ({
+      id: `${parentId}.index:${r.name}`,
+      name: r.name,
+      type: 'index',
+      parentId,
+      hasChildren: false,
+      metadata: { unique: r.unique === 1 }
+    }));
+  }
+
+  async getTriggers(pool: Database.Database, _schema: string, table: string): Promise<TreeNodeResult[]> {
+    const rows = pool.prepare(`SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?`).all(table) as { name: string }[];
+    const parentId = `table:${table}.folder:triggers`;
+    return rows.map((r) => ({
+      id: `${parentId}.trigger:${r.name}`,
+      name: r.name,
+      type: 'trigger',
+      parentId,
+      hasChildren: false
+    }));
+  }
+
+  async getConstraints(pool: Database.Database, _schema: string, table: string): Promise<TreeNodeResult[]> {
+    const rows = pool.prepare(`PRAGMA foreign_key_list(${this.quoteIdentifier(table)})`).all() as any[];
+    const parentId = `table:${table}.folder:constraints`;
+    return rows.map((r) => ({
+      id: `${parentId}.constraint:fk_${r.id}`,
+      name: `FK to ${r.table} (${r.from} -> ${r.to})`,
+      type: 'constraint',
+      parentId,
+      hasChildren: false
+    }));
+  }
+
   async getFullMetadata(pool: Database.Database, _schema: string, table: string): Promise<FullTableMetadata> {
     const columns = await this.getColumns(pool, '', table);
     const indexSql = `PRAGMA index_list(${this.quoteIdentifier(table)})`;

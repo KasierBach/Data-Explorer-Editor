@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { getErrorMessage } from '../common/utils/error.util';
 
 interface RawErdWorkspaceUser {
   id: string;
@@ -45,7 +46,7 @@ export class ErdWorkspacesService {
     private readonly auditService: AuditService,
     private readonly connectionsService: ConnectionsService,
     private readonly versionHistoryService: VersionHistoryService,
-  ) {}
+  ) { }
 
   private get erdWorkspaces() {
     return this.prisma.erdWorkspace;
@@ -57,7 +58,7 @@ export class ErdWorkspacesService {
     const maybeCode = 'code' in error ? String((error as { code: unknown }).code) : '';
     if (maybeCode === 'P2021') return true;
 
-    const message = error instanceof Error ? error.message : String(error);
+    const message = getErrorMessage(error);
     return (
       message.includes('erdWorkspace') &&
       (

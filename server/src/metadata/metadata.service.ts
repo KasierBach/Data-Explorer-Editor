@@ -73,6 +73,32 @@ export class MetadataService {
             if (parentId.endsWith('folder:tables')) return strategy.getTables(dbPool, schema, parsed.dbName);
             if (parentId.endsWith('folder:views')) return strategy.getViews(dbPool, schema, parsed.dbName);
             if (parentId.endsWith('folder:functions')) return strategy.getFunctions(dbPool, schema, parsed.dbName);
+
+            // Sub-folder nodes under a table
+            if (parentId.endsWith('folder:columns')) {
+                const tableName = parsed.tableName!;
+                const columns = await strategy.getColumns(dbPool, schema, tableName, parsed.dbName);
+                return columns.map(col => ({
+                    id: `${parentId}.column:${col.name}`,
+                    name: col.name,
+                    type: col.isPrimaryKey ? 'primary_key' : 'column',
+                    parentId,
+                    hasChildren: false,
+                    metadata: { dataType: col.type, isNullable: col.isNullable }
+                }));
+            }
+            if (parentId.endsWith('folder:indexes')) {
+                const tableName = parsed.tableName!;
+                return strategy.getIndexes(dbPool, schema, tableName, parsed.dbName);
+            }
+            if (parentId.endsWith('folder:triggers')) {
+                const tableName = parsed.tableName!;
+                return strategy.getTriggers(dbPool, schema, tableName, parsed.dbName);
+            }
+            if (parentId.endsWith('folder:constraints')) {
+                const tableName = parsed.tableName!;
+                return strategy.getConstraints(dbPool, schema, tableName, parsed.dbName);
+            }
         }
 
         if (parentId.includes('schema:') && !parentId.includes('.table:') && !parentId.includes('.view:') && !parentId.includes('.func:') && !parentId.includes('.collection:')) {
@@ -92,15 +118,27 @@ export class MetadataService {
         }
 
         if (parentId.includes('.table:') || parentId.includes('.view:') || parentId.includes('.collection:')) {
-            const columns = await this.getColumns(connectionId, parentId, userId);
-            return columns.map(col => ({
-                id: `${parentId}.column:${col.name}`,
-                name: col.name,
-                type: col.isPrimaryKey ? 'primary_key' : 'column',
-                parentId,
-                hasChildren: false,
-                metadata: { dataType: col.type, isNullable: col.isNullable }
-            }));
+            // For MongoDB collections, return columns directly (no sub-folders)
+            if (connection.type === 'mongodb' || connection.type === 'mongodb+srv') {
+                const columns = await this.getColumns(connectionId, parentId, userId);
+                return columns.map(col => ({
+                    id: `${parentId}.column:${col.name}`,
+                    name: col.name,
+                    type: col.isPrimaryKey ? 'primary_key' : 'column',
+                    parentId,
+                    hasChildren: false,
+                    metadata: { dataType: col.type, isNullable: col.isNullable }
+                }));
+            }
+
+            // For SQL databases, return sub-folders like pgAdmin
+            const folders = [
+                { id: `${parentId}.folder:columns`, name: 'Columns', type: 'folder', parentId, hasChildren: true },
+                { id: `${parentId}.folder:indexes`, name: 'Indexes', type: 'folder', parentId, hasChildren: true },
+                { id: `${parentId}.folder:triggers`, name: 'Triggers', type: 'folder', parentId, hasChildren: true },
+                { id: `${parentId}.folder:constraints`, name: 'Constraints', type: 'folder', parentId, hasChildren: true },
+            ];
+            return folders;
         }
 
         if (parentId.includes('.func:')) {

@@ -305,6 +305,75 @@ export class MssqlStrategy implements IDatabaseStrategy {
         }));
     }
 
+    async getIndexes(pool: mssql.ConnectionPool, schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]> {
+        const sql = `
+            SELECT i.name, i.is_unique, i.is_primary_key
+            FROM sys.indexes i
+            JOIN sys.tables t ON i.object_id = t.object_id
+            JOIN sys.schemas s ON t.schema_id = s.schema_id
+            WHERE t.name = @table AND s.name = @schema
+            AND i.name IS NOT NULL
+        `;
+        const result = await pool.request()
+            .input('table', mssql.NVarChar, table)
+            .input('schema', mssql.NVarChar, schema)
+            .query(sql);
+
+        const parentId = dbName ? `db:${dbName}.schema:${schema}.table:${table}.folder:indexes` : `schema:${schema}.table:${table}.folder:indexes`;
+        return result.recordset.map((row: any) => ({
+            id: `${parentId}.index:${row.name}`,
+            name: row.name,
+            type: 'index',
+            parentId,
+            hasChildren: false,
+            metadata: { unique: row.is_unique, isPrimary: row.is_primary_key }
+        }));
+    }
+
+    async getTriggers(pool: mssql.ConnectionPool, schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]> {
+        const sql = `
+            SELECT tr.name
+            FROM sys.triggers tr
+            JOIN sys.tables t ON tr.parent_id = t.object_id
+            JOIN sys.schemas s ON t.schema_id = s.schema_id
+            WHERE t.name = @table AND s.name = @schema
+        `;
+        const result = await pool.request()
+            .input('table', mssql.NVarChar, table)
+            .input('schema', mssql.NVarChar, schema)
+            .query(sql);
+
+        const parentId = dbName ? `db:${dbName}.schema:${schema}.table:${table}.folder:triggers` : `schema:${schema}.table:${table}.folder:triggers`;
+        return result.recordset.map((row: any) => ({
+            id: `${parentId}.trigger:${row.name}`,
+            name: row.name,
+            type: 'trigger',
+            parentId,
+            hasChildren: false
+        }));
+    }
+
+    async getConstraints(pool: mssql.ConnectionPool, schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]> {
+        const sql = `
+            SELECT name, 'CHECK' as type, definition FROM sys.check_constraints WHERE parent_object_id = OBJECT_ID(@quotedTable)
+            UNION
+            SELECT name, 'FOREIGN KEY' as type, '' as definition FROM sys.foreign_keys WHERE parent_object_id = OBJECT_ID(@quotedTable)
+        `;
+        const quotedTable = this.quoteTable(schema, table);
+        const result = await pool.request()
+            .input('quotedTable', mssql.NVarChar, quotedTable)
+            .query(sql);
+
+        const parentId = dbName ? `db:${dbName}.schema:${schema}.table:${table}.folder:constraints` : `schema:${schema}.table:${table}.folder:constraints`;
+        return result.recordset.map((row: any) => ({
+            id: `${parentId}.constraint:${row.name}`,
+            name: `${row.name} (${row.type}) ${row.definition || ''}`,
+            type: 'constraint',
+            parentId,
+            hasChildren: false
+        }));
+    }
+
     async getFullMetadata(pool: mssql.ConnectionPool, schema: string, table: string): Promise<FullTableMetadata> {
         const columns = await this.getColumns(pool, schema, table);
         return {

@@ -8,6 +8,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { AuditAction, AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { getErrorMessage } from '../common/utils/error.util';
 
 type SupportedResourceType = 'QUERY' | 'ERD';
 
@@ -57,7 +58,7 @@ export class VersionHistoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-  ) {}
+  ) { }
 
   private get versionHistories() {
     return this.prisma.versionHistory;
@@ -78,7 +79,7 @@ export class VersionHistoryService {
     const maybeCode = 'code' in error ? String((error as { code: unknown }).code) : '';
     if (maybeCode === 'P2021') return true;
 
-    const message = error instanceof Error ? error.message : String(error);
+    const message = getErrorMessage(error);
     return message.includes('VersionHistory') && (
       message.includes('does not exist') ||
       message.includes('Invalid') ||

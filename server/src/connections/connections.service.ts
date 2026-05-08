@@ -9,6 +9,7 @@ import { AuditService, AuditAction } from '../audit/audit.service';
 import { SshTunnelService } from './ssh-tunnel.service';
 import { OrganizationsService } from '../organizations/services/organizations.service';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
+import { getErrorMessage } from '../common/utils/error.util';
 
 @Injectable()
 export class ConnectionsService implements OnModuleDestroy {
@@ -92,39 +93,66 @@ export class ConnectionsService implements OnModuleDestroy {
     }
   }
 
+  /**
+   * Generic fallback for closing a pool when the strategy/connection is unavailable.
+   */
+  private async fallbackClosePool(pool: any): Promise<void> {
+    try {
+      if (typeof pool.end === 'function') await pool.end();
+      else if (typeof pool.close === 'function') await pool.close();
+    } catch {
+      // Ignore fallback close errors
+    }
+  }
+
+  /**
+   * Safely closes a pool by its key and removes it from the pool map.
+   * Tries strategy-based close first, falls back to generic end/close methods.
+   */
+  private async closePoolByKey(key: string, options?: { silent?: boolean }): Promise<void> {
+    const poolData = this.pools.get(key);
+    if (!poolData) return;
+
+    try {
+      const id = key.split(':')[0];
+      const connection = await this.prisma.connection.findUnique({ where: { id } });
+      if (connection) {
+        const strategy = this.strategyFactory.getStrategy(connection.type);
+        await strategy.closePool(poolData.pool);
+      } else {
+        await this.fallbackClosePool(poolData.pool);
+      }
+    } catch {
+      await this.fallbackClosePool(poolData.pool);
+    } finally {
+      this.pools.delete(key);
+    }
+  }
+
+  /**
+   * Closes all pools belonging to a specific connection ID.
+   */
+  private async closePoolsByConnectionId(connectionId: string): Promise<void> {
+    for (const key of [...this.pools.keys()]) {
+      if (key.startsWith(`${connectionId}:`)) {
+        await this.closePoolByKey(key, { silent: true });
+      }
+    }
+  }
+
   private async cleanupPools() {
     const now = Date.now();
-    for (const [key, { pool, lastAccessed }] of this.pools.entries()) {
+    for (const [key, { lastAccessed }] of this.pools.entries()) {
       if (now - lastAccessed > this.POOL_TTL) {
-        try {
-          const id = key.split(':')[0];
-          const connection = await this.prisma.connection.findUnique({ where: { id } });
-          if (connection) {
-            const strategy = this.strategyFactory.getStrategy(connection.type);
-            await strategy.closePool(pool);
-          } else {
-            // fallback generic close
-            if (typeof pool.end === 'function') await pool.end();
-            if (typeof pool.close === 'function') await pool.close();
-          }
-        } catch (err) {
-          // Silently ignore pool close errors during cleanup
-        } finally {
-          this.pools.delete(key);
-        }
+        await this.closePoolByKey(key, { silent: true });
       }
     }
   }
 
   async onModuleDestroy() {
     clearInterval(this.cleanupInterval);
-    for (const [key, poolData] of this.pools.entries()) {
-      const id = key.split(':')[0];
-      const connection = await this.prisma.connection.findUnique({ where: { id } });
-      if (connection) {
-        const strategy = this.strategyFactory.getStrategy(connection.type);
-        await strategy.closePool(poolData.pool);
-      }
+    for (const key of [...this.pools.keys()]) {
+      await this.closePoolByKey(key);
     }
   }
 
@@ -260,13 +288,14 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   async getPool(id: string, databaseOverride?: string, userId?: string) {
+    let connection: any;
     if (!userId) {
       // if userId isn't provided (e.g from legacy code), fallback to system fetch
       const sysConnection = await this.prisma.connection.findUnique({ where: { id } });
       if (!sysConnection) throw new NotFoundException(`Connection ${id} not found`);
-      var connection = sysConnection;
+      connection = sysConnection;
     } else {
-      var connection = await this.findRawOne(id, userId);
+      connection = await this.findRawOne(id, userId);
     }
     const poolKey = `${id}:${databaseOverride || connection.database}`;
 
@@ -314,7 +343,7 @@ export class ConnectionsService implements OnModuleDestroy {
     } catch (error) {
       await this.updateHealthState(id, {
         status: 'error',
-        error: error instanceof Error ? error.message : 'Connection failed',
+        error: getErrorMessage(error) || 'Connection failed',
       });
       throw error;
     }
@@ -322,15 +351,9 @@ export class ConnectionsService implements OnModuleDestroy {
 
   async update(id: string, updateConnectionDto: UpdateConnectionDto, userId: string): Promise<Connection> {
     const connection = await this.findRawOne(id, userId);
-    const strategy = this.strategyFactory.getStrategy(connection.type);
 
     // Close existing pools for this connection if config changed
-    for (const [key, poolData] of this.pools.entries()) {
-      if (key.startsWith(`${id}:`)) {
-        await strategy.closePool(poolData.pool);
-        this.pools.delete(key);
-      }
-    }
+    await this.closePoolsByConnectionId(id);
 
     const { password, ...rest } = updateConnectionDto;
     const encryptedPassword = password !== undefined && password !== null ? encryptAttribute(password) : undefined;
@@ -411,15 +434,9 @@ export class ConnectionsService implements OnModuleDestroy {
 
   async remove(id: string, userId: string): Promise<void> {
     const connection = await this.findRawOne(id, userId);
-    const strategy = this.strategyFactory.getStrategy(connection.type);
 
     // Close pools
-    for (const [key, poolData] of this.pools.entries()) {
-      if (key.startsWith(`${id}:`)) {
-        await strategy.closePool(poolData.pool);
-        this.pools.delete(key);
-      }
-    }
+    await this.closePoolsByConnectionId(id);
 
     await this.prisma.connection.delete({
       where: { id },
@@ -433,26 +450,7 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   async removePool(poolKey: string, userId?: string): Promise<void> {
-    const poolData = this.pools.get(poolKey);
-    if (poolData) {
-      const id = poolKey.split(':')[0];
-      try {
-        const connection = await this.prisma.connection.findUnique({ where: { id } });
-        if (connection) {
-          const strategy = this.strategyFactory.getStrategy(connection.type);
-          await strategy.closePool(poolData.pool);
-        } else {
-          if (typeof poolData.pool.end === 'function') await poolData.pool.end();
-          if (typeof poolData.pool.close === 'function') await poolData.pool.close();
-        }
-      } catch (err) {
-        // generic fallback close if connection doesn't exist anymore
-        if (typeof poolData.pool.end === 'function') await poolData.pool.end();
-        if (typeof poolData.pool.close === 'function') await poolData.pool.close();
-      } finally {
-        this.pools.delete(poolKey);
-      }
-    }
+    await this.closePoolByKey(poolKey);
   }
 
   async checkHealth(id: string, userId: string) {
@@ -490,7 +488,7 @@ export class ConnectionsService implements OnModuleDestroy {
         status: 'error' as const,
         checkedAt: new Date().toISOString(),
         latencyMs: Date.now() - startedAt,
-        error: error instanceof Error ? error.message : 'Connection failed',
+        error: getErrorMessage(error) || 'Connection failed',
       };
 
       await this.updateHealthState(id, {

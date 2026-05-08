@@ -181,6 +181,31 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
     }));
   }
 
+  async getIndexes(pool: ClickHouseClient, schema: string, table: string): Promise<TreeNodeResult[]> {
+    const resultSet = await pool.query({
+      query: `SELECT name FROM system.data_skipping_indices WHERE database = {db:String} AND table = {tbl:String}`,
+      query_params: { db: schema, tbl: table },
+      format: 'JSONEachRow',
+    });
+    const rows = (await resultSet.json()) as { name: string }[];
+    const parentId = `schema:${schema}.table:${table}.folder:indexes`;
+    return rows.map((r) => ({
+      id: `${parentId}.index:${r.name}`,
+      name: r.name,
+      type: 'index',
+      parentId,
+      hasChildren: false
+    }));
+  }
+
+  async getTriggers(_pool: ClickHouseClient, _schema: string, _table: string, _dbName?: string): Promise<TreeNodeResult[]> {
+    return [];
+  }
+
+  async getConstraints(_pool: ClickHouseClient, _schema: string, _table: string, _dbName?: string): Promise<TreeNodeResult[]> {
+    return [];
+  }
+
   async getFullMetadata(pool: ClickHouseClient, schema: string, table: string): Promise<FullTableMetadata> {
     const columns = await this.getColumns(pool, schema, table);
     const resultSet = await pool.query({

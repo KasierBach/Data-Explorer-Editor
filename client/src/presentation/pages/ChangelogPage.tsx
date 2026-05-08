@@ -5,7 +5,7 @@ import { LandingHeader } from '../modules/LandingPage/components/LandingHeader';
 import { InteractiveBackground } from '../modules/LandingPage/components/InteractiveBackground';
 import { LandingFooter } from '../modules/LandingPage/components/LandingFooter';
 import { motion } from 'framer-motion';
-import { Sparkles, Database, Code2, ShieldCheck, Zap, Globe, TestTube, FileCode, Settings } from 'lucide-react';
+import { Sparkles, Database, Code2, ShieldCheck, Zap, Globe, TestTube, FileCode, Settings, Users } from 'lucide-react';
 import { AuthService } from '@/core/services/AuthService';
 
 export const ChangelogPage: React.FC = () => {
@@ -17,12 +17,63 @@ export const ChangelogPage: React.FC = () => {
     };
 
     const releases = [
+        // v3.5.0 - May 8, 2026
+        {
+            version: 'v3.5.0',
+            date: lang === 'vi' ? '8 Tháng 5, 2026' : 'May 8, 2026',
+            title: lang === 'vi' ? 'NoSQL Explorer Parity & UX Refinement' : 'NoSQL Explorer Parity & UX Refinement',
+            badge: 'LATEST',
+            features: [
+                {
+                    icon: <Zap className="w-5 h-5 text-emerald-400" />,
+                    title: lang === 'vi' ? 'NoSQL Workspace Parity' : 'NoSQL Workspace Parity',
+                    desc: lang === 'vi'
+                        ? 'Đưa các phím tắt (Ctrl+J, Ctrl+Enter), menu File/Edit và các công cụ Visualize/Diagram lên NoSQL để đồng nhất trải nghiệm với SQL.'
+                        : 'Brought shortcuts (Ctrl+J, Ctrl+Enter), File/Edit menus, and Visualize/Diagram tools to NoSQL for a unified workspace experience.'
+                },
+                {
+                    icon: <FileCode className="w-5 h-5 text-indigo-400" />,
+                    title: lang === 'vi' ? 'Version History & Metadata Freshness' : 'Version History & Metadata Freshness',
+                    desc: lang === 'vi'
+                        ? 'Theo dõi lịch sử phiên bản của các thực thể và tự động cập nhật độ tươi mới của metadata để đảm bảo dữ liệu luôn chính xác.'
+                        : 'Track version history for entities and automatically monitor metadata freshness to ensure your data is always up to date.'
+                },
+                {
+                    icon: <ShieldCheck className="w-5 h-5 text-red-400" />,
+                    title: lang === 'vi' ? 'Org Backup & Migration Preview' : 'Org Backup & Migration Preview',
+                    desc: lang === 'vi'
+                        ? 'Hệ thống sao lưu tổ chức và công cụ xem trước migration, giúp chuyển đổi hạ tầng an toàn hơn bao giờ hết.'
+                        : 'Organization backup system and migration preview tools, making infrastructure transitions safer than ever.'
+                },
+                {
+                    icon: <Users className="w-5 h-5 text-cyan-400" />,
+                    title: lang === 'vi' ? 'Real-time Presence Tracking' : 'Real-time Presence Tracking',
+                    desc: lang === 'vi'
+                        ? 'Biết được thành viên nào trong nhóm đang cùng hoạt động trong không gian làm việc nhờ hệ thống theo dõi hiện diện thời gian thực.'
+                        : 'See which team members are active in the workspace in real-time with our new presence tracking system.'
+                },
+                {
+                    icon: <Sparkles className="w-5 h-5 text-blue-400" />,
+                    title: lang === 'vi' ? 'Persistent Workspace State' : 'Persistent Workspace State',
+                    desc: lang === 'vi'
+                        ? 'Ghi nhớ chiều cao bảng kết quả, chế độ xem (Tree/Grid) và Aggregation stages ngay cả khi tải lại trang.'
+                        : 'Automatically remembers result panel height, view modes (Tree/Grid), and Aggregation stages across page refreshes.'
+                },
+                {
+                    icon: <Globe className="w-5 h-5 text-purple-400" />,
+                    title: lang === 'vi' ? 'Universal Visualize Hub' : 'Universal Visualize Hub',
+                    desc: lang === 'vi'
+                        ? 'Trang Trực quan hóa giờ đây hỗ trợ đầy đủ NoSQL, cho phép tạo biểu đồ từ dữ liệu MongoDB một cách mượt mà.'
+                        : 'The Visualization page now fully supports NoSQL, enabling seamless chart creation from MongoDB data.'
+                }
+            ]
+        },
         // v3.4.0 - Early May 2026
         {
             version: 'v3.4.0',
             date: lang === 'vi' ? 'Đầu Tháng 5, 2026' : 'Early May 2026',
             title: lang === 'vi' ? 'Advanced Security & Infrastructure Hardening' : 'Advanced Security & Infrastructure Hardening',
-            badge: 'LATEST',
+            badge: '',
             features: [
                 {
                     icon: <ShieldCheck className="w-5 h-5 text-red-400" />,

@@ -25,7 +25,10 @@ export const NoSqlMainContent: React.FC = () => {
         setNosqlViewMode,
         nosqlActiveConnectionId,
         connections,
-        lang
+        lang,
+        isResultPanelOpen,
+        defaultResultHeight,
+        setDefaultResultHeight
     } = useAppStore();
 
     const activeConnection = connections.find(c => c.id === nosqlActiveConnectionId);
@@ -41,9 +44,10 @@ export const NoSqlMainContent: React.FC = () => {
 
     const { isCompactMobileLayout } = useResponsiveLayoutMode();
     const resizer = useVerticalResizablePanel({
-        initialHeight: 300,
+        initialHeight: defaultResultHeight || 300,
         minHeight: 150,
         maxHeight: 0.8,
+        onHeightChange: setDefaultResultHeight
     });
 
     const { isLoading, error, executeMql, result } = useNoSqlQuery();
@@ -211,7 +215,8 @@ export const NoSqlMainContent: React.FC = () => {
                     onPointerDown={resizer.startResizing}
                     className={cn(
                         "h-1.5 bg-muted/20 border-y border-border/10 cursor-row-resize flex items-center justify-center group transition-colors select-none z-20 touch-none",
-                        resizer.isDragging ? "bg-green-500/20" : "hover:bg-green-500/10"
+                        resizer.isDragging ? "bg-green-500/20" : "hover:bg-green-500/10",
+                        !isResultPanelOpen && "hidden"
                     )}
                 >
                     <div className={cn(
@@ -222,7 +227,7 @@ export const NoSqlMainContent: React.FC = () => {
                 
                 {/* Result Area (Bottom) */}
                 <div 
-                    style={{ height: `${resizer.height}px` }}
+                    style={{ height: isResultPanelOpen ? `${resizer.height}px` : '0px' }}
                     className={cn(
                         "flex flex-col overflow-hidden bg-background shrink-0 relative z-10",
                         resizer.isDragging ? "" : "transition-[height] duration-300 ease-in-out"

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { MigrationService } from './migration.service';
+import { MigrationComparisonService } from './migration-comparison.service';
 import { MigrationController } from './migration.controller';
 import { MigrationProcessor } from './migration.processor';
 import { ConnectionsModule } from '../connections/connections.module';
@@ -17,7 +18,7 @@ import { AuthModule } from '../auth/auth.module';
     }),
   ],
   controllers: [MigrationController],
-  providers: [MigrationService, MigrationProcessor],
+  providers: [MigrationService, MigrationComparisonService, MigrationProcessor],
   exports: [MigrationService],
 })
-export class MigrationModule {}
+export class MigrationModule { }

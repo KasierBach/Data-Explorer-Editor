@@ -1,17 +1,29 @@
+# ──────────────────────────────────────────────
+# Data Explorer – Docker Compose (production-like)
+# ──────────────────────────────────────────────
+
 services:
+  # ── PostgreSQL ──────────────────────────────
   db:
     image: postgres:15-alpine
     container_name: data-explorer-db
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=data_explorer
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: data_explorer
     ports:
       - "5435:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d data_explorer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
 
+  # ── Redis ───────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: data-explorer-redis
@@ -19,8 +31,29 @@ services:
       - "6379:6379"
     volumes:
       - redisdata:/data
-    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
 
+  # ── Database Migrations (runs once then exits) ──
+  migrate:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: data-explorer-migrate
+    entrypoint: ["npx", "prisma", "migrate", "deploy"]
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/data_explorer
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # ── Backend API ─────────────────────────────
   backend:
     build:
       context: ./server
@@ -36,10 +69,19 @@ services:
       - REDIS_URL=redis://redis:6379
       - FRONTEND_URL=http://localhost
     depends_on:
-      - db
-      - redis
-    restart: always
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
 
+  # ── Frontend (Nginx) ───────────────────────
   frontend:
     build:
       context: ./client
@@ -50,8 +92,15 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
-    restart: always
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
 
 volumes:
   pgdata:

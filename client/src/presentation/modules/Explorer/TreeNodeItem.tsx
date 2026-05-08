@@ -8,10 +8,14 @@ import {
     FileCode,
     Key,
     Eye,
-    Zap,
     Box,
     Layers,
-    Binary
+    Binary,
+    GitBranch,
+    Shield,
+    Columns3,
+    Activity,
+    Variable
 } from 'lucide-react';
 import type { TreeNode } from '@/core/domain/entities';
 import { useDatabaseHierarchy } from '@/presentation/hooks/useDatabase';
@@ -29,14 +33,18 @@ const FileIcon = ({ type, className }: { type: string, className?: string }) => 
         case 'folder':
             if (className?.includes('Tables')) return <Table className={cn("w-4 h-4 text-amber-500", className.replace('Tables', ''))} />;
             if (className?.includes('Views')) return <Eye className={cn("w-4 h-4 text-amber-500", className.replace('Views', ''))} />;
-            if (className?.includes('Functions')) return <Zap className={cn("w-4 h-4 text-amber-500", className.replace('Functions', ''))} />;
+            if (className?.includes('Functions')) return <Variable className={cn("w-4 h-4 text-amber-500", className.replace('Functions', ''))} />;
+            if (className?.includes('Columns')) return <Columns3 className={cn("w-4 h-4 text-sky-400", className.replace('Columns', ''))} />;
+            if (className?.includes('Indexes')) return <GitBranch className={cn("w-4 h-4 text-teal-400", className.replace('Indexes', ''))} />;
+            if (className?.includes('Triggers')) return <Activity className={cn("w-4 h-4 text-orange-400", className.replace('Triggers', ''))} />;
+            if (className?.includes('Constraints')) return <Shield className={cn("w-4 h-4 text-rose-400", className.replace('Constraints', ''))} />;
             return <Folder className={cn("w-4 h-4 text-amber-500 fill-amber-500/10", className)} />;
         case 'table':
             return <Table className={cn("w-4 h-4 text-blue-500", className)} />;
         case 'view':
             return <Eye className={cn("w-4 h-4 text-purple-400", className)} />;
         case 'function':
-            return <Zap className={cn("w-4 h-4 text-yellow-500", className)} />;
+            return <Variable className={cn("w-4 h-4 text-yellow-500", className)} />;
         case 'procedure':
             return <FileCode className={cn("w-4 h-4 text-emerald-500", className)} />;
         case 'collection':
@@ -45,6 +53,12 @@ const FileIcon = ({ type, className }: { type: string, className?: string }) => 
             return <Binary className={cn("w-4 h-4 text-slate-400", className)} />;
         case 'primary_key':
             return <Key className={cn("w-4 h-4 text-amber-400 rotate-45", className)} />;
+        case 'index':
+            return <GitBranch className={cn("w-4 h-4 text-teal-400", className)} />;
+        case 'trigger':
+            return <Activity className={cn("w-4 h-4 text-orange-400", className)} />;
+        case 'constraint':
+            return <Shield className={cn("w-4 h-4 text-rose-400", className)} />;
         default:
             return <Box className={cn("w-4 h-4 text-slate-400", className)} />;
     }

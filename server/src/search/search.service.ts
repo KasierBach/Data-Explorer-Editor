@@ -88,11 +88,13 @@ export class SearchService implements OnModuleInit, OnModuleDestroy {
             }
         }
 
+        /* 
         await this.notificationsService.emit(
             userId,
             'success',
             `Global search index synced for ${connections.length} connections.`
         );
+        */
 
         return { success: true, message: 'Sync completed' };
     }

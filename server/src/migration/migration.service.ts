@@ -3,118 +3,25 @@ import { EventEmitter } from 'events';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, Job } from 'bullmq';
 import { ConnectionsService } from '../connections/connections.service';
-import { DatabaseStrategyFactory, IDatabaseStrategy, ConnectionConfig, FullTableMetadata, ColumnInfo, IndexInfo } from '../database-strategies';
+import { DatabaseStrategyFactory, ConnectionConfig, FullTableMetadata } from '../database-strategies';
 import { StartMigrationDto } from './dto/start-migration.dto';
+import { getErrorMessage } from '../common/utils/error.util';
+import { MigrationComparisonService } from './migration-comparison.service';
+import {
+  type MigrationConnection,
+  type MigrationStage,
+  type MigrationJob,
+  type StoredMigrationJob,
+  type MigrationProgress,
+  type MigrationStream,
+  type ResolvedMigrationContext,
+  type MigrationColumnDiff,
+  type MigrationIndexDiff,
+  type MigrationReviewSummary,
+} from './migration.types';
 
-type ConnectionType = 'postgres' | 'mysql' | 'mssql' | 'sqlite' | 'clickhouse' | 'mock' | 'mongodb' | 'mongodb+srv';
-
-interface MigrationConnection {
-  id: string;
-  name: string;
-  type: ConnectionType;
-  host?: string | null;
-  port?: number | null;
-  username?: string | null;
-  password?: string;
-  database?: string | null;
-}
-
-export type MigrationStage =
-  | 'queued'
-  | 'validating'
-  | 'connecting'
-  | 'preflight'
-  | 'streaming'
-  | 'completed'
-  | 'failed';
-
-export interface MigrationJob {
-  id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  stage: MigrationStage;
-  processedRows: number;
-  batchesProcessed: number;
-  error?: string;
-}
-
-interface StoredMigrationJob extends MigrationJob {
-  ownerId: string;
-}
-
-interface MigrationProgress {
-  processedRows: number;
-  batchesProcessed: number;
-  stage: MigrationStage;
-}
-
-interface MigrationStream extends AsyncIterable<Record<string, unknown>> {
-  on(event: 'data' | 'row' | 'end' | 'error' | 'close', listener: (...args: unknown[]) => void): this;
-  pause(): void;
-  resume(): void;
-  emit(event: string, ...args: unknown[]): boolean;
-}
-
-interface ResolvedMigrationContext {
-  sourceConn: MigrationConnection;
-  targetConn: MigrationConnection;
-  sourceStrategy: IDatabaseStrategy;
-  targetStrategy: IDatabaseStrategy;
-  sourcePool: unknown;
-  targetPool: unknown;
-  sourceMetadata: FullTableMetadata;
-  targetMetadata: FullTableMetadata;
-}
-
-export interface MigrationColumnDiff {
-  name: string;
-  status: 'added' | 'removed' | 'changed' | 'unchanged';
-  changes: string[];
-  source: ColumnInfo | null;
-  target: ColumnInfo | null;
-}
-
-export interface MigrationIndexDiff {
-  name: string;
-  status: 'added' | 'removed' | 'changed' | 'unchanged';
-  changes: string[];
-  source: IndexInfo | null;
-  target: IndexInfo | null;
-}
-
-export interface MigrationReviewSummary {
-  canProceed: boolean;
-  blockers: string[];
-  warnings: string[];
-  rollbackCaveats: string[];
-  estimatedImpact: {
-    addedColumns: number;
-    removedColumns: number;
-    changedColumns: number;
-    addedIndices: number;
-    removedIndices: number;
-    changedIndices: number;
-  };
-  source: {
-    connectionId: string;
-    connectionName: string;
-    schema: string;
-    table: string;
-    rowCount: number | null;
-    columnCount: number;
-    indexCount: number;
-  };
-  target: {
-    connectionId: string;
-    connectionName: string;
-    schema: string;
-    table: string;
-    rowCount: number | null;
-    columnCount: number;
-    indexCount: number;
-  };
-  columnDiffs: MigrationColumnDiff[];
-  indexDiffs: MigrationIndexDiff[];
-}
+// Re-export types for backward compatibility with consumers
+export type { MigrationStage, MigrationJob, MigrationColumnDiff, MigrationIndexDiff, MigrationReviewSummary };
 
 @Injectable()
 export class MigrationService {
@@ -124,8 +31,9 @@ export class MigrationService {
   constructor(
     private connectionsService: ConnectionsService,
     private dbStrategiesFactory: DatabaseStrategyFactory,
+    private comparisonService: MigrationComparisonService,
     @InjectQueue('migration') private migrationQueue: Queue,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     this.logger.log('Migration service initialized with BullMQ.');
@@ -135,8 +43,8 @@ export class MigrationService {
     const job = await this.migrationQueue.add(
       'migration-job',
       { userId, dto },
-      { 
-        removeOnComplete: false, 
+      {
+        removeOnComplete: false,
         removeOnFail: false,
         attempts: 1,
       }
@@ -161,7 +69,7 @@ export class MigrationService {
 
   async getPublicJob(jobId: string, userId: string): Promise<MigrationJob> {
     const job = await this.assertJobOwnership(jobId, userId);
-    
+
     const state = await job.getState();
     const progress = job.progress as MigrationProgress | undefined;
 
@@ -177,10 +85,10 @@ export class MigrationService {
 
   private mapBullStatus(state: string): MigrationJob['status'] {
     switch (state) {
-        case 'completed': return 'completed';
-        case 'failed': return 'failed';
-        case 'active': return 'running';
-        default: return 'pending';
+      case 'completed': return 'completed';
+      case 'failed': return 'failed';
+      case 'active': return 'running';
+      default: return 'pending';
     }
   }
 
@@ -192,7 +100,7 @@ export class MigrationService {
     if (typeof progress.processedRows !== 'number') progress.processedRows = 0;
     if (typeof progress.batchesProcessed !== 'number') progress.batchesProcessed = 0;
     if (!progress.stage) progress.stage = 'streaming';
-    
+
     if (typeof updater === 'function') {
       updater(progress);
     } else {
@@ -201,9 +109,9 @@ export class MigrationService {
 
     await job.updateProgress(progress);
     this.eventEmitter.emit(`migration-${jobId}`, {
-        id: jobId,
-        status: 'running',
-        ...progress
+      id: jobId,
+      status: 'running',
+      ...progress
     });
   }
 
@@ -219,13 +127,8 @@ export class MigrationService {
     if (job) await job.moveToFailed(new Error(error), 'token-if-needed');
   }
 
-  private async completeJob(jobId: string) {
-    // BullMQ handles completion via worker return value
-  }
-
-  private isMongoLike(type: string) {
-    return type === 'mongodb' || type === 'mongodb+srv';
-  }
+  /** No-op: BullMQ handles completion via worker return value automatically. */
+  private async completeJob(_jobId: string) { }
 
   private buildMigrationConnectionConfig(conn: MigrationConnection): ConnectionConfig {
     return {
@@ -239,78 +142,11 @@ export class MigrationService {
     };
   }
 
-  private normalizeSchemaName(type: string, schema?: string) {
-    if (this.isMongoLike(type)) return '';
-    return schema?.trim() || (type === 'postgres' ? 'public' : '');
-  }
-
-  private normalizeTableName(table: string) {
-    return table.trim();
-  }
-
-  private sameMigrationEndpoint(dto: StartMigrationDto) {
-    return (
-      dto.sourceConnectionId === dto.targetConnectionId &&
-      (dto.sourceSchema || '') === (dto.targetSchema || '') &&
-      dto.sourceTable === dto.targetTable
-    );
-  }
-
-  private async fetchMetadata(strategy: IDatabaseStrategy, pool: unknown, schema: string, table: string, database?: string): Promise<FullTableMetadata> {
-    return strategy.getFullMetadata(pool, schema, table, database);
-  }
-
-  private collectTargetCompatibilityIssues(sourceConn: MigrationConnection, targetConn: MigrationConnection, sourceMetadata: FullTableMetadata, targetMetadata: FullTableMetadata) {
-    const issues: string[] = [];
-
-    if (this.isMongoLike(targetConn.type)) {
-      return issues;
-    }
-
-    const sourceColumns = new Set((sourceMetadata?.columns || []).map((column) => column.name));
-    const targetColumns = Array.isArray(targetMetadata?.columns) ? targetMetadata.columns : [];
-
-    if (targetColumns.length === 0) {
-      issues.push('Target table not found or has no accessible columns.');
-      return issues;
-    }
-
-    const missingColumns = targetColumns
-      .filter((column) => !sourceColumns.has(column.name))
-      .filter((column) => !column.isNullable && column.defaultValue == null && !column.isPrimaryKey)
-      .map((column) => column.name);
-
-    if (missingColumns.length > 0) {
-      issues.push(`Target table is missing required values for columns: ${missingColumns.slice(0, 5).join(', ')}`);
-    }
-
-    const unsupportedSourceColumns = (sourceMetadata?.columns || [])
-      .map((column) => column.name)
-      .filter((columnName) => !targetColumns.some((targetColumn) => targetColumn.name === columnName));
-
-    if (unsupportedSourceColumns.length > 0) {
-      issues.push(`Target table is missing source columns: ${unsupportedSourceColumns.slice(0, 5).join(', ')}`);
-    }
-
-    if (this.isMongoLike(sourceConn.type) && unsupportedSourceColumns.some((name) => name.includes('.') || name.includes('[]'))) {
-      issues.push('MongoDB nested document fields are not compatible with the selected SQL target table.');
-    }
-
-    return issues;
-  }
-
-  private validateTargetCompatibility(sourceConn: MigrationConnection, targetConn: MigrationConnection, sourceMetadata: FullTableMetadata, targetMetadata: FullTableMetadata) {
-    const issues = this.collectTargetCompatibilityIssues(sourceConn, targetConn, sourceMetadata, targetMetadata);
-    if (issues.length > 0) {
-      throw new Error(issues[0]);
-    }
-  }
-
   private async resolveMigrationContext(userId: string, dto: StartMigrationDto, options: { jobId?: string; strict?: boolean } = {}): Promise<ResolvedMigrationContext> {
     const jobId = options.jobId;
     const strict = options.strict ?? true;
 
-    if (this.sameMigrationEndpoint(dto)) {
+    if (this.comparisonService.sameMigrationEndpoint(dto)) {
       throw new Error('Source and target cannot point to the same table or collection.');
     }
 
@@ -327,11 +163,11 @@ export class MigrationService {
 
     const sourceConn: MigrationConnection = {
       ...rawSourceConn,
-      type: rawSourceConn.type as ConnectionType,
+      type: rawSourceConn.type as import('./migration.types').ConnectionType,
     };
     const targetConn: MigrationConnection = {
       ...rawTargetConn,
-      type: rawTargetConn.type as ConnectionType,
+      type: rawTargetConn.type as import('./migration.types').ConnectionType,
     };
 
     if (jobId) {
@@ -347,29 +183,29 @@ export class MigrationService {
       await this.markStage(jobId, 'preflight');
     }
 
-    const sourceSchema = this.normalizeSchemaName(sourceConn.type, dto.sourceSchema);
-    const targetSchema = this.normalizeSchemaName(targetConn.type, dto.targetSchema);
-    const sourceTable = this.normalizeTableName(dto.sourceTable);
-    const targetTable = this.normalizeTableName(dto.targetTable);
+    const sourceSchema = this.comparisonService.normalizeSchemaName(sourceConn.type, dto.sourceSchema);
+    const targetSchema = this.comparisonService.normalizeSchemaName(targetConn.type, dto.targetSchema);
+    const sourceTable = this.comparisonService.normalizeTableName(dto.sourceTable);
+    const targetTable = this.comparisonService.normalizeTableName(dto.targetTable);
 
-    const sourceMetadata = await this.fetchMetadata(sourceStrategy, sourcePool, sourceSchema, sourceTable, sourceConn.database || undefined);
+    const sourceMetadata = await sourceStrategy.getFullMetadata(sourcePool, sourceSchema, sourceTable, sourceConn.database || undefined);
 
     if (!sourceMetadata?.columns || sourceMetadata.columns.length === 0) {
       throw new Error('Source table or collection could not be validated. Check schema, table name, and permissions.');
     }
 
-    const targetMetadata = await this.fetchMetadata(targetStrategy, targetPool, targetSchema, targetTable, targetConn.database || undefined)
+    const targetMetadata = await targetStrategy.getFullMetadata(targetPool, targetSchema, targetTable, targetConn.database || undefined)
       .catch((error) => {
         if (strict) {
           throw error;
         }
 
-        this.logger.warn(`Migration preview target metadata unavailable: ${error instanceof Error ? error.message : String(error)}`);
+        this.logger.warn(`Migration preview target metadata unavailable: ${getErrorMessage(error)}`);
         return { columns: [], indices: [], rowCount: undefined } as FullTableMetadata;
       });
 
     if (strict) {
-      this.validateTargetCompatibility(sourceConn, targetConn, sourceMetadata, targetMetadata);
+      this.comparisonService.validateTargetCompatibility(sourceConn, targetConn, sourceMetadata, targetMetadata);
     }
 
     return {
@@ -384,138 +220,10 @@ export class MigrationService {
     };
   }
 
-  private compareColumns(sourceColumns: ColumnInfo[], targetColumns: ColumnInfo[]): MigrationColumnDiff[] {
-    const sourceMap = new Map(sourceColumns.map((column) => [column.name, column]));
-    const targetMap = new Map(targetColumns.map((column) => [column.name, column]));
-    const names = Array.from(new Set([...sourceMap.keys(), ...targetMap.keys()])).sort((a, b) => a.localeCompare(b));
-
-    return names.map((name) => {
-      const source = sourceMap.get(name) ?? null;
-      const target = targetMap.get(name) ?? null;
-      const changes: string[] = [];
-
-      if (!source) {
-        changes.push('added in target');
-      } else if (!target) {
-        changes.push('removed from target');
-      } else {
-        if (source.type !== target.type) changes.push(`type ${source.type} -> ${target.type}`);
-        if (source.isNullable !== target.isNullable) changes.push(`nullable ${source.isNullable ? 'yes' : 'no'} -> ${target.isNullable ? 'yes' : 'no'}`);
-        if (JSON.stringify(source.defaultValue ?? null) !== JSON.stringify(target.defaultValue ?? null)) changes.push('default value changed');
-        if (source.isPrimaryKey !== target.isPrimaryKey) changes.push(`primary key ${source.isPrimaryKey ? 'yes' : 'no'} -> ${target.isPrimaryKey ? 'yes' : 'no'}`);
-        if ((source.pkConstraintName ?? null) !== (target.pkConstraintName ?? null)) changes.push('primary key constraint changed');
-        if ((source.comment ?? null) !== (target.comment ?? null)) changes.push('comment changed');
-      }
-
-      return {
-        name,
-        status: !source ? 'added' : !target ? 'removed' : changes.length > 0 ? 'changed' : 'unchanged',
-        changes,
-        source,
-        target,
-      };
-    });
-  }
-
-  private compareIndices(sourceIndices: IndexInfo[], targetIndices: IndexInfo[]): MigrationIndexDiff[] {
-    const sourceMap = new Map(sourceIndices.map((index) => [index.name, index]));
-    const targetMap = new Map(targetIndices.map((index) => [index.name, index]));
-    const names = Array.from(new Set([...sourceMap.keys(), ...targetMap.keys()])).sort((a, b) => a.localeCompare(b));
-
-    return names.map((name) => {
-      const source = sourceMap.get(name) ?? null;
-      const target = targetMap.get(name) ?? null;
-      const changes: string[] = [];
-
-      if (!source) {
-        changes.push('index added in target');
-      } else if (!target) {
-        changes.push('index removed from target');
-      } else {
-        if (source.isUnique !== target.isUnique) changes.push(`unique ${source.isUnique ? 'yes' : 'no'} -> ${target.isUnique ? 'yes' : 'no'}`);
-        if (source.isPrimary !== target.isPrimary) changes.push(`primary ${source.isPrimary ? 'yes' : 'no'} -> ${target.isPrimary ? 'yes' : 'no'}`);
-        if (JSON.stringify(source.columns) !== JSON.stringify(target.columns)) changes.push('indexed columns changed');
-      }
-
-      return {
-        name,
-        status: !source ? 'added' : !target ? 'removed' : changes.length > 0 ? 'changed' : 'unchanged',
-        changes,
-        source,
-        target,
-      };
-    });
-  }
-
-  private buildMigrationReviewSummary(context: ResolvedMigrationContext, dto: StartMigrationDto): MigrationReviewSummary {
-    const columnDiffs = this.compareColumns(context.sourceMetadata.columns || [], context.targetMetadata.columns || []);
-    const indexDiffs = this.compareIndices(context.sourceMetadata.indices || [], context.targetMetadata.indices || []);
-    const blockers = this.collectTargetCompatibilityIssues(context.sourceConn, context.targetConn, context.sourceMetadata, context.targetMetadata);
-    const warnings: string[] = [];
-
-    const changedColumns = columnDiffs.filter((diff) => diff.status === 'changed').length;
-    const removedColumns = columnDiffs.filter((diff) => diff.status === 'removed').length;
-    const addedColumns = columnDiffs.filter((diff) => diff.status === 'added').length;
-    const changedIndices = indexDiffs.filter((diff) => diff.status === 'changed').length;
-    const removedIndices = indexDiffs.filter((diff) => diff.status === 'removed').length;
-    const addedIndices = indexDiffs.filter((diff) => diff.status === 'added').length;
-
-    if ((context.sourceMetadata.rowCount ?? 0) > 100_000) {
-      warnings.push('Large source table detected. Expect the transfer to take noticeable time.');
-    }
-
-    if (changedColumns > 0 || changedIndices > 0) {
-      warnings.push('Structure differs between source and target. Review the diff carefully before running.');
-    }
-
-    if (!context.targetMetadata.columns?.length) {
-      warnings.push('Target metadata could not be inspected fully. Double-check the target schema before running.');
-    }
-
-    return {
-      canProceed: blockers.length === 0,
-      blockers,
-      warnings,
-      rollbackCaveats: [
-        'This transfer is one-way and does not automatically roll back inserted rows.',
-        'If the target structure differs, run a fresh backup before reattempting the transfer.',
-        'Primary key and index mismatches may require manual cleanup after a failed run.',
-      ],
-      estimatedImpact: {
-        addedColumns,
-        removedColumns,
-        changedColumns,
-        addedIndices,
-        removedIndices,
-        changedIndices,
-      },
-      source: {
-        connectionId: context.sourceConn.id,
-        connectionName: context.sourceConn.name,
-        schema: this.normalizeSchemaName(context.sourceConn.type, dto.sourceSchema),
-        table: this.normalizeTableName(dto.sourceTable),
-        rowCount: context.sourceMetadata.rowCount ?? null,
-        columnCount: context.sourceMetadata.columns?.length ?? 0,
-        indexCount: context.sourceMetadata.indices?.length ?? 0,
-      },
-      target: {
-        connectionId: context.targetConn.id,
-        connectionName: context.targetConn.name,
-        schema: this.normalizeSchemaName(context.targetConn.type, dto.targetSchema),
-        table: this.normalizeTableName(dto.targetTable),
-        rowCount: context.targetMetadata.rowCount ?? null,
-        columnCount: context.targetMetadata.columns?.length ?? 0,
-        indexCount: context.targetMetadata.indices?.length ?? 0,
-      },
-      columnDiffs,
-      indexDiffs,
-    };
-  }
-
   async previewMigration(userId: string, dto: StartMigrationDto): Promise<MigrationReviewSummary> {
     const context = await this.resolveMigrationContext(userId, dto, { strict: false });
     try {
-      return this.buildMigrationReviewSummary(context, dto);
+      return this.comparisonService.buildMigrationReviewSummary(context, dto);
     } finally {
       await this.closeResources(context);
     }
@@ -525,12 +233,12 @@ export class MigrationService {
     if (context?.sourcePool && context?.sourceStrategy) {
       try {
         await context.sourceStrategy.closePool(context.sourcePool);
-      } catch {}
+      } catch { }
     }
     if (context?.targetPool && context?.targetStrategy) {
       try {
         await context.targetStrategy.closePool(context.targetPool);
-      } catch {}
+      } catch { }
     }
   }
 
@@ -543,10 +251,10 @@ export class MigrationService {
 
       const rawStream = await context.sourceStrategy!.exportStream(
         context.sourcePool,
-        this.normalizeSchemaName(context.sourceConn!.type, dto.sourceSchema),
-        this.normalizeTableName(dto.sourceTable),
+        this.comparisonService.normalizeSchemaName(context.sourceConn!.type, dto.sourceSchema),
+        this.comparisonService.normalizeTableName(dto.sourceTable),
       );
-      
+
       const stream = rawStream as MigrationStream;
 
       const BATCH_SIZE = 2000;
@@ -560,8 +268,8 @@ export class MigrationService {
         buffer = [];
 
         await context!.targetStrategy!.importData(context!.targetPool, {
-          schema: this.normalizeSchemaName(context!.targetConn!.type, dto.targetSchema),
-          table: this.normalizeTableName(dto.targetTable),
+          schema: this.comparisonService.normalizeSchemaName(context!.targetConn!.type, dto.targetSchema),
+          table: this.comparisonService.normalizeTableName(dto.targetTable),
           data: batch,
         });
 

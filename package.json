@@ -1,6 +1,6 @@
 {
   "name": "data-explorer",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "private": true,
   "scripts": {
     "dev": "concurrently -n SERVER,CLIENT -c blue,green \"npm run start:dev --prefix server\" \"npm run dev --prefix client -- --host\"",

@@ -57,36 +57,6 @@ describe('AiService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('parseAiResponse', () => {
-    it('should correctly parse valid JSON response', () => {
-      const response = '{"message": "Ready", "sql": "SELECT 1"}';
-      const result = (service as any).parseAiResponse(response);
-      expect(result).toEqual({
-        message: 'Ready',
-        sql: 'SELECT 1',
-        explanation: undefined
-      });
-    });
-
-    it('should handle non-JSON response gracefully', () => {
-      const response = 'Plain text response';
-      const result = (service as any).parseAiResponse(response);
-      expect(result).toEqual({
-        message: 'Plain text response'
-      });
-    });
-
-    it('should extract JSON from markdown or extra text', () => {
-      const response = 'Sure, here is your data: {"message": "Extracted", "sql": "SELECT 2"} and some suffix.';
-      const result = (service as any).parseAiResponse(response);
-      expect(result).toEqual({
-        message: 'Extracted',
-        sql: 'SELECT 2',
-        explanation: undefined
-      });
-    });
-  });
-
   describe('chat', () => {
     it('should return parsed AI content', async () => {
       const result = await service.chat({ prompt: 'Test prompt' });

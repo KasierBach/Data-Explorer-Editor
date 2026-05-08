@@ -261,6 +261,64 @@ export class MysqlStrategy implements IDatabaseStrategy {
         }));
     }
 
+    async getIndexes(pool: Pool, schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]> {
+        const [rows] = await pool.query(`SHOW INDEX FROM \`${table}\` IN \`${schema}\``) as [RowDataPacket[], FieldPacket[]];
+        const parentId = dbName ? `db:${dbName}.schema:${schema}.table:${table}.folder:indexes` : `schema:${schema}.table:${table}.folder:indexes`;
+        
+        // Group by index name
+        const indexes = new Map<string, any>();
+        (rows as any[]).forEach(row => {
+            if (!indexes.has(row.Key_name)) {
+                indexes.set(row.Key_name, {
+                    name: row.Key_name,
+                    unique: row.Non_unique === 0
+                });
+            }
+        });
+
+        return Array.from(indexes.values()).map(idx => ({
+            id: `${parentId}.index:${idx.name}`,
+            name: idx.name,
+            type: 'index',
+            parentId,
+            hasChildren: false,
+            metadata: { unique: idx.unique }
+        }));
+    }
+
+    async getTriggers(pool: Pool, schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]> {
+        const [rows] = await pool.query('SHOW TRIGGERS WHERE `Table` = ?', [table]) as [RowDataPacket[], FieldPacket[]];
+        const parentId = dbName ? `db:${dbName}.schema:${schema}.table:${table}.folder:triggers` : `schema:${schema}.table:${table}.folder:triggers`;
+
+        return (rows as any[]).map(r => ({
+            id: `${parentId}.trigger:${r.Trigger}`,
+            name: r.Trigger,
+            type: 'trigger',
+            parentId,
+            hasChildren: false,
+            metadata: { event: r.Event, timing: r.Timing }
+        }));
+    }
+
+    async getConstraints(pool: Pool, schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]> {
+        const sql = `
+            SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME
+            FROM information_schema.KEY_COLUMN_USAGE
+            WHERE TABLE_NAME = ? AND TABLE_SCHEMA = ?
+            AND REFERENCED_TABLE_NAME IS NOT NULL
+        `;
+        const [rows] = await pool.query(sql, [table, schema]) as [RowDataPacket[], FieldPacket[]];
+        const parentId = dbName ? `db:${dbName}.schema:${schema}.table:${table}.folder:constraints` : `schema:${schema}.table:${table}.folder:constraints`;
+
+        return (rows as any[]).map(r => ({
+            id: `${parentId}.constraint:${r.CONSTRAINT_NAME}`,
+            name: `${r.CONSTRAINT_NAME} (FK ${r.COLUMN_NAME} -> ${r.REFERENCED_TABLE_NAME}.${r.REFERENCED_COLUMN_NAME})`,
+            type: 'constraint',
+            parentId,
+            hasChildren: false
+        }));
+    }
+
     async getFullMetadata(pool: Pool, schema: string, table: string): Promise<FullTableMetadata> {
         const columns = await this.getColumns(pool, schema, table);
         return {

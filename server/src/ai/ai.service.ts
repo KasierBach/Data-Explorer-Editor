@@ -9,7 +9,7 @@ export class AiService {
         private readonly chatService: AiChatCompletionService,
         private readonly schemaService: AiSchemaService,
         private readonly autocompleteService: AiAutocompleteService,
-    ) {}
+    ) { }
 
     async chat(params: any): Promise<any> {
         return this.chatService.chat(params);
@@ -52,7 +52,4 @@ export class AiService {
         return this.autocompleteService.generateSql(params);
     }
 
-    parseAiResponse(fullText: string) {
-        return fullText;
-    }
 }

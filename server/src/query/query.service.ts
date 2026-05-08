@@ -25,6 +25,7 @@ import {
   isMongoActionAllowedOnReadOnly,
   isSqlAllowedOnReadOnly,
 } from './query-guard.util';
+import { getErrorMessage, isForbiddenException } from '../common/utils/error.util';
 
 @Injectable()
 export class QueryService {
@@ -279,10 +280,10 @@ export class QueryService {
           const match = sql.match(/FROM\s+([\w"`.[\]]+)/i);
           if (match) {
             const tableRef = match[1];
-            const countSql = connection.type === 'mongodb' 
+            const countSql = connection.type === 'mongodb'
               ? JSON.stringify({ action: 'count', collection: tableRef.replace(/['"`]/g, '') })
               : `SELECT COUNT(*) as total FROM ${tableRef}`;
-            
+
             const countResult = await strategy.executeQuery(pool, countSql);
             if (countResult.rows && countResult.rows.length > 0) {
               const firstRow = countResult.rows[0];
@@ -298,19 +299,19 @@ export class QueryService {
       await this.auditService.log({
         action: AuditAction.DB_QUERY_EXECUTE,
         userId,
-        details: { 
+        details: {
           category: 'query',
-          connectionId, 
-          database: database || connection.database, 
-          sqlSnippet: sql.substring(0, 100) + (sql.length > 100 ? '...' : '') 
+          connectionId,
+          database: database || connection.database,
+          sqlSnippet: sql.substring(0, 100) + (sql.length > 100 ? '...' : '')
         }
       });
 
       return result;
     } catch (error) {
-      if (error instanceof ForbiddenException) throw error;
+      if (isForbiddenException(error)) throw error;
 
-      this.logger.error('Query Service Error Details:', error instanceof Error ? error.message : String(error));
+      this.logger.error('Query Service Error Details:', getErrorMessage(error));
       throw new InternalServerErrorException('Query execution failed. Please check your syntax or connection permissions.');
     }
   }
@@ -330,8 +331,8 @@ export class QueryService {
       await this.invalidateQueryCache(connectionId, database || connection.database);
       return result;
     } catch (error) {
-      this.logger.error('Update Row Error:', error instanceof Error ? error.message : String(error));
-      throw new InternalServerErrorException(`Update failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error('Update Row Error:', getErrorMessage(error));
+      throw new InternalServerErrorException(`Update failed: ${getErrorMessage(error)}`);
     }
   }
 
@@ -347,8 +348,8 @@ export class QueryService {
       await this.invalidateQueryCache(connectionId, database || connection.database);
       return result;
     } catch (error) {
-      this.logger.error('Insert Row Error:', error instanceof Error ? error.message : String(error));
-      throw new InternalServerErrorException(`Insert failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error('Insert Row Error:', getErrorMessage(error));
+      throw new InternalServerErrorException(`Insert failed: ${getErrorMessage(error)}`);
     }
   }
 
@@ -364,8 +365,8 @@ export class QueryService {
       await this.invalidateQueryCache(connectionId, database || connection.database);
       return result;
     } catch (error) {
-      this.logger.error('Delete Rows Error:', error instanceof Error ? error.message : String(error));
-      throw new InternalServerErrorException(`Delete failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error('Delete Rows Error:', getErrorMessage(error));
+      throw new InternalServerErrorException(`Delete failed: ${getErrorMessage(error)}`);
     }
   }
 
@@ -398,21 +399,21 @@ export class QueryService {
       await this.auditService.log({
         action: AuditAction.DB_SCHEMA_CHANGE,
         userId,
-        details: { 
+        details: {
           category: 'schema',
-          connectionId, 
-          database, 
-          schema, 
-          table, 
-          operations: operations.map(op => op.type) 
+          connectionId,
+          database,
+          schema,
+          table,
+          operations: operations.map(op => op.type)
         }
       });
 
       return { success: true, results };
     } catch (error) {
-      if (error instanceof ForbiddenException) throw error;
-      this.logger.error('Update Schema Error:', error instanceof Error ? error.message : String(error));
-      throw new InternalServerErrorException(`Schema update failed: ${error instanceof Error ? error.message : String(error)}`);
+      if (isForbiddenException(error)) throw error;
+      this.logger.error('Update Schema Error:', getErrorMessage(error));
+      throw new InternalServerErrorException(`Schema update failed: ${getErrorMessage(error)}`);
     }
   }
 
@@ -427,8 +428,8 @@ export class QueryService {
       await this.invalidateQueryCache(connectionId, connection.database || undefined);
       return result;
     } catch (error) {
-      this.logger.error('Seed Data Error:', error instanceof Error ? error.message : String(error));
-      throw new InternalServerErrorException(`Seed data failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error('Seed Data Error:', getErrorMessage(error));
+      throw new InternalServerErrorException(`Seed data failed: ${getErrorMessage(error)}`);
     }
   }
 
@@ -448,8 +449,8 @@ export class QueryService {
       await this.invalidateQueryCache(connectionId, databaseName);
       return { success: true, message: `Database ${databaseName} created successfully.` };
     } catch (error) {
-      this.logger.error('Create Database Error:', error instanceof Error ? error.message : String(error));
-      throw new InternalServerErrorException(`Failed to create database: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error('Create Database Error:', getErrorMessage(error));
+      throw new InternalServerErrorException(`Failed to create database: ${getErrorMessage(error)}`);
     }
   }
 
@@ -481,8 +482,8 @@ export class QueryService {
 
       return { success: true, message: `Database ${databaseName} dropped successfully.` };
     } catch (error) {
-      this.logger.error('Drop Database Error:', error instanceof Error ? error.message : String(error));
-      throw new InternalServerErrorException(`Failed to drop database: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error('Drop Database Error:', getErrorMessage(error));
+      throw new InternalServerErrorException(`Failed to drop database: ${getErrorMessage(error)}`);
     }
   }
 
@@ -507,18 +508,18 @@ export class QueryService {
       await this.auditService.log({
         action: AuditAction.DB_IMPORT,
         userId,
-        details: { 
+        details: {
           category: 'import',
-          connectionId, 
-          table: `${schema ? schema + '.' : ''}${table}`, 
-          rowCount: result.rowCount 
+          connectionId,
+          table: `${schema ? schema + '.' : ''}${table}`,
+          rowCount: result.rowCount
         }
       });
 
       return result;
     } catch (error) {
-      this.logger.error('Import Data Error:', error instanceof Error ? error.message : String(error));
-      throw new InternalServerErrorException(`Import failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error('Import Data Error:', getErrorMessage(error));
+      throw new InternalServerErrorException(`Import failed: ${getErrorMessage(error)}`);
     }
   }
 }

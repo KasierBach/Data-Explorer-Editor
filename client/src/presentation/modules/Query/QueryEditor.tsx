@@ -37,8 +37,8 @@ import { ApiError } from '@/core/services/api.service';
 import { SavedQueryService } from '@/core/services/SavedQueryService';
 import { SaveQueryDialog, type SaveQueryFormValues } from './SaveQueryDialog';
 import { toast } from 'sonner';
-import { DashboardService } from '@/core/services/DashboardService';
-import { SaveToDashboardDialog, type SaveToDashboardFormValues } from '@/presentation/modules/Dashboard/SaveToDashboardDialog';
+import { SaveToDashboardDialog } from '@/presentation/modules/Dashboard/SaveToDashboardDialog';
+import { useQueryDashboard } from './hooks';
 import { AiQueryBox } from './components/AiQueryBox';
 import { useResourcePresence } from '@/presentation/hooks/useResourcePresence';
 import { PresenceBadge } from '@/presentation/components/presence/PresenceBadge';
@@ -88,19 +88,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         tags: '',
         description: '',
     });
-    const [isDashboardDialogOpen, setIsDashboardDialogOpen] = useState(false);
-    const [dashboardDialogInitialValues, setDashboardDialogInitialValues] = useState<SaveToDashboardFormValues>({
-        mode: 'new',
-        dashboardId: '',
-        dashboardName: '',
-        dashboardDescription: '',
-        visibility: 'private',
-        widgetTitle: '',
-        chartType: 'bar',
-        xAxis: '',
-        yAxis: [],
-    });
-
     const isFirstLoad = useRef(true);
     const lastHandledRunRequestRef = useRef<number | null>(null);
     const editorRef = useRef<any>(null);
@@ -112,7 +99,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         openTab,
         addQueryHistory,
         savedQueries,
-        openDashboardTab,
     } = useAppStore();
     const currentSavedQuery = savedQueries.find((savedQuery) => savedQuery.id === currentSavedQueryId) || null;
     const queryPresence = useResourcePresence(
@@ -212,6 +198,24 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         const sample = results.rows[0];
         return resultColumns.filter((column) => typeof sample?.[column] === 'number');
     }, [results, resultColumns]);
+
+    // Dashboard hook — extracted from inline state + handlers
+    const {
+        isDashboardDialogOpen,
+        setIsDashboardDialogOpen,
+        dashboardDialogInitialValues,
+        openDashboardDialog,
+        saveToDashboard,
+    } = useQueryDashboard({
+        results,
+        executedQuery,
+        query,
+        resultColumns,
+        resultNumericColumns,
+        currentSavedQueryId,
+        currentSavedQueryName: currentSavedQuery?.name,
+        tabTitle: tab?.title,
+    });
 
     // Record history on success/error
     useEffect(() => {
@@ -401,82 +405,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         await queryClient.resetQueries({ queryKey: ['hierarchy'] });
     };
 
-    const handleOpenDashboardDialog = useCallback(() => {
-        if (!results?.rows?.length) return;
-        const defaultName = currentSavedQuery?.name || tab?.title || (lang === 'vi' ? 'Query Widget' : 'Query Widget');
-        setDashboardDialogInitialValues({
-            mode: 'new',
-            dashboardId: '',
-            dashboardName: activeConnection?.name ? `${activeConnection.name} Dashboard` : 'New Dashboard',
-            dashboardDescription: '',
-            visibility: 'private',
-            widgetTitle: defaultName,
-            chartType: resultNumericColumns.length ? 'bar' : 'table',
-            xAxis: resultColumns[0] || '',
-            yAxis: resultNumericColumns.slice(0, 1),
-        });
-        setIsDashboardDialogOpen(true);
-    }, [results, currentSavedQuery?.name, tab?.title, lang, activeConnection?.name, resultColumns, resultNumericColumns]);
-
-    const handleSaveToDashboard = useCallback(async (values: SaveToDashboardFormValues) => {
-        if (!results) return;
-
-        let dashboardId = values.dashboardId;
-        let dashboardName = values.dashboardName;
-
-        if (values.mode === 'new') {
-            const dashboard = await DashboardService.createDashboard({
-                name: values.dashboardName,
-                description: values.dashboardDescription || undefined,
-                visibility: values.visibility,
-                connectionId: activeConnection?.id,
-                database: activeDatabase || activeConnection?.database || undefined,
-            });
-            dashboardId = dashboard.id;
-            dashboardName = dashboard.name;
-        }
-
-        const updatedDashboard = await DashboardService.addWidget(dashboardId, {
-            title: values.widgetTitle,
-            chartType: values.chartType,
-            queryText: executedQuery || query,
-            connectionId: activeConnection?.id,
-            database: activeDatabase || activeConnection?.database || undefined,
-            columns: resultColumns,
-            xAxis: values.chartType === 'table' ? undefined : values.xAxis,
-            yAxis: values.chartType === 'table' ? [] : values.yAxis,
-            config: {
-                source: 'query-editor',
-                savedQueryId: currentSavedQueryId || undefined,
-            },
-            dataSnapshot: (results.rows || []).slice(0, 200),
-        });
-
-        queryClient.invalidateQueries({ queryKey: ['dashboards'] });
-        queryClient.invalidateQueries({ queryKey: ['dashboard', dashboardId] });
-        openDashboardTab(updatedDashboard.id, dashboardName || updatedDashboard.name);
-        toast.success(lang === 'vi' ? 'Da luu widget vao dashboard' : 'Widget saved to dashboard');
-    }, [
-        results,
-        activeConnection?.id,
-        activeConnection?.database,
-        activeDatabase,
-        executedQuery,
-        query,
-        resultColumns,
-        currentSavedQueryId,
-        queryClient,
-        openDashboardTab,
-        lang,
-    ]);
-
     const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
-
-    useEffect(() => {
-        if (isCompactMobileLayout) {
-            // Nothing to do here for now
-        }
-    }, [isCompactMobileLayout]);
 
     const handleRunRef = useRef(handleRun);
     handleRunRef.current = handleRun;
@@ -537,9 +466,9 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
                         <Popover>
                             <PopoverTrigger asChild>
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
+                                <Button
+                                    variant="outline"
+                                    size="sm"
                                     className="h-8 gap-1.5 px-3 border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-500 transition-all shadow-none"
                                 >
                                     <Sparkles className="w-3.5 h-3.5 fill-blue-500/20" />
@@ -547,7 +476,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[min(450px,calc(100vw-1rem))] p-0 border-white/10 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden" align="start" sideOffset={10}>
-                                <AiQueryBox 
+                                <AiQueryBox
                                     currentConnectionId={activeConnectionId || ''}
                                     currentDatabase={activeDatabase || undefined}
                                     onGenerate={(generatedSql) => {
@@ -715,7 +644,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                     </div>
 
                     {/* Resize Handle - Custom Separator */}
-                    <div 
+                    <div
                         onPointerDown={resizer.startResizing}
                         className={cn(
                             "h-1.5 bg-muted/20 border-y border-border/10 cursor-row-resize flex items-center justify-center group transition-colors select-none z-20 touch-none",
@@ -730,7 +659,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                     </div>
 
                     {/* Bottom Result Panel - with smooth transition */}
-                    <div 
+                    <div
                         style={{ height: isResultPanelOpen ? `${resizer.height}px` : '0px' }}
                         className={cn(
                             "flex flex-col overflow-hidden bg-card shrink-0 relative z-10",
@@ -748,7 +677,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             explainPlan={explainPlan}
                             onClearResults={handleClearResults}
                             onClose={toggleResultPanel}
-                            onSaveToDashboard={results ? handleOpenDashboardDialog : undefined}
+                            onSaveToDashboard={results ? openDashboardDialog : undefined}
                         />
                     </div>
                 </div>
@@ -793,7 +722,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 columns={resultColumns}
                 numericColumns={resultNumericColumns}
                 initialValues={dashboardDialogInitialValues}
-                onSubmit={handleSaveToDashboard}
+                onSubmit={saveToDashboard}
             />
         </>
     );

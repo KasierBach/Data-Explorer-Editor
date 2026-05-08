@@ -396,6 +396,34 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         return Array.from(colsMap.values());
     }
 
+    async getIndexes(client: MongoClient, _schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]> {
+        const db = dbName ? client.db(dbName) : client.db();
+        const indexes = await db.collection(table).indexes();
+        const parentId = dbName 
+            ? `db:${dbName}.schema:public.collection:${table}.folder:indexes`
+            : `schema:public.collection:${table}.folder:indexes`;
+
+        return indexes.map(idx => ({
+            id: `${parentId}.index:${idx.name}`,
+            name: idx.name || 'unnamed',
+            type: 'index',
+            parentId,
+            hasChildren: false,
+            metadata: {
+                unique: !!idx.unique,
+                key: idx.key
+            }
+        }));
+    }
+
+    async getTriggers(_client: MongoClient, _schema: string, _table: string, _dbName?: string): Promise<TreeNodeResult[]> {
+        return [];
+    }
+
+    async getConstraints(_client: MongoClient, _schema: string, _table: string, _dbName?: string): Promise<TreeNodeResult[]> {
+        return [];
+    }
+
     async getFullMetadata(client: MongoClient, schema: string, table: string, dbName?: string): Promise<FullTableMetadata> {
         const db = dbName ? client.db(dbName) : client.db();
         const cols = await this.getColumns(client, schema, table, dbName);

@@ -15,8 +15,8 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
         },
         {
             icon: <Zap className="w-6 h-6 text-yellow-400" aria-hidden="true" />,
-            title: lang === 'vi' ? "Hỗ Trợ SQL & NoSQL" : "SQL & NoSQL Engines",
-            desc: lang === 'vi' ? "Kết nối và thao tác trên PostgreSQL, MySQL, SQL Server, và MongoDB Atlas... tất cả trong một nền tảng duy nhất." : "Query across PostgreSQL, MySQL, SQL Server, and MongoDB Atlas seamlessly from a single unified workspace."
+            title: lang === 'vi' ? "Hỗ Trợ SQL & NoSQL Toàn Diện" : "Universal SQL & NoSQL Power",
+            desc: lang === 'vi' ? "Trải nghiệm đồng nhất giữa PostgreSQL, MySQL và MongoDB với bộ phím tắt, menu và công cụ Trực quan hóa (Visualize) dùng chung." : "Unified experience across SQL & NoSQL. Share same shortcuts, menus, and Visualize designers between relational and document databases."
         },
         {
             icon: <GitGraph className="w-6 h-6 text-purple-400" aria-hidden="true" />,

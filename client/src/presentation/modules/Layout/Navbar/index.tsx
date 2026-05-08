@@ -34,7 +34,10 @@ export const Navbar: React.FC = () => {
     };
 
     return (
-        <div className="h-14 border-b grid grid-cols-[1fr_auto_1fr] items-center px-4 bg-background/95 backdrop-blur-md select-none shrink-0 sticky top-0 z-[60] w-full">
+        <div className={cn(
+            "h-14 border-b items-center px-4 bg-background/95 backdrop-blur-md select-none shrink-0 sticky top-0 z-[60] w-full",
+            isNoSqlRoute ? "grid grid-cols-3" : "grid grid-cols-[1fr_auto_1fr]"
+        )}>
             <ProfileDialog
                 isOpen={isProfileOpen}
                 onClose={() => setIsProfileOpen(false)}
@@ -42,7 +45,7 @@ export const Navbar: React.FC = () => {
             />
 
             {/* ⬅️ LEFT: Logo & Brand */}
-            <div className="flex-1 flex items-center gap-4">
+            <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 shrink-0">
                     {isActualMobile && (
                         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setSidebarOpen(!isSidebarOpen)}>
@@ -51,14 +54,15 @@ export const Navbar: React.FC = () => {
                     )}
                     <NavBrand isSmallMobile={isSmallMobile} onNavigate={navigate} />
                 </div>
-
-
             </div>
 
             {/* 🎯 CENTER: Consolidated Ribbon (Tools + Switcher + Menus) */}
-            <div className="flex-none flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6">
+            <div className={cn(
+                "flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6",
+                isNoSqlRoute && "md:pr-20" // Bias towards left to compensate for sidebar
+            )}>
                 {/* 1. Tools: immediately to the LEFT of the switcher */}
-                {!isActualMobile && (isSqlRoute || isNoSqlRoute) && (
+                {!isActualMobile && (
                     <div className="flex items-center border-r border-border/30 pr-2">
                         <NavMainActions
                             activeConnectionId={activeConnectionId}
@@ -71,7 +75,7 @@ export const Navbar: React.FC = () => {
                 )}
 
                 {/* 2. SQL / NoSQL pill - Compact on Mobile */}
-                <div className="relative flex items-center bg-muted/40 p-0.5 md:p-1 rounded-xl border border-border/40 gap-0.5 md:gap-1 shadow-inner mx-0.5 md:mx-1">
+                <div className="relative flex items-center bg-muted/40 p-0.5 md:p-1 rounded-xl border border-border/40 gap-0.5 md:gap-1 shadow-inner mx-0.5 md:mx-1 flex-none">
                     <motion.div
                         className={cn(
                             "absolute h-[calc(100%-4px)] md:h-[calc(100%-8px)] rounded-lg shadow-sm z-0",
@@ -123,7 +127,7 @@ export const Navbar: React.FC = () => {
             </div>
 
             {/* ➡️ RIGHT: Profile & Status Section */}
-            <div className="flex-1 flex items-center justify-end gap-3">
+            <div className="flex items-center justify-end gap-3">
                 <div className="flex items-center gap-2">
                     {!isActualMobile && <div className="h-4 w-px bg-border mx-1" />}
                     <Button

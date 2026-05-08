@@ -119,6 +119,7 @@ export function App() {
                 }
               />
               <Route path="/nosql-explorer/erd" element={<RequireAuth><ERDPage /></RequireAuth>} />
+              <Route path="/nosql-explorer/visualize" element={<RequireAuth><VisualizePage /></RequireAuth>} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -25,6 +25,20 @@ export interface IndexInfo {
     isPrimary: boolean;
 }
 
+export interface TriggerInfo {
+    name: string;
+    event: string;
+    timing: string;
+    tableName: string;
+}
+
+export interface ConstraintInfo {
+    name: string;
+    type: 'PRIMARY KEY' | 'UNIQUE' | 'CHECK' | 'FOREIGN KEY' | 'EXCLUSION';
+    columns: string[];
+    definition?: string;
+}
+
 export interface FullTableMetadata {
     columns: ColumnInfo[];
     indices: IndexInfo[];
@@ -109,6 +123,9 @@ export interface IDatabaseStrategy {
     getFunctions(pool: unknown, schema: string, dbName?: string): Promise<TreeNodeResult[]>;
     getFunctionParameters(pool: unknown, schema: string, func: string): Promise<ColumnInfo[]>;
     getColumns(pool: unknown, schema: string, table: string, dbName?: string): Promise<ColumnInfo[]>;
+    getIndexes(pool: unknown, schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]>;
+    getTriggers(pool: unknown, schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]>;
+    getConstraints(pool: unknown, schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]>;
     getFullMetadata(pool: unknown, schema: string, table: string, dbName?: string): Promise<FullTableMetadata>;
     getRelationships(pool: unknown, dbName?: string): Promise<Relationship[]>;
     getDatabaseMetrics(pool: unknown): Promise<DatabaseMetrics>;

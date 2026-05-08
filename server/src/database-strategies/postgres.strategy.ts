@@ -334,6 +334,82 @@ export class PostgresStrategy implements IDatabaseStrategy {
         }));
     }
 
+    async getIndexes(pool: Pool, schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]> {
+        const sql = `
+            SELECT i.relname AS index_name, ix.indisunique AS is_unique, ix.indisprimary AS is_primary,
+                   array_agg(a.attname ORDER BY x.n) AS columns
+            FROM pg_class t
+            JOIN pg_index ix ON t.oid = ix.indrelid
+            JOIN pg_class i ON i.oid = ix.indexrelid
+            JOIN pg_namespace n ON n.oid = t.relnamespace
+            CROSS JOIN LATERAL unnest(ix.indkey) WITH ORDINALITY AS x(attnum, n)
+            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = x.attnum
+            WHERE t.relname = $1 AND n.nspname = $2
+            GROUP BY i.relname, ix.indisunique, ix.indisprimary
+            ORDER BY i.relname
+        `;
+        const parentId = dbName
+            ? `db:${dbName}.schema:${schema}.table:${table}.folder:indexes`
+            : `schema:${schema}.table:${table}.folder:indexes`;
+        const result = await pool.query(sql, [table, schema]);
+        return result.rows.map((row: any) => ({
+            id: `${parentId}.index:${row.index_name}`,
+            name: `${row.index_name}${row.is_unique ? ' (UNIQUE)' : ''}${row.is_primary ? ' (PK)' : ''}`,
+            type: 'index',
+            parentId,
+            hasChildren: false,
+        }));
+    }
+
+    async getTriggers(pool: Pool, schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]> {
+        const sql = `
+            SELECT trigger_name, event_manipulation, action_timing
+            FROM information_schema.triggers
+            WHERE event_object_schema = $1 AND event_object_table = $2
+            ORDER BY trigger_name
+        `;
+        const parentId = dbName
+            ? `db:${dbName}.schema:${schema}.table:${table}.folder:triggers`
+            : `schema:${schema}.table:${table}.folder:triggers`;
+        const result = await pool.query(sql, [schema, table]);
+        return result.rows.map((row: any) => ({
+            id: `${parentId}.trigger:${row.trigger_name}`,
+            name: `${row.trigger_name} (${row.action_timing} ${row.event_manipulation})`,
+            type: 'trigger',
+            parentId,
+            hasChildren: false,
+        }));
+    }
+
+    async getConstraints(pool: Pool, schema: string, table: string, dbName?: string): Promise<TreeNodeResult[]> {
+        const sql = `
+            SELECT con.conname AS constraint_name,
+                   con.contype AS constraint_type,
+                   array_agg(a.attname ORDER BY k.n) AS columns
+            FROM pg_constraint con
+            JOIN pg_class t ON t.oid = con.conrelid
+            JOIN pg_namespace ns ON ns.oid = t.relnamespace
+            CROSS JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, n)
+            JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+            WHERE t.relname = $1 AND ns.nspname = $2
+            GROUP BY con.conname, con.contype
+            ORDER BY con.contype, con.conname
+        `;
+        const parentId = dbName
+            ? `db:${dbName}.schema:${schema}.table:${table}.folder:constraints`
+            : `schema:${schema}.table:${table}.folder:constraints`;
+        const typeMap: Record<string, string> = { p: 'PK', u: 'UNIQUE', f: 'FK', c: 'CHECK', x: 'EXCLUDE' };
+        const result = await pool.query(sql, [table, schema]);
+        return result.rows.map((row: any) => ({
+            id: `${parentId}.constraint:${row.constraint_name}`,
+            name: `${row.constraint_name} (${typeMap[row.constraint_type] || row.constraint_type})`,
+            type: 'constraint',
+            parentId,
+            hasChildren: false,
+        }));
+    }
+
+
     async getFullMetadata(pool: Pool, schema: string, table: string): Promise<FullTableMetadata> {
         const columns = await this.getColumns(pool, schema, table);
         

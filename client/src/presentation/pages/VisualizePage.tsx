@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '@/core/services/store';
 import { VisualizeWorkplace } from '@/presentation/modules/Visualization/VisualizeWorkplace';
 import { PieChart, ArrowLeft, Database, Plus, Wifi } from 'lucide-react';
@@ -8,21 +8,39 @@ import { ConnectionDialog } from '@/presentation/modules/Connection/ConnectionDi
 
 export function VisualizePage() {
     const navigate = useNavigate();
-    const activeConnectionId = useAppStore(state => state.activeConnectionId);
+    const location = useLocation();
+    const isNoSql = location.pathname.startsWith('/nosql');
+    const goBackPath = isNoSql ? '/nosql-explorer' : '/sql-explorer';
+
+    const sqlActiveConnectionId = useAppStore(state => state.activeConnectionId);
+    const setSqlActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
+    const nosqlActiveConnectionId = useAppStore(state => state.nosqlActiveConnectionId);
+    const setNosqlActiveConnectionId = useAppStore(state => state.setNosqlActiveConnectionId);
+
+    const activeConnectionId = isNoSql ? nosqlActiveConnectionId : sqlActiveConnectionId;
+    const setActiveConnectionId = isNoSql ? setNosqlActiveConnectionId : setSqlActiveConnectionId;
+    
     const connections = useAppStore(state => state.connections);
-    const setActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
     const openConnectionDialog = useAppStore(state => state.openConnectionDialog);
 
-    // No connections at all
-    if (connections.length === 0) {
+    // Filter connections based on workspace context (SQL vs NoSQL)
+    const filteredConnections = connections.filter(c => {
+        const isMongo = c.type.toLowerCase().includes('mongo');
+        return isNoSql ? isMongo : !isMongo;
+    });
+
+    const hasValidActiveConnection = filteredConnections.some(c => c.id === activeConnectionId);
+
+    // No connections matches context → prompt to add or go back
+    if (filteredConnections.length === 0) {
         return (
             <div className="h-dvh min-h-screen w-full flex items-center justify-center bg-background page-enter">
                 <div className="text-center space-y-4">
                     <PieChart className="w-12 h-12 text-muted-foreground mx-auto" />
-                    <h2 className="text-xl font-bold">No Connections</h2>
-                    <p className="text-muted-foreground">Add a database connection to create visualizations.</p>
+                    <h2 className="text-xl font-bold">No {isNoSql ? 'NoSQL' : 'SQL'} Connections</h2>
+                    <p className="text-muted-foreground">Add a {isNoSql ? 'MongoDB' : 'SQL database'} connection to start visualizing.</p>
                     <div className="flex gap-2 justify-center">
-                        <Button variant="outline" onClick={() => navigate('/sql-explorer')}>Go Back</Button>
+                        <Button variant="outline" onClick={() => navigate(goBackPath)}>Go Back</Button>
                         <Button onClick={() => openConnectionDialog()}>
                             <Plus className="w-4 h-4 mr-2" /> Add Connection
                         </Button>
@@ -33,16 +51,16 @@ export function VisualizePage() {
         );
     }
 
-    // Has connections but none active
-    if (!activeConnectionId) {
+    // Has connections but none active (or active is wrong type)
+    if (!hasValidActiveConnection) {
         return (
             <div className="h-dvh min-h-screen w-full flex items-center justify-center bg-background page-enter">
                 <div className="text-center space-y-4 max-w-sm">
                     <Wifi className="w-12 h-12 text-muted-foreground mx-auto" />
-                    <h2 className="text-xl font-bold">Select Connection</h2>
+                    <h2 className="text-xl font-bold">Select {isNoSql ? 'NoSQL' : 'SQL'} Connection</h2>
                     <p className="text-sm text-muted-foreground">Choose a database connection to start visualizing.</p>
-                    <div className="space-y-2">
-                        {connections.map(c => (
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                        {filteredConnections.map(c => (
                             <button key={c.id} onClick={() => setActiveConnectionId(c.id)}
                                 className="w-full flex items-center gap-3 p-3 rounded-xl border border-border/30 bg-card hover:bg-muted/20 transition-all text-left">
                                 <Database className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -53,7 +71,7 @@ export function VisualizePage() {
                             </button>
                         ))}
                     </div>
-                    <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate('/sql-explorer')}>
+                    <Button variant="outline" size="sm" className="mt-2" onClick={() => navigate(goBackPath)}>
                         <ArrowLeft className="w-3 h-3 mr-2" /> Go Back
                     </Button>
                 </div>
@@ -67,7 +85,7 @@ export function VisualizePage() {
             {/* Header with connection selector */}
             <header className="h-12 border-b bg-card flex items-center px-3 md:px-4 justify-between shrink-0 select-none">
                 <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate('/sql-explorer')}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => navigate(goBackPath)}>
                         <ArrowLeft className="w-4 h-4" />
                     </Button>
                     <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
@@ -75,11 +93,11 @@ export function VisualizePage() {
                         <div className="bg-emerald-500/10 p-1.5 rounded-lg">
                             <PieChart className="w-4 h-4 text-emerald-500" />
                         </div>
-                        <span className="text-sm font-bold hidden sm:inline">Chart Studio</span>
+                        <span className="text-sm font-bold hidden sm:inline">{isNoSql ? 'Document Visualizer' : 'Chart Studio'}</span>
                     </div>
                     <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
                     {/* Connection Selector */}
-                    <Select value={activeConnectionId} onValueChange={(id) => setActiveConnectionId(id)}>
+                    <Select value={activeConnectionId as string} onValueChange={(id) => setActiveConnectionId(id)}>
                         <SelectTrigger className="h-8 w-auto min-w-[100px] sm:min-w-[140px] bg-muted/10 border-border/20 text-xs rounded-lg gap-1 pr-2">
                             <div className="flex items-center gap-1.5">
                                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
@@ -87,7 +105,7 @@ export function VisualizePage() {
                             </div>
                         </SelectTrigger>
                         <SelectContent>
-                            {connections.map(c => (
+                            {filteredConnections.map(c => (
                                 <SelectItem key={c.id} value={c.id} className="text-xs">
                                     <span className="font-bold">{c.name}</span>
                                     <span className="text-muted-foreground ml-1.5">({c.type})</span>
