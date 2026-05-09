@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
@@ -8,7 +9,11 @@ import type { TreeNode } from '@/core/domain/entities';
 export type DataMode = 'table' | 'sql';
 
 export const useVisualizeLogic = () => {
-    const { activeConnectionId, connections, activeDatabase, pageStates, setPageState } = useAppStore();
+    const location = useLocation();
+    const isNoSql = location.pathname.startsWith('/nosql');
+
+    const { activeConnectionId: sqlId, nosqlActiveConnectionId: nosqlId, connections, activeDatabase, pageStates, setPageState } = useAppStore();
+    const activeConnectionId = isNoSql ? nosqlId : sqlId;
     const activeConnection = connections.find(c => c.id === activeConnectionId);
 
     // Ensure adapter is connected
@@ -88,7 +93,7 @@ export const useVisualizeLogic = () => {
                 const nodes = await adapter.getHierarchy(parentId);
                 const toCrawlIds = [];
                 for (const node of nodes) {
-                    if (node.type === 'table' || node.type === 'view') {
+                    if (node.type === 'table' || node.type === 'view' || node.type === 'collection') {
                         results.push(node);
                     } else if (node.type === 'database') {
                         if (!currentDb || node.name === currentDb || node.id.includes(currentDb)) {
@@ -113,11 +118,26 @@ export const useVisualizeLogic = () => {
     const buildQuery = useCallback(() => {
         if (dataMode === 'sql') return customSql;
         if (!selectedTable) return '';
+
+        // Handle NoSQL (MongoDB) query generation
+        if (activeConnection?.type.toLowerCase().includes('mongo')) {
+            return JSON.stringify({
+                action: 'find',
+                collection: selectedTable,
+                filter: {},
+                limit: dataLimit,
+                // Add sort if present
+                options: (sortColumn && sortColumn !== 'none') ? {
+                    sort: { [sortColumn]: sortDir === 'ASC' ? 1 : -1 }
+                } : {}
+            });
+        }
+
         let q = `SELECT * FROM ${selectedTable}`;
         if (sortColumn && sortColumn !== 'none') q += ` ORDER BY ${sortColumn} ${sortDir}`;
         q += ` LIMIT ${dataLimit}`;
         return q;
-    }, [dataMode, customSql, selectedTable, dataLimit, sortColumn, sortDir]);
+    }, [dataMode, customSql, selectedTable, dataLimit, sortColumn, sortDir, activeConnection]);
 
     const { data: chartData, isLoading, refetch } = useQuery({
         queryKey: ['viz-data', activeConnectionId, buildQuery()],

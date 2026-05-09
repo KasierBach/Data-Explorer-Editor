@@ -9,6 +9,7 @@ import { AlertCircle, BarChart3, PieChart as PieIcon, PanelLeft, RotateCcw } fro
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
+import { useAppStore } from '@/core/services/store';
 
 interface VizCanvasProps {
     chartData: any[];
@@ -42,6 +43,10 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
     selectedTable, chartTypeName
 }) => {
     const { isActualMobile } = useResponsiveLayoutMode();
+    const { connections, activeConnectionId, nosqlActiveConnectionId } = useAppStore();
+
+    const isNoSql = (nosqlActiveConnectionId && connections.find(c => c.id === nosqlActiveConnectionId)) || 
+                    connections.find(c => c.id === activeConnectionId)?.type.toLowerCase().includes('mongo');
 
 
     const tooltipStyle = {
@@ -73,7 +78,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
         if (!chartData || chartData.length === 0) return (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-10 gap-6">
                 <BarChart3 className="h-28 w-28" />
-                <p className="font-black text-lg uppercase tracking-[0.3em]">Select Data & Run</p>
+                <p className="font-black text-lg uppercase tracking-[0.3em]">{isNoSql ? 'Select Data & Fetch' : 'Select Data & Run'}</p>
             </div>
         );
 
@@ -327,7 +332,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                 <div className="space-y-2">
                     <div className="flex items-center gap-3">
                         <span className="px-2 py-1 bg-emerald-500/10 text-emerald-600 rounded-lg text-[8px] font-black uppercase tracking-widest border border-emerald-500/20">
-                            {chartData ? `${chartData.length} rows` : 'Idle'}
+                            {chartData ? `${chartData.length} ${isNoSql ? 'docs' : 'rows'}` : 'Idle'}
                         </span>
                         {selectedTable && (
                             <span className="text-[9px] text-muted-foreground/40 font-bold uppercase tracking-wider">

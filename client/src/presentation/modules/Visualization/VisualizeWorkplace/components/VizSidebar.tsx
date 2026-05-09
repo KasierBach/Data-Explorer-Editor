@@ -8,6 +8,7 @@ import { Input } from '@/presentation/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/presentation/components/ui/select";
 import { cn } from '@/lib/utils';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
+import { useAppStore } from '@/core/services/store';
 import type { DataMode } from '../useVisualizeLogic';
 
 interface VizSidebarProps {
@@ -70,6 +71,12 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
     handleExportCSV, chartData
 }) => {
     const { isActualMobile } = useResponsiveLayoutMode();
+    const { connections, activeConnectionId, nosqlActiveConnectionId } = useAppStore();
+    
+    // Detect context (either from activeConnectionId or if we are in NoSQL shell)
+    const isNoSql = (nosqlActiveConnectionId && connections.find(c => c.id === nosqlActiveConnectionId)) || 
+                    connections.find(c => c.id === activeConnectionId)?.type.toLowerCase().includes('mongo');
+
     const sidebarSections = [
         { id: 'source', label: 'Data Source', icon: Database },
         { id: 'chart', label: 'Chart Type', icon: BarChart3 },
@@ -93,9 +100,9 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
                             <PieIcon className="h-4 w-4" />
                         </div>
                         <div>
-                            <h2 className="font-black text-sm tracking-tight leading-none">Chart Studio</h2>
+                            <h2 className="font-black text-sm tracking-tight leading-none">{isNoSql ? 'Document Visualizer' : 'Chart Studio'}</h2>
                             <p className="text-[9px] text-muted-foreground uppercase tracking-[0.15em] font-bold opacity-40 mt-0.5">
-                                {chartData ? `${chartData.length} rows` : 'No data'}
+                                {chartData ? `${chartData.length} ${isNoSql ? 'docs' : 'rows'}` : 'No data'}
                             </p>
                         </div>
                     </div>
@@ -127,12 +134,12 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
                                 <button onClick={() => setDataMode('table')}
                                     className={cn("flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5",
                                         dataMode === 'table' ? "bg-emerald-500 text-white shadow-lg" : "text-muted-foreground hover:text-foreground")}>
-                                    <Table className="h-3 w-3" /> Table
+                                    <Table className="h-3 w-3" /> {isNoSql ? 'Collection' : 'Table'}
                                 </button>
                                 <button onClick={() => setDataMode('sql')}
                                     className={cn("flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5",
                                         dataMode === 'sql' ? "bg-emerald-500 text-white shadow-lg" : "text-muted-foreground hover:text-foreground")}>
-                                    <Code2 className="h-3 w-3" /> SQL
+                                    <Code2 className="h-3 w-3" /> {isNoSql ? 'MQL' : 'SQL'}
                                 </button>
                             </div>
 
@@ -141,7 +148,7 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
                                     <SelectTrigger className="bg-muted/10 border-border/30 h-9 text-[11px] rounded-xl">
                                         <div className="flex items-center gap-2">
                                             <Database className="h-3 w-3 opacity-50" />
-                                            <SelectValue placeholder="Target Database" />
+                                            <SelectValue placeholder={isNoSql ? "Select DB" : "Target Database"} />
                                         </div>
                                     </SelectTrigger>
                                     <SelectContent>
@@ -154,7 +161,7 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
                                 <>
                                     <div className="relative">
                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground opacity-40" />
-                                        <Input placeholder="Search tables..." value={searchTable} onChange={(e) => setSearchTable(e.target.value)}
+                                        <Input placeholder={isNoSql ? "Search collections..." : "Search tables..."} value={searchTable} onChange={(e) => setSearchTable(e.target.value)}
                                             className="pl-9 bg-muted/20 border-border/20 h-9 text-xs rounded-xl" />
                                     </div>
 
@@ -162,7 +169,7 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
                                         <SelectTrigger className="bg-emerald-500/10 border-none hover:bg-emerald-500/20 text-emerald-600 text-xs h-10 rounded-2xl shadow-inner font-bold overflow-hidden">
                                             <div className="flex items-center gap-2 truncate">
                                                 <Table className="h-4 w-4" />
-                                                <SelectValue placeholder={isLoadingTables ? "Scanning..." : "Select Table"} />
+                                                <SelectValue placeholder={isLoadingTables ? (isNoSql ? "Listing..." : "Scanning...") : (isNoSql ? "Select Collection" : "Select Table")} />
                                             </div>
                                         </SelectTrigger>
                                         <SelectContent className="max-h-[350px] rounded-2xl overflow-hidden shadow-2xl">
@@ -179,7 +186,7 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
 
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between">
-                                            <label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">Row Limit</label>
+                                            <label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">{isNoSql ? 'Doc Limit' : 'Row Limit'}</label>
                                             <span className="text-[10px] font-mono text-emerald-500 font-bold">{dataLimit}</span>
                                         </div>
                                         <input type="range" min={10} max={1000} step={10} value={dataLimit}
@@ -210,17 +217,17 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
                                 </>
                             ) : (
                                 <div className="space-y-2">
-                                    <label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">Custom Query</label>
+                                    <label className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/60">{isNoSql ? 'Custom MQL' : 'Custom Query'}</label>
                                     <textarea value={customSql} onChange={(e) => setCustomSql(e.target.value)}
                                         className="w-full h-32 bg-muted/10 border border-border/20 rounded-xl p-3 text-xs font-mono resize-none focus:outline-none focus:ring-1 focus:ring-emerald-500/30"
-                                        placeholder="SELECT * FROM ..." spellCheck={false} />
+                                        placeholder={isNoSql ? '{ "action": "find", ... }' : "SELECT * FROM ..."} spellCheck={false} />
                                 </div>
                             )}
 
                             <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2 h-10 shadow-xl shadow-emerald-500/20 transition-all active:scale-95 rounded-xl font-bold text-xs uppercase tracking-widest"
                                 onClick={() => refetch()} disabled={dataMode === 'table' ? !selectedTable : !customSql.trim() || isLoading}>
                                 <Play className={cn("h-4 w-4", isLoading && "animate-spin")} />
-                                {isLoading ? 'Loading...' : 'Run Query'}
+                                {isLoading ? 'Loading...' : (isNoSql ? 'Fetch Documents' : 'Run Query')}
                             </Button>
                         </>
                     )}
@@ -282,7 +289,7 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
                     {activeSection === 'axes' && columns.length === 0 && (
                         <div className="flex flex-col items-center justify-center py-12 text-muted-foreground/30 gap-3">
                             <Table className="h-10 w-10" />
-                            <p className="text-[10px] font-bold uppercase tracking-widest">Run a query first</p>
+                            <p className="text-[10px] font-bold uppercase tracking-widest">{isNoSql ? 'Fetch documents first' : 'Run a query first'}</p>
                         </div>
                     )}
 

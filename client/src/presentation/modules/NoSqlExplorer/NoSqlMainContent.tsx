@@ -1,7 +1,8 @@
 import React from 'react';
 import { useAppStore } from '@/core/services/store';
-import { Leaf, Database, Play, Filter, TreeDeciduous, Loader2, X, BarChart3, SearchCode, Layers, AlignLeft, AlertCircle } from 'lucide-react';
+import { Leaf, Database, Play, Filter, TreeDeciduous, Loader2, X, BarChart3, SearchCode, Layers, AlignLeft, AlertCircle, Maximize2 } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 import { useVerticalResizablePanel } from '@/presentation/hooks/useVerticalResizablePanel';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
@@ -30,6 +31,7 @@ export const NoSqlMainContent: React.FC = () => {
         defaultResultHeight,
         setDefaultResultHeight
     } = useAppStore();
+    const navigate = useNavigate();
 
     const activeConnection = connections.find(c => c.id === nosqlActiveConnectionId);
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
@@ -142,6 +144,19 @@ export const NoSqlMainContent: React.FC = () => {
                             <Layers className="w-3.5 h-3.5 text-pink-500" /> {isCompactMobileLayout ? 'Steps' : 'Aggregation Builder'}
                         </Button>
                     </div>
+
+                    <div className="w-px h-5 bg-border mx-1" />
+
+                    <Button
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 px-2.5 text-xs gap-2 group/viz hover:bg-orange-500/10 hover:text-orange-500"
+                        onClick={() => navigate('/nosql-explorer/visualize')}
+                        title={lang === 'vi' ? 'Mở trung tâm biểu đồ toàn màn hình' : 'Open full-screen Chart Hub'}
+                    >
+                        <Maximize2 className="w-3.5 h-3.5 transition-transform group-hover/viz:scale-110" />
+                        <span className="hidden lg:inline">{lang === 'vi' ? 'Phóng to Biểu đồ' : 'Chart Hub'}</span>
+                    </Button>
 
                     <div className="w-px h-5 bg-border mx-1" />
 

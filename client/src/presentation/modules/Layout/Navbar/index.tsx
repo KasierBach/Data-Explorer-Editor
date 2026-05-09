@@ -36,7 +36,7 @@ export const Navbar: React.FC = () => {
     return (
         <div className={cn(
             "h-14 border-b items-center px-4 bg-background/95 backdrop-blur-md select-none shrink-0 sticky top-0 z-[60] w-full",
-            isNoSqlRoute ? "grid grid-cols-3" : "grid grid-cols-[1fr_auto_1fr]"
+            isNoSqlRoute ? "grid grid-cols-[0.8fr_auto_1.2fr]" : "grid grid-cols-[1fr_auto_1fr]"
         )}>
             <ProfileDialog
                 isOpen={isProfileOpen}
@@ -58,8 +58,7 @@ export const Navbar: React.FC = () => {
 
             {/* 🎯 CENTER: Consolidated Ribbon (Tools + Switcher + Menus) */}
             <div className={cn(
-                "flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6",
-                isNoSqlRoute && "md:pr-20" // Bias towards left to compensate for sidebar
+                "flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6"
             )}>
                 {/* 1. Tools: immediately to the LEFT of the switcher */}
                 {!isActualMobile && (
