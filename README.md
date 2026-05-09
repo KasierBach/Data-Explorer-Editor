@@ -5,6 +5,7 @@
 [![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
 [![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](#license)
+[![Version](https://img.shields.io/badge/Version-3.5.0-blue.svg)](https://github.com/KasierBach/Data-Explorer-Editor/releases)
 
 **Data Explorer** is a high-fidelity, high-performance database management and visualization IDE. It provides a unified, intelligent interface for developers and data engineers to explore, query, and visualize multi-engine databases, all supercharged by a context-aware AI.
 
@@ -43,6 +44,7 @@
 - **Rate Limiting**: Redis keeps API throttling consistent across multiple backend instances.
 - **Background Work**: Export, sync, and other long-running tasks can be queued without blocking the UI.
 - **Search Indexing**: Global search and metadata lookups use Redis-backed indexing for fast workspace navigation.
+- **Organization Safety**: Redis powers the Organization Backup and Migration Preview engines to handle bulk exports without downtime.
 
 ### Team Collaboration
 - **Team Workspace**: Create teams, invite members, and manage roles from the Team page.
@@ -50,6 +52,8 @@
 - **Role-Based Membership**: Invite users as viewers, members, or admins depending on how much control they need.
 - **Mobile Entry Point**: Teams can be opened directly from the mobile avatar menu.
 - **Activity Visibility**: Shared dashboard activity and team-level usage signals help collaborators see what changed.
+- **Presence Tracking**: Real-time indicators show active members within shared teamspaces.
+- **Org Backup System**: Admins can export and migrate entire organization configurations safely.
 
 ### Entity Relationship Diagrams (ERD)
 - **Intelligent Auto-Layout**: Dynamic graph generation using React Flow with automatic node positioning.
@@ -107,7 +111,7 @@
 | **AI Engine** | Google Generative AI (Gemini API), SSE Streaming |
 | **Engines Support** | `pg`, `mysql2`, `mssql`, `mongodb`, `@clickhouse/client` |
 | **Security** | JWT, Passport.js, AES-256-GCM encryption |
-| **Infrastructure** | Redis for caching, notifications, rate limiting, search, and background jobs |
+| **Infrastructure** | Redis, BullMQ for background jobs, Search indexing |
 
 ---
 
@@ -141,13 +145,19 @@ Data Explorer/
 │       ├── ai/                            # Gemini integration, prompts, chat, streaming, autocomplete
 │       ├── audit/                         # Audit logging and audit history APIs
 │       ├── auth/                          # JWT auth, OAuth, token exchange, guards, roles
+│       ├── collaboration/                 # Shared workspace state and team collaboration logic
 │       ├── connections/                   # Saved connection lifecycle and persistence
 │       ├── database-strategies/           # Per-engine query/metadata/export strategy implementations
+│       ├── metadata/                      # Metadata freshness tracking and schema analysis
 │       ├── migration/                     # Cross-database migration orchestration and progress streaming
 │       ├── notifications/                 # SSE notification streaming and Redis pub/sub
+│       ├── organizations/                 # Org-level management and enterprise backups
+│       ├── presence/                      # Real-time team presence tracking (Redis-backed)
 │       ├── query/                         # Query execution, DML helpers, and result APIs
 │       ├── search/                        # Redis-backed search and metadata indexing
+│       ├── teamspaces/                    # Dynamic team workspace and permission management
 │       ├── users/                         # User profile, settings, roles, billing, onboarding
+│       ├── version-history/               # Entity version control and schema change tracking
 │       └── utils/                         # Encryption, SQL guards, and backend utility helpers
 ├── docker-compose.yml                     # Local container orchestration for db + backend + frontend
 ├── package.json                           # Root dev scripts for running client and server together
@@ -188,7 +198,8 @@ Data Explorer/
 ### 5. Interactive Visualizations
 - **ERD Exploration**: Open the ERD module to inspect table relationships visually.
 - **Insights Dashboard**: Review health signals, charts, and high-level usage indicators.
-- **NoSQL Workspace**: MongoDB-oriented flows are available through the NoSQL explorer modules.
+- **NoSQL Workspace**: MongoDB-oriented flows are fully unified with SQL workspace features (Shortcuts, Results Panel, Visualize).
+- **Metadata Analytics**: Inspect schema version history and metadata freshness signals from the sidebar.
 
 ### 6. Redis Infrastructure
 - **Redis-backed Search**: The backend keeps a fast metadata index in Redis so global search and workspace lookups stay responsive.
