@@ -81,9 +81,9 @@ export const Navbar: React.FC = () => {
                             isSqlRoute ? "bg-gradient-to-r from-blue-600 to-indigo-600" : "bg-gradient-to-r from-emerald-600 to-green-600"
                         )}
                         initial={false}
-                        animate={{ 
-                            x: isSqlRoute ? 0 : (isActualMobile ? 40 : 81), 
-                            width: isActualMobile ? 40 : 78 
+                        animate={{
+                            x: isSqlRoute ? 0 : (isActualMobile ? 40 : 81),
+                            width: isActualMobile ? 40 : 78
                         }}
                         transition={{ type: "spring", stiffness: 500, damping: 35 }}
                     />
@@ -142,7 +142,7 @@ export const Navbar: React.FC = () => {
                         {!isActualMobile && <span className="font-semibold">{lang === 'vi' ? 'Nhóm' : 'Teams'}</span>}
                         <Users className={cn("w-4 h-4", isActualMobile && "text-primary")} />
                     </Button>
- 
+
                     <NavUserSection
                         user={user} logout={handleLogout} isAiPanelOpen={isAiPanelOpen}
                         toggleAiPanel={toggleAiPanel} isMobile={isActualMobile}

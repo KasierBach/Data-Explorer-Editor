@@ -78,6 +78,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         { id: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B (Free)', isNew: true },
         { id: 'z-ai/glm-4.5-air:free', label: 'GLM 4.5 Air (Free)', isNew: true },
         { id: 'tencent/hy3-preview:free', label: 'Tencent Hunyuan 3 (Free)', isNew: true },
+        { id: 'openrouter/owl-alpha', label: 'Owl Alpha (Reasoner)', isNew: true },
     ];
 
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -86,7 +87,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     const {
         activeConnectionId, connections, activeDatabase,
         aiChats, activeAiChatId, createAiChat, setActiveAiChat, tabs, activeTabId,
-        fetchAiChats, loadAiChatMessages
+        fetchAiChats, loadAiChatMessages, isFetchingAiChats
     } = useAppStore();
 
     const activeConnection = connections.find(c => c.id === activeConnectionId);
@@ -102,18 +103,22 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
 
     // Load messages and ensure at least one chat exists
     useEffect(() => {
+        // Wait if we are currently fetching from backend
+        if (isFetchingAiChats) return;
+
         if (aiChats.length === 0) {
-            // Create first chat only if none exist after fetch
+            // Create first chat only if none exist AND we are not fetching
             const timer = setTimeout(() => {
-                if (useAppStore.getState().aiChats.length === 0) {
+                const currentStore = useAppStore.getState();
+                if (currentStore.aiChats.length === 0 && !currentStore.isFetchingAiChats) {
                     createAiChat();
                 }
-            }, 1000);
+            }, 500);
             return () => clearTimeout(timer);
         } else if (!activeAiChatId) {
             setActiveAiChat(aiChats[0].id);
         }
-    }, [aiChats.length, activeAiChatId, createAiChat, setActiveAiChat]);
+    }, [aiChats.length, activeAiChatId, createAiChat, setActiveAiChat, isFetchingAiChats]);
 
     // Load messages lazily when a chat is selected
     useEffect(() => {

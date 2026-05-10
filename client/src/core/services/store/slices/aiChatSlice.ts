@@ -41,6 +41,7 @@ export interface AiChatSlice {
     aiModel: string;
     aiMode: string;
     aiRoutingMode: string;
+    isFetchingAiChats: boolean;
     fetchAiChats: () => Promise<void>;
     loadAiChatMessages: (chatId: string) => Promise<void>;
     createAiChat: () => Promise<string | null>;
@@ -62,7 +63,9 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
     aiModel: 'gemini-3-flash-preview',
     aiMode: 'planning',
     aiRoutingMode: 'auto',
+    isFetchingAiChats: false,
     fetchAiChats: async () => {
+        set({ isFetchingAiChats: true });
         try {
             const formatted = await AiChatService.fetchChats();
             set({ aiChats: formatted });
@@ -71,6 +74,8 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
             }
         } catch (e) {
             console.error('Failed to fetch AI chats:', e);
+        } finally {
+            set({ isFetchingAiChats: false });
         }
     },
     loadAiChatMessages: async (chatId: string) => {
