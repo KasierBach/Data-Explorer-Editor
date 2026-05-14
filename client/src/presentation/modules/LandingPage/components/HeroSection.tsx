@@ -70,7 +70,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                 >
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/20 to-blue-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out" />
                     <Sparkles className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-300 transition-colors" aria-hidden="true" />
-                    <span className="text-white/90 group-hover:text-white transition-colors relative z-10">v3.5: NOSQL EXPLORER PARITY & TEAM COLLABORATION</span>
+                    <span className="text-white/90 group-hover:text-white transition-colors relative z-10">v3.6: AI REASONING TRANSPARENCY & SMART AUTOCOMPLETE</span>
                 </motion.div>
                 
                 <motion.h1 

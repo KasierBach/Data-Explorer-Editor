@@ -1,4 +1,4 @@
-export type AiProvider = 'gemini' | 'cerebras' | 'openrouter' | 'zhipu';
+export type AiProvider = 'gemini' | 'cerebras' | 'openrouter' | 'zhipu' | 'groq';
 export type AiRoutingMode = 'auto' | 'fast' | 'best' | 'gemini-only';
 export type AiRecommendationType = 'query_fix' | 'index_suggestion' | 'schema_suggestion' | 'chart_suggestion';
 
@@ -20,12 +20,14 @@ export interface ChatParams {
     image?: string;
     context?: string;
     routingMode?: string;
+    history?: any[];
 }
 
 export interface ChatResult {
     message: string;
     sql?: string;
     explanation?: string;
+    thought?: string;
     recommendations?: AiRecommendation[];
     provider: AiProvider;
     model: string;

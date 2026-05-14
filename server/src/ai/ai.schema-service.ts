@@ -21,7 +21,7 @@ export class AiSchemaService {
         @Inject(CACHE_MANAGER) private cacheManager: Cache,
         private readonly schemaContextService: AiSchemaContextService,
         private readonly providerRunner: AiProviderRunnerService,
-    ) {}
+    ) { }
 
     async suggestTablesBySemantic(searchTerm: string, tableNames: string[]): Promise<string[]> {
         if (!this.providerRunner.isGeminiAvailable() || tableNames.length === 0) return [];
@@ -42,7 +42,7 @@ Rules:
 
         try {
             const response = await this.providerRunner.completeGeminiText({
-                model: 'gemini-3.1-flash-lite-preview',
+                model: 'gemini-2.5-flash',
                 prompt,
                 temperature: AI_CONSTANTS.TEMPERATURE_PRECISE,
                 maxOutputTokens: 100,

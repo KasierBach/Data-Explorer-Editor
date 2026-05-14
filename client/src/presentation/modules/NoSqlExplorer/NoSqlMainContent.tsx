@@ -1,8 +1,7 @@
 import React from 'react';
 import { useAppStore } from '@/core/services/store';
-import { Leaf, Database, Play, Filter, TreeDeciduous, Loader2, X, BarChart3, SearchCode, Layers, AlignLeft, AlertCircle, Maximize2 } from 'lucide-react';
+import { Leaf, Database, Play, Filter, TreeDeciduous, Loader2, X, BarChart3, SearchCode, Layers, AlignLeft, AlertCircle } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
-import { useNavigate } from 'react-router-dom';
 import { useVerticalResizablePanel } from '@/presentation/hooks/useVerticalResizablePanel';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
@@ -14,6 +13,13 @@ import { NoSqlDashboard } from './NoSqlDashboard';
 import { NoSqlVisualizeView } from './NoSqlVisualizeView';
 import { NoSqlSchemaAnalysisView } from './NoSqlSchemaAnalysisView';
 import { NoSqlAggregationBuilderView } from './NoSqlAggregationBuilderView';
+import { NoSqlAiQueryBox } from './components/NoSqlAiQueryBox';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/presentation/components/ui/popover";
+import { Sparkles } from 'lucide-react';
 
 export const NoSqlMainContent: React.FC = () => {
     const { 
@@ -31,7 +37,6 @@ export const NoSqlMainContent: React.FC = () => {
         defaultResultHeight,
         setDefaultResultHeight
     } = useAppStore();
-    const navigate = useNavigate();
 
     const activeConnection = connections.find(c => c.id === nosqlActiveConnectionId);
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
@@ -89,100 +94,121 @@ export const NoSqlMainContent: React.FC = () => {
                     <div className="mt-1 text-muted-foreground">{guardrailMessage}</div>
                 </div>
             )}
-            {/* Visual MQL Builder Banner */}
-            <div className={cn(`border-b bg-card px-4 py-3 shrink-0 flex items-center justify-between gap-3 ${hasPersistentGuardrail ? 'mt-4' : ''}`, isCompactMobileLayout && "flex-wrap items-start")}>
-                <div className="flex items-center gap-2 min-w-0 flex-1">
+            {/* Top Bar: Collection name + View modes + Close */}
+            <div className={cn(`border-b bg-card px-3 py-1.5 shrink-0 flex items-center gap-2 overflow-hidden ${hasPersistentGuardrail ? 'mt-4' : ''}`)}>
+                <div className="flex items-center gap-1.5 min-w-0 shrink-0">
                     <Database className="w-4 h-4 text-green-500 shrink-0" />
-                    <span className="font-semibold text-sm truncate">db.{nosqlActiveCollection}</span>
-                    {result && (
-                        <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full shrink-0">
-                            {result.rowCount ?? result.rows.length} docs • {result.durationMs}ms
-                        </span>
-                    )}
+                    <span className="font-semibold text-sm truncate max-w-[160px]">db.{nosqlActiveCollection}</span>
                 </div>
-                
-                <div className="flex items-center gap-3 shrink-0">
-                    <div className={cn("flex items-center bg-muted/50 rounded-md p-1 border", isCompactMobileLayout && "w-full")}>
-                        <Button 
-                            variant={nosqlViewMode === 'tree' ? 'secondary' : 'ghost'} 
-                            size="sm" 
-                            className={cn("h-7 px-3 text-xs gap-1.5", isCompactMobileLayout && "flex-1")}
-                            onClick={() => setNosqlViewMode('tree')}
-                        >
-                            <TreeDeciduous className="w-3.5 h-3.5 text-green-600" /> {isCompactMobileLayout ? 'Tree' : 'Tree (JSON)'}
-                        </Button>
-                        <Button 
-                            variant={nosqlViewMode === 'grid' ? 'secondary' : 'ghost'} 
-                            size="sm" 
-                            className={cn("h-7 px-3 text-xs gap-1.5", isCompactMobileLayout && "flex-1")}
-                            onClick={() => setNosqlViewMode('grid')}
-                        >
-                            <Filter className="w-3.5 h-3.5 text-blue-500" /> {isCompactMobileLayout ? 'Grid' : 'Auto-Flatten Grid'}
-                        </Button>
-                        <Button 
-                            variant={nosqlViewMode === 'charts' ? 'secondary' : 'ghost'} 
-                            size="sm" 
-                            className={cn("h-7 px-3 text-xs gap-1.5", isCompactMobileLayout && "flex-1")}
-                            onClick={() => setNosqlViewMode('charts')}
-                        >
-                            <BarChart3 className="w-3.5 h-3.5 text-orange-500" /> {isCompactMobileLayout ? 'Viz' : 'Visualize'}
-                        </Button>
-                        <Button 
-                            variant={nosqlViewMode === 'schema' ? 'secondary' : 'ghost'} 
-                            size="sm" 
-                            className={cn("h-7 px-3 text-xs gap-1.5", isCompactMobileLayout && "flex-1")}
-                            onClick={() => setNosqlViewMode('schema')}
-                        >
-                            <SearchCode className="w-3.5 h-3.5 text-indigo-500" /> {isCompactMobileLayout ? 'Schema' : 'Schema Analysis'}
-                        </Button>
-                        <Button 
-                            variant={nosqlViewMode === 'aggregation' ? 'secondary' : 'ghost'} 
-                            size="sm" 
-                            className={cn("h-7 px-3 text-xs gap-1.5", isCompactMobileLayout && "flex-1")}
-                            onClick={() => setNosqlViewMode('aggregation')}
-                        >
-                            <Layers className="w-3.5 h-3.5 text-pink-500" /> {isCompactMobileLayout ? 'Steps' : 'Aggregation Builder'}
-                        </Button>
-                    </div>
 
-                    <div className="w-px h-5 bg-border mx-1" />
+                <div className="w-px h-5 bg-border/40 shrink-0" />
 
-                    <Button
-                        variant="ghost" 
+                {/* View mode buttons - scrollable if space is tight */}
+                <div className="flex items-center bg-muted/50 rounded-md p-1 border flex-1 min-w-0 overflow-x-auto scrollbar-none">
+                    <Button 
+                        variant={nosqlViewMode === 'tree' ? 'secondary' : 'ghost'} 
                         size="sm" 
-                        className="h-8 px-2.5 text-xs gap-2 group/viz hover:bg-orange-500/10 hover:text-orange-500"
-                        onClick={() => navigate('/nosql-explorer/visualize')}
-                        title={lang === 'vi' ? 'Mở trung tâm biểu đồ toàn màn hình' : 'Open full-screen Chart Hub'}
+                        className="h-7 px-3 text-xs gap-1.5 shrink-0"
+                        onClick={() => setNosqlViewMode('tree')}
                     >
-                        <Maximize2 className="w-3.5 h-3.5 transition-transform group-hover/viz:scale-110" />
-                        <span className="hidden lg:inline">{lang === 'vi' ? 'Phóng to Biểu đồ' : 'Chart Hub'}</span>
+                        <TreeDeciduous className="w-3.5 h-3.5 text-green-600" /> <span className="whitespace-nowrap">{isCompactMobileLayout ? 'Tree' : 'Tree (JSON)'}</span>
                     </Button>
-
-                    <div className="w-px h-5 bg-border mx-1" />
-
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                        onClick={() => setNosqlCollection(null)}
-                        title={lang === 'vi' ? 'Đóng collection' : 'Close collection'}
+                    <Button 
+                        variant={nosqlViewMode === 'grid' ? 'secondary' : 'ghost'} 
+                        size="sm" 
+                        className="h-7 px-3 text-xs gap-1.5 shrink-0"
+                        onClick={() => setNosqlViewMode('grid')}
                     >
-                        <X className="w-4 h-4" />
+                        <Filter className="w-3.5 h-3.5 text-blue-500" /> <span className="whitespace-nowrap">{isCompactMobileLayout ? 'Grid' : 'Auto-Flatten Grid'}</span>
+                    </Button>
+                    <Button 
+                        variant={nosqlViewMode === 'charts' ? 'secondary' : 'ghost'} 
+                        size="sm" 
+                        className="h-7 px-3 text-xs gap-1.5 shrink-0"
+                        onClick={() => setNosqlViewMode('charts')}
+                    >
+                        <BarChart3 className="w-3.5 h-3.5 text-orange-500" /> <span className="whitespace-nowrap">{isCompactMobileLayout ? 'Viz' : 'Visualize'}</span>
+                    </Button>
+                    <Button 
+                        variant={nosqlViewMode === 'schema' ? 'secondary' : 'ghost'} 
+                        size="sm" 
+                        className="h-7 px-3 text-xs gap-1.5 shrink-0"
+                        onClick={() => setNosqlViewMode('schema')}
+                    >
+                        <SearchCode className="w-3.5 h-3.5 text-indigo-500" /> <span className="whitespace-nowrap">{isCompactMobileLayout ? 'Schema' : 'Schema Analysis'}</span>
+                    </Button>
+                    <Button 
+                        variant={nosqlViewMode === 'aggregation' ? 'secondary' : 'ghost'} 
+                        size="sm" 
+                        className="h-7 px-3 text-xs gap-1.5 shrink-0"
+                        onClick={() => setNosqlViewMode('aggregation')}
+                    >
+                        <Layers className="w-3.5 h-3.5 text-pink-500" /> <span className="whitespace-nowrap">{isCompactMobileLayout ? 'Steps' : 'Aggregation Builder'}</span>
                     </Button>
                 </div>
+
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                    onClick={() => setNosqlCollection(null)}
+                    title={lang === 'vi' ? 'Đóng collection' : 'Close collection'}
+                >
+                    <X className="w-4 h-4" />
+                </Button>
             </div>
 
             <div className="flex-1 flex flex-col min-h-0 relative">
                 {/* Visual Filter Area (Top) */}
                 <div className="flex-1 min-h-0 relative bg-muted/10 flex flex-col">
-                    <div className={cn("p-2 border-b text-xs font-semibold text-muted-foreground bg-muted/30 uppercase tracking-widest flex items-center justify-between gap-2", isCompactMobileLayout && "flex-wrap")}>
-                        <div className="flex items-center gap-2 min-w-0">
-                            <span>{lang === 'vi' ? 'Trình thiết kế Truy vấn (MQL)' : 'Visual MQL Builder'}</span>
-                            <span className={cn("text-[9px] font-normal lowercase bg-background border border-border/50 px-1.5 py-0.5 rounded text-muted-foreground tracking-normal", isCompactMobileLayout && "hidden")}>
+                    {/* MQL Designer bar - nowrap, overflow hidden */}
+                    <div className="px-3 py-1.5 border-b text-xs font-semibold text-muted-foreground bg-muted/30 uppercase tracking-widest flex items-center justify-between gap-2 overflow-hidden">
+                        <div className="flex items-center gap-2 min-w-0 shrink truncate">
+                            <span className="truncate whitespace-nowrap">{lang === 'vi' ? 'Trình thiết kế Truy vấn (MQL)' : 'Visual MQL Builder'}</span>
+                            <span className="text-[9px] font-normal lowercase bg-background border border-border/50 px-1.5 py-0.5 rounded text-muted-foreground tracking-normal whitespace-nowrap hidden md:inline">
                                 Shift + Alt + F to format
                             </span>
                         </div>
-                        <div className={cn("flex items-center gap-2", isCompactMobileLayout && "w-full justify-between")}>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            {/* AI NoSQL Button */}
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 gap-1.5 px-2 hover:bg-green-500/10 text-green-500/80 hover:text-green-400 transition-all border border-transparent hover:border-green-500/20"
+                                        title={lang === 'vi' ? 'Hỏi trợ lý AI sinh MQL' : 'Ask AI to generate MQL'}
+                                    >
+                                        <Sparkles className="w-3.5 h-3.5 fill-green-500/10" />
+                                        <span className="font-semibold text-[10px] uppercase tracking-wider">{isCompactMobileLayout ? 'AI' : 'AI NoSQL'}</span>
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[min(450px,calc(100vw-1rem))] p-0 border-white/10 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden" align="start" sideOffset={10}>
+                                    <NoSqlAiQueryBox
+                                        currentConnectionId={nosqlActiveConnectionId || ''}
+                                        currentDatabase={activeConnection?.database || undefined}
+                                        collectionName={nosqlActiveCollection}
+                                        onGenerate={(generatedMql) => {
+                                            setNosqlMqlQuery(generatedMql);
+                                        }}
+                                    />
+                                </PopoverContent>
+                            </Popover>
+
+                            <div className="w-px h-4 bg-border/40" />
+
+                            {/* Result chip */}
+                            {result && (
+                                <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 border border-green-500/20 rounded-full shrink-0">
+                                    <span className="text-[10px] font-bold text-green-500/80">{result.rowCount ?? result.rows.length}</span>
+                                    <span className="text-[9px] text-green-500/50 uppercase tracking-tighter">docs</span>
+                                    <div className="w-1 h-1 rounded-full bg-green-500/20 mx-0.5" />
+                                    <span className="text-[10px] font-medium text-green-500/70">{result.durationMs}ms</span>
+                                </div>
+                            )}
+
+                            <div className="w-px h-4 bg-border/40" />
+
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -193,7 +219,6 @@ export const NoSqlMainContent: React.FC = () => {
                                         setNosqlMqlQuery(formatted);
                                     } catch (e) {
                                         console.error('Failed to format MQL:', e);
-                                        // Just a silent fail or console log is fine for now as it's a non-destructive action
                                     }
                                 }}
                                 title="Alt+Shift+F"

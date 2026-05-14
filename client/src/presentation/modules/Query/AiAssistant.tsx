@@ -1,20 +1,13 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuTrigger,
-} from '@/presentation/components/ui/dropdown-menu';
-import {
-    Sparkles, Send, Loader2, X, Plus,
-    MessageSquare, Image, FileCode2, Clock,
-    Table2, ChevronUp, TriangleAlert
+    Sparkles, Plus, MessageSquare, Clock, X, Loader2
 } from 'lucide-react';
 import { useAiChat } from '@/presentation/hooks/useAiChat';
 import { useAppStore } from '@/core/services/store';
-import { cn } from '@/lib/utils';
 import { AiChatList } from './AiChatList';
 import { AiMessageBubble } from './AiMessageBubble';
+import { AiChatInput } from './AiChatInput';
 
 interface AiAssistantProps {
     onInsertQuery: (sql: string) => void;
@@ -39,7 +32,10 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         handleMentionTable,
         removeAttachment,
         handleSend,
-        handleKeyDown
+        handleKeyDown,
+        handleRegenerate,
+        handleEditSubmit,
+        handleStop
     } = useAiChat();
 
     const [showHistory, setShowHistory] = useState(false);
@@ -51,44 +47,61 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     const {
         aiModel, setAiModel,
         aiMode, setAiMode,
-        aiRoutingMode, setAiRoutingMode
-    } = useAppStore();
-
-    const MODES = [
-        { id: 'planning', label: 'Planning', description: 'Agent can plan before executing tasks. Use for deep research, complex tasks, or collaborative work' },
-        { id: 'fast', label: 'Fast', description: 'Agent will execute tasks directly. Use for simple tasks that can be completed faster' }
-    ];
-
-    const ROUTING_MODES = [
-        { id: 'auto', label: 'Auto', description: 'Balance cost and quality automatically. Simple prompts may use cheaper models first.' },
-        { id: 'fast', label: 'Fast / Cheap', description: 'Prefer lower-cost providers whenever possible before falling back to Gemini.' },
-        { id: 'best', label: 'Best Quality', description: 'Prioritize your selected Gemini model sooner for harder or more important tasks.' },
-        { id: 'gemini-only', label: 'Gemini Only', description: 'Always use the selected Gemini model. Best for consistency, highest cost.' },
-    ];
-
-    const MODELS: Array<{ id: string; label: string; isNew?: boolean; warning?: boolean }> = [
-        { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Reasoning)', isNew: true },
-        { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro (High)', isNew: true },
-        { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (Fast)', isNew: true },
-        { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Balanced)' },
-        { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Balanced)' },
-        { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (Fast)' },
-        { id: 'minimax/minimax-m2.5:free', label: 'MiniMax 2.5 (Free)', isNew: true },
-        { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'NVIDIA Nemotron 120B (Free)', isNew: true },
-        { id: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B (Free)', isNew: true },
-        { id: 'z-ai/glm-4.5-air:free', label: 'GLM 4.5 Air (Free)', isNew: true },
-        { id: 'tencent/hy3-preview:free', label: 'Tencent Hunyuan 3 (Free)', isNew: true },
-        { id: 'openrouter/owl-alpha', label: 'Owl Alpha (Reasoner)', isNew: true },
-    ];
-
-    const inputRef = useRef<HTMLTextAreaElement>(null);
-    const contextMenuRef = useRef<HTMLDivElement>(null);
-
-    const {
+        aiRoutingMode, setAiRoutingMode,
         activeConnectionId, connections, activeDatabase,
         aiChats, activeAiChatId, createAiChat, setActiveAiChat, tabs, activeTabId,
         fetchAiChats, loadAiChatMessages, isFetchingAiChats
     } = useAppStore();
+
+    const MODES = useMemo(() => [
+        { id: 'planning', label: 'Planning', description: 'Agent can plan before executing tasks. Use for deep research, complex tasks, or collaborative work' },
+        { id: 'fast', label: 'Fast', description: 'Agent will execute tasks directly. Use for simple tasks that can be completed faster' }
+    ], []);
+
+    const ROUTING_MODES = useMemo(() => [
+        { id: 'auto', label: 'Auto', description: 'Balance cost and quality automatically. Simple prompts may use cheaper models first.' },
+        { id: 'fast', label: 'Fast / Cheap', description: 'Prefer lower-cost providers whenever possible before falling back to Gemini.' },
+        { id: 'best', label: 'Best Quality', description: 'Prioritize your selected Gemini model sooner for harder or more important tasks.' },
+        { id: 'gemini-only', label: 'Gemini Only', description: 'Always use the selected Gemini model. Best for consistency, highest cost.' },
+    ], []);
+
+    const MODELS = useMemo(() => [
+        {
+            group: 'Google (Gemini)',
+            items: [
+                { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Reasoning)', isNew: true },
+                { id: 'gemini-3-pro', label: 'Gemini 3 Pro (High)', isNew: true },
+                { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (Fast)', isNew: true },
+                { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Balanced)' },
+                { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Balanced)' },
+                { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (Fast)' },
+            ],
+        },
+        {
+            group: 'Groq (Fast & Free)',
+            items: [
+                { id: 'groq:llama-3.3-70b-versatile', label: 'Llama 3.3 70B', isNew: true },
+                { id: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout 17B', isNew: true },
+                { id: 'groq:mixtral-8x7b-32768', label: 'Mixtral 8x7B', isNew: true },
+                { id: 'groq:gemma2-9b-it', label: 'Gemma 2 9B', isNew: true },
+                { id: 'groq:llama-3.1-8b-instant', label: 'Llama 3.1 8B', isNew: true },
+            ],
+        },
+        {
+            group: 'OpenRouter (Free)',
+            items: [
+                { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B', isNew: true },
+                { id: 'google/gemma-4-26b-a4b-it:free', label: 'Gemma 4 26B', isNew: true },
+                { id: 'minimax/minimax-m2.5:free', label: 'MiniMax 2.5', isNew: true },
+                { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'NVIDIA Nemotron 120B', isNew: true },
+                { id: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B', isNew: true },
+                { id: 'z-ai/glm-4.5-air:free', label: 'GLM 4.5 Air', isNew: true },
+                { id: 'openrouter/owl-alpha', label: 'Owl Alpha (Reasoner)', isNew: true },
+            ],
+        },
+    ], []);
+
+    const contextMenuRef = useRef<HTMLDivElement>(null);
 
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const activeChat = aiChats.find(c => c.id === activeAiChatId);
@@ -103,11 +116,9 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
 
     // Load messages and ensure at least one chat exists
     useEffect(() => {
-        // Wait if we are currently fetching from backend
         if (isFetchingAiChats) return;
 
         if (aiChats.length === 0) {
-            // Create first chat only if none exist AND we are not fetching
             const timer = setTimeout(() => {
                 const currentStore = useAppStore.getState();
                 if (currentStore.aiChats.length === 0 && !currentStore.isFetchingAiChats) {
@@ -134,9 +145,14 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    useEffect(() => {
-        if (!showHistory) inputRef.current?.focus();
-    }, [showHistory, activeAiChatId]);
+    // Stable handlers to prevent re-rendering all bubbles on every keystroke
+    const handleMessageRegenerate = React.useCallback((_messageId: string) => {
+        if (activeAiChatId) handleRegenerate(activeAiChatId);
+    }, [activeAiChatId, handleRegenerate]);
+
+    const handleMessageEdit = React.useCallback((messageId: string, content: string) => {
+        if (activeAiChatId) handleEditSubmit(activeAiChatId, messageId, content);
+    }, [activeAiChatId, handleEditSubmit]);
 
     // Close context menus on click outside
     useEffect(() => {
@@ -153,20 +169,10 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         return <AiChatList onClose={onClose} onHideHistory={() => setShowHistory(false)} />;
     }
 
-    // --- Main Chat View ---
     return (
-        <div className="flex flex-col h-full bg-card border-l border-border">
-            {/* Hidden file input for file upload */}
-            <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,.pdf,.csv,.tsv,.xlsx,.xls,.ods,.json,.xml,.yaml,.yml,.txt,.md,.log,.sql,.py,.js,.ts,.tsx,.jsx,.html,.css,.go,.rs,.java,.cpp,.c,.h,.php,.rb,.sh,.toml,.ini,.env"
-                className="hidden"
-                onChange={handleFileSelected}
-            />
-
+        <div className="flex flex-col h-full bg-card border-l border-border min-w-[260px]">
             {/* Header */}
-            <div className="flex items-center justify-between px-3 py-2 border-b bg-gradient-to-r from-violet-500/10 to-blue-500/10">
+            <div className="flex flex-wrap items-center justify-between px-3 py-2 border-b bg-gradient-to-r from-violet-500/10 to-blue-500/10 gap-2">
                 <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-violet-400" />
                     <span className="text-xs font-bold text-foreground">AI Assistant</span>
@@ -204,6 +210,8 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                         msg={msg}
                         onInsertQuery={onInsertQuery}
                         onRunQuery={onRunQuery}
+                        onRegenerate={handleMessageRegenerate}
+                        onEditSubmit={handleMessageEdit}
                     />
                 ))}
 
@@ -219,238 +227,47 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input area */}
-            <div className="p-3 border-t bg-background">
-                <div className="bg-muted/30 border border-border/50 rounded-xl focus-within:ring-1 focus-within:ring-violet-500/30 focus-within:border-violet-500/50 transition-all flex flex-col">
+            {/* Isolated Input Section */}
+            <AiChatInput
+                input={input}
+                setInput={setInput}
+                isLoading={isLoading}
+                attachments={attachments}
+                removeAttachment={removeAttachment}
+                handleSend={handleSend}
+                handleStop={handleStop}
+                handleKeyDown={handleKeyDown}
+                handleFileSelected={handleFileSelected}
+                handlePasteQuery={handlePasteQuery}
+                handleMentionTable={handleMentionTable}
+                fileInputRef={fileInputRef}
+                aiModel={aiModel}
+                setAiModel={setAiModel}
+                aiMode={aiMode}
+                setAiMode={setAiMode}
+                aiRoutingMode={aiRoutingMode}
+                setAiRoutingMode={setAiRoutingMode}
+                MODELS={MODELS}
+                MODES={MODES}
+                ROUTING_MODES={ROUTING_MODES}
+                showContextMenu={showContextMenu}
+                setShowContextMenu={setShowContextMenu}
+                showRoutingMenu={showRoutingMenu}
+                setShowRoutingMenu={setShowRoutingMenu}
+                showModeMenu={showModeMenu}
+                setShowModeMenu={setShowModeMenu}
+                showModelMenu={showModelMenu}
+                setShowModelMenu={setShowModelMenu}
+                contextMenuRef={contextMenuRef}
+                isNoSql={isNoSql}
+                activeTab={activeTab}
+                activeConnection={activeConnection}
+                activeDatabase={activeDatabase}
+            />
 
-                    {/* Attachments preview inside the box */}
-                    {attachments.length > 0 && (
-                        <div className="px-3 pt-3 pb-1 flex flex-wrap gap-1.5">
-                            {attachments.map((att, i) => (
-                                <div
-                                    key={i}
-                                    className={cn(
-                                        "flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium group",
-                                        att.type === 'image' && "bg-pink-500/10 text-pink-400 border border-pink-500/20",
-                                        att.type === 'sql' && "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20",
-                                        att.type === 'table' && "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
-                                        att.type === 'file' && "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20",
-                                    )}
-                                >
-                                    {att.type === 'image' && (
-                                        <>
-                                            {att.preview && <img src={att.preview} className="w-5 h-5 rounded object-cover" alt="" />}
-                                            <Image className="w-3 h-3" />
-                                        </>
-                                    )}
-                                    {att.type === 'sql' && <FileCode2 className="w-3 h-3 min-w-3" />}
-                                    {att.type === 'table' && <Table2 className="w-3 h-3 min-w-3" />}
-                                    {/* For 'file', the emoji is already in the label, so no extra icon needed, or we can use a generic File icon if we strip it. But let's just show the label with emoji. */}
-                                    <span className="max-w-[150px] truncate" title={att.preview || att.label}>{att.label}</span>
-                                    <button
-                                        onClick={() => removeAttachment(i)}
-                                        className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity"
-                                    >
-                                        <X className="w-2.5 h-2.5" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    <textarea
-                        ref={inputRef as any}
-                        value={input}
-                        onChange={e => setInput(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder={activeConnection ? "Hỏi bất cứ điều gì..." : "Kết nối database trước..."}
-                        disabled={isLoading || !activeConnection}
-                        className="w-full bg-transparent border-none text-xs p-3 resize-none focus:outline-none min-h-[60px] max-h-[200px]"
-                        rows={1}
-                        style={{ fieldSizing: "content" } as any}
-                    />
-
-                    {/* Toolbar */}
-                    <div className="flex items-center justify-between p-2 pt-0 gap-1 flex-nowrap">
-                        <div className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto scrollbar-none flex-nowrap">
-                            {/* Paperclip */}
-                            <div className="relative" ref={contextMenuRef}>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 rounded-md text-muted-foreground hover:text-foreground shrink-0"
-                                    onClick={() => setShowContextMenu(!showContextMenu)}
-                                    title="Đính kèm context"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                </Button>
-                                {/* Context popup menu */}
-                                {showContextMenu && (
-                                    <div className="absolute bottom-[calc(100%+8px)] left-0 w-52 bg-popover border border-border rounded-lg shadow-xl py-1 z-[100] animate-in fade-in slide-in-from-bottom-2 duration-150">
-                                        <div className="px-2 py-1">
-                                            <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider">Đính kèm context</span>
-                                        </div>
-                                        <button className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left" onClick={() => { setShowContextMenu(false); fileInputRef.current?.click(); }}>
-                                            <Image className="w-4 h-4 text-pink-400" />
-                                            <div>
-                                                <div className="font-medium">Tệp / Hình ảnh</div>
-                                                <div className="text-[9px] text-muted-foreground">PDF, Excel, CSV, code, ảnh...</div>
-                                            </div>
-                                        </button>
-                                        <button className={cn("w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left", (!isNoSql && (!activeTab || activeTab.type !== 'query' || !activeTab.metadata?.sql)) && "opacity-40 pointer-events-none")} onClick={() => { setShowContextMenu(false); handlePasteQuery(); }}>
-                                            <FileCode2 className="w-4 h-4 text-cyan-400" />
-                                            <div>
-                                                <div className="font-medium">{isNoSql ? 'MQL từ Editor' : 'SQL từ Editor'}</div>
-                                                <div className="text-[9px] text-muted-foreground">{isNoSql ? 'Đính kèm JSON query' : 'Đính kèm SQL đang mở'}</div>
-                                            </div>
-                                        </button>
-                                        <button className={cn("w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted/50 transition-colors text-left", (!activeConnection || !activeDatabase) && "opacity-40 pointer-events-none")} onClick={() => { setShowContextMenu(false); handleMentionTable(); }}>
-                                            <Table2 className="w-4 h-4 text-emerald-400" />
-                                            <div>
-                                                <div className="font-medium">Database Context</div>
-                                                <div className="text-[9px] text-muted-foreground">Thêm thông tin DB đang kết nối</div>
-                                            </div>
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Routing Selector */}
-                            <DropdownMenu
-                                open={showRoutingMenu}
-                                onOpenChange={(open) => {
-                                    setShowRoutingMenu(open);
-                                    if (open) {
-                                        setShowModelMenu(false);
-                                        setShowModeMenu(false);
-                                        setShowContextMenu(false);
-                                    }
-                                }}
-                            >
-                                <DropdownMenuTrigger asChild>
-                                    <button className="flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">
-                                        <ChevronUp className="w-3 h-3 opacity-50 shrink-0" />
-                                        <span>{ROUTING_MODES.find(m => m.id === aiRoutingMode)?.label}</span>
-                                    </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent side="top" align="start" className="w-[18rem] max-w-[calc(100vw-2rem)] max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border-border/10 rounded-xl shadow-2xl p-1.5 text-foreground">
-                                    <div className="px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground mb-1">Routing mode</div>
-                                    <div className="flex flex-col gap-0.5">
-                                        {ROUTING_MODES.map(m => (
-                                            <button
-                                                key={m.id}
-                                                className={cn("w-full flex flex-col items-start px-2.5 py-2 hover:bg-white/5 rounded-lg transition-colors text-left", aiRoutingMode === m.id && "bg-white/5")}
-                                                onClick={() => { setAiRoutingMode(m.id); setShowRoutingMenu(false); }}
-                                            >
-                                                <span className="text-xs font-semibold mb-0.5">{m.label}</span>
-                                                <span className="text-[10px] text-muted-foreground leading-relaxed">{m.description}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-
-                            {/* Mode Selector */}
-                            <DropdownMenu
-                                open={showModeMenu}
-                                onOpenChange={(open) => {
-                                    setShowModeMenu(open);
-                                    if (open) {
-                                        setShowModelMenu(false);
-                                        setShowRoutingMenu(false);
-                                        setShowContextMenu(false);
-                                    }
-                                }}
-                            >
-                                <DropdownMenuTrigger asChild>
-                                    <button className="flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">
-                                        <ChevronUp className="w-3 h-3 opacity-50 shrink-0" />
-                                        <span>{MODES.find(m => m.id === aiMode)?.label}</span>
-                                    </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent side="top" align="start" className="w-[17rem] max-w-[calc(100vw-2rem)] max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border-border/10 rounded-xl shadow-2xl p-1.5 text-foreground">
-                                    <div className="px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground mb-1">Conversation mode</div>
-                                    <div className="flex flex-col gap-0.5">
-                                        {MODES.map(m => (
-                                            <button
-                                                key={m.id}
-                                                className={cn("w-full flex flex-col items-start px-2.5 py-2 hover:bg-white/5 rounded-lg transition-colors text-left", aiMode === m.id && "bg-white/5")}
-                                                onClick={() => { setAiMode(m.id); setShowModeMenu(false); }}
-                                            >
-                                                <span className="text-xs font-semibold mb-0.5">{m.label}</span>
-                                                <span className="text-[10px] text-muted-foreground leading-relaxed">{m.description}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-
-                            {/* Model Selector */}
-                            <DropdownMenu
-                                open={showModelMenu}
-                                onOpenChange={(open) => {
-                                    setShowModelMenu(open);
-                                    if (open) {
-                                        setShowModeMenu(false);
-                                        setShowRoutingMenu(false);
-                                        setShowContextMenu(false);
-                                    }
-                                }}
-                            >
-                                <DropdownMenuTrigger asChild>
-                                    <button className="flex items-center gap-1 px-1.5 py-1 rounded-md hover:bg-muted/50 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors min-w-0 flex-1 overflow-hidden">
-                                        <ChevronUp className="w-3 h-3 opacity-50 shrink-0" />
-                                        <span className="truncate">
-                                            {MODELS.find(m => m.id === aiModel)?.label ?? 'Select Model'}
-                                        </span>
-                                    </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent side="top" align="start" className="w-64 max-w-[calc(100vw-2rem)] max-h-[350px] overflow-y-auto overflow-x-hidden custom-scrollbar bg-[#1c1c1c] border-border/10 rounded-xl shadow-2xl p-1.5 text-foreground">
-                                    <div className="px-2.5 py-1.5 text-[10.5px] font-semibold text-muted-foreground mb-1">Select AI Model</div>
-                                    <div className="flex flex-col gap-0.5">
-                                        {MODELS.map(m => (
-                                            <button
-                                                key={m.id}
-                                                className="w-full flex items-center justify-between px-2.5 py-2 text-xs hover:bg-white/5 rounded-lg transition-colors text-left"
-                                                onClick={() => { setAiModel(m.id); setShowModelMenu(false); }}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <span className={aiModel === m.id ? "font-semibold" : "font-medium"}>{m.label}</span>
-                                                    {m.warning && <TriangleAlert className="w-3.5 h-3.5 text-yellow-500" />}
-                                                </div>
-                                                {m.isNew && <span className="bg-white/10 text-muted-foreground font-semibold text-[9px] px-2 py-0.5 rounded-full">New</span>}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
-                        <div className="flex items-center gap-1 shrink-0">
-                            <Button
-                                size="icon"
-                                className="h-7 w-7 rounded-full bg-blue-500 hover:bg-blue-600 shrink-0 text-white"
-                                onClick={handleSend}
-                                disabled={isLoading || (!input.trim() && attachments.length === 0) || !activeConnection}
-                            >
-                                {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5 ml-0.5" />}
-                            </Button>
-                        </div>
-                    </div>
-
-                    <div className="px-3 pb-1">
-                        <div className="text-[9px] leading-relaxed text-muted-foreground/80">
-                            {aiRoutingMode === 'gemini-only'
-                                ? 'Always uses your selected Gemini model.'
-                                : <>Simple requests may use cheaper models first. <span className="text-foreground/80">Gemini is kept for harder tasks.</span></>}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-center mt-1 px-1">
-                    <span className="text-[9px] text-muted-foreground/70">
-                        AI có thể trả lời KHÔNG CHÍNH XÁC — hãy kiểm tra lại trước khi chạy </span>
-                </div>
+            <div className="flex items-center justify-center mb-2 px-1">
+                <span className="text-[9px] text-muted-foreground/70">
+                    AI có thể trả lời KHÔNG CHÍNH XÁC — hãy kiểm tra lại trước khi chạy </span>
             </div>
         </div>
     );

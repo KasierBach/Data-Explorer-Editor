@@ -5,19 +5,24 @@ import type { AiRoutingMode, ChatParams, ProviderPlan, RouteDecision } from './a
 
 @Injectable()
 export class AiRoutingService {
-    constructor(private readonly configService: ConfigService) {}
+    constructor(private readonly configService: ConfigService) { }
 
     getGeminiModelList(requestedModel?: string): string[] {
         const legacyMap: Record<string, string> = {
-            'gemini-3-flash': 'gemini-3-flash-preview',
             'gemini-3-pro': 'gemini-3-pro-preview',
             'gemini-3.1-pro': 'gemini-3.1-pro-preview',
         };
 
-        const actualModel = requestedModel ? (legacyMap[requestedModel] || requestedModel) : null;
+        // Only accept models that look like Gemini models
+        const isGeminiModel = requestedModel && (
+            requestedModel.startsWith('gemini-') ||
+            legacyMap[requestedModel]
+        );
+
+        const actualModel = isGeminiModel ? (legacyMap[requestedModel!] || requestedModel!) : null;
         return actualModel
             ? [actualModel]
-            : ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3-flash-preview'];
+            : ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3-flash'];
     }
 
     normalizeRoutingMode(routingMode?: string): AiRoutingMode {
@@ -85,19 +90,18 @@ export class AiRoutingService {
     }
 
     getLowCostPlans(): ProviderPlan[] {
-        // Priority: OpenRouter first (most free models), Cerebras last (fewest models)
         const openRouterApiKey = this.configService.get<string>('OPENROUTER_API_KEY');
-        const openRouterModel = this.configService.get<string>('OPENROUTER_CHAT_MODEL');
         const cerebrasApiKey = this.configService.get<string>('CEREBRAS_API_KEY');
+        const groqApiKey = this.configService.get<string>('GROQ_API_KEY');
 
         const plans: ProviderPlan[] = [];
 
-        if (openRouterApiKey && openRouterModel) {
+        if (openRouterApiKey) {
             plans.push({
                 provider: 'openrouter',
                 apiKey: openRouterApiKey,
                 baseUrl: this.configService.get<string>('OPENROUTER_BASE_URL') || 'https://openrouter.ai/api/v1',
-                model: openRouterModel,
+                model: this.configService.get<string>('OPENROUTER_CHAT_MODEL') || 'openai/gpt-3.5-turbo',
             });
         }
 
@@ -107,6 +111,15 @@ export class AiRoutingService {
                 apiKey: cerebrasApiKey,
                 baseUrl: this.configService.get<string>('CEREBRAS_BASE_URL') || 'https://api.cerebras.ai/v1',
                 model: this.configService.get<string>('CEREBRAS_CHAT_MODEL') || 'llama3.1-8b',
+            });
+        }
+
+        if (groqApiKey) {
+            plans.push({
+                provider: 'groq',
+                apiKey: groqApiKey,
+                baseUrl: this.configService.get<string>('GROQ_BASE_URL') || 'https://api.groq.com/openai/v1',
+                model: this.configService.get<string>('GROQ_CHAT_MODEL') || 'meta-llama/llama-4-scout-17b-16e-instruct',
             });
         }
 
@@ -120,7 +133,14 @@ export class AiRoutingService {
         // Detect if user explicitly picked a non-Gemini model from the UI
         let requestedPlan: ProviderPlan | null = null;
         if (params.model) {
-            if (params.model.includes('/') || params.model.includes(':')) {
+            if (params.model.startsWith('groq:')) {
+                // Groq model — strip prefix
+                const modelName = params.model.slice('groq:'.length);
+                const groqConfig = lowCostPlans.find(p => p.provider === 'groq');
+                if (groqConfig) {
+                    requestedPlan = { ...groqConfig, model: modelName };
+                }
+            } else if (params.model.includes('/') || params.model.includes(':')) {
                 // OpenRouter model format: "provider/model-name" or "model:variant"
                 const orConfig = lowCostPlans.find(p => p.provider === 'openrouter');
                 if (orConfig) {
@@ -142,6 +162,9 @@ export class AiRoutingService {
         // Cerebras-only plan for fallback
         const cerebrasPlans = lowCostPlans.filter(p => p.provider === 'cerebras');
 
+        // Groq plan for fallback
+        const groqPlans = lowCostPlans.filter(p => p.provider === 'groq');
+
         // OpenRouter default plan (only if no explicit requestedPlan overrides it)
         const openRouterDefaultPlans = requestedPlan?.provider === 'openrouter'
             ? [] // skip default OR since requestedPlan IS the OR model
@@ -161,23 +184,37 @@ export class AiRoutingService {
         };
         const pushAll = (plans: ProviderPlan[]) => plans.forEach(push);
 
+        const needsSearch = /\b(latest|current|today|news|recent|now|search web|tìm trên mạng|hôm nay|mới nhất|giá|thời tiết|thị trường|tin tức)\b/i.test(params.prompt);
+
         if (routingMode === 'gemini-only') {
-            // Gemini only — no cheap fallbacks unless no Gemini available
+            // Gemini only — no cheap fallbacks
             pushAll(geminiPlans);
-            if (orderedPlans.length === 0) pushAll(lowCostPlans); // safety net
+            if (orderedPlans.length === 0) pushAll(lowCostPlans);
+        } else if (needsSearch) {
+            // Web search needed — only Gemini supports it. Skip free providers.
+            pushAll(geminiPlans);
+            if (orderedPlans.length === 0) pushAll(lowCostPlans);
         } else if (requestedPlan) {
-            // User explicitly picked a model → run it first, Gemini as fallback, Cerebras last
+            // CRITICAL: User picked a model. Use it FIRST.
             push(requestedPlan);
+
+            // Further fallback to Gemini if task is complex
+            if (routeDecision.preferGemini || routingMode === 'best') {
+                pushAll(geminiPlans);
+            }
+
+            pushAll(lowCostPlans);
             pushAll(geminiPlans);
-            pushAll(cerebrasPlans);
         } else if (routingMode === 'best' || params.image || routeDecision.preferGemini) {
-            // Complex tasks: Gemini → OpenRouter → Cerebras
-            pushAll(geminiPlans);
+            // High complexity: OpenRouter & Groq first, then Gemini, Cerebras last
             pushAll(openRouterDefaultPlans);
+            pushAll(groqPlans);
+            pushAll(geminiPlans);
             pushAll(cerebrasPlans);
         } else {
-            // Default auto / fast: OpenRouter → Gemini → Cerebras
+            // Default auto / fast: OpenRouter & Groq first, then Gemini, Cerebras last
             pushAll(openRouterDefaultPlans);
+            pushAll(groqPlans);
             pushAll(geminiPlans);
             pushAll(cerebrasPlans);
         }

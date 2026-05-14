@@ -91,4 +91,39 @@ export class AiChatService {
             }
         });
     }
+
+    async deleteMessage(userId: string, chatId: string, messageId: string) {
+        const chat = await this.prisma.aiChat.findUnique({ where: { id: chatId } });
+        if (!chat) throw new NotFoundException('Chat not found');
+        if (chat.userId !== userId) throw new ForbiddenException('Access denied');
+
+        await this.prisma.aiMessage.delete({
+            where: { id: messageId }
+        });
+
+        return { success: true };
+    }
+
+    async deleteMessagesAfter(userId: string, chatId: string, messageId: string) {
+        const chat = await this.prisma.aiChat.findUnique({ 
+            where: { id: chatId },
+            include: { messages: { orderBy: { createdAt: 'asc' } } }
+        });
+        if (!chat) throw new NotFoundException('Chat not found');
+        if (chat.userId !== userId) throw new ForbiddenException('Access denied');
+
+        const messageIndex = chat.messages.findIndex(m => m.id === messageId);
+        if (messageIndex === -1) throw new NotFoundException('Message not found');
+
+        const messagesToDelete = chat.messages.slice(messageIndex + 1);
+        const idsToDelete = messagesToDelete.map(m => m.id);
+
+        if (idsToDelete.length > 0) {
+            await this.prisma.aiMessage.deleteMany({
+                where: { id: { in: idsToDelete } }
+            });
+        }
+
+        return { success: true, count: idsToDelete.length };
+    }
 }

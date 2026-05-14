@@ -175,11 +175,10 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         model: string;
         mode: string;
         routingMode?: string;
-    }): Promise<Response> {
+        history?: any[];
+    }, options?: { signal?: AbortSignal }): Promise<Response> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        // Note: For generateSql we keep raw fetch because it might be used directly as a Response object
-        // although usually we want the stream. apiService consumes the stream.
         return fetch(`${this.baseUrl}/ai/generate-sql`, {
             method: 'POST',
             headers: apiService.getHeaders(),
@@ -187,6 +186,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
                 ...params,
                 connectionId: this.connectionId
             }),
+            signal: options?.signal
         });
     }
 
@@ -198,7 +198,8 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         model: string;
         mode: string;
         routingMode?: string;
-    }): Promise<Response> {
+        history?: any[];
+    }, options?: { signal?: AbortSignal }): Promise<Response> {
         if (!this.connectionId) throw new Error('Not connected');
 
         return fetch(`${this.baseUrl}/ai/generate-sql-stream`, {
@@ -208,6 +209,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
                 ...params,
                 connectionId: this.connectionId
             }),
+            signal: options?.signal
         });
     }
 }

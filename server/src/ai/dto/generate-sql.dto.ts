@@ -32,4 +32,7 @@ export class GenerateSqlDto {
     @IsOptional()
     @IsString()
     routingMode?: string; // e.g. 'auto', 'fast', 'best', 'gemini-only'
+
+    @IsOptional()
+    history?: any[]; // Chat history for memory
 }

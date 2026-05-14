@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AiService } from './ai.service';
-import { AiController } from './ai.controller';
+import { AiController, AiTestController } from './ai.controller';
 import { AiChatCompletionService } from './ai.chat-completion.service';
 import { AiChatService } from './ai.chat.service';
 import { AiChatController } from './ai.chat.controller';
@@ -16,7 +16,7 @@ import { AiConnectionService } from './ai.connection-service';
 
 @Module({
     imports: [ConnectionsModule, PrismaModule],
-    controllers: [AiController, AiChatController],
+    controllers: [AiController, AiChatController, AiTestController],
     providers: [
         AiService,
         AiChatCompletionService,

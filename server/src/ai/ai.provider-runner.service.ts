@@ -39,7 +39,6 @@ export class AiProviderRunnerService {
 
     private async withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = this.getProviderTimeoutMs()): Promise<T> {
         let timer: NodeJS.Timeout | null = null;
-
         try {
             return await Promise.race<T>([
                 promise,
@@ -48,16 +47,13 @@ export class AiProviderRunnerService {
                 }),
             ]);
         } finally {
-            if (timer) {
-                clearTimeout(timer);
-            }
+            if (timer) clearTimeout(timer);
         }
     }
 
     private createAbortController(label: string, timeoutMs = this.getProviderTimeoutMs()) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
-
         return {
             signal: controller.signal,
             clear: () => clearTimeout(timer),
@@ -70,7 +66,6 @@ export class AiProviderRunnerService {
         timeoutMs = this.getStreamIdleTimeoutMs(),
     ): Promise<ReadableStreamReadResult<T>> {
         let timer: NodeJS.Timeout | null = null;
-
         try {
             return await Promise.race<ReadableStreamReadResult<T>>([
                 reader.read(),
@@ -79,9 +74,7 @@ export class AiProviderRunnerService {
                 }),
             ]);
         } finally {
-            if (timer) {
-                clearTimeout(timer);
-            }
+            if (timer) clearTimeout(timer);
         }
     }
 
@@ -90,31 +83,83 @@ export class AiProviderRunnerService {
         prompt: string;
         temperature?: number;
         maxOutputTokens?: number;
+        timeoutMs?: number;
     }): Promise<string> {
-        if (!this.genAI) {
-            throw new Error('Gemini provider is not configured');
+        if (!this.genAI) throw new Error('Gemini provider is not configured');
+        
+        const tryCompletion = async (mId: string) => {
+            const model = this.genAI!.getGenerativeModel({
+                model: mId,
+                generationConfig: {
+                    temperature: params.temperature ?? AI_CONSTANTS.TEMPERATURE_PRECISE,
+                    maxOutputTokens: params.maxOutputTokens ?? AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
+                },
+            });
+            const timeout = params.timeoutMs ?? this.getProviderTimeoutMs();
+            const result = await this.withTimeout(model.generateContent(params.prompt), `Gemini completion (${mId})`, timeout);
+            return result.response.text().trim();
+        };
+
+        try {
+            return await tryCompletion(params.model);
+        } catch (error: any) {
+            // If the requested model (like 3.1) doesn't exist, fallback to 1.5-flash-latest for stability
+            if (error?.message?.includes('404') || error?.message?.includes('not found')) {
+                this.logger.warn(`Model ${params.model} not found. Falling back to gemini-1.5-flash-latest...`);
+                return await tryCompletion('gemini-1.5-flash-latest');
+            }
+            throw error;
         }
+    }
 
-        const model = this.genAI.getGenerativeModel({
-            model: params.model,
-            generationConfig: {
-                temperature: params.temperature ?? AI_CONSTANTS.TEMPERATURE_PRECISE,
-                maxOutputTokens: params.maxOutputTokens ?? AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
-            },
-        });
+    async completeOpenAiCompatibleText(
+        plan: ProviderPlan,
+        params: {
+            systemPrompt: string;
+            prompt: string;
+            context?: string;
+            temperature?: number;
+            maxOutputTokens?: number;
+            history?: any[];
+            timeoutMs?: number;
+        },
+    ): Promise<string> {
+        if (!plan.apiKey || !plan.baseUrl) throw new Error(`${plan.provider} provider is not configured`);
 
-        const result = await this.withTimeout(
-            model.generateContent(params.prompt),
-            `Gemini completion (${params.model})`,
-        );
-        return result.response.text().trim();
+        const requestTimeout = this.createAbortController(`${plan.provider} completion`, params.timeoutMs ?? this.getProviderTimeoutMs());
+
+        try {
+            const response = await fetch(`${plan.baseUrl}/chat/completions`, {
+                method: 'POST',
+                headers: this.getOpenAiCompatibleHeaders(plan),
+                body: JSON.stringify({
+                    model: plan.model,
+                    messages: this.promptBuilder.buildOpenAiMessages(params.prompt, params.systemPrompt, params.context, params.history),
+                    temperature: params.temperature ?? AI_CONSTANTS.TEMPERATURE_PRECISE,
+                    max_tokens: params.maxOutputTokens ?? AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
+                }),
+                signal: requestTimeout.signal,
+            });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(`${plan.provider} completion error (${response.status}): ${error.error?.message || response.statusText}`);
+            }
+
+            const result = await response.json();
+            const content = result.choices?.[0]?.message?.content;
+            if (typeof content !== 'string') {
+                return '';
+            }
+
+            return content.trim();
+        } finally {
+            requestTimeout.clear();
+        }
     }
 
     async runGemini(plan: ProviderPlan, params: ChatParams, routingMode: AiRoutingMode): Promise<ChatResult> {
-        if (!this.genAI) {
-            throw new Error('Gemini provider is not configured');
-        }
-
+        if (!this.genAI) throw new Error('Gemini provider is not configured');
         const systemPrompt = this.promptBuilder.buildSystemPrompt({
             prompt: params.prompt,
             context: params.context,
@@ -123,13 +168,11 @@ export class AiProviderRunnerService {
             databaseType: params.databaseType,
         });
         const parts = this.promptBuilder.prepareGeminiParts(params.prompt, params.context, params.image);
-
         const model = this.genAI.getGenerativeModel({
             model: plan.model,
             systemInstruction: systemPrompt,
             tools: [{ googleSearch: {} } as Record<string, unknown>],
         });
-
         const result = await this.withTimeout(
             model.generateContent({
                 contents: [{ role: 'user', parts }],
@@ -140,26 +183,14 @@ export class AiProviderRunnerService {
             }),
             `Gemini request (${plan.model})`,
         );
-
         const responseText = result.response.text();
         const parsed = this.promptBuilder.parseAiResponse(responseText);
-        this.promptBuilder.assertUsableStructuredResponse(parsed, responseText, `Gemini (${plan.model})`);
         const sourcesSuffix = this.promptBuilder.extractSources(result.response);
-
-        return {
-            ...parsed,
-            message: parsed.message + sourcesSuffix,
-            provider: 'gemini',
-            model: plan.model,
-            routingMode,
-        };
+        return { ...parsed, message: parsed.message + sourcesSuffix, provider: 'gemini', model: plan.model, routingMode };
     }
 
     async runOpenAiCompatible(plan: ProviderPlan, params: ChatParams, routingMode: AiRoutingMode): Promise<ChatResult> {
-        if (!plan.apiKey || !plan.baseUrl) {
-            throw new Error(`${plan.provider} provider is not configured`);
-        }
-
+        if (!plan.apiKey || !plan.baseUrl) throw new Error(`${plan.provider} provider is not configured`);
         const systemPrompt = this.promptBuilder.buildSystemPrompt({
             prompt: params.prompt,
             context: params.context,
@@ -168,46 +199,60 @@ export class AiProviderRunnerService {
             databaseType: params.databaseType,
         });
 
-        const requestTimeout = this.createAbortController(`${plan.provider} request (${plan.model})`);
-        const response = await fetch(`${plan.baseUrl}/chat/completions`, {
-            method: 'POST',
-            headers: this.getOpenAiCompatibleHeaders(plan),
-            body: JSON.stringify({
-                model: plan.model,
-                messages: this.promptBuilder.buildOpenAiMessages(params.prompt, systemPrompt, params.context),
-                temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
-                max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
-            }),
-            signal: requestTimeout.signal,
-        }).finally(requestTimeout.clear);
-
-        if (!response.ok) {
-            const errorBody = await response.text();
-            this.logger.error(`[${plan.provider}] API Error (${response.status}): ${errorBody}`);
-            throw new Error(`${plan.provider} API error [${response.status}]: ${errorBody.slice(0, 500)}`);
+        const needsSearch = /\b(search|news|latest|current|today|hôm nay|mới nhất|tin tức)\b/i.test(params.prompt);
+        let modelToUse = plan.model;
+        if (needsSearch && plan.provider === 'openrouter' && !modelToUse.endsWith(':online')) {
+            modelToUse = `${modelToUse}:online`;
         }
 
-        const data = await response.json();
-        const content = data?.choices?.[0]?.message?.content;
-        const text = Array.isArray(content)
-            ? content.map((item: { text?: string }) => item?.text || '').join('')
-            : (content || '');
-        const parsed = this.promptBuilder.parseAiResponse(text);
-        this.promptBuilder.assertUsableStructuredResponse(parsed, text, `${plan.provider} (${plan.model})`);
+        const finalPrompt = needsSearch ? `[SEARCH ONLINE] ${params.prompt}` : params.prompt;
+        const requestTimeout = this.createAbortController(`${plan.provider} request (${modelToUse})`);
+        
+        try {
+            let response = await fetch(`${plan.baseUrl}/chat/completions`, {
+                method: 'POST',
+                headers: this.getOpenAiCompatibleHeaders(plan),
+                body: JSON.stringify({
+                    model: modelToUse,
+                    messages: this.promptBuilder.buildOpenAiMessages(finalPrompt, systemPrompt, params.context, params.history),
+                    temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
+                    max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+                }),
+                signal: requestTimeout.signal,
+            });
 
-        return {
-            ...parsed,
-            provider: plan.provider,
-            model: plan.model,
-            routingMode,
-        };
+            if (!response.ok && modelToUse.endsWith(':online') && (response.status === 402 || response.status === 400 || response.status === 404)) {
+                this.logger.warn(`Model ${modelToUse} failed. Retrying without search...`);
+                modelToUse = modelToUse.replace(':online', '');
+                response = await fetch(`${plan.baseUrl}/chat/completions`, {
+                    method: 'POST',
+                    headers: this.getOpenAiCompatibleHeaders(plan),
+                    body: JSON.stringify({
+                        model: modelToUse,
+                        messages: this.promptBuilder.buildOpenAiMessages(params.prompt, systemPrompt, params.context, params.history),
+                        temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
+                        max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+                    }),
+                    signal: requestTimeout.signal,
+                });
+            }
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(`${plan.provider} error (${response.status}): ${error.error?.message || response.statusText}`);
+            }
+
+            const result = await response.json();
+            const responseText = result.choices?.[0]?.message?.content || '';
+            const parsed = this.promptBuilder.parseAiResponse(responseText);
+            return { ...parsed, provider: plan.provider, model: modelToUse, routingMode };
+        } finally {
+            requestTimeout.clear();
+        }
     }
 
     async * streamGemini(plan: ProviderPlan, params: ChatParams, routingMode: AiRoutingMode): AsyncGenerator<StreamEvent> {
-        if (!this.genAI) {
-            throw new Error('Gemini provider is not configured');
-        }
-
+        if (!this.genAI) throw new Error('Gemini provider is not configured');
         const systemPrompt = this.promptBuilder.buildSystemPrompt({
             prompt: params.prompt,
             context: params.context,
@@ -215,7 +260,6 @@ export class AiProviderRunnerService {
             schemaContext: params.schemaContext,
             databaseType: params.databaseType,
         });
-        const parts = this.promptBuilder.prepareGeminiParts(params.prompt, params.context, params.image);
 
         const model = this.genAI.getGenerativeModel({
             model: plan.model,
@@ -225,11 +269,8 @@ export class AiProviderRunnerService {
 
         const result = await this.withTimeout(
             model.generateContentStream({
-                contents: [{ role: 'user', parts }],
-                generationConfig: {
-                    temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
-                    maxOutputTokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
-                },
+                contents: this.promptBuilder.buildGeminiContents(params.prompt, params.context, params.history, params.image),
+                generationConfig: { temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE, maxOutputTokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS },
             }),
             `Gemini stream bootstrap (${plan.model})`,
         );
@@ -237,16 +278,8 @@ export class AiProviderRunnerService {
         let fullText = '';
         const iterator = result.stream[Symbol.asyncIterator]();
         while (true) {
-            const nextChunk = await this.withTimeout(
-                iterator.next(),
-                `Gemini stream (${plan.model})`,
-                this.getStreamIdleTimeoutMs(),
-            );
-
-            if (nextChunk.done) {
-                break;
-            }
-
+            const nextChunk = await this.withTimeout(iterator.next(), `Gemini stream (${plan.model})`, this.getStreamIdleTimeoutMs());
+            if (nextChunk.done) break;
             const chunkText = nextChunk.value.text();
             if (chunkText) {
                 fullText += chunkText;
@@ -254,24 +287,10 @@ export class AiProviderRunnerService {
             }
         }
 
-        const aggregatedResponse = await this.withTimeout(
-            result.response,
-            `Gemini stream finalize (${plan.model})`,
-        );
+        const aggregatedResponse = await this.withTimeout(result.response, `Gemini stream finalize (${plan.model})`);
         const parsed = this.promptBuilder.parseAiResponse(fullText);
-        this.promptBuilder.assertUsableStructuredResponse(parsed, fullText, `Gemini (${plan.model})`);
         const sourcesSuffix = this.promptBuilder.extractSources(aggregatedResponse);
-
-        yield {
-            type: 'done',
-            data: {
-                ...parsed,
-                message: parsed.message + sourcesSuffix,
-                provider: 'gemini',
-                model: plan.model,
-                routingMode,
-            },
-        };
+        yield { type: 'done', data: { ...parsed, message: parsed.message + sourcesSuffix, provider: 'gemini', model: plan.model, routingMode } };
     }
 
     async * streamOpenAiCompatible(plan: ProviderPlan, params: ChatParams, routingMode: AiRoutingMode): AsyncGenerator<StreamEvent> {
@@ -283,112 +302,102 @@ export class AiProviderRunnerService {
             databaseType: params.databaseType,
         });
 
-        const requestTimeout = this.createAbortController(`${plan.provider} stream request (${plan.model})`);
-        const response = await fetch(`${plan.baseUrl}/chat/completions`, {
-            method: 'POST',
-            headers: this.getOpenAiCompatibleHeaders(plan),
-            body: JSON.stringify({
-                model: plan.model,
-                messages: this.promptBuilder.buildOpenAiMessages(params.prompt, systemPrompt, params.context),
-                temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
-                max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
-                stream: true,
-            }),
-            signal: requestTimeout.signal,
-        }).finally(requestTimeout.clear);
-
-        if (!response.ok) {
-            const errorBody = await response.text();
-            this.logger.error(`[${plan.provider}:Stream] API Error (${response.status}): ${errorBody}`);
-            throw new Error(`${plan.provider} Stream API error [${response.status}]: ${errorBody.slice(0, 500)}`);
+        const needsSearch = /\b(search|news|latest|current|today|hôm nay|mới nhất|tin tức)\b/i.test(params.prompt);
+        let modelToUse = plan.model;
+        if (needsSearch && plan.provider === 'openrouter' && !modelToUse.endsWith(':online')) {
+            modelToUse = `${modelToUse}:online`;
         }
 
+        const finalPrompt = needsSearch ? `[SEARCH ONLINE] ${params.prompt}` : params.prompt;
+        const requestTimeout = this.createAbortController(`${plan.provider} stream request (${modelToUse})`);
+
+        try {
+            let response = await fetch(`${plan.baseUrl}/chat/completions`, {
+                method: 'POST',
+                headers: this.getOpenAiCompatibleHeaders(plan),
+                body: JSON.stringify({
+                    model: modelToUse,
+                    messages: this.promptBuilder.buildOpenAiMessages(finalPrompt, systemPrompt, params.context, params.history),
+                    temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
+                    max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+                    stream: true,
+                }),
+                signal: requestTimeout.signal,
+            });
+
+            if (!response.ok && modelToUse.endsWith(':online') && (response.status === 402 || response.status === 400 || response.status === 404)) {
+                this.logger.warn(`Model ${modelToUse} failed. Retrying without search...`);
+                modelToUse = modelToUse.replace(':online', '');
+                response = await fetch(`${plan.baseUrl}/chat/completions`, {
+                    method: 'POST',
+                    headers: this.getOpenAiCompatibleHeaders(plan),
+                    body: JSON.stringify({
+                        model: modelToUse,
+                        messages: this.promptBuilder.buildOpenAiMessages(params.prompt, systemPrompt, params.context, params.history),
+                        temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
+                        max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+                        stream: true,
+                    }),
+                    signal: requestTimeout.signal,
+                });
+            }
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(`${plan.provider} Stream API error [${response.status}]: ${JSON.stringify(error)}`);
+            }
+
+            yield* this.streamFetch(response, requestTimeout, modelToUse, plan.provider, routingMode);
+        } finally {
+            requestTimeout.clear();
+        }
+    }
+
+    private async * streamFetch(response: Response, abortController: { clear: () => void; signal: AbortSignal }, model: string, provider: string, routingMode: AiRoutingMode): AsyncGenerator<StreamEvent> {
         const reader = response.body?.getReader();
-        if (!reader) {
-            throw new Error(`${plan.provider} did not return a readable stream`);
-        }
-
+        if (!reader) throw new Error('Response body is not readable');
         const decoder = new TextDecoder();
-        let buffer = '';
         let fullText = '';
-
-        const processEvents = (data: string): StreamEvent[] => {
-            const events: StreamEvent[] = [];
-            const lines = data.split('\n\n');
-            for (const event of lines) {
-                const line = event.split('\n').find((entry) => entry.startsWith('data: '));
-                if (!line) continue;
-
-                const jsonData = line.slice(6).trim();
-                if (!jsonData || jsonData === '[DONE]') continue;
-
-                try {
-                    const payload = JSON.parse(jsonData);
-                    const text = this.promptBuilder.extractOpenAiStreamText(payload);
-                    if (text) {
-                        fullText += text;
-                        events.push({ type: 'chunk', text });
+        try {
+            while (true) {
+                const { done, value } = await this.readWithTimeout(reader, `${provider} stream chunk`);
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6).trim();
+                        if (data === '[DONE]') break;
+                        try {
+                            const parsed = JSON.parse(data);
+                            const text = parsed.choices?.[0]?.delta?.content || '';
+                            if (text) {
+                                fullText += text;
+                                yield { type: 'chunk', text };
+                            }
+                        } catch { /* skip invalid JSON */ }
                     }
-                } catch {
-                    // Skip malformed events
                 }
             }
-            return events;
-        };
-
-        while (true) {
-            const { value, done } = await this.readWithTimeout(
-                reader,
-                `${plan.provider} stream (${plan.model})`,
-            );
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            for (const event of processEvents(buffer)) {
-                yield event;
-            }
-            const events = buffer.split('\n\n');
-            buffer = events.pop() || '';
+            const parsed = this.promptBuilder.parseAiResponse(fullText);
+            yield { type: 'done', data: { ...parsed, provider, model, routingMode } };
+        } finally {
+            reader.releaseLock();
         }
-
-        const finalChunk = decoder.decode();
-        if (finalChunk) {
-            buffer += finalChunk;
-        }
-
-        for (const event of processEvents(buffer)) {
-            yield event;
-        }
-
-        const parsed = this.promptBuilder.parseAiResponse(fullText);
-        this.promptBuilder.assertUsableStructuredResponse(parsed, fullText, `${plan.provider} (${plan.model})`);
-        yield {
-            type: 'done',
-            data: {
-                ...parsed,
-                provider: plan.provider,
-                model: plan.model,
-                routingMode,
-            },
-        };
     }
 
     private getOpenAiCompatibleHeaders(plan: ProviderPlan): Record<string, string> {
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${plan.apiKey}`,
         };
-
+        // Some local providers (e.g. Ollama) don't require an Authorization header
+        if (plan.apiKey && plan.apiKey !== 'no-key') {
+            headers['Authorization'] = `Bearer ${plan.apiKey}`;
+        }
         if (plan.provider === 'openrouter') {
             headers['HTTP-Referer'] = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
             headers['X-Title'] = 'Data Explorer';
         }
-
-        if (plan.provider === 'zhipu') {
-            // Zhipu/BigModel uses Bearer token, but sometimes requires extra headers if not using standard SDK
-            // For now standard OpenAI headers are fine
-        }
-
         return headers;
     }
 }

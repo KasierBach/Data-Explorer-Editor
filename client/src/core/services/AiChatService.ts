@@ -43,6 +43,7 @@ export class AiChatService {
             content: m.content,
             sql: m.sql,
             explanation: m.explanation,
+            thought: m.thought,
             error: m.error,
             ...normalizeAttachmentPayload(m.attachments),
             timestamp: new Date(m.createdAt).getTime()
@@ -71,6 +72,7 @@ export class AiChatService {
             content: message.content,
             sql: message.sql,
             explanation: message.explanation,
+            thought: message.thought,
             error: message.error || false,
             attachments: attachmentsPayload
         });
@@ -78,5 +80,13 @@ export class AiChatService {
 
     static async updateChat(chatId: string, updates: { title?: string }): Promise<void> {
         await apiService.patch(`/ai/chats/${chatId}`, updates);
+    }
+
+    static async deleteMessage(chatId: string, messageId: string): Promise<void> {
+        await apiService.delete(`/ai/chats/${chatId}/messages/${messageId}`);
+    }
+
+    static async deleteMessagesAfter(chatId: string, messageId: string): Promise<void> {
+        await apiService.delete(`/ai/chats/${chatId}/messages/after/${messageId}`);
     }
 }

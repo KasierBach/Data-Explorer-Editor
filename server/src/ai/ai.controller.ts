@@ -135,3 +135,24 @@ export class AiController {
         }
     }
 }
+
+@Controller('ai-test')
+export class AiTestController {
+    constructor(private readonly aiService: AiService) { }
+
+    @Post('autocomplete')
+    async autocomplete(@Body() body: AutocompleteDto) {
+        const { beforeCursor, afterCursor, context } = body;
+        try {
+            const completion = await this.aiService.autocomplete({
+                beforeCursor,
+                afterCursor,
+                schemaContext: context,
+                databaseType: 'postgres',
+            });
+            return { completion, error: null };
+        } catch (err) {
+            return { completion: '', error: String(err) };
+        }
+    }
+}

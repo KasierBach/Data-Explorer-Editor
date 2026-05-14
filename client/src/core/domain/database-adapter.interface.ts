@@ -96,5 +96,20 @@ export interface IDatabaseAdapter {
         model: string;
         mode: string;
         routingMode?: string;
-    }): Promise<Response>;
+        history?: any[];
+    }, options?: { signal?: AbortSignal }): Promise<Response>;
+
+    /**
+     * Streams SQL generation using the AI Assistant
+     */
+    generateSqlStream?(params: {
+        database?: string;
+        prompt: string;
+        image?: string;
+        context?: string;
+        model: string;
+        mode: string;
+        routingMode?: string;
+        history?: any[];
+    }, options?: { signal?: AbortSignal }): Promise<Response>;
 }

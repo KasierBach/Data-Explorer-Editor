@@ -218,7 +218,7 @@ export function DocumentationPage() {
                                         {lang === 'vi' ? 'Chỉnh sửa trang này' : 'Edit this page'}
                                     </button>
                                     <span className="opacity-30 hidden sm:block">|</span>
-                                    <span className="text-xs">v3.5.0 • {lang === 'vi' ? 'Tháng 5 2026' : 'May 2026'}</span>
+                                    <span className="text-xs">v3.6.0 • {lang === 'vi' ? 'Tháng 5 2026' : 'May 2026'}</span>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <span className="text-xs text-muted-foreground font-medium">

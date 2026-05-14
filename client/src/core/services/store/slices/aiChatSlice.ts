@@ -16,6 +16,7 @@ export interface AiMessage {
     content: string;
     sql?: string;
     explanation?: string;
+    thought?: string;
     recommendations?: AiRecommendation[];
     modelInfo?: {
         provider?: string;
@@ -55,12 +56,14 @@ export interface AiChatSlice {
     setAiModel: (model: string) => void;
     setAiMode: (mode: string) => void;
     setAiRoutingMode: (mode: string) => void;
+    deleteAiMessage: (chatId: string, messageId: string) => Promise<void>;
+    editAiMessage: (chatId: string, messageId: string, newContent: string) => Promise<void>;
 }
 
 export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
     aiChats: [],
     activeAiChatId: null,
-    aiModel: 'gemini-3-flash-preview',
+    aiModel: 'groq:meta-llama/llama-4-scout-17b-16e-instruct',
     aiMode: 'planning',
     aiRoutingMode: 'auto',
     isFetchingAiChats: false,
@@ -202,4 +205,50 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
     setAiModel: (model) => set({ aiModel: model }),
     setAiMode: (mode) => set({ aiMode: mode }),
     setAiRoutingMode: (mode) => set({ aiRoutingMode: mode }),
+    deleteAiMessage: async (chatId, messageId) => {
+        try {
+            await AiChatService.deleteMessage(chatId, messageId);
+            set((state) => ({
+                aiChats: state.aiChats.map(chat =>
+                    chat.id === chatId
+                        ? {
+                            ...chat,
+                            messages: chat.messages.filter(m => m.id !== messageId)
+                        }
+                        : chat
+                )
+            }));
+        } catch (e) {
+            console.error('Failed to delete message', e);
+        }
+    },
+    editAiMessage: async (chatId, messageId, newContent) => {
+        try {
+            // ChatGPT logic: delete all messages after the edited message
+            await AiChatService.deleteMessagesAfter(chatId, messageId);
+            
+            set((state) => ({
+                aiChats: state.aiChats.map(chat => {
+                    if (chat.id !== chatId) return chat;
+                    
+                    const messageIndex = chat.messages.findIndex(m => m.id === messageId);
+                    if (messageIndex === -1) return chat;
+                    
+                    const updatedMessages = chat.messages.slice(0, messageIndex + 1).map(m => 
+                        m.id === messageId ? { ...m, content: newContent } : m
+                    );
+                    
+                    return {
+                        ...chat,
+                        messages: updatedMessages,
+                        updatedAt: Date.now()
+                    };
+                })
+            }));
+            
+            // Note: The caller (UI) is responsible for triggering the new AI request
+        } catch (e) {
+            console.error('Failed to edit message', e);
+        }
+    },
 });

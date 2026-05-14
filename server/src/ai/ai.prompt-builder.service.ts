@@ -28,7 +28,11 @@ export class AiPromptBuilderService {
             ? Prompts.RESPONSE_FORMAT_STRUCTURED
             : Prompts.RESPONSE_FORMAT_CHAT;
 
-        return `${Prompts.SYSTEM_IDENTITY}\n\nToday's date: ${today}\n\n---
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+
+        return `${Prompts.SYSTEM_IDENTITY}\n\n## CURRENT TIME CONTEXT:\n- Today is: ${dateStr}\n- Local time: ${timeStr}\n\n---
 # CORE MISSION\n\n${Prompts.CORE_MISSION}\n\n---
 # SQL RULES\n\n${sqlRules}\n\n---
 ${modeSection}\n\n---
@@ -36,15 +40,51 @@ ${dbContextSection}\n\n---
 ${responseFormat}`;
     }
 
-    buildOpenAiMessages(prompt: string, systemPrompt: string, context?: string) {
+    buildOpenAiMessages(prompt: string, systemPrompt: string, context?: string, history: any[] = []) {
         const userText = context
             ? `${prompt}\n\nAdditional context:\n${context}`
             : prompt;
 
-        return [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userText },
-        ];
+        const messages: any[] = [{ role: 'system', content: systemPrompt }];
+
+        // Map history to OpenAI format
+        if (history && history.length > 0) {
+            for (const msg of history) {
+                // Skip the last user message if it's identical to the current prompt to avoid duplication
+                // but usually the history contains only PAST messages.
+                messages.push({
+                    role: msg.role === 'ai' ? 'assistant' : 'user',
+                    content: msg.content
+                });
+            }
+        }
+
+        messages.push({ role: 'user', content: userText });
+
+        return messages;
+    }
+
+    buildGeminiContents(prompt: string, context?: string, history: any[] = [], image?: string) {
+        const contents: any[] = [];
+
+        // Map history to Gemini format
+        if (history && history.length > 0) {
+            for (const msg of history) {
+                contents.push({
+                    role: msg.role === 'ai' ? 'model' : 'user',
+                    parts: [{ text: msg.content }]
+                });
+            }
+        }
+
+        // Add current message
+        const currentParts = this.prepareGeminiParts(prompt, context, image);
+        contents.push({
+            role: 'user',
+            parts: currentParts
+        });
+
+        return contents;
     }
 
     prepareGeminiParts(prompt: string, context?: string, image?: string): Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> {
@@ -66,15 +106,22 @@ ${responseFormat}`;
         return parts;
     }
 
-    parseAiResponse(fullText: string): { message: string; sql?: string; explanation?: string; recommendations?: AiRecommendation[] } {
+    parseAiResponse(fullText: string): { message: string; sql?: string; explanation?: string; thought?: string; recommendations?: AiRecommendation[] } {
         try {
-            const match = fullText.match(/\{[\s\S]*\}/);
-            const cleanJsonStr = match ? match[0] : fullText;
+            // 1. Try to extract reasoning/thought from tags if exists (common in modern reasoning models)
+            const thoughtMatch = fullText.match(/<thought>([\s\S]*?)<\/thought>/);
+            const thoughtFromTags = thoughtMatch ? thoughtMatch[1].trim() : undefined;
+            const remainingText = thoughtMatch ? fullText.replace(thoughtMatch[0], '').trim() : fullText;
+
+            const match = remainingText.match(/\{[\s\S]*\}/);
+            const cleanJsonStr = match ? match[0] : remainingText;
             const parsed = JSON.parse(cleanJsonStr);
+            
             return {
-                message: parsed.message || (match ? '' : fullText),
+                message: parsed.message || (match ? '' : remainingText),
                 sql: parsed.sql || undefined,
                 explanation: parsed.explanation || undefined,
+                thought: parsed.thought || thoughtFromTags, // Prioritize JSON, fallback to tags
                 recommendations: this.normalizeRecommendations(parsed.recommendations),
             };
         } catch {

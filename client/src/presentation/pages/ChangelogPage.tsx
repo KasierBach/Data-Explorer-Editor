@@ -17,12 +17,56 @@ export const ChangelogPage: React.FC = () => {
     };
 
     const releases = [
+        // v3.6.0 - Mid May 2026
+        {
+            version: 'v3.6.0',
+            date: lang === 'vi' ? 'Giữa Tháng 5, 2026' : 'Mid May, 2026',
+            title: lang === 'vi' ? 'Kiến trúc Cơ sở AI & AI Reasoning Xuyên thấu' : 'AI foundational Architecture & Reasoning Transparency',
+            badge: 'LATEST',
+            features: [
+                {
+                    icon: <Sparkles className="w-5 h-5 text-purple-400" />,
+                    title: lang === 'vi' ? 'Xuyên thấu Suy nghĩ AI (Reasoning Transparency)' : 'AI Reasoning Transparency',
+                    desc: lang === 'vi'
+                        ? 'Bổ sung block "Thought" có thể gập mở ngay trong khung chat (AiMessageBubble) để hiển thị toàn bộ quá trình tóm tắt và phân tích logic của AI, tăng độ trong suốt và đáng tin cậy.'
+                        : "Added a collapsible 'Thought' block within the chat interface displaying the AI's logical analysis and reasoning process, enhancing transparency and trust."
+                },
+                {
+                    icon: <Globe className="w-5 h-5 text-blue-400" />,
+                    title: lang === 'vi' ? 'Cấu trúc Giao tiếp Thông minh (Dynamic AI Routing)' : 'Dynamic AI Routing & Fallback',
+                    desc: lang === 'vi'
+                        ? 'Tái cấu trúc toàn rễ backend với các module ai.routing.service và ai.provider-runner nhằm hỗ trợ mạng lưới mô hình đa dạng (OpenRouter, Groq), cùng cơ chế fallback siêu mượt nếu model chính bị quá tải.'
+                        : 'Deep backend refactor introducing ai.routing.service and provider runners to support diverse model networks (OpenRouter, Groq) with seamless fallback mechanisms.'
+                },
+                {
+                    icon: <Database className="w-5 h-5 text-emerald-400" />,
+                    title: lang === 'vi' ? 'Mở rộng Trợ lý AI cho NoSQL (NoSQL AI Integration)' : 'NoSQL AI Assistant Integration',
+                    desc: lang === 'vi'
+                        ? 'Phát triển NoSqlAiQueryBox mới toanh, mang toàn bộ sức mạnh hoàn thiện mã, sửa lỗi cú pháp và khởi tạo query NoSQL vào trong không gian làm việc MongoDB.'
+                        : 'Developed the brand new NoSqlAiQueryBox, bringing full code completion, syntax fixing, and query generation power into the MongoDB workspace.'
+                },
+                {
+                    icon: <Code2 className="w-5 h-5 text-cyan-400" />,
+                    title: lang === 'vi' ? 'Nâng cấp Quản lý State & UI Chat' : 'Chat State & UI Overhaul',
+                    desc: lang === 'vi'
+                        ? 'Đập đi xây lại luồng quản lý hội thoại với aiChatSlice, useAiChat, và component AiChatInput mới để hỗ trợ lịch sử ngữ cảnh dài hạn và giao diện gõ code đa dòng mượt mà.'
+                        : 'Overhauled the conversational state flow using aiChatSlice, useAiChat, and the new AiChatInput component to support semantic history memory and multi-line interactions.'
+                },
+                {
+                    icon: <Zap className="w-5 h-5 text-yellow-400" />,
+                    title: lang === 'vi' ? 'Khóa cứng Autocomplete (Ghost Text Hardening)' : 'Autocomplete Hardening',
+                    desc: lang === 'vi'
+                        ? 'Siết chặt context qua ai.prompt-builder, xử lý triệt để lỗi treo UI (hangs) với strict timeouts, và ưu tiên đẩy mạnh hiệu năng cho các mô hình chớp nhoáng như Gemini Flash Preview.'
+                        : 'Tightened context via ai.prompt-builder, completely eliminating UI hangs with strict timeouts, and aggressively prioritizing ultra-fast models like Gemini Flash Preview.'
+                }
+            ]
+        },
         // v3.5.0 - May 8, 2026
         {
             version: 'v3.5.0',
             date: lang === 'vi' ? '8 Tháng 5, 2026' : 'May 8, 2026',
             title: lang === 'vi' ? 'NoSQL Explorer Parity & UX Refinement' : 'NoSQL Explorer Parity & UX Refinement',
-            badge: 'LATEST',
+            badge: '',
             features: [
                 {
                     icon: <Zap className="w-5 h-5 text-emerald-400" />,

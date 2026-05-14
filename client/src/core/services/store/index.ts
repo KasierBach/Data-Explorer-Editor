@@ -53,6 +53,9 @@ export const useAppStore = create<AppState>()(
                         messages: [],
                     }));
                 }
+                if (!persisted.aiModel || persisted.aiModel === 'gemini-3-flash-preview') {
+                    persisted.aiModel = 'groq:meta-llama/llama-4-scout-17b-16e-instruct';
+                }
                 return { ...currentState, ...persisted } as AppState;
             },
             // Only persist essential state AND sanitize passwords

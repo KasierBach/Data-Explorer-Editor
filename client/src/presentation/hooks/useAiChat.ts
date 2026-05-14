@@ -75,16 +75,45 @@ async function readExcelAsText(arrayBuffer: ArrayBuffer, fileName: string): Prom
 }
 
 // Extract the "message" field content from partial JSON streaming output
-function extractMessageFromPartialJson(raw: string): string {
+function parsePartialAiResponse(raw: string): { message: string, thought?: string } {
+    const result = { message: '', thought: undefined as string | undefined };
+    
+    // 1. Try <thought> tags (common in reasoning models)
+    const tagMatch = raw.match(/<thought>([\s\S]*?)(?:<\/thought>|$)/);
+    if (tagMatch) {
+        result.thought = tagMatch[1].trim();
+        // Remove the thought part to try parsing the rest as JSON if needed
+        const remaining = raw.replace(tagMatch[0], '').trim();
+        if (remaining.startsWith('{')) raw = remaining;
+    }
+
+    // 2. Try JSON "thought" field
+    const thoughtMatch = raw.match(/"thought"\s*:\s*"((?:[^"\\]|\\.)*)"?/s);
+    if (thoughtMatch) {
+        try {
+            result.thought = JSON.parse('"' + thoughtMatch[1] + '"');
+        } catch {
+            result.thought = thoughtMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+        }
+    }
+
+    // 3. Try JSON "message" field
     const msgMatch = raw.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"?/s);
     if (msgMatch) {
         try {
-            return JSON.parse('"' + msgMatch[1] + '"');
+            result.message = JSON.parse('"' + msgMatch[1] + '"');
         } catch {
-            return msgMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+            result.message = msgMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
         }
+    } else if (!result.thought && raw.trim() && !raw.trim().startsWith('{')) {
+        // Fallback for non-JSON or partial raw text
+        result.message = raw;
+    } else if (raw.trim() && !raw.trim().startsWith('{')) {
+        // Handle text outside of tags or JSON
+        result.message = raw.replace(/<thought>[\s\S]*?(?:<\/thought>|$)/, '').trim();
     }
-    return raw.replace(/^\s*\{\s*"message"\s*:\s*"?/, '').replace(/"?\s*\}\s*$/, '');
+
+    return result;
 }
 
 export function useAiChat() {
@@ -94,6 +123,7 @@ export function useAiChat() {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     const store = useAppStore();
     const {
@@ -230,6 +260,9 @@ export function useAiChat() {
         }
     };
 
+    const lastUpdateRef = useRef<number>(0);
+    const pendingUpdateRef = useRef<{ message: string, thought?: string } | null>(null);
+
     const removeAttachment = (index: number) => {
         setAttachments(prev => prev.filter((_, i) => i !== index));
     };
@@ -243,8 +276,21 @@ export function useAiChat() {
             const event = JSON.parse(data);
             if (event.type === 'chunk' && event.text) {
                 const nextRaw = raw + event.text;
-                const displayText = extractMessageFromPartialJson(nextRaw);
-                updateAiMessage(chatId, aiMessageId, { content: displayText });
+                const parsed = parsePartialAiResponse(nextRaw);
+                
+                // Throttle updates to ~60fps (16ms) or slightly more (30-50ms) for better performance
+                const now = Date.now();
+                if (now - lastUpdateRef.current > 40) { // 40ms = 25fps, very smooth but low CPU
+                    updateAiMessage(chatId, aiMessageId, { 
+                        content: parsed.message,
+                        thought: parsed.thought
+                    });
+                    lastUpdateRef.current = now;
+                    pendingUpdateRef.current = null;
+                } else {
+                    pendingUpdateRef.current = parsed;
+                }
+                
                 return nextRaw;
             }
             if (event.type === 'done' && event.data) {
@@ -254,6 +300,7 @@ export function useAiChat() {
                     sql: event.data.sql || undefined,
                     explanation: event.data.explanation || undefined,
                     recommendations: event.data.recommendations || undefined,
+                    thought: event.data.thought || undefined,
                     modelInfo: {
                         provider: event.data.provider,
                         model: event.data.model,
@@ -267,6 +314,7 @@ export function useAiChat() {
                     sql: event.data.sql,
                     explanation: event.data.explanation,
                     recommendations: event.data.recommendations,
+                    thought: event.data.thought,
                     modelInfo: {
                         provider: event.data.provider,
                         model: event.data.model,
@@ -286,7 +334,113 @@ export function useAiChat() {
         return raw;
     }, [store, updateAiMessage]);
 
-    const handleSend = async () => {
+    const triggerGenerate = useCallback(async (chatId: string, prompt: string, customAttachments: Attachment[] = [], customImageData?: string) => {
+        setIsLoading(true);
+        const aiMsgId = `msg-${Date.now()}-ai`;
+        addAiMessage(chatId, { id: aiMsgId, role: 'ai', content: '', timestamp: Date.now() });
+
+        // Setup abort controller
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+        let rawText = '';
+
+        try {
+            const adapter = connectionService.getActiveAdapter();
+            if (!adapter || !(adapter as any).generateSqlStream) throw new Error("API Adapter does not support AI streaming.");
+
+            const contextParts: string[] = [];
+            let imageData = customImageData;
+
+            for (const att of customAttachments) {
+                if (att.type === 'image' && !imageData) imageData = att.data;
+                else contextParts.push(`[${att.type.toUpperCase()}] ${att.label}:\n${att.data}`);
+            }
+
+            const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';
+            if (isNoSql && store.nosqlActiveCollection && !customAttachments.some(a => a.type === 'table')) {
+                const schemaSummary = store.nosqlSchemaStats ? 
+                     `[NOSQL SCHEMA] Collection: ${store.nosqlActiveCollection}\nFields: ` + 
+                     store.nosqlSchemaStats.map((s: any) => `${s.name} (${Object.keys(s.types).join('/')})`).join(', ')
+                     : `[NOSQL CONTEXT] Collection: ${store.nosqlActiveCollection}`;
+                contextParts.unshift(schemaSummary);
+            }
+
+            // Prepare chat history (filtered to only past messages)
+            const chat = store.aiChats.find(c => c.id === chatId);
+            const history = chat?.messages?.filter(m => m.id !== aiMsgId) || [];
+
+            const response = await (adapter as any).generateSqlStream({
+                database: activeDatabase || undefined,
+                prompt: prompt || '(xem hình/context đính kèm)',
+                image: imageData,
+                context: contextParts.length > 0 ? contextParts.join('\n\n') : undefined,
+                model: aiModel,
+                mode: aiMode,
+                routingMode: aiRoutingMode,
+                history: history.length > 0 ? history.map(m => ({ role: m.role, content: m.content })) : undefined,
+            }, { signal: controller.signal });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || response.statusText);
+            }
+
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('No readable stream');
+
+            const decoder = new TextDecoder();
+            let buffer = '';
+            rawText = '';
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                
+                // Check if aborted during read
+                if (controller.signal.aborted) throw new Error('Aborted');
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split(/\r?\n/);
+                buffer = lines.pop() || '';
+                for (const line of lines) {
+                    rawText = processSseLine(chatId, aiMsgId, rawText, line.trimEnd());
+                }
+            }
+
+            buffer += decoder.decode();
+            if (buffer) {
+                const remainingLines = buffer.split(/\r?\n/);
+                for (const line of remainingLines) {
+                    rawText = processSseLine(chatId, aiMsgId, rawText, line.trimEnd());
+                }
+            }
+            if (pendingUpdateRef.current) {
+                updateAiMessage(chatId, aiMsgId, { 
+                    content: pendingUpdateRef.current.message,
+                    thought: pendingUpdateRef.current.thought
+                });
+            }
+        } catch (error: any) {
+            if (error.name === 'AbortError' || error.message === 'Aborted') {
+                updateAiMessage(chatId, aiMsgId, { content: (rawText ? parsePartialAiResponse(rawText).message : '') + '\n\n[Đã dừng bởi người dùng]' });
+            } else {
+                updateAiMessage(chatId, aiMsgId, { content: `❌ Lỗi: ${error.message}`, error: true });
+            }
+        } finally {
+            setIsLoading(false);
+            lastUpdateRef.current = 0;
+            pendingUpdateRef.current = null;
+            abortControllerRef.current = null;
+        }
+    }, [addAiMessage, updateAiMessage, processSseLine, activeDatabase, aiModel, aiMode, aiRoutingMode, activeConnection?.type, store.nosqlActiveCollection, store.nosqlSchemaStats, store.aiChats]);
+
+    const handleStop = useCallback(() => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+    }, []);
+
+    const handleSend = useCallback(async () => {
         if ((!input.trim() && attachments.length === 0) || isLoading || !activeAiChatId) return;
 
         if (!activeConnection) {
@@ -318,87 +472,46 @@ export function useAiChat() {
         };
         addAiMessage(activeAiChatId, userMsg);
 
-        const contextParts: string[] = [];
-        let imageData: string | undefined;
-
-        for (const att of attachments) {
-            if (att.type === 'image') imageData = att.data;
-            else contextParts.push(`[${att.type.toUpperCase()}] ${att.label}:\n${att.data}`);
-        }
-
+        const currentInput = input.trim();
+        const currentAttachments = [...attachments];
+        
         setInput('');
         setAttachments([]);
-        setIsLoading(true);
+        
+        await triggerGenerate(activeAiChatId, currentInput, currentAttachments);
+    }, [input, attachments, isLoading, activeAiChatId, activeConnection, addAiMessage, triggerGenerate]);
 
-        const aiMsgId = `msg-${Date.now()}-ai`;
-        addAiMessage(activeAiChatId, { id: aiMsgId, role: 'ai', content: '', timestamp: Date.now() });
+    const handleRegenerate = useCallback(async (chatId: string) => {
+        const chat = store.aiChats.find(c => c.id === chatId);
+        if (!chat || isLoading) return;
 
-        try {
-            const adapter = connectionService.getActiveAdapter();
-            if (!adapter || !(adapter as any).generateSqlStream) throw new Error("API Adapter does not support AI streaming.");
+        // Find last user message
+        const messages = chat.messages || [];
+        const lastUserMsgIndex = [...messages].reverse().findIndex(m => m.role === 'user');
+        if (lastUserMsgIndex === -1) return;
 
-            const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';
-            if (isNoSql && store.nosqlActiveCollection && !attachments.some(a => a.type === 'table')) {
-                const schemaSummary = store.nosqlSchemaStats ? 
-                     `[NOSQL SCHEMA] Collection: ${store.nosqlActiveCollection}\nFields: ` + 
-                     store.nosqlSchemaStats.map((s: any) => `${s.name} (${Object.keys(s.types).join('/')})`).join(', ')
-                     : `[NOSQL CONTEXT] Collection: ${store.nosqlActiveCollection}`;
-                contextParts.unshift(schemaSummary);
-            }
+        const lastUserMsg = messages[messages.length - 1 - lastUserMsgIndex];
+        
+        // Remove subsequent messages
+        await store.editAiMessage(chatId, lastUserMsg.id, lastUserMsg.content);
+        
+        // Trigger generation
+        await triggerGenerate(chatId, lastUserMsg.content, lastUserMsg.attachments as any || []);
+    }, [store, isLoading, triggerGenerate]);
 
-            const response = await (adapter as any).generateSqlStream({
-                database: activeDatabase || undefined,
-                prompt: input || '(xem hình/context đính kèm)',
-                image: imageData,
-                context: contextParts.length > 0 ? contextParts.join('\n\n') : undefined,
-                model: aiModel,
-                mode: aiMode,
-                routingMode: aiRoutingMode,
-            });
+    const handleEditSubmit = useCallback(async (chatId: string, messageId: string, newContent: string) => {
+        if (isLoading) return;
+        
+        await store.editAiMessage(chatId, messageId, newContent);
+        await triggerGenerate(chatId, newContent, []);
+    }, [isLoading, store, triggerGenerate]);
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || response.statusText);
-            }
-
-            const reader = response.body?.getReader();
-            if (!reader) throw new Error('No readable stream');
-
-            const decoder = new TextDecoder();
-            let buffer = '';
-            let rawText = '';
-
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split(/\r?\n/);
-                buffer = lines.pop() || '';
-                for (const line of lines) {
-                    rawText = processSseLine(activeAiChatId, aiMsgId, rawText, line.trimEnd());
-                }
-            }
-
-            buffer += decoder.decode();
-            if (buffer) {
-                const remainingLines = buffer.split(/\r?\n/);
-                for (const line of remainingLines) {
-                    rawText = processSseLine(activeAiChatId, aiMsgId, rawText, line.trimEnd());
-                }
-            }
-        } catch (error: any) {
-            updateAiMessage(activeAiChatId, aiMsgId, { content: `❌ Lỗi: ${error.message}`, error: true });
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
+    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
         }
-    };
+    }, [handleSend]);
 
     const formatTime = (ts: number) => {
         const d = new Date(ts);
@@ -409,6 +522,7 @@ export function useAiChat() {
 
     return {
         input, setInput, isLoading, attachments, messagesEndRef, fileInputRef,
-        handleFileSelected, handlePasteQuery, handleMentionTable, removeAttachment, handleSend, handleKeyDown, formatTime
+        handleFileSelected, handlePasteQuery, handleMentionTable, removeAttachment, handleSend, handleKeyDown, formatTime,
+        handleRegenerate, handleEditSubmit, handleStop
     };
 }

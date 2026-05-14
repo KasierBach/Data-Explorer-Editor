@@ -70,11 +70,23 @@ export const TabsBar: React.FC = () => {
         handleDragEnd();
     }, [dragIndex, reorderTabs, handleDragEnd]);
 
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    const handleWheel = (e: React.WheelEvent) => {
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollLeft += e.deltaY;
+        }
+    };
+
     if (tabs.length === 0) return null;
 
     return (
-        <div className="flex items-center border-b bg-muted/10 h-10 shrink-0 backdrop-blur-sm">
-            <div className="flex-1 flex items-center overflow-x-auto hide-scrollbar scroll-smooth h-full">
+        <div className="flex items-center border-b bg-muted/10 h-9 shrink-0 backdrop-blur-sm shadow-sm relative z-20">
+            <div 
+                ref={scrollContainerRef}
+                onWheel={handleWheel}
+                className="flex-1 flex items-center overflow-x-auto hide-scrollbar scroll-smooth h-full"
+            >
                 {tabs.map((tab, index) => (
                     <div
                         key={tab.id}
@@ -84,10 +96,10 @@ export const TabsBar: React.FC = () => {
                         onDragOver={(e) => handleDragOver(e, index)}
                         onDrop={(e) => handleDrop(e, index)}
                         className={cn(
-                            "group flex items-center gap-2 px-3.5 h-full border-r text-[13px] font-medium cursor-pointer select-none transition-all duration-200 relative",
-                            isCompactMobileLayout ? "min-w-[120px] max-w-[160px]" : "min-w-[140px] max-w-[220px]",
+                            "group flex items-center gap-2 px-3 h-full border-r text-[12.5px] font-medium cursor-pointer select-none transition-all duration-200 relative shrink-0",
+                            isCompactMobileLayout ? "min-w-[100px] max-w-[160px]" : "min-w-[130px] max-w-[220px]",
                             activeTabId === tab.id
-                                ? "bg-background text-foreground shadow-[inset_0_-2px_0_0_hsl(var(--primary))] z-10"
+                                ? "bg-background text-foreground shadow-[inset_0_-2px_0_0_hsl(var(--primary))] z-10 font-semibold"
                                 : "hover:bg-muted/40 text-muted-foreground border-b border-b-transparent",
                             dragIndex === index && "opacity-40",
                             dropTargetIndex === index && dragIndex !== index && "border-l-2 border-l-primary"
@@ -95,9 +107,9 @@ export const TabsBar: React.FC = () => {
                         onClick={() => setActiveTab(tab.id)}
                     >
                         {/* Drag Handle */}
-                        <GripVertical className="w-3.5 h-3.5 text-muted-foreground/30 shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <GripVertical className="w-2.5 h-2.5 text-muted-foreground/30 shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity" />
 
-                        <Database className="w-4 h-4 text-blue-500/80 shrink-0" />
+                        <Database className="w-3.5 h-3.5 text-blue-500/80 shrink-0" />
 
                         <span className="truncate flex-1">
                             {getTabDisplayTitle(tab, lang)}
