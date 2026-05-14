@@ -35,7 +35,7 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
 
             const generatedSql = result.sql?.trim() || '';
             const explicitSchemaIntent = /\b(create|alter|drop|truncate|migrate|migration|schema|table|column|ddl)\b/i.test(query);
-            const isSchemaChangingSql = /^\s*(create|alter|drop|truncate)\s+table\b/i.test(generatedSql);
+            const isSchemaChangingSql = /^\s*(create|alter|drop|truncate|insert|update|delete|replace|rename)\s+/i.test(generatedSql);
             const isTooLong = generatedSql.length > 500 || generatedSql.split('\n').length > 6;
 
             if (generatedSql && !explicitSchemaIntent && (isSchemaChangingSql || isTooLong)) {
@@ -43,8 +43,8 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                     ? 'Kết quả AI quá dài hoặc có thay đổi schema nên chưa được chèn tự động.'
                     : 'The AI result is too long or schema-changing, so it was not inserted automatically.'));
                 toast.warning(lang === 'vi'
-                    ? 'Kết quả AI quá dài nên chưa chèn vào editor'
-                    : 'AI result was not inserted into the editor');
+                    ? 'Kết quả AI bị từ chối chèn tự động do thao tác ghi/cấu trúc hoặc quá dài'
+                    : 'AI result was not inserted due to DML/schema modifications or excessive length');
             } else if (generatedSql) {
                 onGenerate(generatedSql);
                 setExplanation(result.explanation);

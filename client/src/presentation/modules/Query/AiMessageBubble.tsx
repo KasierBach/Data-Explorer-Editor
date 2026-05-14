@@ -36,9 +36,21 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
         setIsEditing(false);
     };
 
+    const handleCopy = async (text: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch (e) {
+            console.error('Failed to copy', e);
+        }
+    };
+
     const handleDelete = async () => {
         if (activeAiChatId && window.confirm('Xóa tin nhắn này?')) {
-            await deleteAiMessage(activeAiChatId, msg.id);
+            try {
+                await deleteAiMessage(activeAiChatId, msg.id);
+            } catch (e) {
+                console.error("Failed to delete", e);
+            }
         }
     };
 
@@ -118,6 +130,7 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                     {isEditing ? (
                         <div className="flex flex-col gap-2 w-full">
                             <textarea
+                                aria-label="Edit message"
                                 value={editContent}
                                 onChange={(e) => setEditContent(e.target.value)}
                                 className="w-full bg-background/40 border border-violet-500/40 rounded-lg p-2.5 text-xs outline-none focus:ring-1 focus:ring-violet-500/50 resize-none min-h-[100px]"
@@ -163,7 +176,7 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                                     <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-blue-500/20" onClick={() => { onInsertQuery(msg.sql!); onRunQuery(msg.sql!); }} title="Chạy ngay">
                                         <Play className="w-3 h-3 text-blue-400" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-muted/50" onClick={() => navigator.clipboard.writeText(msg.sql!)} title={isNoSql ? 'Copy MQL' : 'Copy SQL'}>
+                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-muted/50" onClick={() => handleCopy(msg.sql!)} title={isNoSql ? 'Copy MQL' : 'Copy SQL'} aria-label="Copy SQL">
                                         <Copy className="w-3 h-3" />
                                     </Button>
                                 </div>
@@ -214,7 +227,7 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                                                     <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-blue-500/20" onClick={() => { onInsertQuery(recommendation.sql!); onRunQuery(recommendation.sql!); }} title="Run suggestion">
                                                         <Play className="w-3 h-3 text-blue-400" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted/50" onClick={() => navigator.clipboard.writeText(recommendation.sql!)} title="Copy suggestion">
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted/50" onClick={() => handleCopy(recommendation.sql!)} title="Copy suggestion" aria-label="Copy suggestion SQL">
                                                         <Copy className="w-3 h-3" />
                                                     </Button>
                                                 </div>
@@ -227,26 +240,25 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                     )}
                 </div>
 
-                {/* ChatGPT style Actions below bubble */}
                 <div className={cn(
                     "flex items-center gap-0.5 mt-1 transition-opacity duration-200",
                     "opacity-0 group-hover/bubble:opacity-100",
                     msg.role === 'user' ? "justify-end mr-1" : "justify-start ml-1"
                 )}>
-                    {msg.role === 'user' && !isEditing && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => { setIsEditing(true); setEditContent(msg.content); }} title="Chỉnh sửa">
+                    {msg.role === 'user' && !isEditing && !!onEditSubmit && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => { setIsEditing(true); setEditContent(msg.content); }} title="Chỉnh sửa" aria-label="Edit message">
                             <Pencil className="w-3.5 h-3.5" />
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => navigator.clipboard.writeText(msg.content)} title="Sao chép">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => handleCopy(msg.content)} title="Sao chép" aria-label="Copy message">
                         <Copy className="w-3.5 h-3.5" />
                     </Button>
                     {msg.role === 'ai' && !msg.error && onRegenerate && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => onRegenerate(msg.id)} title="Thử lại">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => onRegenerate(msg.id)} title="Thử lại" aria-label="Regenerate message">
                             <RotateCcw className="w-3.5 h-3.5" />
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-red-500/10 text-muted-foreground/60 hover:text-red-400" onClick={handleDelete} title="Xóa">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-red-500/10 text-muted-foreground/60 hover:text-red-400" onClick={handleDelete} title="Xóa" aria-label="Delete message">
                         <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                 </div>

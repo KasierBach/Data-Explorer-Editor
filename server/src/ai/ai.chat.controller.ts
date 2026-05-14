@@ -39,13 +39,13 @@ export class AiChatController {
         return this.aiChatService.addMessage(req.user.id, id, dto);
     }
 
-    @Delete(':id/messages/:messageId')
-    deleteMessage(@Request() req: AuthenticatedRequest, @Param('id') id: string, @Param('messageId') messageId: string) {
-        return this.aiChatService.deleteMessage(req.user.id, id, messageId);
-    }
-
     @Delete(':id/messages/after/:messageId')
     deleteMessagesAfter(@Request() req: AuthenticatedRequest, @Param('id') id: string, @Param('messageId') messageId: string) {
         return this.aiChatService.deleteMessagesAfter(req.user.id, id, messageId);
+    }
+
+    @Delete(':id/messages/:messageId')
+    deleteMessage(@Request() req: AuthenticatedRequest, @Param('id') id: string, @Param('messageId') messageId: string) {
+        return this.aiChatService.deleteMessage(req.user.id, id, messageId);
     }
 }

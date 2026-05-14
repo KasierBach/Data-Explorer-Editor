@@ -50,9 +50,9 @@ interface AiChatInputProps {
 
     contextMenuRef: React.RefObject<HTMLDivElement | null>;
     isNoSql: boolean;
-    activeTab: any;
-    activeConnection: any;
-    activeDatabase: any;
+    activeTab: { type: string; metadata?: any } | undefined;
+    activeConnection: { type: string } | undefined;
+    activeDatabase: string | null | undefined;
 }
 
 export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
@@ -84,8 +84,8 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                 {attachments.length > 0 && (
                     <div className="px-3 pt-3 pb-1 flex flex-wrap gap-1.5">
                         {attachments.map((att, i) => (
-                            <div
-                                key={i}
+                                <div
+                                key={att.id || att.label + i}
                                 className={cn(
                                     "flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-medium group",
                                     att.type === 'image' && "bg-pink-500/10 text-pink-400 border border-pink-500/20",
@@ -96,7 +96,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                             >
                                 {att.type === 'image' && (
                                     <>
-                                        {att.preview && <img src={att.preview} className="w-5 h-5 rounded object-cover" alt="" />}
+                                        {att.preview && <img src={att.preview} className="w-5 h-5 rounded object-cover" alt={att.label || "attachment preview"} />}
                                         <Image className="w-3 h-3" />
                                     </>
                                 )}
@@ -106,6 +106,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                 <button
                                     onClick={() => removeAttachment(i)}
                                     className="opacity-0 group-hover:opacity-100 hover:text-red-400 transition-opacity"
+                                    aria-label="Remove attachment"
                                 >
                                     <X className="w-2.5 h-2.5" />
                                 </button>
@@ -115,7 +116,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                 )}
 
                 <textarea
-                    ref={inputRef as any}
+                    ref={inputRef}
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}

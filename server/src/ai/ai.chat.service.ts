@@ -97,9 +97,11 @@ export class AiChatService {
         if (!chat) throw new NotFoundException('Chat not found');
         if (chat.userId !== userId) throw new ForbiddenException('Access denied');
 
-        await this.prisma.aiMessage.delete({
-            where: { id: messageId }
+        const deleted = await this.prisma.aiMessage.deleteMany({
+            where: { id: messageId, chatId }
         });
+
+        if (deleted.count === 0) throw new NotFoundException('Message not found');
 
         return { success: true };
     }
@@ -107,23 +109,21 @@ export class AiChatService {
     async deleteMessagesAfter(userId: string, chatId: string, messageId: string) {
         const chat = await this.prisma.aiChat.findUnique({ 
             where: { id: chatId },
-            include: { messages: { orderBy: { createdAt: 'asc' } } }
+            select: { userId: true }
         });
         if (!chat) throw new NotFoundException('Chat not found');
         if (chat.userId !== userId) throw new ForbiddenException('Access denied');
 
-        const messageIndex = chat.messages.findIndex(m => m.id === messageId);
-        if (messageIndex === -1) throw new NotFoundException('Message not found');
+        const target = await this.prisma.aiMessage.findUnique({
+            where: { id: messageId },
+            select: { id: true, chatId: true, createdAt: true }
+        });
+        if (!target || target.chatId !== chatId) throw new NotFoundException('Message not found');
 
-        const messagesToDelete = chat.messages.slice(messageIndex + 1);
-        const idsToDelete = messagesToDelete.map(m => m.id);
+        const deleted = await this.prisma.aiMessage.deleteMany({
+            where: { chatId, createdAt: { gt: target.createdAt } }
+        });
 
-        if (idsToDelete.length > 0) {
-            await this.prisma.aiMessage.deleteMany({
-                where: { id: { in: idsToDelete } }
-            });
-        }
-
-        return { success: true, count: idsToDelete.length };
+        return { success: true, count: deleted.count };
     }
 }

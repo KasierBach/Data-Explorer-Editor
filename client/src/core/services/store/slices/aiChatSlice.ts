@@ -25,7 +25,7 @@ export interface AiMessage {
     };
     error?: boolean;
     timestamp: number;
-    attachments?: { type: string; label: string; preview?: string }[];
+    attachments?: { type: string; label: string; preview?: string; data?: string }[];
 }
 
 export interface AiChat {
@@ -226,6 +226,13 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
         try {
             // ChatGPT logic: delete all messages after the edited message
             await AiChatService.deleteMessagesAfter(chatId, messageId);
+
+            const state = get();
+            const chatToUpdate = state.aiChats.find(c => c.id === chatId);
+            const msgToUpdate = chatToUpdate?.messages.find(m => m.id === messageId);
+            if (msgToUpdate) {
+                await AiChatService.saveMessage(chatId, { ...msgToUpdate, content: newContent } as any);
+            }
             
             set((state) => ({
                 aiChats: state.aiChats.map(chat => {

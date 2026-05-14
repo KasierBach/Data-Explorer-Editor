@@ -4,6 +4,7 @@ import { connectionService } from '@/core/services/ConnectionService';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 export interface Attachment {
+    id?: string;
     type: 'image' | 'sql' | 'table' | 'file';
     label: string;
     data: string;
@@ -278,7 +279,7 @@ export function useAiChat() {
                 const nextRaw = raw + event.text;
                 const parsed = parsePartialAiResponse(nextRaw);
                 
-                // Throttle updates to ~60fps (16ms) or slightly more (30-50ms) for better performance
+                // Throttle updates to ~25fps (40ms) or slightly more for better performance
                 const now = Date.now();
                 if (now - lastUpdateRef.current > 40) { // 40ms = 25fps, very smooth but low CPU
                     updateAiMessage(chatId, aiMessageId, { 
@@ -468,7 +469,7 @@ export function useAiChat() {
             role: 'user',
             content: displayContent,
             timestamp: Date.now(),
-            attachments: attachments.map(a => ({ type: a.type, label: a.label, preview: a.preview }))
+            attachments: attachments.map(a => ({ type: a.type, label: a.label, preview: a.preview, data: a.data }))
         };
         addAiMessage(activeAiChatId, userMsg);
 

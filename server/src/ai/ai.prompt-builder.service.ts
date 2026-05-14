@@ -10,10 +10,11 @@ export class AiPromptBuilderService {
         mode?: string;
         schemaContext?: string;
         databaseType?: string;
+        locale?: string;
     }): string {
-        const { prompt = '', context = '', mode = 'planning', schemaContext, databaseType = 'postgres' } = params;
+        const { prompt = '', context = '', mode = 'planning', schemaContext, databaseType = 'postgres', locale = 'en-US' } = params;
         const hasDbContext = !!(schemaContext && schemaContext.trim().length > 0 && !schemaContext.includes('Could not load'));
-        const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const today = new Date().toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         const shouldUseStructuredOutput = this.shouldUseStructuredOutput(prompt, context);
 
         const sqlRules = hasDbContext
@@ -29,8 +30,8 @@ export class AiPromptBuilderService {
             : Prompts.RESPONSE_FORMAT_CHAT;
 
         const now = new Date();
-        const dateStr = now.toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = now.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
 
         return `${Prompts.SYSTEM_IDENTITY}\n\n## CURRENT TIME CONTEXT:\n- Today is: ${dateStr}\n- Local time: ${timeStr}\n\n---
 # CORE MISSION\n\n${Prompts.CORE_MISSION}\n\n---
@@ -49,9 +50,10 @@ ${responseFormat}`;
 
         // Map history to OpenAI format
         if (history && history.length > 0) {
-            for (const msg of history) {
+            for (let i = 0; i < history.length; i++) {
+                const msg = history[i];
                 // Skip the last user message if it's identical to the current prompt to avoid duplication
-                // but usually the history contains only PAST messages.
+                if (i === history.length - 1 && msg.role === 'user' && msg.content === prompt) continue;
                 messages.push({
                     role: msg.role === 'ai' ? 'assistant' : 'user',
                     content: msg.content
@@ -69,7 +71,9 @@ ${responseFormat}`;
 
         // Map history to Gemini format
         if (history && history.length > 0) {
-            for (const msg of history) {
+            for (let i = 0; i < history.length; i++) {
+                const msg = history[i];
+                if (i === history.length - 1 && msg.role === 'user' && msg.content === prompt) continue;
                 contents.push({
                     role: msg.role === 'ai' ? 'model' : 'user',
                     parts: [{ text: msg.content }]
@@ -113,12 +117,29 @@ ${responseFormat}`;
             const thoughtFromTags = thoughtMatch ? thoughtMatch[1].trim() : undefined;
             const remainingText = thoughtMatch ? fullText.replace(thoughtMatch[0], '').trim() : fullText;
 
-            const match = remainingText.match(/\{[\s\S]*\}/);
-            const cleanJsonStr = match ? match[0] : remainingText;
+            let cleanJsonStr = remainingText;
+            const matchIndex = remainingText.indexOf('{');
+            if (matchIndex !== -1) {
+                let braceCount = 0;
+                let jsonEnd = -1;
+                for (let i = matchIndex; i < remainingText.length; i++) {
+                    if (remainingText[i] === '{') braceCount++;
+                    else if (remainingText[i] === '}') {
+                        braceCount--;
+                        if (braceCount === 0) {
+                            jsonEnd = i;
+                            break;
+                        }
+                    }
+                }
+                if (jsonEnd !== -1) {
+                    cleanJsonStr = remainingText.substring(matchIndex, jsonEnd + 1);
+                }
+            }
             const parsed = JSON.parse(cleanJsonStr);
             
             return {
-                message: parsed.message || (match ? '' : remainingText),
+                message: parsed.message || (matchIndex !== -1 ? '' : remainingText),
                 sql: parsed.sql || undefined,
                 explanation: parsed.explanation || undefined,
                 thought: parsed.thought || thoughtFromTags, // Prioritize JSON, fallback to tags

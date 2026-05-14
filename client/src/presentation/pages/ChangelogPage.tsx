@@ -33,7 +33,7 @@ export const ChangelogPage: React.FC = () => {
                 },
                 {
                     icon: <Globe className="w-5 h-5 text-blue-400" />,
-                    title: lang === 'vi' ? 'Cấu trúc Giao tiếp Thông minh (Dynamic AI Routing)' : 'Dynamic AI Routing & Fallback',
+                    title: lang === 'vi' ? 'Cấu trúc Giao tiếp & Fallback (Dynamic AI Routing)' : 'Dynamic AI Routing & Fallback',
                     desc: lang === 'vi'
                         ? 'Tái cấu trúc toàn rễ backend với các module ai.routing.service và ai.provider-runner nhằm hỗ trợ mạng lưới mô hình đa dạng (OpenRouter, Groq), cùng cơ chế fallback siêu mượt nếu model chính bị quá tải.'
                         : 'Deep backend refactor introducing ai.routing.service and provider runners to support diverse model networks (OpenRouter, Groq) with seamless fallback mechanisms.'

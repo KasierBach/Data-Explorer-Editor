@@ -204,6 +204,16 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                {!activeConnection && messages.length <= 1 && (
+                    <div className="flex flex-col items-center justify-center p-6 my-4 border border-red-500/10 bg-red-500/5 rounded-xl text-center space-y-2 animate-in fade-in zoom-in-95">
+                        <span className="text-xs font-bold text-red-500/80 uppercase tracking-widest">
+                            Chưa Kết Nối Database
+                        </span>
+                        <span className="text-[10px] text-muted-foreground leading-relaxed px-4">
+                            Bạn cần thiết lập Server & Database (hoặc NoSQL) ở sidebar để AI có thể tự động viết query chuẩn xác.
+                        </span>
+                    </div>
+                )}
                 {messages.map(msg => (
                     <AiMessageBubble
                         key={msg.id}

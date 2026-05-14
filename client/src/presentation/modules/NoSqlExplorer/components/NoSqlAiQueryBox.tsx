@@ -123,7 +123,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({ onGenerate, cu
                                     "text-[9px] font-bold py-0.5 px-1.5 rounded transition-all tracking-tighter",
                                     query.length > 0 ? "bg-green-500/20 text-green-400 border border-green-500/20" : "text-muted-foreground/20 italic"
                                 )}>
-                                    CTRL + ENTER TO RUN
+                                    {lang === 'vi' ? (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? "⌘ + ENTER ĐỂ CHẠY" : "CTRL + ENTER ĐỂ CHẠY") : (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? "⌘ + ENTER TO RUN" : "CTRL + ENTER TO RUN")}
                                 </span>
                             </div>
                         </div>
@@ -143,7 +143,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({ onGenerate, cu
                             <div className="flex items-center space-x-4">
                                 <div className="flex items-center space-x-1.5 opacity-40 hover:opacity-100 transition-opacity cursor-help">
                                     <Database className="w-3.5 h-3.5" />
-                                    <span className="text-[10px] font-bold uppercase tracking-widest leading-none">COLL: {collectionName || 'Default'}</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-widest leading-none">COLL: {collectionName || (lang === 'vi' ? 'Mặc định' : 'Default')}</span>
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">

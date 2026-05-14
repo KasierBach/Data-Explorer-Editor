@@ -137,18 +137,30 @@ export class AiController {
 }
 
 @Controller('ai-test')
+@UseGuards(JwtAuthGuard)
 export class AiTestController {
-    constructor(private readonly aiService: AiService) { }
+    constructor(
+        private readonly aiService: AiService,
+        private readonly connectionService: AiConnectionService,
+    ) { }
 
     @Post('autocomplete')
-    async autocomplete(@Body() body: AutocompleteDto) {
-        const { beforeCursor, afterCursor, context } = body;
+    async autocomplete(@Body() body: AutocompleteDto, @Req() req: AuthenticatedRequest) {
+        const { connectionId, database, beforeCursor, afterCursor, context } = body;
+        
         try {
+            const { connection, schemaContext } = await this.connectionService.getConnectionContext(
+                connectionId,
+                database,
+                req.user.id,
+                (pool, strategy, db, connId) => this.aiService.gatherSchemaContext(pool, strategy, db, connId),
+            );
+
             const completion = await this.aiService.autocomplete({
                 beforeCursor,
                 afterCursor,
-                schemaContext: context,
-                databaseType: 'postgres',
+                schemaContext: context ? `${context}\n\n${schemaContext}` : schemaContext,
+                databaseType: connection.type,
             });
             return { completion, error: null };
         } catch (err) {

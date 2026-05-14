@@ -74,6 +74,7 @@ export const TabsBar: React.FC = () => {
 
     const handleWheel = (e: React.WheelEvent) => {
         if (scrollContainerRef.current) {
+            e.preventDefault();
             scrollContainerRef.current.scrollLeft += e.deltaY;
         }
     };

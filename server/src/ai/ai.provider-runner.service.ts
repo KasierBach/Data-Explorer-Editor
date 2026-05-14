@@ -104,7 +104,14 @@ export class AiProviderRunnerService {
             return await tryCompletion(params.model);
         } catch (error: any) {
             // If the requested model (like 3.1) doesn't exist, fallback to 1.5-flash-latest for stability
-            if (error?.message?.includes('404') || error?.message?.includes('not found')) {
+            if (
+                error?.status === 404 ||
+                error?.code === 'NOT_FOUND' ||
+                error?.code === 'notFound' ||
+                error?.response?.status === 404 ||
+                error?.message?.includes('404') ||
+                error?.message?.includes('not found')
+            ) {
                 this.logger.warn(`Model ${params.model} not found. Falling back to gemini-1.5-flash-latest...`);
                 return await tryCompletion('gemini-1.5-flash-latest');
             }
@@ -206,7 +213,7 @@ export class AiProviderRunnerService {
         }
 
         const finalPrompt = needsSearch ? `[SEARCH ONLINE] ${params.prompt}` : params.prompt;
-        const requestTimeout = this.createAbortController(`${plan.provider} request (${modelToUse})`);
+        let requestTimeout = this.createAbortController(`${plan.provider} request (${modelToUse})`);
         
         try {
             let response = await fetch(`${plan.baseUrl}/chat/completions`, {
@@ -224,6 +231,8 @@ export class AiProviderRunnerService {
             if (!response.ok && modelToUse.endsWith(':online') && (response.status === 402 || response.status === 400 || response.status === 404)) {
                 this.logger.warn(`Model ${modelToUse} failed. Retrying without search...`);
                 modelToUse = modelToUse.replace(':online', '');
+                requestTimeout.clear();
+                requestTimeout = this.createAbortController(`${plan.provider} request (retry) (${modelToUse})`);
                 response = await fetch(`${plan.baseUrl}/chat/completions`, {
                     method: 'POST',
                     headers: this.getOpenAiCompatibleHeaders(plan),
@@ -309,7 +318,7 @@ export class AiProviderRunnerService {
         }
 
         const finalPrompt = needsSearch ? `[SEARCH ONLINE] ${params.prompt}` : params.prompt;
-        const requestTimeout = this.createAbortController(`${plan.provider} stream request (${modelToUse})`);
+        let requestTimeout = this.createAbortController(`${plan.provider} stream request (${modelToUse})`);
 
         try {
             let response = await fetch(`${plan.baseUrl}/chat/completions`, {
@@ -328,6 +337,8 @@ export class AiProviderRunnerService {
             if (!response.ok && modelToUse.endsWith(':online') && (response.status === 402 || response.status === 400 || response.status === 404)) {
                 this.logger.warn(`Model ${modelToUse} failed. Retrying without search...`);
                 modelToUse = modelToUse.replace(':online', '');
+                requestTimeout.clear();
+                requestTimeout = this.createAbortController(`${plan.provider} stream request (retry) (${modelToUse})`);
                 response = await fetch(`${plan.baseUrl}/chat/completions`, {
                     method: 'POST',
                     headers: this.getOpenAiCompatibleHeaders(plan),
@@ -359,7 +370,8 @@ export class AiProviderRunnerService {
         const decoder = new TextDecoder();
         let fullText = '';
         try {
-            while (true) {
+            let doneStream = false;
+            while (!doneStream) {
                 const { done, value } = await this.readWithTimeout(reader, `${provider} stream chunk`);
                 if (done) break;
                 const chunk = decoder.decode(value, { stream: true });
@@ -367,7 +379,10 @@ export class AiProviderRunnerService {
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         const data = line.slice(6).trim();
-                        if (data === '[DONE]') break;
+                        if (data === '[DONE]') {
+                            doneStream = true;
+                            break;
+                        }
                         try {
                             const parsed = JSON.parse(data);
                             const text = parsed.choices?.[0]?.delta?.content || '';

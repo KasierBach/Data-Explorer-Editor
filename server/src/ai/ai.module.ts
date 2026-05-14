@@ -14,9 +14,11 @@ import { AiSchemaService } from './ai.schema-service';
 import { AiAutocompleteService } from './ai.autocomplete-service';
 import { AiConnectionService } from './ai.connection-service';
 
+const isProd = process.env.NODE_ENV === 'production';
+
 @Module({
     imports: [ConnectionsModule, PrismaModule],
-    controllers: [AiController, AiChatController, AiTestController],
+    controllers: [AiController, AiChatController, ...(isProd ? [] : [AiTestController])],
     providers: [
         AiService,
         AiChatCompletionService,
