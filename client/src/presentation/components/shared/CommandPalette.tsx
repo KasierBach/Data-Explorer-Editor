@@ -93,7 +93,7 @@ export const CommandPalette: React.FC = () => {
 
     return (
         <Dialog open={isCommandPaletteOpen} onOpenChange={setCommandPaletteOpen}>
-            <DialogContent className="p-0 overflow-hidden max-w-2xl bg-background/95 backdrop-blur-xl border-white/10 shadow-2xl">
+            <DialogContent className="max-w-[calc(100vw-1rem)] p-0 overflow-hidden bg-background/95 backdrop-blur-xl border-white/10 shadow-2xl sm:max-w-2xl">
                 <div className="flex items-center border-b border-white/5 px-4 h-14 space-x-3">
                     <Search className="w-5 h-5 text-muted-foreground opacity-50" />
                     <Input
@@ -133,7 +133,7 @@ export const CommandPalette: React.FC = () => {
                                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/30 px-2 mb-3">
                                     {lang === 'vi' ? "Lệnh gợi ý" : "Suggested Commands"}
                                 </h3>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                     <CommandItem 
                                         icon={<Zap className="w-4 h-4 text-amber-400" />} 
                                         label={lang === 'vi' ? "Đồng bộ Index" : "Sync Index"} 
@@ -227,8 +227,8 @@ export const CommandPalette: React.FC = () => {
                     )}
                 </div>
                 
-                <div className="h-10 px-4 border-t border-white/5 flex items-center justify-between bg-muted/20">
-                    <div className="flex items-center space-x-4">
+                <div className="h-10 px-4 border-t border-white/5 flex items-center justify-between gap-3 bg-muted/20">
+                    <div className="hidden items-center space-x-4 sm:flex">
                         <KbdHint keys={["↑", "↓"]} label={lang === 'vi' ? "Di chuyển" : "Navigate"} />
                         <KbdHint keys={["↵"]} label={lang === 'vi' ? "Mở" : "Open"} />
                     </div>

@@ -57,7 +57,7 @@ describe('QueryService', () => {
     service = module.get(QueryService);
   });
 
-  it('builds versioned cache keys for query reads', async () => {
+  it('builds versioned cache keys for query reads including pagination options', async () => {
     connectionsService.findOne.mockResolvedValue({
       id: 'conn-1',
       type: 'postgres',
@@ -72,12 +72,20 @@ describe('QueryService', () => {
     cacheManager.get.mockResolvedValue(undefined);
     strategy.executeQuery.mockResolvedValue({ rows: [{ id: 1 }] });
 
-    await service.executeQuery({ connectionId: 'conn-1', sql: 'SELECT * FROM users' } as any, 'user-1');
+    await service.executeQuery(
+      {
+        connectionId: 'conn-1',
+        sql: 'SELECT * FROM users',
+        limit: 25,
+        offset: 50,
+      } as any,
+      'user-1',
+    );
 
     expect(freshnessService.buildKey).toHaveBeenCalledWith(
       'query',
       ['conn-1', 'main'],
-      ['select * from users'],
+      ['select * from users', 'limit:25', 'offset:50'],
     );
   });
 

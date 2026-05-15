@@ -42,7 +42,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
     getChartData, chartRef, title, isSidebarCollapsed, setSidebarCollapsed, isLoading,
     selectedTable, chartTypeName
 }) => {
-    const { isActualMobile } = useResponsiveLayoutMode();
+    const { isCompactMobileLayout } = useResponsiveLayoutMode();
     const { connections, activeConnectionId, nosqlActiveConnectionId } = useAppStore();
 
     const isNoSql = (nosqlActiveConnectionId && connections.find(c => c.id === nosqlActiveConnectionId)) || 
@@ -327,7 +327,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
 
             <div className={cn(
                 "pb-4 flex items-end justify-between",
-                isActualMobile ? "px-4 pt-4" : "px-8 pt-8"
+                isCompactMobileLayout ? "px-4 pt-4" : "px-8 pt-8"
             )}>
                 <div className="space-y-2">
                     <div className="flex items-center gap-3">
@@ -342,7 +342,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                     </div>
                     <h1 className={cn(
                         "font-black tracking-tight",
-                        isActualMobile ? "text-xl" : "text-3xl"
+                        isCompactMobileLayout ? "text-xl" : "text-3xl"
                     )}>{title}</h1>
                 </div>
                 <div className="flex gap-2">
@@ -355,7 +355,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
 
             <div className={cn(
                 "flex-1 pb-8 min-h-0",
-                isActualMobile ? "px-2" : "px-8"
+                isCompactMobileLayout ? "px-2" : "px-8"
             )}>
                 <div ref={chartRef} className="h-full relative group rounded-3xl overflow-hidden">
                     <div className="absolute -top-24 -right-24 w-[400px] h-[400px] bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none group-hover:bg-emerald-500/8 transition-colors duration-1000" />
@@ -363,7 +363,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
 
                     <div className={cn(
                         "h-full border border-border/10 bg-card/30 backdrop-blur-xl rounded-3xl shadow-2xl ring-1 ring-white/5",
-                        isActualMobile ? "p-2" : "p-8"
+                        isCompactMobileLayout ? "p-2" : "p-8"
                     )}>
                         {renderChart()}
                     </div>

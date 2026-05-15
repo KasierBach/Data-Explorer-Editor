@@ -30,15 +30,17 @@ export default defineConfig({
           'vendor-core': ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'zustand'],
           'vendor-ui': ['framer-motion', 'lucide-react', 'sonner', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
           'vendor-editor': ['@monaco-editor/react', 'monaco-editor'],
-          'vendor-data': ['xlsx', 'sql-formatter', 'pdfjs-dist'],
+          'vendor-xlsx': ['xlsx'],
+          'vendor-pdf': ['pdfjs-dist'],
+          'vendor-sql-format': ['sql-formatter'],
           'vendor-diagram': ['@xyflow/react', 'dagre'],
           'vendor-charts': ['recharts'],
-          'vendor-markdown': ['react-markdown', 'remark-gfm', 'react-syntax-highlighter'],
+          'vendor-markdown': ['react-markdown', 'remark-gfm'],
         }
       }
     }
   },
-  // @ts-ignore
+  // @ts-expect-error Vitest config is accepted by Vite at runtime.
   test: {
     globals: true,
     environment: 'jsdom',

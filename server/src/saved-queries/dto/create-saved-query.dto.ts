@@ -24,9 +24,13 @@ export class CreateSavedQueryDto {
   connectionId?: string;
 
   @IsString()
-  @IsIn(['private', 'team', 'workspace'])
   @IsOptional()
-  visibility?: 'private' | 'team' | 'workspace';
+  organizationId?: string;
+
+  @IsString()
+  @IsIn(['private', 'workspace'])
+  @IsOptional()
+  visibility?: 'private' | 'workspace';
 
   @IsString()
   @IsOptional()

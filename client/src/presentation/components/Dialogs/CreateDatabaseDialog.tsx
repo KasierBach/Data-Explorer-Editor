@@ -48,7 +48,7 @@ export const CreateDatabaseDialog: React.FC<CreateDatabaseDialogProps> = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Database className="w-5 h-5 text-blue-500" />

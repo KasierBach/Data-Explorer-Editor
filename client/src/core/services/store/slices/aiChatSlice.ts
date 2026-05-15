@@ -199,7 +199,9 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
                     chat.id === chatId ? { ...chat, title } : chat
                 ),
             }));
-        } catch (e) {}
+        } catch {
+            // Title sync is best-effort; local state remains usable if the request fails.
+        }
     },
     clearAiChats: () => set({ aiChats: [], activeAiChatId: null }),
     setAiModel: (model) => set({ aiModel: model }),

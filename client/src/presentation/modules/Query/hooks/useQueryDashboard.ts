@@ -9,7 +9,8 @@ export interface SaveToDashboardFormValues {
     dashboardId: string;
     dashboardName: string;
     dashboardDescription: string;
-    visibility: 'private' | 'team' | 'workspace';
+    visibility: 'private' | 'workspace';
+    organizationId: string;
     widgetTitle: string;
     chartType: 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'table';
     xAxis: string;
@@ -40,6 +41,7 @@ export function useQueryDashboard({
     const queryClient = useQueryClient();
     const { activeConnectionId, connections, activeDatabase, openDashboardTab, lang } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
+    const activeOrganizationId = activeConnection?.organizationId || undefined;
 
     const [isDashboardDialogOpen, setIsDashboardDialogOpen] = useState(false);
     const [dashboardDialogInitialValues, setDashboardDialogInitialValues] = useState<SaveToDashboardFormValues>({
@@ -48,6 +50,7 @@ export function useQueryDashboard({
         dashboardName: '',
         dashboardDescription: '',
         visibility: 'private',
+        organizationId: '',
         widgetTitle: '',
         chartType: 'bar',
         xAxis: '',
@@ -63,13 +66,14 @@ export function useQueryDashboard({
             dashboardName: activeConnection?.name ? `${activeConnection.name} Dashboard` : 'New Dashboard',
             dashboardDescription: '',
             visibility: 'private',
+            organizationId: activeOrganizationId || '',
             widgetTitle: defaultName,
             chartType: resultNumericColumns.length ? 'bar' : 'table',
             xAxis: resultColumns[0] || '',
             yAxis: resultNumericColumns.slice(0, 1),
         });
         setIsDashboardDialogOpen(true);
-    }, [results, currentSavedQueryName, tabTitle, lang, activeConnection?.name, resultColumns, resultNumericColumns]);
+    }, [results, currentSavedQueryName, tabTitle, lang, activeConnection?.name, activeOrganizationId, resultColumns, resultNumericColumns]);
 
     const saveToDashboard = useCallback(async (values: SaveToDashboardFormValues) => {
         if (!results) return;
@@ -83,6 +87,7 @@ export function useQueryDashboard({
                 description: values.dashboardDescription || undefined,
                 visibility: values.visibility,
                 connectionId: activeConnection?.id,
+                organizationId: values.visibility === 'workspace' ? values.organizationId : undefined,
                 database: activeDatabase || activeConnection?.database || undefined,
             });
             dashboardId = dashboard.id;

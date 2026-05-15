@@ -4,6 +4,7 @@ import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
 import { getQueueToken } from '@nestjs/bullmq';
 import { PassThrough } from 'stream';
+import { MigrationComparisonService } from './migration-comparison.service';
 
 // Mock uuid to avoid ESM import issues in Jest
 let uuidCounter = 0;
@@ -106,6 +107,7 @@ describe('MigrationService', () => {
                 MigrationService,
                 { provide: ConnectionsService, useValue: mockConnectionsService },
                 { provide: DatabaseStrategyFactory, useValue: mockStrategyFactory },
+                MigrationComparisonService,
                 { provide: getQueueToken('migration'), useValue: mockMigrationQueue },
             ],
         }).compile();

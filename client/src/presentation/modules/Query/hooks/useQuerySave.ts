@@ -5,7 +5,8 @@ import { toast } from 'sonner';
 
 interface SaveQueryFormValues {
     name: string;
-    visibility: 'private' | 'team' | 'workspace';
+    visibility: 'private' | 'workspace';
+    organizationId: string;
     folderId: string;
     tags: string;
     description: string;
@@ -18,6 +19,7 @@ export function useQuerySave() {
     const [saveDialogInitialValues, setSaveDialogInitialValues] = useState<SaveQueryFormValues>({
         name: '',
         visibility: 'private',
+        organizationId: '',
         folderId: '',
         tags: '',
         description: '',
@@ -25,10 +27,12 @@ export function useQuerySave() {
 
     const openSaveDialog = useCallback((_query: string, existingId?: string) => {
         const existing = existingId ? savedQueries.find(q => q.id === existingId) : null;
+        const existingVisibility = existing?.visibility === 'workspace' ? 'workspace' : 'private';
         
         setSaveDialogInitialValues({
             name: existing?.name || '',
-            visibility: (existing?.visibility as 'private' | 'team' | 'workspace') || 'private',
+            visibility: existingVisibility,
+            organizationId: existing?.organizationId || '',
             folderId: existing?.folderId || '',
             tags: existing?.tags?.join(', ') || '',
             description: existing?.description || '',
@@ -44,6 +48,7 @@ export function useQuerySave() {
                 name: values.name,
                 sql: query,
                 visibility: values.visibility,
+                organizationId: values.visibility === 'workspace' ? values.organizationId : undefined,
                 folderId: values.folderId || undefined,
                 tags: tagArray,
                 description: values.description || undefined,

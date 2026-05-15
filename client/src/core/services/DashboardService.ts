@@ -4,8 +4,9 @@ import type { DashboardEntity } from '@/core/domain/entities';
 export interface CreateDashboardPayload {
     name: string;
     description?: string;
-    visibility?: 'private' | 'team' | 'workspace';
+    visibility?: 'private' | 'workspace';
     connectionId?: string;
+    organizationId?: string;
     database?: string;
 }
 

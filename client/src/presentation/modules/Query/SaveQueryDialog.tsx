@@ -14,11 +14,19 @@ import type { SavedQuery } from '@/core/services/store';
 
 export interface SaveQueryFormValues {
     name: string;
-    visibility: 'private' | 'team' | 'workspace';
+    visibility: 'private' | 'workspace';
+    organizationId: string;
     folderId: string;
     tags: string;
     description: string;
 }
+
+export interface WorkspaceOption {
+    id: string;
+    name: string;
+}
+
+const EMPTY_WORKSPACE_OPTIONS: WorkspaceOption[] = [];
 
 interface SaveQueryDialogProps {
     open: boolean;
@@ -26,6 +34,7 @@ interface SaveQueryDialogProps {
     lang: 'vi' | 'en';
     initialValues: SaveQueryFormValues;
     currentQuery?: SavedQuery | null;
+    workspaceOptions?: WorkspaceOption[];
     onSubmit: (values: SaveQueryFormValues) => Promise<void> | void;
 }
 
@@ -35,22 +44,39 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
     lang,
     initialValues,
     currentQuery,
+    workspaceOptions = EMPTY_WORKSPACE_OPTIONS,
     onSubmit,
 }) => {
     const [form, setForm] = useState<SaveQueryFormValues>(initialValues);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const canShareToWorkspace = workspaceOptions.length > 0;
 
     useEffect(() => {
         if (open) {
-            setForm(initialValues);
+            const fallbackWorkspaceId = initialValues.organizationId || workspaceOptions[0]?.id || '';
+            const nextVisibility = canShareToWorkspace ? initialValues.visibility : 'private';
+            setForm({
+                ...initialValues,
+                visibility: nextVisibility,
+                organizationId: nextVisibility === 'workspace' ? fallbackWorkspaceId : '',
+            });
             setIsSaving(false);
             setError(null);
         }
-    }, [open, initialValues]);
+    }, [open, initialValues, canShareToWorkspace, workspaceOptions]);
+
+    const handleVisibilityChange = (value: SaveQueryFormValues['visibility']) => {
+        setForm((prev) => ({
+            ...prev,
+            visibility: value,
+            organizationId: value === 'workspace' ? (prev.organizationId || workspaceOptions[0]?.id || '') : '',
+        }));
+    };
 
     const handleSubmit = async () => {
         if (!form.name.trim()) return;
+        if (form.visibility === 'workspace' && !form.organizationId) return;
         setIsSaving(true);
         try {
             await onSubmit({
@@ -99,21 +125,54 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                             <Label>{lang === 'vi' ? 'Quyền hiển thị' : 'Visibility'}</Label>
                             <Select
                                 value={form.visibility}
-                                onValueChange={(value: SaveQueryFormValues['visibility']) =>
-                                    setForm((prev) => ({ ...prev, visibility: value }))
-                                }
+                                onValueChange={handleVisibilityChange}
                             >
                                 <SelectTrigger>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="private">{lang === 'vi' ? 'Riêng tư' : 'Private'}</SelectItem>
-                                    <SelectItem value="team">{lang === 'vi' ? 'Nhóm (cùng domain email)' : 'Team (same email domain)'}</SelectItem>
-                                    <SelectItem value="workspace">{lang === 'vi' ? 'Toàn workspace' : 'Workspace-wide'}</SelectItem>
+                                    {canShareToWorkspace && (
+                                        <SelectItem value="workspace">{lang === 'vi' ? 'Toàn workspace' : 'Workspace-wide'}</SelectItem>
+                                    )}
                                 </SelectContent>
                             </Select>
                         </div>
 
+                        <div className="space-y-1.5">
+                            {form.visibility === 'workspace' && canShareToWorkspace ? (
+                                <>
+                                    <Label>{lang === 'vi' ? 'Workspace / Team' : 'Workspace / Team'}</Label>
+                                    <Select
+                                        value={form.organizationId}
+                                        onValueChange={(value) => setForm((prev) => ({ ...prev, organizationId: value }))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder={lang === 'vi' ? 'Chọn workspace' : 'Choose workspace'} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {workspaceOptions.map((workspace) => (
+                                                <SelectItem key={workspace.id} value={workspace.id}>
+                                                    {workspace.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </>
+                            ) : (
+                                <>
+                                    <Label>{lang === 'vi' ? 'Folder / Group' : 'Folder / Group'}</Label>
+                                    <Input
+                                        value={form.folderId}
+                                        onChange={(e) => setForm((prev) => ({ ...prev, folderId: e.target.value }))}
+                                        placeholder={lang === 'vi' ? 'analytics, ops, growth...' : 'analytics, ops, growth...'}
+                                    />
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {form.visibility === 'workspace' && canShareToWorkspace && (
                         <div className="space-y-1.5">
                             <Label>{lang === 'vi' ? 'Folder / Group' : 'Folder / Group'}</Label>
                             <Input
@@ -122,7 +181,7 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                                 placeholder={lang === 'vi' ? 'analytics, ops, growth...' : 'analytics, ops, growth...'}
                             />
                         </div>
-                    </div>
+                    )}
 
                     <div className="space-y-1.5">
                         <Label>{lang === 'vi' ? 'Tags (phân tách bằng dấu phẩy)' : 'Tags (comma-separated)'}</Label>
@@ -148,7 +207,10 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                     <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>
                         {lang === 'vi' ? 'Hủy' : 'Cancel'}
                     </Button>
-                    <Button onClick={handleSubmit} disabled={isSaving || !form.name.trim()}>
+                    <Button
+                        onClick={handleSubmit}
+                        disabled={isSaving || !form.name.trim() || (form.visibility === 'workspace' && !form.organizationId)}
+                    >
                         {isSaving
                             ? (lang === 'vi' ? 'Đang lưu...' : 'Saving...')
                             : (currentQuery ? (lang === 'vi' ? 'Cập nhật' : 'Update') : (lang === 'vi' ? 'Lưu query' : 'Save query'))}

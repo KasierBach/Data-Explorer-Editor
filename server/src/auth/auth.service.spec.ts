@@ -9,10 +9,11 @@ describe('AuthService - login', () => {
   const mockOtpService = {} as any;
   const mockSeedService = {} as any;
   const mockTokenService = {} as any;
-  const mockAuditService = {} as any;
+  const mockAuditService = { log: jest.fn() } as any;
 
   beforeEach(() => {
     mockPrisma.user.findUnique = jest.fn();
+    mockAuditService.log.mockClear();
     authService = new AuthService(
       mockPrisma,
       mockMailService,
@@ -28,5 +29,13 @@ describe('AuthService - login', () => {
     await expect(
       authService.login({ email: 'notfound@example.com', password: 'pw' } as LoginDto),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(mockAuditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.objectContaining({
+          email: 'notfound@example.com',
+          reason: 'User not found',
+        }),
+      }),
+    );
   });
 });

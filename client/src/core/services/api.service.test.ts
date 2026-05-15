@@ -66,4 +66,30 @@ describe('ApiService', () => {
       }),
     );
   });
+
+  it('should expose structured error fields for auth flows', async () => {
+    vi.spyOn(useAppStore, 'getState').mockReturnValue({
+      accessToken: null,
+      logout: vi.fn(),
+    } as any);
+
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      json: () => Promise.resolve({
+        message: 'Please verify email',
+        unverified: true,
+        email: 'ada@example.com',
+      }),
+    });
+
+    await expect(apiService.post('/auth/login', {}, {}, false)).rejects.toMatchObject({
+      message: 'Please verify email',
+      data: {
+        unverified: true,
+        email: 'ada@example.com',
+      },
+    });
+  });
 });

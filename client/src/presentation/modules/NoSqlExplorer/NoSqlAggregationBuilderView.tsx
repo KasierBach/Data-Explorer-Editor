@@ -46,7 +46,7 @@ export const NoSqlAggregationBuilderView: React.FC = () => {
             .map(s => {
                 try {
                     return { [s.type]: JSON.parse(s.value) };
-                } catch (e) {
+                } catch {
                     return null;
                 }
             })

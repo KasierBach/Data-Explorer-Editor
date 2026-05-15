@@ -6,7 +6,8 @@ export interface SaveSavedQueryPayload {
     sql: string;
     database?: string;
     connectionId?: string;
-    visibility: 'private' | 'team' | 'workspace';
+    organizationId?: string;
+    visibility: 'private' | 'workspace';
     folderId?: string;
     tags: string[];
     description?: string;

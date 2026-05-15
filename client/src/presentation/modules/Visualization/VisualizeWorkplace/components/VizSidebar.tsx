@@ -70,7 +70,7 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
     chartTypes, curveType, setCurveType, curveTypes, options, handleExportPNG, 
     handleExportCSV, chartData
 }) => {
-    const { isActualMobile } = useResponsiveLayoutMode();
+    const { isCompactMobileLayout } = useResponsiveLayoutMode();
     const { connections, activeConnectionId, nosqlActiveConnectionId } = useAppStore();
     
     // Detect context (either from activeConnectionId or if we are in NoSQL shell)
@@ -88,11 +88,11 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
     return (
         <div className={cn(
             "border-r bg-card/30 backdrop-blur-3xl flex flex-col shrink-0 transition-all duration-300",
-            isCollapsed ? "w-0 overflow-hidden border-none" : (isActualMobile ? "w-full" : "w-80")
+            isCollapsed ? "w-0 overflow-hidden border-none" : (isCompactMobileLayout ? "w-full" : "w-80")
         )}>
             <div className={cn(
                 "h-full flex flex-col",
-                isActualMobile ? "w-full" : "w-80"
+                isCompactMobileLayout ? "w-full" : "w-80"
             )}>
                 <div className="p-5 border-b bg-muted/5 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -126,7 +126,7 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
 
                 <div className={cn(
                     "flex-1 overflow-auto custom-scrollbar space-y-5",
-                    isActualMobile ? "p-3" : "p-5"
+                    isCompactMobileLayout ? "p-3" : "p-5"
                 )}>
                     {activeSection === 'source' && (
                         <>

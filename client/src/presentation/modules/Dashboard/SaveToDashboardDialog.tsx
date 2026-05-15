@@ -19,12 +19,20 @@ export interface SaveToDashboardFormValues {
     dashboardId: string;
     dashboardName: string;
     dashboardDescription: string;
-    visibility: 'private' | 'team' | 'workspace';
+    visibility: 'private' | 'workspace';
+    organizationId: string;
     widgetTitle: string;
     chartType: 'bar' | 'line' | 'area' | 'pie' | 'donut' | 'table';
     xAxis: string;
     yAxis: string[];
 }
+
+export interface DashboardWorkspaceOption {
+    id: string;
+    name: string;
+}
+
+const EMPTY_WORKSPACE_OPTIONS: DashboardWorkspaceOption[] = [];
 
 interface SaveToDashboardDialogProps {
     open: boolean;
@@ -32,6 +40,7 @@ interface SaveToDashboardDialogProps {
     columns: string[];
     numericColumns: string[];
     initialValues: SaveToDashboardFormValues;
+    workspaceOptions?: DashboardWorkspaceOption[];
     onSubmit: (values: SaveToDashboardFormValues) => Promise<void> | void;
 }
 
@@ -50,6 +59,7 @@ export const SaveToDashboardDialog: React.FC<SaveToDashboardDialogProps> = ({
     columns,
     numericColumns,
     initialValues,
+    workspaceOptions = EMPTY_WORKSPACE_OPTIONS,
     onSubmit,
 }) => {
     const [form, setForm] = useState<SaveToDashboardFormValues>(initialValues);
@@ -60,14 +70,21 @@ export const SaveToDashboardDialog: React.FC<SaveToDashboardDialogProps> = ({
         queryFn: () => DashboardService.getDashboards(),
         enabled: open,
     });
+    const canShareToWorkspace = workspaceOptions.length > 0;
 
     useEffect(() => {
         if (open) {
-            setForm(initialValues);
+            const fallbackWorkspaceId = initialValues.organizationId || workspaceOptions[0]?.id || '';
+            const nextVisibility = canShareToWorkspace ? initialValues.visibility : 'private';
+            setForm({
+                ...initialValues,
+                visibility: nextVisibility,
+                organizationId: nextVisibility === 'workspace' ? fallbackWorkspaceId : '',
+            });
             setError(null);
             setIsSaving(false);
         }
-    }, [open, initialValues]);
+    }, [open, initialValues, canShareToWorkspace, workspaceOptions]);
 
     const availableDashboards = useMemo(
         () => dashboards.filter((dashboard) => dashboard.isOwner),
@@ -104,6 +121,7 @@ export const SaveToDashboardDialog: React.FC<SaveToDashboardDialogProps> = ({
         if (!form.widgetTitle.trim()) return;
         if (form.mode === 'existing' && !form.dashboardId) return;
         if (form.mode === 'new' && !form.dashboardName.trim()) return;
+        if (form.mode === 'new' && form.visibility === 'workspace' && !form.organizationId) return;
         if (!form.xAxis && form.chartType !== 'table') return;
         if (form.chartType !== 'table' && form.yAxis.length === 0) return;
 
@@ -212,18 +230,45 @@ export const SaveToDashboardDialog: React.FC<SaveToDashboardDialogProps> = ({
                                 <Label>Visibility</Label>
                                 <Select
                                     value={form.visibility}
-                                    onValueChange={(value: SaveToDashboardFormValues['visibility']) => setForm((prev) => ({ ...prev, visibility: value }))}
+                                    onValueChange={(value: SaveToDashboardFormValues['visibility']) =>
+                                        setForm((prev) => ({
+                                            ...prev,
+                                            visibility: value,
+                                            organizationId: value === 'workspace' ? (prev.organizationId || workspaceOptions[0]?.id || '') : '',
+                                        }))
+                                    }
                                 >
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="private">Private</SelectItem>
-                                        <SelectItem value="team">Team</SelectItem>
-                                        <SelectItem value="workspace">Workspace</SelectItem>
+                                        {canShareToWorkspace && (
+                                            <SelectItem value="workspace">Workspace</SelectItem>
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>
+                            {form.visibility === 'workspace' && canShareToWorkspace && (
+                                <div className="col-span-2 space-y-1.5">
+                                    <Label>Workspace / Team</Label>
+                                    <Select
+                                        value={form.organizationId}
+                                        onValueChange={(value) => setForm((prev) => ({ ...prev, organizationId: value }))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Choose workspace" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {workspaceOptions.map((workspace) => (
+                                                <SelectItem key={workspace.id} value={workspace.id}>
+                                                    {workspace.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                             <div className="col-span-2 space-y-1.5">
                                 <Label>Description</Label>
                                 <textarea
@@ -287,7 +332,10 @@ export const SaveToDashboardDialog: React.FC<SaveToDashboardDialogProps> = ({
 
                 <div className="flex justify-end gap-2 pt-2">
                     <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>Cancel</Button>
-                    <Button onClick={handleSubmit} disabled={isSaving}>
+                    <Button
+                        onClick={handleSubmit}
+                        disabled={isSaving || (form.mode === 'new' && form.visibility === 'workspace' && !form.organizationId)}
+                    >
                         {isSaving ? 'Saving...' : 'Save widget'}
                     </Button>
                 </div>

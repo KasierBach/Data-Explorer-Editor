@@ -6,6 +6,8 @@ import { ConnectionsService } from '../connections/connections.service';
 import { CreateDashboardDto } from './dto/create-dashboard.dto';
 import { AddDashboardWidgetDto } from './dto/add-dashboard-widget.dto';
 import { DashboardEntity } from './entities/dashboard.entity';
+import { OrganizationsService } from '../organizations/services/organizations.service';
+import { ResourceType } from '../permissions/enums/resource-type.enum';
 
 interface RawDashboardUser {
   id: string;
@@ -53,6 +55,7 @@ export class DashboardsService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly connectionsService: ConnectionsService,
+    private readonly organizationsService: OrganizationsService,
   ) {}
 
   private get dashboards() {
@@ -63,16 +66,16 @@ export class DashboardsService {
     return this.prisma.dashboardWidget;
   }
 
-  private getEmailDomain(email?: string | null) {
-    if (!email || !email.includes('@')) {
-      return null;
-    }
-    return email.split('@')[1].toLowerCase();
-  }
-
   private async validateConnectionOwnership(connectionId: string | undefined | null, userId: string) {
     if (!connectionId) return;
     await this.connectionsService.findOne(connectionId, userId);
+  }
+
+  private normalizeVisibility(visibility?: string, organizationId?: string | null) {
+    if (visibility === 'workspace') {
+      return organizationId ? 'workspace' : 'private';
+    }
+    return visibility ?? 'private';
   }
 
   private toEntity(dashboard: RawDashboard, currentUserId: string): DashboardEntity {
@@ -115,29 +118,20 @@ export class DashboardsService {
   }
 
   async findAllAvailable(userId: string): Promise<DashboardEntity[]> {
-    const currentUser = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    const domain = this.getEmailDomain(currentUser?.email);
-
     const dashboards = await this.dashboards.findMany({
       where: {
         OR: [
           { userId },
-          { visibility: 'workspace' },
-          ...(domain
-            ? [{
-                visibility: 'team',
-                user: {
-                  email: {
-                    endsWith: `@${domain}`,
-                    mode: 'insensitive' as Prisma.QueryMode,
-                  },
-                },
-              }]
-            : []),
-          { organization: { members: { some: { userId } } } },
+          {
+            visibility: 'workspace',
+            organizationId: { not: null },
+            organization: { members: { some: { userId } } },
+          },
+          {
+            visibility: 'team',
+            organizationId: { not: null },
+            organization: { members: { some: { userId } } },
+          },
         ],
       },
       include: {
@@ -170,13 +164,19 @@ export class DashboardsService {
 
   async create(dto: CreateDashboardDto, userId: string): Promise<DashboardEntity> {
     await this.validateConnectionOwnership(dto.connectionId, userId);
+    const visibility = this.normalizeVisibility(dto.visibility, dto.organizationId);
+    const organizationId = visibility === 'workspace' ? (dto.organizationId || null) : null;
+    if (organizationId) {
+      await this.organizationsService.ensureMemberAccess(organizationId, userId);
+    }
 
     const dashboard = await this.dashboards.create({
       data: {
         name: dto.name.trim(),
         description: dto.description?.trim() || null,
-        visibility: dto.visibility ?? 'private',
+        visibility,
         connectionId: dto.connectionId || null,
+        organizationId,
         database: dto.database?.trim() || null,
         userId,
       },
@@ -203,6 +203,14 @@ export class DashboardsService {
         connectionId: dashboard.connectionId,
       },
     });
+
+    if (dashboard.organizationId) {
+      await this.organizationsService.ensureResourcePolicy(
+        ResourceType.DASHBOARD,
+        dashboard.id,
+        dashboard.organizationId,
+      );
+    }
 
     return this.toEntity(dashboard, userId);
   }

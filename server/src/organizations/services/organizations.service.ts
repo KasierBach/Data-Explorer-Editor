@@ -359,7 +359,10 @@ export class OrganizationsService {
 
     const [queries, resourcePolicies] = await Promise.all([
       this.prisma.savedQuery.findMany({
-        where: { organizationId },
+        where: {
+          organizationId,
+          visibility: { in: ['workspace', 'team'] },
+        },
         select: {
           id: true,
           name: true,
@@ -382,7 +385,10 @@ export class OrganizationsService {
 
     const [dashboards, resourcePolicies] = await Promise.all([
       this.prisma.dashboard.findMany({
-        where: { organizationId },
+        where: {
+          organizationId,
+          visibility: { in: ['workspace', 'team'] },
+        },
         select: {
           id: true,
           name: true,

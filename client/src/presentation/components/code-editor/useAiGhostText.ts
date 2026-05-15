@@ -90,7 +90,7 @@ export function useAiGhostText(
                     const charBefore = textBefore.length > 0 ? textBefore[textBefore.length - 1] : '';
                     const firstCharOfCompletion = finalCompletion[0];
 
-                    const isIdentifierPart = (ch: string) => /[a-zA-Z0-9_"\`\[]/.test(ch);
+                    const isIdentifierPart = (ch: string) => /[a-zA-Z0-9_"`[]/.test(ch);
 
                     if (charBefore && firstCharOfCompletion) {
                         if (isIdentifierPart(charBefore) && isIdentifierPart(firstCharOfCompletion)) {
@@ -129,7 +129,7 @@ export function useAiGhostText(
                             },
                         ],
                     };
-                } catch (err) {
+                } catch {
                     return;
                 }
             },

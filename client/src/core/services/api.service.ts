@@ -6,6 +6,7 @@ export class ApiError extends Error {
   reason?: string;
   action?: string;
   details?: any;
+  data?: Record<string, unknown>;
 }
 
 class ApiService {
@@ -56,6 +57,7 @@ class ApiService {
     error.reason = errorData.reason;
     error.action = errorData.action;
     error.details = errorData.details;
+    error.data = errorData;
     return error;
   }
 

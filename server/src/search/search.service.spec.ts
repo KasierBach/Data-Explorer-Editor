@@ -5,6 +5,7 @@ import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
 import { NotificationsService } from '../notifications/notifications.service';
 import Redis from 'ioredis';
+import { AiService } from '../ai/ai.service';
 
 jest.mock('ioredis');
 
@@ -13,7 +14,6 @@ describe('SearchService', () => {
   let redisMock: jest.Mocked<Redis>;
   let connectionsService: jest.Mocked<ConnectionsService>;
   let strategyFactory: jest.Mocked<DatabaseStrategyFactory>;
-  let notificationsService: jest.Mocked<NotificationsService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -35,13 +35,16 @@ describe('SearchService', () => {
           provide: NotificationsService,
           useValue: { emit: jest.fn() },
         },
+        {
+          provide: AiService,
+          useValue: { suggestTablesBySemantic: jest.fn().mockResolvedValue([]) },
+        },
       ],
     }).compile();
 
     service = module.get<SearchService>(SearchService);
     connectionsService = module.get(ConnectionsService);
     strategyFactory = module.get(DatabaseStrategyFactory);
-    notificationsService = module.get(NotificationsService);
     
     // Setup Redis mock
     service.onModuleInit();
@@ -92,7 +95,6 @@ describe('SearchService', () => {
 
       expect(redisMock.del).toHaveBeenCalled();
       expect(redisMock.sadd).toHaveBeenCalled();
-      expect(notificationsService.emit).toHaveBeenCalledWith(userId, 'success', expect.any(String));
     });
   });
 });

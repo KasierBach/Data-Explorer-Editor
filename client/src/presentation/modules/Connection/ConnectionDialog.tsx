@@ -131,7 +131,7 @@ export const ConnectionDialog: React.FC = () => {
             }
             if (!name) setName(`${parsedType} @ ${url.hostname}`);
             setError(null);
-        } catch (err) {
+        } catch {
             setError(t ? "Sai định dạng Connection String. VD: postgresql://user:pass@localhost:5432/mydb" : "Invalid Connection String format. Example: postgresql://user:pass@localhost:5432/mydb");
         }
     };

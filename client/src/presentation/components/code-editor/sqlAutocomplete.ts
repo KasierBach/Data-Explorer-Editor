@@ -121,9 +121,9 @@ function extractReferencedTables(textBefore: string): string[] {
 
     // Match FROM table, JOIN table patterns
     const patterns = [
-        /(?:FROM|JOIN)\s+["'`\[]?(\w+)["'`\]]?/gi,
-        /(?:UPDATE)\s+["'`\[]?(\w+)["'`\]]?/gi,
-        /(?:INSERT\s+INTO)\s+["'`\[]?(\w+)["'`\]]?/gi,
+        /(?:FROM|JOIN)\s+["'`[]?(\w+)["'`\]]?/gi,
+        /(?:UPDATE)\s+["'`[]?(\w+)["'`\]]?/gi,
+        /(?:INSERT\s+INTO)\s+["'`[]?(\w+)["'`\]]?/gi,
     ];
 
     for (const pattern of patterns) {

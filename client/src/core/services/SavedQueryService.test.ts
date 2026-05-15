@@ -69,6 +69,7 @@ describe('SavedQueryService', () => {
       sql: 'SELECT * FROM users',
       visibility: 'private',
       connectionId: 'conn-1',
+      organizationId: 'org-1',
       database: 'mydb',
       tags: [],
     };
@@ -83,7 +84,7 @@ describe('SavedQueryService', () => {
     const payload: SaveSavedQueryPayload = {
       name: 'Tagged Query',
       sql: 'SELECT 1',
-      visibility: 'team',
+      visibility: 'workspace',
       tags: ['analytics', 'dashboard'],
     };
     vi.spyOn(apiService, 'post').mockResolvedValue({ id: '1', ...payload } as any);

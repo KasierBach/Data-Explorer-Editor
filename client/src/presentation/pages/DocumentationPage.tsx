@@ -49,7 +49,7 @@ export function DocumentationPage() {
 
     useEffect(() => {
         let cancelled = false;
-        let frameId = window.requestAnimationFrame(() => {
+        const frameId = window.requestAnimationFrame(() => {
             if (cancelled) return;
 
             const contentElement = document.querySelector('main');

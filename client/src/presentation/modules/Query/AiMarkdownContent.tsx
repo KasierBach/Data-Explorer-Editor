@@ -1,8 +1,6 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface AiMarkdownContentProps {
     content: string;
@@ -14,7 +12,7 @@ export const AiMarkdownContent: React.FC<AiMarkdownContentProps> = ({ content })
             remarkPlugins={[remarkGfm]}
             skipHtml
             components={{
-                a: ({ node, className, ...props }: any) => (
+                a: ({ className, ...props }: any) => (
                     <a
                         className={className || 'text-violet-400 hover:underline'}
                         {...props}
@@ -22,18 +20,14 @@ export const AiMarkdownContent: React.FC<AiMarkdownContentProps> = ({ content })
                         rel="noopener noreferrer"
                     />
                 ),
-                code({ node, inline, className, children, ...props }: any) {
-                    const match = /language-(\w+)/.exec(className || '');
-                    return !inline && match ? (
-                        <SyntaxHighlighter
+                code({ inline, className, children, ...props }: any) {
+                    return !inline ? (
+                        <code
+                            className="block overflow-x-auto rounded-md border border-border bg-slate-950 px-3 py-2 text-[12px] leading-relaxed text-slate-100"
                             {...props}
-                            style={vscDarkPlus as any}
-                            language={match[1]}
-                            PreTag="div"
-                            className="rounded-md my-2"
                         >
                             {String(children).replace(/\n$/, '')}
-                        </SyntaxHighlighter>
+                        </code>
                     ) : (
                         <code className={className} {...props}>
                             {children}

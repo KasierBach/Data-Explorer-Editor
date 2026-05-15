@@ -60,19 +60,20 @@ export const VisualizeWorkplace: React.FC = () => {
         { label: 'Brush Zoom', value: state.showBrush, set: actions.setShowBrush, icon: Maximize2 },
     ];
 
-    const { isActualMobile } = useResponsiveLayoutMode();
+    const { isCompactMobileLayout } = useResponsiveLayoutMode();
 
-    // Auto-collapse sidebar on mobile on mount
+    // Auto-collapse only in compact mobile mode. Desktop mode on a mobile browser
+    // should preserve the desktop-style canvas/sidebar layout.
     React.useEffect(() => {
-        if (isActualMobile) {
+        if (isCompactMobileLayout) {
             actions.setSidebarCollapsed(true);
         }
-    }, [isActualMobile]);
+    }, [isCompactMobileLayout]);
 
     return (
         <div className={cn(
             "h-full flex bg-background overflow-hidden font-sans",
-            isActualMobile ? "flex-col" : "flex-row"
+            isCompactMobileLayout ? "flex-col" : "flex-row"
         )}>
             <VizSidebar
                 isCollapsed={state.isSidebarCollapsed}

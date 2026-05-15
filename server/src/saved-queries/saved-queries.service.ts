@@ -6,6 +6,8 @@ import { UpdateSavedQueryDto } from './dto/update-saved-query.dto';
 import { ConnectionsService } from '../connections/connections.service';
 import { SavedQueryEntity } from './entities/saved-query.entity';
 import { VersionHistoryService } from '../version-history/version-history.service';
+import { OrganizationsService } from '../organizations/services/organizations.service';
+import { ResourceType } from '../permissions/enums/resource-type.enum';
 
 @Injectable()
 export class SavedQueriesService {
@@ -14,6 +16,7 @@ export class SavedQueriesService {
     private readonly auditService: AuditService,
     private readonly connectionsService: ConnectionsService,
     private readonly versionHistoryService: VersionHistoryService,
+    private readonly organizationsService: OrganizationsService,
   ) {}
 
   private get savedQueries() {
@@ -60,13 +63,28 @@ export class SavedQueriesService {
     await this.connectionsService.findOne(connectionId, userId);
   }
 
+  private normalizeVisibility(visibility?: string, organizationId?: string | null) {
+    if (visibility === 'workspace') {
+      return organizationId ? 'workspace' : 'private';
+    }
+    return visibility ?? 'private';
+  }
+
   async findAllAvailable(userId: string): Promise<SavedQueryEntity[]> {
     const availableQueries = await this.savedQueries.findMany({
       where: {
         OR: [
           { userId },
-          { visibility: 'workspace' },
-          { organization: { members: { some: { userId } } } },
+          {
+            visibility: 'workspace',
+            organizationId: { not: null },
+            organization: { members: { some: { userId } } },
+          },
+          {
+            visibility: 'team',
+            organizationId: { not: null },
+            organization: { members: { some: { userId } } },
+          },
         ],
       },
       include: {
@@ -87,6 +105,11 @@ export class SavedQueriesService {
 
   async create(dto: CreateSavedQueryDto, userId: string): Promise<SavedQueryEntity> {
     await this.validateConnectionOwnership(dto.connectionId, userId);
+    const visibility = this.normalizeVisibility(dto.visibility, dto.organizationId);
+    const organizationId = visibility === 'workspace' ? (dto.organizationId || null) : null;
+    if (organizationId) {
+      await this.organizationsService.ensureMemberAccess(organizationId, userId);
+    }
 
     const savedQuery = await this.savedQueries.create({
       data: {
@@ -94,7 +117,8 @@ export class SavedQueriesService {
         sql: dto.sql,
         database: dto.database?.trim() || null,
         connectionId: dto.connectionId || null,
-        visibility: dto.visibility ?? 'private',
+        visibility,
+        organizationId,
         folderId: dto.folderId?.trim() || null,
         tags: this.normalizeTags(dto.tags),
         description: dto.description?.trim() || null,
@@ -123,6 +147,14 @@ export class SavedQueriesService {
       },
     });
 
+    if (savedQuery.organizationId) {
+      await this.organizationsService.ensureResourcePolicy(
+        ResourceType.QUERY,
+        savedQuery.id,
+        savedQuery.organizationId,
+      );
+    }
+
     await this.versionHistoryService.recordSavedQueryVersion(savedQuery, userId);
 
     return this.toEntity(savedQuery, userId);
@@ -148,6 +180,13 @@ export class SavedQueriesService {
     }
 
     await this.validateConnectionOwnership(dto.connectionId ?? existing.connectionId ?? undefined, userId);
+    const requestedVisibility = dto.visibility ?? existing.visibility;
+    const requestedOrganizationId = dto.organizationId !== undefined ? (dto.organizationId || null) : existing.organizationId;
+    const nextVisibility = this.normalizeVisibility(requestedVisibility, requestedOrganizationId);
+    const nextOrganizationId = nextVisibility === 'workspace' ? requestedOrganizationId : null;
+    if (nextOrganizationId) {
+      await this.organizationsService.ensureMemberAccess(nextOrganizationId, userId);
+    }
 
     const updated = await this.savedQueries.update({
       where: { id },
@@ -156,7 +195,8 @@ export class SavedQueriesService {
         ...(dto.sql !== undefined ? { sql: dto.sql } : {}),
         ...(dto.database !== undefined ? { database: dto.database?.trim() || null } : {}),
         ...(dto.connectionId !== undefined ? { connectionId: dto.connectionId || null } : {}),
-        ...(dto.visibility !== undefined ? { visibility: dto.visibility } : {}),
+        visibility: nextVisibility,
+        organizationId: nextOrganizationId,
         ...(dto.folderId !== undefined ? { folderId: dto.folderId?.trim() || null } : {}),
         ...(dto.tags !== undefined ? { tags: this.normalizeTags(dto.tags) } : {}),
         ...(dto.description !== undefined ? { description: dto.description?.trim() || null } : {}),
@@ -182,6 +222,22 @@ export class SavedQueriesService {
         visibility: updated.visibility,
       },
     });
+
+    if (existing.organizationId && (existing.organizationId !== updated.organizationId || updated.visibility !== 'workspace')) {
+      await this.organizationsService.removeResourcePolicy(
+        ResourceType.QUERY,
+        updated.id,
+        existing.organizationId,
+      );
+    }
+
+    if (updated.organizationId && updated.visibility === 'workspace') {
+      await this.organizationsService.ensureResourcePolicy(
+        ResourceType.QUERY,
+        updated.id,
+        updated.organizationId,
+      );
+    }
 
     await this.versionHistoryService.recordSavedQueryVersion(updated, userId);
 

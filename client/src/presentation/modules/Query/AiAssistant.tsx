@@ -146,7 +146,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     }, [messages]);
 
     // Stable handlers to prevent re-rendering all bubbles on every keystroke
-    const handleMessageRegenerate = React.useCallback((_messageId: string) => {
+    const handleMessageRegenerate = React.useCallback(() => {
         if (activeAiChatId) handleRegenerate(activeAiChatId);
     }, [activeAiChatId, handleRegenerate]);
 

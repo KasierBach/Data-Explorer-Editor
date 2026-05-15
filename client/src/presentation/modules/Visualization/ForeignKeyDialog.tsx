@@ -76,7 +76,7 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[600px] bg-card/95 backdrop-blur-xl border-white/10 shadow-2xl">
+            <DialogContent className="max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto bg-card/95 backdrop-blur-xl border-white/10 shadow-2xl sm:max-w-[600px]">
                 <DialogHeader>
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
@@ -104,7 +104,7 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-8 p-4 rounded-xl bg-muted/20 border border-white/5">
+                    <div className="grid grid-cols-1 gap-4 p-4 rounded-xl bg-muted/20 border border-white/5 sm:grid-cols-2 sm:gap-8">
                         <div className="space-y-4">
                             <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
                                 <span>{lang === 'vi' ? 'Bảng Khóa ngoại (Con)' : 'Foreign Key Table (Child)'}</span>
@@ -120,7 +120,7 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                         </div>
 
                         <div className="space-y-4 relative">
-                            <div className="absolute top-1/2 -left-4 -translate-y-1/2 -translate-x-1/2 z-10 flex flex-col items-center justify-center text-muted-foreground/30">
+                            <div className="absolute top-1/2 -left-4 -translate-y-1/2 -translate-x-1/2 z-10 hidden flex-col items-center justify-center text-muted-foreground/30 sm:flex">
                                 <div className="w-8 h-px bg-current"></div>
                                 <div className="text-[10px] font-black uppercase bg-card px-1">{lang === 'vi' ? 'Tham chiếu' : 'Refs'}</div>
                             </div>
@@ -139,7 +139,7 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{lang === 'vi' ? 'Khi xóa' : 'On Delete'}</Label>
                             <Select value={onDelete} onValueChange={(v: any) => setOnDelete(v)}>

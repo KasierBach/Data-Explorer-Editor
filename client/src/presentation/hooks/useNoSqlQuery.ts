@@ -61,7 +61,7 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
         let payload: any = {};
         try {
             payload = JSON.parse(state.nosqlMqlQuery || '{}');
-        } catch (err: any) {
+        } catch {
             toast.error('Invalid MQL JSON');
             return;
         }

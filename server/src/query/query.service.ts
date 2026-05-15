@@ -40,11 +40,21 @@ export class QueryService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) { }
 
-  private async getQueryCacheKey(connectionId: string, sql: string, database?: string): Promise<string> {
+  private async getQueryCacheKey(
+    connectionId: string,
+    sql: string,
+    database?: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<string> {
+    const optionParts = [
+      options?.limit !== undefined ? `limit:${options.limit}` : null,
+      options?.offset !== undefined ? `offset:${options.offset}` : null,
+    ].filter((part): part is string => Boolean(part));
+
     return this.freshnessService.buildKey(
       'query',
       [connectionId, database || 'default'],
-      [sql.trim().toLowerCase()],
+      [sql.trim().toLowerCase(), ...optionParts],
     );
   }
 
@@ -258,7 +268,10 @@ export class QueryService {
       const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
       const strategy = this.strategyFactory.getStrategy(connection.type);
 
-      const cacheKey = await this.getQueryCacheKey(connectionId, sql, database || connection.database);
+      const cacheKey = await this.getQueryCacheKey(connectionId, sql, database || connection.database, {
+        limit,
+        offset,
+      });
       const isCacheable = this.isCacheableQuery(sql);
 
       if (isCacheable) {

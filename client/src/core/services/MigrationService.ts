@@ -100,7 +100,7 @@ export const migrationService = {
             try {
                 const response = await apiService.post<{ ticket: string }>(`/migration/progress-ticket/${jobId}`, {});
                 ticket = response.ticket;
-            } catch (error) {
+            } catch {
                 onError?.('Unable to authorize migration progress stream');
                 return;
             }

@@ -190,6 +190,16 @@ export class VersionHistoryService {
     };
   }
 
+  private normalizeSavedQueryVisibility(visibility: string | undefined, organizationId?: string | null) {
+    if (visibility === 'team') {
+      return organizationId ? 'workspace' : 'private';
+    }
+    if (visibility === 'workspace' && !organizationId) {
+      return 'private';
+    }
+    return visibility === 'workspace' ? 'workspace' : 'private';
+  }
+
   private async assertResourceAccessible(
     resourceType: SupportedResourceType,
     resourceId: string,
@@ -201,8 +211,16 @@ export class VersionHistoryService {
           id: resourceId,
           OR: [
             { userId },
-            { visibility: 'workspace' },
-            { organization: { members: { some: { userId } } } },
+            {
+              visibility: 'workspace',
+              organizationId: { not: null },
+              organization: { members: { some: { userId } } },
+            },
+            {
+              visibility: 'team',
+              organizationId: { not: null },
+              organization: { members: { some: { userId } } },
+            },
           ],
         },
         include: {
@@ -411,7 +429,7 @@ export class VersionHistoryService {
 
   async restoreVersion(rawResourceType: string, resourceId: string, versionId: string, userId: string) {
     const resourceType = this.parseResourceType(rawResourceType);
-    await this.assertResourceOwner(resourceType, resourceId, userId);
+    const existingResource = await this.assertResourceOwner(resourceType, resourceId, userId);
     const version = await this.getVersion(resourceType, resourceId, versionId, userId);
 
     if (resourceType === 'QUERY') {
@@ -423,7 +441,7 @@ export class VersionHistoryService {
           sql: snapshot.sql,
           database: snapshot.database,
           connectionId: snapshot.connectionId,
-          visibility: snapshot.visibility,
+          visibility: this.normalizeSavedQueryVisibility(snapshot.visibility, existingResource.organizationId),
           folderId: snapshot.folderId,
           tags: Array.isArray(snapshot.tags) ? snapshot.tags : [],
           description: snapshot.description,

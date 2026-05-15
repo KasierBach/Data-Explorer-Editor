@@ -11,12 +11,16 @@ export class CreateDashboardDto {
   description?: string;
 
   @IsOptional()
-  @IsIn(['private', 'team', 'workspace'])
-  visibility?: 'private' | 'team' | 'workspace';
+  @IsIn(['private', 'workspace'])
+  visibility?: 'private' | 'workspace';
 
   @IsOptional()
   @IsString()
   connectionId?: string;
+
+  @IsOptional()
+  @IsString()
+  organizationId?: string;
 
   @IsOptional()
   @IsString()

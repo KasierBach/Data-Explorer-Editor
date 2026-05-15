@@ -143,4 +143,77 @@ describe('VersionHistoryService', () => {
 
     await expect(service.listVersions('QUERY', 'missing', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('does not allow version access through global workspace visibility', async () => {
+    prisma.savedQuery.findFirst.mockResolvedValueOnce(null);
+
+    await expect(service.listVersions('QUERY', 'query-1', 'viewer-1')).rejects.toBeInstanceOf(NotFoundException);
+
+    const where = prisma.savedQuery.findFirst.mock.calls[0][0].where;
+    expect(where.OR).not.toContainEqual({ visibility: 'workspace' });
+    expect(where.OR).toContainEqual({
+      visibility: 'workspace',
+      organizationId: { not: null },
+      organization: { members: { some: { userId: 'viewer-1' } } },
+    });
+  });
+
+  it('normalizes legacy team visibility when restoring a saved query snapshot', async () => {
+    prisma.savedQuery.findFirst.mockResolvedValueOnce({
+      id: 'query-1',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      user: { id: 'user-1', email: 'user@example.com', firstName: 'Ada', lastName: 'Lovelace' },
+    });
+    prisma.savedQuery.findFirst.mockResolvedValueOnce({
+      id: 'query-1',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      user: { id: 'user-1', email: 'user@example.com', firstName: 'Ada', lastName: 'Lovelace' },
+    });
+    prisma.versionHistory.findFirst.mockResolvedValueOnce({
+      id: 'version-legacy',
+      resourceType: ResourceType.QUERY,
+      resourceId: 'query-1',
+      versionNumber: 4,
+      createdAt: new Date('2026-05-05T00:00:00.000Z'),
+      snapshot: {
+        name: 'Legacy team query',
+        sql: 'select * from revenue',
+        database: null,
+        connectionId: null,
+        visibility: 'team',
+        folderId: null,
+        tags: [],
+        description: null,
+      },
+      user: { id: 'user-1', email: 'user@example.com', firstName: 'Ada', lastName: 'Lovelace' },
+    });
+    prisma.savedQuery.update.mockResolvedValueOnce({
+      id: 'query-1',
+      name: 'Legacy team query',
+      sql: 'select * from revenue',
+      database: null,
+      connectionId: null,
+      visibility: 'workspace',
+      organizationId: 'org-1',
+      folderId: null,
+      tags: [],
+      description: null,
+      createdAt: new Date('2026-05-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-05-05T00:00:00.000Z'),
+      userId: 'user-1',
+      user: { id: 'user-1', email: 'user@example.com', firstName: 'Ada', lastName: 'Lovelace' },
+    });
+    prisma.versionHistory.findFirst.mockResolvedValueOnce({ versionNumber: 4 });
+    prisma.versionHistory.create.mockResolvedValueOnce({ versionNumber: 5 });
+
+    await service.restoreVersion('QUERY', 'query-1', 'version-legacy', 'user-1');
+
+    expect(prisma.savedQuery.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        visibility: 'workspace',
+      }),
+    }));
+  });
 });

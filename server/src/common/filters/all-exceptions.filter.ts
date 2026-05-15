@@ -43,6 +43,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
             reason: (exceptionResponse as any).reason,
             action: (exceptionResponse as any).action,
             details: (exceptionResponse as any).details,
+            unverified: (exceptionResponse as any).unverified,
+            email: (exceptionResponse as any).email,
           }
         : {};
 

@@ -39,7 +39,7 @@ describe('MysqlStrategy', () => {
                 host: 'localhost',
                 user: 'root',
                 connectTimeout: 10000,
-                multipleStatements: true,
+                multipleStatements: false,
             }));
         });
     });

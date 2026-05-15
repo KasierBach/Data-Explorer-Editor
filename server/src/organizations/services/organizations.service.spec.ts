@@ -10,6 +10,9 @@ describe('OrganizationsService security', () => {
     organization: { findUnique: jest.fn() },
     organizationMember: { findUnique: jest.fn(), create: jest.fn() },
     organizationInvitation: { upsert: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+    organizationResource: { findMany: jest.fn() },
+    savedQuery: { findMany: jest.fn() },
+    dashboard: { findMany: jest.fn() },
   };
   const auditMock = { log: jest.fn() };
   const permissionsMock = { buildDefaultResourcePolicy: jest.fn().mockReturnValue({}) };
@@ -50,5 +53,35 @@ describe('OrganizationsService security', () => {
     await expect(service.acceptInvitation('invite-1', 'user-1')).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(prismaMock.organizationInvitation.update).not.toHaveBeenCalled();
+  });
+
+  it('lists only shared queries for an organization workspace', async () => {
+    prismaMock.organizationMember.findUnique.mockResolvedValueOnce({ role: OrganizationRole.MEMBER });
+    prismaMock.savedQuery.findMany.mockResolvedValueOnce([]);
+    prismaMock.organizationResource.findMany.mockResolvedValueOnce([]);
+
+    await service.listQueries('org-1', 'user-1');
+
+    expect(prismaMock.savedQuery.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        organizationId: 'org-1',
+        visibility: { in: ['workspace', 'team'] },
+      },
+    }));
+  });
+
+  it('lists only shared dashboards for an organization workspace', async () => {
+    prismaMock.organizationMember.findUnique.mockResolvedValueOnce({ role: OrganizationRole.MEMBER });
+    prismaMock.dashboard.findMany.mockResolvedValueOnce([]);
+    prismaMock.organizationResource.findMany.mockResolvedValueOnce([]);
+
+    await service.listDashboards('org-1', 'user-1');
+
+    expect(prismaMock.dashboard.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        organizationId: 'org-1',
+        visibility: { in: ['workspace', 'team'] },
+      },
+    }));
   });
 });

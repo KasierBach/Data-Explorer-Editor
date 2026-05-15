@@ -41,7 +41,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
         if (!serverLogs) return [];
         return serverLogs.map((log: any) => {
             let details: Record<string, unknown> = {};
-            try { details = JSON.parse(log.details || '{}'); } catch (e) {
+            try { details = JSON.parse(log.details || '{}'); } catch {
                 // details may be malformed JSON; use empty object fallback
             }
             

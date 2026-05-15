@@ -4,9 +4,10 @@ import { DashboardsService } from './dashboards.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { ConnectionsModule } from '../connections/connections.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, ConnectionsModule],
+  imports: [PrismaModule, AuditModule, ConnectionsModule, OrganizationsModule],
   controllers: [DashboardsController],
   providers: [DashboardsService],
   exports: [DashboardsService],

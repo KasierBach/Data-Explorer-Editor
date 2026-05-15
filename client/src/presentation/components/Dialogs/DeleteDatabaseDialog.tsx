@@ -49,7 +49,7 @@ export const DeleteDatabaseDialog: React.FC<DeleteDatabaseDialogProps> = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[425px] border-red-500/20">
+            <DialogContent className="max-w-[calc(100vw-1rem)] border-red-500/20 sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-red-500">
                         <Trash2 className="w-5 h-5" />
@@ -64,7 +64,7 @@ export const DeleteDatabaseDialog: React.FC<DeleteDatabaseDialogProps> = ({
 
                 <div className="bg-red-500/10 border border-red-500/20 rounded-md p-3 flex gap-3 items-start my-2">
                     <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                    <div className="text-sm text-red-500/90">
+                    <div className="min-w-0 text-sm text-red-500/90">
                         Please type <span className="font-bold select-all">{databaseName}</span> to confirm.
                     </div>
                 </div>

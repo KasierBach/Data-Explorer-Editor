@@ -1,56 +1,38 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { AiService } from '../../ai/ai.service';
-import { AiPromptBuilderService } from '../../ai/ai.prompt-builder.service';
-import { AiRoutingService } from '../../ai/ai.routing.service';
-import { AiSchemaContextService } from '../../ai/ai.schema-context.service';
-import { AiProviderRunnerService } from '../../ai/ai.provider-runner.service';
-
-// Mock GoogleGenerativeAI
-jest.mock('@google/generative-ai', () => {
-  return {
-    GoogleGenerativeAI: jest.fn().mockImplementation(() => ({
-      getGenerativeModel: jest.fn().mockReturnValue({
-        generateContent: jest.fn().mockResolvedValue({
-          response: {
-            text: () => JSON.stringify({
-              message: 'Hello from AI',
-              sql: 'SELECT * FROM users',
-              explanation: 'This query selects all users'
-            }),
-          },
-        }),
-      }),
-    })),
-  };
-});
+import { AiChatCompletionService } from '../../ai/ai.chat-completion.service';
+import { AiSchemaService } from '../../ai/ai.schema-service';
+import { AiAutocompleteService } from '../../ai/ai.autocomplete-service';
 
 describe('AiService', () => {
   let service: AiService;
-  let configService: ConfigService;
+  const chatService = {
+    chat: jest.fn(),
+    chatStream: jest.fn(),
+  };
+  const schemaService = {
+    gatherSchemaContext: jest.fn(),
+    clearCache: jest.fn(),
+    buildSchemaContext: jest.fn(),
+    suggestTablesBySemantic: jest.fn(),
+  };
+  const autocompleteService = {
+    autocomplete: jest.fn(),
+    generateSql: jest.fn(),
+  };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AiService,
-        AiPromptBuilderService,
-        AiRoutingService,
-        AiSchemaContextService,
-        AiProviderRunnerService,
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn().mockImplementation((key: string) => {
-              if (key === 'GEMINI_API_KEY') return 'fake-api-key';
-              return undefined;
-            }),
-          },
-        },
+        { provide: AiChatCompletionService, useValue: chatService },
+        { provide: AiSchemaService, useValue: schemaService },
+        { provide: AiAutocompleteService, useValue: autocompleteService },
       ],
     }).compile();
 
     service = module.get<AiService>(AiService);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   it('should be defined', () => {
@@ -59,11 +41,19 @@ describe('AiService', () => {
 
   describe('chat', () => {
     it('should return parsed AI content', async () => {
+      chatService.chat.mockResolvedValue({
+        message: 'Hello from AI',
+        sql: 'SELECT * FROM users',
+        provider: 'gemini',
+        routingMode: 'auto',
+      });
+
       const result = await service.chat({ prompt: 'Test prompt' });
       expect(result).toHaveProperty('message', 'Hello from AI');
       expect(result).toHaveProperty('sql', 'SELECT * FROM users');
       expect(result).toHaveProperty('provider', 'gemini');
       expect(result).toHaveProperty('routingMode', 'auto');
+      expect(chatService.chat).toHaveBeenCalledWith({ prompt: 'Test prompt' });
     });
   });
 });

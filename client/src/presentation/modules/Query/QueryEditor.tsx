@@ -1,47 +1,44 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Button } from '@/presentation/components/ui/button';
 import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
-import { Play, Loader2, Eraser, AlignLeft, Save, FolderOpen, RefreshCw, History, Zap, Sparkles } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore, type SavedQuery } from '@/core/services/store';
 import { SavedQueriesDialog } from './SavedQueriesDialog';
 import { QueryHistoryDialog } from './QueryHistoryDialog';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/presentation/components/ui/dropdown-menu";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from "@/presentation/components/ui/popover";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/presentation/components/ui/select";
 import type { QueryResult } from '@/core/domain/entities';
 import { QueryResults } from './QueryResults';
 import { useSchemaInfo } from '@/presentation/hooks/useSchemaInfo';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { useVerticalResizablePanel } from '@/presentation/hooks/useVerticalResizablePanel';
 import { cn } from '@/lib/utils';
-import { ChevronDown } from 'lucide-react';
 import { ApiError } from '@/core/services/api.service';
 import { SavedQueryService } from '@/core/services/SavedQueryService';
+import { OrganizationService } from '@/core/services/OrganizationService';
 import { SaveQueryDialog, type SaveQueryFormValues } from './SaveQueryDialog';
 import { toast } from 'sonner';
 import { SaveToDashboardDialog } from '@/presentation/modules/Dashboard/SaveToDashboardDialog';
 import { useQueryDashboard } from './hooks';
-import { AiQueryBox } from './components/AiQueryBox';
+import { QueryToolbar } from './components/QueryToolbar';
 import { useResourcePresence } from '@/presentation/hooks/useResourcePresence';
 import { PresenceBadge } from '@/presentation/components/presence/PresenceBadge';
+
+interface SqlEditorSelection {
+    isEmpty: () => boolean;
+}
+
+interface SqlEditorModel {
+    getValueInRange: (selection: SqlEditorSelection) => string;
+}
+
+interface SqlEditorHandle {
+    getSelection: () => SqlEditorSelection | null;
+    getModel: () => SqlEditorModel | null;
+    focus: () => void;
+}
+
+function getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : 'Unexpected error';
+}
 
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const queryClient = useQueryClient();
@@ -51,6 +48,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         defaultResultHeight, setDefaultResultHeight
     } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
+    const activeOrganizationId = activeConnection?.organizationId || undefined;
     const schemaInfo = useSchemaInfo();
 
     // Find options for this tab
@@ -80,17 +78,18 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
     const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
     const [currentSavedQueryId, setCurrentSavedQueryId] = useState<string | null>(initialMetadata.savedQueryId || null);
-    const [explainPlan, setExplainPlan] = useState<any>(null);
+    const [explainPlan, setExplainPlan] = useState<unknown>(null);
     const [saveDialogInitialValues, setSaveDialogInitialValues] = useState<SaveQueryFormValues>({
         name: '',
         visibility: 'private',
+        organizationId: '',
         folderId: '',
         tags: '',
         description: '',
     });
     const isFirstLoad = useRef(true);
     const lastHandledRunRequestRef = useRef<number | null>(null);
-    const editorRef = useRef<any>(null);
+    const editorRef = useRef<SqlEditorHandle | null>(null);
     const effectiveLimit = limit === 'all' ? undefined : Number.parseInt(limit, 10);
     const requestLimit = Number.isInteger(effectiveLimit) ? effectiveLimit : undefined;
 
@@ -159,7 +158,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             if (!executedQuery) return null;
             if (!activeConnection) throw new Error("No active connection");
 
-            const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type as any);
+            const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
             await adapter.connect(activeConnection);
 
             return adapter.executeQuery(executedQuery, {
@@ -216,6 +215,18 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         currentSavedQueryName: currentSavedQuery?.name,
         tabTitle: tab?.title,
     });
+    const { data: organizations = [] } = useQuery({
+        queryKey: ['organizations'],
+        queryFn: () => OrganizationService.getMyOrganizations(),
+        enabled: isSaveDialogOpen || isDashboardDialogOpen,
+    });
+    const workspaceOptions = React.useMemo(
+        () => organizations.map((organization) => ({
+            id: organization.id,
+            name: organization.name,
+        })),
+        [organizations],
+    );
 
     // Record history on success/error
     useEffect(() => {
@@ -278,6 +289,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             }
         }
         if (!sqlToExplain.trim()) return;
+        if (!activeConnection) return;
 
         // Use FORMAT JSON for structured plan data
         const explainSql = `EXPLAIN (ANALYZE, FORMAT JSON) ${sqlToExplain}`;
@@ -286,7 +298,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
         try {
             // Execute explain query directly
-            const adapter = connectionService.getAdapter(activeConnection!.id, activeConnection!.type as any);
+            const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
             const result = await adapter.executeQuery(
                 explainSql,
                 activeDatabase ? { database: activeDatabase } : undefined
@@ -303,7 +315,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 durationMs: result.durationMs,
                 status: 'success',
             });
-        } catch (e: any) {
+        } catch (error) {
             setActiveResultTab('messages');
             addQueryHistory({
                 id: `history-${Date.now()}`,
@@ -312,7 +324,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 connectionName: activeConnection?.name,
                 executedAt: Date.now(),
                 status: 'error',
-                errorMessage: e.message,
+                errorMessage: getErrorMessage(error),
             });
         }
     };
@@ -347,14 +359,16 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 const updated = await SavedQueryService.updateSavedQuery(currentSavedQueryId, { sql: query });
                 saveQuery(updated);
                 toast.success(lang === 'vi' ? 'Da cap nhat saved query' : 'Saved query updated');
-            } catch (err: any) {
-                toast.error(err.message || 'Failed to update saved query');
+            } catch (err) {
+                toast.error(getErrorMessage(err) || 'Failed to update saved query');
             }
         } else {
             const defaultName = lang === 'vi' ? `Truy van ${new Date().toLocaleString('vi-VN')}` : `Query ${new Date().toLocaleString('en-US')}`;
+            const currentVisibility = currentSavedQuery?.visibility === 'workspace' ? 'workspace' : 'private';
             setSaveDialogInitialValues({
                 name: currentSavedQuery?.name || defaultName,
-                visibility: currentSavedQuery?.isOwner ? (currentSavedQuery.visibility || 'private') : 'private',
+                visibility: currentSavedQuery?.isOwner ? currentVisibility : 'private',
+                organizationId: currentSavedQuery?.organizationId || activeOrganizationId || '',
                 folderId: currentSavedQuery?.folderId || '',
                 tags: currentSavedQuery?.tags?.join(', ') || '',
                 description: currentSavedQuery?.description || '',
@@ -369,6 +383,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             sql: query,
             database: activeDatabase || activeConnection?.database || undefined,
             connectionId: activeConnection?.id,
+            organizationId: values.visibility === 'workspace' ? values.organizationId : undefined,
             visibility: values.visibility,
             folderId: values.folderId || undefined,
             tags: values.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
@@ -387,7 +402,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         setCurrentSavedQueryId(created.id);
         updateTabMetadata(tabId, { savedQueryId: created.id });
         toast.success(lang === 'vi' ? 'Da luu saved query' : 'Query saved');
-    }, [query, activeDatabase, activeConnection, currentSavedQueryId, currentSavedQuery, saveQuery, lang, tabId, updateTabMetadata]);
+    }, [query, activeDatabase, activeConnection, activeOrganizationId, currentSavedQueryId, currentSavedQuery, saveQuery, lang, tabId, updateTabMetadata]);
 
     // Open saved query into a new tab
     const handleOpenSavedQuery = useCallback((sq: SavedQuery) => {
@@ -444,163 +459,38 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     return (
         <>
             <div className="flex flex-col h-full bg-background">
-                {/* Toolbar */}
-                <div className="p-1 px-1.5 border-b flex items-center justify-between bg-muted/30 min-h-[40px] overflow-hidden flex-nowrap">
-                    <div className="flex items-center gap-0.5 min-w-0 flex-1 overflow-x-auto scrollbar-none py-0.5 flex-nowrap">
-                        <Button
-                            size="sm"
-                            onClick={() => handleRun()}
-                            disabled={isLoading || activeConnection?.allowQueryExecution === false}
-                            className={cn(
-                                "h-8 gap-1.5 px-3 bg-green-600 hover:bg-green-700 text-white border-none shadow-sm transition-all",
-                                isCompactMobileLayout && "px-2"
-                            )}
-                        >
-                            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
-                            <span className="font-bold">
-                                {isCompactMobileLayout ? (lang === 'vi' ? "Chạy" : "Run") : (lang === 'vi' ? "Thực thi" : "Execute")}
-                            </span>
-                        </Button>
-
-                        <div className="h-4 w-[1px] bg-border mx-1" />
-
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 gap-1.5 px-3 border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-500 transition-all shadow-none"
-                                >
-                                    <Sparkles className="w-3.5 h-3.5 fill-blue-500/20" />
-                                    <span className="font-medium">{isSmallMobile ? 'AI' : 'AI SQL'}</span>
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[min(450px,calc(100vw-1rem))] p-0 border-white/10 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden" align="start" sideOffset={10}>
-                                <AiQueryBox
-                                    currentConnectionId={activeConnectionId || ''}
-                                    currentDatabase={activeDatabase || undefined}
-                                    onGenerate={(generatedSql) => {
-                                        setQuery(generatedSql);
-                                        if (editorRef.current) {
-                                            editorRef.current.focus();
-                                        }
-                                    }}
-                                />
-                            </PopoverContent>
-                        </Popover>
-
-
-
-                        {!isCompactMobileLayout && (
-                            <>
-                                <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
-                                <Button variant="ghost" size="sm" onClick={handleRefreshSchema} className="h-7 gap-1 px-1.5 text-xs shrink-0" title={lang === 'vi' ? "Tải lại thanh bên" : "Refresh Sidebar"}>
-                                    <RefreshCw className="w-3.5 h-3.5" />
-                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Tải lại' : 'Refresh'}</span>
-                                </Button>
-                                <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
-                            </>
-                        )}
-
-                        {!isCompactMobileLayout ? (
-                            <>
-                                <Button variant="ghost" size="sm" onClick={handleFormat} className="h-7 gap-1 px-1.5 text-xs shrink-0">
-                                    <AlignLeft className="w-3.5 h-3.5" />
-                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Định dạng' : 'Format'}</span>
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={handleClear} className="h-7 gap-1 px-1.5 text-xs text-muted-foreground hover:text-destructive shrink-0">
-                                    <Eraser className="w-3.5 h-3.5" />
-                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Xóa' : 'Clear'}</span>
-                                </Button>
-                                <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
-                                <Button variant="ghost" size="sm" onClick={handleSave} className="h-7 gap-1 px-1.5 text-xs shrink-0" title="Ctrl+S">
-                                    <Save className="w-3.5 h-3.5" />
-                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Lưu' : 'Save'}</span>
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => setIsSavedDialogOpen(true)} className="h-7 gap-1 px-1.5 text-xs shrink-0" title="Ctrl+O">
-                                    <FolderOpen className="w-3.5 h-3.5" />
-                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Mở' : 'Open'}</span>
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => setIsHistoryDialogOpen(true)} className="h-7 gap-1 px-1.5 text-xs shrink-0" title="Ctrl+H">
-                                    <History className="w-3.5 h-3.5" />
-                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Lịch sử' : 'History'}</span>
-                                </Button>
-                                <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
-                                <Button variant="ghost" size="sm" onClick={handleExplain} disabled={isLoading || activeConnection?.allowQueryExecution === false} className="h-7 gap-1 px-1.5 text-xs text-orange-500 hover:text-orange-600 shrink-0" title="EXPLAIN ANALYZE">
-                                    <Zap className="w-3.5 h-3.5" />
-                                    <span className="whitespace-nowrap">{lang === 'vi' ? 'Giải thích' : 'Explain'}</span>
-                                </Button>
-                            </>
-                        ) : (
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs">
-                                        <History className="w-4 h-4" />
-                                        {lang === 'vi' ? 'Hành động' : 'Actions'}
-                                        <ChevronDown className="w-3 h-3 opacity-50" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="start" className="w-48">
-                                    <DropdownMenuItem onClick={handleFormat}>
-                                        <AlignLeft className="mr-2 h-4 w-4" />
-                                        <span>{lang === 'vi' ? 'Định dạng SQL' : 'Format SQL'}</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={handleSave}>
-                                        <Save className="mr-2 h-4 w-4" />
-                                        <span>{lang === 'vi' ? 'Lưu truy vấn' : 'Save Query'}</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => setIsSavedDialogOpen(true)}>
-                                        <FolderOpen className="mr-2 h-4 w-4" />
-                                        <span>{lang === 'vi' ? 'Mở đã lưu' : 'Open Saved'}</span>
-                                    </DropdownMenuItem>
-
-                                    <DropdownMenuItem onClick={() => setIsHistoryDialogOpen(true)}>
-                                        <History className="mr-2 h-4 w-4" />
-                                        <span>{lang === 'vi' ? 'Lịch sử' : 'History'}</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={handleExplain} className="text-orange-500" disabled={activeConnection?.allowQueryExecution === false}>
-                                        <Zap className="mr-2 h-4 w-4" />
-                                        <span>{lang === 'vi' ? 'Giải thích thực thi' : 'Explain Plan'}</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={handleClear} className="text-red-600">
-                                        <Eraser className="mr-2 h-4 w-4" />
-                                        <span>{lang === 'vi' ? 'Xóa tất cả' : 'Clear All'}</span>
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        )}
-
-                        <div className="flex items-center gap-1 px-1 shrink-0">
-                            {!isCompactMobileLayout && <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{lang === 'vi' ? 'Giới hạn' : 'Limit'}</span>}
-                            <Select value={limit} onValueChange={setLimit}>
-                                <SelectTrigger className="h-7 w-[80px] text-[10px] py-0 border-none bg-muted hover:bg-muted/80 focus:ring-0 shadow-none">
-                                    <SelectValue placeholder={lang === 'vi' ? 'Giới hạn' : 'Limit'} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="100">100</SelectItem>
-                                    <SelectItem value="500">500</SelectItem>
-                                    <SelectItem value="1000">1000</SelectItem>
-                                    <SelectItem value="5000">5000</SelectItem>
-                                    <SelectItem value="all">{lang === 'vi' ? 'Không' : 'No Limit'}</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-3 min-w-0">
-                        {currentSavedQuery?.organizationId && (
-                            <PresenceBadge
-                                entries={queryPresence.entries}
-                                isLoading={queryPresence.isLoading}
-                                label={lang === 'vi' ? 'Query live' : 'Query live'}
-                                emptyLabel={lang === 'vi' ? 'Chua ai mo query nay' : 'No one on this query'}
-                                className="max-w-[280px]"
-                            />
-                        )}
-                    </div>
-                </div>
+                <QueryToolbar
+                    isLoading={isLoading}
+                    allowQueryExecution={activeConnection?.allowQueryExecution}
+                    isCompactMobileLayout={isCompactMobileLayout}
+                    isSmallMobile={isSmallMobile}
+                    lang={lang}
+                    limit={limit}
+                    activeConnectionId={activeConnectionId}
+                    activeDatabase={activeDatabase}
+                    onRun={() => handleRun()}
+                    onGenerateSql={(generatedSql) => {
+                        setQuery(generatedSql);
+                        editorRef.current?.focus();
+                    }}
+                    onRefreshSchema={handleRefreshSchema}
+                    onFormat={handleFormat}
+                    onClear={handleClear}
+                    onSave={handleSave}
+                    onOpenSaved={() => setIsSavedDialogOpen(true)}
+                    onOpenHistory={() => setIsHistoryDialogOpen(true)}
+                    onExplain={handleExplain}
+                    onLimitChange={setLimit}
+                    rightSlot={currentSavedQuery?.organizationId ? (
+                        <PresenceBadge
+                            entries={queryPresence.entries}
+                            isLoading={queryPresence.isLoading}
+                            label={lang === 'vi' ? 'Query live' : 'Query live'}
+                            emptyLabel={lang === 'vi' ? 'Chua ai mo query nay' : 'No one on this query'}
+                            className="max-w-[280px]"
+                        />
+                    ) : null}
+                />
 
                 {activeConnection && (blockedReason || hasPersistentGuardrail) && (
                     <div className={cn(
@@ -714,6 +604,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 lang={lang}
                 initialValues={saveDialogInitialValues}
                 currentQuery={currentSavedQuery?.isOwner ? currentSavedQuery : null}
+                workspaceOptions={workspaceOptions}
                 onSubmit={handleSaveDialogSubmit}
             />
             <SaveToDashboardDialog
@@ -722,6 +613,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 columns={resultColumns}
                 numericColumns={resultNumericColumns}
                 initialValues={dashboardDialogInitialValues}
+                workspaceOptions={workspaceOptions}
                 onSubmit={saveToDashboard}
             />
         </>

@@ -1,11 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/presentation/components/ui/button';
-import { Input } from '@/presentation/components/ui/input';
 import { Textarea } from '@/presentation/components/ui/textarea';
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/presentation/components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/presentation/components/ui/select';
@@ -34,14 +30,15 @@ import {
 } from '@/core/services/CollaborationService';
 import { useAppStore } from '@/core/services/store';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
-import { useResourcePresence } from '@/presentation/hooks/useResourcePresence';
-import { PresenceBadge } from '@/presentation/components/presence/PresenceBadge';
 import { cn } from '@/lib/utils';
 import { TeamActivityTab } from './TeamPage/components/TeamActivityTab';
 import { TeamCommentsDrawer } from './TeamPage/components/TeamCommentsDrawer';
+import { CreateTeamDialog, CreateTeamspaceDialog, InviteMemberDialog } from './TeamPage/components/TeamDialogs';
+import { TeamMembersPanel } from './TeamPage/components/TeamMembersPanel';
+import { TeamspaceCard, TeamspaceResourceGroups } from './TeamPage/components/TeamspaceResourceGroups';
 import {
   ArrowLeft, Database, FileText, LayoutDashboard, Mail,
-  MessageSquare, Plus, Shield, Trash2, User, Users, Download, Upload,
+  MessageSquare, Plus, Trash2, Users, Download, Upload,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -54,21 +51,7 @@ interface TeamCommentTarget {
   resourceName: string;
 }
 
-type TeamspaceGroupedResource<T> = {
-  teamspace: TeamspaceEntity | null;
-  items: T[];
-};
-
 const TEAMSPACE_UNASSIGNED = '__unassigned__';
-
-function getDisplayName(person?: { firstName?: string | null; lastName?: string | null; email?: string | null }) {
-  if (!person) {
-    return 'Unknown';
-  }
-
-  const fullName = [person.firstName, person.lastName].filter(Boolean).join(' ').trim();
-  return fullName || person.email || 'Unknown';
-}
 
 function getPermissionLabel(role: string | undefined, permissions?: TeamResourcePermissionPolicy) {
   if (!role) {
@@ -119,37 +102,6 @@ function ResourceActions({
   );
 }
 
-function groupResourcesByTeamspace<T extends { id: string; teamspaceId?: string | null }>(
-  items: T[],
-  teamspaces: TeamspaceEntity[],
-) {
-  const grouped = new Map<string | null, T[]>();
-
-  for (const item of items) {
-    const key = item.teamspaceId ?? null;
-    const current = grouped.get(key) ?? [];
-    current.push(item);
-    grouped.set(key, current);
-  }
-
-  const sections: TeamspaceGroupedResource<T>[] = [];
-
-  for (const teamspace of teamspaces) {
-    const teamspaceItems = grouped.get(teamspace.id);
-    if (teamspaceItems && teamspaceItems.length > 0) {
-      sections.push({ teamspace, items: teamspaceItems });
-      grouped.delete(teamspace.id);
-    }
-  }
-
-  const unassignedItems = grouped.get(null);  
-  if (unassignedItems && unassignedItems.length > 0) {
-    sections.push({ teamspace: null, items: unassignedItems });
-  }
-
-  return sections;
-}
-
 function renderTeamspaceOptions(teamspaces: TeamspaceEntity[]) {
   return teamspaces.map((teamspace) => (
     <SelectItem key={teamspace.id} value={teamspace.id} className="text-xs">
@@ -166,122 +118,6 @@ function downloadJsonFile(filename: string, content: unknown) {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
-}
-
-function TeamspaceCard({
-  organizationId,
-  teamspace,
-  canManage,
-  lang,
-  onDelete,
-}: {
-  organizationId: string;
-  teamspace: TeamspaceEntity;
-  canManage: boolean;
-  lang: 'vi' | 'en';
-  onDelete: (teamspaceId: string) => void;
-}) {
-  const presence = useResourcePresence(
-    organizationId
-      ? {
-          organizationId,
-          teamspaceId: teamspace.id,
-        }
-      : null,
-    {
-      enabled: Boolean(organizationId),
-      intervalMs: 20_000,
-    },
-  );
-
-  return (
-    <div className="rounded-md border border-border/60 bg-background px-3 py-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-medium">{teamspace.name}</div>
-          {teamspace.description && (
-            <div className="mt-1 max-h-10 overflow-hidden text-xs text-muted-foreground">
-              {teamspace.description}
-            </div>
-          )}
-        </div>
-        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-          {teamspace.resourceCount}
-        </span>
-      </div>
-      <div className="mt-2">
-        <PresenceBadge
-          entries={presence.entries}
-          isLoading={presence.isLoading}
-          label={lang === 'vi' ? 'Teamspace live' : 'Teamspace live'}
-          emptyLabel={lang === 'vi' ? 'Chua co ai dang hoat dong' : 'No one active yet'}
-          className="w-full justify-between"
-        />
-      </div>
-      {canManage && (
-        <div className="mt-2 flex justify-end">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-[11px] text-destructive"
-            onClick={() => onDelete(teamspace.id)}
-          >
-            <Trash2 className="mr-1 h-3.5 w-3.5" />
-            {lang === 'vi' ? 'Xoa' : 'Delete'}
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TeamspaceResourceGroups<T extends { id: string; teamspaceId?: string | null }>({
-  items,
-  teamspaces,
-  loading,
-  emptyMessage,
-  renderItem,
-}: {
-  items: T[];
-  teamspaces: TeamspaceEntity[];
-  loading: boolean;
-  emptyMessage: string;
-  renderItem: (item: T) => React.ReactNode;
-}) {
-  if (loading) {
-    return <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</div>;
-  }
-
-  if (items.length === 0) {
-    return <div className="px-4 py-8 text-center text-sm text-muted-foreground">{emptyMessage}</div>;
-  }
-
-  const sections = groupResourcesByTeamspace(items, teamspaces);
-
-  return (
-    <div className="space-y-4">
-      {sections.map((section) => (
-        <section key={section.teamspace?.id ?? 'unassigned'} className="overflow-hidden rounded-lg border">
-          <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-4 py-2">
-            <div className="min-w-0">
-              <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                {section.teamspace?.name ?? 'Unassigned'}
-              </div>
-              <div className="text-[11px] text-muted-foreground">
-                {section.items.length} resource{section.items.length === 1 ? '' : 's'}
-              </div>
-            </div>
-          </div>
-          <div className="divide-y">
-            {section.items.map((item) => (
-              <React.Fragment key={item.id}>{renderItem(item)}</React.Fragment>
-            ))}
-          </div>
-        </section>
-      ))}
-    </div>
-  );
 }
 
 export function TeamPage() {
@@ -782,127 +618,13 @@ export function TeamPage() {
                   </div>
 
                   {activeTab === 'members' && (
-                    <div className="overflow-hidden rounded-lg border">
-                      {isCompactMobileLayout ? (
-                        <div className="divide-y">
-                          {members.map((member) => (
-                            <div key={member.id} className="space-y-3 px-4 py-4">
-                              <div className="flex items-start gap-3">
-                                <User className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                                <div className="min-w-0 flex-1">
-                                  <div className="break-words font-medium">
-                                    {getDisplayName(member.user)}
-                                  </div>
-                                  <div className="break-all text-xs text-muted-foreground">{member.user.email}</div>
-                                </div>
-                              </div>
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="min-w-0">
-                                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Role</div>
-                                  {canManage && member.role !== 'OWNER' ? (
-                                    <Select
-                                      value={member.role}
-                                      onValueChange={(value) => handleUpdateRole(member.userId, value)}
-                                    >
-                                      <SelectTrigger className="mt-1 h-8 w-full text-xs sm:w-28">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="ADMIN">Admin</SelectItem>
-                                        <SelectItem value="MEMBER">Member</SelectItem>
-                                        <SelectItem value="VIEWER">Viewer</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs">
-                                      {member.role === 'OWNER' && <Shield className="h-3 w-3" />}
-                                      {member.role}
-                                    </span>
-                                  )}
-                                </div>
-                                {canManage && member.role !== 'OWNER' && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-8 justify-start px-0 text-destructive sm:h-7 sm:w-7 sm:justify-center"
-                                    onClick={() => handleRemoveMember(member.userId)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                    <span className="ml-2 sm:hidden">Remove member</span>
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted/50">
-                            <tr>
-                              <th className="px-4 py-2 text-left font-medium">Member</th>
-                              <th className="px-4 py-2 text-left font-medium">Role</th>
-                              <th className="px-4 py-2 text-right font-medium">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {members.map((member) => (
-                              <tr key={member.id} className="border-t">
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-2">
-                                    <User className="h-4 w-4 text-muted-foreground" />
-                                    <div className="min-w-0">
-                                      <div className="font-medium">
-                                        {getDisplayName(member.user)}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground">{member.user.email}</div>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3">
-                                  {canManage && member.role !== 'OWNER' ? (
-                                    <Select
-                                      value={member.role}
-                                      onValueChange={(value) => handleUpdateRole(member.userId, value)}
-                                    >
-                                      <SelectTrigger className="h-8 w-28 text-xs">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="ADMIN">Admin</SelectItem>
-                                        <SelectItem value="MEMBER">Member</SelectItem>
-                                        <SelectItem value="VIEWER">Viewer</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs">
-                                      {member.role === 'OWNER' && <Shield className="h-3 w-3" />}
-                                      {member.role}
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  {canManage && member.role !== 'OWNER' && (
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-7 w-7 text-destructive"
-                                      onClick={() => handleRemoveMember(member.userId)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                      {members.length === 0 && (
-                        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                          No members yet.
-                        </div>
-                      )}
-                    </div>
+                    <TeamMembersPanel
+                      members={members}
+                      canManage={canManage}
+                      isCompactMobileLayout={isCompactMobileLayout}
+                      onUpdateRole={handleUpdateRole}
+                      onRemoveMember={handleRemoveMember}
+                    />
                   )}
 
                   {activeTab === 'connections' && (
@@ -1186,149 +908,15 @@ export function TeamPage() {
         />
       )}
 
-      <Dialog open={showInvite} onOpenChange={setShowInvite}>
-        <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Invite Member</DialogTitle>
-            <DialogDescription>
-              Send a pending invitation so the person can accept it from their team inbox.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <label className="text-sm font-medium">Email</label>
-              <Input
-                type="email"
-                placeholder="colleague@company.com"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Role</label>
-              <Select value={inviteRole} onValueChange={setInviteRole}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ADMIN">Admin</SelectItem>
-                  <SelectItem value="MEMBER">Member</SelectItem>
-                  <SelectItem value="VIEWER">Viewer</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowInvite(false)}>Cancel</Button>
-            <Button onClick={handleInvite}>Send Invite</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <InviteMemberDialog
+        open={showInvite}
+        email={inviteEmail}
+        role={inviteRole}
+        onOpenChange={setShowInvite}
+        onEmailChange={setInviteEmail}
+        onRoleChange={setInviteRole}
+        onInvite={handleInvite}
+      />
     </div>
-  );
-}
-
-function CreateTeamDialog({
-  open,
-  onClose,
-  onCreate,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreate: (name: string) => void;
-}) {
-  const [name, setName] = useState('');
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
-    onCreate(name.trim());
-    setName('');
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Create New Team</DialogTitle>
-          <DialogDescription>
-            Create a new organization workspace for shared resources and collaboration.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
-          <div>
-            <label className="text-sm font-medium">Team Name</label>
-            <Input
-              placeholder="Engineering Team"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit">Create</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function CreateTeamspaceDialog({
-  open,
-  onClose,
-  onCreate,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onCreate: (name: string, description?: string) => void;
-}) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
-    onCreate(name.trim(), description.trim() || undefined);
-    setName('');
-    setDescription('');
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Create Teamspace</DialogTitle>
-          <DialogDescription>
-            Group shared connections, queries, and dashboards into a lightweight workspace.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-2">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Name</label>
-            <Input
-              placeholder="Data Platform"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Description</label>
-            <Textarea
-              placeholder="Optional note about this teamspace"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
-          </div>
-          <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit">Create</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

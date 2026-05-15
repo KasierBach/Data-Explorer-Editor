@@ -59,7 +59,7 @@ export function DestructiveQueryDialog() {
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && handleCancel()}>
-            <DialogContent className="sm:max-w-md border-red-500/20">
+            <DialogContent className="max-w-[calc(100vw-1rem)] border-red-500/20 sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-destructive">
                         {isHighSeverity ? (
@@ -76,12 +76,12 @@ export function DestructiveQueryDialog() {
 
                 <div className="flex flex-col gap-3 py-4">
                     <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive border border-destructive/20">
-                        <div className="grid grid-cols-[130px_1fr] gap-2 font-mono">
+                        <div className="grid grid-cols-1 gap-2 font-mono sm:grid-cols-[130px_1fr]">
                             <span className="font-semibold">{t.keywordsLabel}</span>
-                            <span className="uppercase">{keywords}</span>
+                            <span className="break-words uppercase">{keywords}</span>
                             
                             <span className="font-semibold">{t.targetLabel}</span>
-                            <span className="uppercase">{target}</span>
+                            <span className="break-words uppercase">{target}</span>
                         </div>
                     </div>
                     <p className="text-sm font-medium text-foreground">
