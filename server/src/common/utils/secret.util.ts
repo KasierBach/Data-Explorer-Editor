@@ -16,7 +16,11 @@ function buildTestFallback(name: string, exactLength?: number) {
   return `${name.toLowerCase()}-test-secret-material-32`;
 }
 
-function validateSecret(name: string, value: string, options: RequiredSecretOptions) {
+function validateSecret(
+  name: string,
+  value: string,
+  options: RequiredSecretOptions,
+) {
   if (options.disallowValues?.includes(value)) {
     throw new Error(`${name} is set to an insecure placeholder value.`);
   }

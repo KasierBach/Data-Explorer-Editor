@@ -17,26 +17,30 @@ import { AiConnectionService } from './ai.connection-service';
 const isProd = process.env.NODE_ENV === 'production';
 
 @Module({
-    imports: [ConnectionsModule, PrismaModule],
-    controllers: [AiController, AiChatController, ...(isProd ? [] : [AiTestController])],
-    providers: [
-        AiService,
-        AiChatCompletionService,
-        AiChatService,
-        AiPromptBuilderService,
-        AiRoutingService,
-        AiSchemaContextService,
-        AiProviderRunnerService,
-        AiSchemaService,
-        AiAutocompleteService,
-        AiConnectionService,
-    ],
-    exports: [
-        AiService,
-        AiChatCompletionService,
-        AiSchemaContextService,
-        AiSchemaService,
-        AiAutocompleteService,
-    ],
+  imports: [ConnectionsModule, PrismaModule],
+  controllers: [
+    AiController,
+    AiChatController,
+    ...(isProd ? [] : [AiTestController]),
+  ],
+  providers: [
+    AiService,
+    AiChatCompletionService,
+    AiChatService,
+    AiPromptBuilderService,
+    AiRoutingService,
+    AiSchemaContextService,
+    AiProviderRunnerService,
+    AiSchemaService,
+    AiAutocompleteService,
+    AiConnectionService,
+  ],
+  exports: [
+    AiService,
+    AiChatCompletionService,
+    AiSchemaContextService,
+    AiSchemaService,
+    AiAutocompleteService,
+  ],
 })
-export class AiModule { }
+export class AiModule {}

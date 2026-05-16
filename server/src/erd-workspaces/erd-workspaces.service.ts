@@ -5,7 +5,6 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { getErrorMessage } from '../common/utils/error.util';
 
@@ -46,7 +45,7 @@ export class ErdWorkspacesService {
     private readonly auditService: AuditService,
     private readonly connectionsService: ConnectionsService,
     private readonly versionHistoryService: VersionHistoryService,
-  ) { }
+  ) {}
 
   private get erdWorkspaces() {
     return this.prisma.erdWorkspace;
@@ -55,29 +54,33 @@ export class ErdWorkspacesService {
   private isWorkspaceStoreUnavailable(error: unknown) {
     if (!error || typeof error !== 'object') return false;
 
-    const maybeCode = 'code' in error ? String((error as { code: unknown }).code) : '';
+    const maybeCode =
+      'code' in error ? String((error as { code: unknown }).code) : '';
     if (maybeCode === 'P2021') return true;
 
     const message = getErrorMessage(error);
     return (
       message.includes('erdWorkspace') &&
-      (
-        message.includes('does not exist') ||
+      (message.includes('does not exist') ||
         message.includes('Invalid') ||
-        message.includes('Could not find')
-      )
+        message.includes('Could not find'))
     );
   }
 
   private buildWorkspaceStoreUnavailableException() {
     return new ServiceUnavailableException({
-      message: 'ERD workspaces are temporarily unavailable until the database schema is synced.',
+      message:
+        'ERD workspaces are temporarily unavailable until the database schema is synced.',
       reason: 'ERD_WORKSPACE_STORAGE_UNAVAILABLE',
-      action: 'Run prisma db push on the server database and restart the backend.',
+      action:
+        'Run prisma db push on the server database and restart the backend.',
     });
   }
 
-  private async validateConnectionOwnership(connectionId: string | undefined | null, userId: string) {
+  private async validateConnectionOwnership(
+    connectionId: string | undefined | null,
+    userId: string,
+  ) {
     if (!connectionId) return;
     await this.connectionsService.findOne(connectionId, userId);
   }
@@ -92,7 +95,10 @@ export class ErdWorkspacesService {
   }
 
   private normalizeLayout(layout: unknown) {
-    const l = typeof layout === 'object' && layout !== null ? layout as Record<string, unknown> : {};
+    const l =
+      typeof layout === 'object' && layout !== null
+        ? (layout as Record<string, unknown>)
+        : {};
     return {
       visibleTables: Array.isArray(l.visibleTables) ? l.visibleTables : [],
       nodes: Array.isArray(l.nodes) ? l.nodes : [],
@@ -106,11 +112,16 @@ export class ErdWorkspacesService {
       backgroundVariant: l.backgroundVariant || 'dots',
       isEdgeAnimated: l.isEdgeAnimated ?? true,
       isToolbarCollapsed: !!l.isToolbarCollapsed,
-      collapsedTables: Array.isArray(l.collapsedTables) ? l.collapsedTables : [],
+      collapsedTables: Array.isArray(l.collapsedTables)
+        ? l.collapsedTables
+        : [],
     };
   }
 
-  private toEntity(workspace: RawErdWorkspace, currentUserId: string): ErdWorkspaceEntity {
+  private toEntity(
+    workspace: RawErdWorkspace,
+    currentUserId: string,
+  ): ErdWorkspaceEntity {
     return {
       id: workspace.id,
       name: workspace.name,
@@ -131,14 +142,14 @@ export class ErdWorkspacesService {
     };
   }
 
-  async findAll(userId: string, connectionId?: string): Promise<ErdWorkspaceEntity[]> {
+  async findAll(
+    userId: string,
+    connectionId?: string,
+  ): Promise<ErdWorkspaceEntity[]> {
     try {
       const workspaces = await this.erdWorkspaces.findMany({
         where: {
-          OR: [
-            { userId },
-            { organization: { members: { some: { userId } } } },
-          ],
+          OR: [{ userId }, { organization: { members: { some: { userId } } } }],
           ...(connectionId ? { connectionId } : {}),
         },
         include: {
@@ -154,10 +165,14 @@ export class ErdWorkspacesService {
         orderBy: { updatedAt: 'desc' },
       });
 
-      return workspaces.map((workspace) => this.toEntity(workspace as unknown as RawErdWorkspace, userId));
+      return workspaces.map((workspace) =>
+        this.toEntity(workspace as unknown as RawErdWorkspace, userId),
+      );
     } catch (error) {
       if (this.isWorkspaceStoreUnavailable(error)) {
-        this.logger.warn('ERD workspace storage is unavailable. Returning an empty workspace list.');
+        this.logger.warn(
+          'ERD workspace storage is unavailable. Returning an empty workspace list.',
+        );
         return [];
       }
       throw error;
@@ -168,10 +183,7 @@ export class ErdWorkspacesService {
     const workspace = await this.erdWorkspaces.findFirst({
       where: {
         id,
-        OR: [
-          { userId },
-          { organization: { members: { some: { userId } } } },
-        ],
+        OR: [{ userId }, { organization: { members: { some: { userId } } } }],
       },
       include: {
         user: {
@@ -192,7 +204,10 @@ export class ErdWorkspacesService {
     return this.toEntity(workspace, userId);
   }
 
-  async create(dto: CreateErdWorkspaceDto, userId: string): Promise<ErdWorkspaceEntity> {
+  async create(
+    dto: CreateErdWorkspaceDto,
+    userId: string,
+  ): Promise<ErdWorkspaceEntity> {
     await this.validateConnectionOwnership(dto.connectionId, userId);
 
     let workspace: RawErdWorkspace;
@@ -235,12 +250,19 @@ export class ErdWorkspacesService {
       },
     });
 
-    await this.versionHistoryService.recordErdWorkspaceVersion(workspace, userId);
+    await this.versionHistoryService.recordErdWorkspaceVersion(
+      workspace,
+      userId,
+    );
 
     return this.toEntity(workspace, userId);
   }
 
-  async update(id: string, dto: UpdateErdWorkspaceDto, userId: string): Promise<ErdWorkspaceEntity> {
+  async update(
+    id: string,
+    dto: UpdateErdWorkspaceDto,
+    userId: string,
+  ): Promise<ErdWorkspaceEntity> {
     let existing: RawErdWorkspace | null;
     try {
       existing = await this.erdWorkspaces.findFirst({
@@ -267,18 +289,31 @@ export class ErdWorkspacesService {
       throw new NotFoundException('ERD workspace not found.');
     }
 
-    await this.validateConnectionOwnership(dto.connectionId ?? existing.connectionId ?? undefined, userId);
+    await this.validateConnectionOwnership(
+      dto.connectionId ?? existing.connectionId ?? undefined,
+      userId,
+    );
 
     let updated: RawErdWorkspace;
     try {
       updated = await this.erdWorkspaces.update({
         where: { id },
         data: {
-          ...(dto.name !== undefined ? { name: this.sanitizeName(dto.name) } : {}),
-          ...(dto.notes !== undefined ? { notes: this.sanitizeNotes(dto.notes) } : {}),
-          ...(dto.connectionId !== undefined ? { connectionId: dto.connectionId || null } : {}),
-          ...(dto.database !== undefined ? { database: dto.database?.trim() || null } : {}),
-          ...(dto.layout !== undefined ? { layout: this.normalizeLayout(dto.layout) } : {}),
+          ...(dto.name !== undefined
+            ? { name: this.sanitizeName(dto.name) }
+            : {}),
+          ...(dto.notes !== undefined
+            ? { notes: this.sanitizeNotes(dto.notes) }
+            : {}),
+          ...(dto.connectionId !== undefined
+            ? { connectionId: dto.connectionId || null }
+            : {}),
+          ...(dto.database !== undefined
+            ? { database: dto.database?.trim() || null }
+            : {}),
+          ...(dto.layout !== undefined
+            ? { layout: this.normalizeLayout(dto.layout) }
+            : {}),
         },
         include: {
           user: {

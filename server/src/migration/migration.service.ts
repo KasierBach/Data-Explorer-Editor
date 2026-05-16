@@ -1,9 +1,18 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException, OnModuleInit, Inject } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue, Job } from 'bullmq';
 import { ConnectionsService } from '../connections/connections.service';
-import { DatabaseStrategyFactory, ConnectionConfig, FullTableMetadata } from '../database-strategies';
+import {
+  DatabaseStrategyFactory,
+  ConnectionConfig,
+  FullTableMetadata,
+} from '../database-strategies';
 import { StartMigrationDto } from './dto/start-migration.dto';
 import { getErrorMessage } from '../common/utils/error.util';
 import { MigrationComparisonService } from './migration-comparison.service';
@@ -21,7 +30,13 @@ import {
 } from './migration.types';
 
 // Re-export types for backward compatibility with consumers
-export type { MigrationStage, MigrationJob, MigrationColumnDiff, MigrationIndexDiff, MigrationReviewSummary };
+export type {
+  MigrationStage,
+  MigrationJob,
+  MigrationColumnDiff,
+  MigrationIndexDiff,
+  MigrationReviewSummary,
+};
 
 @Injectable()
 export class MigrationService {
@@ -33,13 +48,16 @@ export class MigrationService {
     private dbStrategiesFactory: DatabaseStrategyFactory,
     private comparisonService: MigrationComparisonService,
     @InjectQueue('migration') private migrationQueue: Queue,
-  ) { }
+  ) {}
 
   async onModuleInit() {
     this.logger.log('Migration service initialized with BullMQ.');
   }
 
-  async startMigration(userId: string, dto: StartMigrationDto): Promise<{ jobId: string }> {
+  async startMigration(
+    userId: string,
+    dto: StartMigrationDto,
+  ): Promise<{ jobId: string }> {
     const job = await this.migrationQueue.add(
       'migration-job',
       { userId, dto },
@@ -47,7 +65,7 @@ export class MigrationService {
         removeOnComplete: false,
         removeOnFail: false,
         attempts: 1,
-      }
+      },
     );
 
     if (!job.id) throw new Error('Failed to create migration job ID');
@@ -62,7 +80,9 @@ export class MigrationService {
       throw new NotFoundException('Job not found.');
     }
     if (job.data.userId !== userId) {
-      throw new ForbiddenException('You do not have access to this migration job.');
+      throw new ForbiddenException(
+        'You do not have access to this migration job.',
+      );
     }
     return job;
   }
@@ -76,7 +96,9 @@ export class MigrationService {
     return {
       id: job.id!,
       status: this.mapBullStatus(state),
-      stage: progress?.stage || (state === 'waiting' || state === 'delayed' ? 'queued' : 'streaming'),
+      stage:
+        progress?.stage ||
+        (state === 'waiting' || state === 'delayed' ? 'queued' : 'streaming'),
       processedRows: progress?.processedRows || 0,
       batchesProcessed: progress?.batchesProcessed || 0,
       error: job.failedReason,
@@ -85,20 +107,28 @@ export class MigrationService {
 
   private mapBullStatus(state: string): MigrationJob['status'] {
     switch (state) {
-      case 'completed': return 'completed';
-      case 'failed': return 'failed';
-      case 'active': return 'running';
-      default: return 'pending';
+      case 'completed':
+        return 'completed';
+      case 'failed':
+        return 'failed';
+      case 'active':
+        return 'running';
+      default:
+        return 'pending';
     }
   }
 
-  private async updateJob(jobId: string, updater: Partial<MigrationJob> | ((job: any) => void)) {
+  private async updateJob(
+    jobId: string,
+    updater: Partial<MigrationJob> | ((job: any) => void),
+  ) {
     const job = await this.migrationQueue.getJob(jobId);
     if (!job) return;
 
-    let progress = (job.progress as any) || {};
+    const progress = (job.progress as any) || {};
     if (typeof progress.processedRows !== 'number') progress.processedRows = 0;
-    if (typeof progress.batchesProcessed !== 'number') progress.batchesProcessed = 0;
+    if (typeof progress.batchesProcessed !== 'number')
+      progress.batchesProcessed = 0;
     if (!progress.stage) progress.stage = 'streaming';
 
     if (typeof updater === 'function') {
@@ -111,11 +141,15 @@ export class MigrationService {
     this.eventEmitter.emit(`migration-${jobId}`, {
       id: jobId,
       status: 'running',
-      ...progress
+      ...progress,
     });
   }
 
-  private async markStage(jobId: string, stage: MigrationStage, status?: MigrationJob['status']) {
+  private async markStage(
+    jobId: string,
+    stage: MigrationStage,
+    status?: MigrationJob['status'],
+  ) {
     await this.updateJob(jobId, {
       stage,
       ...(status ? { status } : {}),
@@ -128,9 +162,11 @@ export class MigrationService {
   }
 
   /** No-op: BullMQ handles completion via worker return value automatically. */
-  private async completeJob(_jobId: string) { }
+  private async completeJob(_jobId: string) {}
 
-  private buildMigrationConnectionConfig(conn: MigrationConnection): ConnectionConfig {
+  private buildMigrationConnectionConfig(
+    conn: MigrationConnection,
+  ): ConnectionConfig {
     return {
       host: conn.host,
       port: conn.port,
@@ -142,20 +178,32 @@ export class MigrationService {
     };
   }
 
-  private async resolveMigrationContext(userId: string, dto: StartMigrationDto, options: { jobId?: string; strict?: boolean } = {}): Promise<ResolvedMigrationContext> {
+  private async resolveMigrationContext(
+    userId: string,
+    dto: StartMigrationDto,
+    options: { jobId?: string; strict?: boolean } = {},
+  ): Promise<ResolvedMigrationContext> {
     const jobId = options.jobId;
     const strict = options.strict ?? true;
 
     if (this.comparisonService.sameMigrationEndpoint(dto)) {
-      throw new Error('Source and target cannot point to the same table or collection.');
+      throw new Error(
+        'Source and target cannot point to the same table or collection.',
+      );
     }
 
     if (jobId) {
       await this.markStage(jobId, 'validating', 'running');
     }
 
-    const rawSourceConn = await this.connectionsService.getDecryptedConnection(dto.sourceConnectionId, userId);
-    const rawTargetConn = await this.connectionsService.getDecryptedConnection(dto.targetConnectionId, userId);
+    const rawSourceConn = await this.connectionsService.getDecryptedConnection(
+      dto.sourceConnectionId,
+      userId,
+    );
+    const rawTargetConn = await this.connectionsService.getDecryptedConnection(
+      dto.targetConnectionId,
+      userId,
+    );
 
     if (!rawSourceConn || !rawTargetConn) {
       throw new Error('Source or target connection not found.');
@@ -174,38 +222,80 @@ export class MigrationService {
       await this.markStage(jobId, 'connecting');
     }
 
-    const sourceStrategy = this.dbStrategiesFactory.getStrategy(sourceConn.type);
-    const targetStrategy = this.dbStrategiesFactory.getStrategy(targetConn.type);
-    const sourcePool = await sourceStrategy.createPool(this.buildMigrationConnectionConfig(sourceConn));
-    const targetPool = await targetStrategy.createPool(this.buildMigrationConnectionConfig(targetConn));
+    const sourceStrategy = this.dbStrategiesFactory.getStrategy(
+      sourceConn.type,
+    );
+    const targetStrategy = this.dbStrategiesFactory.getStrategy(
+      targetConn.type,
+    );
+    const sourcePool = await sourceStrategy.createPool(
+      this.buildMigrationConnectionConfig(sourceConn),
+    );
+    const targetPool = await targetStrategy.createPool(
+      this.buildMigrationConnectionConfig(targetConn),
+    );
 
     if (jobId) {
       await this.markStage(jobId, 'preflight');
     }
 
-    const sourceSchema = this.comparisonService.normalizeSchemaName(sourceConn.type, dto.sourceSchema);
-    const targetSchema = this.comparisonService.normalizeSchemaName(targetConn.type, dto.targetSchema);
-    const sourceTable = this.comparisonService.normalizeTableName(dto.sourceTable);
-    const targetTable = this.comparisonService.normalizeTableName(dto.targetTable);
+    const sourceSchema = this.comparisonService.normalizeSchemaName(
+      sourceConn.type,
+      dto.sourceSchema,
+    );
+    const targetSchema = this.comparisonService.normalizeSchemaName(
+      targetConn.type,
+      dto.targetSchema,
+    );
+    const sourceTable = this.comparisonService.normalizeTableName(
+      dto.sourceTable,
+    );
+    const targetTable = this.comparisonService.normalizeTableName(
+      dto.targetTable,
+    );
 
-    const sourceMetadata = await sourceStrategy.getFullMetadata(sourcePool, sourceSchema, sourceTable, sourceConn.database || undefined);
+    const sourceMetadata = await sourceStrategy.getFullMetadata(
+      sourcePool,
+      sourceSchema,
+      sourceTable,
+      sourceConn.database || undefined,
+    );
 
     if (!sourceMetadata?.columns || sourceMetadata.columns.length === 0) {
-      throw new Error('Source table or collection could not be validated. Check schema, table name, and permissions.');
+      throw new Error(
+        'Source table or collection could not be validated. Check schema, table name, and permissions.',
+      );
     }
 
-    const targetMetadata = await targetStrategy.getFullMetadata(targetPool, targetSchema, targetTable, targetConn.database || undefined)
+    const targetMetadata = await targetStrategy
+      .getFullMetadata(
+        targetPool,
+        targetSchema,
+        targetTable,
+        targetConn.database || undefined,
+      )
       .catch((error) => {
         if (strict) {
           throw error;
         }
 
-        this.logger.warn(`Migration preview target metadata unavailable: ${getErrorMessage(error)}`);
-        return { columns: [], indices: [], rowCount: undefined } as FullTableMetadata;
+        this.logger.warn(
+          `Migration preview target metadata unavailable: ${getErrorMessage(error)}`,
+        );
+        return {
+          columns: [],
+          indices: [],
+          rowCount: undefined,
+        } as FullTableMetadata;
       });
 
     if (strict) {
-      this.comparisonService.validateTargetCompatibility(sourceConn, targetConn, sourceMetadata, targetMetadata);
+      this.comparisonService.validateTargetCompatibility(
+        sourceConn,
+        targetConn,
+        sourceMetadata,
+        targetMetadata,
+      );
     }
 
     return {
@@ -220,8 +310,13 @@ export class MigrationService {
     };
   }
 
-  async previewMigration(userId: string, dto: StartMigrationDto): Promise<MigrationReviewSummary> {
-    const context = await this.resolveMigrationContext(userId, dto, { strict: false });
+  async previewMigration(
+    userId: string,
+    dto: StartMigrationDto,
+  ): Promise<MigrationReviewSummary> {
+    const context = await this.resolveMigrationContext(userId, dto, {
+      strict: false,
+    });
     try {
       return this.comparisonService.buildMigrationReviewSummary(context, dto);
     } finally {
@@ -233,25 +328,39 @@ export class MigrationService {
     if (context?.sourcePool && context?.sourceStrategy) {
       try {
         await context.sourceStrategy.closePool(context.sourcePool);
-      } catch { }
+      } catch {
+        // Best-effort cleanup.
+      }
     }
     if (context?.targetPool && context?.targetStrategy) {
       try {
         await context.targetStrategy.closePool(context.targetPool);
-      } catch { }
+      } catch {
+        // Best-effort cleanup.
+      }
     }
   }
 
-  public async runMigrationPipeline(userId: string, jobId: string, dto: StartMigrationDto) {
+  public async runMigrationPipeline(
+    userId: string,
+    jobId: string,
+    dto: StartMigrationDto,
+  ) {
     let context: Partial<ResolvedMigrationContext> | undefined;
 
     try {
-      context = await this.resolveMigrationContext(userId, dto, { jobId, strict: true });
+      context = await this.resolveMigrationContext(userId, dto, {
+        jobId,
+        strict: true,
+      });
       await this.markStage(jobId, 'streaming');
 
       const rawStream = await context.sourceStrategy!.exportStream(
         context.sourcePool,
-        this.comparisonService.normalizeSchemaName(context.sourceConn!.type, dto.sourceSchema),
+        this.comparisonService.normalizeSchemaName(
+          context.sourceConn!.type,
+          dto.sourceSchema,
+        ),
         this.comparisonService.normalizeTableName(dto.sourceTable),
       );
 
@@ -268,7 +377,10 @@ export class MigrationService {
         buffer = [];
 
         await context!.targetStrategy!.importData(context!.targetPool, {
-          schema: this.comparisonService.normalizeSchemaName(context!.targetConn!.type, dto.targetSchema),
+          schema: this.comparisonService.normalizeSchemaName(
+            context!.targetConn!.type,
+            dto.targetSchema,
+          ),
           table: this.comparisonService.normalizeTableName(dto.targetTable),
           data: batch,
         });
@@ -307,7 +419,8 @@ export class MigrationService {
 
       const handleTerminalFailure = async (error: unknown) => {
         this.logger.error(`Stream error in migration ${jobId}`, error);
-        const message = error instanceof Error ? error.message : 'Migration stream failed.';
+        const message =
+          error instanceof Error ? error.message : 'Migration stream failed.';
         await this.failJob(jobId, message);
       };
 
@@ -347,8 +460,12 @@ export class MigrationService {
             try {
               await processing;
               await flushBuffer();
-              const finalizedProgress = currentJob.progress as MigrationProgress | undefined;
-              this.logger.log(`Migration ${jobId}: completed (${finalizedProgress?.processedRows || 0} rows)`);
+              const finalizedProgress = currentJob.progress as
+                | MigrationProgress
+                | undefined;
+              this.logger.log(
+                `Migration ${jobId}: completed (${finalizedProgress?.processedRows || 0} rows)`,
+              );
               await this.completeJob(jobId);
             } catch (error) {
               await handleTerminalFailure(error);
@@ -365,10 +482,22 @@ export class MigrationService {
           };
 
           const cleanup = () => {
-            eventStream.removeListener('data', enqueueChunk as (...args: unknown[]) => void);
-            eventStream.removeListener('row', enqueueChunk as (...args: unknown[]) => void);
-            eventStream.removeListener('end', handleEnd as (...args: unknown[]) => void);
-            eventStream.removeListener('error', handleError as (...args: unknown[]) => void);
+            eventStream.removeListener(
+              'data',
+              enqueueChunk as (...args: unknown[]) => void,
+            );
+            eventStream.removeListener(
+              'row',
+              enqueueChunk as (...args: unknown[]) => void,
+            );
+            eventStream.removeListener(
+              'end',
+              handleEnd as (...args: unknown[]) => void,
+            );
+            eventStream.removeListener(
+              'error',
+              handleError as (...args: unknown[]) => void,
+            );
           };
 
           stream.on('data', enqueueChunk as (...args: unknown[]) => void);
@@ -382,7 +511,7 @@ export class MigrationService {
           if (!currentJob) break;
           const state = await currentJob.getState();
           if (state === 'failed') break;
-          await handleChunk(chunk as Record<string, unknown>);
+          await handleChunk(chunk);
         }
 
         const currentJob = await this.migrationQueue.getJob(jobId);
@@ -390,15 +519,20 @@ export class MigrationService {
           const state = await currentJob.getState();
           if (state !== 'failed') {
             await flushBuffer();
-            const finalizedProgress = currentJob.progress as MigrationProgress | undefined;
-            this.logger.log(`Migration ${jobId}: completed (${finalizedProgress?.processedRows || 0} rows)`);
+            const finalizedProgress = currentJob.progress as
+              | MigrationProgress
+              | undefined;
+            this.logger.log(
+              `Migration ${jobId}: completed (${finalizedProgress?.processedRows || 0} rows)`,
+            );
             await this.completeJob(jobId);
           }
         }
       }
     } catch (error) {
       this.logger.error(`Migration ${jobId} PIPELINE EXCEPTION`, error);
-      const message = error instanceof Error ? error.message : 'Migration pipeline failed.';
+      const message =
+        error instanceof Error ? error.message : 'Migration pipeline failed.';
       await this.failJob(jobId, message);
     } finally {
       await this.closeResources(context);

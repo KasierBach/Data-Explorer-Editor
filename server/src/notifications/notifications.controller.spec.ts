@@ -11,7 +11,9 @@ describe('NotificationsController', () => {
   };
   const tokenServiceMock = {
     createNotificationsStreamTicket: jest.fn().mockReturnValue('stream-ticket'),
-    verifyNotificationsStreamTicket: jest.fn().mockReturnValue({ sub: 'user-1' }),
+    verifyNotificationsStreamTicket: jest
+      .fn()
+      .mockReturnValue({ sub: 'user-1' }),
   };
 
   beforeEach(async () => {
@@ -31,18 +33,26 @@ describe('NotificationsController', () => {
   });
 
   it('should issue a short-lived stream ticket', () => {
-    const result = controller.createStreamTicket({ user: { id: 'user-1' } } as any);
+    const result = controller.createStreamTicket({
+      user: { id: 'user-1' },
+    } as any);
     expect(result).toEqual({ ticket: 'stream-ticket' });
-    expect(tokenServiceMock.createNotificationsStreamTicket).toHaveBeenCalledWith('user-1');
+    expect(
+      tokenServiceMock.createNotificationsStreamTicket,
+    ).toHaveBeenCalledWith('user-1');
   });
 
   it('should stream notifications when ticket is valid', (done) => {
-    notificationsServiceMock.eventStream.mockReturnValue(of({ data: { message: 'hi' } }));
+    notificationsServiceMock.eventStream.mockReturnValue(
+      of({ data: { message: 'hi' } }),
+    );
 
     controller.stream('stream-ticket').subscribe({
       next: (event) => {
         expect(event).toEqual({ data: { message: 'hi' } });
-        expect(tokenServiceMock.verifyNotificationsStreamTicket).toHaveBeenCalledWith('stream-ticket');
+        expect(
+          tokenServiceMock.verifyNotificationsStreamTicket,
+        ).toHaveBeenCalledWith('stream-ticket');
         done();
       },
       error: done.fail,

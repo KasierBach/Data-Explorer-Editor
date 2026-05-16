@@ -42,7 +42,9 @@ describe('TeamspacesService', () => {
   });
 
   it('rejects teamspace creation for non-admin members', async () => {
-    prismaMock.organizationMember.findUnique.mockResolvedValue({ role: 'MEMBER' });
+    prismaMock.organizationMember.findUnique.mockResolvedValue({
+      role: 'MEMBER',
+    });
 
     await expect(
       service.create('org-1', 'user-1', { name: 'Operations' }),
@@ -50,8 +52,13 @@ describe('TeamspacesService', () => {
   });
 
   it('assigns a resource to a teamspace and logs the change', async () => {
-    prismaMock.organizationMember.findUnique.mockResolvedValue({ role: 'OWNER' });
-    prismaMock.teamspace.findFirst.mockResolvedValue({ id: 'teamspace-1', organizationId: 'org-1' });
+    prismaMock.organizationMember.findUnique.mockResolvedValue({
+      role: 'OWNER',
+    });
+    prismaMock.teamspace.findFirst.mockResolvedValue({
+      id: 'teamspace-1',
+      organizationId: 'org-1',
+    });
     prismaMock.organizationResource.upsert.mockResolvedValue({
       id: 'resource-1',
       teamspaceId: 'teamspace-1',

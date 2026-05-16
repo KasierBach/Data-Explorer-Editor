@@ -8,7 +8,13 @@ import { VersionHistoryModule } from '../version-history/version-history.module'
 import { OrganizationsModule } from '../organizations/organizations.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, ConnectionsModule, VersionHistoryModule, OrganizationsModule],
+  imports: [
+    PrismaModule,
+    AuditModule,
+    ConnectionsModule,
+    VersionHistoryModule,
+    OrganizationsModule,
+  ],
   controllers: [SavedQueriesController],
   providers: [SavedQueriesService],
   exports: [SavedQueriesService],

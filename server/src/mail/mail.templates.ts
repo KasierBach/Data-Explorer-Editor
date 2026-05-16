@@ -1,11 +1,11 @@
 export class MailTemplates {
-    /**
-     * Builds a consistent HTML email wrapper with Data Explorer branding.
-     * Uses a modern, high-contrast Deep Slate theme.
-     */
-    private static wrap(title: string, bodyContent: string): string {
-        const year = new Date().getFullYear();
-        return `
+  /**
+   * Builds a consistent HTML email wrapper with Data Explorer branding.
+   * Uses a modern, high-contrast Deep Slate theme.
+   */
+  private static wrap(title: string, bodyContent: string): string {
+    const year = new Date().getFullYear();
+    return `
         <!DOCTYPE html>
         <html>
         <head>
@@ -55,10 +55,10 @@ export class MailTemplates {
             </table>
         </body>
         </html>`;
-    }
+  }
 
-    static getVerificationEmail(name: string, otp: string): string {
-        const bodyContent = `
+  static getVerificationEmail(name: string, otp: string): string {
+    const bodyContent = `
             <p style="margin-bottom:24px;">
                 Xin chào <strong style="color:#f1f5f9;">${name}</strong>,
             </p>
@@ -78,11 +78,11 @@ export class MailTemplates {
             <p style="margin-top:24px;font-size:13px;color:#64748b;">
                 Nếu bạn không thực hiện đăng ký này, vui lòng bỏ qua email. Tài khoản sẽ không được kích hoạt nếu không có mã xác minh.
             </p>`;
-        return this.wrap('Xác nhận đăng ký tài khoản', bodyContent);
-    }
+    return this.wrap('Xác nhận đăng ký tài khoản', bodyContent);
+  }
 
-    static getPasswordResetEmail(name: string, otp: string): string {
-        const bodyContent = `
+  static getPasswordResetEmail(name: string, otp: string): string {
+    const bodyContent = `
             <p style="margin-bottom:24px;">
                 Xin chào <strong style="color:#f1f5f9;">${name}</strong>,
             </p>
@@ -102,11 +102,11 @@ export class MailTemplates {
             <p style="margin-top:24px;font-size:13px;color:#64748b;">
                 Nếu bạn không yêu cầu đặt lại mật khẩu, đừng lo lắng, tài khoản của bạn vẫn an toàn. Hãy đổi mật khẩu nếu bạn cảm thấy có dấu hiệu lạ.
             </p>`;
-        return this.wrap('Yêu cầu đặt lại mật khẩu', bodyContent);
-    }
+    return this.wrap('Yêu cầu đặt lại mật khẩu', bodyContent);
+  }
 
-    static getSecurityAlertEmail(name: string, ip: string, time: string): string {
-        const bodyContent = `
+  static getSecurityAlertEmail(name: string, ip: string, time: string): string {
+    const bodyContent = `
             <p style="margin-bottom:24px;">
                 Xin chào <strong style="color:#f1f5f9;">${name}</strong>,
             </p>
@@ -136,11 +136,16 @@ export class MailTemplates {
             <p style="font-size:13px;color:#64748b;">
                 Nếu hành động này là của bạn, bạn hoàn toàn có thể bỏ qua email này.
             </p>`;
-        return this.wrap('Cảnh báo bảo mật hệ thống', bodyContent);
-    }
+    return this.wrap('Cảnh báo bảo mật hệ thống', bodyContent);
+  }
 
-    static getTeamInvitationEmail(teamName: string, inviterName: string, role: string, loginUrl: string): string {
-        const bodyContent = `
+  static getTeamInvitationEmail(
+    teamName: string,
+    inviterName: string,
+    role: string,
+    loginUrl: string,
+  ): string {
+    const bodyContent = `
             <p style="margin-bottom:24px;">
                 Xin chào,
             </p>
@@ -160,6 +165,6 @@ export class MailTemplates {
             <p style="margin-top:24px;font-size:13px;color:#64748b;">
                 Nếu bạn không mong đợi email này, có thể bỏ qua.
             </p>`;
-        return this.wrap('Lời mời tham gia team', bodyContent);
-    }
+    return this.wrap('Lời mời tham gia team', bodyContent);
+  }
 }

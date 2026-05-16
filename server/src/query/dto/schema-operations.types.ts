@@ -1,14 +1,19 @@
-import { IsString, IsBoolean, IsArray, IsOptional, ValidateNested, IsIn } from 'class-validator';
-import { Type } from 'class-transformer';
+import {
+  IsString,
+  IsBoolean,
+  IsArray,
+  IsOptional,
+  IsIn,
+} from 'class-validator';
 
-export type SchemaOperationType = 
-  | 'add_column' 
-  | 'drop_column' 
-  | 'alter_column_type' 
-  | 'rename_column' 
-  | 'add_pk' 
-  | 'drop_pk' 
-  | 'add_fk' 
+export type SchemaOperationType =
+  | 'add_column'
+  | 'drop_column'
+  | 'alter_column_type'
+  | 'rename_column'
+  | 'add_pk'
+  | 'drop_pk'
+  | 'add_fk'
   | 'drop_fk';
 
 export class AddColumnOperation {
@@ -101,12 +106,12 @@ export class DropForeignKeyOperation {
   name!: string;
 }
 
-export type SchemaOperation = 
-  | AddColumnOperation 
-  | DropColumnOperation 
-  | AlterColumnTypeOperation 
-  | RenameColumnOperation 
-  | AddPrimaryKeyOperation 
-  | DropPrimaryKeyOperation 
-  | AddForeignKeyOperation 
+export type SchemaOperation =
+  | AddColumnOperation
+  | DropColumnOperation
+  | AlterColumnTypeOperation
+  | RenameColumnOperation
+  | AddPrimaryKeyOperation
+  | DropPrimaryKeyOperation
+  | AddForeignKeyOperation
   | DropForeignKeyOperation;

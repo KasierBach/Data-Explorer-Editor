@@ -4,9 +4,9 @@ import { MetadataController } from './metadata.controller';
 import { ConnectionsModule } from '../connections/connections.module';
 
 @Module({
-    imports: [ConnectionsModule],
-    controllers: [MetadataController],
-    providers: [MetadataService],
-    exports: [MetadataService],
+  imports: [ConnectionsModule],
+  controllers: [MetadataController],
+  providers: [MetadataService],
+  exports: [MetadataService],
 })
-export class MetadataModule { }
+export class MetadataModule {}

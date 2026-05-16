@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Patch,
+  Delete,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { QueryService } from './query.service';
 import { CreateQueryDto } from './dto/create-query.dto';
@@ -21,10 +29,13 @@ interface RequestWithUser extends Request {
 @Controller('query')
 @UseGuards(JwtAuthGuard)
 export class QueryController {
-  constructor(private readonly queryService: QueryService) { }
+  constructor(private readonly queryService: QueryService) {}
 
   @Post()
-  executeQuery(@Body() createQueryDto: CreateQueryDto, @Req() req: RequestWithUser) {
+  executeQuery(
+    @Body() createQueryDto: CreateQueryDto,
+    @Req() req: RequestWithUser,
+  ) {
     return this.queryService.executeQuery(createQueryDto, req.user.id);
   }
 
@@ -39,32 +50,64 @@ export class QueryController {
   }
 
   @Post('delete-rows')
-  deleteRows(@Body() deleteRowsDto: DeleteRowsDto, @Req() req: RequestWithUser) {
+  deleteRows(
+    @Body() deleteRowsDto: DeleteRowsDto,
+    @Req() req: RequestWithUser,
+  ) {
     return this.queryService.deleteRows(deleteRowsDto, req.user.id);
   }
 
   @Post('schema')
-  updateSchema(@Body() updateSchemaDto: UpdateSchemaDto, @Req() req: RequestWithUser) {
+  updateSchema(
+    @Body() updateSchemaDto: UpdateSchemaDto,
+    @Req() req: RequestWithUser,
+  ) {
     return this.queryService.updateSchema(updateSchemaDto, req.user.id);
   }
 
   @Post('seed')
-  async seedFailed(@Body() body: { connectionId: string }, @Req() req: RequestWithUser) {
+  async seedFailed(
+    @Body() body: { connectionId: string },
+    @Req() req: RequestWithUser,
+  ) {
     return this.queryService.seedData(body.connectionId, req.user.id);
   }
 
   @Post('database')
-  async createDatabase(@Body() body: { connectionId: string; name: string }, @Req() req: RequestWithUser) {
-    return this.queryService.createDatabase(body.connectionId, body.name, req.user.id);
+  async createDatabase(
+    @Body() body: { connectionId: string; name: string },
+    @Req() req: RequestWithUser,
+  ) {
+    return this.queryService.createDatabase(
+      body.connectionId,
+      body.name,
+      req.user.id,
+    );
   }
 
   @Delete('database')
-  async dropDatabase(@Body() body: { connectionId: string; name: string }, @Req() req: RequestWithUser) {
-    return this.queryService.dropDatabase(body.connectionId, body.name, req.user.id);
+  async dropDatabase(
+    @Body() body: { connectionId: string; name: string },
+    @Req() req: RequestWithUser,
+  ) {
+    return this.queryService.dropDatabase(
+      body.connectionId,
+      body.name,
+      req.user.id,
+    );
   }
 
   @Post('import')
-  async importData(@Body() body: { connectionId: string; schema: string; table: string; data: Record<string, unknown>[] }, @Req() req: RequestWithUser) {
+  async importData(
+    @Body()
+    body: {
+      connectionId: string;
+      schema: string;
+      table: string;
+      data: Record<string, unknown>[];
+    },
+    @Req() req: RequestWithUser,
+  ) {
     return this.queryService.importData(body, req.user.id);
   }
 }

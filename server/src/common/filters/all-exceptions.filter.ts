@@ -33,8 +33,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
         : exceptionResponse;
 
     // Log the actual error internally for debugging
-    if (httpStatus === HttpStatus.INTERNAL_SERVER_ERROR) {
-       this.logger.error(`Exception: ${exception instanceof Error ? exception.message : exception}`, exception instanceof Error ? exception.stack : undefined);
+    if (httpStatus === 500) {
+      this.logger.error(
+        `Exception: ${exception instanceof Error ? exception.message : String(exception)}`,
+        exception instanceof Error ? exception.stack : undefined,
+      );
     }
 
     const extraDetails =

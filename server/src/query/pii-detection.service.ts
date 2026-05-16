@@ -4,24 +4,66 @@ export interface PiiColumn {
   name: string;
   table: string;
   schema: string;
-  type: 'email' | 'phone' | 'credit_card' | 'ssn' | 'password' | 'name' | 'address' | 'ip' | 'unknown';
+  type:
+    | 'email'
+    | 'phone'
+    | 'credit_card'
+    | 'ssn'
+    | 'password'
+    | 'name'
+    | 'address'
+    | 'ip'
+    | 'unknown';
   confidence: 'high' | 'medium' | 'low';
 }
 
 @Injectable()
 export class PiiDetectionService {
-  private readonly patterns: Array<{ type: PiiColumn['type']; confidence: PiiColumn['confidence']; regex: RegExp }> = [
-    { type: 'password', confidence: 'high', regex: /pass(word|wd)?|pwd|secret|token|api[_\s]?key/i },
+  private readonly patterns: Array<{
+    type: PiiColumn['type'];
+    confidence: PiiColumn['confidence'];
+    regex: RegExp;
+  }> = [
+    {
+      type: 'password',
+      confidence: 'high',
+      regex: /pass(word|wd)?|pwd|secret|token|api[_\s]?key/i,
+    },
     { type: 'email', confidence: 'high', regex: /e[-_]?mail|email[_\s]?addr/i },
     { type: 'phone', confidence: 'high', regex: /phone|mobile|tel|fax/i },
-    { type: 'credit_card', confidence: 'high', regex: /card|cc[_\s]?num|credit|cvv|ccv/i },
-    { type: 'ssn', confidence: 'high', regex: /ssn|social[_\s]?sec|national[_\s]?id|tax[_\s]?id/i },
-    { type: 'name', confidence: 'medium', regex: /first[_\s]?name|last[_\s]?name|full[_\s]?name|given[_\s]?name|family[_\s]?name/i },
-    { type: 'address', confidence: 'medium', regex: /address|street|city|zip|postal/i },
-    { type: 'ip', confidence: 'medium', regex: /ip[_\s]?addr|ip[_\s]?address|remote[_\s]?ip/i },
+    {
+      type: 'credit_card',
+      confidence: 'high',
+      regex: /card|cc[_\s]?num|credit|cvv|ccv/i,
+    },
+    {
+      type: 'ssn',
+      confidence: 'high',
+      regex: /ssn|social[_\s]?sec|national[_\s]?id|tax[_\s]?id/i,
+    },
+    {
+      type: 'name',
+      confidence: 'medium',
+      regex:
+        /first[_\s]?name|last[_\s]?name|full[_\s]?name|given[_\s]?name|family[_\s]?name/i,
+    },
+    {
+      type: 'address',
+      confidence: 'medium',
+      regex: /address|street|city|zip|postal/i,
+    },
+    {
+      type: 'ip',
+      confidence: 'medium',
+      regex: /ip[_\s]?addr|ip[_\s]?address|remote[_\s]?ip/i,
+    },
   ];
 
-  detect(columns: { name: string; type?: string }[], schema: string, table: string): PiiColumn[] {
+  detect(
+    columns: { name: string; type?: string }[],
+    schema: string,
+    table: string,
+  ): PiiColumn[] {
     const results: PiiColumn[] = [];
 
     for (const col of columns) {
@@ -41,7 +83,12 @@ export class PiiDetectionService {
   }
 
   maskValue(value: unknown, piiType: PiiColumn['type']): string {
-    const str = String(value ?? '');
+    const str =
+      typeof value === 'string'
+        ? value
+        : typeof value === 'number' || typeof value === 'boolean'
+          ? String(value)
+          : '';
     if (str.length === 0) return str;
 
     switch (piiType) {
@@ -73,7 +120,8 @@ export class PiiDetectionService {
     if (parts.length !== 2) return '***@***';
     const local = parts[0];
     const domain = parts[1];
-    const maskedLocal = local.length > 2 ? local[0] + '***' + local[local.length - 1] : '***';
+    const maskedLocal =
+      local.length > 2 ? local[0] + '***' + local[local.length - 1] : '***';
     return `${maskedLocal}@${domain}`;
   }
 

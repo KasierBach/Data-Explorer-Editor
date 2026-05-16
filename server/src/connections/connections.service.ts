@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, OnModuleDestroy, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  OnModuleDestroy,
+  BadRequestException,
+} from '@nestjs/common';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { Connection } from './entities/connection.entity';
@@ -25,10 +30,12 @@ export class ConnectionsService implements OnModuleDestroy {
     private organizationsService: OrganizationsService,
   ) {
     // Run cleanup every minute
-    this.cleanupInterval = setInterval(() => this.cleanupPools(), 60000);
+    this.cleanupInterval = setInterval(() => void this.cleanupPools(), 60000);
   }
 
-  private sanitizeConnection<T extends { password?: string | null }>(connection: T) {
+  private sanitizeConnection<T extends { password?: string | null }>(
+    connection: T,
+  ) {
     const { password: _, ...safe } = connection;
     return safe;
   }
@@ -44,11 +51,16 @@ export class ConnectionsService implements OnModuleDestroy {
 
   private ensureHostConfigured(type: string, host?: string | null) {
     if (this.requiresExplicitHost(type) && !this.normalizeHost(host)) {
-      throw new BadRequestException('Host is required for this connection type.');
+      throw new BadRequestException(
+        'Host is required for this connection type.',
+      );
     }
   }
 
-  private async ensureOrganizationMembership(organizationId: string, userId: string) {
+  private async ensureOrganizationMembership(
+    organizationId: string,
+    userId: string,
+  ) {
     await this.organizationsService.ensureMemberAccess(organizationId, userId);
   }
 
@@ -109,13 +121,18 @@ export class ConnectionsService implements OnModuleDestroy {
    * Safely closes a pool by its key and removes it from the pool map.
    * Tries strategy-based close first, falls back to generic end/close methods.
    */
-  private async closePoolByKey(key: string, options?: { silent?: boolean }): Promise<void> {
+  private async closePoolByKey(
+    key: string,
+    options?: { silent?: boolean },
+  ): Promise<void> {
     const poolData = this.pools.get(key);
     if (!poolData) return;
 
     try {
       const id = key.split(':')[0];
-      const connection = await this.prisma.connection.findUnique({ where: { id } });
+      const connection = await this.prisma.connection.findUnique({
+        where: { id },
+      });
       if (connection) {
         const strategy = this.strategyFactory.getStrategy(connection.type);
         await strategy.closePool(poolData.pool);
@@ -156,18 +173,27 @@ export class ConnectionsService implements OnModuleDestroy {
     }
   }
 
-  async create(createConnectionDto: CreateConnectionDto, userId: string): Promise<Connection> {
+  async create(
+    createConnectionDto: CreateConnectionDto,
+    userId: string,
+  ): Promise<Connection> {
     const { name, password, organizationId, ...rest } = createConnectionDto;
     const encryptedPassword = password ? encryptAttribute(password) : undefined;
     const teamOrganizationId = organizationId?.trim() || null;
-    this.ensureHostConfigured(createConnectionDto.type, createConnectionDto.host);
+    this.ensureHostConfigured(
+      createConnectionDto.type,
+      createConnectionDto.host,
+    );
 
     if (teamOrganizationId) {
       await this.ensureOrganizationMembership(teamOrganizationId, userId);
     }
 
     const normalizedHost = this.normalizeHost(createConnectionDto.host);
-    const hasHost = Object.prototype.hasOwnProperty.call(createConnectionDto, 'host');
+    const hasHost = Object.prototype.hasOwnProperty.call(
+      createConnectionDto,
+      'host',
+    );
 
     const connection = await this.prisma.connection.create({
       data: {
@@ -177,8 +203,12 @@ export class ConnectionsService implements OnModuleDestroy {
         password: encryptedPassword,
         userId,
         readOnly: createConnectionDto.readOnly ?? false,
-        allowSchemaChanges: createConnectionDto.readOnly ? false : (createConnectionDto.allowSchemaChanges ?? true),
-        allowImportExport: createConnectionDto.readOnly ? false : (createConnectionDto.allowImportExport ?? true),
+        allowSchemaChanges: createConnectionDto.readOnly
+          ? false
+          : (createConnectionDto.allowSchemaChanges ?? true),
+        allowImportExport: createConnectionDto.readOnly
+          ? false
+          : (createConnectionDto.allowImportExport ?? true),
         allowQueryExecution: createConnectionDto.allowQueryExecution ?? true,
         ...(teamOrganizationId ? { organizationId: teamOrganizationId } : {}),
       } as any,
@@ -189,7 +219,11 @@ export class ConnectionsService implements OnModuleDestroy {
       action: AuditAction.DB_CONNECTION_CREATE,
       userId,
       organizationId: teamOrganizationId ?? undefined,
-      details: { name: connection.name, type: connection.type, database: connection.database },
+      details: {
+        name: connection.name,
+        type: connection.type,
+        database: connection.database,
+      },
     });
 
     if (teamOrganizationId) {
@@ -214,8 +248,13 @@ export class ConnectionsService implements OnModuleDestroy {
     return safeConnection as unknown as Connection;
   }
 
-  async test(createConnectionDto: CreateConnectionDto): Promise<{ status: string; latencyMs: number; error: string | null }> {
-    this.ensureHostConfigured(createConnectionDto.type, createConnectionDto.host);
+  async test(
+    createConnectionDto: CreateConnectionDto,
+  ): Promise<{ status: string; latencyMs: number; error: string | null }> {
+    this.ensureHostConfigured(
+      createConnectionDto.type,
+      createConnectionDto.host,
+    );
     const strategy = this.strategyFactory.getStrategy(createConnectionDto.type);
     const startedAt = Date.now();
     let pool: any;
@@ -242,31 +281,28 @@ export class ConnectionsService implements OnModuleDestroy {
     }
   }
 
-
   async findAll(userId: string): Promise<Connection[]> {
     const connections = await this.prisma.connection.findMany({
       where: {
-        OR: [
-          { userId },
-          { organization: { members: { some: { userId } } } },
-        ],
+        OR: [{ userId }, { organization: { members: { some: { userId } } } }],
       },
     });
-    return connections.map(c => this.sanitizeConnection(c)) as unknown as Connection[];
+    return connections.map((c) =>
+      this.sanitizeConnection(c),
+    ) as unknown as Connection[];
   }
 
   private async findRawOne(id: string, userId: string) {
     const connection = await this.prisma.connection.findFirst({
       where: {
         id,
-        OR: [
-          { userId },
-          { organization: { members: { some: { userId } } } },
-        ],
+        OR: [{ userId }, { organization: { members: { some: { userId } } } }],
       },
     });
     if (!connection) {
-      throw new NotFoundException(`Connection with ID ${id} not found or you don't have permission`);
+      throw new NotFoundException(
+        `Connection with ID ${id} not found or you don't have permission`,
+      );
     }
     return connection;
   }
@@ -283,7 +319,9 @@ export class ConnectionsService implements OnModuleDestroy {
    */
   async getDecryptedConnection(id: string, userId: string) {
     const connection = await this.findRawOne(id, userId);
-    const decryptedPassword = connection.password ? decryptAttribute(connection.password) : undefined;
+    const decryptedPassword = connection.password
+      ? decryptAttribute(connection.password)
+      : undefined;
     return { ...connection, password: decryptedPassword };
   }
 
@@ -291,8 +329,11 @@ export class ConnectionsService implements OnModuleDestroy {
     let connection: any;
     if (!userId) {
       // if userId isn't provided (e.g from legacy code), fallback to system fetch
-      const sysConnection = await this.prisma.connection.findUnique({ where: { id } });
-      if (!sysConnection) throw new NotFoundException(`Connection ${id} not found`);
+      const sysConnection = await this.prisma.connection.findUnique({
+        where: { id },
+      });
+      if (!sysConnection)
+        throw new NotFoundException(`Connection ${id} not found`);
       connection = sysConnection;
     } else {
       connection = await this.findRawOne(id, userId);
@@ -307,14 +348,21 @@ export class ConnectionsService implements OnModuleDestroy {
       }
     }
 
-    const decryptedPassword = connection.password ? decryptAttribute(connection.password) : undefined;
-    let connectionWithDecryptedPassword = { ...connection, password: decryptedPassword };
+    const decryptedPassword = connection.password
+      ? decryptAttribute(connection.password)
+      : undefined;
+    let connectionWithDecryptedPassword = {
+      ...connection,
+      password: decryptedPassword,
+    };
 
-    const connAny = connection as any;
+    const connAny = connection;
     if (connAny.sshHost && connAny.sshUsername) {
       const dbHost = this.normalizeHost(connection.host);
       if (!dbHost) {
-        throw new BadRequestException('Host is required for SSH tunnel connections.');
+        throw new BadRequestException(
+          'Host is required for SSH tunnel connections.',
+        );
       }
 
       const localPort = await this.sshTunnelService.openTunnel(poolKey, {
@@ -335,7 +383,10 @@ export class ConnectionsService implements OnModuleDestroy {
 
     const strategy = this.strategyFactory.getStrategy(connection.type);
     try {
-      const pool = await strategy.createPool(connectionWithDecryptedPassword, databaseOverride);
+      const pool = await strategy.createPool(
+        connectionWithDecryptedPassword,
+        databaseOverride,
+      );
 
       this.pools.set(poolKey, { pool, lastAccessed: Date.now() });
       await this.updateHealthState(id, { status: 'healthy', connected: true });
@@ -349,23 +400,40 @@ export class ConnectionsService implements OnModuleDestroy {
     }
   }
 
-  async update(id: string, updateConnectionDto: UpdateConnectionDto, userId: string): Promise<Connection> {
+  async update(
+    id: string,
+    updateConnectionDto: UpdateConnectionDto,
+    userId: string,
+  ): Promise<Connection> {
     const connection = await this.findRawOne(id, userId);
 
     // Close existing pools for this connection if config changed
     await this.closePoolsByConnectionId(id);
 
     const { password, ...rest } = updateConnectionDto;
-    const encryptedPassword = password !== undefined && password !== null ? encryptAttribute(password) : undefined;
-    const hasOrganizationId = Object.prototype.hasOwnProperty.call(updateConnectionDto, 'organizationId');
+    const encryptedPassword =
+      password !== undefined && password !== null
+        ? encryptAttribute(password)
+        : undefined;
+    const hasOrganizationId = Object.prototype.hasOwnProperty.call(
+      updateConnectionDto,
+      'organizationId',
+    );
     const nextOrganizationId = hasOrganizationId
-      ? (updateConnectionDto.organizationId?.trim() || null)
-      : connection.organizationId ?? null;
-    const hasHost = Object.prototype.hasOwnProperty.call(updateConnectionDto, 'host');
+      ? updateConnectionDto.organizationId?.trim() || null
+      : (connection.organizationId ?? null);
+    const hasHost = Object.prototype.hasOwnProperty.call(
+      updateConnectionDto,
+      'host',
+    );
     const nextType = updateConnectionDto.type ?? connection.type;
     const nextHost = hasHost ? updateConnectionDto.host : connection.host;
     this.ensureHostConfigured(nextType, nextHost);
-    if (hasOrganizationId && nextOrganizationId && nextOrganizationId !== connection.organizationId) {
+    if (
+      hasOrganizationId &&
+      nextOrganizationId &&
+      nextOrganizationId !== connection.organizationId
+    ) {
       await this.ensureOrganizationMembership(nextOrganizationId, userId);
     }
     const readOnly =
@@ -375,11 +443,21 @@ export class ConnectionsService implements OnModuleDestroy {
     const dataToUpdate = {
       ...rest,
       ...(hasHost ? { host: this.normalizeHost(nextHost) } : {}),
-      ...(password !== undefined && password !== null ? { password: encryptedPassword } : {}),
+      ...(password !== undefined && password !== null
+        ? { password: encryptedPassword }
+        : {}),
       readOnly,
-      allowSchemaChanges: readOnly ? false : (updateConnectionDto.allowSchemaChanges ?? connection.allowSchemaChanges),
-      allowImportExport: readOnly ? false : (updateConnectionDto.allowImportExport ?? connection.allowImportExport),
-      allowQueryExecution: updateConnectionDto.allowQueryExecution ?? connection.allowQueryExecution,
+      allowSchemaChanges: readOnly
+        ? false
+        : (updateConnectionDto.allowSchemaChanges ??
+          connection.allowSchemaChanges),
+      allowImportExport: readOnly
+        ? false
+        : (updateConnectionDto.allowImportExport ??
+          connection.allowImportExport),
+      allowQueryExecution:
+        updateConnectionDto.allowQueryExecution ??
+        connection.allowQueryExecution,
       ...(hasOrganizationId ? { organizationId: nextOrganizationId } : {}),
     };
 
@@ -388,7 +466,10 @@ export class ConnectionsService implements OnModuleDestroy {
       data: dataToUpdate,
     });
 
-    if (connection.organizationId && connection.organizationId !== nextOrganizationId) {
+    if (
+      connection.organizationId &&
+      connection.organizationId !== nextOrganizationId
+    ) {
       await this.organizationsService.removeResourcePolicy(
         ResourceType.CONNECTION,
         id,
@@ -445,7 +526,7 @@ export class ConnectionsService implements OnModuleDestroy {
     await this.auditService.log({
       action: AuditAction.DB_CONNECTION_DELETE,
       userId,
-      details: { name: connection.name, type: connection.type }
+      details: { name: connection.name, type: connection.type },
     });
   }
 

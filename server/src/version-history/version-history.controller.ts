@@ -11,12 +11,22 @@ export class VersionHistoryController {
   constructor(private readonly versionHistoryService: VersionHistoryService) {}
 
   @Get(':resourceType/:resourceId')
-  listVersions(@Param() params: VersionHistoryResourceParamDto, @Req() req: AuthenticatedRequest) {
-    return this.versionHistoryService.listVersions(params.resourceType, params.resourceId, req.user.id);
+  listVersions(
+    @Param() params: VersionHistoryResourceParamDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.versionHistoryService.listVersions(
+      params.resourceType,
+      params.resourceId,
+      req.user.id,
+    );
   }
 
   @Get(':resourceType/:resourceId/:versionId')
-  getVersion(@Param() params: VersionHistoryDetailParamDto, @Req() req: AuthenticatedRequest) {
+  getVersion(
+    @Param() params: VersionHistoryDetailParamDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.versionHistoryService.getVersion(
       params.resourceType,
       params.resourceId,
@@ -26,7 +36,10 @@ export class VersionHistoryController {
   }
 
   @Post(':resourceType/:resourceId/:versionId/restore')
-  restoreVersion(@Param() params: VersionHistoryDetailParamDto, @Req() req: AuthenticatedRequest) {
+  restoreVersion(
+    @Param() params: VersionHistoryDetailParamDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.versionHistoryService.restoreVersion(
       params.resourceType,
       params.resourceId,

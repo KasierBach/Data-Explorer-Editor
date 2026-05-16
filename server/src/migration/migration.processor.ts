@@ -14,16 +14,16 @@ export class MigrationProcessor extends WorkerHost {
   async process(job: Job<any, any, string>): Promise<any> {
     this.logger.log(`Processing migration job ${job.id}`);
     const { userId, dto } = job.data;
-    
+
     // The actual migration logic will be called here.
     // We will refactor migration.service to have a method that performs the work
     // which this processor will call.
     try {
-        await this.migrationService.runMigrationPipeline(userId, job.id!, dto);
-        return { success: true };
+      await this.migrationService.runMigrationPipeline(userId, job.id!, dto);
+      return { success: true };
     } catch (error: any) {
-        this.logger.error(`Migration job ${job.id} failed: ${error.message}`);
-        throw error;
+      this.logger.error(`Migration job ${job.id} failed: ${error.message}`);
+      throw error;
     }
   }
 

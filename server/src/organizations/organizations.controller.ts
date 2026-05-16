@@ -1,5 +1,15 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, UseGuards, HttpCode, HttpStatus, Req,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  Req,
 } from '@nestjs/common';
 import { OrganizationsService } from './services/organizations.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
@@ -8,7 +18,10 @@ import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberRoleDto } from './dto/update-member-role.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
-import { OrganizationBackupService, type OrganizationBackupPackage } from './services/organization-backup.service';
+import {
+  OrganizationBackupService,
+  type OrganizationBackupPackage,
+} from './services/organization-backup.service';
 
 @Controller('organizations')
 @UseGuards(JwtAuthGuard)
@@ -20,7 +33,10 @@ export class OrganizationsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Req() req: AuthenticatedRequest, @Body() dto: CreateOrganizationDto) {
+  async create(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: CreateOrganizationDto,
+  ) {
     return this.organizationsService.create(req.user.id, dto);
   }
 
@@ -39,7 +55,10 @@ export class OrganizationsController {
     @Req() req: AuthenticatedRequest,
     @Param('invitationId') invitationId: string,
   ) {
-    return this.organizationsService.acceptInvitation(invitationId, req.user.id);
+    return this.organizationsService.acceptInvitation(
+      invitationId,
+      req.user.id,
+    );
   }
 
   @Delete('invitations/:invitationId')
@@ -48,7 +67,10 @@ export class OrganizationsController {
     @Req() req: AuthenticatedRequest,
     @Param('invitationId') invitationId: string,
   ) {
-    await this.organizationsService.declineInvitation(invitationId, req.user.id);
+    await this.organizationsService.declineInvitation(
+      invitationId,
+      req.user.id,
+    );
   }
 
   @Get(':id')
@@ -57,7 +79,11 @@ export class OrganizationsController {
   }
 
   @Put(':id')
-  async update(@Req() req: AuthenticatedRequest, @Param('id') id: string, @Body() dto: UpdateOrganizationDto) {
+  async update(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdateOrganizationDto,
+  ) {
     return this.organizationsService.update(id, req.user.id, dto);
   }
 
@@ -74,7 +100,11 @@ export class OrganizationsController {
     @Param('id') organizationId: string,
     @Body() dto: InviteMemberDto,
   ) {
-    return this.organizationsService.inviteMember(organizationId, req.user.id, dto);
+    return this.organizationsService.inviteMember(
+      organizationId,
+      req.user.id,
+      dto,
+    );
   }
 
   @Put(':id/members/:userId')
@@ -84,7 +114,12 @@ export class OrganizationsController {
     @Param('userId') targetUserId: string,
     @Body() dto: UpdateMemberRoleDto,
   ) {
-    return this.organizationsService.updateMemberRole(organizationId, req.user.id, targetUserId, dto.role);
+    return this.organizationsService.updateMemberRole(
+      organizationId,
+      req.user.id,
+      targetUserId,
+      dto.role,
+    );
   }
 
   @Delete(':id/members/:userId')
@@ -94,37 +129,71 @@ export class OrganizationsController {
     @Param('id') organizationId: string,
     @Param('userId') targetUserId: string,
   ) {
-    await this.organizationsService.removeMember(organizationId, req.user.id, targetUserId);
+    await this.organizationsService.removeMember(
+      organizationId,
+      req.user.id,
+      targetUserId,
+    );
   }
 
   @Get(':id/members')
-  async listMembers(@Req() req: AuthenticatedRequest, @Param('id') organizationId: string) {
+  async listMembers(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') organizationId: string,
+  ) {
     return this.organizationsService.listMembers(organizationId, req.user.id);
   }
 
   @Get(':id/connections')
-  async listConnections(@Req() req: AuthenticatedRequest, @Param('id') organizationId: string) {
-    return this.organizationsService.listConnections(organizationId, req.user.id);
+  async listConnections(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') organizationId: string,
+  ) {
+    return this.organizationsService.listConnections(
+      organizationId,
+      req.user.id,
+    );
   }
 
   @Get(':id/queries')
-  async listQueries(@Req() req: AuthenticatedRequest, @Param('id') organizationId: string) {
+  async listQueries(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') organizationId: string,
+  ) {
     return this.organizationsService.listQueries(organizationId, req.user.id);
   }
 
   @Get(':id/dashboards')
-  async listDashboards(@Req() req: AuthenticatedRequest, @Param('id') organizationId: string) {
-    return this.organizationsService.listDashboards(organizationId, req.user.id);
+  async listDashboards(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') organizationId: string,
+  ) {
+    return this.organizationsService.listDashboards(
+      organizationId,
+      req.user.id,
+    );
   }
 
   @Get(':id/activities')
-  async listActivities(@Req() req: AuthenticatedRequest, @Param('id') organizationId: string) {
-    return this.organizationsService.getActivityLogs(organizationId, req.user.id);
+  async listActivities(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') organizationId: string,
+  ) {
+    return this.organizationsService.getActivityLogs(
+      organizationId,
+      req.user.id,
+    );
   }
 
   @Get(':id/backup')
-  async exportBackup(@Req() req: AuthenticatedRequest, @Param('id') organizationId: string) {
-    return this.organizationBackupService.exportOrganizationBackup(organizationId, req.user.id);
+  async exportBackup(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') organizationId: string,
+  ) {
+    return this.organizationBackupService.exportOrganizationBackup(
+      organizationId,
+      req.user.id,
+    );
   }
 
   @Post(':id/backup/restore')
@@ -133,6 +202,10 @@ export class OrganizationsController {
     @Param('id') organizationId: string,
     @Body() body: { backup: OrganizationBackupPackage },
   ) {
-    return this.organizationBackupService.restoreOrganizationBackup(organizationId, req.user.id, body.backup);
+    return this.organizationBackupService.restoreOrganizationBackup(
+      organizationId,
+      req.user.id,
+      body.backup,
+    );
   }
 }

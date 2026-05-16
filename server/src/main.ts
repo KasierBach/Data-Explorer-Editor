@@ -15,36 +15,48 @@ async function bootstrap() {
     process.env.FRONTEND_URL,
   ].filter(Boolean) as string[];
   const websocketOrigins = allowedOrigins.flatMap((origin) => {
-    if (origin.startsWith('https://')) return [origin.replace('https://', 'wss://')];
-    if (origin.startsWith('http://')) return [origin.replace('http://', 'ws://')];
+    if (origin.startsWith('https://'))
+      return [origin.replace('https://', 'wss://')];
+    if (origin.startsWith('http://'))
+      return [origin.replace('http://', 'ws://')];
     return [];
   });
-  const connectSrc = Array.from(new Set(["'self'", ...allowedOrigins, ...websocketOrigins]));
-  const imgSrc = Array.from(new Set(["'self'", 'data:', 'blob:', ...allowedOrigins]));
+  const connectSrc = Array.from(
+    new Set(["'self'", ...allowedOrigins, ...websocketOrigins]),
+  );
+  const imgSrc = Array.from(
+    new Set(["'self'", 'data:', 'blob:', ...allowedOrigins]),
+  );
   const scriptSrc = isProduction
     ? ["'self'"]
     : ["'self'", "'unsafe-inline'", "'unsafe-eval'"];
 
   // Security headers
-  app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        "default-src": ["'self'"],
-        "base-uri": ["'self'"],
-        "form-action": ["'self'"],
-        "frame-ancestors": ["'none'"],
-        "object-src": ["'none'"],
-        "img-src": imgSrc,
-        "script-src": scriptSrc,
-        "connect-src": connectSrc,
-        "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        "font-src": ["'self'", "https://fonts.gstatic.com"],
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+          'default-src': ["'self'"],
+          'base-uri': ["'self'"],
+          'form-action': ["'self'"],
+          'frame-ancestors': ["'none'"],
+          'object-src': ["'none'"],
+          'img-src': imgSrc,
+          'script-src': scriptSrc,
+          'connect-src': connectSrc,
+          'style-src': [
+            "'self'",
+            "'unsafe-inline'",
+            'https://fonts.googleapis.com',
+          ],
+          'font-src': ["'self'", 'https://fonts.gstatic.com'],
+        },
       },
-    },
-    crossOriginEmbedderPolicy: false,
-    crossOriginResourcePolicy: { policy: 'cross-origin' },
-  }));
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   // Increase body size limit for base64 image uploads
   app.use(bodyParser.json({ limit: '10mb' }));
@@ -59,11 +71,13 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   // Global Validation Pipe
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-    forbidNonWhitelisted: true,
-  }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
 
   // Global Exception Filter
   app.useGlobalFilters(new AllExceptionsFilter());

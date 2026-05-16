@@ -58,7 +58,7 @@ export class VersionHistoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-  ) { }
+  ) {}
 
   private get versionHistories() {
     return this.prisma.versionHistory;
@@ -76,22 +76,26 @@ export class VersionHistoryService {
   private isHistoryStoreUnavailable(error: unknown) {
     if (!error || typeof error !== 'object') return false;
 
-    const maybeCode = 'code' in error ? String((error as { code: unknown }).code) : '';
+    const maybeCode =
+      'code' in error ? String((error as { code: unknown }).code) : '';
     if (maybeCode === 'P2021') return true;
 
     const message = getErrorMessage(error);
-    return message.includes('VersionHistory') && (
-      message.includes('does not exist') ||
-      message.includes('Invalid') ||
-      message.includes('Could not find')
+    return (
+      message.includes('VersionHistory') &&
+      (message.includes('does not exist') ||
+        message.includes('Invalid') ||
+        message.includes('Could not find'))
     );
   }
 
   private buildHistoryStoreUnavailableException() {
     return new ServiceUnavailableException({
-      message: 'Version history is temporarily unavailable until the database schema is synced.',
+      message:
+        'Version history is temporarily unavailable until the database schema is synced.',
       reason: 'VERSION_HISTORY_STORAGE_UNAVAILABLE',
-      action: 'Run prisma db push on the server database and restart the backend.',
+      action:
+        'Run prisma db push on the server database and restart the backend.',
     });
   }
 
@@ -101,7 +105,9 @@ export class VersionHistoryService {
       return normalized;
     }
 
-    throw new BadRequestException('Version history currently supports only QUERY and ERD resources.');
+    throw new BadRequestException(
+      'Version history currently supports only QUERY and ERD resources.',
+    );
   }
 
   private toListItem(version: {
@@ -190,7 +196,10 @@ export class VersionHistoryService {
     };
   }
 
-  private normalizeSavedQueryVisibility(visibility: string | undefined, organizationId?: string | null) {
+  private normalizeSavedQueryVisibility(
+    visibility: string | undefined,
+    organizationId?: string | null,
+  ) {
     if (visibility === 'team') {
       return organizationId ? 'workspace' : 'private';
     }
@@ -231,7 +240,9 @@ export class VersionHistoryService {
       });
 
       if (!savedQuery) {
-        throw new NotFoundException('Saved query not found or you do not have access.');
+        throw new NotFoundException(
+          'Saved query not found or you do not have access.',
+        );
       }
 
       return savedQuery;
@@ -240,10 +251,7 @@ export class VersionHistoryService {
     const workspace = await this.prisma.erdWorkspace.findFirst({
       where: {
         id: resourceId,
-        OR: [
-          { userId },
-          { organization: { members: { some: { userId } } } },
-        ],
+        OR: [{ userId }, { organization: { members: { some: { userId } } } }],
       },
       include: {
         user: {
@@ -253,7 +261,9 @@ export class VersionHistoryService {
     });
 
     if (!workspace) {
-      throw new NotFoundException('ERD workspace not found or you do not have access.');
+      throw new NotFoundException(
+        'ERD workspace not found or you do not have access.',
+      );
     }
 
     return workspace;
@@ -275,7 +285,9 @@ export class VersionHistoryService {
       });
 
       if (!savedQuery) {
-        throw new NotFoundException('Saved query not found or you do not have permission.');
+        throw new NotFoundException(
+          'Saved query not found or you do not have permission.',
+        );
       }
 
       return savedQuery;
@@ -291,7 +303,9 @@ export class VersionHistoryService {
     });
 
     if (!workspace) {
-      throw new NotFoundException('ERD workspace not found or you do not have permission.');
+      throw new NotFoundException(
+        'ERD workspace not found or you do not have permission.',
+      );
     }
 
     return workspace;
@@ -337,12 +351,16 @@ export class VersionHistoryService {
       return await this.createVersionRecord(
         'QUERY',
         savedQuery.id,
-        this.buildSavedQuerySnapshot(savedQuery) as unknown as Prisma.InputJsonValue,
+        this.buildSavedQuerySnapshot(
+          savedQuery,
+        ) as unknown as Prisma.InputJsonValue,
         userId,
       );
     } catch (error) {
       if (error instanceof ServiceUnavailableException) {
-        this.logger.warn(`Skipping saved query version snapshot because storage is unavailable. queryId=${savedQuery.id}`);
+        this.logger.warn(
+          `Skipping saved query version snapshot because storage is unavailable. queryId=${savedQuery.id}`,
+        );
         return null;
       }
       throw error;
@@ -354,19 +372,27 @@ export class VersionHistoryService {
       return await this.createVersionRecord(
         'ERD',
         workspace.id,
-        this.buildErdWorkspaceSnapshot(workspace) as unknown as Prisma.InputJsonValue,
+        this.buildErdWorkspaceSnapshot(
+          workspace,
+        ) as unknown as Prisma.InputJsonValue,
         userId,
       );
     } catch (error) {
       if (error instanceof ServiceUnavailableException) {
-        this.logger.warn(`Skipping ERD workspace version snapshot because storage is unavailable. workspaceId=${workspace.id}`);
+        this.logger.warn(
+          `Skipping ERD workspace version snapshot because storage is unavailable. workspaceId=${workspace.id}`,
+        );
         return null;
       }
       throw error;
     }
   }
 
-  async listVersions(rawResourceType: string, resourceId: string, userId: string) {
+  async listVersions(
+    rawResourceType: string,
+    resourceId: string,
+    userId: string,
+  ) {
     const resourceType = this.parseResourceType(rawResourceType);
     await this.assertResourceAccessible(resourceType, resourceId, userId);
 
@@ -378,10 +404,7 @@ export class VersionHistoryService {
             select: this.userSelect,
           },
         },
-        orderBy: [
-          { versionNumber: 'desc' },
-          { createdAt: 'desc' },
-        ],
+        orderBy: [{ versionNumber: 'desc' }, { createdAt: 'desc' }],
       });
 
       return versions.map((version) => this.toListItem(version));
@@ -393,7 +416,12 @@ export class VersionHistoryService {
     }
   }
 
-  async getVersion(rawResourceType: string, resourceId: string, versionId: string, userId: string): Promise<VersionHistoryDetailItem> {
+  async getVersion(
+    rawResourceType: string,
+    resourceId: string,
+    versionId: string,
+    userId: string,
+  ): Promise<VersionHistoryDetailItem> {
     const resourceType = this.parseResourceType(rawResourceType);
     await this.assertResourceAccessible(resourceType, resourceId, userId);
 
@@ -427,10 +455,24 @@ export class VersionHistoryService {
     }
   }
 
-  async restoreVersion(rawResourceType: string, resourceId: string, versionId: string, userId: string) {
+  async restoreVersion(
+    rawResourceType: string,
+    resourceId: string,
+    versionId: string,
+    userId: string,
+  ) {
     const resourceType = this.parseResourceType(rawResourceType);
-    const existingResource = await this.assertResourceOwner(resourceType, resourceId, userId);
-    const version = await this.getVersion(resourceType, resourceId, versionId, userId);
+    const existingResource = await this.assertResourceOwner(
+      resourceType,
+      resourceId,
+      userId,
+    );
+    const version = await this.getVersion(
+      resourceType,
+      resourceId,
+      versionId,
+      userId,
+    );
 
     if (resourceType === 'QUERY') {
       const snapshot = version.snapshot as unknown as SavedQuerySnapshot;
@@ -441,7 +483,10 @@ export class VersionHistoryService {
           sql: snapshot.sql,
           database: snapshot.database,
           connectionId: snapshot.connectionId,
-          visibility: this.normalizeSavedQueryVisibility(snapshot.visibility, existingResource.organizationId),
+          visibility: this.normalizeSavedQueryVisibility(
+            snapshot.visibility,
+            existingResource.organizationId,
+          ),
           folderId: snapshot.folderId,
           tags: Array.isArray(snapshot.tags) ? snapshot.tags : [],
           description: snapshot.description,

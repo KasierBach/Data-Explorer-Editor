@@ -1,4 +1,9 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
@@ -10,9 +15,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
-    const redisUrl = this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
+    const redisUrl =
+      this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
     this.client = new Redis(redisUrl);
-    
+
     this.client.on('error', (err) => {
       this.logger.error('Redis connection error:', err);
     });
@@ -30,7 +36,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    * Set a key-value pair in Redis with an optional TTL (Time To Live).
    */
   async set(key: string, value: any, ttlSeconds?: number): Promise<void> {
-    const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+    const stringValue =
+      typeof value === 'string' ? value : JSON.stringify(value);
     if (ttlSeconds) {
       await this.client.set(key, stringValue, 'EX', ttlSeconds);
     } else {
@@ -44,7 +51,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async get<T = any>(key: string): Promise<T | null> {
     const value = await this.client.get(key);
     if (!value) return null;
-    
+
     try {
       return JSON.parse(value) as T;
     } catch {

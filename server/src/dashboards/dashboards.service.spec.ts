@@ -20,7 +20,9 @@ describe('DashboardsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    prismaMock.user.findUnique.mockResolvedValue({ email: 'analyst@example.com' });
+    prismaMock.user.findUnique.mockResolvedValue({
+      email: 'analyst@example.com',
+    });
     prismaMock.dashboard.findMany.mockResolvedValue([]);
   });
 
@@ -86,16 +88,24 @@ describe('DashboardsService', () => {
       organizationsServiceMock as any,
     );
 
-    await service.create({
-      name: 'Revenue',
-      visibility: 'workspace',
-      organizationId: 'org-1',
-    }, 'owner-1');
+    await service.create(
+      {
+        name: 'Revenue',
+        visibility: 'workspace',
+        organizationId: 'org-1',
+      },
+      'owner-1',
+    );
 
-    expect(organizationsServiceMock.ensureMemberAccess).toHaveBeenCalledWith('org-1', 'owner-1');
-    expect(prismaMock.dashboard.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ organizationId: 'org-1' }),
-    }));
+    expect(organizationsServiceMock.ensureMemberAccess).toHaveBeenCalledWith(
+      'org-1',
+      'owner-1',
+    );
+    expect(prismaMock.dashboard.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ organizationId: 'org-1' }),
+      }),
+    );
     expect(organizationsServiceMock.ensureResourcePolicy).toHaveBeenCalledWith(
       'DASHBOARD',
       'dashboard-1',
@@ -132,19 +142,26 @@ describe('DashboardsService', () => {
       organizationsServiceMock as any,
     );
 
-    await service.create({
-      name: 'Draft',
-      visibility: 'private',
-      organizationId: 'org-1',
-    }, 'owner-1');
+    await service.create(
+      {
+        name: 'Draft',
+        visibility: 'private',
+        organizationId: 'org-1',
+      },
+      'owner-1',
+    );
 
     expect(organizationsServiceMock.ensureMemberAccess).not.toHaveBeenCalled();
-    expect(prismaMock.dashboard.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        visibility: 'private',
-        organizationId: null,
+    expect(prismaMock.dashboard.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          visibility: 'private',
+          organizationId: null,
+        }),
       }),
-    }));
-    expect(organizationsServiceMock.ensureResourcePolicy).not.toHaveBeenCalled();
+    );
+    expect(
+      organizationsServiceMock.ensureResourcePolicy,
+    ).not.toHaveBeenCalled();
   });
 });

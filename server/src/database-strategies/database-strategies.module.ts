@@ -9,23 +9,23 @@ import { ClickHouseStrategy } from './clickhouse.strategy';
 
 @Global()
 @Module({
-    providers: [
-        PostgresStrategy,
-        MysqlStrategy,
-        MssqlStrategy,
-        MongoDbStrategy,
-        SqliteStrategy,
-        ClickHouseStrategy,
-        DatabaseStrategyFactory,
-    ],
-    exports: [
-        PostgresStrategy,
-        MysqlStrategy,
-        MssqlStrategy,
-        MongoDbStrategy,
-        SqliteStrategy,
-        ClickHouseStrategy,
-        DatabaseStrategyFactory,
-    ],
+  providers: [
+    PostgresStrategy,
+    MysqlStrategy,
+    MssqlStrategy,
+    MongoDbStrategy,
+    SqliteStrategy,
+    ClickHouseStrategy,
+    DatabaseStrategyFactory,
+  ],
+  exports: [
+    PostgresStrategy,
+    MysqlStrategy,
+    MssqlStrategy,
+    MongoDbStrategy,
+    SqliteStrategy,
+    ClickHouseStrategy,
+    DatabaseStrategyFactory,
+  ],
 })
-export class DatabaseStrategiesModule { }
+export class DatabaseStrategiesModule {}

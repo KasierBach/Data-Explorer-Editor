@@ -25,7 +25,12 @@ export class SshTunnelService {
 
   private isInternalIp(host: string): boolean {
     const h = host.toLowerCase().trim();
-    if (h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '0.0.0.0') {
+    if (
+      h === 'localhost' ||
+      h === '127.0.0.1' ||
+      h === '::1' ||
+      h === '0.0.0.0'
+    ) {
       return true;
     }
 
@@ -46,7 +51,9 @@ export class SshTunnelService {
 
   async openTunnel(key: string, config: SshTunnelConfig): Promise<number> {
     if (this.isInternalIp(config.dbHost)) {
-      throw new Error(`Connection to internal host ${config.dbHost} is forbidden for security reasons.`);
+      throw new Error(
+        `Connection to internal host ${config.dbHost} is forbidden for security reasons.`,
+      );
     }
 
     const existing = this.tunnels.get(key);

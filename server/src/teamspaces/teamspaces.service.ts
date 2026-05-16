@@ -1,4 +1,9 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrganizationsRepository } from '../organizations/repositories/organizations.repository';
 import { AuditAction, AuditService } from '../audit/audit.service';
@@ -39,7 +44,10 @@ export class TeamspacesService {
     this.repository = new OrganizationsRepository(prisma);
   }
 
-  async list(organizationId: string, userId: string): Promise<TeamspaceListItem[]> {
+  async list(
+    organizationId: string,
+    userId: string,
+  ): Promise<TeamspaceListItem[]> {
     await this.ensureMemberAccess(organizationId, userId);
 
     const teamspaces = await this.prisma.teamspace.findMany({
@@ -77,7 +85,11 @@ export class TeamspacesService {
     }));
   }
 
-  async create(organizationId: string, userId: string, dto: CreateTeamspaceDto): Promise<TeamspaceListItem> {
+  async create(
+    organizationId: string,
+    userId: string,
+    dto: CreateTeamspaceDto,
+  ): Promise<TeamspaceListItem> {
     await this.ensureOwnerOrAdminAccess(organizationId, userId);
 
     const name = dto.name.trim();
@@ -134,7 +146,10 @@ export class TeamspacesService {
   ): Promise<TeamspaceListItem> {
     await this.ensureOwnerOrAdminAccess(organizationId, userId);
 
-    const teamspace = await this.getTeamspaceOrThrow(organizationId, teamspaceId);
+    const teamspace = await this.getTeamspaceOrThrow(
+      organizationId,
+      teamspaceId,
+    );
     const data: { name?: string; description?: string | null } = {};
 
     if (dto.name !== undefined) {
@@ -184,10 +199,17 @@ export class TeamspacesService {
     return this.toListItem(updated);
   }
 
-  async delete(organizationId: string, teamspaceId: string, userId: string): Promise<{ id: string; unassignedResourceCount: number }> {
+  async delete(
+    organizationId: string,
+    teamspaceId: string,
+    userId: string,
+  ): Promise<{ id: string; unassignedResourceCount: number }> {
     await this.ensureOwnerOrAdminAccess(organizationId, userId);
 
-    const teamspace = await this.getTeamspaceOrThrow(organizationId, teamspaceId);
+    const teamspace = await this.getTeamspaceOrThrow(
+      organizationId,
+      teamspaceId,
+    );
     const resourceCount = await this.prisma.organizationResource.count({
       where: {
         organizationId,
@@ -271,7 +293,10 @@ export class TeamspacesService {
     return resource;
   }
 
-  private async getTeamspaceOrThrow(organizationId: string, teamspaceId: string) {
+  private async getTeamspaceOrThrow(
+    organizationId: string,
+    teamspaceId: string,
+  ) {
     const teamspace = await this.prisma.teamspace.findFirst({
       where: {
         id: teamspaceId,
@@ -293,7 +318,10 @@ export class TeamspacesService {
     }
   }
 
-  private async ensureOwnerOrAdminAccess(organizationId: string, userId: string) {
+  private async ensureOwnerOrAdminAccess(
+    organizationId: string,
+    userId: string,
+  ) {
     const member = await this.repository.findMember(organizationId, userId);
     if (!member) {
       throw new ForbiddenException('You are not a member');
@@ -301,7 +329,9 @@ export class TeamspacesService {
 
     const allowed = [OrganizationRole.OWNER, OrganizationRole.ADMIN];
     if (!allowed.includes(member.role as OrganizationRole)) {
-      throw new ForbiddenException('Only owners and admins can perform this action');
+      throw new ForbiddenException(
+        'Only owners and admins can perform this action',
+      );
     }
   }
 
@@ -310,7 +340,11 @@ export class TeamspacesService {
     let candidate = baseSlug;
     let suffix = 2;
 
-    while (await this.prisma.teamspace.findFirst({ where: { organizationId, slug: candidate } })) {
+    while (
+      await this.prisma.teamspace.findFirst({
+        where: { organizationId, slug: candidate },
+      })
+    ) {
       candidate = `${baseSlug}-${suffix}`;
       suffix += 1;
     }

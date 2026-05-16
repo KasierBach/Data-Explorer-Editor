@@ -11,7 +11,11 @@ function isDevelopment() {
 
 function isLocalDevHost(host: string): boolean {
   const normalized = host.trim().toLowerCase();
-  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
+  return (
+    normalized === 'localhost' ||
+    normalized === '127.0.0.1' ||
+    normalized === '::1'
+  );
 }
 
 function normalizeHost(host: string): string {
@@ -54,22 +58,22 @@ export function isPrivateIp(ip: string): boolean {
   // IPv4 Private/Reserved
   if (net.isIPv4(ip)) {
     const parts = ip.split('.').map(Number);
-    
+
     // Loopback (127.0.0.0/8)
     if (parts[0] === 127) return true;
-    
+
     // Private Network (10.0.0.0/8)
     if (parts[0] === 10) return true;
-    
+
     // Private Network (172.16.0.0/12)
     if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-    
+
     // Private Network (192.168.0.0/16)
     if (parts[0] === 192 && parts[1] === 168) return true;
-    
+
     // Link-local (169.254.0.0/16)
     if (parts[0] === 169 && parts[1] === 254) return true;
-    
+
     // Broadcast
     if (ip === '255.255.255.255') return true;
   }
@@ -78,10 +82,11 @@ export function isPrivateIp(ip: string): boolean {
   if (net.isIPv6(ip)) {
     // Loopback (::1)
     if (ip === '::1' || ip === '0:0:0:0:0:0:0:1') return true;
-    
+
     // Unique Local (fc00::/7)
-    if (ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd')) return true;
-    
+    if (ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd'))
+      return true;
+
     // Link-local (fe80::/10)
     if (ip.toLowerCase().startsWith('fe8')) return true;
   }
@@ -96,7 +101,7 @@ export function isPrivateIp(ip: string): boolean {
 export async function validateHost(host: string): Promise<boolean> {
   if (!host) return true;
   const normalizedHost = normalizeHost(host);
-  
+
   // Environment override for local development if needed
   if (process.env.ALLOW_INTERNAL_IPS === 'true') {
     return true;

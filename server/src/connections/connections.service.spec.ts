@@ -59,7 +59,9 @@ describe('ConnectionsService security', () => {
   });
 
   it('rejects attaching a connection to a team the caller does not belong to', async () => {
-    organizationsMock.ensureMemberAccess.mockRejectedValueOnce(new ForbiddenException('nope'));
+    organizationsMock.ensureMemberAccess.mockRejectedValueOnce(
+      new ForbiddenException('nope'),
+    );
 
     await expect(
       service.create(
@@ -73,7 +75,10 @@ describe('ConnectionsService security', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
-    expect(organizationsMock.ensureMemberAccess).toHaveBeenCalledWith('org-1', 'user-1');
+    expect(organizationsMock.ensureMemberAccess).toHaveBeenCalledWith(
+      'org-1',
+      'user-1',
+    );
     expect(prismaMock.connection.create).not.toHaveBeenCalled();
   });
 });

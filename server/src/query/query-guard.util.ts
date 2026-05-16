@@ -58,7 +58,11 @@ export function isSqlAllowedOnReadOnly(sql: string): boolean {
   const normalized = normalizeSql(sql).toUpperCase();
   if (!normalized) return true;
 
-  if (SQL_DESTRUCTIVE_KEYWORDS.some((kw) => new RegExp(`\\b${kw}\\b`, 'i').test(normalized))) {
+  if (
+    SQL_DESTRUCTIVE_KEYWORDS.some((kw) =>
+      new RegExp(`\\b${kw}\\b`, 'i').test(normalized),
+    )
+  ) {
     return false;
   }
 
@@ -85,7 +89,6 @@ export function containsMultipleStatements(sql: string): boolean {
   const normalized = normalizeSql(sql);
   let insideSingle = false;
   let insideDouble = false;
-  let semicolonCount = 0;
 
   for (let i = 0; i < normalized.length; i++) {
     const ch = normalized[i];
@@ -96,7 +99,6 @@ export function containsMultipleStatements(sql: string): boolean {
     } else if (ch === '"' && !insideSingle && prev !== '\\') {
       insideDouble = !insideDouble;
     } else if (ch === ';' && !insideSingle && !insideDouble) {
-      semicolonCount++;
       // A trailing semicolon at the end of a single statement is fine;
       // we only flag it if there is non-whitespace content AFTER the semicolon.
       const remainder = normalized.slice(i + 1).trim();
@@ -128,10 +130,17 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
   );
 
   if (foundKeywords.length === 0) {
-    return { isDestructive: false, severity: 'none', keywords: [], affectedObject: null };
+    return {
+      isDestructive: false,
+      severity: 'none',
+      keywords: [],
+      affectedObject: null,
+    };
   }
 
-  const isHighSeverity = foundKeywords.some((kw) => SQL_HIGH_SEVERITY_KEYWORDS.includes(kw));
+  const isHighSeverity = foundKeywords.some((kw) =>
+    SQL_HIGH_SEVERITY_KEYWORDS.includes(kw),
+  );
 
   // Try to extract the affected table/database name
   const objectMatch = normalized.match(
@@ -148,7 +157,9 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
 
 // ─── MongoDB Helpers ───
 
-export function getMongoActionFromPayload(payloadString: string): string | null {
+export function getMongoActionFromPayload(
+  payloadString: string,
+): string | null {
   try {
     const payload = JSON.parse(payloadString);
     return typeof payload?.action === 'string' ? payload.action : null;

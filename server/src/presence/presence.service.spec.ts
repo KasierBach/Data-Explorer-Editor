@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PresenceService } from './presence.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -43,7 +43,9 @@ describe('PresenceService', () => {
   });
 
   it('heartbeats and lists live teamspace presence', async () => {
-    prismaMock.organizationMember.findUnique.mockResolvedValue({ id: 'member-1' });
+    prismaMock.organizationMember.findUnique.mockResolvedValue({
+      id: 'member-1',
+    });
     prismaMock.teamspace.findFirst.mockResolvedValue({ id: 'teamspace-1' });
     prismaMock.user.findUnique.mockResolvedValue({
       id: 'user-1',
@@ -55,7 +57,11 @@ describe('PresenceService', () => {
     });
     redisMock.hgetall.mockResolvedValue({});
 
-    const result = await service.heartbeatTeamspace('org-1', 'teamspace-1', 'user-1');
+    const result = await service.heartbeatTeamspace(
+      'org-1',
+      'teamspace-1',
+      'user-1',
+    );
 
     expect(redisMock.hset).toHaveBeenCalledWith(
       'presence:organizations:org-1:teamspaces:teamspace-1',
@@ -67,7 +73,9 @@ describe('PresenceService', () => {
   });
 
   it('filters stale presence on read', async () => {
-    prismaMock.organizationMember.findUnique.mockResolvedValue({ id: 'member-1' });
+    prismaMock.organizationMember.findUnique.mockResolvedValue({
+      id: 'member-1',
+    });
     prismaMock.teamspace.findFirst.mockResolvedValue({ id: 'teamspace-1' });
     redisMock.hgetall.mockResolvedValue({
       fresh: JSON.stringify({
@@ -92,18 +100,32 @@ describe('PresenceService', () => {
       }),
     });
 
-    const result = await service.listTeamspacePresence('org-1', 'teamspace-1', 'user-1');
+    const result = await service.listTeamspacePresence(
+      'org-1',
+      'teamspace-1',
+      'user-1',
+    );
 
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('fresh');
-    expect(redisMock.hdel).toHaveBeenCalledWith('presence:organizations:org-1:teamspaces:teamspace-1', 'stale');
+    expect(redisMock.hdel).toHaveBeenCalledWith(
+      'presence:organizations:org-1:teamspaces:teamspace-1',
+      'stale',
+    );
   });
 
   it('blocks resource presence without read access', async () => {
-    permissionsMock.ensurePermission.mockRejectedValue(new ForbiddenException('denied'));
+    permissionsMock.ensurePermission.mockRejectedValue(
+      new ForbiddenException('denied'),
+    );
 
     await expect(
-      service.heartbeatResource('org-1', ResourceType.QUERY, 'query-1', 'user-1'),
+      service.heartbeatResource(
+        'org-1',
+        ResourceType.QUERY,
+        'query-1',
+        'user-1',
+      ),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -111,6 +133,8 @@ describe('PresenceService', () => {
     prismaMock.organizationMember.findUnique.mockResolvedValue(null);
     prismaMock.teamspace.findFirst.mockResolvedValue({ id: 'teamspace-1' });
 
-    await expect(service.listTeamspacePresence('org-1', 'teamspace-1', 'user-1')).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      service.listTeamspacePresence('org-1', 'teamspace-1', 'user-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

@@ -49,7 +49,8 @@ import { NoSqlModule } from './nosql/nosql.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         connection: {
-          url: configService.get<string>('REDIS_URL') || 'redis://localhost:6379',
+          url:
+            configService.get<string>('REDIS_URL') || 'redis://localhost:6379',
         },
       }),
     }),
@@ -59,7 +60,8 @@ import { NoSqlModule } from './nosql/nosql.module';
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => {
         const store = await redisStore({
-          url: configService.get<string>('REDIS_URL') || 'redis://localhost:6379',
+          url:
+            configService.get<string>('REDIS_URL') || 'redis://localhost:6379',
           ttl: 60000,
         });
         return { store };
@@ -69,10 +71,12 @@ import { NoSqlModule } from './nosql/nosql.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        throttlers: [{
-          ttl: 60000,
-          limit: 100,
-        }],
+        throttlers: [
+          {
+            ttl: 60000,
+            limit: 100,
+          },
+        ],
         storage: new ThrottlerStorageRedisService(
           configService.get<string>('REDIS_URL') || 'redis://localhost:6379',
         ),

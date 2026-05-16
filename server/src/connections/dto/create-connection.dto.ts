@@ -1,57 +1,86 @@
-import { IsString, IsInt, IsOptional, IsIn, IsNotEmpty, IsBoolean, ValidateIf } from 'class-validator';
+import {
+  IsString,
+  IsInt,
+  IsOptional,
+  IsIn,
+  IsNotEmpty,
+  IsBoolean,
+  ValidateIf,
+} from 'class-validator';
 import { IsValidHost } from '../../common/decorators/is-valid-host.decorator';
 
 export class CreateConnectionDto {
-    @IsString()
-    @IsNotEmpty()
-    name: string;
+  @IsString()
+  @IsNotEmpty()
+  name: string;
 
-    @IsString()
-    @IsIn(['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse', 'mock', 'mongodb', 'mongodb+srv'])
-    type: 'postgres' | 'mysql' | 'mssql' | 'sqlite' | 'clickhouse' | 'mock' | 'mongodb' | 'mongodb+srv';
+  @IsString()
+  @IsIn([
+    'postgres',
+    'mysql',
+    'mssql',
+    'sqlite',
+    'clickhouse',
+    'mock',
+    'mongodb',
+    'mongodb+srv',
+  ])
+  type:
+    | 'postgres'
+    | 'mysql'
+    | 'mssql'
+    | 'sqlite'
+    | 'clickhouse'
+    | 'mock'
+    | 'mongodb'
+    | 'mongodb+srv';
 
-    @ValidateIf((dto: CreateConnectionDto) => dto.type !== 'sqlite' && dto.type !== 'mock')
-    @IsString()
-    @IsNotEmpty()
-    @IsValidHost({ message: 'Host address is not allowed for security reasons (SSRF).' })
-    host?: string;
+  @ValidateIf(
+    (dto: CreateConnectionDto) => dto.type !== 'sqlite' && dto.type !== 'mock',
+  )
+  @IsString()
+  @IsNotEmpty()
+  @IsValidHost({
+    message: 'Host address is not allowed for security reasons (SSRF).',
+  })
+  host?: string;
 
-    @IsInt()
-    @IsOptional()
-    port?: number;
+  @IsInt()
+  @IsOptional()
+  port?: number;
 
-    @IsString()
-    @IsOptional()
-    username?: string;
+  @IsString()
+  @IsOptional()
+  username?: string;
 
-    @IsString()
-    @IsOptional()
-    password?: string;
+  @IsString()
+  @IsOptional()
+  password?: string;
 
-    @IsString()
-    @IsOptional()
-    database?: string;
+  @IsString()
+  @IsOptional()
+  database?: string;
 
-    @IsOptional()
-    showAllDatabases?: boolean;
+  @IsOptional()
+  showAllDatabases?: boolean;
 
-    @IsBoolean()
-    @IsOptional()
-    readOnly?: boolean;
+  @IsBoolean()
+  @IsOptional()
+  readOnly?: boolean;
 
-    @IsBoolean()
-    @IsOptional()
-    allowSchemaChanges?: boolean;
+  @IsBoolean()
+  @IsOptional()
+  allowSchemaChanges?: boolean;
 
-    @IsBoolean()
-    @IsOptional()
-    allowImportExport?: boolean;
+  @IsBoolean()
+  @IsOptional()
+  allowImportExport?: boolean;
 
-    @IsBoolean()
-    @IsOptional()
-    allowQueryExecution?: boolean;
+  @IsBoolean()
+  @IsOptional()
+  allowQueryExecution?: boolean;
 
-    @IsString()
-    @IsOptional()
-    organizationId?: string;
+  @IsString()
+  @IsOptional()
+  organizationId?: string;
 }

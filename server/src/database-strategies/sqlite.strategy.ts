@@ -1,7 +1,15 @@
 import type {
-  IDatabaseStrategy, TreeNodeResult, ColumnInfo, QueryResult,
-  UpdateRowParams, InsertRowParams, DeleteRowsParams,
-  FullTableMetadata, IndexInfo, Relationship, DatabaseMetrics,
+  IDatabaseStrategy,
+  TreeNodeResult,
+  ColumnInfo,
+  QueryResult,
+  UpdateRowParams,
+  InsertRowParams,
+  DeleteRowsParams,
+  FullTableMetadata,
+  IndexInfo,
+  Relationship,
+  DatabaseMetrics,
   ConnectionConfig,
 } from './database-strategy.interface';
 import { SchemaOperation } from '../query/dto/schema-operations.types';
@@ -15,11 +23,9 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return new Database(path);
   }
 
-
   async closePool(pool: Database.Database): Promise<void> {
     pool.close();
   }
-
 
   quoteIdentifier(name: string): string {
     return `"${name.replace(/"/g, '""')}"`;
@@ -29,7 +35,11 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return this.quoteIdentifier(table);
   }
 
-  async executeQuery(pool: Database.Database, sql: string, options?: { limit?: number; offset?: number }): Promise<QueryResult> {
+  async executeQuery(
+    pool: Database.Database,
+    sql: string,
+    options?: { limit?: number; offset?: number },
+  ): Promise<QueryResult> {
     let safeSql = sql;
     if (options?.limit !== undefined) {
       safeSql += ` LIMIT ${options.limit}`;
@@ -44,30 +54,44 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return { rows: rows.slice(0, 50000), columns, rowCount: rows.length };
   }
 
-
-  async updateRow(pool: Database.Database, params: UpdateRowParams): Promise<{ success: boolean; rowCount: number }> {
+  async updateRow(
+    pool: Database.Database,
+    params: UpdateRowParams,
+  ): Promise<{ success: boolean; rowCount: number }> {
     const { table, pkColumn, pkValue, updates } = params;
     const cols = Object.keys(updates);
     if (cols.length === 0) return { success: false, rowCount: 0 };
 
-    const setClause = cols.map((c) => `${this.quoteIdentifier(c)} = ?`).join(', ');
+    const setClause = cols
+      .map((c) => `${this.quoteIdentifier(c)} = ?`)
+      .join(', ');
     const sql = `UPDATE ${this.quoteIdentifier(table)} SET ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = ?`;
     const values = [...cols.map((c) => updates[c]), pkValue];
 
     return this.runChange(pool, sql, values);
   }
 
-  async insertRow(pool: Database.Database, params: InsertRowParams): Promise<{ success: boolean; rowCount: number }> {
+  async insertRow(
+    pool: Database.Database,
+    params: InsertRowParams,
+  ): Promise<{ success: boolean; rowCount: number }> {
     const { table, data } = params;
     const cols = Object.keys(data);
     if (cols.length === 0) return { success: false, rowCount: 0 };
 
     const placeholders = cols.map(() => '?').join(', ');
     const sql = `INSERT INTO ${this.quoteIdentifier(table)} (${cols.map((c) => this.quoteIdentifier(c)).join(', ')}) VALUES (${placeholders})`;
-    return this.runChange(pool, sql, cols.map((c) => data[c]));
+    return this.runChange(
+      pool,
+      sql,
+      cols.map((c) => data[c]),
+    );
   }
 
-  async deleteRows(pool: Database.Database, params: DeleteRowsParams): Promise<{ success: boolean; rowCount: number }> {
+  async deleteRows(
+    pool: Database.Database,
+    params: DeleteRowsParams,
+  ): Promise<{ success: boolean; rowCount: number }> {
     const { table, pkColumn, pkValues } = params;
     if (pkValues.length === 0) return { success: true, rowCount: 0 };
 
@@ -76,14 +100,19 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return this.runChange(pool, sql, pkValues);
   }
 
-  private async runChange(pool: Database.Database, sql: string, values: unknown[]): Promise<{ success: boolean; rowCount: number }> {
-
+  private async runChange(
+    pool: Database.Database,
+    sql: string,
+    values: unknown[],
+  ): Promise<{ success: boolean; rowCount: number }> {
     const result = pool.prepare(sql).run(...values);
     return { success: true, rowCount: result.changes };
   }
 
-
-  async importData(pool: Database.Database, params: { schema: string; table: string; data: Record<string, unknown>[] }): Promise<{ success: boolean; rowCount: number }> {
+  async importData(
+    pool: Database.Database,
+    params: { schema: string; table: string; data: Record<string, unknown>[] },
+  ): Promise<{ success: boolean; rowCount: number }> {
     const { table, data } = params;
     if (!data || data.length === 0) return { success: true, rowCount: 0 };
 
@@ -95,12 +124,19 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return { success: true, rowCount: total };
   }
 
-  async exportStream(pool: Database.Database, _schema: string, table: string): Promise<unknown> {
+  async exportStream(
+    pool: Database.Database,
+    _schema: string,
+    table: string,
+  ): Promise<unknown> {
     const sql = `SELECT * FROM ${this.quoteIdentifier(table)}`;
     const rows = pool.prepare(sql).all();
-    return { [Symbol.asyncIterator]: async function* () { for (const row of rows) yield row; } };
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        for (const row of rows) yield row;
+      },
+    };
   }
-
 
   buildAlterTableSql(quotedTable: string, op: SchemaOperation): string {
     switch (op.type) {
@@ -124,26 +160,63 @@ export class SqliteStrategy implements IDatabaseStrategy {
   }
 
   async getDatabases(_pool: Database.Database): Promise<TreeNodeResult[]> {
-    return [{ id: 'db:main', name: 'main', type: 'database', parentId: 'root', hasChildren: true }];
+    return [
+      {
+        id: 'db:main',
+        name: 'main',
+        type: 'database',
+        parentId: 'root',
+        hasChildren: true,
+      },
+    ];
   }
 
-  async getSchemas(_pool: Database.Database, _dbName?: string): Promise<TreeNodeResult[]> {
-    return [{ id: 'schema:main', name: 'main', type: 'schema', parentId: 'root', hasChildren: true }];
+  async getSchemas(
+    _pool: Database.Database,
+    _dbName?: string,
+  ): Promise<TreeNodeResult[]> {
+    return [
+      {
+        id: 'schema:main',
+        name: 'main',
+        type: 'schema',
+        parentId: 'root',
+        hasChildren: true,
+      },
+    ];
   }
 
-  async getTables(pool: Database.Database, _schema: string, _dbName?: string): Promise<TreeNodeResult[]> {
+  async getTables(
+    pool: Database.Database,
+    _schema: string,
+    _dbName?: string,
+  ): Promise<TreeNodeResult[]> {
     const sql = `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`;
     const rows = pool.prepare(sql).all() as { name: string }[];
-    return rows.map((r) => ({ id: `table:${r.name}`, name: r.name, type: 'table', parentId: 'schema:main', hasChildren: true }));
+    return rows.map((r) => ({
+      id: `table:${r.name}`,
+      name: r.name,
+      type: 'table',
+      parentId: 'schema:main',
+      hasChildren: true,
+    }));
   }
 
-
-  async getViews(pool: Database.Database, _schema: string, _dbName?: string): Promise<TreeNodeResult[]> {
+  async getViews(
+    pool: Database.Database,
+    _schema: string,
+    _dbName?: string,
+  ): Promise<TreeNodeResult[]> {
     const sql = `SELECT name FROM sqlite_master WHERE type='view'`;
     const rows = pool.prepare(sql).all() as { name: string }[];
-    return rows.map((r) => ({ id: `view:${r.name}`, name: r.name, type: 'view', parentId: 'schema:main', hasChildren: true }));
+    return rows.map((r) => ({
+      id: `view:${r.name}`,
+      name: r.name,
+      type: 'view',
+      parentId: 'schema:main',
+      hasChildren: true,
+    }));
   }
-
 
   async getFunctions(): Promise<TreeNodeResult[]> {
     return [];
@@ -153,7 +226,11 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return [];
   }
 
-  async getColumns(pool: Database.Database, _schema: string, table: string): Promise<ColumnInfo[]> {
+  async getColumns(
+    pool: Database.Database,
+    _schema: string,
+    table: string,
+  ): Promise<ColumnInfo[]> {
     const sql = `PRAGMA table_info(${this.quoteIdentifier(table)})`;
     const rows = pool.prepare(sql).all() as any[];
     return rows.map((r) => ({
@@ -166,9 +243,14 @@ export class SqliteStrategy implements IDatabaseStrategy {
     }));
   }
 
-
-  async getIndexes(pool: Database.Database, _schema: string, table: string): Promise<TreeNodeResult[]> {
-    const rows = pool.prepare(`PRAGMA index_list(${this.quoteIdentifier(table)})`).all() as any[];
+  async getIndexes(
+    pool: Database.Database,
+    _schema: string,
+    table: string,
+  ): Promise<TreeNodeResult[]> {
+    const rows = pool
+      .prepare(`PRAGMA index_list(${this.quoteIdentifier(table)})`)
+      .all() as any[];
     const parentId = `table:${table}.folder:indexes`;
     return rows.map((r) => ({
       id: `${parentId}.index:${r.name}`,
@@ -176,35 +258,53 @@ export class SqliteStrategy implements IDatabaseStrategy {
       type: 'index',
       parentId,
       hasChildren: false,
-      metadata: { unique: r.unique === 1 }
+      metadata: { unique: r.unique === 1 },
     }));
   }
 
-  async getTriggers(pool: Database.Database, _schema: string, table: string): Promise<TreeNodeResult[]> {
-    const rows = pool.prepare(`SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?`).all(table) as { name: string }[];
+  async getTriggers(
+    pool: Database.Database,
+    _schema: string,
+    table: string,
+  ): Promise<TreeNodeResult[]> {
+    const rows = pool
+      .prepare(
+        `SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?`,
+      )
+      .all(table) as { name: string }[];
     const parentId = `table:${table}.folder:triggers`;
     return rows.map((r) => ({
       id: `${parentId}.trigger:${r.name}`,
       name: r.name,
       type: 'trigger',
       parentId,
-      hasChildren: false
+      hasChildren: false,
     }));
   }
 
-  async getConstraints(pool: Database.Database, _schema: string, table: string): Promise<TreeNodeResult[]> {
-    const rows = pool.prepare(`PRAGMA foreign_key_list(${this.quoteIdentifier(table)})`).all() as any[];
+  async getConstraints(
+    pool: Database.Database,
+    _schema: string,
+    table: string,
+  ): Promise<TreeNodeResult[]> {
+    const rows = pool
+      .prepare(`PRAGMA foreign_key_list(${this.quoteIdentifier(table)})`)
+      .all() as any[];
     const parentId = `table:${table}.folder:constraints`;
     return rows.map((r) => ({
       id: `${parentId}.constraint:fk_${r.id}`,
       name: `FK to ${r.table} (${r.from} -> ${r.to})`,
       type: 'constraint',
       parentId,
-      hasChildren: false
+      hasChildren: false,
     }));
   }
 
-  async getFullMetadata(pool: Database.Database, _schema: string, table: string): Promise<FullTableMetadata> {
+  async getFullMetadata(
+    pool: Database.Database,
+    _schema: string,
+    table: string,
+  ): Promise<FullTableMetadata> {
     const columns = await this.getColumns(pool, '', table);
     const indexSql = `PRAGMA index_list(${this.quoteIdentifier(table)})`;
     const indicesRaw = pool.prepare(indexSql).all() as any[];
@@ -227,7 +327,6 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return { columns, indices, rowCount: countRow.cnt };
   }
 
-
   async getRelationships(): Promise<Relationship[]> {
     return [];
   }
@@ -244,10 +343,14 @@ export class SqliteStrategy implements IDatabaseStrategy {
     };
   }
 
-  async getHierarchyNodes(pool: Database.Database, parentId: string | null): Promise<TreeNodeResult[]> {
+  async getHierarchyNodes(
+    pool: Database.Database,
+    parentId: string | null,
+  ): Promise<TreeNodeResult[]> {
     if (!parentId) return this.getSchemas(pool);
     if (parentId === 'schema:main') return this.getTables(pool, '');
-    if (parentId.startsWith('schema:main.folder:tables')) return this.getTables(pool, '');
+    if (parentId.startsWith('schema:main.folder:tables'))
+      return this.getTables(pool, '');
     return [];
   }
 

@@ -1,4 +1,11 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
@@ -47,7 +54,8 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    const redisUrl = this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
+    const redisUrl =
+      this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
     this.redis = new Redis(redisUrl);
   }
 
@@ -55,16 +63,27 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
     this.redis?.quit();
   }
 
-  async heartbeatTeamspace(organizationId: string, teamspaceId: string, userId: string) {
+  async heartbeatTeamspace(
+    organizationId: string,
+    teamspaceId: string,
+    userId: string,
+  ) {
     await this.assertTeamspaceAccess(organizationId, teamspaceId, userId);
-    return this.heartbeat({
-      kind: 'teamspace',
-      organizationId,
-      teamspaceId,
-    }, userId);
+    return this.heartbeat(
+      {
+        kind: 'teamspace',
+        organizationId,
+        teamspaceId,
+      },
+      userId,
+    );
   }
 
-  async listTeamspacePresence(organizationId: string, teamspaceId: string, userId: string) {
+  async listTeamspacePresence(
+    organizationId: string,
+    teamspaceId: string,
+    userId: string,
+  ) {
     await this.assertTeamspaceAccess(organizationId, teamspaceId, userId);
     return this.list({
       kind: 'teamspace',
@@ -73,28 +92,58 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async leaveTeamspace(organizationId: string, teamspaceId: string, userId: string) {
+  async leaveTeamspace(
+    organizationId: string,
+    teamspaceId: string,
+    userId: string,
+  ) {
     await this.assertTeamspaceAccess(organizationId, teamspaceId, userId);
-    await this.leave({
-      kind: 'teamspace',
-      organizationId,
-      teamspaceId,
-    }, userId);
+    await this.leave(
+      {
+        kind: 'teamspace',
+        organizationId,
+        teamspaceId,
+      },
+      userId,
+    );
     return { success: true };
   }
 
-  async heartbeatResource(organizationId: string, resourceType: ResourceType, resourceId: string, userId: string) {
-    await this.permissions.ensurePermission(userId, resourceType, resourceId, Permission.READ);
-    return this.heartbeat({
-      kind: 'resource',
-      organizationId,
+  async heartbeatResource(
+    organizationId: string,
+    resourceType: ResourceType,
+    resourceId: string,
+    userId: string,
+  ) {
+    await this.permissions.ensurePermission(
+      userId,
       resourceType,
       resourceId,
-    }, userId);
+      Permission.READ,
+    );
+    return this.heartbeat(
+      {
+        kind: 'resource',
+        organizationId,
+        resourceType,
+        resourceId,
+      },
+      userId,
+    );
   }
 
-  async listResourcePresence(organizationId: string, resourceType: ResourceType, resourceId: string, userId: string) {
-    await this.permissions.ensurePermission(userId, resourceType, resourceId, Permission.READ);
+  async listResourcePresence(
+    organizationId: string,
+    resourceType: ResourceType,
+    resourceId: string,
+    userId: string,
+  ) {
+    await this.permissions.ensurePermission(
+      userId,
+      resourceType,
+      resourceId,
+      Permission.READ,
+    );
     return this.list({
       kind: 'resource',
       organizationId,
@@ -103,14 +152,27 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async leaveResource(organizationId: string, resourceType: ResourceType, resourceId: string, userId: string) {
-    await this.permissions.ensurePermission(userId, resourceType, resourceId, Permission.READ);
-    await this.leave({
-      kind: 'resource',
-      organizationId,
+  async leaveResource(
+    organizationId: string,
+    resourceType: ResourceType,
+    resourceId: string,
+    userId: string,
+  ) {
+    await this.permissions.ensurePermission(
+      userId,
       resourceType,
       resourceId,
-    }, userId);
+      Permission.READ,
+    );
+    await this.leave(
+      {
+        kind: 'resource',
+        organizationId,
+        resourceType,
+        resourceId,
+      },
+      userId,
+    );
     return { success: true };
   }
 
@@ -131,7 +193,10 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
   }
 
   private displayName(user: PresenceParticipant) {
-    const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+    const fullName = [user.firstName, user.lastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
     return fullName || user.username || user.email;
   }
 
@@ -155,7 +220,11 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
     return user;
   }
 
-  private async assertTeamspaceAccess(organizationId: string, teamspaceId: string, userId: string) {
+  private async assertTeamspaceAccess(
+    organizationId: string,
+    teamspaceId: string,
+    userId: string,
+  ) {
     const [member, teamspace] = await Promise.all([
       this.prisma.organizationMember.findUnique({
         where: {
@@ -183,7 +252,10 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async heartbeat(scope: PresenceScope, userId: string): Promise<PresenceEntry[]> {
+  private async heartbeat(
+    scope: PresenceScope,
+    userId: string,
+  ): Promise<PresenceEntry[]> {
     const redis = this.requireRedis();
     const user = await this.loadUser(userId);
     const now = Date.now();

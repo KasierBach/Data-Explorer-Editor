@@ -31,7 +31,12 @@ export class TeamspacesController {
     @Param('teamspaceId') teamspaceId: string,
     @Body() dto: UpdateTeamspaceDto,
   ) {
-    return this.teamspacesService.update(organizationId, teamspaceId, req.user.id, dto);
+    return this.teamspacesService.update(
+      organizationId,
+      teamspaceId,
+      req.user.id,
+      dto,
+    );
   }
 
   @Delete('teamspaces/:teamspaceId')
@@ -41,7 +46,11 @@ export class TeamspacesController {
     @Param('organizationId') organizationId: string,
     @Param('teamspaceId') teamspaceId: string,
   ) {
-    await this.teamspacesService.delete(organizationId, teamspaceId, req.user.id);
+    await this.teamspacesService.delete(
+      organizationId,
+      teamspaceId,
+      req.user.id,
+    );
   }
 
   @Get('teamspaces')

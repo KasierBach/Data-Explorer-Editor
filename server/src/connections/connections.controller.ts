@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { ConnectionsService } from './connections.service';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
@@ -8,10 +18,13 @@ import type { AuthenticatedRequest } from '../auth/auth-request.types';
 @Controller('connections')
 @UseGuards(JwtAuthGuard)
 export class ConnectionsController {
-  constructor(private readonly connectionsService: ConnectionsService) { }
+  constructor(private readonly connectionsService: ConnectionsService) {}
 
   @Post()
-  create(@Body() createConnectionDto: CreateConnectionDto, @Req() req: AuthenticatedRequest) {
+  create(
+    @Body() createConnectionDto: CreateConnectionDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.connectionsService.create(createConnectionDto, req.user.id);
   }
 
@@ -19,7 +32,6 @@ export class ConnectionsController {
   test(@Body() createConnectionDto: CreateConnectionDto) {
     return this.connectionsService.test(createConnectionDto);
   }
-
 
   @Get()
   findAll(@Req() req: AuthenticatedRequest) {
@@ -37,7 +49,11 @@ export class ConnectionsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateConnectionDto: UpdateConnectionDto, @Req() req: AuthenticatedRequest) {
+  update(
+    @Param('id') id: string,
+    @Body() updateConnectionDto: UpdateConnectionDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.connectionsService.update(id, updateConnectionDto, req.user.id);
   }
 

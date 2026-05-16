@@ -13,17 +13,23 @@ export type ResourcePermissionPolicy = Record<OrganizationRole, Permission[]>;
 const PERMISSION_VALUES = new Set(Object.values(Permission));
 
 function isPermissionValue(value: unknown): value is Permission {
-  return typeof value === 'string' && PERMISSION_VALUES.has(value as Permission);
+  return (
+    typeof value === 'string' && PERMISSION_VALUES.has(value as Permission)
+  );
 }
 
-export function isResourcePermissionPolicy(value: unknown): value is ResourcePermissionPolicy {
+export function isResourcePermissionPolicy(
+  value: unknown,
+): value is ResourcePermissionPolicy {
   if (!value || typeof value !== 'object') {
     return false;
   }
 
   return RESOURCE_PERMISSION_ROLES.every((role) => {
     const rolePermissions = (value as Record<string, unknown>)[role];
-    return Array.isArray(rolePermissions) && rolePermissions.every(isPermissionValue);
+    return (
+      Array.isArray(rolePermissions) && rolePermissions.every(isPermissionValue)
+    );
   });
 }
 

@@ -76,17 +76,25 @@ describe('SavedQueriesService', () => {
       organizationsServiceMock as any,
     );
 
-    await service.create({
-      name: 'Revenue',
-      sql: 'select 1',
-      visibility: 'workspace',
-      organizationId: 'org-1',
-    }, 'owner-1');
+    await service.create(
+      {
+        name: 'Revenue',
+        sql: 'select 1',
+        visibility: 'workspace',
+        organizationId: 'org-1',
+      },
+      'owner-1',
+    );
 
-    expect(organizationsServiceMock.ensureMemberAccess).toHaveBeenCalledWith('org-1', 'owner-1');
-    expect(prismaMock.savedQuery.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ organizationId: 'org-1' }),
-    }));
+    expect(organizationsServiceMock.ensureMemberAccess).toHaveBeenCalledWith(
+      'org-1',
+      'owner-1',
+    );
+    expect(prismaMock.savedQuery.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ organizationId: 'org-1' }),
+      }),
+    );
     expect(organizationsServiceMock.ensureResourcePolicy).toHaveBeenCalledWith(
       'QUERY',
       'query-1',
@@ -126,21 +134,28 @@ describe('SavedQueriesService', () => {
       organizationsServiceMock as any,
     );
 
-    await service.create({
-      name: 'Draft',
-      sql: 'select 1',
-      visibility: 'private',
-      organizationId: 'org-1',
-    }, 'owner-1');
+    await service.create(
+      {
+        name: 'Draft',
+        sql: 'select 1',
+        visibility: 'private',
+        organizationId: 'org-1',
+      },
+      'owner-1',
+    );
 
     expect(organizationsServiceMock.ensureMemberAccess).not.toHaveBeenCalled();
-    expect(prismaMock.savedQuery.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        visibility: 'private',
-        organizationId: null,
+    expect(prismaMock.savedQuery.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          visibility: 'private',
+          organizationId: null,
+        }),
       }),
-    }));
-    expect(organizationsServiceMock.ensureResourcePolicy).not.toHaveBeenCalled();
+    );
+    expect(
+      organizationsServiceMock.ensureResourcePolicy,
+    ).not.toHaveBeenCalled();
   });
 
   it('validates organization membership and refreshes policy when updating query workspace scope', async () => {
@@ -182,18 +197,27 @@ describe('SavedQueriesService', () => {
       organizationsServiceMock as any,
     );
 
-    await service.update('query-1', {
-      visibility: 'workspace',
-      organizationId: 'org-1',
-    }, 'owner-1');
-
-    expect(organizationsServiceMock.ensureMemberAccess).toHaveBeenCalledWith('org-1', 'owner-1');
-    expect(prismaMock.savedQuery.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
+    await service.update(
+      'query-1',
+      {
         visibility: 'workspace',
         organizationId: 'org-1',
+      },
+      'owner-1',
+    );
+
+    expect(organizationsServiceMock.ensureMemberAccess).toHaveBeenCalledWith(
+      'org-1',
+      'owner-1',
+    );
+    expect(prismaMock.savedQuery.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          visibility: 'workspace',
+          organizationId: 'org-1',
+        }),
       }),
-    }));
+    );
     expect(organizationsServiceMock.ensureResourcePolicy).toHaveBeenCalledWith(
       'QUERY',
       'query-1',
@@ -240,21 +264,29 @@ describe('SavedQueriesService', () => {
       organizationsServiceMock as any,
     );
 
-    await service.update('query-1', {
-      visibility: 'private',
-    }, 'owner-1');
-
-    expect(prismaMock.savedQuery.update).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
+    await service.update(
+      'query-1',
+      {
         visibility: 'private',
-        organizationId: null,
+      },
+      'owner-1',
+    );
+
+    expect(prismaMock.savedQuery.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          visibility: 'private',
+          organizationId: null,
+        }),
       }),
-    }));
+    );
     expect(organizationsServiceMock.removeResourcePolicy).toHaveBeenCalledWith(
       'QUERY',
       'query-1',
       'org-1',
     );
-    expect(organizationsServiceMock.ensureResourcePolicy).not.toHaveBeenCalled();
+    expect(
+      organizationsServiceMock.ensureResourcePolicy,
+    ).not.toHaveBeenCalled();
   });
 });

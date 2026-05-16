@@ -19,15 +19,18 @@ describe('AuthService - login', () => {
       mockMailService,
       mockOtpService,
       mockSeedService,
-      mockTokenService as any,
-      mockAuditService as any,
+      mockTokenService,
+      mockAuditService,
     );
   });
 
   it('should throw UnauthorizedException when user not found', async () => {
     mockPrisma.user.findUnique.mockResolvedValue(null);
     await expect(
-      authService.login({ email: 'notfound@example.com', password: 'pw' } as LoginDto),
+      authService.login({
+        email: 'notfound@example.com',
+        password: 'pw',
+      } as LoginDto),
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(mockAuditService.log).toHaveBeenCalledWith(
       expect.objectContaining({

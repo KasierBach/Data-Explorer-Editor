@@ -21,7 +21,9 @@ describe('SearchService', () => {
         SearchService,
         {
           provide: ConfigService,
-          useValue: { get: jest.fn().mockReturnValue('redis://localhost:6379') },
+          useValue: {
+            get: jest.fn().mockReturnValue('redis://localhost:6379'),
+          },
         },
         {
           provide: ConnectionsService,
@@ -37,7 +39,9 @@ describe('SearchService', () => {
         },
         {
           provide: AiService,
-          useValue: { suggestTablesBySemantic: jest.fn().mockResolvedValue([]) },
+          useValue: {
+            suggestTablesBySemantic: jest.fn().mockResolvedValue([]),
+          },
         },
       ],
     }).compile();
@@ -45,7 +49,7 @@ describe('SearchService', () => {
     service = module.get<SearchService>(SearchService);
     connectionsService = module.get(ConnectionsService);
     strategyFactory = module.get(DatabaseStrategyFactory);
-    
+
     // Setup Redis mock
     service.onModuleInit();
     redisMock = (service as any).redis;
@@ -59,13 +63,17 @@ describe('SearchService', () => {
     it('should return matched items from Redis', async () => {
       const mockItems = [
         JSON.stringify({ name: 'users', type: 'table', connectionName: 'DB1' }),
-        JSON.stringify({ name: 'orders', type: 'table', connectionName: 'DB1' }),
+        JSON.stringify({
+          name: 'orders',
+          type: 'table',
+          connectionName: 'DB1',
+        }),
       ];
-      
+
       redisMock.smembers.mockResolvedValue(mockItems as any);
 
       const results = await service.search('user-1', 'user');
-      
+
       expect(results).toHaveLength(1);
       expect(results[0].name).toBe('users');
     });
@@ -82,10 +90,14 @@ describe('SearchService', () => {
       const userId = 'user-1';
       const mockConn = { id: 'conn-1', name: 'Main DB', type: 'postgres' };
       connectionsService.findAll.mockResolvedValue([mockConn] as any);
-      
+
       const strategyMock = {
-        getSchemas: jest.fn().mockResolvedValue([{ id: 'db:postgres.schema:public' }]),
-        getTables: jest.fn().mockResolvedValue([{ name: 'users', type: 'table', id: 't1' }]),
+        getSchemas: jest
+          .fn()
+          .mockResolvedValue([{ id: 'db:postgres.schema:public' }]),
+        getTables: jest
+          .fn()
+          .mockResolvedValue([{ name: 'users', type: 'table', id: 't1' }]),
         getViews: jest.fn().mockResolvedValue([]),
       };
       strategyFactory.getStrategy.mockReturnValue(strategyMock as any);

@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, ParseEnumPipe, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseEnumPipe,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CollaborationService } from './collaboration.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
@@ -17,28 +27,49 @@ export class CollaborationController {
     @Param('organizationId') organizationId: string,
     @Query() query: ListActivityDto,
   ) {
-    return this.collaborationService.listActivity(organizationId, req.user.id, query.limit ?? 50);
+    return this.collaborationService.listActivity(
+      organizationId,
+      req.user.id,
+      query.limit ?? 50,
+    );
   }
 
-  @Get('organizations/:organizationId/resources/:resourceType/:resourceId/comments')
+  @Get(
+    'organizations/:organizationId/resources/:resourceType/:resourceId/comments',
+  )
   listResourceComments(
     @Req() req: AuthenticatedRequest,
     @Param('organizationId') organizationId: string,
-    @Param('resourceType', new ParseEnumPipe(ResourceType)) resourceType: ResourceType,
+    @Param('resourceType', new ParseEnumPipe(ResourceType))
+    resourceType: ResourceType,
     @Param('resourceId') resourceId: string,
   ) {
-    return this.collaborationService.listResourceComments(organizationId, req.user.id, resourceType, resourceId);
+    return this.collaborationService.listResourceComments(
+      organizationId,
+      req.user.id,
+      resourceType,
+      resourceId,
+    );
   }
 
-  @Post('organizations/:organizationId/resources/:resourceType/:resourceId/comments')
+  @Post(
+    'organizations/:organizationId/resources/:resourceType/:resourceId/comments',
+  )
   createComment(
     @Req() req: AuthenticatedRequest,
     @Param('organizationId') organizationId: string,
-    @Param('resourceType', new ParseEnumPipe(ResourceType)) resourceType: ResourceType,
+    @Param('resourceType', new ParseEnumPipe(ResourceType))
+    resourceType: ResourceType,
     @Param('resourceId') resourceId: string,
     @Body() dto: CreateCommentDto,
   ) {
-    return this.collaborationService.createComment(organizationId, req.user.id, resourceType, resourceId, dto);
+    return this.collaborationService.createComment(
+      organizationId,
+      req.user.id,
+      resourceType,
+      resourceId,
+      dto,
+    );
   }
 
   @Post('organizations/:organizationId/comments/:commentId/replies')
@@ -48,7 +79,12 @@ export class CollaborationController {
     @Param('commentId') commentId: string,
     @Body() dto: CreateCommentDto,
   ) {
-    return this.collaborationService.replyToComment(organizationId, req.user.id, commentId, dto);
+    return this.collaborationService.replyToComment(
+      organizationId,
+      req.user.id,
+      commentId,
+      dto,
+    );
   }
 
   @Post('organizations/:organizationId/comments/:commentId/resolve')
@@ -57,6 +93,10 @@ export class CollaborationController {
     @Param('organizationId') organizationId: string,
     @Param('commentId') commentId: string,
   ) {
-    return this.collaborationService.resolveComment(organizationId, req.user.id, commentId);
+    return this.collaborationService.resolveComment(
+      organizationId,
+      req.user.id,
+      commentId,
+    );
   }
 }

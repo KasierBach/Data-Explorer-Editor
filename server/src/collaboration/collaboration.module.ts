@@ -7,7 +7,12 @@ import { PermissionsModule } from '../permissions/permissions.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 
 @Module({
-  imports: [AuditModule, NotificationsModule, PermissionsModule, OrganizationsModule],
+  imports: [
+    AuditModule,
+    NotificationsModule,
+    PermissionsModule,
+    OrganizationsModule,
+  ],
   controllers: [CollaborationController],
   providers: [CollaborationService],
   exports: [CollaborationService],

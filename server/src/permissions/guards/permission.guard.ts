@@ -1,7 +1,15 @@
-import { Injectable, CanActivate, ExecutionContext, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  BadRequestException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionsService } from '../services/permissions.service';
-import { PERMISSION_KEY, PermissionMetadata } from '../decorators/require-permission.decorator';
+import {
+  PERMISSION_KEY,
+  PermissionMetadata,
+} from '../decorators/require-permission.decorator';
 import type { AuthenticatedRequest } from '../../auth/auth-request.types';
 
 @Injectable()
@@ -12,10 +20,10 @@ export class PermissionGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const meta = this.reflector.getAllAndOverride<PermissionMetadata>(PERMISSION_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const meta = this.reflector.getAllAndOverride<PermissionMetadata>(
+      PERMISSION_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!meta) return true;
 
@@ -30,7 +38,9 @@ export class PermissionGuard implements CanActivate {
       throw new BadRequestException('Resource ID is required');
     }
 
-    const resourceId = Array.isArray(rawResourceId) ? rawResourceId[0] : rawResourceId;
+    const resourceId = Array.isArray(rawResourceId)
+      ? rawResourceId[0]
+      : rawResourceId;
 
     await this.permissionsService.ensurePermission(
       userId,

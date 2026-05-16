@@ -15,31 +15,31 @@ import { AuditModule } from '../audit/audit.module';
 import { getRequiredSecret } from '../common/utils/secret.util';
 
 @Module({
-    imports: [
-        PassportModule,
-        JwtModule.registerAsync({
-            imports: [ConfigModule],
-            useFactory: async () => ({
-                secret: getRequiredSecret('JWT_SECRET', {
-                    minLength: 32,
-                    disallowValues: ['super-secret-key', 'your-secret-key'],
-                }),
-                signOptions: { expiresIn: '1d' },
-            }),
+  imports: [
+    PassportModule,
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: async () => ({
+        secret: getRequiredSecret('JWT_SECRET', {
+          minLength: 32,
+          disallowValues: ['super-secret-key', 'your-secret-key'],
         }),
-        OtpModule,
-        SeedModule,
-        AuditModule,
-    ],
-    controllers: [AuthController],
-    providers: [
-        AuthService, 
-        SocialAuthService, 
-        TokenService,
-        JwtStrategy, 
-        GoogleStrategy, 
-        GithubStrategy
-    ],
-    exports: [AuthService, SocialAuthService, TokenService],
+        signOptions: { expiresIn: '1d' },
+      }),
+    }),
+    OtpModule,
+    SeedModule,
+    AuditModule,
+  ],
+  controllers: [AuthController],
+  providers: [
+    AuthService,
+    SocialAuthService,
+    TokenService,
+    JwtStrategy,
+    GoogleStrategy,
+    GithubStrategy,
+  ],
+  exports: [AuthService, SocialAuthService, TokenService],
 })
-export class AuthModule { }
+export class AuthModule {}

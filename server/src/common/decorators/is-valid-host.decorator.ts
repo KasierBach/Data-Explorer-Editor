@@ -1,4 +1,10 @@
-import { registerDecorator, ValidationOptions, ValidatorConstraint, ValidatorConstraintInterface, ValidationArguments } from 'class-validator';
+import {
+  registerDecorator,
+  ValidationOptions,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  ValidationArguments,
+} from 'class-validator';
 import { validateHost } from '../utils/ssrf-validator.util';
 
 @ValidatorConstraint({ name: 'isValidHost', async: true })
@@ -14,7 +20,7 @@ export class IsValidHostConstraint implements ValidatorConstraintInterface {
 }
 
 export function IsValidHost(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
+  return function (object: object, propertyName: string) {
     registerDecorator({
       target: object.constructor,
       propertyName: propertyName,

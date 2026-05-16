@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditAction, AuditService } from '../audit/audit.service';
 import { CreateSavedQueryDto } from './dto/create-saved-query.dto';
@@ -58,12 +62,18 @@ export class SavedQueriesService {
     };
   }
 
-  private async validateConnectionOwnership(connectionId: string | undefined, userId: string) {
+  private async validateConnectionOwnership(
+    connectionId: string | undefined,
+    userId: string,
+  ) {
     if (!connectionId) return;
     await this.connectionsService.findOne(connectionId, userId);
   }
 
-  private normalizeVisibility(visibility?: string, organizationId?: string | null) {
+  private normalizeVisibility(
+    visibility?: string,
+    organizationId?: string | null,
+  ) {
     if (visibility === 'workspace') {
       return organizationId ? 'workspace' : 'private';
     }
@@ -103,12 +113,22 @@ export class SavedQueriesService {
     return availableQueries.map((query) => this.toEntity(query, userId));
   }
 
-  async create(dto: CreateSavedQueryDto, userId: string): Promise<SavedQueryEntity> {
+  async create(
+    dto: CreateSavedQueryDto,
+    userId: string,
+  ): Promise<SavedQueryEntity> {
     await this.validateConnectionOwnership(dto.connectionId, userId);
-    const visibility = this.normalizeVisibility(dto.visibility, dto.organizationId);
-    const organizationId = visibility === 'workspace' ? (dto.organizationId || null) : null;
+    const visibility = this.normalizeVisibility(
+      dto.visibility,
+      dto.organizationId,
+    );
+    const organizationId =
+      visibility === 'workspace' ? dto.organizationId || null : null;
     if (organizationId) {
-      await this.organizationsService.ensureMemberAccess(organizationId, userId);
+      await this.organizationsService.ensureMemberAccess(
+        organizationId,
+        userId,
+      );
     }
 
     const savedQuery = await this.savedQueries.create({
@@ -155,12 +175,19 @@ export class SavedQueriesService {
       );
     }
 
-    await this.versionHistoryService.recordSavedQueryVersion(savedQuery, userId);
+    await this.versionHistoryService.recordSavedQueryVersion(
+      savedQuery,
+      userId,
+    );
 
     return this.toEntity(savedQuery, userId);
   }
 
-  async update(id: string, dto: UpdateSavedQueryDto, userId: string): Promise<SavedQueryEntity> {
+  async update(
+    id: string,
+    dto: UpdateSavedQueryDto,
+    userId: string,
+  ): Promise<SavedQueryEntity> {
     const existing = await this.savedQueries.findFirst({
       where: { id, userId },
       include: {
@@ -176,16 +203,31 @@ export class SavedQueriesService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Saved query not found or you do not have permission.');
+      throw new NotFoundException(
+        'Saved query not found or you do not have permission.',
+      );
     }
 
-    await this.validateConnectionOwnership(dto.connectionId ?? existing.connectionId ?? undefined, userId);
+    await this.validateConnectionOwnership(
+      dto.connectionId ?? existing.connectionId ?? undefined,
+      userId,
+    );
     const requestedVisibility = dto.visibility ?? existing.visibility;
-    const requestedOrganizationId = dto.organizationId !== undefined ? (dto.organizationId || null) : existing.organizationId;
-    const nextVisibility = this.normalizeVisibility(requestedVisibility, requestedOrganizationId);
-    const nextOrganizationId = nextVisibility === 'workspace' ? requestedOrganizationId : null;
+    const requestedOrganizationId =
+      dto.organizationId !== undefined
+        ? dto.organizationId || null
+        : existing.organizationId;
+    const nextVisibility = this.normalizeVisibility(
+      requestedVisibility,
+      requestedOrganizationId,
+    );
+    const nextOrganizationId =
+      nextVisibility === 'workspace' ? requestedOrganizationId : null;
     if (nextOrganizationId) {
-      await this.organizationsService.ensureMemberAccess(nextOrganizationId, userId);
+      await this.organizationsService.ensureMemberAccess(
+        nextOrganizationId,
+        userId,
+      );
     }
 
     const updated = await this.savedQueries.update({
@@ -193,13 +235,23 @@ export class SavedQueriesService {
       data: {
         ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
         ...(dto.sql !== undefined ? { sql: dto.sql } : {}),
-        ...(dto.database !== undefined ? { database: dto.database?.trim() || null } : {}),
-        ...(dto.connectionId !== undefined ? { connectionId: dto.connectionId || null } : {}),
+        ...(dto.database !== undefined
+          ? { database: dto.database?.trim() || null }
+          : {}),
+        ...(dto.connectionId !== undefined
+          ? { connectionId: dto.connectionId || null }
+          : {}),
         visibility: nextVisibility,
         organizationId: nextOrganizationId,
-        ...(dto.folderId !== undefined ? { folderId: dto.folderId?.trim() || null } : {}),
-        ...(dto.tags !== undefined ? { tags: this.normalizeTags(dto.tags) } : {}),
-        ...(dto.description !== undefined ? { description: dto.description?.trim() || null } : {}),
+        ...(dto.folderId !== undefined
+          ? { folderId: dto.folderId?.trim() || null }
+          : {}),
+        ...(dto.tags !== undefined
+          ? { tags: this.normalizeTags(dto.tags) }
+          : {}),
+        ...(dto.description !== undefined
+          ? { description: dto.description?.trim() || null }
+          : {}),
       },
       include: {
         user: {
@@ -223,7 +275,11 @@ export class SavedQueriesService {
       },
     });
 
-    if (existing.organizationId && (existing.organizationId !== updated.organizationId || updated.visibility !== 'workspace')) {
+    if (
+      existing.organizationId &&
+      (existing.organizationId !== updated.organizationId ||
+        updated.visibility !== 'workspace')
+    ) {
       await this.organizationsService.removeResourcePolicy(
         ResourceType.QUERY,
         updated.id,
@@ -250,7 +306,9 @@ export class SavedQueriesService {
     });
 
     if (!existing) {
-      throw new ForbiddenException('Only the owner can delete this saved query.');
+      throw new ForbiddenException(
+        'Only the owner can delete this saved query.',
+      );
     }
 
     await this.savedQueries.delete({

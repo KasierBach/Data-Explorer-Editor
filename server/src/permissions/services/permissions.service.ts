@@ -28,7 +28,9 @@ export class PermissionsService {
     );
 
     if (!hasAccess) {
-      throw new ForbiddenException('Insufficient permissions for this resource');
+      throw new ForbiddenException(
+        'Insufficient permissions for this resource',
+      );
     }
   }
 
@@ -42,7 +44,13 @@ export class PermissionsService {
     const orgId = record?.organizationId ?? null;
 
     if (orgId) {
-      return this.checkOrgPermission(userId, orgId, resourceType, resourceId, permission);
+      return this.checkOrgPermission(
+        userId,
+        orgId,
+        resourceType,
+        resourceId,
+        permission,
+      );
     }
 
     return record?.userId === userId;
@@ -69,7 +77,10 @@ export class PermissionsService {
 
     if (!member) return false;
 
-    return this.getPermissionsForRole(member.role as OrganizationRole, policy).includes(permission);
+    return this.getPermissionsForRole(
+      member.role as OrganizationRole,
+      policy,
+    ).includes(permission);
   }
 
   getRolePermissions(role: OrganizationRole): Permission[] {
@@ -135,19 +146,33 @@ export class PermissionsService {
       select: { permissions: true },
     });
 
-    return isResourcePermissionPolicy(record?.permissions) ? record.permissions : null;
+    return isResourcePermissionPolicy(record?.permissions)
+      ? record.permissions
+      : null;
   }
 
   private findResourceRecord(type: ResourceType, id: string): Promise<any> {
     switch (type) {
       case ResourceType.CONNECTION:
-        return this.prisma.connection.findUnique({ where: { id }, select: { userId: true, organizationId: true } });
+        return this.prisma.connection.findUnique({
+          where: { id },
+          select: { userId: true, organizationId: true },
+        });
       case ResourceType.QUERY:
-        return this.prisma.savedQuery.findUnique({ where: { id }, select: { userId: true, organizationId: true } });
+        return this.prisma.savedQuery.findUnique({
+          where: { id },
+          select: { userId: true, organizationId: true },
+        });
       case ResourceType.DASHBOARD:
-        return this.prisma.dashboard.findUnique({ where: { id }, select: { userId: true, organizationId: true } });
+        return this.prisma.dashboard.findUnique({
+          where: { id },
+          select: { userId: true, organizationId: true },
+        });
       case ResourceType.ERD:
-        return this.prisma.erdWorkspace.findUnique({ where: { id }, select: { userId: true, organizationId: true } });
+        return this.prisma.erdWorkspace.findUnique({
+          where: { id },
+          select: { userId: true, organizationId: true },
+        });
       default:
         return Promise.resolve(null);
     }

@@ -21,4 +21,4 @@ import { AuthModule } from '../auth/auth.module';
   providers: [MigrationService, MigrationComparisonService, MigrationProcessor],
   exports: [MigrationService],
 })
-export class MigrationModule { }
+export class MigrationModule {}

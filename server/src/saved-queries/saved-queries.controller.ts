@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SavedQueriesService } from './saved-queries.service';
 import { CreateSavedQueryDto } from './dto/create-saved-query.dto';
@@ -21,7 +31,11 @@ export class SavedQueriesController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateSavedQueryDto, @Req() req: AuthenticatedRequest) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateSavedQueryDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.savedQueriesService.update(id, dto, req.user.id);
   }
 

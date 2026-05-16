@@ -9,4 +9,4 @@ import { AuditModule } from '../audit/audit.module';
   controllers: [QueryController],
   providers: [QueryService],
 })
-export class QueryModule { }
+export class QueryModule {}

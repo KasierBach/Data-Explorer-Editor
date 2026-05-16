@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrganizationsRepository } from '../repositories/organizations.repository';
@@ -122,7 +128,10 @@ export class OrganizationBackupService {
     this.repository = new OrganizationsRepository(prisma);
   }
 
-  async exportOrganizationBackup(organizationId: string, userId: string): Promise<OrganizationBackupPackage> {
+  async exportOrganizationBackup(
+    organizationId: string,
+    userId: string,
+  ): Promise<OrganizationBackupPackage> {
     await this.ensureMemberAccess(organizationId, userId);
 
     const organization = await this.prisma.organization.findUnique({
@@ -140,7 +149,13 @@ export class OrganizationBackupService {
       throw new NotFoundException('Organization not found.');
     }
 
-    const [teamspaces, resourcePolicies, savedQueries, dashboards, erdWorkspaces] = await Promise.all([
+    const [
+      teamspaces,
+      resourcePolicies,
+      savedQueries,
+      dashboards,
+      erdWorkspaces,
+    ] = await Promise.all([
       this.prisma.teamspace.findMany({
         where: { organizationId },
         orderBy: { createdAt: 'asc' },
@@ -181,7 +196,8 @@ export class OrganizationBackupService {
         name: organization.name,
         slug: organization.slug,
         logoUrl: organization.logoUrl ?? null,
-        settings: (organization.settings as Record<string, unknown> | null) ?? null,
+        settings:
+          (organization.settings as Record<string, unknown> | null) ?? null,
       },
       notes: [
         'Connection secrets are not included.',
@@ -280,7 +296,9 @@ export class OrganizationBackupService {
     await this.ensureOwnerOrAdminAccess(organizationId, userId);
 
     if (backup.organization.id !== organizationId) {
-      throw new ConflictException('This backup belongs to a different organization.');
+      throw new ConflictException(
+        'This backup belongs to a different organization.',
+      );
     }
 
     const warnings: string[] = [];
@@ -294,18 +312,25 @@ export class OrganizationBackupService {
     };
 
     const teamspaceMap = new Map<string, string>();
-    const supportedResourcePolicies = backup.resourcePolicies.filter((policy) =>
-      policy.resourceType === ResourceType.QUERY ||
-      policy.resourceType === ResourceType.DASHBOARD ||
-      policy.resourceType === ResourceType.ERD,
+    const supportedResourcePolicies = backup.resourcePolicies.filter(
+      (policy) =>
+        policy.resourceType === ResourceType.QUERY ||
+        policy.resourceType === ResourceType.DASHBOARD ||
+        policy.resourceType === ResourceType.ERD,
     );
 
     const policyMap = new Map(
-      supportedResourcePolicies.map((policy) => [`${policy.resourceType}:${policy.resourceId}`, policy] as const),
+      supportedResourcePolicies.map(
+        (policy) =>
+          [`${policy.resourceType}:${policy.resourceId}`, policy] as const,
+      ),
     );
 
     for (const teamspace of backup.teamspaces) {
-      const slug = await this.generateUniqueTeamspaceSlug(organizationId, teamspace.slug || teamspace.name);
+      const slug = await this.generateUniqueTeamspaceSlug(
+        organizationId,
+        teamspace.slug || teamspace.name,
+      );
       const createdTeamspace = await this.prisma.teamspace.create({
         data: {
           organizationId,
@@ -443,7 +468,9 @@ export class OrganizationBackupService {
     });
 
     if (supportedResourcePolicies.length < backup.resourcePolicies.length) {
-      warnings.push('Some resource policies in the backup were skipped because they are not currently restored by this flow.');
+      warnings.push(
+        'Some resource policies in the backup were skipped because they are not currently restored by this flow.',
+      );
     }
 
     return {
@@ -464,7 +491,9 @@ export class OrganizationBackupService {
     teamspaceMap: Map<string, string>,
   ) {
     const policy = policyMap.get(`${resourceType}:${sourceId}`);
-    const mappedTeamspaceId = policy?.teamspaceId ? (teamspaceMap.get(policy.teamspaceId) ?? null) : null;
+    const mappedTeamspaceId = policy?.teamspaceId
+      ? (teamspaceMap.get(policy.teamspaceId) ?? null)
+      : null;
 
     if (policy?.teamspaceId && !mappedTeamspaceId) {
       // The resource policy referenced a teamspace that was not part of the backup.
@@ -483,22 +512,31 @@ export class OrganizationBackupService {
         resourceType,
         resourceId: restoredId,
         organizationId,
-        permissions: (policy?.permissions ?? this.permissions.buildDefaultResourcePolicy()) as Prisma.InputJsonValue,
+        permissions: (policy?.permissions ??
+          this.permissions.buildDefaultResourcePolicy()) as Prisma.InputJsonValue,
         teamspaceId: mappedTeamspaceId,
       },
       update: {
-        permissions: (policy?.permissions ?? this.permissions.buildDefaultResourcePolicy()) as Prisma.InputJsonValue,
+        permissions: (policy?.permissions ??
+          this.permissions.buildDefaultResourcePolicy()) as Prisma.InputJsonValue,
         teamspaceId: mappedTeamspaceId,
       },
     });
   }
 
-  private async generateUniqueTeamspaceSlug(organizationId: string, rawSlug: string) {
+  private async generateUniqueTeamspaceSlug(
+    organizationId: string,
+    rawSlug: string,
+  ) {
     const baseSlug = this.slugify(rawSlug) || 'teamspace';
     let candidate = baseSlug;
     let suffix = 2;
 
-    while (await this.prisma.teamspace.findFirst({ where: { organizationId, slug: candidate } })) {
+    while (
+      await this.prisma.teamspace.findFirst({
+        where: { organizationId, slug: candidate },
+      })
+    ) {
       candidate = `${baseSlug}-${suffix}`;
       suffix += 1;
     }
@@ -520,7 +558,10 @@ export class OrganizationBackupService {
     }
   }
 
-  private async ensureOwnerOrAdminAccess(organizationId: string, userId: string) {
+  private async ensureOwnerOrAdminAccess(
+    organizationId: string,
+    userId: string,
+  ) {
     const member = await this.repository.findMember(organizationId, userId);
     if (!member) {
       throw new ForbiddenException('You are not a member');
@@ -528,7 +569,9 @@ export class OrganizationBackupService {
 
     const allowed = [OrganizationRole.OWNER, OrganizationRole.ADMIN];
     if (!allowed.includes(member.role as OrganizationRole)) {
-      throw new ForbiddenException('Only owners and admins can perform this action');
+      throw new ForbiddenException(
+        'Only owners and admins can perform this action',
+      );
     }
   }
 }

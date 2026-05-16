@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditAction, AuditService } from '../audit/audit.service';
@@ -66,19 +70,28 @@ export class DashboardsService {
     return this.prisma.dashboardWidget;
   }
 
-  private async validateConnectionOwnership(connectionId: string | undefined | null, userId: string) {
+  private async validateConnectionOwnership(
+    connectionId: string | undefined | null,
+    userId: string,
+  ) {
     if (!connectionId) return;
     await this.connectionsService.findOne(connectionId, userId);
   }
 
-  private normalizeVisibility(visibility?: string, organizationId?: string | null) {
+  private normalizeVisibility(
+    visibility?: string,
+    organizationId?: string | null,
+  ) {
     if (visibility === 'workspace') {
       return organizationId ? 'workspace' : 'private';
     }
     return visibility ?? 'private';
   }
 
-  private toEntity(dashboard: RawDashboard, currentUserId: string): DashboardEntity {
+  private toEntity(
+    dashboard: RawDashboard,
+    currentUserId: string,
+  ): DashboardEntity {
     return {
       id: dashboard.id,
       name: dashboard.name,
@@ -97,7 +110,11 @@ export class DashboardsService {
       isOwner: dashboard.userId === currentUserId,
       widgets: (dashboard.widgets ?? [])
         .slice()
-        .sort((a, b) => a.orderIndex - b.orderIndex || a.createdAt.getTime() - b.createdAt.getTime())
+        .sort(
+          (a, b) =>
+            a.orderIndex - b.orderIndex ||
+            a.createdAt.getTime() - b.createdAt.getTime(),
+        )
         .map((widget) => ({
           id: widget.id,
           title: widget.title,
@@ -110,7 +127,9 @@ export class DashboardsService {
           yAxis: widget.yAxis ?? [],
           orderIndex: widget.orderIndex ?? 0,
           config: widget.config ?? null,
-          dataSnapshot: Array.isArray(widget.dataSnapshot) ? widget.dataSnapshot : [],
+          dataSnapshot: Array.isArray(widget.dataSnapshot)
+            ? widget.dataSnapshot
+            : [],
           createdAt: widget.createdAt,
           updatedAt: widget.updatedAt,
         })),
@@ -150,7 +169,9 @@ export class DashboardsService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return dashboards.map((dashboard) => this.toEntity(dashboard as unknown as RawDashboard, userId));
+    return dashboards.map((dashboard) =>
+      this.toEntity(dashboard as unknown as RawDashboard, userId),
+    );
   }
 
   async findOne(id: string, userId: string): Promise<DashboardEntity> {
@@ -162,12 +183,22 @@ export class DashboardsService {
     return dashboard;
   }
 
-  async create(dto: CreateDashboardDto, userId: string): Promise<DashboardEntity> {
+  async create(
+    dto: CreateDashboardDto,
+    userId: string,
+  ): Promise<DashboardEntity> {
     await this.validateConnectionOwnership(dto.connectionId, userId);
-    const visibility = this.normalizeVisibility(dto.visibility, dto.organizationId);
-    const organizationId = visibility === 'workspace' ? (dto.organizationId || null) : null;
+    const visibility = this.normalizeVisibility(
+      dto.visibility,
+      dto.organizationId,
+    );
+    const organizationId =
+      visibility === 'workspace' ? dto.organizationId || null : null;
     if (organizationId) {
-      await this.organizationsService.ensureMemberAccess(organizationId, userId);
+      await this.organizationsService.ensureMemberAccess(
+        organizationId,
+        userId,
+      );
     }
 
     const dashboard = await this.dashboards.create({
@@ -215,7 +246,11 @@ export class DashboardsService {
     return this.toEntity(dashboard, userId);
   }
 
-  async addWidget(dashboardId: string, dto: AddDashboardWidgetDto, userId: string): Promise<DashboardEntity> {
+  async addWidget(
+    dashboardId: string,
+    dto: AddDashboardWidgetDto,
+    userId: string,
+  ): Promise<DashboardEntity> {
     const dashboard = await this.dashboards.findFirst({
       where: { id: dashboardId, userId },
       include: {
@@ -235,7 +270,10 @@ export class DashboardsService {
       throw new ForbiddenException('Only the dashboard owner can add widgets.');
     }
 
-    await this.validateConnectionOwnership(dto.connectionId ?? dashboard.connectionId, userId);
+    await this.validateConnectionOwnership(
+      dto.connectionId ?? dashboard.connectionId,
+      userId,
+    );
 
     const widgetCount = dashboard.widgets?.length ?? 0;
     await this.dashboardWidgets.create({
@@ -297,7 +335,9 @@ export class DashboardsService {
     });
 
     if (!dashboard) {
-      throw new ForbiddenException('Only the dashboard owner can delete widgets.');
+      throw new ForbiddenException(
+        'Only the dashboard owner can delete widgets.',
+      );
     }
 
     const widget = await this.dashboardWidgets.findFirst({

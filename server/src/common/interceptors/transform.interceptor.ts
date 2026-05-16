@@ -15,9 +15,10 @@ export interface Response<T> {
 }
 
 @Injectable()
-export class TransformInterceptor<T>
-  implements NestInterceptor<T, Response<T>>
-{
+export class TransformInterceptor<T> implements NestInterceptor<
+  T,
+  Response<T>
+> {
   intercept(
     context: ExecutionContext,
     next: CallHandler,
@@ -28,11 +29,17 @@ export class TransformInterceptor<T>
 
     // Do not transform if it's SSE (Server-Sent Events) or a stream.
     // Check Content-Type OR the specific migration progress path
-    const contentType = response.getHeader ? response.getHeader('Content-Type') : '';
-    const isSsePath = request.url && request.url.includes('/migration/progress');
+    const contentType = response.getHeader
+      ? response.getHeader('Content-Type')
+      : '';
+    const isSsePath =
+      request.url && request.url.includes('/migration/progress');
 
-    if (isSsePath || (contentType && (contentType as string).includes('text/event-stream'))) {
-        return next.handle();
+    if (
+      isSsePath ||
+      (contentType && (contentType as string).includes('text/event-stream'))
+    ) {
+      return next.handle();
     }
 
     return next.handle().pipe(

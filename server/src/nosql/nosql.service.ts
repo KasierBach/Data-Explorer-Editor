@@ -13,7 +13,11 @@ export class NoSqlService {
     private readonly strategyFactory: DatabaseStrategyFactory,
   ) {}
 
-  private getSchemaCacheKey(connectionId: string, database: string, collection: string) {
+  private getSchemaCacheKey(
+    connectionId: string,
+    database: string,
+    collection: string,
+  ) {
     return `nosql_schema:${connectionId}:${database}:${collection}`;
   }
 
@@ -25,7 +29,14 @@ export class NoSqlService {
     userId: string;
     refresh?: boolean;
   }) {
-    const { connectionId, database, collection, sampleSize = 100, userId, refresh = false } = params;
+    const {
+      connectionId,
+      database,
+      collection,
+      sampleSize = 100,
+      userId,
+      refresh = false,
+    } = params;
     const cacheKey = this.getSchemaCacheKey(connectionId, database, collection);
 
     // 1. Clear cache if refresh is requested
@@ -42,8 +53,14 @@ export class NoSqlService {
     }
 
     // 2. Sample and analyze
-    this.logger.log(`Analyzing schema for ${collection} (sampling ${sampleSize} docs)`);
-    const pool = await this.connectionsService.getPool(connectionId, database, userId);
+    this.logger.log(
+      `Analyzing schema for ${collection} (sampling ${sampleSize} docs)`,
+    );
+    const pool = await this.connectionsService.getPool(
+      connectionId,
+      database,
+      userId,
+    );
     const strategy = this.strategyFactory.getStrategy('mongodb'); // Explicitly use mongodb for now
 
     // Get sample data
@@ -56,29 +73,35 @@ export class NoSqlService {
     // Inference Logic
     const fieldMeta: Record<string, any> = {};
     data.forEach((doc: any) => {
-      Object.keys(doc).forEach(key => {
+      Object.keys(doc).forEach((key) => {
         if (!fieldMeta[key]) {
           fieldMeta[key] = {
             name: key,
             types: {},
             count: 0,
             probability: 0,
-            sampleValues: []
+            sampleValues: [],
           };
         }
 
         const meta = fieldMeta[key];
         meta.count++;
-        
+
         let type: string = typeof doc[key];
         if (doc[key] === null) type = 'null';
         else if (Array.isArray(doc[key])) type = 'array';
         else if (doc[key] instanceof Date) type = 'date';
-        else if (type === 'object' && doc[key]._bsontype) type = doc[key]._bsontype.toLowerCase();
+        else if (type === 'object' && doc[key]._bsontype)
+          type = doc[key]._bsontype.toLowerCase();
 
         meta.types[type] = (meta.types[type] || 0) + 1;
 
-        if (meta.sampleValues.length < 5 && !meta.sampleValues.map(v => JSON.stringify(v)).includes(JSON.stringify(doc[key]))) {
+        if (
+          meta.sampleValues.length < 5 &&
+          !meta.sampleValues
+            .map((v) => JSON.stringify(v))
+            .includes(JSON.stringify(doc[key]))
+        ) {
           meta.sampleValues.push(doc[key]);
         }
       });
@@ -88,7 +111,7 @@ export class NoSqlService {
     const stats = Object.values(fieldMeta)
       .map((stat: any) => ({
         ...stat,
-        probability: (stat.count / totalDocs) * 100
+        probability: (stat.count / totalDocs) * 100,
       }))
       .sort((a, b) => b.count - a.count);
 
@@ -98,7 +121,11 @@ export class NoSqlService {
     return stats;
   }
 
-  async clearSchemaCache(connectionId: string, database: string, collection: string) {
+  async clearSchemaCache(
+    connectionId: string,
+    database: string,
+    collection: string,
+  ) {
     const cacheKey = this.getSchemaCacheKey(connectionId, database, collection);
     await this.redisService.del(cacheKey);
   }

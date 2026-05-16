@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditAction, AuditService } from '../audit/audit.service';
@@ -7,7 +11,11 @@ import { PermissionsService } from '../permissions/services/permissions.service'
 import { Permission } from '../permissions/enums/permission.enum';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
 import { CreateCommentDto } from './dto/create-comment.dto';
-import { CommentParticipant, CommentReply, CommentThread } from './entities/comment.entity';
+import {
+  CommentParticipant,
+  CommentReply,
+  CommentThread,
+} from './entities/comment.entity';
 
 type CommentDetails = {
   commentId: string;
@@ -36,7 +44,10 @@ export class CollaborationService {
 
   async listActivity(organizationId: string, userId: string, limit = 50) {
     await this.ensureMemberAccess(organizationId, userId);
-    return this.audit.findOrganizationLogs(organizationId, { limit, order: 'desc' });
+    return this.audit.findOrganizationLogs(organizationId, {
+      limit,
+      order: 'desc',
+    });
   }
 
   async listResourceComments(
@@ -46,7 +57,12 @@ export class CollaborationService {
     resourceId: string,
   ) {
     await this.ensureMemberAccess(organizationId, userId);
-    await this.permissions.ensurePermission(userId, resourceType, resourceId, Permission.READ);
+    await this.permissions.ensurePermission(
+      userId,
+      resourceType,
+      resourceId,
+      Permission.READ,
+    );
 
     const logs = await this.audit.findOrganizationLogs(organizationId, {
       limit: 500,
@@ -70,7 +86,12 @@ export class CollaborationService {
     dto: CreateCommentDto,
   ) {
     await this.ensureMemberAccess(organizationId, userId);
-    await this.permissions.ensurePermission(userId, resourceType, resourceId, Permission.COMMENT);
+    await this.permissions.ensurePermission(
+      userId,
+      resourceType,
+      resourceId,
+      Permission.COMMENT,
+    );
 
     const body = this.normalizeBody(dto.body);
     const commentId = randomUUID();
@@ -80,7 +101,9 @@ export class CollaborationService {
     const resource = await this.loadResourceSnapshot(resourceType, resourceId);
 
     await this.audit.log({
-      action: parentCommentId ? AuditAction.TEAM_COMMENT_REPLY : AuditAction.TEAM_COMMENT_CREATE,
+      action: parentCommentId
+        ? AuditAction.TEAM_COMMENT_REPLY
+        : AuditAction.TEAM_COMMENT_CREATE,
       userId,
       organizationId,
       details: {
@@ -95,9 +118,22 @@ export class CollaborationService {
     });
 
     const actor = await this.loadUserSnapshot(userId);
-    await this.notifyMentions(mentions, actor, resource, organizationId, threadId, resourceType, resourceId);
+    await this.notifyMentions(
+      mentions,
+      actor,
+      resource,
+      organizationId,
+      threadId,
+      resourceType,
+      resourceId,
+    );
 
-    return this.findCommentThreadInResource(organizationId, resourceType, resourceId, threadId);
+    return this.findCommentThreadInResource(
+      organizationId,
+      resourceType,
+      resourceId,
+      threadId,
+    );
   }
 
   async replyToComment(
@@ -106,11 +142,20 @@ export class CollaborationService {
     commentId: string,
     dto: CreateCommentDto,
   ) {
-    const thread = await this.findCommentThreadByCommentId(organizationId, commentId);
-    return this.createComment(organizationId, userId, thread.resourceType, thread.resourceId, {
-      ...dto,
-      parentCommentId: commentId,
-    });
+    const thread = await this.findCommentThreadByCommentId(
+      organizationId,
+      commentId,
+    );
+    return this.createComment(
+      organizationId,
+      userId,
+      thread.resourceType,
+      thread.resourceId,
+      {
+        ...dto,
+        parentCommentId: commentId,
+      },
+    );
   }
 
   async resolveComment(
@@ -120,12 +165,23 @@ export class CollaborationService {
   ) {
     await this.ensureMemberAccess(organizationId, userId);
 
-    const thread = await this.findCommentThreadByCommentId(organizationId, commentId);
-    const canResolve = thread.author.id === userId
-      || await this.permissions.checkPermission(userId, thread.resourceType, thread.resourceId, Permission.MANAGE);
+    const thread = await this.findCommentThreadByCommentId(
+      organizationId,
+      commentId,
+    );
+    const canResolve =
+      thread.author.id === userId ||
+      (await this.permissions.checkPermission(
+        userId,
+        thread.resourceType,
+        thread.resourceId,
+        Permission.MANAGE,
+      ));
 
     if (!canResolve) {
-      throw new ForbiddenException('Insufficient permissions to resolve this thread');
+      throw new ForbiddenException(
+        'Insufficient permissions to resolve this thread',
+      );
     }
 
     await this.audit.log({
@@ -140,7 +196,12 @@ export class CollaborationService {
       },
     });
 
-    return this.findCommentThreadInResource(organizationId, thread.resourceType, thread.resourceId, thread.threadId);
+    return this.findCommentThreadInResource(
+      organizationId,
+      thread.resourceType,
+      thread.resourceId,
+      thread.threadId,
+    );
   }
 
   private async ensureMemberAccess(organizationId: string, userId: string) {
@@ -182,7 +243,9 @@ export class CollaborationService {
   private async resolveMentions(organizationId: string, body: string) {
     const tokens = Array.from(
       new Set(
-        Array.from(body.matchAll(/@([a-zA-Z0-9._-]+)/g), (match) => match[1].toLowerCase()),
+        Array.from(body.matchAll(/@([a-zA-Z0-9._-]+)/g), (match) =>
+          match[1].toLowerCase(),
+        ),
       ),
     );
 
@@ -216,7 +279,9 @@ export class CollaborationService {
       tokens: this.buildMentionTokens(member.user),
     }));
 
-    return normalizedMembers.filter((member) => member.tokens.some((token) => tokens.includes(token)));
+    return normalizedMembers.filter((member) =>
+      member.tokens.some((token) => tokens.includes(token)),
+    );
   }
 
   private buildMentionTokens(user: {
@@ -239,7 +304,14 @@ export class CollaborationService {
   }
 
   private async notifyMentions(
-    mentions: Array<{ id: string; email: string; firstName?: string | null; lastName?: string | null; username?: string | null; avatarUrl?: string | null }>,
+    mentions: Array<{
+      id: string;
+      email: string;
+      firstName?: string | null;
+      lastName?: string | null;
+      username?: string | null;
+      avatarUrl?: string | null;
+    }>,
     actor: CommentParticipant,
     resource: { name?: string | null; ownerId: string | null },
     organizationId: string,
@@ -260,12 +332,17 @@ export class CollaborationService {
       ? `${actor.firstName || actor.email} commented on "${resource.name}"`
       : `${actor.firstName || actor.email} commented on a shared resource`;
 
-    await this.notifications.emitMany(Array.from(targetIds), 'comment', message, {
-      organizationId,
-      threadId,
-      resourceType,
-      resourceId,
-    });
+    await this.notifications.emitMany(
+      Array.from(targetIds),
+      'comment',
+      message,
+      {
+        organizationId,
+        threadId,
+        resourceType,
+        resourceId,
+      },
+    );
   }
 
   private async loadUserSnapshot(userId: string): Promise<CommentParticipant> {
@@ -288,7 +365,10 @@ export class CollaborationService {
     return user;
   }
 
-  private async loadResourceSnapshot(resourceType: ResourceType, resourceId: string) {
+  private async loadResourceSnapshot(
+    resourceType: ResourceType,
+    resourceId: string,
+  ) {
     switch (resourceType) {
       case ResourceType.CONNECTION: {
         const resource = await this.prisma.connection.findUnique({
@@ -296,7 +376,11 @@ export class CollaborationService {
           select: { name: true, userId: true, organizationId: true },
         });
         if (!resource) throw new NotFoundException('Connection not found');
-        return { name: resource.name, ownerId: resource.userId, organizationId: resource.organizationId };
+        return {
+          name: resource.name,
+          ownerId: resource.userId,
+          organizationId: resource.organizationId,
+        };
       }
       case ResourceType.QUERY: {
         const resource = await this.prisma.savedQuery.findUnique({
@@ -304,7 +388,11 @@ export class CollaborationService {
           select: { name: true, userId: true, organizationId: true },
         });
         if (!resource) throw new NotFoundException('Saved query not found');
-        return { name: resource.name, ownerId: resource.userId, organizationId: resource.organizationId };
+        return {
+          name: resource.name,
+          ownerId: resource.userId,
+          organizationId: resource.organizationId,
+        };
       }
       case ResourceType.DASHBOARD: {
         const resource = await this.prisma.dashboard.findUnique({
@@ -312,7 +400,11 @@ export class CollaborationService {
           select: { name: true, userId: true, organizationId: true },
         });
         if (!resource) throw new NotFoundException('Dashboard not found');
-        return { name: resource.name, ownerId: resource.userId, organizationId: resource.organizationId };
+        return {
+          name: resource.name,
+          ownerId: resource.userId,
+          organizationId: resource.organizationId,
+        };
       }
       case ResourceType.ERD: {
         const resource = await this.prisma.erdWorkspace.findUnique({
@@ -320,7 +412,11 @@ export class CollaborationService {
           select: { name: true, userId: true, organizationId: true },
         });
         if (!resource) throw new NotFoundException('ERD workspace not found');
-        return { name: resource.name, ownerId: resource.userId, organizationId: resource.organizationId };
+        return {
+          name: resource.name,
+          ownerId: resource.userId,
+          organizationId: resource.organizationId,
+        };
       }
       default:
         return { name: null, ownerId: null, organizationId: null };
@@ -328,7 +424,13 @@ export class CollaborationService {
   }
 
   private async buildCommentThreads(
-    logs: Array<{ action: string; userId?: string | null; createdAt: Date; details: string | null; user?: CommentParticipant | null }>,
+    logs: Array<{
+      action: string;
+      userId?: string | null;
+      createdAt: Date;
+      details: string | null;
+      user?: CommentParticipant | null;
+    }>,
     organizationId: string,
     resourceType?: ResourceType,
     resourceId?: string,
@@ -341,7 +443,12 @@ export class CollaborationService {
         continue;
       }
 
-      if (resourceType && resourceId && (details.resourceType !== resourceType || details.resourceId !== resourceId)) {
+      if (
+        resourceType &&
+        resourceId &&
+        (details.resourceType !== resourceType ||
+          details.resourceId !== resourceId)
+      ) {
         continue;
       }
 
@@ -349,10 +456,15 @@ export class CollaborationService {
         continue;
       }
 
-      const author = this.normalizeParticipant(log.user ?? await this.loadUserSnapshot(log.userId as string));
-      const mentions = await this.resolveMentionSnapshots(organizationId, details.mentions ?? []);
+      const author = this.normalizeParticipant(
+        log.user ?? (await this.loadUserSnapshot(log.userId as string)),
+      );
+      const mentions = await this.resolveMentionSnapshots(
+        organizationId,
+        details.mentions ?? [],
+      );
 
-      if (log.action === AuditAction.TEAM_COMMENT_RESOLVE) {
+      if (log.action === String(AuditAction.TEAM_COMMENT_RESOLVE)) {
         const thread = threads.get(details.threadId);
         if (thread) {
           thread.resolvedAt = log.createdAt.toISOString();
@@ -403,7 +515,9 @@ export class CollaborationService {
     return Array.from(threads.values())
       .map((thread) => ({
         ...thread,
-        replies: thread.replies.sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+        replies: thread.replies.sort((a, b) =>
+          a.createdAt.localeCompare(b.createdAt),
+        ),
       }))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
@@ -419,11 +533,17 @@ export class CollaborationService {
       order: 'asc',
       actions: COMMENT_ACTIONS,
     });
-    const threads = await this.buildCommentThreads(logs, organizationId, resourceType, resourceId);
-    const thread = threads.find((entry) =>
-      entry.threadId === threadId
-      || entry.commentId === threadId
-      || entry.replies.some((reply) => reply.commentId === threadId),
+    const threads = await this.buildCommentThreads(
+      logs,
+      organizationId,
+      resourceType,
+      resourceId,
+    );
+    const thread = threads.find(
+      (entry) =>
+        entry.threadId === threadId ||
+        entry.commentId === threadId ||
+        entry.replies.some((reply) => reply.commentId === threadId),
     );
     if (!thread) {
       throw new NotFoundException('Comment thread not found');
@@ -431,7 +551,10 @@ export class CollaborationService {
     return thread;
   }
 
-  private async findCommentThreadByCommentId(organizationId: string, commentId: string) {
+  private async findCommentThreadByCommentId(
+    organizationId: string,
+    commentId: string,
+  ) {
     const logs = await this.audit.findOrganizationLogs(organizationId, {
       limit: 500,
       order: 'asc',
@@ -439,10 +562,11 @@ export class CollaborationService {
     });
 
     const threads = await this.buildCommentThreads(logs, organizationId);
-    const thread = threads.find((entry) =>
-      entry.threadId === commentId
-      || entry.commentId === commentId
-      || entry.replies.some((reply) => reply.commentId === commentId),
+    const thread = threads.find(
+      (entry) =>
+        entry.threadId === commentId ||
+        entry.commentId === commentId ||
+        entry.replies.some((reply) => reply.commentId === commentId),
     );
     if (thread) {
       return thread;
@@ -451,7 +575,10 @@ export class CollaborationService {
     throw new NotFoundException('Comment thread not found');
   }
 
-  private async resolveMentionSnapshots(organizationId: string, mentionIds: string[]) {
+  private async resolveMentionSnapshots(
+    organizationId: string,
+    mentionIds: string[],
+  ) {
     if (mentionIds.length === 0) {
       return [];
     }

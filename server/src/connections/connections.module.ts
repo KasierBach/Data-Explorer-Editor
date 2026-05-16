@@ -8,9 +8,9 @@ import { SshTunnelService } from './ssh-tunnel.service';
 import { OrganizationsModule } from '../organizations/organizations.module';
 
 @Module({
-    imports: [PrismaModule, AuditModule, OrganizationsModule],
-    controllers: [ConnectionsController],
-    providers: [ConnectionsService, DatabaseStrategyFactory, SshTunnelService],
-    exports: [ConnectionsService, SshTunnelService],
+  imports: [PrismaModule, AuditModule, OrganizationsModule],
+  controllers: [ConnectionsController],
+  providers: [ConnectionsService, DatabaseStrategyFactory, SshTunnelService],
+  exports: [ConnectionsService, SshTunnelService],
 })
-export class ConnectionsModule { }
+export class ConnectionsModule {}

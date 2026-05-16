@@ -10,7 +10,14 @@ export class NoSqlController {
 
   @Post('analyze-schema')
   async analyzeSchema(
-    @Body() body: { connectionId: string; database: string; collection: string; sampleSize?: number; refresh?: boolean },
+    @Body()
+    body: {
+      connectionId: string;
+      database: string;
+      collection: string;
+      sampleSize?: number;
+      refresh?: boolean;
+    },
     @Req() req: any,
   ) {
     return this.nosqlService.analyzeSchema({
@@ -21,9 +28,18 @@ export class NoSqlController {
 
   @Delete('cache')
   async clearCache(
-    @Body() body: { connectionId: string; database: string; collection: string },
+    @Body()
+    body: {
+      connectionId: string;
+      database: string;
+      collection: string;
+    },
   ) {
-    await this.nosqlService.clearSchemaCache(body.connectionId, body.database, body.collection);
+    await this.nosqlService.clearSchemaCache(
+      body.connectionId,
+      body.database,
+      body.collection,
+    );
     return { success: true };
   }
 }

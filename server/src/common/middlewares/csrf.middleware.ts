@@ -15,16 +15,19 @@ export class CsrfMiddleware implements NestMiddleware {
       '/api/auth/reset-password',
       '/api/auth/exchange-oauth-code',
     ]);
-    
-    if (mutationMethods.includes(req.method) && !csrfExemptPaths.has(req.originalUrl)) {
+
+    if (
+      mutationMethods.includes(req.method) &&
+      !csrfExemptPaths.has(req.originalUrl)
+    ) {
       const requestedWith = req.headers['x-requested-with'];
-      
+
       // Simple custom header check (Defense in Depth)
       // Since browser-based CSRF attacks cannot set custom headers easily
       // (due to CORS Preflight), this is a common and effective protection.
       if (requestedWith !== 'XMLHttpRequest') {
         throw new ForbiddenException(
-          'Yêu cầu bị từ chối do thiếu header bảo mật (CSRF Protection).'
+          'Yêu cầu bị từ chối do thiếu header bảo mật (CSRF Protection).',
         );
       }
     }

@@ -25,7 +25,10 @@ import {
   isMongoActionAllowedOnReadOnly,
   isSqlAllowedOnReadOnly,
 } from './query-guard.util';
-import { getErrorMessage, isForbiddenException } from '../common/utils/error.util';
+import {
+  getErrorMessage,
+  isForbiddenException,
+} from '../common/utils/error.util';
 
 @Injectable()
 export class QueryService {
@@ -38,7 +41,7 @@ export class QueryService {
     private readonly auditService: AuditService,
     private readonly freshnessService: FreshnessService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-  ) { }
+  ) {}
 
   private async getQueryCacheKey(
     connectionId: string,
@@ -60,13 +63,26 @@ export class QueryService {
 
   private isCacheableQuery(sql: string): boolean {
     const trimmed = sql.trim().toUpperCase();
-    return trimmed.startsWith('SELECT') && !trimmed.includes('NOW()') && !trimmed.includes('RAND()');
+    return (
+      trimmed.startsWith('SELECT') &&
+      !trimmed.includes('NOW()') &&
+      !trimmed.includes('RAND()')
+    );
   }
 
-  private async invalidateQueryCache(connectionId: string, database?: string): Promise<void> {
-    await this.freshnessService.bump('query', [connectionId, database || 'default']);
+  private async invalidateQueryCache(
+    connectionId: string,
+    database?: string,
+  ): Promise<void> {
+    await this.freshnessService.bump('query', [
+      connectionId,
+      database || 'default',
+    ]);
     await this.freshnessService.bump('metadata', [connectionId]);
-    await this.freshnessService.bump('ai-schema', [connectionId, database || 'default']);
+    await this.freshnessService.bump('ai-schema', [
+      connectionId,
+      database || 'default',
+    ]);
     this.logger.debug(`Freshness bumped for connection ${connectionId}`);
   }
 
@@ -104,7 +120,10 @@ export class QueryService {
     connection: Connection,
     userId: string,
     action: string,
-    permissionFlag: 'allowQueryExecution' | 'allowSchemaChanges' | 'allowImportExport',
+    permissionFlag:
+      | 'allowQueryExecution'
+      | 'allowSchemaChanges'
+      | 'allowImportExport',
     extra?: Record<string, unknown>,
   ): Promise<void> {
     const reasonMap = {
@@ -170,7 +189,8 @@ export class QueryService {
           database,
           action: 'execute_query',
           reason: 'MULTI_STATEMENT_BLOCKED',
-          message: 'Multi-statement queries are not allowed. Please execute one statement at a time.',
+          message:
+            'Multi-statement queries are not allowed. Please execute one statement at a time.',
           sqlSnippet: sql.slice(0, 120),
         });
       }
@@ -185,7 +205,8 @@ export class QueryService {
           database,
           action: 'execute_query',
           reason: 'READ_ONLY_CONNECTION',
-          message: 'This connection is read-only. Only read operations are allowed.',
+          message:
+            'This connection is read-only. Only read operations are allowed.',
           extra: { mongoAction: action },
         });
       }
@@ -260,18 +281,37 @@ export class QueryService {
   }
 
   async executeQuery(createQueryDto: CreateQueryDto, userId: string) {
-    const { connectionId, sql, database, limit, offset, confirmed } = createQueryDto;
-    const connection = await this.connectionsService.findOne(connectionId, userId);
-    await this.assertQueryAllowed(connection, sql, userId, database || connection.database, confirmed);
+    const { connectionId, sql, database, limit, offset, confirmed } =
+      createQueryDto;
+    const connection = await this.connectionsService.findOne(
+      connectionId,
+      userId,
+    );
+    await this.assertQueryAllowed(
+      connection,
+      sql,
+      userId,
+      database || connection.database,
+      confirmed,
+    );
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
+      const pool = await this.connectionsService.getPool(
+        connectionId,
+        database || connection.database,
+        userId,
+      );
       const strategy = this.strategyFactory.getStrategy(connection.type);
 
-      const cacheKey = await this.getQueryCacheKey(connectionId, sql, database || connection.database, {
-        limit,
-        offset,
-      });
+      const cacheKey = await this.getQueryCacheKey(
+        connectionId,
+        sql,
+        database || connection.database,
+        {
+          limit,
+          offset,
+        },
+      );
       const isCacheable = this.isCacheableQuery(sql);
 
       if (isCacheable) {
@@ -293,19 +333,32 @@ export class QueryService {
           const match = sql.match(/FROM\s+([\w"`.[\]]+)/i);
           if (match) {
             const tableRef = match[1];
-            const countSql = connection.type === 'mongodb'
-              ? JSON.stringify({ action: 'count', collection: tableRef.replace(/['"`]/g, '') })
-              : `SELECT COUNT(*) as total FROM ${tableRef}`;
+            const countSql =
+              connection.type === 'mongodb'
+                ? JSON.stringify({
+                    action: 'count',
+                    collection: tableRef.replace(/['"`]/g, ''),
+                  })
+                : `SELECT COUNT(*) as total FROM ${tableRef}`;
 
             const countResult = await strategy.executeQuery(pool, countSql);
             if (countResult.rows && countResult.rows.length > 0) {
               const firstRow = countResult.rows[0];
-              const countVal = firstRow.total ?? firstRow.TOTAL ?? firstRow.count ?? firstRow[Object.keys(firstRow)[0]];
+              const countVal =
+                firstRow.total ??
+                firstRow.TOTAL ??
+                firstRow.count ??
+                firstRow[Object.keys(firstRow)[0]];
               result.totalCount = parseInt(String(countVal), 10);
             }
           }
         } catch (countError) {
-          this.logger.warn('Failed to fetch total row count:', countError instanceof Error ? countError.message : String(countError));
+          this.logger.warn(
+            'Failed to fetch total row count:',
+            countError instanceof Error
+              ? countError.message
+              : String(countError),
+          );
         }
       }
 
@@ -316,8 +369,8 @@ export class QueryService {
           category: 'query',
           connectionId,
           database: database || connection.database,
-          sqlSnippet: sql.substring(0, 100) + (sql.length > 100 ? '...' : '')
-        }
+          sqlSnippet: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
+        },
       });
 
       return result;
@@ -325,74 +378,161 @@ export class QueryService {
       if (isForbiddenException(error)) throw error;
 
       this.logger.error('Query Service Error Details:', getErrorMessage(error));
-      throw new InternalServerErrorException('Query execution failed. Please check your syntax or connection permissions.');
+      throw new InternalServerErrorException(
+        'Query execution failed. Please check your syntax or connection permissions.',
+      );
     }
   }
 
   async updateRow(updateRowDto: UpdateRowDto, userId: string) {
-    const { connectionId, database, schema, table, pkColumn, pkValue, updates } = updateRowDto;
-    const connection = await this.connectionsService.findOne(connectionId, userId);
-    await this.assertWritePermission(connection, userId, 'update_row', 'allowQueryExecution', { table });
+    const {
+      connectionId,
+      database,
+      schema,
+      table,
+      pkColumn,
+      pkValue,
+      updates,
+    } = updateRowDto;
+    const connection = await this.connectionsService.findOne(
+      connectionId,
+      userId,
+    );
+    await this.assertWritePermission(
+      connection,
+      userId,
+      'update_row',
+      'allowQueryExecution',
+      { table },
+    );
 
     const updateCols = Object.keys(updates);
-    if (updateCols.length === 0) return { success: true, message: 'No changes' };
+    if (updateCols.length === 0)
+      return { success: true, message: 'No changes' };
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId, database, userId);
+      const pool = await this.connectionsService.getPool(
+        connectionId,
+        database,
+        userId,
+      );
       const strategy = this.strategyFactory.getStrategy(connection.type);
-      const result = await strategy.updateRow(pool, { schema, table, pkColumn, pkValue, updates });
-      await this.invalidateQueryCache(connectionId, database || connection.database);
+      const result = await strategy.updateRow(pool, {
+        schema,
+        table,
+        pkColumn,
+        pkValue,
+        updates,
+      });
+      await this.invalidateQueryCache(
+        connectionId,
+        database || connection.database,
+      );
       return result;
     } catch (error) {
       this.logger.error('Update Row Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(`Update failed: ${getErrorMessage(error)}`);
+      throw new InternalServerErrorException(
+        `Update failed: ${getErrorMessage(error)}`,
+      );
     }
   }
 
   async insertRow(insertRowDto: InsertRowDto, userId: string) {
     const { connectionId, database, schema, table, data } = insertRowDto;
-    const connection = await this.connectionsService.findOne(connectionId, userId);
-    await this.assertWritePermission(connection, userId, 'insert_row', 'allowQueryExecution', { table });
+    const connection = await this.connectionsService.findOne(
+      connectionId,
+      userId,
+    );
+    await this.assertWritePermission(
+      connection,
+      userId,
+      'insert_row',
+      'allowQueryExecution',
+      { table },
+    );
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
+      const pool = await this.connectionsService.getPool(
+        connectionId,
+        database || connection.database,
+        userId,
+      );
       const strategy = this.strategyFactory.getStrategy(connection.type);
       const result = await strategy.insertRow(pool, { schema, table, data });
-      await this.invalidateQueryCache(connectionId, database || connection.database);
+      await this.invalidateQueryCache(
+        connectionId,
+        database || connection.database,
+      );
       return result;
     } catch (error) {
       this.logger.error('Insert Row Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(`Insert failed: ${getErrorMessage(error)}`);
+      throw new InternalServerErrorException(
+        `Insert failed: ${getErrorMessage(error)}`,
+      );
     }
   }
 
   async deleteRows(deleteRowsDto: DeleteRowsDto, userId: string) {
-    const { connectionId, database, schema, table, pkColumn, pkValues } = deleteRowsDto;
-    const connection = await this.connectionsService.findOne(connectionId, userId);
-    await this.assertWritePermission(connection, userId, 'delete_rows', 'allowQueryExecution', { table, rowCount: pkValues.length });
+    const { connectionId, database, schema, table, pkColumn, pkValues } =
+      deleteRowsDto;
+    const connection = await this.connectionsService.findOne(
+      connectionId,
+      userId,
+    );
+    await this.assertWritePermission(
+      connection,
+      userId,
+      'delete_rows',
+      'allowQueryExecution',
+      { table, rowCount: pkValues.length },
+    );
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId, database || connection.database, userId);
+      const pool = await this.connectionsService.getPool(
+        connectionId,
+        database || connection.database,
+        userId,
+      );
       const strategy = this.strategyFactory.getStrategy(connection.type);
-      const result = await strategy.deleteRows(pool, { schema, table, pkColumn, pkValues });
-      await this.invalidateQueryCache(connectionId, database || connection.database);
+      const result = await strategy.deleteRows(pool, {
+        schema,
+        table,
+        pkColumn,
+        pkValues,
+      });
+      await this.invalidateQueryCache(
+        connectionId,
+        database || connection.database,
+      );
       return result;
     } catch (error) {
       this.logger.error('Delete Rows Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(`Delete failed: ${getErrorMessage(error)}`);
+      throw new InternalServerErrorException(
+        `Delete failed: ${getErrorMessage(error)}`,
+      );
     }
   }
 
   // ─── Schema Operations ───
 
   async updateSchema(updateSchemaDto: UpdateSchemaDto, userId: string) {
-    const { connectionId, database, schema, table, operations } = updateSchemaDto;
-    const connection = await this.connectionsService.findOne(connectionId, userId);
+    const { connectionId, database, schema, table, operations } =
+      updateSchemaDto;
+    const connection = await this.connectionsService.findOne(
+      connectionId,
+      userId,
+    );
     if (!connection) throw new BadRequestException('Invalid connection ID');
-    await this.assertWritePermission(connection, userId, 'update_schema', 'allowSchemaChanges', {
-      table,
-      operations: operations.map((op) => op.type),
-    });
+    await this.assertWritePermission(
+      connection,
+      userId,
+      'update_schema',
+      'allowSchemaChanges',
+      {
+        table,
+        operations: operations.map((op) => op.type),
+      },
+    );
 
     const strategy = this.strategyFactory.getStrategy(connection.type);
     const quotedTable = strategy.quoteTable(schema, table);
@@ -406,9 +546,17 @@ export class QueryService {
     try {
       const results: any[] = [];
       for (const sql of sqlStatements) {
-        results.push(await this.executeQuery({ connectionId, sql, database, confirmed: true }, userId));
+        results.push(
+          await this.executeQuery(
+            { connectionId, sql, database, confirmed: true },
+            userId,
+          ),
+        );
       }
-      await this.invalidateQueryCache(connectionId, database || connection.database);
+      await this.invalidateQueryCache(
+        connectionId,
+        database || connection.database,
+      );
       await this.auditService.log({
         action: AuditAction.DB_SCHEMA_CHANGE,
         userId,
@@ -418,74 +566,139 @@ export class QueryService {
           database,
           schema,
           table,
-          operations: operations.map(op => op.type)
-        }
+          operations: operations.map((op) => op.type),
+        },
       });
 
       return { success: true, results };
     } catch (error) {
       if (isForbiddenException(error)) throw error;
       this.logger.error('Update Schema Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(`Schema update failed: ${getErrorMessage(error)}`);
+      throw new InternalServerErrorException(
+        `Schema update failed: ${getErrorMessage(error)}`,
+      );
     }
   }
 
   async seedData(connectionId: string, userId: string) {
-    const connection = await this.connectionsService.findOne(connectionId, userId);
-    await this.assertWritePermission(connection, userId, 'seed_data', 'allowQueryExecution');
+    const connection = await this.connectionsService.findOne(
+      connectionId,
+      userId,
+    );
+    await this.assertWritePermission(
+      connection,
+      userId,
+      'seed_data',
+      'allowQueryExecution',
+    );
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
+      const pool = await this.connectionsService.getPool(
+        connectionId,
+        undefined,
+        userId,
+      );
       const strategy = this.strategyFactory.getStrategy(connection.type);
       const result = await strategy.seedData(pool);
-      await this.invalidateQueryCache(connectionId, connection.database || undefined);
+      await this.invalidateQueryCache(
+        connectionId,
+        connection.database || undefined,
+      );
       return result;
     } catch (error) {
       this.logger.error('Seed Data Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(`Seed data failed: ${getErrorMessage(error)}`);
+      throw new InternalServerErrorException(
+        `Seed data failed: ${getErrorMessage(error)}`,
+      );
     }
   }
 
-  async createDatabase(connectionId: string, databaseName: string, userId: string) {
-    const connection = await this.connectionsService.findOne(connectionId, userId);
+  async createDatabase(
+    connectionId: string,
+    databaseName: string,
+    userId: string,
+  ) {
+    const connection = await this.connectionsService.findOne(
+      connectionId,
+      userId,
+    );
     if (!connection) throw new BadRequestException('Invalid connection ID');
-    await this.assertWritePermission(connection, userId, 'create_database', 'allowSchemaChanges', { databaseName });
+    await this.assertWritePermission(
+      connection,
+      userId,
+      'create_database',
+      'allowSchemaChanges',
+      { databaseName },
+    );
 
     if (!/^[a-zA-Z0-9_-]+$/.test(databaseName)) {
-      throw new BadRequestException('Invalid database name. Only alphanumeric characters, underscores, and hyphens are allowed.');
+      throw new BadRequestException(
+        'Invalid database name. Only alphanumeric characters, underscores, and hyphens are allowed.',
+      );
     }
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
+      const pool = await this.connectionsService.getPool(
+        connectionId,
+        undefined,
+        userId,
+      );
       const strategy = this.strategyFactory.getStrategy(connection.type);
       await strategy.createDatabase(pool, databaseName);
       await this.invalidateQueryCache(connectionId, databaseName);
-      return { success: true, message: `Database ${databaseName} created successfully.` };
+      return {
+        success: true,
+        message: `Database ${databaseName} created successfully.`,
+      };
     } catch (error) {
       this.logger.error('Create Database Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(`Failed to create database: ${getErrorMessage(error)}`);
+      throw new InternalServerErrorException(
+        `Failed to create database: ${getErrorMessage(error)}`,
+      );
     }
   }
 
-  async dropDatabase(connectionId: string, databaseName: string, userId: string) {
-    const connection = await this.connectionsService.findOne(connectionId, userId);
+  async dropDatabase(
+    connectionId: string,
+    databaseName: string,
+    userId: string,
+  ) {
+    const connection = await this.connectionsService.findOne(
+      connectionId,
+      userId,
+    );
     if (!connection) throw new BadRequestException('Invalid connection ID');
-    await this.assertWritePermission(connection, userId, 'drop_database', 'allowSchemaChanges', { databaseName });
+    await this.assertWritePermission(
+      connection,
+      userId,
+      'drop_database',
+      'allowSchemaChanges',
+      { databaseName },
+    );
 
     if (!/^[a-zA-Z0-9_-]+$/.test(databaseName)) {
       throw new BadRequestException('Invalid database name.');
     }
 
-    const adminDb = (connection.database && connection.database !== databaseName)
-      ? connection.database
-      : (connection.type === 'postgres' ? 'postgres' : connection.database);
+    const adminDb =
+      connection.database && connection.database !== databaseName
+        ? connection.database
+        : connection.type === 'postgres'
+          ? 'postgres'
+          : connection.database;
 
     if (adminDb === databaseName) {
-      throw new BadRequestException('Cannot drop the default connection database. Connect to a different database first.');
+      throw new BadRequestException(
+        'Cannot drop the default connection database. Connect to a different database first.',
+      );
     }
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId, adminDb, userId);
+      const pool = await this.connectionsService.getPool(
+        connectionId,
+        adminDb,
+        userId,
+      );
       const strategy = this.strategyFactory.getStrategy(connection.type);
       await strategy.dropDatabase(pool, databaseName);
 
@@ -493,30 +706,54 @@ export class QueryService {
       await this.connectionsService.removePool(droppedPoolKey, userId);
       await this.invalidateQueryCache(connectionId, databaseName);
 
-      return { success: true, message: `Database ${databaseName} dropped successfully.` };
+      return {
+        success: true,
+        message: `Database ${databaseName} dropped successfully.`,
+      };
     } catch (error) {
       this.logger.error('Drop Database Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(`Failed to drop database: ${getErrorMessage(error)}`);
+      throw new InternalServerErrorException(
+        `Failed to drop database: ${getErrorMessage(error)}`,
+      );
     }
   }
 
   // ─── Data Import ───
 
-  async importData(body: { connectionId: string; schema: string; table: string; data: any[] }, userId: string) {
+  async importData(
+    body: { connectionId: string; schema: string; table: string; data: any[] },
+    userId: string,
+  ) {
     const { connectionId, schema, table, data } = body;
-    const connection = await this.connectionsService.findOne(connectionId, userId);
+    const connection = await this.connectionsService.findOne(
+      connectionId,
+      userId,
+    );
     if (!connection) throw new BadRequestException('Invalid connection ID');
-    await this.assertWritePermission(connection, userId, 'import_data', 'allowImportExport', { table });
+    await this.assertWritePermission(
+      connection,
+      userId,
+      'import_data',
+      'allowImportExport',
+      { table },
+    );
 
     if (!data || !Array.isArray(data) || data.length === 0) {
       throw new BadRequestException('No data provided for import.');
     }
 
     try {
-      const pool = await this.connectionsService.getPool(connectionId, undefined, userId);
+      const pool = await this.connectionsService.getPool(
+        connectionId,
+        undefined,
+        userId,
+      );
       const strategy = this.strategyFactory.getStrategy(connection.type);
       const result = await strategy.importData(pool, { schema, table, data });
-      await this.invalidateQueryCache(connectionId, connection.database || undefined);
+      await this.invalidateQueryCache(
+        connectionId,
+        connection.database || undefined,
+      );
 
       await this.auditService.log({
         action: AuditAction.DB_IMPORT,
@@ -525,14 +762,16 @@ export class QueryService {
           category: 'import',
           connectionId,
           table: `${schema ? schema + '.' : ''}${table}`,
-          rowCount: result.rowCount
-        }
+          rowCount: result.rowCount,
+        },
       });
 
       return result;
     } catch (error) {
       this.logger.error('Import Data Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(`Import failed: ${getErrorMessage(error)}`);
+      throw new InternalServerErrorException(
+        `Import failed: ${getErrorMessage(error)}`,
+      );
     }
   }
 }

@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ErdWorkspacesService } from './erd-workspaces.service';
 import { CreateErdWorkspaceDto } from './dto/create-erd-workspace.dto';
@@ -11,7 +22,10 @@ export class ErdWorkspacesController {
   constructor(private readonly erdWorkspacesService: ErdWorkspacesService) {}
 
   @Get()
-  findAll(@Req() req: AuthenticatedRequest, @Query('connectionId') connectionId?: string) {
+  findAll(
+    @Req() req: AuthenticatedRequest,
+    @Query('connectionId') connectionId?: string,
+  ) {
     return this.erdWorkspacesService.findAll(req.user.id, connectionId);
   }
 
@@ -26,7 +40,11 @@ export class ErdWorkspacesController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateErdWorkspaceDto, @Req() req: AuthenticatedRequest) {
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateErdWorkspaceDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.erdWorkspacesService.update(id, dto, req.user.id);
   }
 

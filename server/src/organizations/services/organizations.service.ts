@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrganizationsRepository } from '../repositories/organizations.repository';
 import { CreateOrganizationDto } from '../dto/create-organization.dto';
@@ -49,7 +54,7 @@ export class OrganizationsService {
       action: AuditAction.TEAM_CREATE,
       userId,
       organizationId: organization.id,
-      details: { name: dto.name }
+      details: { name: dto.name },
     });
 
     const updatedOrg = await this.repository.findById(organization.id);
@@ -67,10 +72,28 @@ export class OrganizationsService {
   async findMyOrganizations(userId: string) {
     const memberships = await this.prisma.organizationMember.findMany({
       where: { userId },
-      include: { organization: { include: { members: { include: { user: { select: { id: true, email: true, firstName: true, lastName: true, avatarUrl: true } } } } } } },
+      include: {
+        organization: {
+          include: {
+            members: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                    avatarUrl: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
-    return memberships.map(m => this.toEntity(m.organization, userId));
+    return memberships.map((m) => this.toEntity(m.organization, userId));
   }
 
   async update(id: string, userId: string, dto: UpdateOrganizationDto) {
@@ -84,7 +107,11 @@ export class OrganizationsService {
     await this.repository.delete(id);
   }
 
-  async inviteMember(organizationId: string, inviterId: string, dto: { email: string; role: OrganizationRole }) {
+  async inviteMember(
+    organizationId: string,
+    inviterId: string,
+    dto: { email: string; role: OrganizationRole },
+  ) {
     await this.ensureOwnerOrAdminAccess(organizationId, inviterId);
     const normalizedEmail = this.normalizeEmail(dto.email);
     const role = this.ensureInvitableRole(dto.role);
@@ -95,7 +122,11 @@ export class OrganizationsService {
       where: { id: inviterId },
       select: { firstName: true, lastName: true, email: true },
     });
-    const inviterName = UserUtils.getDisplayName(inviter?.firstName, inviter?.lastName, inviter?.email);
+    const inviterName = UserUtils.getDisplayName(
+      inviter?.firstName,
+      inviter?.lastName,
+      inviter?.email,
+    );
 
     const user = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -103,7 +134,10 @@ export class OrganizationsService {
     });
 
     if (user) {
-      const existing = await this.repository.findMember(organizationId, user.id);
+      const existing = await this.repository.findMember(
+        organizationId,
+        user.id,
+      );
       if (existing) throw new ConflictException('User is already a member');
     }
 
@@ -133,20 +167,34 @@ export class OrganizationsService {
       action: AuditAction.TEAM_MEMBER_INVITE,
       userId: inviterId,
       organizationId,
-      details: { memberEmail: normalizedEmail, role, status: 'invitation-sent' }
+      details: {
+        memberEmail: normalizedEmail,
+        role,
+        status: 'invitation-sent',
+      },
     });
 
-    void this.mailService.sendTeamInvitationEmail(
-      normalizedEmail,
-      organization.name,
-      inviterName,
+    void this.mailService
+      .sendTeamInvitationEmail(
+        normalizedEmail,
+        organization.name,
+        inviterName,
+        role,
+        this.getInvitationLoginUrl(),
+      )
+      .catch((error) => {
+        console.warn(
+          '[OrganizationsService] Failed to send invitation email',
+          error,
+        );
+      });
+
+    return {
+      status: 'invitation-sent',
+      email: normalizedEmail,
       role,
-      this.getInvitationLoginUrl(),
-    ).catch((error) => {
-      console.warn('[OrganizationsService] Failed to send invitation email', error);
-    });
-
-    return { status: 'invitation-sent', email: normalizedEmail, role, invitation };
+      invitation,
+    };
   }
 
   async listMyInvitations(userId: string) {
@@ -208,12 +256,19 @@ export class OrganizationsService {
       throw new NotFoundException('Invitation not found');
     }
 
-    if (this.normalizeEmail(invitation.email) !== this.normalizeEmail(user.email)) {
-      throw new ForbiddenException('This invitation does not belong to your account');
+    if (
+      this.normalizeEmail(invitation.email) !== this.normalizeEmail(user.email)
+    ) {
+      throw new ForbiddenException(
+        'This invitation does not belong to your account',
+      );
     }
 
     const role = this.ensureInvitableRole(invitation.role as OrganizationRole);
-    const existingMember = await this.repository.findMember(invitation.organizationId, user.id);
+    const existingMember = await this.repository.findMember(
+      invitation.organizationId,
+      user.id,
+    );
     if (!existingMember) {
       await this.prisma.organizationMember.create({
         data: {
@@ -245,7 +300,9 @@ export class OrganizationsService {
       },
     });
 
-    const organization = await this.repository.findById(invitation.organizationId);
+    const organization = await this.repository.findById(
+      invitation.organizationId,
+    );
     return {
       id: invitation.id,
       organizationId: invitation.organizationId,
@@ -272,8 +329,12 @@ export class OrganizationsService {
       throw new NotFoundException('Invitation not found');
     }
 
-    if (this.normalizeEmail(invitation.email) !== this.normalizeEmail(user.email)) {
-      throw new ForbiddenException('This invitation does not belong to your account');
+    if (
+      this.normalizeEmail(invitation.email) !== this.normalizeEmail(user.email)
+    ) {
+      throw new ForbiddenException(
+        'This invitation does not belong to your account',
+      );
     }
 
     await this.prisma.organizationInvitation.delete({
@@ -283,27 +344,45 @@ export class OrganizationsService {
     return { id: invitation.id };
   }
 
-  async updateMemberRole(organizationId: string, inviterId: string, targetUserId: string, role: OrganizationRole) {
+  async updateMemberRole(
+    organizationId: string,
+    inviterId: string,
+    targetUserId: string,
+    role: OrganizationRole,
+  ) {
     await this.ensureOwnerAccess(organizationId, inviterId);
-    if (inviterId === targetUserId) throw new ForbiddenException('Cannot change your own role');
+    if (inviterId === targetUserId)
+      throw new ForbiddenException('Cannot change your own role');
 
-    const result = await this.repository.updateMemberRole(organizationId, targetUserId, role);
+    const result = await this.repository.updateMemberRole(
+      organizationId,
+      targetUserId,
+      role,
+    );
 
     await this.audit.log({
       action: AuditAction.TEAM_MEMBER_ROLE_CHANGE,
       userId: inviterId,
       organizationId,
-      details: { targetUserId, newRole: role }
+      details: { targetUserId, newRole: role },
     });
 
     return result;
   }
 
-  async removeMember(organizationId: string, inviterId: string, targetUserId: string) {
+  async removeMember(
+    organizationId: string,
+    inviterId: string,
+    targetUserId: string,
+  ) {
     await this.ensureOwnerOrAdminAccess(organizationId, inviterId);
-    if (inviterId === targetUserId) throw new ForbiddenException('Cannot remove yourself');
+    if (inviterId === targetUserId)
+      throw new ForbiddenException('Cannot remove yourself');
 
-    const targetMember = await this.repository.findMember(organizationId, targetUserId);
+    const targetMember = await this.repository.findMember(
+      organizationId,
+      targetUserId,
+    );
     if (targetMember?.role === OrganizationRole.OWNER) {
       throw new ForbiddenException('Cannot remove owner');
     }
@@ -314,7 +393,7 @@ export class OrganizationsService {
       action: AuditAction.TEAM_MEMBER_REMOVE,
       userId: inviterId,
       organizationId,
-      details: { targetUserId }
+      details: { targetUserId },
     });
   }
 
@@ -418,9 +497,17 @@ export class OrganizationsService {
     } as any);
   }
 
-  async removeResourcePolicy(resourceType: ResourceType, resourceId: string, organizationId: string) {
+  async removeResourcePolicy(
+    resourceType: ResourceType,
+    resourceId: string,
+    organizationId: string,
+  ) {
     try {
-      await this.repository.removeResource(resourceType, resourceId, organizationId);
+      await this.repository.removeResource(
+        resourceType,
+        resourceId,
+        organizationId,
+      );
     } catch {
       // The resource may already have been detached. That's fine.
     }
@@ -438,7 +525,9 @@ export class OrganizationsService {
   }
 
   private getInvitationLoginUrl(): string {
-    const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+    const frontendUrl = (
+      process.env.FRONTEND_URL || 'http://localhost:5173'
+    ).replace(/\/$/, '');
     return `${frontendUrl}/login`;
   }
 
@@ -447,13 +536,18 @@ export class OrganizationsService {
     if (!member) throw new ForbiddenException('You are not a member');
   }
 
-  private async ensureOwnerOrAdminAccess(organizationId: string, userId: string) {
+  private async ensureOwnerOrAdminAccess(
+    organizationId: string,
+    userId: string,
+  ) {
     const member = await this.repository.findMember(organizationId, userId);
     if (!member) throw new ForbiddenException('You are not a member');
 
     const allowed = [OrganizationRole.OWNER, OrganizationRole.ADMIN];
     if (!allowed.includes(member.role as OrganizationRole)) {
-      throw new ForbiddenException('Only owners and admins can perform this action');
+      throw new ForbiddenException(
+        'Only owners and admins can perform this action',
+      );
     }
   }
 
@@ -466,7 +560,9 @@ export class OrganizationsService {
 
   private ensureInvitableRole(role: OrganizationRole) {
     if (!this.invitableRoles.has(role)) {
-      throw new ForbiddenException('Owner roles cannot be assigned through invitations.');
+      throw new ForbiddenException(
+        'Owner roles cannot be assigned through invitations.',
+      );
     }
 
     return role;
@@ -474,7 +570,11 @@ export class OrganizationsService {
 
   private attachResourcePolicies<T extends { id: string }>(
     items: T[],
-    resourcePolicies: Array<{ resourceId: string; permissions: unknown; teamspaceId?: string | null }>,
+    resourcePolicies: Array<{
+      resourceId: string;
+      permissions: unknown;
+      teamspaceId?: string | null;
+    }>,
   ) {
     const policyMap = new Map(
       resourcePolicies.map((resource) => [
@@ -503,7 +603,9 @@ export class OrganizationsService {
       createdAt: organization.createdAt,
       updatedAt: organization.updatedAt,
       memberCount: organization.members?.length || 0,
-      currentUserRole: organization.members?.find((m: any) => m.userId === currentUserId)?.role,
+      currentUserRole: organization.members?.find(
+        (m: any) => m.userId === currentUserId,
+      )?.role,
     };
   }
 }

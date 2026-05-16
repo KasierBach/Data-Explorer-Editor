@@ -39,13 +39,21 @@ describe('OrganizationBackupService', () => {
   };
 
   const auditMock = { log: jest.fn() };
-  const permissionsMock = { buildDefaultResourcePolicy: jest.fn().mockReturnValue({ read: ['read'] }) };
+  const permissionsMock = {
+    buildDefaultResourcePolicy: jest.fn().mockReturnValue({ read: ['read'] }),
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    prismaMock.organizationMember.findUnique.mockResolvedValue({ role: 'OWNER' });
+    prismaMock.organizationMember.findUnique.mockResolvedValue({
+      role: 'OWNER',
+    });
     prismaMock.teamspace.findFirst.mockResolvedValue(null);
-    service = new OrganizationBackupService(prismaMock, auditMock as any, permissionsMock as any);
+    service = new OrganizationBackupService(
+      prismaMock,
+      auditMock as any,
+      permissionsMock as any,
+    );
   });
 
   it('exports a backup package with teamspaces and artifacts', async () => {
@@ -141,10 +149,12 @@ describe('OrganizationBackupService', () => {
     expect(backup.dashboards).toHaveLength(1);
     expect(backup.erdWorkspaces).toHaveLength(1);
     expect(backup.resourcePolicies).toHaveLength(1);
-    expect(auditMock.log).toHaveBeenCalledWith(expect.objectContaining({
-      action: expect.any(String),
-      organizationId: 'org-1',
-    }));
+    expect(auditMock.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: expect.any(String),
+        organizationId: 'org-1',
+      }),
+    );
   });
 
   it('restores a backup package and reattaches policies', async () => {
@@ -155,10 +165,16 @@ describe('OrganizationBackupService', () => {
       logoUrl: null,
       settings: {},
     });
-    prismaMock.teamspace.create.mockResolvedValue({ id: 'teamspace-restored-1' });
+    prismaMock.teamspace.create.mockResolvedValue({
+      id: 'teamspace-restored-1',
+    });
     prismaMock.savedQuery.create.mockResolvedValue({ id: 'query-restored-1' });
-    prismaMock.dashboard.create.mockResolvedValue({ id: 'dashboard-restored-1' });
-    prismaMock.dashboardWidget.create.mockResolvedValue({ id: 'widget-restored-1' });
+    prismaMock.dashboard.create.mockResolvedValue({
+      id: 'dashboard-restored-1',
+    });
+    prismaMock.dashboardWidget.create.mockResolvedValue({
+      id: 'widget-restored-1',
+    });
     prismaMock.erdWorkspace.create.mockResolvedValue({ id: 'erd-restored-1' });
 
     const result = await service.restoreOrganizationBackup('org-1', 'user-1', {
@@ -255,23 +271,29 @@ describe('OrganizationBackupService', () => {
     expect(result.created.dashboards).toBe(1);
     expect(result.created.dashboardWidgets).toBe(1);
     expect(result.created.erdWorkspaces).toBe(1);
-    expect(prismaMock.teamspace.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        organizationId: 'org-1',
-        name: 'Core',
-      }),
-    }));
-    expect(prismaMock.organizationResource.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: {
-        resourceType_resourceId_organizationId: {
-          resourceType: ResourceType.QUERY,
-          resourceId: 'query-restored-1',
+    expect(prismaMock.teamspace.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
           organizationId: 'org-1',
+          name: 'Core',
+        }),
+      }),
+    );
+    expect(prismaMock.organizationResource.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          resourceType_resourceId_organizationId: {
+            resourceType: ResourceType.QUERY,
+            resourceId: 'query-restored-1',
+            organizationId: 'org-1',
+          },
         },
-      },
-    }));
-    expect(prismaMock.organization.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: 'org-1' },
-    }));
+      }),
+    );
+    expect(prismaMock.organization.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'org-1' },
+      }),
+    );
   });
 });

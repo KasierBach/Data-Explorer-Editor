@@ -7,7 +7,7 @@
  * Replaces the repeated pattern: `error instanceof Error ? error.message : String(error)`
  */
 export function getErrorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
+  return error instanceof Error ? error.message : String(error);
 }
 
 /**
@@ -15,7 +15,7 @@ export function getErrorMessage(error: unknown): string {
  * Useful for re-throwing auth/permission errors while wrapping others.
  */
 export function isForbiddenException(error: unknown): boolean {
-    if (error == null || typeof error !== 'object') return false;
-    const ctor = (error as object).constructor;
-    return ctor?.name === 'ForbiddenException';
+  if (error == null || typeof error !== 'object') return false;
+  const ctor = error.constructor;
+  return ctor?.name === 'ForbiddenException';
 }

@@ -4,7 +4,9 @@ export const REFRESH_TOKEN_COOKIE = 'de_refresh';
 
 function useSecureCookies() {
   const frontendUrl = (process.env.FRONTEND_URL || '').trim();
-  return process.env.NODE_ENV === 'production' || frontendUrl.startsWith('https://');
+  return (
+    process.env.NODE_ENV === 'production' || frontendUrl.startsWith('https://')
+  );
 }
 
 export function getRefreshTokenCookieOptions(maxAgeMs: number): CookieOptions {

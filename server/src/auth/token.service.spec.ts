@@ -22,6 +22,8 @@ describe('TokenService notifications stream tickets', () => {
   });
 
   it('should reject a missing notifications stream ticket', () => {
-    expect(() => tokenService.verifyNotificationsStreamTicket()).toThrow(UnauthorizedException);
+    expect(() => tokenService.verifyNotificationsStreamTicket()).toThrow(
+      UnauthorizedException,
+    );
   });
 });

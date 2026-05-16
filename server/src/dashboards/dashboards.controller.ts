@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { DashboardsService } from './dashboards.service';
 import { CreateDashboardDto } from './dto/create-dashboard.dto';
@@ -26,12 +35,24 @@ export class DashboardsController {
   }
 
   @Post(':id/widgets')
-  addWidget(@Param('id') id: string, @Body() dto: AddDashboardWidgetDto, @Req() req: AuthenticatedRequest) {
+  addWidget(
+    @Param('id') id: string,
+    @Body() dto: AddDashboardWidgetDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
     return this.dashboardsService.addWidget(id, dto, req.user.id);
   }
 
   @Delete(':dashboardId/widgets/:widgetId')
-  removeWidget(@Param('dashboardId') dashboardId: string, @Param('widgetId') widgetId: string, @Req() req: AuthenticatedRequest) {
-    return this.dashboardsService.removeWidget(dashboardId, widgetId, req.user.id);
+  removeWidget(
+    @Param('dashboardId') dashboardId: string,
+    @Param('widgetId') widgetId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.dashboardsService.removeWidget(
+      dashboardId,
+      widgetId,
+      req.user.id,
+    );
   }
 }

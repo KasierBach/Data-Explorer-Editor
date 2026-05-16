@@ -18,7 +18,9 @@ describe('QueryService', () => {
     updateRow: jest.fn(),
     insertRow: jest.fn(),
     deleteRows: jest.fn(),
-    quoteTable: jest.fn((schema: string, table: string) => `${schema}.${table}`),
+    quoteTable: jest.fn(
+      (schema: string, table: string) => `${schema}.${table}`,
+    ),
     buildAlterTableSql: jest.fn(),
     seedData: jest.fn(),
     createDatabase: jest.fn(),
@@ -115,8 +117,14 @@ describe('QueryService', () => {
       'user-1',
     );
 
-    expect(freshnessService.bump).toHaveBeenCalledWith('query', ['conn-1', 'main']);
+    expect(freshnessService.bump).toHaveBeenCalledWith('query', [
+      'conn-1',
+      'main',
+    ]);
     expect(freshnessService.bump).toHaveBeenCalledWith('metadata', ['conn-1']);
-    expect(freshnessService.bump).toHaveBeenCalledWith('ai-schema', ['conn-1', 'main']);
+    expect(freshnessService.bump).toHaveBeenCalledWith('ai-schema', [
+      'conn-1',
+      'main',
+    ]);
   });
 });

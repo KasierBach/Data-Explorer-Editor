@@ -65,7 +65,11 @@ export class OrganizationsRepository implements IOrganizationsRepository {
     });
   }
 
-  async updateMemberRole(organizationId: string, userId: string, role: OrganizationRole) {
+  async updateMemberRole(
+    organizationId: string,
+    userId: string,
+    role: OrganizationRole,
+  ) {
     return this.prisma.organizationMember.update({
       where: {
         organizationId_userId: { organizationId, userId },
@@ -83,7 +87,11 @@ export class OrganizationsRepository implements IOrganizationsRepository {
     });
   }
 
-  async findResource(resourceType: ResourceType, resourceId: string, organizationId: string) {
+  async findResource(
+    resourceType: ResourceType,
+    resourceId: string,
+    organizationId: string,
+  ) {
     return this.prisma.organizationResource.findUnique({
       where: {
         resourceType_resourceId_organizationId: {
@@ -101,29 +109,32 @@ export class OrganizationsRepository implements IOrganizationsRepository {
 
   async upsertResource(data: Prisma.OrganizationResourceCreateInput) {
     const payload = data as any;
-    const organizationId = payload.organizationId ?? payload.organization?.connect?.id;
+    const organizationId =
+      payload.organizationId ?? payload.organization?.connect?.id;
     if (!organizationId) {
-      throw new Error('organizationId is required to upsert an organization resource');
+      throw new Error(
+        'organizationId is required to upsert an organization resource',
+      );
     }
 
     return this.prisma.organizationResource.upsert({
       where: {
         resourceType_resourceId_organizationId: {
-          resourceType: payload.resourceType as any,
+          resourceType: payload.resourceType,
           resourceId: payload.resourceId,
           organizationId,
         },
       },
       create: {
-        resourceType: payload.resourceType as any,
+        resourceType: payload.resourceType,
         resourceId: payload.resourceId,
         organization: {
           connect: { id: organizationId },
         },
-        permissions: payload.permissions as any,
+        permissions: payload.permissions,
       } as any,
       update: {
-        permissions: payload.permissions as any,
+        permissions: payload.permissions,
       },
     });
   }
@@ -138,7 +149,11 @@ export class OrganizationsRepository implements IOrganizationsRepository {
     });
   }
 
-  async removeResource(resourceType: ResourceType, resourceId: string, organizationId: string) {
+  async removeResource(
+    resourceType: ResourceType,
+    resourceId: string,
+    organizationId: string,
+  ) {
     await this.prisma.organizationResource.delete({
       where: {
         resourceType_resourceId_organizationId: {
