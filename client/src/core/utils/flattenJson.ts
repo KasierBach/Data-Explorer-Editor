@@ -7,8 +7,8 @@
  * Flattens a single document.
  * Example: { user: { name: 'John' } } -> { 'user.name': 'John' }
  */
-export function flattenDocument(obj: any, prefix = '', depth = 0, maxDepth = 5): Record<string, any> {
-    const flattened: Record<string, any> = {};
+export function flattenDocument(obj: unknown, prefix = '', depth = 0, maxDepth = 5): Record<string, unknown> {
+    const flattened: Record<string, unknown> = {};
 
     if (depth >= maxDepth || obj === null || typeof obj !== 'object') {
         return { [prefix]: obj };
@@ -20,11 +20,12 @@ export function flattenDocument(obj: any, prefix = '', depth = 0, maxDepth = 5):
         return { [prefix]: obj.toISOString() };
     }
 
-    for (const key in obj) {
-        if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+    const record = obj as Record<string, unknown>;
+    for (const key in record) {
+        if (!Object.prototype.hasOwnProperty.call(record, key)) continue;
 
         const newKey = prefix ? `${prefix}.${key}` : key;
-        const value = obj[key];
+        const value = record[key];
 
         if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
             // Recursive call for nested objects
@@ -44,7 +45,7 @@ export function flattenDocument(obj: any, prefix = '', depth = 0, maxDepth = 5):
 /**
  * Flattens an array of documents and extracts all unique keys as columns.
  */
-export function flattenDocuments(docs: any[]): { columns: string[], rows: Record<string, any>[] } {
+export function flattenDocuments(docs: unknown[]): { columns: string[], rows: Record<string, unknown>[] } {
     if (!docs || !Array.isArray(docs) || docs.length === 0) {
         return { columns: [], rows: [] };
     }

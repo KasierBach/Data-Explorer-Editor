@@ -87,8 +87,8 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                 description: form.description.trim(),
             });
             onOpenChange(false);
-        } catch (err: any) {
-            setError(err.message || 'Failed to save query');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to save query');
         } finally {
             setIsSaving(false);
         }

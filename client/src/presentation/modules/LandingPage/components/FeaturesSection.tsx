@@ -1,6 +1,6 @@
 import React from 'react';
 import { Terminal, Zap, BarChart3, GitGraph, PieChart, Lock } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 
 interface FeaturesSectionProps {
     lang: string;
@@ -50,12 +50,12 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
         }
     };
 
-    const cardVariants = {
+    const cardVariants: Variants = {
         hidden: { y: 20, opacity: 0 },
         visible: {
             y: 0,
             opacity: 1,
-            transition: { duration: 0.5, ease: "easeOut" as any }
+            transition: { duration: 0.5, ease: "easeOut" }
         }
     };
 

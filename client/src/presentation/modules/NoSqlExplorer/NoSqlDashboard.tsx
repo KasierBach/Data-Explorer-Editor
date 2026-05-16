@@ -17,9 +17,9 @@ export const NoSqlDashboard: React.FC = () => {
         try {
             await ConnectionService.deleteConnection(id);
             removeConnection(id);
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error deleting connection:', error);
-            alert(error.message || 'Error deleting connection');
+            alert(error instanceof Error ? error.message : 'Error deleting connection');
         } finally {
             setIsDeleting(null);
         }

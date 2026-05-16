@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import Editor, { useMonaco } from '@monaco-editor/react';
+import Editor, { useMonaco, type OnMount } from '@monaco-editor/react';
 import { useAppStore } from '@/core/services/store';
 import { Loader2 } from 'lucide-react';
 import { useAiGhostText } from '@/presentation/components/code-editor/useAiGhostText';
@@ -11,26 +11,31 @@ interface MqlEditorProps {
     height?: string | number;
 }
 
+type EditorTheme = 'vs-dark' | 'light';
+type MqlEditorHandle = Parameters<OnMount>[0];
+
+function getEditorTheme(): EditorTheme {
+    if (typeof document === 'undefined') return 'vs-dark';
+    return document.documentElement.classList.contains('dark') ? 'vs-dark' : 'light';
+}
+
 /**
  * Monaco-based JSON editor for MQL queries.
  * Supports Ctrl+Enter to execute, Shift+Alt+F to format, and AI Ghost Text.
  */
 export const MqlEditor: React.FC<MqlEditorProps> = ({ value, onChange, onRun, height = '100%' }) => {
-    const [theme, setTheme] = React.useState<'vs-dark' | 'light'>('vs-dark');
-    const editorRef = useRef<any>(null);
+    const [theme, setTheme] = React.useState<EditorTheme>(() => getEditorTheme());
+    const editorRef = useRef<MqlEditorHandle | null>(null);
     const { activeConnectionId, activeDatabase } = useAppStore();
     
     const monaco = useMonaco();
     useAiGhostText(monaco, activeConnectionId, activeDatabase || undefined, 'json');
 
     useEffect(() => {
-        const isDark = document.documentElement.classList.contains('dark');
-        setTheme(isDark ? 'vs-dark' : 'light');
-
         const observer = new MutationObserver((mutations) => {
             for (const mutation of mutations) {
                 if (mutation.attributeName === 'class') {
-                    setTheme(document.documentElement.classList.contains('dark') ? 'vs-dark' : 'light');
+                    setTheme(getEditorTheme());
                 }
             }
         });
@@ -38,16 +43,16 @@ export const MqlEditor: React.FC<MqlEditorProps> = ({ value, onChange, onRun, he
         return () => observer.disconnect();
     }, []);
 
-    const handleEditorMount = (editor: any, monaco: any) => {
+    const handleEditorMount: OnMount = (editor, monacoInstance) => {
         editorRef.current = editor;
 
         // Ctrl+Enter → Run query
-        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+        editor.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Enter, () => {
             onRun?.();
         });
 
         // Shift+Alt+F → Format JSON
-        editor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => {
+        editor.addCommand(monacoInstance.KeyMod.Shift | monacoInstance.KeyMod.Alt | monacoInstance.KeyCode.KeyF, () => {
             editor.getAction('editor.action.formatDocument')?.run();
         });
     };

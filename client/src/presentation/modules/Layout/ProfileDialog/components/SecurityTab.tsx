@@ -2,9 +2,10 @@ import React from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Loader2, Shield } from 'lucide-react';
+import type { AuthUser } from '@/core/services/store/slices/authSlice';
 
 interface SecurityTabProps {
-    user: any;
+    user: AuthUser | null;
     t: (key: string) => string;
     isLoading: boolean;
     securityState: {

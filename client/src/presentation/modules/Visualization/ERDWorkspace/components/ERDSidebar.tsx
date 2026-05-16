@@ -5,6 +5,17 @@ import { Input } from '@/presentation/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/presentation/components/ui/select";
 import { cn } from '@/lib/utils';
 import { Layers } from 'lucide-react';
+import type { TreeNode } from '@/core/domain/entities';
+import type { SearchResult } from '@/core/services/SearchService';
+
+interface ERDHierarchyNode extends TreeNode {
+    schema?: string;
+}
+
+interface DatabaseOption {
+    id: string;
+    name: string;
+}
 
 interface ERDSidebarProps {
     isCollapsed: boolean;
@@ -12,9 +23,9 @@ interface ERDSidebarProps {
     lang: string;
     selectedDatabase?: string;
     setSelectedDatabase: (v: string) => void;
-    allDatabases: any[];
-    hierarchy: any[];
-    filteredHierarchy: any[];
+    allDatabases: DatabaseOption[];
+    hierarchy: ERDHierarchyNode[];
+    filteredHierarchy: ERDHierarchyNode[];
     visibleTableNames: Set<string>;
     toggleTable: (name: string) => void;
     searchTerm: string;
@@ -24,9 +35,9 @@ interface ERDSidebarProps {
     handleSelectAll: () => void;
     handleDeselectAll: () => void;
     isLoadingHierarchy?: boolean;
-    globalSearchResults?: any[];
+    globalSearchResults?: SearchResult[];
     isSearchingGlobal?: boolean;
-    onAddGlobalTable?: (item: any) => void;
+    onAddGlobalTable?: (item: SearchResult) => void;
     isRefreshing?: boolean;
     onRefresh?: () => void;
 }
@@ -92,7 +103,7 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                                 <SelectValue placeholder={lang === 'vi' ? 'Chọn Cơ sở dữ liệu' : 'Select Database'} />
                             </SelectTrigger>
                             <SelectContent>
-                                {allDatabases.map((db: any) => (
+                                {allDatabases.map((db) => (
                                     <SelectItem key={db.id} value={db.name} className="text-xs">{db.name}</SelectItem>
                                 ))}
                             </SelectContent>
@@ -157,7 +168,7 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                     <div className="p-4 space-y-3">
                         {/* Local Results */}
                         <div className="space-y-1.5">
-                            <div className="px-3 pb-2 text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] border-b border-border/10 mb-2 flex justify-between items-center">
+                            <div className="px-3 pb-2 text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] border-b border-border/10 mb-2 flex justify-between items-center">
                                 <span>{lang === 'vi' ? 'Danh sách bảng' : 'Table List'}</span>
                                 {filteredHierarchy.length > 0 && <span className="opacity-50">{filteredHierarchy.length}</span>}
                             </div>
@@ -207,8 +218,8 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                                         key={item.id}
                                         className={cn(
                                             "px-4 py-3 rounded-2xl cursor-pointer transition-all duration-300 flex flex-col gap-1 group border border-transparent",
-                                            item.isAiSuggested 
-                                                ? "bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.05)]" 
+                                            item.isAiSuggested
+                                                ? "bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/30 shadow-[0_0_15px_rgba(168,85,247,0.05)]"
                                                 : "hover:bg-emerald-500/5 hover:border-emerald-500/20"
                                         )}
                                         onClick={() => onAddGlobalTable?.(item)}
@@ -241,7 +252,7 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                                     </div>
                                 ))}
                                 <div className="px-4 py-2 text-[9px] text-muted-foreground/30 text-center italic">
-                                    {globalSearchResults.some(i => i.isAiSuggested) 
+                                    {globalSearchResults.some(i => i.isAiSuggested)
                                         ? (lang === 'vi' ? 'Kết quả từ Redis Hybrid Search (AI + Index)' : 'Results from Redis Hybrid Search (AI + Index)')
                                         : (lang === 'vi' ? 'Kết quả từ Redis Global Index' : 'Results from Redis Global Index')
                                     }

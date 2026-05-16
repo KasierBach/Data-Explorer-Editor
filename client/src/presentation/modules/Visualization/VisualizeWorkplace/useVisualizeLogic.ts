@@ -4,9 +4,22 @@ import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
 import { toast } from 'sonner';
-import type { TreeNode } from '@/core/domain/entities';
+import type { RowData, TreeNode } from '@/core/domain/entities';
 
 export type DataMode = 'table' | 'sql';
+export type CurveType = 'basis' | 'linear' | 'monotone' | 'natural' | 'step';
+
+const getErrorMessage = (error: unknown) => (
+    error instanceof Error ? error.message : 'Failed to fetch data'
+);
+
+const isCurveType = (value: unknown): value is CurveType => (
+    value === 'basis'
+    || value === 'linear'
+    || value === 'monotone'
+    || value === 'natural'
+    || value === 'step'
+);
 
 export const useVisualizeLogic = () => {
     const location = useLocation();
@@ -43,7 +56,7 @@ export const useVisualizeLogic = () => {
     const [showGrid, setShowGrid] = useState(savedState.showGrid ?? true);
     const [showLegend, setShowLegend] = useState(savedState.showLegend ?? true);
     const [showBrush, setShowBrush] = useState(savedState.showBrush ?? false);
-    const [curveType, setCurveType] = useState<string>(savedState.curveType || 'monotone');
+    const [curveType, setCurveType] = useState<CurveType>(isCurveType(savedState.curveType) ? savedState.curveType : 'monotone');
     const [animationEnabled, setAnimationEnabled] = useState(savedState.animationEnabled ?? true);
     const [labelVisible, setLabelVisible] = useState(savedState.labelVisible ?? false);
     const [isSidebarCollapsed, setSidebarCollapsed] = useState(savedState.isSidebarCollapsed || false);
@@ -73,21 +86,21 @@ export const useVisualizeLogic = () => {
     ]);
 
     // ─── Queries ───
-    const { data: databases } = useQuery({
+    const { data: databases } = useQuery<string[]>({
         queryKey: ['db-list', activeConnectionId],
         queryFn: async () => {
-            if (!activeConnectionId) return [];
-            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection?.type as any);
+            if (!activeConnectionId || !activeConnection) return [];
+            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type);
             return adapter.getDatabases();
         },
-        enabled: !!activeConnectionId
+        enabled: !!activeConnectionId && !!activeConnection
     });
 
-    const { data: allTables, isLoading: isLoadingTables } = useQuery({
+    const { data: allTables, isLoading: isLoadingTables } = useQuery<TreeNode[]>({
         queryKey: ['flat-tables', activeConnectionId, currentDb],
         queryFn: async () => {
-            if (!activeConnectionId) return [];
-            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection?.type as any);
+            if (!activeConnectionId || !activeConnection) return [];
+            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type);
             const results: TreeNode[] = [];
             const crawl = async (parentId: string | null) => {
                 const nodes = await adapter.getHierarchy(parentId);
@@ -112,7 +125,7 @@ export const useVisualizeLogic = () => {
             await crawl(currentDb ? `db:${currentDb}` : null);
             return results;
         },
-        enabled: !!activeConnectionId
+        enabled: !!activeConnectionId && !!activeConnection
     });
 
     const buildQuery = useCallback(() => {
@@ -139,18 +152,18 @@ export const useVisualizeLogic = () => {
         return q;
     }, [dataMode, customSql, selectedTable, dataLimit, sortColumn, sortDir, activeConnection]);
 
-    const { data: chartData, isLoading, refetch } = useQuery({
+    const { data: chartData, isLoading, refetch } = useQuery<RowData[]>({
         queryKey: ['viz-data', activeConnectionId, buildQuery()],
         queryFn: async () => {
             const query = buildQuery();
-            if (!activeConnectionId || !query) return [];
-            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection?.type as any);
+            if (!activeConnectionId || !activeConnection || !query) return [];
+            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type);
             try {
                 setError(null);
                 const result = await adapter.executeQuery(query, { database: currentDb });
                 return result.rows || [];
-            } catch (err: any) {
-                setError(err.message || 'Failed to fetch data');
+            } catch (err) {
+                setError(getErrorMessage(err));
                 throw err;
             }
         },
@@ -166,7 +179,7 @@ export const useVisualizeLogic = () => {
     const downsampledData = useMemo(() => {
         if (!chartData || chartData.length <= 300) return chartData;
         const step = Math.ceil(chartData.length / 150);
-        return chartData.filter((_: any, i: number) => i % step === 0 || i === chartData.length - 1);
+        return chartData.filter((_, i) => i % step === 0 || i === chartData.length - 1);
     }, [chartData]);
 
     // Auto-setup axes
@@ -179,7 +192,7 @@ export const useVisualizeLogic = () => {
                 else if (columns.length > 1) setYAxis([columns[1]]);
             }
         }
-    }, [chartData, columns]);
+    }, [chartData, columns, xAxis]);
 
     // ─── Handlers ───
     const handleExportPNG = useCallback(() => {

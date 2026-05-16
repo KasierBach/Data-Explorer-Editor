@@ -1,4 +1,5 @@
 import React from 'react';
+import type { AuthUser } from '@/core/services/store/slices/authSlice';
 
 interface NotificationsTabProps {
     t: (key: string) => string;
@@ -9,7 +10,7 @@ interface NotificationsTabProps {
         securityAlerts: boolean;
     };
     actions: {
-        handleSaveSettings: (updates: any) => void;
+        handleSaveSettings: (updates: Partial<AuthUser>) => void;
     };
 }
 

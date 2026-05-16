@@ -111,17 +111,17 @@ export const migrationService = {
 
             eventSource.onmessage = (event) => {
                 try {
-                    const data = JSON.parse(event.data) as MigrationJob;
+                    const data = JSON.parse(event.data) as unknown;
 
                     // Filter out server heartbeat pings
-                    if ((data as any) === '__heartbeat__') return;
+                    if (data === '__heartbeat__') return;
 
                     // Reset retry count on successful message
                     retryCount = 0;
 
-                    onProgress(data);
+                    onProgress(data as MigrationJob);
 
-                    if (data.status === 'completed' || data.status === 'failed') {
+                    if ((data as MigrationJob).status === 'completed' || (data as MigrationJob).status === 'failed') {
                         cleanup();
                     }
                 } catch (err) {

@@ -2,14 +2,24 @@ import { useState, useCallback } from 'react';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
-import { ApiError } from '@/core/services/api.service';
+import type { RowData } from '@/core/domain/entities';
 
 interface NoSqlQueryResult {
-    rows: any[];
+    rows: RowData[];
     columns?: string[];
     rowCount?: number;
     durationMs?: number;
 }
+
+type MqlPayload = Record<string, unknown>;
+
+const isMqlPayload = (value: unknown): value is MqlPayload => (
+    typeof value === 'object' && value !== null
+);
+
+const toError = (error: unknown) => (
+    error instanceof Error ? error : new Error('MQL Execution Failed')
+);
 
 interface UseNoSqlQueryReturn {
     result: NoSqlQueryResult | null;
@@ -57,10 +67,14 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
             return;
         }
 
-// Parse MQL Query from JSON string in the store
-        let payload: any = {};
+        // Parse MQL Query from JSON string in the store
+        let payload: MqlPayload = {};
         try {
-            payload = JSON.parse(state.nosqlMqlQuery || '{}');
+            const parsed = JSON.parse(state.nosqlMqlQuery || '{}') as unknown;
+            if (!isMqlPayload(parsed)) {
+                throw new Error('MQL payload must be a JSON object');
+            }
+            payload = parsed;
         } catch {
             toast.error('Invalid MQL JSON');
             return;
@@ -106,10 +120,10 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
             setResult(enrichedResult);
             state.setNosqlResult(queryResult.rows);
             toast.success(`${queryResult.rowCount ?? queryResult.rows.length} documents returned (${durationMs}ms)`);
-        } catch (err: any) {
-            const apiError = err as ApiError;
-            setError(err);
-            toast.error(apiError.message || 'MQL Execution Failed');
+        } catch (err) {
+            const error = toError(err);
+            setError(error);
+            toast.error(error.message || 'MQL Execution Failed');
         } finally {
             setIsLoading(false);
             state.setNosqlQueryRunning(false);

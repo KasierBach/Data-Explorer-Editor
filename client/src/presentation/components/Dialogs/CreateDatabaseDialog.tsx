@@ -37,9 +37,9 @@ export const CreateDatabaseDialog: React.FC<CreateDatabaseDialogProps> = ({
             setDbName('');
             onSuccess();
             onClose();
-        } catch (error: any) {
+        } catch (error) {
             toast.error("Failed to create database", {
-                description: error.message
+                description: error instanceof Error ? error.message : undefined
             });
         } finally {
             setIsLoading(false);

@@ -8,7 +8,7 @@ import {
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { useAppStore } from '@/core/services/store';
-import { adminService } from '@/core/services/AdminService';
+import { adminService, type AuditLogEntry } from '@/core/services/AdminService';
 import { useQuery } from '@tanstack/react-query';
 import { 
     Trash2, Play, Copy, Search, Clock, 
@@ -19,6 +19,14 @@ interface QueryHistoryDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onRunQuery: (sql: string) => void;
+}
+
+function parseAuditDetails(log: AuditLogEntry): Record<string, unknown> {
+    try {
+        return JSON.parse(log.details || '{}') as Record<string, unknown>;
+    } catch {
+        return {};
+    }
 }
 
 export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
@@ -39,17 +47,14 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
     // Map server logs back to QueryHistoryEntry format
     const serverHistory = useMemo(() => {
         if (!serverLogs) return [];
-        return serverLogs.map((log: any) => {
-            let details: Record<string, unknown> = {};
-            try { details = JSON.parse(log.details || '{}'); } catch {
-                // details may be malformed JSON; use empty object fallback
-            }
+        return serverLogs.map((log) => {
+            const details = parseAuditDetails(log);
             
             return {
                 id: log.id,
-                sql: String((details as Record<string, unknown>).sqlSnippet || (details as Record<string, unknown>).sql || 'Unknown Query'),
-                database: String((details as Record<string, unknown>).database || ''),
-                connectionName: String((details as Record<string, unknown>).connectionName || 'Database'),
+                sql: String(details.sqlSnippet || details.sql || 'Unknown Query'),
+                database: String(details.database || ''),
+                connectionName: String(details.connectionName || 'Database'),
                 executedAt: new Date(log.createdAt).getTime(),
                 status: 'success' as const, // For now assume successful if in logs
                 isServerPersisted: true

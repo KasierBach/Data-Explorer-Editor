@@ -1,8 +1,37 @@
-import type { IDatabaseAdapter } from '../domain/database-adapter.interface';
-import type { TableMetadata, TreeNode, QueryResult } from '../domain/entities';
+import type {
+    DatabaseConnectionConfig,
+    DatabaseMetrics,
+    DatabaseRelationship,
+    GenerateSqlParams,
+    IDatabaseAdapter,
+    MutationResult,
+    QueryExecutionContext,
+    SchemaOperation,
+} from '../domain/database-adapter.interface';
+import type { DatabaseValue, QueryResult, RowData, TableMetadata, TreeNode } from '../domain/entities';
 import { apiService } from '../services/api.service';
 import { API_BASE_URL } from '../config/env';
 import { useAppStore } from '../services/store';
+import { ApiError } from '../services/api.service';
+import type { DestructiveQueryAnalysis } from '../services/store/slices/uiSlice';
+
+interface MetadataResponse {
+    columns: Array<{
+        name: string;
+        type: string;
+        isPrimaryKey?: boolean;
+        isNullable?: boolean;
+        isForeignKey?: boolean;
+        comment?: string | null;
+    }>;
+    rowCount?: number;
+    comment?: string | null;
+    indices?: TableMetadata['indices'];
+}
+
+const hasDestructiveAnalysis = (value: unknown): value is { analysis: DestructiveQueryAnalysis } => (
+    typeof value === 'object' && value !== null && 'analysis' in value
+);
 
 /**
  * Adapter that communicates with the backend API to perform database operations.
@@ -12,8 +41,8 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
     private connectionId: string | null = null;
     private baseUrl = API_BASE_URL;
 
-    async connect(config: any): Promise<void> {
-        if (!config.id) {
+    async connect(config?: DatabaseConnectionConfig): Promise<void> {
+        if (!config?.id) {
             throw new Error('Connection configuration is missing an ID');
         }
         this.connectionId = config.id;
@@ -32,10 +61,17 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         });
     }
 
-    async executeQuery(sql: string, context?: { database?: string, limit?: number, offset?: number, confirmed?: boolean }): Promise<QueryResult> {
+    async executeQuery(sql: string, context?: QueryExecutionContext): Promise<QueryResult> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        const body: any = {
+        const body: {
+            connectionId: string;
+            sql: string;
+            database?: string;
+            limit?: number;
+            offset?: number;
+            confirmed?: boolean;
+        } = {
             connectionId: this.connectionId,
             sql: sql,
         };
@@ -47,11 +83,10 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
 
         try {
             return await apiService.post<QueryResult>('/query', body);
-        } catch (error: any) {
+        } catch (error) {
             // Intercept the destructive SQL confirmation flow
-// Add import at the top later
-            if (error.reason === 'DESTRUCTIVE_REQUIRES_CONFIRMATION') {
-                const analysis = error.details?.analysis || {};
+            if (error instanceof ApiError && error.reason === 'DESTRUCTIVE_REQUIRES_CONFIRMATION') {
+                const analysis = hasDestructiveAnalysis(error.details) ? error.details.analysis : {};
                 const userConfirmed = await useAppStore.getState().requestDestructiveConfirm(analysis);
 
                 if (userConfirmed) {
@@ -67,10 +102,10 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
     async getMetadata(tableId: string): Promise<TableMetadata> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        const data = await apiService.get<any>(`/metadata/full?connectionId=${this.connectionId}&tableId=${encodeURIComponent(tableId)}`);
+        const data = await apiService.get<MetadataResponse>(`/metadata/full?connectionId=${this.connectionId}&tableId=${encodeURIComponent(tableId)}`);
         
         return {
-            columns: data.columns.map((col: any) => ({
+            columns: data.columns.map((col) => ({
                 name: col.name,
                 type: col.type,
                 isPrimaryKey: col.isPrimaryKey || false,
@@ -89,12 +124,12 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         schema: string;
         table: string;
         pkColumn: string;
-        pkValue: any;
-        updates: Record<string, any>;
-    }): Promise<any> {
+        pkValue: DatabaseValue;
+        updates: RowData;
+    }): Promise<MutationResult> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        return await apiService.patch<any>('/query/row', {
+        return await apiService.patch<MutationResult>('/query/row', {
             ...params,
             connectionId: this.connectionId
         });
@@ -104,11 +139,11 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         database?: string;
         schema: string;
         table: string;
-        data: Record<string, any>;
-    }): Promise<any> {
+        data: RowData;
+    }): Promise<MutationResult> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        return await apiService.post<any>('/query/row', {
+        return await apiService.post<MutationResult>('/query/row', {
             ...params,
             connectionId: this.connectionId
         });
@@ -119,11 +154,11 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         schema: string;
         table: string;
         pkColumn: string;
-        pkValues: any[];
-    }): Promise<any> {
+        pkValues: DatabaseValue[];
+    }): Promise<MutationResult> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        return await apiService.post<any>('/query/delete-rows', {
+        return await apiService.post<MutationResult>('/query/delete-rows', {
             ...params,
             connectionId: this.connectionId
         });
@@ -133,23 +168,23 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         database?: string;
         schema: string;
         table: string;
-        operations: any[];
-    }): Promise<any> {
+        operations: SchemaOperation[];
+    }): Promise<MutationResult> {
         if (!this.connectionId) throw new Error('Not connected');
 
-        return await apiService.post<any>('/query/schema', {
+        return await apiService.post<MutationResult>('/query/schema', {
             ...params,
             connectionId: this.connectionId
         });
     }
 
-    async getMetrics(database?: string): Promise<any> {
+    async getMetrics(database?: string): Promise<DatabaseMetrics> {
         if (!this.connectionId) throw new Error('Not connected');
 
         let url = `/metadata/metrics?connectionId=${this.connectionId}`;
         if (database) url += `&database=${encodeURIComponent(database)}`;
 
-        return await apiService.get<any>(url);
+        return await apiService.get<DatabaseMetrics>(url);
     }
 
     async getDatabases(): Promise<string[]> {
@@ -158,25 +193,16 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         return await apiService.get<string[]>(`/metadata/databases?connectionId=${this.connectionId}`);
     }
 
-    async getRelationships(database?: string): Promise<any[]> {
+    async getRelationships(database?: string): Promise<DatabaseRelationship[]> {
         if (!this.connectionId) throw new Error('Not connected');
 
         let url = `/metadata/relationships?connectionId=${this.connectionId}`;
         if (database) url += `&database=${encodeURIComponent(database)}`;
 
-        return await apiService.get<any[]>(url);
+        return await apiService.get<DatabaseRelationship[]>(url);
     }
 
-    async generateSql(params: {
-        database?: string;
-        prompt: string;
-        image?: string;
-        context?: string;
-        model: string;
-        mode: string;
-        routingMode?: string;
-        history?: any[];
-    }, options?: { signal?: AbortSignal }): Promise<Response> {
+    async generateSql(params: GenerateSqlParams, options?: { signal?: AbortSignal }): Promise<Response> {
         if (!this.connectionId) throw new Error('Not connected');
 
         return fetch(`${this.baseUrl}/ai/generate-sql`, {
@@ -190,16 +216,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         });
     }
 
-    async generateSqlStream(params: {
-        database?: string;
-        prompt: string;
-        image?: string;
-        context?: string;
-        model: string;
-        mode: string;
-        routingMode?: string;
-        history?: any[];
-    }, options?: { signal?: AbortSignal }): Promise<Response> {
+    async generateSqlStream(params: GenerateSqlParams, options?: { signal?: AbortSignal }): Promise<Response> {
         if (!this.connectionId) throw new Error('Not connected');
 
         return fetch(`${this.baseUrl}/ai/generate-sql-stream`, {

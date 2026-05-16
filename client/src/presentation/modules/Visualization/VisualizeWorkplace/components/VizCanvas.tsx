@@ -10,9 +10,20 @@ import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayou
 import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
 import { useAppStore } from '@/core/services/store';
+import type { RowData } from '@/core/domain/entities';
+import type { CurveType } from '../useVisualizeLogic';
+
+interface TreemapContentProps {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    name?: string | number;
+    fill?: string;
+}
 
 interface VizCanvasProps {
-    chartData: any[];
+    chartData: RowData[];
     error: string | null;
     refetch: () => void;
     chartType: string;
@@ -21,12 +32,12 @@ interface VizCanvasProps {
     showGrid: boolean;
     showLegend: boolean;
     showBrush: boolean;
-    curveType: any;
+    curveType: CurveType;
     animationEnabled: boolean;
     labelVisible: boolean;
     palette: string[];
     isLargeDataset: boolean;
-    getChartData: (type: string) => any[];
+    getChartData: (type: string) => RowData[];
     chartRef: React.RefObject<HTMLDivElement | null>;
     title: string;
     isSidebarCollapsed: boolean;
@@ -268,17 +279,21 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                             aspectRatio={4 / 3}
                             stroke="hsl(var(--background))"
                             isAnimationActive={effectiveAnimation}
-                            content={({ x, y, width, height, name, fill }: any) => (
-                                <g>
-                                    <rect x={x} y={y} width={width} height={height} fill={fill} rx={4} stroke="hsl(var(--background))" strokeWidth={2} />
-                                    {width > 40 && height > 20 && (
-                                        <text x={x + width / 2} y={y + height / 2} textAnchor="middle" dominantBaseline="central"
-                                            fill="#fff" fontSize={Math.min(11, width / 8)} fontWeight="bold">
-                                            {String(name).substring(0, Math.floor(width / 7))}
-                                        </text>
-                                    )}
-                                </g>
-                            )}
+                            content={(props: TreemapContentProps) => {
+                                const { x = 0, y = 0, width = 0, height = 0, name = '', fill = palette[0] } = props;
+
+                                return (
+                                    <g>
+                                        <rect x={x} y={y} width={width} height={height} fill={fill} rx={4} stroke="hsl(var(--background))" strokeWidth={2} />
+                                        {width > 40 && height > 20 && (
+                                            <text x={x + width / 2} y={y + height / 2} textAnchor="middle" dominantBaseline="central"
+                                                fill="#fff" fontSize={Math.min(11, width / 8)} fontWeight="bold">
+                                                {String(name).substring(0, Math.floor(width / 7))}
+                                            </text>
+                                        )}
+                                    </g>
+                                );
+                            }}
                         />
                     </ResponsiveContainer>
                 );

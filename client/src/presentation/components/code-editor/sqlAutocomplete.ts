@@ -20,6 +20,16 @@ export interface SchemaInfo {
     databases?: string[];
 }
 
+interface AiAutocompleteService {
+    getAutocomplete(params: {
+        connectionId: string;
+        database?: string;
+        beforeCursor: string;
+        afterCursor?: string;
+        context?: string;
+    }): Promise<string>;
+}
+
 // ─── SQL Keywords ───
 
 const SQL_KEYWORDS = [
@@ -323,7 +333,7 @@ let currentRequestId = 0;
 export function createAiInlineCompletionProvider(
     activeConnectionId: string | null,
     activeDatabase: string | undefined,
-    aiService: any,
+    aiService: AiAutocompleteService,
 ): languages.InlineCompletionsProvider {
     return {
         provideInlineCompletions: async (model, position, _context, token) => {
@@ -365,7 +375,7 @@ export function createAiInlineCompletionProvider(
             const requestId = currentRequestId;
 
             // 2. Wrap the API call in a Promise that resolves after a delay (Debounce)
-            return new Promise<{ items: any[] }>((resolve) => {
+            return new Promise<{ items: languages.InlineCompletion[] }>((resolve) => {
                 autocompleteTimeout = setTimeout(async () => {
                     // If this request is no longer the latest one or was cancelled, abort
                     if (requestId !== currentRequestId || token.isCancellationRequested) {

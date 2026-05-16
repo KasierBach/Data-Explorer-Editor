@@ -11,6 +11,7 @@ import { Upload, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { queryService } from '@/core/services/QueryService';
 import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
+import type { RowData } from '@/core/domain/entities';
 
 interface BulkImportDialogProps {
     open: boolean;
@@ -33,7 +34,7 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
 }) => {
     const { activeConnectionId, lang } = useAppStore();
     const [file, setFile] = useState<File | null>(null);
-    const [data, setData] = useState<any[]>([]);
+    const [data, setData] = useState<RowData[]>([]);
     const [isImporting, setIsImporting] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -60,7 +61,7 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
             const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
             const rows = lines.slice(1).map(line => {
                 const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                const obj: any = {};
+                const obj: RowData = {};
                 headers.forEach((h, i) => {
                     obj[h] = values[i];
                 });
@@ -114,8 +115,8 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
             onOpenChange(false);
             setFile(null);
             setData([]);
-        } catch (err: any) {
-            setError(err.message || 'Import failed');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Import failed');
             toast.error(lang === 'vi' ? 'Lỗi khi nhập dữ liệu' : 'Import failed');
         } finally {
             setIsImporting(false);

@@ -38,9 +38,9 @@ export const DeleteDatabaseDialog: React.FC<DeleteDatabaseDialogProps> = ({
             setConfirmName('');
             onSuccess();
             onClose();
-        } catch (error: any) {
+        } catch (error) {
             toast.error("Failed to delete database", {
-                description: error.message
+                description: error instanceof Error ? error.message : undefined
             });
         } finally {
             setIsLoading(false);

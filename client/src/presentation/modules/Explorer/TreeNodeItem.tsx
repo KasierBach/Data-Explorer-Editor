@@ -124,7 +124,7 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level, connectionI
 
     return (
         <SidebarContextMenu 
-            type={node.type as any} 
+            type={node.type} 
             connectionId={connectionId}
             onAction={(action) => {
                 window.dispatchEvent(new CustomEvent('tree-node-action', {

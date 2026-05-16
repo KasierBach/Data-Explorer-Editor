@@ -4,6 +4,10 @@ import { apiService } from '@/core/services/api.service';
 import { toast } from 'sonner';
 import { AuthService } from '@/core/services/AuthService';
 
+const getErrorMessage = (error: unknown) => (
+    error instanceof Error ? error.message : 'Something went wrong'
+);
+
 export const useAccountSecurity = (onClose?: () => void) => {
     const { lang } = useAppStore();
     const [isLoading, setIsLoading] = useState(false);
@@ -27,8 +31,8 @@ export const useAccountSecurity = (onClose?: () => void) => {
             setNewPassword('');
             setConfirmPassword('');
             return true;
-        } catch (err: any) {
-            toast.error(err.message);
+        } catch (err) {
+            toast.error(getErrorMessage(err));
             return false;
         } finally {
             setIsLoading(false);
@@ -46,8 +50,8 @@ export const useAccountSecurity = (onClose?: () => void) => {
                 onClose?.();
                 await AuthService.logoutAndRedirect('/login');
                 return true;
-            } catch (err: any) {
-                toast.error(err.message);
+            } catch (err) {
+                toast.error(getErrorMessage(err));
                 return false;
             } finally {
                 setIsLoading(false);

@@ -30,6 +30,8 @@ interface PlanNode {
     'Hash Cond'?: string;
     'Merge Cond'?: string;
     'Sort Key'?: string[];
+    'Sort Method'?: string;
+    'Group Key'?: string[];
     'Strategy'?: string;
     'Startup Cost': number;
     'Total Cost': number;
@@ -42,19 +44,31 @@ interface PlanNode {
     'Shared Hit Blocks'?: number;
     'Shared Read Blocks'?: number;
     Plans?: PlanNode[];
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 interface QueryPlan {
     Plan: PlanNode;
     'Planning Time'?: number;
     'Execution Time'?: number;
-    'Triggers'?: any[];
+    'Triggers'?: unknown[];
 }
 
 interface QueryPlanVisualizerProps {
-    planData: any; // raw query result rows
+    planData: unknown; // raw query result rows
 }
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+    typeof value === 'object' && value !== null
+);
+
+const isPlanNode = (value: unknown): value is PlanNode => (
+    isRecord(value) && typeof value['Node Type'] === 'string'
+);
+
+const isQueryPlan = (value: unknown): value is QueryPlan => (
+    isRecord(value) && isPlanNode(value.Plan)
+);
 
 // ─── Icon for node type ───
 const getNodeIcon = (nodeType: string) => {
@@ -411,12 +425,12 @@ export const QueryPlanVisualizer: React.FC<QueryPlanVisualizerProps> = ({ planDa
         if (!planData) return null;
         try {
             // Helper: extract QueryPlan from any structure
-            const extractPlan = (obj: any): QueryPlan | null => {
+            const extractPlan = (obj: unknown): QueryPlan | null => {
                 if (!obj) return null;
                 // Direct plan object { Plan: { ... } }
-                if (obj.Plan && obj.Plan['Node Type']) return obj as QueryPlan;
+                if (isQueryPlan(obj)) return obj;
                 // Array of plan objects [{ Plan: { ... } }]
-                if (Array.isArray(obj) && obj[0]?.Plan) return obj[0] as QueryPlan;
+                if (Array.isArray(obj) && isQueryPlan(obj[0])) return obj[0];
                 return null;
             };
 
@@ -428,15 +442,17 @@ export const QueryPlanVisualizer: React.FC<QueryPlanVisualizerProps> = ({ planDa
                 if (directPlan) return directPlan;
 
                 // Case 2: { "QUERY PLAN": <value> } — PG returns this
-                for (const key of Object.keys(firstRow)) {
-                    if (key.toUpperCase().includes('QUERY PLAN') || key === 'QUERY PLAN') {
-                        let val = firstRow[key];
-                        // If string, parse it
-                        if (typeof val === 'string') {
-                            try { val = JSON.parse(val); } catch { /* not JSON */ }
+                if (isRecord(firstRow)) {
+                    for (const key of Object.keys(firstRow)) {
+                        if (key.toUpperCase().includes('QUERY PLAN') || key === 'QUERY PLAN') {
+                            let val = firstRow[key];
+                            // If string, parse it
+                            if (typeof val === 'string') {
+                                try { val = JSON.parse(val); } catch { /* not JSON */ }
+                            }
+                            const fromVal = extractPlan(val);
+                            if (fromVal) return fromVal;
                         }
-                        const fromVal = extractPlan(val);
-                        if (fromVal) return fromVal;
                     }
                 }
 
@@ -452,8 +468,8 @@ export const QueryPlanVisualizer: React.FC<QueryPlanVisualizerProps> = ({ planDa
 
                 // Case 4: All rows together form the JSON string
                 // (some drivers split the JSON across multiple rows)
-                const allText = planData.map((r: any) => {
-                    const val = Object.values(r)[0];
+                const allText = planData.map((row) => {
+                    const val = isRecord(row) ? Object.values(row)[0] : row;
                     return typeof val === 'string' ? val : JSON.stringify(val);
                 }).join('');
                 try {

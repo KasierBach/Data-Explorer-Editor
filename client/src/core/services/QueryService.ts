@@ -1,4 +1,6 @@
 import { apiService } from './api.service';
+import type { DatabaseValue, QueryResult, RowData } from '../domain/entities';
+import type { MutationResult } from '../domain/database-adapter.interface';
 
 export interface UpdateSchemaDto {
     connectionId: string;
@@ -6,6 +8,29 @@ export interface UpdateSchemaDto {
     schema?: string;
     table?: string;
     operations: SchemaOperation[];
+}
+
+interface ExecuteQueryPayload {
+    connectionId: string;
+    sql: string;
+    database?: string;
+}
+
+interface UpdateRowPayload {
+    connectionId: string;
+    database?: string;
+    schema: string;
+    table: string;
+    pkColumn: string;
+    pkValue: DatabaseValue;
+    updates: RowData;
+}
+
+interface ImportDataPayload {
+    connectionId: string;
+    schema: string;
+    table: string;
+    data: RowData[];
 }
 
 export type SchemaOperation =
@@ -19,20 +44,20 @@ export type SchemaOperation =
     | { type: 'drop_fk'; name: string; constraintName?: string };
 
 export const queryService = {
-    executeQuery: async (payload: { connectionId: string; sql: string; database?: string }) => {
-        return await apiService.post<any>('/query', payload);
+    executeQuery: async (payload: ExecuteQueryPayload) => {
+        return await apiService.post<QueryResult>('/query', payload);
     },
 
-    updateRow: async (payload: any) => {
-        return await apiService.patch<any>('/query/row', payload);
+    updateRow: async (payload: UpdateRowPayload) => {
+        return await apiService.patch<MutationResult>('/query/row', payload);
     },
 
     updateSchema: async (payload: UpdateSchemaDto) => {
-        return await apiService.post<any>('/query/schema', payload);
+        return await apiService.post<MutationResult>('/query/schema', payload);
     },
 
     createDatabase: async (connectionId: string, name: string) => {
-        return await apiService.post<any>('/query/database', { connectionId, name });
+        return await apiService.post<MutationResult>('/query/database', { connectionId, name });
     },
 
     dropDatabase: async (connectionId: string, name: string) => {
@@ -40,13 +65,13 @@ export const queryService = {
         // Our backend expects connectionId/name in the body for this particular DELETE 
         // but apiService.delete doesn't take a body. 
         // We can use apiService.request
-        return await apiService.request<any>('/query/database', {
+        return await apiService.request<MutationResult>('/query/database', {
             method: 'DELETE',
             body: JSON.stringify({ connectionId, name })
         });
     },
 
-    importData: async (payload: { connectionId: string; schema: string; table: string; data: any[] }) => {
-        return await apiService.post<any>('/query/import', payload);
+    importData: async (payload: ImportDataPayload) => {
+        return await apiService.post<MutationResult>('/query/import', payload);
     }
 };

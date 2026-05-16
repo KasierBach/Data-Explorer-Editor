@@ -41,7 +41,7 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
         queryKey: ['metadata', activeConnectionId, tableId],
         queryFn: async () => {
             if (!activeConnection) throw new Error("No active connection");
-            const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type as any);
+            const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
             return adapter.getMetadata(tableId);
         },
         enabled: !!activeConnectionId
@@ -52,7 +52,7 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
         queryKey: ['data', activeConnectionId, tableId, isLargeDataset, page, pageSize],
         queryFn: async () => {
             if (!activeConnection) throw new Error("No active connection");
-            const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type as any);
+            const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
 
             if (isLargeDataset) {
                 return adapter.executeQuery(

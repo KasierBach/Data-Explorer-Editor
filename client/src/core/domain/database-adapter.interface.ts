@@ -1,10 +1,66 @@
-import type { QueryResult, TableMetadata, TreeNode } from "./entities";
+import type { DatabaseValue, QueryResult, RowData, TableMetadata, TreeNode } from "./entities";
+
+export interface DatabaseConnectionConfig {
+    id: string;
+    type?: string;
+}
+
+export interface QueryExecutionContext {
+    database?: string;
+    limit?: number;
+    offset?: number;
+    confirmed?: boolean;
+}
+
+export interface SchemaOperation {
+    type: string;
+    [key: string]: unknown;
+}
+
+export interface MutationResult {
+    success?: boolean;
+    rowCount?: number;
+    [key: string]: unknown;
+}
+
+export interface DatabaseMetrics {
+    tableCount: number;
+    sizeBytes: number;
+    activeConnections: number;
+    topTables: Array<{ name: string; sizeBytes: number }>;
+    tableTypes: Array<{ type: string; count: number }>;
+}
+
+export interface DatabaseRelationship {
+    constraint_name?: string;
+    source_table: string;
+    source_column: string;
+    target_table: string;
+    target_column: string;
+}
+
+export interface AiHistoryMessage {
+    role?: string;
+    content?: unknown;
+    [key: string]: unknown;
+}
+
+export interface GenerateSqlParams {
+    database?: string;
+    prompt: string;
+    image?: string;
+    context?: string;
+    model: string;
+    mode: string;
+    routingMode?: string;
+    history?: AiHistoryMessage[];
+}
 
 export interface IDatabaseAdapter {
     /**
      * Establishes a connection to the database.
      */
-    connect(config?: any): Promise<void>;
+    connect(config?: DatabaseConnectionConfig): Promise<void>;
 
     /**
      * Disconnects from the database.
@@ -20,7 +76,7 @@ export interface IDatabaseAdapter {
     /**
      * Executes a raw SQL query and returns the results.
      */
-    executeQuery(sql: string, context?: { database?: string, limit?: number, offset?: number }): Promise<QueryResult>;
+    executeQuery(sql: string, context?: QueryExecutionContext): Promise<QueryResult>;
 
     /**
      * Retrieves metadata (columns, constraints) for a specific table.
@@ -35,9 +91,9 @@ export interface IDatabaseAdapter {
         schema: string;
         table: string;
         pkColumn: string;
-        pkValue: any;
-        updates: Record<string, any>;
-    }): Promise<any>;
+        pkValue: DatabaseValue;
+        updates: RowData;
+    }): Promise<MutationResult>;
 
     /**
      * Inserts a new row into a table.
@@ -46,8 +102,8 @@ export interface IDatabaseAdapter {
         database?: string;
         schema: string;
         table: string;
-        data: Record<string, any>;
-    }): Promise<any>;
+        data: RowData;
+    }): Promise<MutationResult>;
 
     /**
      * Deletes one or more rows from a table.
@@ -57,8 +113,8 @@ export interface IDatabaseAdapter {
         schema: string;
         table: string;
         pkColumn: string;
-        pkValues: any[];
-    }): Promise<any>;
+        pkValues: DatabaseValue[];
+    }): Promise<MutationResult>;
 
     /**
      * Performs DDL operations on a table.
@@ -67,13 +123,13 @@ export interface IDatabaseAdapter {
         database?: string;
         schema: string;
         table: string;
-        operations: any[];
-    }): Promise<any>;
+        operations: SchemaOperation[];
+    }): Promise<MutationResult>;
 
     /**
      * Gets database metrics for the dashboard.
      */
-    getMetrics(database?: string): Promise<any>;
+    getMetrics(database?: string): Promise<DatabaseMetrics>;
 
     /**
      * Gets list of database names for the connection.
@@ -83,33 +139,15 @@ export interface IDatabaseAdapter {
     /**
      * Gets table relationships (foreign keys) for the database.
      */
-    getRelationships(database?: string): Promise<any[]>;
+    getRelationships(database?: string): Promise<DatabaseRelationship[]>;
 
     /**
      * Generates SQL using the AI Assistant
      */
-    generateSql?(params: {
-        database?: string;
-        prompt: string;
-        image?: string;
-        context?: string;
-        model: string;
-        mode: string;
-        routingMode?: string;
-        history?: any[];
-    }, options?: { signal?: AbortSignal }): Promise<Response>;
+    generateSql?(params: GenerateSqlParams, options?: { signal?: AbortSignal }): Promise<Response>;
 
     /**
      * Streams SQL generation using the AI Assistant
      */
-    generateSqlStream?(params: {
-        database?: string;
-        prompt: string;
-        image?: string;
-        context?: string;
-        model: string;
-        mode: string;
-        routingMode?: string;
-        history?: any[];
-    }, options?: { signal?: AbortSignal }): Promise<Response>;
+    generateSqlStream?(params: GenerateSqlParams, options?: { signal?: AbortSignal }): Promise<Response>;
 }

@@ -57,7 +57,7 @@ export function useQueryDashboard({
         yAxis: [],
     });
 
-    const openDashboardDialog = useCallback(() => {
+    const openDashboardDialog = () => {
         if (!results?.rows?.length) return;
         const defaultName = currentSavedQueryName || tabTitle || (lang === 'vi' ? 'Query Widget' : 'Query Widget');
         setDashboardDialogInitialValues({
@@ -73,7 +73,7 @@ export function useQueryDashboard({
             yAxis: resultNumericColumns.slice(0, 1),
         });
         setIsDashboardDialogOpen(true);
-    }, [results, currentSavedQueryName, tabTitle, lang, activeConnection?.name, activeOrganizationId, resultColumns, resultNumericColumns]);
+    };
 
     const saveToDashboard = useCallback(async (values: SaveToDashboardFormValues) => {
         if (!results) return;

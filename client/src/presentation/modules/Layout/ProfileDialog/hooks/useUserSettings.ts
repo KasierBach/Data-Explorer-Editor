@@ -3,6 +3,11 @@ import { useAppStore } from '@/core/services/store';
 import { apiService } from '@/core/services/api.service';
 import { toast } from 'sonner';
 import { useTheme } from '@/presentation/components/theme-provider';
+import type { AuthUser } from '@/core/services/store/slices/authSlice';
+
+const getErrorMessage = (error: unknown) => (
+    error instanceof Error ? error.message : 'Something went wrong'
+);
 
 export const useUserSettings = (isOpen: boolean) => {
     const { user, updateUser, lang, setLang } = useAppStore();
@@ -30,18 +35,18 @@ export const useUserSettings = (isOpen: boolean) => {
         }
     }, [isOpen, user]);
 
-    const handleSaveSettings = async (updates: any) => {
+    const handleSaveSettings = async (updates: Partial<AuthUser>) => {
         setIsLoading(true);
         try {
-            if (updates.language) {
+            if (updates.language === 'vi' || updates.language === 'en') {
                 setLang(updates.language);
             }
-            const data = await apiService.patch<any>('/users/settings', updates);
+            const data = await apiService.patch<AuthUser>('/users/settings', updates);
             updateUser(data);
             toast.success(lang === 'vi' ? "Cập nhật cài đặt thành công!" : "Settings updated successfully!");
             return true;
-        } catch (err: any) {
-            toast.error(err.message);
+        } catch (err) {
+            toast.error(getErrorMessage(err));
             return false;
         } finally {
             setIsLoading(false);

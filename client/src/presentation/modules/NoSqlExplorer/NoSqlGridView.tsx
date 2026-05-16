@@ -3,12 +3,13 @@ import {
     useReactTable,
     getCoreRowModel,
     flexRender,
+    type CellContext,
 } from '@tanstack/react-table';
 import { Info } from 'lucide-react';
 import { flattenDocuments } from '@/core/utils/flattenJson';
 
 interface NoSqlGridViewProps {
-    data: any[] | null;
+    data: unknown[] | null;
 }
 
 /**
@@ -27,7 +28,7 @@ export const NoSqlGridView: React.FC<NoSqlGridViewProps> = ({ data }) => {
         return columns.map((colName) => ({
             header: colName,
             accessorKey: colName,
-            cell: (info: any) => {
+            cell: (info: CellContext<Record<string, unknown>, unknown>) => {
                 const val = info.getValue();
                 if (val === null) return <span className="text-muted-foreground italic">null</span>;
                 if (typeof val === 'object') return JSON.stringify(val);
@@ -36,6 +37,7 @@ export const NoSqlGridView: React.FC<NoSqlGridViewProps> = ({ data }) => {
         }));
     }, [columns]);
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data: rows,
         columns: tableColumns,

@@ -64,8 +64,8 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
             deleteSavedQuery(id);
             if (selectedId === id) setSelectedId(null);
             toast.success('Saved query deleted');
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to delete saved query');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to delete saved query');
         }
     };
 

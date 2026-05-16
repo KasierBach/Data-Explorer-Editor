@@ -1,9 +1,10 @@
 import { getQuotedIdentifier } from '@/core/utils/id-parser';
+import type { RowData } from '@/core/domain/entities';
 import type { Row } from '@tanstack/react-table';
 import { toast } from 'sonner';
 
 export interface ExportContext {
-    rows: Row<any>[];
+    rows: Row<RowData>[];
     columns: { name: string }[];
     schema: string;
     tableName: string;
@@ -20,7 +21,7 @@ function downloadFile(content: string, filename: string, type: string) {
     URL.revokeObjectURL(url);
 }
 
-function formatValue(v: any): string {
+function formatValue(v: unknown): string {
     if (v === null || v === undefined) return 'NULL';
     if (typeof v === 'number' || typeof v === 'boolean') return String(v);
     return `'${String(v).replace(/'/g, "''")}'`;
@@ -46,7 +47,7 @@ export function exportCSV(ctx: ExportContext) {
 export function exportJSON(ctx: ExportContext) {
     if (!ctx.rows.length || !ctx.columns.length) return;
     const data = ctx.rows.map(row => {
-        const obj: Record<string, any> = {};
+        const obj: Record<string, unknown> = {};
         ctx.columns.forEach(col => { obj[col.name] = row.getValue(col.name); });
         return obj;
     });
@@ -66,7 +67,7 @@ export function exportSQL(ctx: ExportContext) {
     downloadFile(inserts, `${tableName}_export.sql`, 'text/sql');
 }
 
-export function copyRowAsSQL(rowData: any, columns: { name: string }[], schema: string, tableName: string, dialect: 'mysql' | 'postgres') {
+export function copyRowAsSQL(rowData: RowData, columns: { name: string }[], schema: string, tableName: string, dialect: 'mysql' | 'postgres') {
     const qSchema = getQuotedIdentifier(schema, dialect);
     const qTable = getQuotedIdentifier(tableName, dialect);
     const cols = columns.map(c => getQuotedIdentifier(c.name, dialect)).join(', ');

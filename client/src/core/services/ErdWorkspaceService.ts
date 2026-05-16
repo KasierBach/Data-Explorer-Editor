@@ -6,7 +6,7 @@ export interface SaveErdWorkspacePayload {
     notes?: string;
     connectionId?: string;
     database?: string;
-    layout: Record<string, any>;
+    layout: unknown;
 }
 
 export class ErdWorkspaceService {

@@ -36,7 +36,7 @@ export const createDefaultWorkspaceLayout = (): ErdWorkspaceLayout => ({
     collapsedTables: [],
 });
 
-export const normalizeWorkspaceLayout = (layout?: Record<string, any> | null): ErdWorkspaceLayout => {
+export const normalizeWorkspaceLayout = (layout?: Partial<ErdWorkspaceLayout> | null): ErdWorkspaceLayout => {
     const defaults = createDefaultWorkspaceLayout();
     return {
         visibleTables: Array.isArray(layout?.visibleTables) ? layout.visibleTables : defaults.visibleTables,

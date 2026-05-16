@@ -21,7 +21,7 @@ interface QueryResultsProps {
     dataUpdatedAt: number;
     activeTab: string;
     onTabChange: (tab: string) => void;
-    explainPlan?: any;
+    explainPlan?: unknown;
     onClearResults?: () => void;
     onClose?: () => void;
     onSaveToDashboard?: () => void;
@@ -42,6 +42,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
 }) => {
     const { lang } = useAppStore();
     const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
+    const hasExplainPlan = explainPlan !== null && explainPlan !== undefined;
 
     // Determine content based on state
     const renderDataContent = () => {
@@ -99,7 +100,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                         <Info className="w-3 h-3" />
                         {isCompactMobileLayout ? (lang === 'vi' ? "T.Báo" : "Msgs") : (lang === 'vi' ? "Thông báo" : "Messages")}
                     </TabsTrigger>
-                    {explainPlan && (
+                    {hasExplainPlan && (
                         <TabsTrigger
                             value="plan"
                             className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-transparent shadow-none px-1 text-[10px] md:text-[11px] flex gap-1.5 text-orange-500"
@@ -191,7 +192,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                     )}
                 </TabsContent>
 
-                {explainPlan && (
+                {hasExplainPlan && (
                     <TabsContent value="plan" className="m-0 h-full overflow-auto">
                         <QueryPlanVisualizer planData={explainPlan} />
                     </TabsContent>

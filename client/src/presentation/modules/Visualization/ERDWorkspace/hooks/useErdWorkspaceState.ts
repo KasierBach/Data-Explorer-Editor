@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import {
     useNodesState,
     useEdgesState,
@@ -34,7 +34,7 @@ export function useErdWorkspaceState({ initialMetadata }: UseErdWorkspaceStateOp
     const [isEdgeAnimated, setIsEdgeAnimated] = useState<boolean>(initialLayout.isEdgeAnimated);
     const [isToolbarCollapsed, setIsToolbarCollapsed] = useState<boolean>(initialLayout.isToolbarCollapsed);
 
-    const buildWorkspaceLayout = useCallback(() => buildWorkspaceLayoutSnapshot({
+    const buildWorkspaceLayout = () => buildWorkspaceLayoutSnapshot({
         visibleTables: visibleTableNames,
         nodes,
         edges,
@@ -48,23 +48,9 @@ export function useErdWorkspaceState({ initialMetadata }: UseErdWorkspaceStateOp
         isEdgeAnimated,
         isToolbarCollapsed,
         collapsedTables,
-    }), [
-        visibleTableNames,
-        nodes,
-        edges,
-        isSidebarCollapsed,
-        detailLevel,
-        schemaFilter,
-        showMinimap,
-        performanceMode,
-        edgeRouting,
-        backgroundVariant,
-        isEdgeAnimated,
-        isToolbarCollapsed,
-        collapsedTables,
-    ]);
+    });
 
-    const applyWorkspaceLayout = useCallback((layout?: Record<string, unknown> | null) => {
+    const applyWorkspaceLayout = (layout?: Record<string, unknown> | null) => {
         const normalized = normalizeWorkspaceLayout(layout);
         setVisibleTableNames(new Set(normalized.visibleTables));
         setNodes(normalized.nodes);
@@ -79,9 +65,9 @@ export function useErdWorkspaceState({ initialMetadata }: UseErdWorkspaceStateOp
         setIsEdgeAnimated(normalized.isEdgeAnimated);
         setIsToolbarCollapsed(normalized.isToolbarCollapsed);
         setCollapsedTables(new Set(normalized.collapsedTables));
-    }, [setEdges, setNodes]);
+    };
 
-    const handleToggleCollapse = useCallback((name: string) => {
+    const handleToggleCollapse = (name: string) => {
         setCollapsedTables((current) => {
             const next = new Set(current);
             if (next.has(name)) {
@@ -91,15 +77,15 @@ export function useErdWorkspaceState({ initialMetadata }: UseErdWorkspaceStateOp
             }
             return next;
         });
-    }, []);
+    };
 
-    const handleSelectAll = useCallback((filteredHierarchy: Array<{ name: string }>) => {
+    const handleSelectAll = (filteredHierarchy: Array<{ name: string }>) => {
         setVisibleTableNames(new Set(filteredHierarchy.map((entry) => entry.name)));
-    }, []);
+    };
 
-    const handleDeselectAll = useCallback(() => {
+    const handleDeselectAll = () => {
         setVisibleTableNames(new Set());
-    }, []);
+    };
 
     return {
         nodes,

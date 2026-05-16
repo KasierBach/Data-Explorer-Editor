@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { apiService } from '@/core/services/api.service';
 import { useAppStore } from '@/core/services/store';
+import type { QueryResult } from '@/core/domain/entities';
 
 interface UseExplainPlanOptions {
     query: string;
@@ -19,7 +20,7 @@ export function useExplainPlan({ query }: UseExplainPlanOptions) {
             const explainQuery = `EXPLAIN ANALYZE ${query}`;
             // Use ConnectionService API to execute explain query if available
             // Fallback: execute via ConnectionService if available
-            const result = await apiService.post<any>('/query', {
+            const result = await apiService.post<QueryResult>('/query', {
                 connectionId: activeConnectionId,
                 sql: explainQuery,
                 database: activeDatabase || undefined,
@@ -27,7 +28,7 @@ export function useExplainPlan({ query }: UseExplainPlanOptions) {
                 confirmed: true,
             });
             
-            setExplainPlan(result?.rows?.[0] || null);
+            setExplainPlan(result.rows[0] || null);
         } catch (error) {
             console.error('Explain plan error:', error);
             setExplainPlan(null);

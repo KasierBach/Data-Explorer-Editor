@@ -11,11 +11,18 @@ import { ShieldAlert, Database, Lock, Globe, Wand2, ShieldCheck, Shield, FileWar
 import { ConnectionService } from '@/core/services/ConnectionService';
 import { OrganizationService, type OrganizationEntity } from '@/core/services/OrganizationService';
 
+type EditableConnectionType = Exclude<Connection['type'], 'mock' | 'redis'>;
+type ConnectionPayload = Omit<Connection, 'id'>;
+
+const getErrorMessage = (error: unknown, fallback: string) => (
+    error instanceof Error ? error.message : fallback
+);
+
 export const ConnectionDialog: React.FC = () => {
     const { isConnectionDialogOpen, closeConnectionDialog, addConnection, lang } = useAppStore();
     const t = lang === 'vi';
 
-    const [type, setType] = useState<'postgres' | 'mysql' | 'mssql' | 'mongodb' | 'mongodb+srv' | 'sqlite' | 'clickhouse'>('postgres');
+    const [type, setType] = useState<EditableConnectionType>('postgres');
     const [name, setName] = useState('');
     const [host, setHost] = useState('localhost');
     const [port, setPort] = useState('5432');
@@ -136,8 +143,8 @@ export const ConnectionDialog: React.FC = () => {
         }
     };
 
-    const getConnectionData = () => {
-        const connectionData: any = {
+    const getConnectionData = (): ConnectionPayload => {
+        const connectionData: ConnectionPayload = {
             name: name || `${type}@${host}`,
             type,
             host: isFileType ? undefined : host,
@@ -165,14 +172,14 @@ export const ConnectionDialog: React.FC = () => {
             const data = getConnectionData();
             const result = await ConnectionService.testConnection(data);
             setTestResult({
-                status: result.status as any,
+                status: result.status,
                 latency: result.latencyMs,
                 error: result.error || undefined
             });
-        } catch (err: any) {
+        } catch (err) {
             setTestResult({
                 status: 'error',
-                error: err.message || 'Connection failed'
+                error: getErrorMessage(err, 'Connection failed')
             });
         } finally {
             setIsTesting(false);
@@ -214,8 +221,8 @@ export const ConnectionDialog: React.FC = () => {
             setName('');
             setPassword('');
             setError(null);
-        } catch (err: any) {
-            setError(err.message || 'Failed to save connection');
+        } catch (err) {
+            setError(getErrorMessage(err, 'Failed to save connection'));
         } finally {
             setIsSaving(false);
         }
@@ -308,15 +315,16 @@ export const ConnectionDialog: React.FC = () => {
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <div className="space-y-1">
                                         <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Loại Database' : 'Database Type'}</Label>
-                                        <Select value={type} onValueChange={(v: any) => {
-                                            setType(v);
-                                            if (v === 'postgres') { setPort('5432'); setUsername('postgres'); setHost('localhost'); }
-                                            else if (v === 'mysql') { setPort('3306'); setUsername('root'); setHost('localhost'); }
-                                            else if (v === 'mssql') { setPort('1433'); setUsername('sa'); setHost('localhost'); }
-                                            else if (v === 'mongodb') { setPort('27017'); setUsername(''); setHost('localhost'); }
-                                            else if (v === 'mongodb+srv') { setPort(''); setUsername(''); setHost(''); }
-                                            else if (v === 'sqlite') { setPort(''); setUsername(''); setHost(''); setDatabase(''); }
-                                            else if (v === 'clickhouse') { setPort('8123'); setUsername('default'); setHost('localhost'); }
+                                        <Select value={type} onValueChange={(v) => {
+                                            const nextType = v as EditableConnectionType;
+                                            setType(nextType);
+                                            if (nextType === 'postgres') { setPort('5432'); setUsername('postgres'); setHost('localhost'); }
+                                            else if (nextType === 'mysql') { setPort('3306'); setUsername('root'); setHost('localhost'); }
+                                            else if (nextType === 'mssql') { setPort('1433'); setUsername('sa'); setHost('localhost'); }
+                                            else if (nextType === 'mongodb') { setPort('27017'); setUsername(''); setHost('localhost'); }
+                                            else if (nextType === 'mongodb+srv') { setPort(''); setUsername(''); setHost(''); }
+                                            else if (nextType === 'sqlite') { setPort(''); setUsername(''); setHost(''); setDatabase(''); }
+                                            else if (nextType === 'clickhouse') { setPort('8123'); setUsername('default'); setHost('localhost'); }
                                         }}>
                                             <SelectTrigger className="h-9 text-xs">
                                                 <SelectValue />

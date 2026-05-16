@@ -30,7 +30,7 @@ interface ERDCanvasProps {
     lang: string;
     showMinimap: boolean;
     pendingConnection: { sourceTable: string; sourceColumn: string; targetTable: string; targetColumn: string } | null;
-    setPendingConnection: (v: any) => void;
+    setPendingConnection: (v: ERDCanvasProps['pendingConnection']) => void;
     handleCreateForeignKey: (data: ForeignKeyData) => void;
     handleEdgeMouseEnter?: (event: React.MouseEvent, edge: Edge) => void;
     handleEdgeMouseLeave?: (event: React.MouseEvent, edge: Edge) => void;
@@ -44,7 +44,7 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
     nodes, edges, onNodesChange, onEdgesChange, onConnect, isLoading, lang, showMinimap, pendingConnection, setPendingConnection, handleCreateForeignKey,
     handleEdgeMouseEnter, handleEdgeMouseLeave, hoverPosition, hoveredEdgeId, backgroundVariant = 'dots', toolbar
 }) => {
-    const reactFlowRef = useRef<any>(null);
+    const reactFlowRef = useRef<HTMLDivElement | null>(null);
 
     return (
         <div className="flex-1 relative">

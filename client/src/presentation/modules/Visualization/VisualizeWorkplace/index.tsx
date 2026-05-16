@@ -37,6 +37,7 @@ const CURVE_TYPES = ['monotone', 'linear', 'step', 'basis', 'natural'] as const;
 
 export const VisualizeWorkplace: React.FC = () => {
     const { state, actions } = useVisualizeLogic();
+    const { setSidebarCollapsed } = actions;
 
     const chartTypeName = CHART_TYPES.find(t => t.id === state.chartType)?.name;
     const activePalette = COLOR_PALETTES[state.paletteIdx].colors;
@@ -66,9 +67,9 @@ export const VisualizeWorkplace: React.FC = () => {
     // should preserve the desktop-style canvas/sidebar layout.
     React.useEffect(() => {
         if (isCompactMobileLayout) {
-            actions.setSidebarCollapsed(true);
+            setSidebarCollapsed(true);
         }
-    }, [isCompactMobileLayout]);
+    }, [isCompactMobileLayout, setSidebarCollapsed]);
 
     return (
         <div className={cn(

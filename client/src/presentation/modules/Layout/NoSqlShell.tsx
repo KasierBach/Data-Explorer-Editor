@@ -60,7 +60,7 @@ export function NoSqlShell() {
         if (!leftPanel.isDragging && sidebarWidth !== leftPanel.width && sidebarWidth > 0) {
             leftPanel.setWidth(sidebarWidth);
         }
-    }, [sidebarWidth]);
+    }, [leftPanel, sidebarWidth]);
 
     React.useEffect(() => {
         if (!isCompactMobileLayout) return;

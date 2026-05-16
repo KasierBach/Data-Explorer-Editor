@@ -16,6 +16,11 @@ import { CreateDatabaseDialog } from '@/presentation/components/Dialogs/CreateDa
 import { DeleteDatabaseDialog } from '@/presentation/components/Dialogs/DeleteDatabaseDialog';
 import { handleTreeAction as importedHandleTreeAction } from './treeActions';
 import { toast } from 'sonner';
+import type { SearchResult } from '@/core/services/SearchService';
+
+const getErrorMessage = (error: unknown) => (
+    error instanceof Error ? error.message : 'Sync failed'
+);
 
 export const ExplorerSidebar: React.FC = () => {
     const connections = useAppStore(state => state.connections);
@@ -28,7 +33,7 @@ export const ExplorerSidebar: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const explorerSearchMode = useAppStore(state => state.explorerSearchMode);
     const setExplorerSearchMode = useAppStore(state => state.setExplorerSearchMode);
-    const [globalResults, setGlobalResults] = useState<any[]>([]);
+    const [globalResults, setGlobalResults] = useState<SearchResult[]>([]);
     const [isSearchingGlobal, setIsSearchingGlobal] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     
@@ -36,9 +41,14 @@ export const ExplorerSidebar: React.FC = () => {
     const [isDeleteDatabaseDialogOpen, setDeleteDatabaseDialogOpen] = useState(false);
     const [databaseToDelete, setDatabaseToDelete] = useState<string | null>(null);
     
+    const activeConnection = connections.find(c => c.id === activeConnectionId);
+    const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
+    const schemaChangesDisabled = activeConnection?.readOnly || activeConnection?.allowSchemaChanges === false;
+    const effectiveDatabase = activeConnection?.database || (!isNoSql ? activeDatabase : null);
+
     const queryClient = useQueryClient();
 
-    const handleRefresh = async () => {
+    const handleRefresh = React.useCallback(async () => {
         const t = toast.loading(lang === 'vi' ? 'Đang làm mới dữ liệu...' : 'Refreshing hierarchy...');
         if (activeConnectionId) {
             await MetadataService.refresh(activeConnectionId, effectiveDatabase || undefined).catch((err) => {
@@ -51,7 +61,7 @@ export const ExplorerSidebar: React.FC = () => {
             console.warn('Failed to sync search index', err);
         });
         toast.success(lang === 'vi' ? 'Đã cập nhật' : 'Refreshed', { id: t });
-    };
+    }, [activeConnectionId, effectiveDatabase, lang, queryClient]);
 
     const handleSyncIndex = async () => {
         setIsSyncing(true);
@@ -60,8 +70,8 @@ export const ExplorerSidebar: React.FC = () => {
             const { SearchService } = await import('@/core/services/SearchService');
             await SearchService.syncIndex();
             toast.success(lang === 'vi' ? 'Đã đồng bộ!' : 'Index synced!', { id: t });
-        } catch (err: any) {
-            toast.error(err.message || 'Sync failed', { id: t });
+        } catch (err) {
+            toast.error(getErrorMessage(err), { id: t });
         } finally {
             setIsSyncing(false);
         }
@@ -107,7 +117,7 @@ export const ExplorerSidebar: React.FC = () => {
 
         window.addEventListener('tree-node-action', handleTreeAction as EventListener);
         return () => window.removeEventListener('tree-node-action', handleTreeAction as EventListener);
-    }, [activeConnectionId]);
+    }, [handleRefresh]);
 
     useEffect(() => {
         if (connections.length > 0) {
@@ -117,11 +127,6 @@ export const ExplorerSidebar: React.FC = () => {
             }
         }
     }, [activeConnectionId, connections, setActiveConnectionId]);
-
-    const activeConnection = connections.find((c: any) => c.id === activeConnectionId);
-    const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
-    const schemaChangesDisabled = activeConnection?.readOnly || activeConnection?.allowSchemaChanges === false;
-    const effectiveDatabase = activeConnection?.database || (!isNoSql ? activeDatabase : null);
 
     useEffect(() => {
         if (activeConnection) {
@@ -139,7 +144,7 @@ export const ExplorerSidebar: React.FC = () => {
         );
     }, [rootNodes, searchTerm, explorerSearchMode]);
 
-    const handleGlobalResultClick = (result: any) => {
+    const handleGlobalResultClick = (result: SearchResult) => {
         setActiveConnectionId(result.connectionId);
         // We could also trigger opening the entity here, but switching connection is the main part
         toast.info(lang === 'vi' ? `Đã chuyển sang kết nối ${result.connectionName}` : `Switched to ${result.connectionName}`);
@@ -318,7 +323,7 @@ export const ExplorerSidebar: React.FC = () => {
                                                 const newValue = !conn.showAllDatabases;
                                                 useAppStore.getState().updateConnection(conn.id, { showAllDatabases: newValue });
                                                 ConnectionService.updateConnection(conn.id, { showAllDatabases: newValue }).then(async () => {
-                                                    await connectionService.setActiveConnection({ ...conn, showAllDatabases: newValue } as any);
+                                                    await connectionService.setActiveConnection({ ...conn, showAllDatabases: newValue });
                                                     triggerRefresh();
                                                 });
                                             }

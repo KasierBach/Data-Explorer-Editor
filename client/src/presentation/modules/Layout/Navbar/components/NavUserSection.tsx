@@ -16,9 +16,10 @@ import {
     DropdownMenuTrigger,
 } from "@/presentation/components/ui/dropdown-menu"
 import { cn } from '@/lib/utils';
+import type { AuthUser } from '@/core/services/store/slices/authSlice';
 
 interface NavUserSectionProps {
-    user: any;
+    user: AuthUser | null;
     logout: () => void;
     isAiPanelOpen: boolean;
     toggleAiPanel: () => void;

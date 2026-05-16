@@ -105,7 +105,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
 
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const activeChat = aiChats.find(c => c.id === activeAiChatId);
-    const messages = activeChat?.messages || [];
+    const messages = useMemo(() => activeChat?.messages || [], [activeChat?.messages]);
     const activeTab = tabs.find(t => t.id === activeTabId);
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';
 
@@ -129,7 +129,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         } else if (!activeAiChatId) {
             setActiveAiChat(aiChats[0].id);
         }
-    }, [aiChats.length, activeAiChatId, createAiChat, setActiveAiChat, isFetchingAiChats]);
+    }, [aiChats, aiChats.length, activeAiChatId, createAiChat, setActiveAiChat, isFetchingAiChats]);
 
     // Load messages lazily when a chat is selected
     useEffect(() => {
@@ -143,7 +143,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+    }, [messages, messagesEndRef]);
 
     // Stable handlers to prevent re-rendering all bubbles on every keystroke
     const handleMessageRegenerate = React.useCallback(() => {

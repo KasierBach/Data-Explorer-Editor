@@ -1,14 +1,17 @@
 import React from 'react';
+import type { AuthUser } from '@/core/services/store/slices/authSlice';
+
+type AppearanceTheme = 'dark' | 'light' | 'system';
 
 interface AppearanceTabProps {
     t: (key: string) => string;
     appearanceState: {
         theme: string; setTheme: (v: string) => void;
         language: string; setLanguage: (v: string) => void;
-        setAppTheme: (v: any) => void;
+        setAppTheme: (v: AppearanceTheme) => void;
     };
     actions: {
-        handleSaveSettings: (updates: any) => void;
+        handleSaveSettings: (updates: Partial<AuthUser>) => void;
     };
 }
 

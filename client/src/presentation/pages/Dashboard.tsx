@@ -17,8 +17,8 @@ interface ActivityLog {
     createdAt: string;
     userId?: string;
     organizationId?: string;
-    detail?: any;
-    details?: any;
+    detail?: Record<string, unknown>;
+    details?: Record<string, unknown>;
     user?: {
         id?: string;
         firstName?: string;
@@ -27,6 +27,11 @@ interface ActivityLog {
         username?: string;
         avatarUrl?: string;
     };
+}
+
+function getStringDetail(details: ActivityLog['details'], key: string) {
+    const value = details?.[key];
+    return typeof value === 'string' ? value : null;
 }
 
 function getActivityActorName(user?: ActivityLog['user']) {
@@ -86,9 +91,9 @@ export const Dashboard: React.FC = () => {
         try {
             await ConnectionService.deleteConnection(id);
             removeConnection(id);
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error deleting connection:', error);
-            alert(error.message || 'Error deleting connection');
+            alert(error instanceof Error ? error.message : 'Error deleting connection');
         } finally {
             setIsDeleting(null);
         }
@@ -354,6 +359,8 @@ export const Dashboard: React.FC = () => {
                                 <div className="space-y-6">
                                     {teamActivities.map((log: ActivityLog) => {
                                         const user = log.user;
+                                        const resourceName = getStringDetail(log.details, 'resourceName');
+                                        const detailName = getStringDetail(log.details, 'name');
                                         const initials = user
                                             ? `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}` || user.email?.[0]?.toUpperCase() || 'U'
                                             : 'U';
@@ -374,11 +381,11 @@ export const Dashboard: React.FC = () => {
                                                         <span className="text-muted-foreground lowercase">
                                                             {formatActivityAction(log.action)}
                                                         </span>
-                                                        {log.details?.resourceName && (
-                                                            <> <span className="font-semibold text-blue-500">"{log.details.resourceName}"</span></>
+                                                        {resourceName && (
+                                                            <> <span className="font-semibold text-blue-500">"{resourceName}"</span></>
                                                         )}
-                                                        {log.details?.name && (
-                                                            <> <span className="font-semibold text-blue-500">"{log.details.name}"</span></>
+                                                        {detailName && (
+                                                            <> <span className="font-semibold text-blue-500">"{detailName}"</span></>
                                                         )}
                                                     </p>
                                                     <span className="text-[10px] text-muted-foreground">

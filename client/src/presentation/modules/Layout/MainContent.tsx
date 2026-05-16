@@ -39,7 +39,7 @@ export const MainContent: React.FC = () => {
                             {activeTab.type === 'dashboard' && (
                                 <SavedDashboardView
                                     key={activeTab.id}
-                                    dashboardId={activeTab.metadata?.dashboardId}
+                                    dashboardId={activeTab.metadata?.dashboardId || ''}
                                 />
                             )}
                             {activeTab.type === 'visualize' && (
@@ -50,7 +50,7 @@ export const MainContent: React.FC = () => {
                                     <ERDWorkspace
                                         key={activeTab.id}
                                         tabId={activeTab.id}
-                                        connectionId={activeTab.metadata?.connectionId}
+                                        connectionId={activeTab.metadata?.connectionId || ''}
                                         database={activeTab.metadata?.database}
                                     />
                                 </React.Suspense>

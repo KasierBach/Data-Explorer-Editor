@@ -31,31 +31,31 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
     const { data: databases } = useQuery({
         queryKey: ['db-list', activeConnectionId],
         queryFn: async () => {
-            if (!activeConnectionId) return [];
-            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection?.type as any);
+            if (!activeConnectionId || !activeConnection) return [];
+            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type);
             return adapter.getDatabases();
         },
-        enabled: !!activeConnectionId
+        enabled: !!activeConnectionId && !!activeConnection
     });
 
     const { data: metrics, isLoading, refetch, isFetching } = useQuery({
         queryKey: ['db-metrics', activeConnectionId, selectedDatabase],
         queryFn: async () => {
-            if (!activeConnectionId) throw new Error("No active connection");
-            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection?.type as any);
+            if (!activeConnectionId || !activeConnection) throw new Error("No active connection");
+            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type);
             return adapter.getMetrics(selectedDatabase);
         },
-        enabled: !!activeConnectionId
+        enabled: !!activeConnectionId && !!activeConnection
     });
 
     const { data: relationships } = useQuery({
         queryKey: ['db-relationships', activeConnectionId, selectedDatabase],
         queryFn: async () => {
-            if (!activeConnectionId) return [];
-            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection?.type as any);
+            if (!activeConnectionId || !activeConnection) return [];
+            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type);
             return adapter.getRelationships(selectedDatabase);
         },
-        enabled: !!activeConnectionId
+        enabled: !!activeConnectionId && !!activeConnection
     });
 
     if (!activeConnectionId) {
@@ -96,7 +96,7 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
-                            <BarChart3 className="h-5 w-5 md:h-6 md:h-6" />
+                            <BarChart3 className="h-5 w-5 md:h-6 md:w-6" />
                         </div>
                         <div className="min-w-0">
                             <h2 className="text-xl md:text-2xl font-bold tracking-tight truncate">Intelligence Dashboard</h2>
@@ -167,10 +167,10 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
                                     <Tooltip
                                         cursor={{ fill: 'var(--muted)', opacity: 0.1 }}
                                         contentStyle={{ backgroundColor: 'hsl(var(--background))', borderRadius: '12px', border: '1px solid hsl(var(--border))', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                                        formatter={(value: any) => [formatBytes(Number(value) || 0), 'Total Size']}
+                                        formatter={(value: unknown) => [formatBytes(Number(value) || 0), 'Total Size']}
                                     />
                                     <Bar dataKey="sizeBytes" radius={[0, 6, 6, 0]} maxBarSize={40}>
-                                        {(metrics?.topTables || []).map((_entry: any, index: number) => (
+                                        {(metrics?.topTables || []).map((_entry, index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Bar>
@@ -205,7 +205,7 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
                                                 animationBegin={0}
                                                 animationDuration={1500}
                                             >
-                                                {metrics.tableTypes.map((_entry: any, index: number) => (
+                                                {metrics.tableTypes.map((_entry, index) => (
                                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
                                                 ))}
                                             </Pie>
@@ -215,7 +215,7 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
                                         </PieChart>
                                     </ResponsiveContainer>
                                     <div className="mt-4 w-full px-4 space-y-2">
-                                        {metrics.tableTypes.map((t: any, i: number) => (
+                                        {metrics.tableTypes.map((t, i) => (
                                             <div key={t.type} className="flex items-center justify-between text-xs">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
@@ -259,7 +259,7 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
                     <CardContent className="p-0">
                         {relationships && relationships.length > 0 ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 md:divide-x divide-y divide-border/30">
-                                {relationships.map((rel: any, i: number) => (
+                                {relationships.map((rel, i) => (
                                     <div key={i} className="p-4 md:p-5 group hover:bg-muted/30 transition-all duration-300">
                                         <div className="flex items-center justify-between mb-4">
                                             <div className="flex flex-col min-w-0">

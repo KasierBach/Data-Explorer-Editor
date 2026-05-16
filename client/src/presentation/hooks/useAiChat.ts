@@ -11,6 +11,28 @@ export interface Attachment {
     preview?: string;
 }
 
+interface NoSqlSchemaField {
+    name: string;
+    types: Record<string, unknown>;
+    probability?: number;
+}
+
+interface AiStreamDoneData {
+    message?: string;
+    sql?: string;
+    explanation?: string;
+    recommendations?: AiMessage['recommendations'];
+    thought?: string;
+    provider?: string;
+    model?: string;
+    routingMode?: string;
+}
+
+type AiStreamEvent =
+    | { type: 'chunk'; text?: string }
+    | { type: 'done'; data?: AiStreamDoneData }
+    | { type: 'error'; text?: string };
+
 // File extensions we accept as text/code
 const TEXT_EXTENSIONS = new Set([
     'txt', 'md', 'csv', 'tsv', 'json', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'log',
@@ -41,6 +63,47 @@ function getFileEmoji(ext: string): string {
     return '📎';
 }
 
+function isNoSqlSchemaField(value: unknown): value is NoSqlSchemaField {
+    if (!value || typeof value !== 'object') return false;
+    const candidate = value as Partial<NoSqlSchemaField>;
+    return typeof candidate.name === 'string' && !!candidate.types && typeof candidate.types === 'object';
+}
+
+function formatNoSqlSchemaFields(stats: unknown, includeProbability = false) {
+    if (!Array.isArray(stats)) return '';
+    return stats
+        .filter(isNoSqlSchemaField)
+        .map((field) => {
+            const typeNames = Object.keys(field.types).join('/');
+            if (!includeProbability) return `${field.name} (${typeNames})`;
+            const probability = typeof field.probability === 'number' ? ` (${field.probability}% xuáº¥t hiá»‡n)` : '';
+            return `- ${field.name}: ${typeNames}${probability}`;
+        })
+        .join(includeProbability ? '\n' : ', ');
+}
+
+function parseAiStreamEvent(data: string): AiStreamEvent | null {
+    try {
+        const parsed = JSON.parse(data) as Partial<AiStreamEvent>;
+        return typeof parsed.type === 'string' ? parsed as AiStreamEvent : null;
+    } catch {
+        return null;
+    }
+}
+
+function getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : 'Unknown error';
+}
+
+function toTriggerAttachments(messageAttachments: AiMessage['attachments']): Attachment[] {
+    return (messageAttachments || []).map((attachment) => ({
+        type: attachment.type === 'image' || attachment.type === 'sql' || attachment.type === 'table' ? attachment.type : 'file',
+        label: attachment.label,
+        data: attachment.data || '',
+        preview: attachment.preview,
+    }));
+}
+
 async function readPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
     try {
         const pdfjsLib = await import('pdfjs-dist');
@@ -50,7 +113,7 @@ async function readPdfText(arrayBuffer: ArrayBuffer): Promise<string> {
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const content = await page.getTextContent();
-            const text = content.items.map((item: any) => ('str' in item ? item.str : '')).join(' ');
+            const text = content.items.map((item) => ('str' in item ? item.str : '')).join(' ');
             pages.push(`--- Page ${i} ---\n${text}`);
         }
         return pages.join('\n\n');
@@ -243,7 +306,7 @@ export function useAiChat() {
             if (isNoSql && store.nosqlActiveCollection) {
                 const schemaStr = store.nosqlSchemaStats ? 
                     `Schema cho collection "${store.nosqlActiveCollection}":\n` + 
-                    store.nosqlSchemaStats.map((s: any) => `- ${s.name}: ${Object.keys(s.types).join('/')} (${s.probability}% xuất hiện)`).join('\n')
+                    formatNoSqlSchemaFields(store.nosqlSchemaStats, true)
                     : `Collection đang mở: ${store.nosqlActiveCollection} (Chưa chạy phân tích Schema)`;
 
                 setAttachments(prev => [...prev, {
@@ -274,7 +337,8 @@ export function useAiChat() {
         if (!data || data === '[DONE]') return raw;
 
         try {
-            const event = JSON.parse(data);
+            const event = parseAiStreamEvent(data);
+            if (!event) return raw;
             if (event.type === 'chunk' && event.text) {
                 const nextRaw = raw + event.text;
                 const parsed = parsePartialAiResponse(nextRaw);
@@ -322,7 +386,7 @@ export function useAiChat() {
                         routingMode: event.data.routingMode,
                     },
                     timestamp: Date.now()
-                } as any);
+                });
                 return raw;
             }
             if (event.type === 'error') {
@@ -347,7 +411,7 @@ export function useAiChat() {
 
         try {
             const adapter = connectionService.getActiveAdapter();
-            if (!adapter || !(adapter as any).generateSqlStream) throw new Error("API Adapter does not support AI streaming.");
+            if (!adapter?.generateSqlStream) throw new Error("API Adapter does not support AI streaming.");
 
             const contextParts: string[] = [];
             let imageData = customImageData;
@@ -361,7 +425,7 @@ export function useAiChat() {
             if (isNoSql && store.nosqlActiveCollection && !customAttachments.some(a => a.type === 'table')) {
                 const schemaSummary = store.nosqlSchemaStats ? 
                      `[NOSQL SCHEMA] Collection: ${store.nosqlActiveCollection}\nFields: ` + 
-                     store.nosqlSchemaStats.map((s: any) => `${s.name} (${Object.keys(s.types).join('/')})`).join(', ')
+                     formatNoSqlSchemaFields(store.nosqlSchemaStats)
                      : `[NOSQL CONTEXT] Collection: ${store.nosqlActiveCollection}`;
                 contextParts.unshift(schemaSummary);
             }
@@ -370,7 +434,7 @@ export function useAiChat() {
             const chat = store.aiChats.find(c => c.id === chatId);
             const history = chat?.messages?.filter(m => m.id !== aiMsgId) || [];
 
-            const response = await (adapter as any).generateSqlStream({
+            const response = await adapter.generateSqlStream({
                 database: activeDatabase || undefined,
                 prompt: prompt || '(xem hình/context đính kèm)',
                 image: imageData,
@@ -421,11 +485,12 @@ export function useAiChat() {
                     thought: pendingUpdateRef.current.thought
                 });
             }
-        } catch (error: any) {
-            if (error.name === 'AbortError' || error.message === 'Aborted') {
+        } catch (error) {
+            const errorMessage = getErrorMessage(error);
+            if ((error instanceof DOMException && error.name === 'AbortError') || errorMessage === 'Aborted') {
                 updateAiMessage(chatId, aiMsgId, { content: (rawText ? parsePartialAiResponse(rawText).message : '') + '\n\n[Đã dừng bởi người dùng]' });
             } else {
-                updateAiMessage(chatId, aiMsgId, { content: `❌ Lỗi: ${error.message}`, error: true });
+                updateAiMessage(chatId, aiMsgId, { content: `❌ Lỗi: ${errorMessage}`, error: true });
             }
         } finally {
             setIsLoading(false);
@@ -497,7 +562,7 @@ export function useAiChat() {
         await store.editAiMessage(chatId, lastUserMsg.id, lastUserMsg.content);
         
         // Trigger generation
-        await triggerGenerate(chatId, lastUserMsg.content, lastUserMsg.attachments as any || []);
+        await triggerGenerate(chatId, lastUserMsg.content, toTriggerAttachments(lastUserMsg.attachments));
     }, [store, isLoading, triggerGenerate]);
 
     const handleEditSubmit = useCallback(async (chatId: string, messageId: string, newContent: string) => {

@@ -9,11 +9,20 @@ import { toast } from 'sonner';
 import { AuthService } from '@/core/services/AuthService';
 import { ConnectionService } from '@/core/services/ConnectionService';
 import { SEO } from '@/presentation/components/shared/Seo';
+import { ApiError } from '@/core/services/api.service';
+
+const getErrorMessage = (error: unknown, fallback: string) => (
+    error instanceof Error ? error.message : fallback
+);
+
+const getApiErrorData = (error: unknown): Record<string, unknown> => (
+    error instanceof ApiError && error.data ? error.data : {}
+);
 
 export const LoginPage = () => {
     const navigate = useNavigate();
     const { login, lang } = useAppStore();
-    const t = (vi: string, en: string) => (lang === 'vi' ? vi : en);
+    const t = React.useCallback((vi: string, en: string) => (lang === 'vi' ? vi : en), [lang]);
 
     const [isRegister, setIsRegister] = useState(false);
     const [name, setName] = useState('');
@@ -59,16 +68,7 @@ export const LoginPage = () => {
         register: t('Đăng ký', 'Register'),
     };
 
-    useEffect(() => {
-        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-        const code = hashParams.get('code');
-        if (code) {
-            window.history.replaceState(null, '', window.location.pathname);
-            handleOAuthCode(code);
-        }
-    }, []);
-
-    const handleOAuthCode = async (code: string) => {
+    const handleOAuthCode = React.useCallback(async (code: string) => {
         setIsLoading(true);
         try {
             const data = await AuthService.exchangeOauthCode(code);
@@ -95,7 +95,16 @@ export const LoginPage = () => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [login, navigate, t]);
+
+    useEffect(() => {
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        const code = hashParams.get('code');
+        if (code) {
+            window.history.replaceState(null, '', window.location.pathname);
+            void handleOAuthCode(code);
+        }
+    }, [handleOAuthCode]);
 
     const handleSocialLogin = (provider: 'google' | 'github') => {
         window.location.href = `${API_BASE_URL}/auth/${provider}`;
@@ -112,7 +121,7 @@ export const LoginPage = () => {
                 : await AuthService.login(email, password);
 
             if (data.unverified) {
-                setRegisteredEmail(data.email || email);
+                setRegisteredEmail(typeof data.email === 'string' ? data.email : email);
                 setVerifyEmailStep(true);
                 toast.success(data.message || (lang === 'vi'
                     ? 'Mã xác minh đã được gửi đến email của bạn.'
@@ -137,14 +146,14 @@ export const LoginPage = () => {
                     navigate('/');
                 }
             }
-        } catch (err: any) {
-            const data = err.data || {};
+        } catch (err) {
+            const data = getApiErrorData(err);
             if (data.unverified) {
-                setRegisteredEmail(data.email || email);
+                setRegisteredEmail(typeof data.email === 'string' ? data.email : email);
                 setVerifyEmailStep(true);
-                setError(data.message || t('Vui lòng xác minh email', 'Please verify email'));
+                setError(typeof data.message === 'string' ? data.message : t('Vui lòng xác minh email', 'Please verify email'));
             } else {
-                setError(err.message || t('Thông tin đăng nhập không hợp lệ', 'Invalid credentials'));
+                setError(getErrorMessage(err, t('Thông tin đăng nhập không hợp lệ', 'Invalid credentials')));
             }
         } finally {
             setIsLoading(false);
@@ -169,8 +178,8 @@ export const LoginPage = () => {
                     navigate('/');
                 }
             }
-        } catch (err: any) {
-            setError(err.message || t('Mã OTP không hợp lệ', 'Invalid OTP'));
+        } catch (err) {
+            setError(getErrorMessage(err, t('Mã OTP không hợp lệ', 'Invalid OTP')));
         } finally {
             setIsLoading(false);
         }
@@ -182,8 +191,8 @@ export const LoginPage = () => {
         try {
             const data = await AuthService.resendVerification(registeredEmail);
             toast.success(data.message || t('Đã gửi lại mã xác minh!', 'Verification code resent!'));
-        } catch (err: any) {
-            setError(err.message || t('Không thể gửi lại mã', 'Error resending OTP'));
+        } catch (err) {
+            setError(getErrorMessage(err, t('Không thể gửi lại mã', 'Error resending OTP')));
         } finally {
             setIsLoading(false);
         }

@@ -19,8 +19,8 @@ export interface AddDashboardWidgetPayload {
     columns: string[];
     xAxis?: string;
     yAxis: string[];
-    config?: Record<string, any>;
-    dataSnapshot: Record<string, any>[];
+    config?: Record<string, unknown>;
+    dataSnapshot: Record<string, unknown>[];
 }
 
 export class DashboardService {

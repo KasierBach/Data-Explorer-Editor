@@ -63,8 +63,8 @@ export const OnboardingPage = () => {
             toast.success('Welcome to Data Explorer! 🚀');
             navigate('/sql-explorer');
 
-        } catch (err: any) {
-            toast.error(err.message || 'Something went wrong');
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Something went wrong');
         } finally {
             setIsLoading(false);
         }

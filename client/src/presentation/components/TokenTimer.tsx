@@ -6,19 +6,19 @@ import { AuthService } from '@/core/services/AuthService';
 
 export const TokenTimer: React.FC = () => {
     const { tokenExp, isAuthenticated } = useAppStore();
-    const [timeLeft, setTimeLeft] = useState<number | null>(null);
-    const [hasWarned, setHasWarned] = useState(false);
+    const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+    const [warnedTokenExp, setWarnedTokenExp] = useState<number | null>(null);
+    const timeLeft = isAuthenticated && tokenExp ? tokenExp - now : null;
+    const hasWarned = warnedTokenExp === tokenExp;
 
     useEffect(() => {
         if (!isAuthenticated || !tokenExp) {
-            setTimeLeft(null);
-            setHasWarned(false);
             return;
         }
 
         const interval = setInterval(() => {
-            const now = Math.floor(Date.now() / 1000);
-            const remaining = tokenExp - now;
+            const nextNow = Math.floor(Date.now() / 1000);
+            const remaining = tokenExp - nextNow;
 
             if (remaining <= 0) {
                 clearInterval(interval);
@@ -28,24 +28,20 @@ export const TokenTimer: React.FC = () => {
 
             // Warn at exactly 5 minutes (300 seconds)
             if (remaining <= 300 && !hasWarned) {
-                setHasWarned(true);
+                setWarnedTokenExp(tokenExp);
                 toast.warning('Session Expiring Soon', {
                     description: 'Your login session will expire in 5 minutes. Please save your work and re-login.',
                     duration: 10000,
                 });
             }
 
-            setTimeLeft(remaining);
+            setNow(nextNow);
         }, 1000);
-
-        // Initial check
-        const now = Math.floor(Date.now() / 1000);
-        setTimeLeft(tokenExp - now);
 
         return () => clearInterval(interval);
     }, [tokenExp, isAuthenticated, hasWarned]);
 
-    if (!isAuthenticated || timeLeft === null) return null;
+    if (!isAuthenticated || timeLeft === null || timeLeft <= 0) return null;
 
     // Formatting HH:MM:SS
     const hours = Math.floor(timeLeft / 3600);

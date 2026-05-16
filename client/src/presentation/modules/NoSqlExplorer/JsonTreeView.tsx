@@ -5,14 +5,14 @@ import { cn } from '@/lib/utils';
 // ─── Type Definitions ───
 
 interface JsonTreeViewProps {
-    data: any;
+    data: unknown;
     initialExpanded?: boolean;
     className?: string;
 }
 
 interface JsonNodeProps {
     label: string;
-    value: any;
+    value: unknown;
     depth: number;
     isLast: boolean;
     defaultExpanded?: boolean;
@@ -20,7 +20,7 @@ interface JsonNodeProps {
 
 // ─── Helper: Determine Value Display ───
 
-const getValueColor = (value: any): string => {
+const getValueColor = (value: unknown): string => {
     if (value === null || value === undefined) return 'text-red-400';
     if (typeof value === 'string') return 'text-amber-500 dark:text-amber-400';
     if (typeof value === 'number') return 'text-blue-500 dark:text-blue-400';
@@ -28,7 +28,7 @@ const getValueColor = (value: any): string => {
     return 'text-foreground';
 };
 
-const formatValue = (value: any): string => {
+const formatValue = (value: unknown): string => {
     if (value === null) return 'null';
     if (value === undefined) return 'undefined';
     if (typeof value === 'string') return `"${value}"`;
@@ -36,9 +36,13 @@ const formatValue = (value: any): string => {
     return String(value);
 };
 
-const isExpandable = (value: any): boolean => {
+const isExpandable = (value: unknown): boolean => {
     return value !== null && typeof value === 'object';
 };
+
+const getObjectEntries = (value: unknown): [string, unknown][] => (
+    isExpandable(value) ? Object.entries(value as Record<string, unknown>) : []
+);
 
 // ─── JsonNode (Recursive) ───
 
@@ -48,7 +52,7 @@ const JsonNode: React.FC<JsonNodeProps> = React.memo(({ label, value, depth, isL
 
     const expandable = isExpandable(value);
     const isArray = Array.isArray(value);
-    const entries = expandable ? Object.entries(value) : [];
+    const entries = expandable ? getObjectEntries(value) : [];
     const bracketOpen = isArray ? '[' : '{';
     const bracketClose = isArray ? ']' : '}';
     const childCount = entries.length;
@@ -134,7 +138,7 @@ JsonNode.displayName = 'JsonNode';
 
 export const JsonTreeView: React.FC<JsonTreeViewProps> = ({ data, initialExpanded = true, className }) => {
     const isArray = Array.isArray(data);
-    const entries = Object.entries(data);
+    const entries = getObjectEntries(data);
 
     return (
         <div className={cn("font-mono text-[13px] leading-[1.8] select-text", className)}>

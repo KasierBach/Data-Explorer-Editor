@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import Editor, { useMonaco } from '@monaco-editor/react';
+import Editor, { useMonaco, type Monaco, type OnMount } from '@monaco-editor/react';
 import { createSqlCompletionProvider, type SchemaInfo } from './sqlAutocomplete';
 import { useAppStore } from '@/core/services/store';
 import { useAiGhostText } from './useAiGhostText';
@@ -8,26 +8,28 @@ interface SqlEditorProps {
     value: string;
     onChange: (value: string | undefined) => void;
     height?: string | number;
-    onMount?: (editor: any, monaco: any) => void;
+    onMount?: OnMount;
     schemaInfo?: SchemaInfo;
 }
 
+type EditorTheme = 'vs-dark' | 'light';
+type Disposable = { dispose: () => void };
+
+function getEditorTheme(): EditorTheme {
+    if (typeof document === 'undefined') return 'vs-dark';
+    return document.documentElement.classList.contains('dark') ? 'vs-dark' : 'light';
+}
+
 export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = "300px", onMount, schemaInfo }) => {
-    const [theme, setTheme] = React.useState<'vs-dark' | 'light'>('vs-dark');
+    const [theme, setTheme] = React.useState<EditorTheme>(() => getEditorTheme());
     const { activeConnectionId, activeDatabase } = useAppStore();
-    const disposableRef = useRef<any>(null);
-    const editorRef = useRef<any>(null);
-    const monacoInstanceRef = useRef<any>(null);
+    const disposableRef = useRef<Disposable | null>(null);
 
     useEffect(() => {
-        const isDark = document.documentElement.classList.contains('dark');
-        setTheme(isDark ? 'vs-dark' : 'light');
-
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 if (mutation.attributeName === 'class') {
-                    const isDark = document.documentElement.classList.contains('dark');
-                    setTheme(isDark ? 'vs-dark' : 'light');
+                    setTheme(getEditorTheme());
                 }
             });
         });
@@ -62,9 +64,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = 
     // AI Ghost Text (uses Monaco's InlineCompletionsProvider)
     useAiGhostText(monaco, activeConnectionId, activeDatabase || undefined);
 
-    const handleEditorMount = (editor: any, monacoInstance: any) => {
-        editorRef.current = editor;
-        monacoInstanceRef.current = monacoInstance;
+    const handleEditorMount: OnMount = (editor, monacoInstance: Monaco) => {
         onMount?.(editor, monacoInstance);
     };
 

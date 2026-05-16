@@ -31,10 +31,12 @@ export function useResizablePanel({
     const minWidthRef = useRef(minWidth);
     const maxWidthRef = useRef(maxWidth);
 
-    // Keep refs in sync with props
-    directionRef.current = direction;
-    minWidthRef.current = minWidth;
-    maxWidthRef.current = maxWidth;
+    // Keep refs in sync with props outside render for React Compiler.
+    useEffect(() => {
+        directionRef.current = direction;
+        minWidthRef.current = minWidth;
+        maxWidthRef.current = maxWidth;
+    }, [direction, minWidth, maxWidth]);
 
     const startResizing = useCallback((e: React.MouseEvent | React.PointerEvent | React.TouchEvent) => {
         e.preventDefault();

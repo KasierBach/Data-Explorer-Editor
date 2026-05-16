@@ -15,16 +15,15 @@ export const handleTreeAction = (
     const { setDatabaseToDelete, setDeleteDatabaseDialogOpen, handleRefresh, overrideConnectionId } = options;
     const store = useAppStore.getState();
     const activeConnectionId = overrideConnectionId || store.activeConnectionId;
-    const activeConnection = store.connections.find((c: any) => c.id === activeConnectionId);
+    const activeConnection = store.connections.find((c) => c.id === activeConnectionId);
     if (!activeConnection) return;
 
-    const dialect: any = activeConnection.type;
     const { dbName, schema, table: tableName } = parseNodeId(nodeId);
-    const qualifiedName = getFullyQualifiedTable(nodeId, dialect);
 
     // Cast dialect to 'postgres' | 'mysql' since getQuotedIdentifier only supports these currently
     // Defaulting to postgres if it's mssql or clickhouse for safe quoting fallback
-    const qDialect = (dialect === 'mysql' ? 'mysql' : 'postgres') as 'postgres' | 'mysql';
+    const qDialect = activeConnection.type === 'mysql' ? 'mysql' : 'postgres';
+    const qualifiedName = getFullyQualifiedTable(nodeId, qDialect);
     const q = (name: string) => getQuotedIdentifier(name, qDialect);
 
     // ─── Database actions ───

@@ -1,5 +1,17 @@
 export type ConnectionType = 'postgres' | 'mysql' | 'mssql' | 'mongodb' | 'mongodb+srv' | 'redis';
 
+export type JsonValue =
+    | string
+    | number
+    | boolean
+    | null
+    | { [key: string]: JsonValue }
+    | JsonValue[];
+
+export type DatabaseValue = JsonValue | Date | Uint8Array;
+
+export type RowData = Record<string, DatabaseValue>;
+
 export interface Connection {
     id: string;
     name: string;
@@ -24,7 +36,7 @@ export interface TreeNode {
     parentId: string | null;
     name: string;
     type: 'connection' | 'database' | 'schema' | 'table' | 'view' | 'function' | 'column' | 'folder' | 'collection';
-    metadata?: Record<string, any>;
+    metadata?: Record<string, JsonValue>;
     children?: TreeNode[]; // For recursive structures if needed, though we might lazy load
     hasChildren?: boolean;
 }
@@ -48,7 +60,7 @@ export interface TableMetadata {
 export interface QueryResult {
     columns?: string[];
     fields?: { name: string; type: string }[];
-    rows: Record<string, any>[];
+    rows: RowData[];
     rowCount?: number; // Added to support row count in UI
     totalCount?: number; // Total rows in table for pagination
     durationMs?: number;
@@ -65,8 +77,8 @@ export interface DashboardWidget {
     xAxis?: string | null;
     yAxis: string[];
     orderIndex: number;
-    config?: Record<string, any> | null;
-    dataSnapshot: Record<string, any>[];
+    config?: Record<string, JsonValue> | null;
+    dataSnapshot: RowData[];
     createdAt: string;
     updatedAt: string;
 }
@@ -97,7 +109,7 @@ export interface ErdWorkspaceEntity {
     organizationId?: string | null;
     connectionId?: string | null;
     database?: string | null;
-    layout: Record<string, any>;
+    layout: Record<string, JsonValue>;
     createdAt: string;
     updatedAt: string;
     owner: {

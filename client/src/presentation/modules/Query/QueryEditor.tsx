@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
+import type { editor } from 'monaco-editor';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore, type SavedQuery } from '@/core/services/store';
@@ -22,19 +23,8 @@ import { QueryToolbar } from './components/QueryToolbar';
 import { useResourcePresence } from '@/presentation/hooks/useResourcePresence';
 import { PresenceBadge } from '@/presentation/components/presence/PresenceBadge';
 
-interface SqlEditorSelection {
-    isEmpty: () => boolean;
-}
+type SqlEditorHandle = editor.IStandaloneCodeEditor;
 
-interface SqlEditorModel {
-    getValueInRange: (selection: SqlEditorSelection) => string;
-}
-
-interface SqlEditorHandle {
-    getSelection: () => SqlEditorSelection | null;
-    getModel: () => SqlEditorModel | null;
-    focus: () => void;
-}
 
 function getErrorMessage(error: unknown) {
     return error instanceof Error ? error.message : 'Unexpected error';
@@ -89,6 +79,8 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     });
     const isFirstLoad = useRef(true);
     const lastHandledRunRequestRef = useRef<number | null>(null);
+    const lastSuccessHistoryAtRef = useRef(0);
+    const lastErrorHistoryAtRef = useRef(0);
     const editorRef = useRef<SqlEditorHandle | null>(null);
     const effectiveLimit = limit === 'all' ? undefined : Number.parseInt(limit, 10);
     const requestLimit = Number.isInteger(effectiveLimit) ? effectiveLimit : undefined;
@@ -135,7 +127,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         if (typeof externalSql === 'string' && externalSql !== query) {
             setQuery(externalSql);
         }
-    }, [externalSql]);
+    }, [externalSql, query]);
 
     useEffect(() => {
         if (!externalRunRequest || lastHandledRunRequestRef.current === externalRunRequest) {
@@ -152,7 +144,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         }
     }, [externalRunRequest, externalSql, tabId, updateTabMetadata]);
 
-    const { data: results, isLoading, error, dataUpdatedAt, isSuccess, isError } = useQuery<QueryResult | null, Error>({
+    const { data: results, isLoading, error, dataUpdatedAt, errorUpdatedAt, isSuccess, isError } = useQuery<QueryResult | null, Error>({
         queryKey: ['query-execution', activeConnectionId, activeDatabase, executedQuery, requestLimit, runNonce],
         queryFn: async () => {
             if (!executedQuery) return null;
@@ -230,35 +222,49 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
     // Record history on success/error
     useEffect(() => {
-        if (isSuccess && results && executedQuery) {
-            setActiveResultTab("data");
-            addQueryHistory({
-                id: `history-${Date.now()}`,
-                sql: executedQuery,
-                database: activeDatabase || undefined,
-                connectionName: activeConnection?.name,
-                executedAt: Date.now(),
-                durationMs: results.durationMs,
-                rowCount: results.rowCount ?? results.rows?.length,
-                status: 'success',
-            });
+        if (!isSuccess || !results || !executedQuery || !dataUpdatedAt) {
+            return;
         }
-    }, [isSuccess, results]);
+
+        if (lastSuccessHistoryAtRef.current === dataUpdatedAt) {
+            return;
+        }
+
+        lastSuccessHistoryAtRef.current = dataUpdatedAt;
+        setActiveResultTab("data");
+        addQueryHistory({
+            id: `history-${Date.now()}`,
+            sql: executedQuery,
+            database: activeDatabase || undefined,
+            connectionName: activeConnection?.name,
+            executedAt: Date.now(),
+            durationMs: results.durationMs,
+            rowCount: results.rowCount ?? results.rows?.length,
+            status: 'success',
+        });
+    }, [isSuccess, results, executedQuery, dataUpdatedAt, activeDatabase, activeConnection?.name, addQueryHistory]);
 
     useEffect(() => {
-        if (isError && executedQuery) {
-            setActiveResultTab("messages");
-            addQueryHistory({
-                id: `history-${Date.now()}`,
-                sql: executedQuery,
-                database: activeDatabase || undefined,
-                connectionName: activeConnection?.name,
-                executedAt: Date.now(),
-                status: 'error',
-                errorMessage: (error as Error)?.message,
-            });
+        if (!isError || !executedQuery || !errorUpdatedAt) {
+            return;
         }
-    }, [isError]);
+
+        if (lastErrorHistoryAtRef.current === errorUpdatedAt) {
+            return;
+        }
+
+        lastErrorHistoryAtRef.current = errorUpdatedAt;
+        setActiveResultTab("messages");
+        addQueryHistory({
+            id: `history-${Date.now()}`,
+            sql: executedQuery,
+            database: activeDatabase || undefined,
+            connectionName: activeConnection?.name,
+            executedAt: Date.now(),
+            status: 'error',
+            errorMessage: (error as Error)?.message,
+        });
+    }, [isError, executedQuery, errorUpdatedAt, activeDatabase, activeConnection?.name, error, addQueryHistory]);
 
     const handleRun = (overrideSql?: string) => {
         let sqlToExecute = overrideSql || query;
@@ -375,7 +381,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             });
             setIsSaveDialogOpen(true);
         }
-    }, [query, currentSavedQueryId, currentSavedQuery, saveQuery, lang]);
+    }, [query, currentSavedQueryId, currentSavedQuery, saveQuery, lang, activeOrganizationId]);
 
     const handleSaveDialogSubmit = useCallback(async (values: SaveQueryFormValues) => {
         const payload = {
@@ -402,7 +408,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         setCurrentSavedQueryId(created.id);
         updateTabMetadata(tabId, { savedQueryId: created.id });
         toast.success(lang === 'vi' ? 'Da luu saved query' : 'Query saved');
-    }, [query, activeDatabase, activeConnection, activeOrganizationId, currentSavedQueryId, currentSavedQuery, saveQuery, lang, tabId, updateTabMetadata]);
+    }, [query, activeDatabase, activeConnection, currentSavedQueryId, currentSavedQuery, saveQuery, lang, tabId, updateTabMetadata]);
 
     // Open saved query into a new tab
     const handleOpenSavedQuery = useCallback((sq: SavedQuery) => {
@@ -416,7 +422,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     }, [openTab]);
 
     const handleRefreshSchema = async () => {
-        console.log("♻️ Triggering Hierarchy Refresh via QueryClient");
         await queryClient.resetQueries({ queryKey: ['hierarchy'] });
     };
 

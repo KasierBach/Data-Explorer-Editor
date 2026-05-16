@@ -3,8 +3,9 @@ import {
     useReactTable,
     getCoreRowModel,
     flexRender,
+    type CellContext,
 } from '@tanstack/react-table';
-import type { QueryResult } from '@/core/domain/entities';
+import type { QueryResult, RowData } from '@/core/domain/entities';
 import { Info } from 'lucide-react';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
@@ -19,7 +20,7 @@ export const ResultTable: React.FC<ResultTableProps> = ({ results }) => {
         return results.columns.map((colName: string) => ({
             header: colName,
             accessorKey: colName,
-            cell: (info: any) => {
+            cell: (info: CellContext<RowData, unknown>) => {
                 const val = info.getValue();
                 if (val === null) return <span className="text-muted-foreground italic">null</span>;
                 if (typeof val === 'object') return JSON.stringify(val);
@@ -28,6 +29,7 @@ export const ResultTable: React.FC<ResultTableProps> = ({ results }) => {
         }));
     }, [results]);
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data: results?.rows || [],
         columns,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -41,6 +41,8 @@ export interface ForeignKeyData {
     onUpdate: 'NO ACTION' | 'CASCADE' | 'SET NULL' | 'RESTRICT';
 }
 
+type ReferentialAction = ForeignKeyData['onDelete'];
+
 export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
     isOpen,
     onClose,
@@ -52,18 +54,17 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
 }) => {
     const { lang } = useAppStore();
     const [constraintName, setConstraintName] = useState('');
-    const [onDelete, setOnDelete] = useState<'NO ACTION' | 'CASCADE' | 'SET NULL' | 'RESTRICT'>('NO ACTION');
-    const [onUpdate, setOnUpdate] = useState<'NO ACTION' | 'CASCADE' | 'SET NULL' | 'RESTRICT'>('NO ACTION');
+    const [onDelete, setOnDelete] = useState<ReferentialAction>('NO ACTION');
+    const [onUpdate, setOnUpdate] = useState<ReferentialAction>('NO ACTION');
 
-    useEffect(() => {
-        if (isOpen) {
-            setConstraintName(`FK_${sourceTable}_${targetTable}_${Math.floor(Math.random() * 1000)}`);
-        }
-    }, [isOpen, sourceTable, targetTable]);
+    const defaultConstraintName = useMemo(
+        () => `FK_${sourceTable}_${targetTable}`,
+        [sourceTable, targetTable],
+    );
 
     const handleConfirm = () => {
         onConfirm({
-            constraintName,
+            constraintName: constraintName || defaultConstraintName,
             sourceTable, // The table holding the FK
             sourceColumn,
             targetTable, // The table holding the PK
@@ -98,7 +99,7 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                         <Label htmlFor="constraintName" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{lang === 'vi' ? 'Tên ràng buộc' : 'Constraint Name'}</Label>
                         <Input
                             id="constraintName"
-                            value={constraintName}
+                            value={constraintName || defaultConstraintName}
                             onChange={(e) => setConstraintName(e.target.value)}
                             className="font-mono text-sm bg-muted/30"
                         />
@@ -142,7 +143,7 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{lang === 'vi' ? 'Khi xóa' : 'On Delete'}</Label>
-                            <Select value={onDelete} onValueChange={(v: any) => setOnDelete(v)}>
+                            <Select value={onDelete} onValueChange={(v) => setOnDelete(v as ReferentialAction)}>
                                 <SelectTrigger className="bg-muted/30">
                                     <SelectValue />
                                 </SelectTrigger>
@@ -156,7 +157,7 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                         </div>
                         <div className="space-y-2">
                             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{lang === 'vi' ? 'Khi cập nhật' : 'On Update'}</Label>
-                            <Select value={onUpdate} onValueChange={(v: any) => setOnUpdate(v)}>
+                            <Select value={onUpdate} onValueChange={(v) => setOnUpdate(v as ReferentialAction)}>
                                 <SelectTrigger className="bg-muted/30">
                                     <SelectValue />
                                 </SelectTrigger>

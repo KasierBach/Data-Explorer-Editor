@@ -1,20 +1,61 @@
 import { apiService } from './api.service';
 import type { AiMessage, AiChat } from './store/slices/aiChatSlice';
 
-function normalizeAttachmentPayload(payload: any): {
+interface AiChatResponse {
+    id: string;
+    title: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+interface AiMessageResponse {
+    id: string;
+    role: 'user' | 'ai' | 'model';
+    content: string;
+    sql?: string;
+    explanation?: string;
+    thought?: string;
+    error?: boolean;
+    attachments?: unknown;
+    createdAt: string;
+}
+
+interface AiChatDetailResponse {
+    messages?: AiMessageResponse[];
+}
+
+type CreateChatResponse = AiChatResponse;
+
+function isAttachmentPayloadItem(value: unknown): value is { type: string; label: string; preview?: string } {
+    if (!value || typeof value !== 'object') return false;
+    const candidate = value as { type?: unknown; label?: unknown };
+    return typeof candidate.type === 'string' && typeof candidate.label === 'string';
+}
+
+function getPayloadRecord(payload: unknown) {
+    return payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? payload as Record<string, unknown>
+        : null;
+}
+
+function normalizeAttachmentPayload(payload: unknown): {
     attachments?: { type: string; label: string; preview?: string }[];
     modelInfo?: AiMessage['modelInfo'];
     recommendations?: AiMessage['recommendations'];
 } {
     if (Array.isArray(payload)) {
-        return { attachments: payload };
+        return { attachments: payload.filter(isAttachmentPayloadItem) };
     }
 
-    if (payload && typeof payload === 'object') {
+    const payloadRecord = getPayloadRecord(payload);
+    if (payloadRecord) {
+        const items = payloadRecord.items;
         return {
-            attachments: Array.isArray(payload.items) ? payload.items : undefined,
-            modelInfo: payload.modelInfo || undefined,
-            recommendations: Array.isArray(payload.recommendations) ? payload.recommendations : undefined,
+            attachments: Array.isArray(items) ? items.filter(isAttachmentPayloadItem) : undefined,
+            modelInfo: getPayloadRecord(payloadRecord.modelInfo) as AiMessage['modelInfo'] | undefined,
+            recommendations: Array.isArray(payloadRecord.recommendations)
+                ? payloadRecord.recommendations as AiMessage['recommendations']
+                : undefined,
         };
     }
 
@@ -23,7 +64,7 @@ function normalizeAttachmentPayload(payload: any): {
 
 export class AiChatService {
     static async fetchChats(): Promise<AiChat[]> {
-        const data = await apiService.get<any[]>('/ai/chats');
+        const data = await apiService.get<AiChatResponse[]>('/ai/chats');
         return data.map(chat => ({
             id: chat.id,
             title: chat.title,
@@ -34,10 +75,10 @@ export class AiChatService {
     }
 
     static async loadMessages(chatId: string): Promise<AiMessage[]> {
-        const data = await apiService.get<any>(`/ai/chats/${chatId}`);
+        const data = await apiService.get<AiChatDetailResponse>(`/ai/chats/${chatId}`);
         if (!data.messages) return [];
         
-        return data.messages.map((m: any) => ({
+        return data.messages.map((m) => ({
             id: m.id,
             role: m.role === 'model' ? 'ai' : m.role,
             content: m.content,
@@ -50,8 +91,8 @@ export class AiChatService {
         }));
     }
 
-    static async createChat(title: string = 'Cuộc trò chuyện mới'): Promise<any> {
-        return await apiService.post<any>('/ai/chats', { title });
+    static async createChat(title: string = 'Cuộc trò chuyện mới'): Promise<CreateChatResponse> {
+        return await apiService.post<CreateChatResponse>('/ai/chats', { title });
     }
 
     static async deleteChat(id: string): Promise<void> {

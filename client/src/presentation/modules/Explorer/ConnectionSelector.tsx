@@ -130,11 +130,11 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
                 lastConnectionLatencyMs: result.latencyMs,
                 ...(result.status === 'healthy' ? { lastConnectedAt: result.checkedAt } : {}),
             });
-        } catch (error: any) {
+        } catch (error) {
             updateConnection(connectionId, {
                 lastHealthStatus: 'error',
                 lastHealthCheckAt: new Date().toISOString(),
-                lastHealthError: error.message || 'Health check failed',
+                lastHealthError: error instanceof Error ? error.message : 'Health check failed',
             });
         } finally {
             setIsCheckingHealth(null);
@@ -159,10 +159,10 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
         try {
             await ConnectionService.deleteConnection(id);
             removeConnection(id);
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error deleting connection:', error);
             const errMsg = lang === 'vi' ? 'Lỗi khi xóa kết nối' : 'Error deleting connection';
-            alert(error.message || errMsg);
+            alert(error instanceof Error ? error.message : errMsg);
         } finally {
             setIsDeleting(null);
         }

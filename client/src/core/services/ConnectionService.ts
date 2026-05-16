@@ -5,6 +5,16 @@ import { apiService } from "./api.service";
 import { SearchService } from "./SearchService";
 import type { Connection } from "./store/slices/connectionSlice";
 
+type CreateConnectionPayload = Omit<Connection, 'id'>;
+type UpdateConnectionPayload = Partial<Omit<Connection, 'id'>>;
+
+interface ConnectionHealthResult {
+    status: 'healthy' | 'error';
+    checkedAt?: string;
+    latencyMs: number;
+    error: string | null;
+}
+
 /**
  * Service to manage database adapter instances.
  * Follows Singleton/Factory pattern logic.
@@ -26,12 +36,13 @@ export class ConnectionService {
     /**
      * Factory method to get or create an adapter for a connection.
      */
-    public getAdapter(connectionId: string, type: Connection['type']): IDatabaseAdapter {
+    public getAdapter(connectionId: string, _type: Connection['type']): IDatabaseAdapter {
+        void _type;
+
         if (this.adapters.has(connectionId)) {
             return this.adapters.get(connectionId)!;
         }
 
-        console.log(`[ConnectionService] Creating ApiAdapter for ${type}`);
         const adapter = new ApiDatabaseAdapter();
 
         this.adapters.set(connectionId, adapter);
@@ -59,32 +70,27 @@ export class ConnectionService {
 
     // ─── API Methods ───
 
-    public static async getConnections(): Promise<any[]> {
-        return await apiService.get<any[]>('/connections');
+    public static async getConnections(): Promise<Connection[]> {
+        return await apiService.get<Connection[]>('/connections');
     }
 
-    public static async testConnection(data: any): Promise<{ status: 'healthy' | 'error'; latencyMs: number; error: string | null }> {
-        return await apiService.post<any>('/connections/test', data);
+    public static async testConnection(data: CreateConnectionPayload): Promise<ConnectionHealthResult> {
+        return await apiService.post<ConnectionHealthResult>('/connections/test', data);
 
     }
 
-    public static async createConnection(data: any): Promise<any> {
-        const result = await apiService.post<any>('/connections', data);
+    public static async createConnection(data: CreateConnectionPayload): Promise<Connection> {
+        const result = await apiService.post<Connection>('/connections', data);
         void SearchService.syncIndex().catch(() => undefined);
         return result;
     }
 
-    public static async updateConnection(id: string, updates: any): Promise<void> {
+    public static async updateConnection(id: string, updates: UpdateConnectionPayload): Promise<void> {
         await apiService.patch(`/connections/${id}`, updates);
         void SearchService.syncIndex().catch(() => undefined);
     }
 
-    public static async checkConnectionHealth(id: string): Promise<{
-        status: 'healthy' | 'error';
-        checkedAt: string;
-        latencyMs: number;
-        error: string | null;
-    }> {
+    public static async checkConnectionHealth(id: string): Promise<ConnectionHealthResult> {
         return await apiService.post(`/connections/${id}/health-check`, {});
     }
 

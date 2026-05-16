@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiService } from './api.service';
 import { ConnectionService } from './ConnectionService';
 import { SearchService } from './SearchService';
+import type { Connection } from './store/slices/connectionSlice';
 
 vi.mock('./api.service', () => ({
   apiService: {
@@ -32,10 +33,10 @@ describe('ConnectionService', () => {
 
   describe('static methods', () => {
     it('should fetch connections via API', async () => {
-      const mockConnections = [
+      const mockConnections: Connection[] = [
         { id: '1', name: 'Test DB', type: 'postgres' }
       ];
-      vi.spyOn(apiService, 'get').mockResolvedValue(mockConnections as any);
+      vi.spyOn(apiService, 'get').mockResolvedValue(mockConnections);
 
       const result = await ConnectionService.getConnections();
 
@@ -44,8 +45,8 @@ describe('ConnectionService', () => {
     });
 
     it('should create a new connection via API', async () => {
-      const mockConnection = { id: '1', name: 'New DB' };
-      vi.spyOn(apiService, 'post').mockResolvedValue(mockConnection as any);
+      const mockConnection: Connection = { id: '1', name: 'New DB', type: 'postgres' };
+      vi.spyOn(apiService, 'post').mockResolvedValue(mockConnection);
 
       const result = await ConnectionService.createConnection({ name: 'New DB', type: 'postgres' });
 
@@ -73,8 +74,8 @@ describe('ConnectionService', () => {
     });
 
     it('should check connection health via API', async () => {
-      const mockHealth = { status: 'healthy', latencyMs: 50 };
-      vi.spyOn(apiService, 'post').mockResolvedValue(mockHealth as any);
+      const mockHealth = { status: 'healthy' as const, latencyMs: 50, error: null };
+      vi.spyOn(apiService, 'post').mockResolvedValue(mockHealth);
 
       const result = await ConnectionService.checkConnectionHealth('1');
 

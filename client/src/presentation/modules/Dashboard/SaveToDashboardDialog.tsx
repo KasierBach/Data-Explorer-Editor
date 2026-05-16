@@ -91,8 +91,8 @@ export const SaveToDashboardDialog: React.FC<SaveToDashboardDialogProps> = ({
         [dashboards],
     );
 
-    const effectiveXAxisOptions = columns.length ? columns : ['__value'];
-    const effectiveYOptions = numericColumns.length ? numericColumns : columns;
+    const effectiveXAxisOptions = useMemo(() => columns.length ? columns : ['__value'], [columns]);
+    const effectiveYOptions = useMemo(() => numericColumns.length ? numericColumns : columns, [columns, numericColumns]);
     const needsSingleMetric = form.chartType === 'pie' || form.chartType === 'donut';
 
     useEffect(() => {
@@ -135,8 +135,8 @@ export const SaveToDashboardDialog: React.FC<SaveToDashboardDialogProps> = ({
                 widgetTitle: form.widgetTitle.trim(),
             });
             onOpenChange(false);
-        } catch (err: any) {
-            setError(err.message || 'Failed to save widget');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to save widget');
         } finally {
             setIsSaving(false);
         }

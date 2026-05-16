@@ -11,6 +11,10 @@ import {
 import { cn } from '@/lib/utils';
 import type { Attachment } from '@/presentation/hooks/useAiChat';
 
+type FieldSizingStyle = React.CSSProperties & {
+    fieldSizing?: 'content';
+};
+
 interface AiChatInputProps {
     input: string;
     setInput: (val: string) => void;
@@ -50,7 +54,7 @@ interface AiChatInputProps {
 
     contextMenuRef: React.RefObject<HTMLDivElement | null>;
     isNoSql: boolean;
-    activeTab: { type: string; metadata?: any } | undefined;
+    activeTab: { type: string; metadata?: { sql?: string } } | undefined;
     activeConnection: { type: string } | undefined;
     activeDatabase: string | null | undefined;
 }
@@ -124,7 +128,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                     disabled={isLoading || !activeConnection}
                     className="w-full bg-transparent border-none text-xs p-3 resize-none focus:outline-none min-h-[60px] max-h-[200px]"
                     rows={1}
-                    style={{ fieldSizing: "content" } as any}
+                    style={{ fieldSizing: "content" } satisfies FieldSizingStyle}
                 />
 
                 {/* Toolbar */}

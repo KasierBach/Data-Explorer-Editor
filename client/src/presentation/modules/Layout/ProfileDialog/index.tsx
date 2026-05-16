@@ -14,6 +14,8 @@ import { NotificationsTab } from './components/NotificationsTab';
 import { SecurityTab } from './components/SecurityTab';
 import { AdvancedTab } from './components/AdvancedTab';
 
+type TranslationNode = string | { [key: string]: TranslationNode };
+
 interface ProfileDialogProps {
     isOpen: boolean;
     onClose: () => void;
@@ -35,13 +37,13 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
 
     const t = (key: string) => {
         const lang = appearanceState.language || 'en';
-        const res = (translations as any)[lang];
+        const res = translations[lang as keyof typeof translations] as TranslationNode;
         const keys = key.split('.');
-        let current = res;
+        let current: TranslationNode | undefined = res;
         for (const k of keys) {
-            current = current ? current[k] : undefined;
+            current = typeof current === 'object' ? current[k] : undefined;
         }
-        return current || key;
+        return typeof current === 'string' ? current : key;
     };
 
     const handleFeatureNotImplemented = (feature: string) => {

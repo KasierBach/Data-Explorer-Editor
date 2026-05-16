@@ -4,6 +4,7 @@ import { useAppStore } from '@/core/services/store';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/presentation/components/ui/select";
 import { MqlEditor } from './MqlEditor';
 import { cn } from '@/lib/utils';
+import type { NoSqlPipelineStage } from '@/core/services/store/slices/nosqlSlice';
 
 export const NoSqlAggregationBuilderView: React.FC = () => {
     const { 
@@ -27,7 +28,7 @@ export const NoSqlAggregationBuilderView: React.FC = () => {
         setNosqlPipelineStages(nosqlPipelineStages.filter(s => s.id !== id));
     };
 
-    const updateStage = (id: string, updates: any) => {
+    const updateStage = (id: string, updates: Partial<NoSqlPipelineStage>) => {
         setNosqlPipelineStages(nosqlPipelineStages.map(s => s.id === id ? { ...s, ...updates } : s));
     };
 

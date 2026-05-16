@@ -135,8 +135,8 @@ export const MigrationHubDialog: React.FC<MigrationHubDialogProps> = ({
                     return prev ? { ...prev, status: 'failed', error: errMsg } : null;
                 }),
             );
-        } catch (err: any) {
-            setJob({ id: '', status: 'failed', processedRows: 0, error: err.message });
+        } catch (err) {
+            setJob({ id: '', status: 'failed', processedRows: 0, error: err instanceof Error ? err.message : 'Migration failed' });
         } finally {
             setIsStarting(false);
         }

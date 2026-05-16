@@ -23,7 +23,7 @@ export function useDatabaseHierarchy(parentId: string | null, connectionIdProp?:
             if (!activeConnectionId || !activeConnection) throw new Error("No active connection");
 
             try {
-                const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type as any);
+                const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type);
                 // Ensure we are connected. In a real app, connection state should be managed more robustly.
                 await adapter.connect(activeConnection);
 
@@ -50,7 +50,7 @@ export function useTableMetadata(tableId: string, connectionIdProp?: string | nu
         queryKey: QUERY_KEYS.tableMetadata(activeConnectionId || 'none', tableId),
         queryFn: async () => {
             if (!activeConnectionId || !activeConnection) throw new Error("No active connection");
-            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type as any);
+            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type);
             return adapter.getMetadata(tableId);
         },
         enabled: !!activeConnectionId && !!tableId,
@@ -69,7 +69,7 @@ export function useExecuteQuery(sql: string, connectionIdProp?: string | null) {
         queryKey: QUERY_KEYS.query(activeConnectionId || 'none', sql),
         queryFn: async () => {
             if (!activeConnectionId || !activeConnection) throw new Error("No active connection");
-            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type as any);
+            const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type);
             await adapter.connect(activeConnection); // Ensure connection
             return adapter.executeQuery(sql);
         },

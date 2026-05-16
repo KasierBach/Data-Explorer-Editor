@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import { RefreshCw, Plus, Trash2, Save, X, Link as LinkIcon } from 'lucide-react';
 import type { TableMetadata, TableColumn } from '@/core/domain/entities';
+import type { SchemaOperation } from '@/core/domain/database-adapter.interface';
 
 interface TableDesignerProps {
     tableName: string;
     metadata: TableMetadata;
-    onSave: (operations: any[]) => void;
+    onSave: (operations: SchemaOperation[]) => void;
     onCancel: () => void;
     isReadOnly?: boolean;
     schemaChangesAllowed?: boolean;
@@ -31,7 +32,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
         setColumns(columns.filter((_, i) => i !== index));
     };
 
-    const handleUpdateColumn = (index: number, updates: any) => {
+    const handleUpdateColumn = (index: number, updates: Partial<TableColumn>) => {
         const newCols = [...columns];
         newCols[index] = { ...newCols[index], ...updates };
         setColumns(newCols);
@@ -40,7 +41,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
     const handleSave = async () => {
         if (isBlocked) return;
         setIsSaving(true);
-        const operations: any[] = [];
+        const operations: SchemaOperation[] = [];
 
         // 1. Identify dropped columns
         const currentNames = columns.map(c => c.name);

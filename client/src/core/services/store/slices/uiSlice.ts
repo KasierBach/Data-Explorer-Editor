@@ -1,5 +1,36 @@
 import type { StateCreator } from 'zustand';
 
+export interface PageState {
+    dataMode?: 'table' | 'sql';
+    selectedTable?: string;
+    customSql?: string;
+    dataLimit?: number;
+    sortColumn?: string;
+    sortDir?: 'ASC' | 'DESC';
+    searchTable?: string;
+    chartType?: string;
+    xAxis?: string;
+    yAxis?: string[];
+    paletteIdx?: number;
+    title?: string;
+    showGrid?: boolean;
+    showLegend?: boolean;
+    showBrush?: boolean;
+    curveType?: string;
+    animationEnabled?: boolean;
+    labelVisible?: boolean;
+    isSidebarCollapsed?: boolean;
+    activeSection?: string;
+    [key: string]: unknown;
+}
+
+export interface DestructiveQueryAnalysis {
+    severity?: 'low' | 'medium' | 'high';
+    keywords?: string[];
+    affectedObject?: string;
+    [key: string]: unknown;
+}
+
 export interface UISlice {
     isSidebarOpen: boolean;
     sidebarWidth: number;
@@ -14,8 +45,8 @@ export interface UISlice {
     setAiPanelOpen: (isOpen: boolean) => void;
     expandedNodes: string[];
     toggleNodeExpansion: (nodeId: string) => void;
-    pageStates: Record<string, any>;
-    setPageState: (pageId: string, pageState: any) => void;
+    pageStates: Record<string, PageState>;
+    setPageState: (pageId: string, pageState: PageState) => void;
     lang: 'vi' | 'en';
     setLang: (lang: 'vi' | 'en') => void;
     isResultPanelOpen: boolean;
@@ -27,8 +58,8 @@ export interface UISlice {
     setCommandPaletteOpen: (isOpen: boolean) => void;
     defaultResultHeight: number;
     setDefaultResultHeight: (height: number) => void;
-    destructiveConfirm: { isOpen: boolean; analysis: any; resolve: ((val: boolean) => void) | null } | null;
-    requestDestructiveConfirm: (analysis: any) => Promise<boolean>;
+    destructiveConfirm: { isOpen: boolean; analysis: DestructiveQueryAnalysis; resolve: ((val: boolean) => void) | null } | null;
+    requestDestructiveConfirm: (analysis: DestructiveQueryAnalysis) => Promise<boolean>;
     closeDestructiveConfirm: (confirmed: boolean) => void;
 }
 

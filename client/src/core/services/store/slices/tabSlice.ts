@@ -1,10 +1,25 @@
 import type { StateCreator } from 'zustand';
 
+export interface TabMetadata {
+    sql?: string;
+    tableId?: string;
+    page?: number;
+    pageSize?: number;
+    resultHeight?: number;
+    limit?: string;
+    savedQueryId?: string | null;
+    database?: string;
+    connectionId?: string;
+    dashboardId?: string;
+    folderId?: string | null;
+    [key: string]: unknown;
+}
+
 export interface Tab {
     id: string;
     title: string;
     type: 'table' | 'query' | 'settings' | 'insights' | 'dashboard' | 'visualize' | 'erd';
-    metadata?: any;
+    metadata?: TabMetadata;
     initialSql?: string;
 }
 
@@ -14,7 +29,7 @@ export interface TabSlice {
     openTab: (tab: Tab) => void;
     closeTab: (tabId: string) => void;
     setActiveTab: (tabId: string) => void;
-    updateTabMetadata: (tabId: string, metadata: any) => void;
+    updateTabMetadata: (tabId: string, metadata: TabMetadata) => void;
     reorderTabs: (fromIndex: number, toIndex: number) => void;
     openQueryTab: () => void;
     openInsightsTab: (connectionId: string, database?: string) => void;
@@ -86,7 +101,7 @@ export const createTabSlice: StateCreator<TabSlice & ConnectionLookup, [], [], T
         const exists = state.tabs.find(t => t.id === id);
         if (exists) return { activeTabId: id };
 
-        const conn = (get() as any).connections?.find((c: any) => c.id === connectionId);
+        const conn = get().connections.find((c) => c.id === connectionId);
         const newTab: Tab = {
             id,
             title: `Insights: ${conn?.name || 'DB'}${database ? ` (${database})` : ''}`,
@@ -123,7 +138,7 @@ export const createTabSlice: StateCreator<TabSlice & ConnectionLookup, [], [], T
         const exists = state.tabs.find(t => t.id === id);
         if (exists) return { activeTabId: id };
 
-        const conn = (get() as any).connections?.find((c: any) => c.id === connectionId);
+        const conn = get().connections.find((c) => c.id === connectionId);
         const newTab: Tab = {
             id,
             title: `ERD: ${conn?.name || 'Default'}${database ? ` (${database})` : ''}`,

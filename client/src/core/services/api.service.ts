@@ -1,11 +1,12 @@
 import { API_BASE_URL } from '../config/env';
 import { useAppStore } from './store';
+import type { AuthUser } from './store/slices/authSlice';
 
 export class ApiError extends Error {
   statusCode?: number;
   reason?: string;
   action?: string;
-  details?: any;
+  details?: unknown;
   data?: Record<string, unknown>;
 }
 
@@ -49,13 +50,13 @@ class ApiService {
   }
 
   private async buildApiError(response: Response) {
-    const errorData = await response.json().catch(() => ({}));
+    const errorData = await response.json().catch(() => ({})) as Record<string, unknown>;
     const error = new ApiError(
-      errorData.message || `API Error: ${response.status} ${response.statusText}`,
+      typeof errorData.message === 'string' ? errorData.message : `API Error: ${response.status} ${response.statusText}`,
     );
-    error.statusCode = errorData.statusCode ?? response.status;
-    error.reason = errorData.reason;
-    error.action = errorData.action;
+    error.statusCode = typeof errorData.statusCode === 'number' ? errorData.statusCode : response.status;
+    error.reason = typeof errorData.reason === 'string' ? errorData.reason : undefined;
+    error.action = typeof errorData.action === 'string' ? errorData.action : undefined;
     error.details = errorData.details;
     error.data = errorData;
     return error;
@@ -94,7 +95,7 @@ class ApiService {
         const data = await this.parseResponse<{
           access_token?: string;
           accessTokenExpiresAt?: number;
-          user?: any;
+          user?: AuthUser;
         }>(response);
 
         if (!data?.access_token || !data.user) {
@@ -159,7 +160,7 @@ class ApiService {
 
   async post<T>(
     endpoint: string,
-    body: any,
+    body: unknown,
     headers: Record<string, string> = {},
     allowRefresh = true,
   ): Promise<T> {
@@ -176,7 +177,7 @@ class ApiService {
 
   async patch<T>(
     endpoint: string,
-    body: any,
+    body: unknown,
     headers: Record<string, string> = {},
     allowRefresh = true,
   ): Promise<T> {

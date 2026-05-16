@@ -25,6 +25,10 @@ interface ShareConnectionDialogProps {
 
 const TEAMSPACE_UNASSIGNED = '__unassigned__';
 
+const getErrorMessage = (error: unknown, fallback: string) => (
+  error instanceof Error ? error.message : fallback
+);
+
 function getTeamspaceItems(teamspaces: TeamspaceEntity[]) {
   return teamspaces.map((teamspace) => (
     <SelectItem key={teamspace.id} value={teamspace.id} className="text-xs">
@@ -80,14 +84,14 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
         });
       }
 
-      updateConnection(connectionId, { organizationId: shareOrgId } as any);
+      updateConnection(connectionId, { organizationId: shareOrgId });
 
       onOpenChange(false);
       onSuccess?.();
       alert(lang === 'vi' ? 'Đã chia sẻ kết nối với team!' : 'Connection shared with team!');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error sharing connection:', error);
-      alert(error.message || (lang === 'vi' ? 'Lỗi khi chia sẻ kết nối' : 'Error sharing connection'));
+      alert(getErrorMessage(error, lang === 'vi' ? 'Lỗi khi chia sẻ kết nối' : 'Error sharing connection'));
     } finally {
       setIsSharing(false);
     }
@@ -103,9 +107,9 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
       setShareTeamspaceId(TEAMSPACE_UNASSIGNED);
       await refetchOrgs();
       await refetchTeamspaces();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating team:', error);
-      alert(error.message || (lang === 'vi' ? 'Lỗi khi tạo team' : 'Error creating team'));
+      alert(getErrorMessage(error, lang === 'vi' ? 'Lỗi khi tạo team' : 'Error creating team'));
     }
   };
 
@@ -135,7 +139,7 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
               </SelectTrigger>
               <SelectContent>
                 {organizations.length > 0 ? (
-                  organizations.map((org: any) => (
+                  organizations.map((org) => (
                     <SelectItem key={org.id} value={org.id} className="text-xs">
                       {org.name}
                     </SelectItem>

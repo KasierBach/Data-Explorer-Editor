@@ -1,6 +1,27 @@
 import { useEffect } from 'react';
 import { aiService } from '@/core/services/AiService';
 import { useAppStore } from '@/core/services/store';
+import type { Monaco } from '@monaco-editor/react';
+import type { CancellationToken, editor, languages, Position } from 'monaco-editor';
+
+interface NoSqlSchemaField {
+    name: string;
+    types: Record<string, unknown>;
+}
+
+function isNoSqlSchemaField(value: unknown): value is NoSqlSchemaField {
+    if (!value || typeof value !== 'object') return false;
+    const candidate = value as Partial<NoSqlSchemaField>;
+    return typeof candidate.name === 'string' && !!candidate.types && typeof candidate.types === 'object';
+}
+
+function formatNoSqlSchemaFields(stats: unknown) {
+    if (!Array.isArray(stats)) return '';
+    return stats
+        .filter(isNoSqlSchemaField)
+        .map((field) => `${field.name} (${Object.keys(field.types).join('/')})`)
+        .join(', ');
+}
 
 /**
  * Custom hook that registers an AI-powered Inline Completions Provider for Monaco.
@@ -9,12 +30,13 @@ import { useAppStore } from '@/core/services/store';
  * It automatically handles Tab to accept and Esc to dismiss.
  */
 export function useAiGhostText(
-    monaco: any,
+    monaco: Monaco | null,
     activeConnectionId: string | null,
     activeDatabase: string | undefined,
     language: string = 'sql'
 ) {
-    const store = useAppStore();
+    const nosqlActiveCollection = useAppStore((state) => state.nosqlActiveCollection);
+    const nosqlSchemaStats = useAppStore((state) => state.nosqlSchemaStats);
     
     useEffect(() => {
         if (!monaco || !activeConnectionId) return;
@@ -28,8 +50,13 @@ export function useAiGhostText(
             'VALUES', 'LIMIT'
         ]);
 
-        const provider = {
-            provideInlineCompletions: async (model: any, position: any, _context: any, token: any) => {
+        const provider: languages.InlineCompletionsProvider = {
+            provideInlineCompletions: async (
+                model: editor.ITextModel,
+                position: Position,
+                _context: languages.InlineCompletionContext,
+                token: CancellationToken,
+            ) => {
                 // 1. Basic Validation
                 const lineContent = model.getLineContent(position.lineNumber);
                 const textBefore = lineContent.substring(0, position.column - 1);
@@ -69,9 +96,8 @@ export function useAiGhostText(
                     // 5. Build Context (including NoSQL schema if available)
                     let contextStr = undefined;
                     const isNoSql = language === 'json';
-                    if (isNoSql && store.nosqlActiveCollection && store.nosqlSchemaStats) {
-                        contextStr = `[NOSQL SCHEMA] Collection: ${store.nosqlActiveCollection}\nFields: ` + 
-                                     store.nosqlSchemaStats.map((s: any) => `${s.name} (${Object.keys(s.types).join('/')})`).join(', ');
+                    if (isNoSql && nosqlActiveCollection && nosqlSchemaStats) {
+                        contextStr = `[NOSQL SCHEMA] Collection: ${nosqlActiveCollection}\nFields: ${formatNoSqlSchemaFields(nosqlSchemaStats)}`;
                     }
 
                     const completion = await aiService.getAutocomplete({
@@ -133,11 +159,11 @@ export function useAiGhostText(
                     return;
                 }
             },
-            freeInlineCompletions: () => {},
+            disposeInlineCompletions: () => undefined,
         };
 
         const disposable = monaco.languages.registerInlineCompletionsProvider(language, provider);
 
         return () => disposable.dispose();
-    }, [monaco, activeConnectionId, activeDatabase]);
+    }, [monaco, activeConnectionId, activeDatabase, language, nosqlActiveCollection, nosqlSchemaStats]);
 }

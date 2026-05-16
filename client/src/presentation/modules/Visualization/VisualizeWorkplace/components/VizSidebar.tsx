@@ -9,7 +9,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from '@/lib/utils';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { useAppStore } from '@/core/services/store';
-import type { DataMode } from '../useVisualizeLogic';
+import type { CurveType, DataMode } from '../useVisualizeLogic';
+import type { RowData, TreeNode } from '@/core/domain/entities';
+import type { LucideIcon } from 'lucide-react';
+
+interface ColorPaletteOption {
+    name: string;
+    colors: string[];
+}
+
+interface ChartTypeOption {
+    id: string;
+    name: string;
+    icon: LucideIcon;
+}
+
+interface ToggleOption {
+    label: string;
+    value: boolean;
+    set: (value: boolean) => void;
+    icon: LucideIcon;
+}
 
 interface VizSidebarProps {
     isCollapsed: boolean;
@@ -20,12 +40,12 @@ interface VizSidebarProps {
     setDataMode: (v: DataMode) => void;
     currentDb: string;
     setCurrentDb: (v: string) => void;
-    databases: any[];
+    databases: string[];
     searchTable: string;
     setSearchTable: (v: string) => void;
     selectedTable: string;
     setSelectedTable: (v: string) => void;
-    filteredTables: any[];
+    filteredTables: TreeNode[];
     isLoadingTables: boolean;
     dataLimit: number;
     setDataLimit: (v: number) => void;
@@ -49,15 +69,15 @@ interface VizSidebarProps {
     setTitle: (v: string) => void;
     paletteIdx: number;
     setPaletteIdx: (v: number) => void;
-    colorPalettes: any[];
-    chartTypes: any[];
-    curveType: string;
-    setCurveType: (v: string) => void;
-    curveTypes: readonly string[];
-    options: any[];
+    colorPalettes: ColorPaletteOption[];
+    chartTypes: ChartTypeOption[];
+    curveType: CurveType;
+    setCurveType: (v: CurveType) => void;
+    curveTypes: readonly CurveType[];
+    options: ToggleOption[];
     handleExportPNG: () => void;
     handleExportCSV: () => void;
-    chartData?: any[];
+    chartData?: RowData[];
 }
 
 export const VizSidebar: React.FC<VizSidebarProps> = ({
@@ -311,7 +331,7 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
                                                 paletteIdx === i ? "bg-emerald-500/10 border-emerald-500/20" : "border-transparent hover:bg-muted/10 opacity-50"
                                             )}>
                                             <div className="flex gap-1">
-                                                {p.colors.slice(0, 6).map((c: string) => <div key={c} className="w-4 h-4 rounded-md" style={{ backgroundColor: c }} />)}
+                                                {p.colors.slice(0, 6).map(c => <div key={c} className="w-4 h-4 rounded-md" style={{ backgroundColor: c }} />)}
                                             </div>
                                             <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">{p.name}</span>
                                         </div>

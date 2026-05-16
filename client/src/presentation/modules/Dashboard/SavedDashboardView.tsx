@@ -59,8 +59,8 @@ function DashboardWidgetCard({
             await DashboardService.deleteWidget(dashboardId, widget.id);
             toast.success('Widget removed');
             onDeleted();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to remove widget');
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to remove widget');
         } finally {
             setIsDeleting(false);
         }

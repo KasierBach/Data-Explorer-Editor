@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '@/core/services/store';
 import { apiService } from '@/core/services/api.service';
 import { toast } from 'sonner';
+import type { AuthUser } from '@/core/services/store/slices/authSlice';
+
+const getErrorMessage = (error: unknown) => (
+    error instanceof Error ? error.message : 'Something went wrong'
+);
 
 export const useUserProfile = (isOpen: boolean) => {
     const { user, updateUser, lang } = useAppStore();
@@ -33,14 +38,14 @@ export const useUserProfile = (isOpen: boolean) => {
     const handleSaveProfile = async () => {
         setIsLoading(true);
         try {
-            const data = await apiService.patch<any>('/users/profile', {
+            const data = await apiService.patch<AuthUser>('/users/profile', {
                 firstName, lastName, email, username, jobRole, bio, phoneNumber, address
             });
             updateUser(data);
             toast.success(lang === 'vi' ? "Cập nhật hồ sơ thành công!" : "Profile updated successfully!");
             return true;
-        } catch (err: any) {
-            toast.error(err.message);
+        } catch (err) {
+            toast.error(getErrorMessage(err));
             return false;
         } finally {
             setIsLoading(false);
@@ -50,12 +55,12 @@ export const useUserProfile = (isOpen: boolean) => {
     const handleUploadAvatar = async (base64String: string) => {
         setIsLoading(true);
         try {
-            const data = await apiService.patch<any>('/users/profile', { avatarUrl: base64String });
+            const data = await apiService.patch<AuthUser>('/users/profile', { avatarUrl: base64String });
             updateUser(data);
             toast.success(lang === 'vi' ? "Cập nhật ảnh đại diện thành công!" : "Avatar updated successfully!");
             return true;
-        } catch (err: any) {
-            toast.error(err.message);
+        } catch (err) {
+            toast.error(getErrorMessage(err));
             return false;
         } finally {
             setIsLoading(false);

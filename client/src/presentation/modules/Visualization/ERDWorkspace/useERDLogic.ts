@@ -18,7 +18,8 @@ import { ErdWorkspaceService, type SaveErdWorkspacePayload } from '@/core/servic
 import { ApiError } from '@/core/services/api.service';
 import { MetadataService } from '@/core/services/MetadataService';
 import { SearchService, type SearchResult } from '@/core/services/SearchService';
-import type { ErdWorkspaceEntity } from '@/core/domain/entities';
+import type { ErdWorkspaceEntity, JsonValue, TableColumn, TableMetadata, TreeNode } from '@/core/domain/entities';
+import type { DatabaseRelationship } from '@/core/domain/database-adapter.interface';
 import type { ForeignKeyData } from '../ForeignKeyDialog';
 import {
     buildWorkspaceLayoutSnapshot,
@@ -28,6 +29,27 @@ import {
     type EdgeRouting,
 } from './workspace-layout';
 import { applyAutoLayout } from './erd-auto-layout';
+
+type ErdHierarchyNode = TreeNode & {
+    schema?: string;
+};
+
+type ErdWorkspaceMetadata = Record<string, JsonValue | undefined>;
+
+function getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : undefined;
+}
+
+function getStringMetadataValue(metadata: ErdWorkspaceMetadata, key: string) {
+    const value = metadata[key];
+    return typeof value === 'string' ? value : null;
+}
+
+function getNodeSchema(node: ErdHierarchyNode) {
+    const schemaFromMetadata = node.metadata?.schema;
+    if (typeof schemaFromMetadata === 'string') return schemaFromMetadata;
+    return node.schema;
+}
 
 export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: string) => {
     const {
@@ -45,7 +67,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
     const isStandalone = tabId.startsWith('erd-page-');
     const tab = tabs.find((entry) => entry.id === tabId);
-    const initialMetadata = isStandalone ? (pageStates[tabId] || {}) : (tab?.metadata || {});
+    const initialMetadata = (isStandalone ? (pageStates[tabId] || {}) : (tab?.metadata || {})) as ErdWorkspaceMetadata;
     const initialLayout = normalizeWorkspaceLayout(initialMetadata);
 
     const [selectedDatabase, setLocalSelectedDatabase] = useState<string | undefined>(databaseProp);
@@ -69,9 +91,9 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     const [backgroundVariant, setBackgroundVariant] = useState<BackgroundVariant>(initialLayout.backgroundVariant);
     const [isEdgeAnimated, setIsEdgeAnimated] = useState<boolean>(initialLayout.isEdgeAnimated);
     const [isToolbarCollapsed, setIsToolbarCollapsed] = useState<boolean>(initialLayout.isToolbarCollapsed);
-    const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(initialMetadata.currentWorkspaceId || null);
-    const [currentWorkspaceName, setCurrentWorkspaceName] = useState<string | null>(initialMetadata.currentWorkspaceName || null);
-    const [currentWorkspaceNotes, setCurrentWorkspaceNotes] = useState<string>(initialMetadata.currentWorkspaceNotes || '');
+    const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string | null>(getStringMetadataValue(initialMetadata, 'currentWorkspaceId'));
+    const [currentWorkspaceName, setCurrentWorkspaceName] = useState<string | null>(getStringMetadataValue(initialMetadata, 'currentWorkspaceName'));
+    const [currentWorkspaceNotes, setCurrentWorkspaceNotes] = useState<string>(getStringMetadataValue(initialMetadata, 'currentWorkspaceNotes') || '');
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
     const [isOpenWorkspaceDialogOpen, setIsOpenWorkspaceDialogOpen] = useState(false);
     const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
@@ -125,7 +147,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         collapsedTables,
     ]);
 
-    const applyWorkspaceLayout = useCallback((layout?: Record<string, any> | null) => {
+    const applyWorkspaceLayout = useCallback((layout?: Record<string, JsonValue> | null) => {
         const normalized = normalizeWorkspaceLayout(layout);
         setVisibleTableNames(new Set(normalized.visibleTables));
         setNodes(normalized.nodes);
@@ -199,12 +221,12 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         queryKey: ['erd-hierarchy-v2', connectionId, selectedDatabase, !!activeConnection],
         queryFn: async () => {
             if (!connectionId || !activeConnection) return [];
-            const adapter = connectionService.getAdapter(connectionId, activeConnection.type as any);
-            const results: any[] = [];
+            const adapter = connectionService.getAdapter(connectionId, activeConnection.type);
+            const results: ErdHierarchyNode[] = [];
 
             const crawl = async (parentId: string | null) => {
                 try {
-                    const entries = await adapter.getHierarchy(parentId);
+                    const entries = await adapter.getHierarchy(parentId) as ErdHierarchyNode[];
                     for (const entry of entries) {
                         if (entry.type === 'table' || entry.type === 'view' || entry.type === 'collection') {
                             results.push(entry);
@@ -238,7 +260,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         queryKey: ['erd-rels', connectionId, selectedDatabase, !!activeConnection],
         queryFn: async () => {
             if (!connectionId || !activeConnection) return [];
-            const adapter = connectionService.getAdapter(connectionId, activeConnection.type as any);
+            const adapter = connectionService.getAdapter(connectionId, activeConnection.type);
             return adapter.getRelationships(selectedDatabase);
         },
         enabled: !!connectionId && !!hierarchy && hierarchy.length > 0,
@@ -251,9 +273,9 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         queryKey: ['erd-databases', connectionId, !!activeConnection],
         queryFn: async () => {
             if (!connectionId || !activeConnection) return [];
-            const adapter = connectionService.getAdapter(connectionId, activeConnection.type as any);
+            const adapter = connectionService.getAdapter(connectionId, activeConnection.type);
             const dbs = await adapter.getDatabases();
-            return dbs.map(db => ({ id: `db:${db}`, name: db, type: 'database' }));
+            return dbs.map(db => ({ id: `db:${db}`, name: db, type: 'database' as const }));
         },
         enabled: !!connectionId && !!activeConnection,
         placeholderData: (prev) => prev,
@@ -265,8 +287,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         queryKey: ['erd-columns-v2', connectionId, Array.from(visibleTableNames), selectedDatabase],
         queryFn: async () => {
             if (visibleTableNames.size === 0 || !hierarchy || !activeConnection) return {};
-            const adapter = connectionService.getAdapter(connectionId, activeConnection.type as any);
-            const results: Record<string, any> = {};
+            const adapter = connectionService.getAdapter(connectionId, activeConnection.type);
+            const results: Record<string, TableMetadata> = {};
             const nameToIdMap = new Map<string, string>();
 
             hierarchy.forEach((item) => nameToIdMap.set(item.name, item.id));
@@ -305,7 +327,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             const schemaPrefix = `schema:${schemaFilter}`;
             filtered = filtered.filter((entry) => 
                 entry.id?.includes(schemaPrefix) || 
-                entry.schema === schemaFilter
+                getNodeSchema(entry) === schemaFilter
             );
         }
 
@@ -332,7 +354,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             try {
                 const results = await SearchService.search(searchTerm);
                 // Filter out results that are already in the local hierarchy to avoid duplicates
-                const localNames = new Set(hierarchy?.map((h: any) => h.name.toLowerCase()) || []);
+                const localNames = new Set(hierarchy?.map((h) => h.name.toLowerCase()) || []);
                 const globalOnly = results.filter((r: SearchResult) => !localNames.has(r.name.toLowerCase()));
                 setGlobalSearchResults(globalOnly);
             } catch (error) {
@@ -349,7 +371,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         const map = new Map<string, string>();
         if (!relationships) return map;
 
-        relationships.forEach((relationship: any) => {
+        relationships.forEach((relationship: DatabaseRelationship) => {
             if (!relationship.constraint_name) return;
             const sourceTable = relationship.source_table?.split('.').pop() || relationship.source_table;
             map.set(`${sourceTable}.${relationship.source_column}`, relationship.constraint_name);
@@ -416,9 +438,9 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             await queryClient.invalidateQueries({ queryKey: ['erd-hierarchy-v2'] });
             await queryClient.invalidateQueries({ queryKey: ['erd-databases'] });
             await queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
-        } catch (error: any) {
+        } catch (error) {
             toast.error(lang === 'vi' ? 'Không thể làm mới metadata' : 'Failed to refresh metadata', {
-                description: error.message
+                description: getErrorMessage(error)
             });
         } finally {
             setIsRefreshing(false);
@@ -443,9 +465,9 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             toast.success(lang === 'vi' ? `${type.toUpperCase()} đã được xóa thành công` : `${type.toUpperCase()} removed successfully`);
             queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
             queryClient.invalidateQueries({ queryKey: ['erd-columns-v2'] });
-        } catch (error: any) {
+        } catch (error) {
             toast.error(lang === 'vi' ? `Không thể xóa ${type.toUpperCase()}` : `Failed to remove ${type.toUpperCase()}`, {
-                description: error.message,
+                description: getErrorMessage(error),
             });
         }
     }, [connectionId, lang, queryClient, selectedDatabase]);
@@ -500,9 +522,9 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
                 queryClient.invalidateQueries({ queryKey: ['erd-columns-v2'] });
                 onEdgesChange([change]);
-            } catch (error: any) {
+            } catch (error) {
                 toast.error(lang === 'vi' ? 'Không thể xóa liên kết' : 'Failed to remove relationship', {
-                    description: error.message,
+                    description: getErrorMessage(error),
                 });
             }
         });
@@ -549,9 +571,9 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
             queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
             queryClient.invalidateQueries({ queryKey: ['erd-columns-v2'] });
-        } catch (error: any) {
+        } catch (error) {
             toast.error(lang === 'vi' ? 'Không thể tạo liên kết' : 'Failed to create relationship', {
-                description: error.message,
+                description: getErrorMessage(error),
             });
         }
     };
@@ -604,7 +626,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         }
 
         const dbEdges: Edge[] = (relationships || [])
-            .map((relationship: any, index: number) => {
+            .map((relationship: DatabaseRelationship, index: number) => {
                 const targetTable = relationship.target_table?.split('.').pop() || relationship.target_table;
                 const sourceTable = relationship.source_table?.split('.').pop() || relationship.source_table;
 
@@ -636,9 +658,9 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                     const columns = metadata.columns || [];
                     const isCollapsed = collapsedTables.has(name);
 
-                    let filteredColumns = columns;
+                    let filteredColumns: TableColumn[] = columns;
                     if (detailLevel === 'keys') {
-                        filteredColumns = columns.filter((column: any) => (
+                        filteredColumns = columns.filter((column) => (
                             column.isPrimaryKey ||
                             column.isForeignKey ||
                             fkConstraintMap.has(`${name}.${column.name}`)
@@ -649,7 +671,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
                     const data = {
                         tableName: name,
-                        columns: (isCollapsed ? [] : filteredColumns).map((column: any) => ({
+                        columns: (isCollapsed ? [] : filteredColumns).map((column) => ({
                             ...column,
                             fkConstraintName: fkConstraintMap.get(`${name}.${column.name}`),
                         })),
@@ -765,7 +787,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
             sql += `CREATE TABLE "${tableName}" (\n`;
             sql += metadata.columns
-                .map((column: any) => `    "${column.name}" ${column.type}${column.isPrimaryKey ? ' PRIMARY KEY' : ''}${column.nullable === false ? ' NOT NULL' : ''}`)
+                .map((column) => `    "${column.name}" ${column.type}${column.isPrimaryKey ? ' PRIMARY KEY' : ''}${column.isNullable === false ? ' NOT NULL' : ''}`)
                 .join(',\n');
             sql += '\n);\n\n';
         });

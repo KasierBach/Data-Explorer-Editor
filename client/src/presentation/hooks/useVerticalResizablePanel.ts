@@ -24,8 +24,10 @@ export function useVerticalResizablePanel({
     const minHeightRef = useRef(minHeight);
     const maxHeightRef = useRef(maxHeight);
 
-    minHeightRef.current = minHeight;
-    maxHeightRef.current = maxHeight;
+    useEffect(() => {
+        minHeightRef.current = minHeight;
+        maxHeightRef.current = maxHeight;
+    }, [minHeight, maxHeight]);
 
     const startResizing = useCallback((e: React.MouseEvent | React.PointerEvent | React.TouchEvent) => {
         e.preventDefault();

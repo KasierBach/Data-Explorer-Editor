@@ -128,7 +128,7 @@ export interface TeamActivityEntity {
   createdAt: string;
   userId?: string;
   organizationId?: string;
-  details?: any;
+  details?: Record<string, unknown>;
   user?: {
     id: string;
     firstName?: string | null;

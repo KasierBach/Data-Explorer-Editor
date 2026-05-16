@@ -11,6 +11,10 @@ import { cn } from '@/lib/utils';
 
 const AiMarkdownContent = React.lazy(() => import('./AiMarkdownContent').then((module) => ({ default: module.AiMarkdownContent })));
 
+type FieldSizingStyle = React.CSSProperties & {
+    fieldSizing?: 'content';
+};
+
 interface AiMessageBubbleProps {
     msg: AiMessage;
     onInsertQuery: (sql: string) => void;
@@ -135,7 +139,7 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                                 onChange={(e) => setEditContent(e.target.value)}
                                 className="w-full bg-background/40 border border-violet-500/40 rounded-lg p-2.5 text-xs outline-none focus:ring-1 focus:ring-violet-500/50 resize-none min-h-[100px]"
                                 autoFocus
-                                style={{ fieldSizing: "content" } as any}
+                                style={{ fieldSizing: "content" } satisfies FieldSizingStyle}
                             />
                             <div className="flex justify-end gap-2">
                                 <Button variant="ghost" size="sm" className="h-8 px-3 text-xs font-medium hover:bg-muted/50" onClick={() => setIsEditing(false)}>

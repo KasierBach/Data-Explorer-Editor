@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SavedQueryService, type SaveSavedQueryPayload } from './SavedQueryService';
 import { apiService } from './api.service';
+import type { SavedQuery } from './store/slices/querySlice';
 
 vi.mock('./api.service', () => ({
   apiService: {
@@ -11,6 +12,17 @@ vi.mock('./api.service', () => ({
   },
 }));
 
+const createMockSavedQuery = (overrides: Partial<SavedQuery>): SavedQuery => ({
+  id: 'query-1',
+  name: 'Query',
+  sql: 'SELECT 1',
+  visibility: 'private',
+  tags: [],
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  ...overrides,
+});
+
 describe('SavedQueryService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -18,9 +30,9 @@ describe('SavedQueryService', () => {
 
   it('should fetch all saved queries', async () => {
     const mockQueries = [
-      { id: '1', name: 'Query 1', sql: 'SELECT * FROM users' }
+      createMockSavedQuery({ id: '1', name: 'Query 1', sql: 'SELECT * FROM users' })
     ];
-    vi.spyOn(apiService, 'get').mockResolvedValue(mockQueries as any);
+    vi.spyOn(apiService, 'get').mockResolvedValue(mockQueries);
 
     const result = await SavedQueryService.getSavedQueries();
 
@@ -35,8 +47,8 @@ describe('SavedQueryService', () => {
       visibility: 'private',
       tags: [],
     };
-    const mockResult = { id: '1', ...payload };
-    vi.spyOn(apiService, 'post').mockResolvedValue(mockResult as any);
+    const mockResult = createMockSavedQuery({ id: '1', ...payload });
+    vi.spyOn(apiService, 'post').mockResolvedValue(mockResult);
 
     const result = await SavedQueryService.createSavedQuery(payload);
 
@@ -46,8 +58,8 @@ describe('SavedQueryService', () => {
 
   it('should update a saved query', async () => {
     const updates = { name: 'Updated Name' };
-    const mockResult = { id: '1', name: 'Updated Name' };
-    vi.spyOn(apiService, 'patch').mockResolvedValue(mockResult as any);
+    const mockResult = createMockSavedQuery({ id: '1', name: 'Updated Name' });
+    vi.spyOn(apiService, 'patch').mockResolvedValue(mockResult);
 
     const result = await SavedQueryService.updateSavedQuery('1', updates);
 
@@ -73,7 +85,7 @@ describe('SavedQueryService', () => {
       database: 'mydb',
       tags: [],
     };
-    vi.spyOn(apiService, 'post').mockResolvedValue({ id: '1', ...payload } as any);
+    vi.spyOn(apiService, 'post').mockResolvedValue(createMockSavedQuery({ id: '1', ...payload }));
 
     await SavedQueryService.createSavedQuery(payload);
 
@@ -87,7 +99,7 @@ describe('SavedQueryService', () => {
       visibility: 'workspace',
       tags: ['analytics', 'dashboard'],
     };
-    vi.spyOn(apiService, 'post').mockResolvedValue({ id: '1', ...payload } as any);
+    vi.spyOn(apiService, 'post').mockResolvedValue(createMockSavedQuery({ id: '1', ...payload }));
 
     await SavedQueryService.createSavedQuery(payload);
 

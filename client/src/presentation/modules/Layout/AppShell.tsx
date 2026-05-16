@@ -32,7 +32,7 @@ export function AppShell() {
             setAiPanelOpen(false);
         }
         setSidebarOpen(!isSidebarOpen);
-    }, [isAiPanelOpen, isCompactMobileLayout, isSidebarOpen, setAiPanelOpen, setSidebarOpen]);
+    }, [isCompactMobileLayout, isSidebarOpen, setAiPanelOpen, setSidebarOpen]);
 
     const handleToggleAiPanel = React.useCallback(() => {
         if (isCompactMobileLayout && !isAiPanelOpen) {

@@ -31,6 +31,7 @@ import { BulkImportDialog } from './BulkImportDialog';
 import { MigrationHubDialog } from '../Migration/MigrationHubDialog';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
+import type { RowData } from '@/core/domain/entities';
 
 interface DataGridProps {
     tableId: string;
@@ -71,11 +72,12 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const editing = useDataGridEditing({
         tableId, metadata, dbName, schema, cleanTableName, pkField, refetch,
     });
+    const { handleCellChange, isEditMode, pendingChanges } = editing;
 
     // Build columns
     const tableColumns = useMemo(() => {
         if (!metadata?.columns) return [];
-        const helper = createColumnHelper<any>();
+        const helper = createColumnHelper<RowData>();
 
         const dataCols = metadata.columns.map(col => helper.accessor(col.name, {
             header: () => (
@@ -91,15 +93,15 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                 const val = info.getValue();
                 const colName = col.name;
                 const rowId = pkField ? String(info.row.original[pkField]) : info.row.id;
-                const isEdited = editing.pendingChanges[rowId] && colName in editing.pendingChanges[rowId];
-                const displayVal = isEdited ? editing.pendingChanges[rowId][colName] : val;
+                const isEdited = pendingChanges[rowId] && colName in pendingChanges[rowId];
+                const displayVal = isEdited ? pendingChanges[rowId][colName] : val;
 
-                if (editing.isEditMode && !col.isPrimaryKey) {
+                if (isEditMode && !col.isPrimaryKey) {
                     return (
                         <input
                             className={`w-full bg-transparent border-none outline-none focus:ring-1 focus:ring-primary rounded px-1 -mx-1 py-0.5 h-6 ${isEdited ? 'text-blue-500 font-bold bg-blue-500/5' : ''}`}
                             value={displayVal === null ? '' : String(displayVal)}
-                            onChange={(e) => editing.handleCellChange(rowId, colName, e.target.value)}
+                            onChange={(e) => handleCellChange(rowId, colName, e.target.value)}
                         />
                     );
                 }
@@ -119,7 +121,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         });
 
         return [rowNumCol, ...dataCols];
-    }, [metadata, editing.isEditMode, editing.pendingChanges, pkField]);
+    }, [metadata, handleCellChange, isEditMode, pendingChanges, pkField]);
 
     const table = useReactTable({
         data: queryResult?.rows || [],

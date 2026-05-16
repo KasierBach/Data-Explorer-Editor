@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { adminService } from '@/core/services/AdminService';
+import { useCallback, useEffect, useState } from 'react';
+import { adminService, type AdminUser } from '@/core/services/AdminService';
 import { useAppStore } from '@/core/services/store';
 import { Ban, KeyRound, Shield, ShieldAlert, Trash2, User as UserIcon, UserCheck } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
@@ -7,41 +7,45 @@ import { Badge } from '@/presentation/components/ui/badge';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { toast } from 'sonner';
 
+function getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : 'Unexpected error';
+}
+
 export function UsersView() {
     const { lang } = useAppStore();
     const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const fetchUsers = async () => {
+    const fetchUsers = useCallback(async () => {
         try {
             setLoading(true);
             const data = await adminService.getUsers();
             setUsers(data);
-        } catch (error: any) {
+        } catch (error) {
             toast.error(lang === 'vi' ? 'Khong the tai danh sach nguoi dung' : 'Failed to load users');
             console.error(error);
         } finally {
             setLoading(false);
         }
-    };
+    }, [lang]);
 
     useEffect(() => {
         fetchUsers();
-    }, []);
+    }, [fetchUsers]);
 
-    const toggleRole = async (user: any) => {
+    const toggleRole = async (user: AdminUser) => {
         const newRole = user.role === 'admin' ? 'user' : 'admin';
         try {
             await adminService.updateRole(user.id, newRole);
             toast.success(lang === 'vi' ? `Da cap nhat vai tro thanh ${newRole}` : `Role updated to ${newRole}`);
             fetchUsers();
-        } catch (error: any) {
-            toast.error(error.message);
+        } catch (error) {
+            toast.error(getErrorMessage(error));
         }
     };
 
-    const resetPassword = async (user: any) => {
+    const resetPassword = async (user: AdminUser) => {
         const newPassword = prompt(
             lang === 'vi'
                 ? 'Nhap mat khau moi (it nhat 6 ky tu):'
@@ -56,12 +60,12 @@ export function UsersView() {
         try {
             await adminService.resetPassword(user.id, newPassword);
             toast.success(lang === 'vi' ? 'Da dat lai mat khau thanh cong' : 'Password reset successfully');
-        } catch (error: any) {
-            toast.error(error.message);
+        } catch (error) {
+            toast.error(getErrorMessage(error));
         }
     };
 
-    const deleteUser = async (user: any) => {
+    const deleteUser = async (user: AdminUser) => {
         const confirmed = window.confirm(
             lang === 'vi'
                 ? `Ban co chac chan muon xoa nguoi dung ${user.email}?`
@@ -73,18 +77,18 @@ export function UsersView() {
             await adminService.deleteUser(user.id);
             toast.success(lang === 'vi' ? 'Da xoa nguoi dung thanh cong' : 'User deleted successfully');
             fetchUsers();
-        } catch (error: any) {
-            toast.error(error.message);
+        } catch (error) {
+            toast.error(getErrorMessage(error));
         }
     };
 
-    const toggleBan = async (user: any) => {
+    const toggleBan = async (user: AdminUser) => {
         try {
             const res = await adminService.toggleBan(user.id);
             toast.success(res.message);
             fetchUsers();
-        } catch (error: any) {
-            toast.error(error.message);
+        } catch (error) {
+            toast.error(getErrorMessage(error));
         }
     };
 
@@ -92,7 +96,7 @@ export function UsersView() {
         return <div className="flex justify-center p-8 text-muted-foreground">Loading...</div>;
     }
 
-    const ActionButtons = ({ user }: { user: any }) => (
+    const ActionButtons = ({ user }: { user: AdminUser }) => (
         <div className="flex flex-wrap gap-2">
             <Button
                 variant="outline"

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
-import type { TableMetadata } from '@/core/domain/entities';
+import type { DatabaseValue, RowData, TableMetadata } from '@/core/domain/entities';
+import type { SchemaOperation } from '@/core/domain/database-adapter.interface';
 
 interface UseDataGridEditingParams {
     tableId: string;
@@ -14,6 +15,22 @@ interface UseDataGridEditingParams {
     refetch: () => void;
 }
 
+function getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : 'Unexpected error';
+}
+
+function parseEditableValue(value: string): DatabaseValue {
+    const trimmedValue = value.trim();
+    const normalizedValue = trimmedValue.toLowerCase();
+
+    if (normalizedValue === 'null') return null;
+    if (normalizedValue === 'true') return true;
+    if (normalizedValue === 'false') return false;
+    if (trimmedValue !== '' && !Number.isNaN(Number(trimmedValue))) return Number(trimmedValue);
+
+    return value;
+}
+
 export function useDataGridEditing({
     tableId, metadata, dbName, schema, cleanTableName, pkField, refetch,
 }: UseDataGridEditingParams) {
@@ -21,7 +38,7 @@ export function useDataGridEditing({
     const activeConnection = connections.find(c => c.id === activeConnectionId);
 
     const [isEditMode, setIsEditMode] = useState(false);
-    const [pendingChanges, setPendingChanges] = useState<Record<string, Record<string, any>>>({});
+    const [pendingChanges, setPendingChanges] = useState<Record<string, RowData>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const [isInserting, setIsInserting] = useState(false);
@@ -29,7 +46,7 @@ export function useDataGridEditing({
 
     const getAdapter = () => {
         if (!activeConnection) throw new Error("No active connection");
-        return connectionService.getAdapter(activeConnection.id, activeConnection.type as any);
+        return connectionService.getAdapter(activeConnection.id, activeConnection.type);
     };
 
     const handleCellChange = (rowId: string, colName: string, value: string) => {
@@ -58,14 +75,14 @@ export function useDataGridEditing({
             setIsEditMode(false);
             refetch();
             toast.success('Changes saved');
-        } catch (e: any) {
-            toast.error(e.message);
+        } catch (error) {
+            toast.error(getErrorMessage(error));
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleSaveSchema = async (operations: any[]) => {
+    const handleSaveSchema = async (operations: SchemaOperation[]) => {
         if (!activeConnection || !metadata) return;
         setIsSaving(true);
         try {
@@ -78,8 +95,8 @@ export function useDataGridEditing({
             });
             refetch();
             toast.success('Schema updated');
-        } catch (e: any) {
-            toast.error(e.message);
+        } catch (error) {
+            toast.error(getErrorMessage(error));
         } finally {
             setIsSaving(false);
         }
@@ -102,8 +119,8 @@ export function useDataGridEditing({
             setSelectedRows(new Set());
             toast.success(`${selectedRows.size} row(s) deleted`);
             refetch();
-        } catch (e: any) {
-            toast.error(e.message);
+        } catch (error) {
+            toast.error(getErrorMessage(error));
         } finally {
             setIsSaving(false);
         }
@@ -112,14 +129,10 @@ export function useDataGridEditing({
     const handleInsertRow = async () => {
         if (!activeConnection || !metadata) return;
         
-        const data: Record<string, any> = {};
+        const data: RowData = {};
         Object.entries(newRowData).forEach(([col, v]) => {
             if (v.trim() === '') return;
-            if (v.toLowerCase() === 'null') data[col] = null;
-            else if (v.toLowerCase() === 'true') data[col] = true;
-            else if (v.toLowerCase() === 'false') data[col] = false;
-            else if (!isNaN(Number(v))) data[col] = Number(v);
-            else data[col] = v;
+            data[col] = parseEditableValue(v);
         });
 
         if (Object.keys(data).length === 0) { 
@@ -140,8 +153,8 @@ export function useDataGridEditing({
             setIsInserting(false);
             toast.success('Row inserted successfully');
             refetch();
-        } catch (e: any) {
-            toast.error(e.message);
+        } catch (error) {
+            toast.error(getErrorMessage(error));
         } finally {
             setIsSaving(false);
         }

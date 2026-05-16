@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock, History, RefreshCw, RotateCcw, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
@@ -48,23 +48,16 @@ export function VersionHistoryDialog<TResource, TSnapshot = Record<string, unkno
         enabled: open && !!resourceId,
     });
 
-    const versions = versionsQuery.data ?? [];
+    const versions = useMemo(() => versionsQuery.data ?? [], [versionsQuery.data]);
 
-    useEffect(() => {
-        if (!open) {
-            setSelectedVersionId(null);
-            return;
-        }
-
-        if (!versions.some((entry) => entry.id === selectedVersionId)) {
-            setSelectedVersionId(versions[0]?.id ?? null);
-        }
-    }, [open, selectedVersionId, versions]);
+    const effectiveSelectedVersionId = open && versions.some((entry) => entry.id === selectedVersionId)
+        ? selectedVersionId
+        : versions[0]?.id ?? null;
 
     const detailQuery = useQuery<VersionHistoryDetail<TSnapshot>, Error>({
-        queryKey: ['version-history', resourceType, resourceId, selectedVersionId],
-        queryFn: () => VersionHistoryService.getVersion<TSnapshot>(resourceType, resourceId!, selectedVersionId!),
-        enabled: open && !!resourceId && !!selectedVersionId,
+        queryKey: ['version-history', resourceType, resourceId, effectiveSelectedVersionId],
+        queryFn: () => VersionHistoryService.getVersion<TSnapshot>(resourceType, resourceId!, effectiveSelectedVersionId!),
+        enabled: open && !!resourceId && !!effectiveSelectedVersionId,
     });
 
     const restoreMutation = useMutation({
@@ -86,8 +79,8 @@ export function VersionHistoryDialog<TResource, TSnapshot = Record<string, unkno
     });
 
     const selectedVersion = useMemo(
-        () => versions.find((entry) => entry.id === selectedVersionId) ?? null,
-        [selectedVersionId, versions],
+        () => versions.find((entry) => entry.id === effectiveSelectedVersionId) ?? null,
+        [effectiveSelectedVersionId, versions],
     );
 
     const formatDate = (value: string) => {
@@ -153,7 +146,7 @@ export function VersionHistoryDialog<TResource, TSnapshot = Record<string, unkno
                                     className={cn(
                                         'cursor-pointer border-b border-border/50 px-3 py-2.5 transition-colors',
                                         'hover:bg-accent/50',
-                                        selectedVersionId === version.id && 'bg-accent',
+                                        effectiveSelectedVersionId === version.id && 'bg-accent',
                                     )}
                                 >
                                     <div className="flex items-center justify-between gap-2">

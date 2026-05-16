@@ -36,6 +36,11 @@ function formatAction(action: string) {
     .toLowerCase();
 }
 
+function getDetailString(details: CollaborationActivityLog['details'], key: string) {
+  const value = details?.[key];
+  return typeof value === 'string' ? value : null;
+}
+
 export function TeamActivityTab({ activities, lang }: TeamActivityTabProps) {
   if (activities.length === 0) {
     return (
@@ -54,6 +59,8 @@ export function TeamActivityTab({ activities, lang }: TeamActivityTabProps) {
           : 'U';
         const Icon = getActivityIcon(log.action);
         const actorName = getParticipantName(user);
+        const resourceName = getDetailString(log.details, 'resourceName');
+        const detailName = getDetailString(log.details, 'name');
 
         return (
           <div key={log.id} className="relative flex gap-3 rounded-lg bg-muted/20 p-3">
@@ -71,16 +78,16 @@ export function TeamActivityTab({ activities, lang }: TeamActivityTabProps) {
                 <p className="min-w-0 text-sm leading-relaxed">
                   <span className="font-semibold">{actorName}</span>{' '}
                   <span className="text-muted-foreground">{formatAction(log.action)}</span>
-                  {log.details?.resourceName && (
+                  {resourceName && (
                     <>
                       {' '}
-                      <span className="font-medium text-primary">"{log.details.resourceName}"</span>
+                      <span className="font-medium text-primary">"{resourceName}"</span>
                     </>
                   )}
-                  {log.details?.name && !log.details.resourceName && (
+                  {detailName && !resourceName && (
                     <>
                       {' '}
-                      <span className="font-medium text-primary">"{log.details.name}"</span>
+                      <span className="font-medium text-primary">"{detailName}"</span>
                     </>
                   )}
                 </p>

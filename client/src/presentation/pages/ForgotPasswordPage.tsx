@@ -28,8 +28,8 @@ export const ForgotPasswordPage = () => {
             await AuthService.forgotPassword(email);
             toast.success(lang === 'vi' ? 'Đã gửi mã OTP đến email của bạn!' : 'OTP sent to your email!');
             setStep(2);
-        } catch (err: any) {
-            setError(err.message || 'Error sending OTP');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Error sending OTP');
         } finally {
             setIsLoading(false);
         }
@@ -44,8 +44,8 @@ export const ForgotPasswordPage = () => {
             await AuthService.resetPassword({ email, otp, newPassword });
             toast.success(lang === 'vi' ? 'Đổi mật khẩu thành công!' : 'Password reset successfully!');
             navigate('/login');
-        } catch (err: any) {
-            setError(err.message || 'Invalid OTP');
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Invalid OTP');
         } finally {
             setIsLoading(false);
         }

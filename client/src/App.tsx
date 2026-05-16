@@ -17,6 +17,12 @@ import { Toaster } from 'sonner';
 import { DestructiveQueryDialog } from '@/presentation/components/Dialogs/DestructiveQueryDialog';
 import { CommandPalette } from '@/presentation/components/shared/CommandPalette';
 
+type AppTheme = 'dark' | 'light' | 'system';
+
+const isAppTheme = (value: unknown): value is AppTheme => (
+  value === 'dark' || value === 'light' || value === 'system'
+);
+
 const AppShell = lazy(() => import('@/presentation/modules/Layout/AppShell').then((m) => ({ default: m.AppShell })))
 const NoSqlShell = lazy(() => import('@/presentation/modules/Layout/NoSqlShell').then((m) => ({ default: m.NoSqlShell })))
 const DocumentationPage = lazy(() => import('@/presentation/pages/DocumentationPage').then((m) => ({ default: m.DocumentationPage })))
@@ -53,8 +59,8 @@ export function App() {
 
   // Sync profile theme with App Theme
   useEffect(() => {
-    if (user?.theme && user.theme !== appTheme) {
-        setAppTheme(user.theme as any);
+    if (isAppTheme(user?.theme) && user.theme !== appTheme) {
+        setAppTheme(user.theme);
     }
   }, [user?.theme, appTheme, setAppTheme]);
 

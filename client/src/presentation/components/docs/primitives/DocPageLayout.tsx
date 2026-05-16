@@ -12,10 +12,18 @@ export function DocPageLayout({ title, subtitle, gradient = false, children }: D
     return (
         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="space-y-6">
-                <h1 className={cn(
-                    "text-4xl font-extrabold tracking-tight lg:text-5xl",
-                    gradient ? "bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent" : "text-white"
-                )}>
+                <h1
+                    className={cn(
+                        'text-4xl font-extrabold tracking-tight lg:text-5xl',
+                        !gradient && 'text-foreground'
+                    )}
+                    style={gradient ? {
+                        background: 'linear-gradient(to right, hsl(var(--primary)), #2563eb)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                    } : undefined}
+                >
                     {title}
                 </h1>
                 <p className="text-xl text-muted-foreground leading-relaxed max-w-2xl">
@@ -30,7 +38,7 @@ export function DocPageLayout({ title, subtitle, gradient = false, children }: D
 export function DocSection({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
     return (
         <section className="space-y-6 pt-10 border-t border-border/50">
-            <h2 className="text-2xl font-bold flex items-center gap-3 text-white">
+            <h2 className="text-2xl font-bold flex items-center gap-3 text-foreground">
                 {icon} {title}
             </h2>
             {children}
@@ -41,7 +49,7 @@ export function DocSection({ title, icon, children }: { title: string; icon?: Re
 export function DocSubSection({ title, children }: { title: string; children: React.ReactNode }) {
     return (
         <div className="space-y-4 pt-6">
-            <h3 className="text-xl font-bold text-white/90">{title}</h3>
+            <h3 className="text-xl font-bold text-foreground/90">{title}</h3>
             {children}
         </div>
     );

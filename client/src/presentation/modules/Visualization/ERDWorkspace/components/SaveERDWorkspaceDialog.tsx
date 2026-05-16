@@ -48,8 +48,8 @@ export const SaveErdWorkspaceDialog: React.FC<SaveErdWorkspaceDialogProps> = ({
                 notes: form.notes.trim(),
             });
             onOpenChange(false);
-        } catch (err: any) {
-            setError(err.message || (lang === 'vi' ? 'Không thể lưu workspace ERD' : 'Failed to save ERD workspace'));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : (lang === 'vi' ? 'Không thể lưu workspace ERD' : 'Failed to save ERD workspace'));
         } finally {
             setIsSaving(false);
         }

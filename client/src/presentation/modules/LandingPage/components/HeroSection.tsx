@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, ArrowRight, Hexagon } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 
 interface HeroSectionProps {
     lang: string;
@@ -23,12 +23,12 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
         }
     };
 
-    const itemVariants = {
+    const itemVariants: Variants = {
         hidden: { y: 20, opacity: 0 },
         visible: {
             y: 0,
             opacity: 1,
-            transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] as any }
+            transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] as const }
         }
     };
 

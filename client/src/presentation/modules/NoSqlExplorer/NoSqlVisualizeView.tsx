@@ -6,10 +6,20 @@ import {
 import { BarChart3, PieChart as PieIcon, LineChart as LineIcon, Settings2, Sparkles } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/presentation/components/ui/select";
+import type { RowData } from '@/core/domain/entities';
 
 interface NoSqlVisualizeViewProps {
-    data: any[];
+    data: RowData[];
 }
+
+const toFiniteNumber = (value: unknown) => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (typeof value === 'string') {
+        const parsed = Number.parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+};
 
 export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) => {
     const [chartType, setChartType] = useState<'bar' | 'pie' | 'line'>('bar');
@@ -30,7 +40,7 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
         keys.forEach(key => {
             if (key === '_id') return;
             const values = sampleDocs.map(d => d[key]);
-            const isNumerical = values.every(v => typeof v === 'number' || (!isNaN(parseFloat(v)) && isFinite(v)));
+            const isNumerical = values.every(v => typeof v === 'number' || (typeof v === 'string' && Number.isFinite(Number.parseFloat(v))));
             
             if (isNumerical) {
                 num.push(key);
@@ -55,7 +65,7 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
 
         const chartData = data.slice(0, 50).map(d => ({
             ...d,
-            [yAxis]: typeof d[yAxis] === 'number' ? d[yAxis] : parseFloat(d[yAxis]) || 0
+            [yAxis]: toFiniteNumber(d[yAxis])
         }));
 
         switch (chartType) {

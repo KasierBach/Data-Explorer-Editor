@@ -80,7 +80,17 @@ export function useErdWorkspace({
 
         await queryClient.invalidateQueries({ queryKey: ['erd-workspaces', connectionId] });
         toast.success(lang === 'vi' ? 'Đã lưu workspace ERD' : 'ERD workspace saved');
-    }, [buildWorkspaceLayout, connectionId, currentWorkspaceId, lang, queryClient, selectedDatabase]);
+    }, [
+        buildWorkspaceLayout,
+        connectionId,
+        currentWorkspaceId,
+        lang,
+        queryClient,
+        selectedDatabase,
+        setCurrentWorkspaceId,
+        setCurrentWorkspaceName,
+        setCurrentWorkspaceNotes,
+    ]);
 
     const loadWorkspace = useCallback(async (workspace: ErdWorkspaceEntity) => {
         if (workspace.database !== selectedDatabase) {
@@ -92,7 +102,15 @@ export function useErdWorkspace({
         setCurrentWorkspaceName(workspace.name);
         setCurrentWorkspaceNotes(workspace.notes || '');
         toast.success(lang === 'vi' ? 'Đã mở workspace ERD' : 'ERD workspace loaded');
-    }, [applyWorkspaceLayout, handleSetSelectedDatabase, lang, selectedDatabase]);
+    }, [
+        applyWorkspaceLayout,
+        handleSetSelectedDatabase,
+        lang,
+        selectedDatabase,
+        setCurrentWorkspaceId,
+        setCurrentWorkspaceName,
+        setCurrentWorkspaceNotes,
+    ]);
 
     const deleteWorkspace = useCallback(async (workspace: ErdWorkspaceEntity) => {
         await ErdWorkspaceService.deleteWorkspace(workspace.id);
@@ -103,7 +121,15 @@ export function useErdWorkspace({
         }
         await queryClient.invalidateQueries({ queryKey: ['erd-workspaces', connectionId] });
         toast.success(lang === 'vi' ? 'Đã xóa workspace ERD' : 'ERD workspace deleted');
-    }, [connectionId, currentWorkspaceId, lang, queryClient]);
+    }, [
+        connectionId,
+        currentWorkspaceId,
+        lang,
+        queryClient,
+        setCurrentWorkspaceId,
+        setCurrentWorkspaceName,
+        setCurrentWorkspaceNotes,
+    ]);
 
     return {
         handleWorkspaceListError,

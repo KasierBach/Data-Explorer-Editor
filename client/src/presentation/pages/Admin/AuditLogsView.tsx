@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { adminService } from '@/core/services/AdminService';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { adminService, type AuditLogEntry } from '@/core/services/AdminService';
 import { useAppStore } from '@/core/services/store';
 import {
     Activity, Database, Eye, Info, MessageSquare, Search, Settings, Shield, Users,
@@ -16,7 +16,7 @@ import {
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
 
-function getLogUserName(log: any) {
+function getLogUserName(log: AuditLogEntry) {
     if (!log.user) return '';
 
     const name = [log.user.firstName, log.user.lastName].filter(Boolean).join(' ').trim();
@@ -26,13 +26,13 @@ function getLogUserName(log: any) {
 export function AuditLogsView() {
     const { lang } = useAppStore();
     const { isCompactMobileLayout } = useResponsiveLayoutMode();
-    const [logs, setLogs] = useState<any[]>([]);
+    const [logs, setLogs] = useState<AuditLogEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<'all' | 'AUTH' | 'DB' | 'TEAM' | 'USER' | 'SYSTEM'>('all');
-    const [selectedLog, setSelectedLog] = useState<any>(null);
+    const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
 
-    const fetchLogs = async () => {
+    const fetchLogs = useCallback(async () => {
         try {
             setLoading(true);
             const data = await adminService.getAuditLogs(200);
@@ -42,11 +42,11 @@ export function AuditLogsView() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchLogs();
-    }, []);
+    }, [fetchLogs]);
 
     const getLogMetadata = (action: string) => {
         if (action.startsWith('AUTH:')) return { color: 'text-blue-500', bg: 'bg-blue-500/10', icon: Shield, label: lang === 'vi' ? 'Bao mat' : 'Security' };

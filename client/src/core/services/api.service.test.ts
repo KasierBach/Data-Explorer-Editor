@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiService } from './api.service';
 import { useAppStore } from './store';
+import type { AppState } from './store';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
+
+const mockStoreState = (state: Partial<AppState>) => {
+  vi.spyOn(useAppStore, 'getState').mockReturnValue(state as AppState);
+};
 
 describe('ApiService', () => {
   beforeEach(() => {
@@ -11,9 +16,9 @@ describe('ApiService', () => {
   });
 
   it('should inject Authorization header when token exists', async () => {
-    vi.spyOn(useAppStore, 'getState').mockReturnValue({
+    mockStoreState({
       accessToken: 'fake-token',
-    } as any);
+    });
 
     mockFetch.mockResolvedValue({
       ok: true,
@@ -36,10 +41,10 @@ describe('ApiService', () => {
 
   it('should attempt refresh on 401 and then call logout if refresh fails', async () => {
     const logoutMock = vi.fn();
-    vi.spyOn(useAppStore, 'getState').mockReturnValue({
+    mockStoreState({
       accessToken: 'expired-token',
       logout: logoutMock,
-    } as any);
+    });
 
     mockFetch
       .mockResolvedValueOnce({
@@ -68,10 +73,10 @@ describe('ApiService', () => {
   });
 
   it('should expose structured error fields for auth flows', async () => {
-    vi.spyOn(useAppStore, 'getState').mockReturnValue({
+    mockStoreState({
       accessToken: null,
       logout: vi.fn(),
-    } as any);
+    });
 
     mockFetch.mockResolvedValueOnce({
       ok: false,

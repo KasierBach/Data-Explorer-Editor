@@ -21,6 +21,10 @@ export type AppState = UISlice &
     QuerySlice &
     NoSqlSlice;
 
+type PersistedStoreState = Partial<AppState> & {
+    aiChats?: Array<AiChat & { messages?: AiMessage[] }>;
+};
+
 export const useAppStore = create<AppState>()(
     persist(
         (set, get, api) => ({
@@ -37,7 +41,7 @@ export const useAppStore = create<AppState>()(
             storage: createJSONStorage(() => localStorage),
             // Sanitize persisted state on rehydration to fix corrupt data
             merge: (persistedState, currentState) => {
-                const persisted = (persistedState as Record<string, any>) || {};
+                const persisted = (persistedState as PersistedStoreState) || {};
                 // Fix: expandedNodes may have been saved as {} instead of []
                 if (persisted.expandedNodes && !Array.isArray(persisted.expandedNodes)) {
                     persisted.expandedNodes = [];
@@ -48,7 +52,7 @@ export const useAppStore = create<AppState>()(
                 delete persisted.tokenExp;
                 delete persisted.user;
                 if (Array.isArray(persisted.aiChats)) {
-                    persisted.aiChats = persisted.aiChats.map((chat: Record<string, any>) => ({
+                    persisted.aiChats = persisted.aiChats.map((chat) => ({
                         ...chat,
                         messages: [],
                     }));

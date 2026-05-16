@@ -24,15 +24,15 @@ export const NoSqlSidebar: React.FC = () => {
     const [databaseToDelete, setDatabaseToDelete] = useState<string | null>(null);
     const queryClient = useQueryClient();
 
-    const handleRefresh = async () => {
+    const handleRefresh = React.useCallback(async () => {
         const t = toast.loading(lang === 'vi' ? 'Đang làm mới dữ liệu...' : 'Refreshing hierarchy...');
         await queryClient.resetQueries({ queryKey: ['hierarchy'] });
         toast.success(lang === 'vi' ? 'Đã cập nhật' : 'Refreshed', { id: t });
-    };
+    }, [lang, queryClient]);
 
     const nosqlActiveConnectionId = useAppStore(state => state.nosqlActiveConnectionId);
     const nosqlActiveDatabase = useAppStore(state => state.nosqlActiveDatabase);
-    const activeConnection = useAppStore(state => state.connections.find((c: any) => c.id === nosqlActiveConnectionId));
+    const activeConnection = useAppStore(state => state.connections.find((c) => c.id === nosqlActiveConnectionId));
     const nosqlEffectiveDatabase = activeConnection?.database || nosqlActiveDatabase;
 
     React.useEffect(() => {
@@ -48,7 +48,7 @@ export const NoSqlSidebar: React.FC = () => {
 
         window.addEventListener('tree-node-action', handleTreeAction as EventListener);
         return () => window.removeEventListener('tree-node-action', handleTreeAction as EventListener);
-    }, [nosqlActiveConnectionId]);
+    }, [handleRefresh, nosqlActiveConnectionId]);
 
     // Sync active connection with backend when nosqlActiveConnectionId changes
     React.useEffect(() => {

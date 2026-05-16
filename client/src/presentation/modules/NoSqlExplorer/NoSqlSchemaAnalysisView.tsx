@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { SearchCode, Info, Activity, Database, CheckCircle2, RefreshCw, Loader2, Zap } from 'lucide-react';
 import { Badge } from '@/presentation/components/ui/badge';
 import { Button } from '@/presentation/components/ui/button';
@@ -10,7 +10,7 @@ interface FieldStat {
     types: Record<string, number>;
     count: number;
     probability: number;
-    sampleValues: any[];
+    sampleValues: unknown[];
 }
 
 export const NoSqlSchemaAnalysisView: React.FC = () => {
@@ -25,7 +25,7 @@ export const NoSqlSchemaAnalysisView: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isCached, setIsCached] = useState(false);
 
-    const analyzeSchema = async (forceRefresh = false) => {
+    const analyzeSchema = useCallback(async (forceRefresh = false) => {
         if (!nosqlActiveConnectionId || !nosqlActiveCollection) return;
         
         setIsLoading(true);
@@ -46,12 +46,12 @@ export const NoSqlSchemaAnalysisView: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [activeDatabase, nosqlActiveCollection, nosqlActiveConnectionId, setNosqlSchemaStats]);
 
     useEffect(() => {
         // Initial load from backend (will be fast if cached in Redis)
         analyzeSchema();
-    }, [nosqlActiveConnectionId, nosqlActiveCollection, activeDatabase]);
+    }, [analyzeSchema]);
 
     if (isLoading && stats.length === 0) {
         return (
@@ -188,4 +188,4 @@ export const NoSqlSchemaAnalysisView: React.FC = () => {
     );
 };
 
-const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');
+const cn = (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');

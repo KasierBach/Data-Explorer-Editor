@@ -1,10 +1,18 @@
 import { apiService } from './api.service';
 import { useAppStore } from './store';
+import type { AuthUser } from './store/slices/authSlice';
+
+export interface OnboardingPayload {
+    username: string;
+    jobRole: string;
+    phoneNumber?: string | null;
+    address?: string | null;
+}
 
 export interface AuthResponse {
     access_token?: string;
     accessTokenExpiresAt?: number;
-    user?: any;
+    user?: AuthUser;
     unverified?: boolean;
     email?: string;
     message?: string;
@@ -62,11 +70,11 @@ export class AuthService {
         return await apiService.post<{ message: string }>('/auth/reset-password', params, {}, false);
     }
 
-    static async getMe(token?: string): Promise<any> {
-        return await apiService.get<any>('/users/me', token ? { Authorization: `Bearer ${token}` } : {});
+    static async getMe(token?: string): Promise<AuthUser> {
+        return await apiService.get<AuthUser>('/users/me', token ? { Authorization: `Bearer ${token}` } : {});
     }
 
-    static async onboard(formData: any, token?: string): Promise<any> {
-        return await apiService.patch<any>('/users/profile/onboarding', formData, token ? { Authorization: `Bearer ${token}` } : {});
+    static async onboard(formData: OnboardingPayload, token?: string): Promise<AuthUser> {
+        return await apiService.patch<AuthUser>('/users/profile/onboarding', formData, token ? { Authorization: `Bearer ${token}` } : {});
     }
 }

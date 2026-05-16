@@ -6,7 +6,20 @@ interface Props {
     engine: 'postgres' | 'mysql' | 'mssql' | 'mongodb';
 }
 
-const ENGINE_CONFIG: Record<string, any> = {
+interface EngineConfig {
+    name: string;
+    port: string;
+    icon: string;
+    uriScheme: string;
+    uriExample: string;
+    dockerImage: string;
+    dockerEnv: string[];
+    features: Record<Props['lang'], string[]>;
+    sslNote: Record<Props['lang'], string>;
+    introspectQuery: string;
+}
+
+const ENGINE_CONFIG: Record<Props['engine'], EngineConfig> = {
     postgres: {
         name: 'PostgreSQL',
         port: '5432',

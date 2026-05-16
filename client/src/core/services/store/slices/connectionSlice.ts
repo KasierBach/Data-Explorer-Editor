@@ -44,7 +44,7 @@ export const createConnectionSlice: StateCreator<ConnectionSlice> = (set) => ({
     isConnectionDialogOpen: false,
     openConnectionDialog: () => set({ isConnectionDialogOpen: true }),
     closeConnectionDialog: () => set({ isConnectionDialogOpen: false }),
-    setActiveConnectionId: (id) => set({ activeConnectionId: id, activeDatabase: null } as any),
+    setActiveConnectionId: (id) => set({ activeConnectionId: id, activeDatabase: null }),
     setActiveDatabase: (db) => set({ activeDatabase: db }),
     addConnection: (connection) => set((state) => ({
         connections: [...state.connections, connection],

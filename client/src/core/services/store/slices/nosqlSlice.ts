@@ -1,9 +1,25 @@
 import type { StateCreator } from 'zustand';
+import type { RowData } from '@/core/domain/entities';
 
 export interface NoSqlFilterState {
     action: string;
     filter: string;
     options: string;
+}
+
+export interface NoSqlPipelineStage {
+    id: string;
+    type: string;
+    value: string;
+    enabled: boolean;
+}
+
+export interface NoSqlSchemaFieldStat {
+    name: string;
+    types: Record<string, number>;
+    count: number;
+    probability: number;
+    sampleValues: unknown[];
 }
 
 export interface NoSqlSlice {
@@ -13,19 +29,19 @@ export interface NoSqlSlice {
     nosqlViewMode: 'tree' | 'grid' | 'charts' | 'schema' | 'aggregation';
     nosqlFilter: NoSqlFilterState;
     nosqlMqlQuery: string;
-    nosqlResult: any | null;
+    nosqlResult: RowData[] | null;
     nosqlIsQueryRunning: boolean;
-    nosqlPipelineStages: Array<{ id: string, type: string, value: string, enabled: boolean }>;
-    nosqlSchemaStats: any | null;
+    nosqlPipelineStages: NoSqlPipelineStage[];
+    nosqlSchemaStats: NoSqlSchemaFieldStat[] | null;
     setNosqlActiveConnectionId: (id: string | null) => void;
     setNosqlDatabase: (db: string | null) => void;
     setNosqlCollection: (col: string | null) => void;
     setNosqlViewMode: (mode: 'tree' | 'grid' | 'charts' | 'schema' | 'aggregation') => void;
-    setNosqlPipelineStages: (stages: Array<{ id: string, type: string, value: string, enabled: boolean }>) => void;
-    setNosqlSchemaStats: (stats: any) => void;
+    setNosqlPipelineStages: (stages: NoSqlPipelineStage[]) => void;
+    setNosqlSchemaStats: (stats: NoSqlSchemaFieldStat[] | null) => void;
     setNosqlFilter: (filter: Partial<NoSqlFilterState>) => void;
     setNosqlMqlQuery: (query: string) => void;
-    setNosqlResult: (result: any) => void;
+    setNosqlResult: (result: RowData[] | null) => void;
     setNosqlQueryRunning: (isRunning: boolean) => void;
 }
 
