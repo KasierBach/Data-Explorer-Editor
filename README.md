@@ -12,9 +12,11 @@
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![Framer_Motion](https://img.shields.io/badge/Framer_Motion-12-0055FF?logo=framer&logoColor=white)](https://www.framer.com/motion/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](#license)
-[![Version](https://img.shields.io/badge/Version-3.5.0-blue.svg)](https://github.com/KasierBach/Data-Explorer-Editor/releases)
+[![Version](https://img.shields.io/badge/Version-3.6.0-blue.svg)](https://github.com/KasierBach/Data-Explorer-Editor/releases)
 
 **Data Explorer** is a high-fidelity, high-performance database management and visualization IDE. It provides a unified, intelligent interface for developers and data engineers to explore, query, and visualize multi-engine databases, all supercharged by a context-aware AI.
+
+Current release focus: **v3.6.0** tightens AI provider routing, connection safety, responsive desktop/mobile chrome, server-side lint quality, and database-tool workflows across SQL, NoSQL, ERD, migration, and team collaboration surfaces.
 
 ---
 
@@ -24,8 +26,9 @@
 - **Context-Aware SQL Generation**: Describe complex data needs in natural language and the AI generates SQL based on your live schema and foreign key relationships.
 - **Vision Integration**: Upload screenshots of DB diagrams or whiteboards for AI-assisted schema reconstruction and query help.
 - **Global Assistant Panel**: A resizable, toggleable sidebar available across major modules with SSE-based streaming responses.
-- **Provider-Aware Routing**: Gemini remains the premium lane, while Cerebras and OpenRouter can be configured as lower-cost or fallback lanes.
-- **Intelligent Model Fallback**: The AI layer can iterate through providers and models when a requested lane fails, helping keep generation more resilient.
+- **Provider-Aware Routing**: Gemini remains the premium lane, while Cerebras and OpenRouter can be configured as lower-cost, fast, or fallback lanes.
+- **Dedicated AI Services**: Prompt building, schema context assembly, provider execution, connection context, and routing are separated into focused services for easier testing and safer future changes.
+- **Intelligent Model Fallback**: The AI layer can iterate through providers and models when a requested lane fails, helping keep generation more resilient without hanging the backend.
 - **Surgical Precision Autocomplete**: Inline AI suggestions prioritize exact SQL syntax completion without unnecessary explanations.
 - **Chain Tabbing**: Accept multi-line AI suggestions incrementally with the `Tab` key for fast editing flow.
 - **Chat Persistence**: Conversation history is stored in app state for continuity across sessions.
@@ -89,6 +92,8 @@
   - Touch-friendly controls
   - Overlay navigation for constrained screens
   - Horizontal tab management for dense workflows
+- **Desktop Mode on Mobile**: Mobile browsers can switch into a denser desktop-style layout when users need the full database IDE surface.
+- **Centered Desktop Navigation**: The top navbar keeps the primary workspace switcher visually balanced while preserving the right-side user, theme, AI, timer, settings, and team controls.
 - **High-Density Desktop Mode**: Designed for productivity with compact, information-rich layouts.
 - **Modern UI System**: Uses Radix UI, Tailwind, motion, and a componentized feature-driven structure.
 - **Standardized API Communication**: Consistent response shapes keep frontend handling predictable.
@@ -115,7 +120,7 @@
 |---|---|
 | **Architecture** | NestJS |
 | **ORM / Persistence** | Prisma |
-| **AI Engine** | Google Generative AI (Gemini API), SSE Streaming |
+| **AI Engine** | Google Generative AI (Gemini API), Cerebras/OpenRouter-compatible routing, SSE Streaming |
 | **Engines Support** | `pg`, `mysql2`, `mssql`, `mongodb`, `@clickhouse/client` |
 | **Security** | JWT, Passport.js, AES-256-GCM encryption |
 | **Infrastructure** | Redis, BullMQ for background jobs, Search indexing |
@@ -123,6 +128,19 @@
 ---
 
 ## Project Architecture and Structure
+
+### Current Architecture Notes
+- **Frontend layering**: `core` keeps shared app/domain state, `infrastructure` keeps bootstrapping/plumbing, and `presentation` owns UI composition by feature module.
+- **Backend layering**: NestJS modules separate auth, permissions, connection persistence, query execution, AI, metadata, migrations, teamspaces, notifications, and Redis-backed infrastructure.
+- **AI layering**: Prompt building, schema context, routing, provider execution, and connection context are split so provider changes do not leak into UI or query services.
+- **Database strategy pattern**: Engine-specific SQL/NoSQL behavior lives behind database strategy implementations, keeping query services and controllers cleaner.
+- **Responsive shell**: `Layout` owns AppShell, NoSQL shell, navbar, profile dialog, compact mobile chrome, and desktop-mode-on-mobile behavior.
+
+### Code Intelligence and Review Workflow
+- **GitNexus indexed workspace**: The repository is indexed as `Data-Explorer-Workspace` with symbol, relationship, and execution-flow awareness for safer navigation and refactoring.
+- **Impact-first changes**: Before changing an important function, class, or method, run GitNexus impact analysis to understand direct callers, affected flows, and blast radius.
+- **Pre-commit scope check**: Use GitNexus change detection before committing so the changed symbols and execution flows match the intended patch.
+- **AI-assisted review option**: CodeRabbit can be used for an additional review pass on larger PRs, especially for regressions, maintainability, and security notes.
 
 ```bash
 Data Explorer/
@@ -153,19 +171,33 @@ Data Explorer/
 │       ├── audit/                         # Audit logging and audit history APIs
 │       ├── auth/                          # JWT auth, OAuth, token exchange, guards, roles
 │       ├── collaboration/                 # Shared workspace state and team collaboration logic
+│       ├── common/                        # Shared backend primitives and cross-cutting helpers
 │       ├── connections/                   # Saved connection lifecycle and persistence
+│       ├── dashboards/                    # Dashboard APIs and dashboard persistence
 │       ├── database-strategies/           # Per-engine query/metadata/export strategy implementations
+│       ├── erd-workspaces/                # Persisted ERD workspace state and diagram APIs
+│       ├── mail/                          # Mail delivery and notification email helpers
 │       ├── metadata/                      # Metadata freshness tracking and schema analysis
 │       ├── migration/                     # Cross-database migration orchestration and progress streaming
+│       ├── nosql/                         # MongoDB/NoSQL workspace APIs and collection operations
 │       ├── notifications/                 # SSE notification streaming and Redis pub/sub
 │       ├── organizations/                 # Org-level management and enterprise backups
+│       ├── otp/                           # One-time passcode flows for authentication/security
+│       ├── permissions/                   # Permission checks and access-control helpers
 │       ├── presence/                      # Real-time team presence tracking (Redis-backed)
+│       ├── prisma/                        # Prisma service and database access integration
 │       ├── query/                         # Query execution, DML helpers, and result APIs
+│       ├── redis/                         # Redis module, clients, and shared Redis utilities
+│       ├── saved-queries/                 # Saved query APIs and persistence
 │       ├── search/                        # Redis-backed search and metadata indexing
+│       ├── seed/                          # Seed/dev data helpers
 │       ├── teamspaces/                    # Dynamic team workspace and permission management
+│       ├── tests/                         # Server-side strategy and service test coverage
 │       ├── users/                         # User profile, settings, roles, billing, onboarding
 │       ├── version-history/               # Entity version control and schema change tracking
 │       └── utils/                         # Encryption, SQL guards, and backend utility helpers
+├── docs/                                  # Local documentation and generated knowledge assets
+├── plans/                                 # Implementation plans and review notes
 ├── docker-compose.yml                     # Local container orchestration for db + backend + frontend
 ├── package.json                           # Root dev scripts for running client and server together
 ├── .env.example                           # Root Docker-friendly example values
@@ -188,6 +220,8 @@ Data Explorer/
 - **Explain and Analyze**: Use the explain action to inspect query plans directly in the results panel.
 - **Saved Queries and History**: Save reusable queries and reopen recent executions quickly.
 - **Query Guardrails**: Read-only and restricted connections are enforced at both UI and server levels.
+- **Balanced IDE Chrome**: The desktop navbar centers the SQL/NoSQL workspace switcher while preserving enough space for teams, theme controls, AI, timer, settings, and profile actions.
+- **Mobile/Desktop Toggle**: On mobile browsers, users can stay in compact mode or enable desktop-style mode when they need the full query/editor surface.
 
 ### 3. Team Collaboration
 - **Invite and Manage Members**: Create teams, invite members by email, and assign roles.
@@ -198,6 +232,8 @@ Data Explorer/
 ### 4. Using the AI Assistant
 - **Contextual Knowledge**: The assistant is aware of your active connection, schema context, and current workspace state.
 - **Vision Features**: Drop in screenshots or reference material for AI-assisted schema and SQL help.
+- **Routing Modes**: Use premium Gemini for harder work, with optional Cerebras/OpenRouter lanes for cheaper, faster, or fallback chat flows.
+- **Operational Safety**: Provider requests include timeout and stream-idle limits so failed or slow model lanes do not block the app indefinitely.
 - **Prompt Engineering**: Ask practical questions like:
   - `"Summarize the relationship between orders and customers"`
   - `"Find the top 5 customers with high churn risk based on transaction volume"`
@@ -311,6 +347,23 @@ Note:
    ```bash
    npm run dev
    ```
+
+### Root Convenience Scripts
+
+From the repository root:
+
+```bash
+npm run dev      # Start server and client together
+npm run server   # Start only the NestJS backend in watch mode
+npm run client   # Start only the Vite client with host binding
+```
+
+From each workspace:
+
+```bash
+cd client && npm run lint && npm run build
+cd server && npm run lint && npm run build
+```
 
 ---
 
