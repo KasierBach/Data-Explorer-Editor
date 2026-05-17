@@ -35,17 +35,14 @@ export const Navbar: React.FC = () => {
     };
 
     return (
-        <div className={cn(
-            "h-14 border-b items-center px-4 bg-background/95 backdrop-blur-md select-none shrink-0 sticky top-0 z-[60] w-full",
-            isNoSqlRoute ? "grid grid-cols-[0.8fr_auto_1.2fr]" : "grid grid-cols-[1fr_auto_1fr]"
-        )}>
+        <div className="relative h-14 border-b flex items-center px-4 bg-background/95 backdrop-blur-md select-none shrink-0 sticky top-0 z-[60] w-full">
             <ProfileDialog
                 isOpen={isProfileOpen}
                 onClose={() => setIsProfileOpen(false)}
                 initialTab={activeProfileTab}
             />
 
-            <div className="flex items-center gap-4 min-w-0">
+            <div className="absolute left-4 top-1/2 z-10 flex -translate-y-1/2 items-center gap-4 min-w-0">
                 <div className="flex items-center gap-2 shrink-0">
                     {useCompactChrome && (
                         <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setSidebarOpen(!isSidebarOpen)}>
@@ -56,7 +53,13 @@ export const Navbar: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex items-center justify-center gap-1 md:gap-2 px-2 md:px-6 min-w-0">
+            <div
+                className={cn(
+                    "absolute top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-1 md:gap-2 px-2 md:px-6 min-w-0",
+                    useCompactChrome ? "max-w-[calc(100vw-9rem)]" : "max-w-[calc(100vw-42rem)]"
+                )}
+                style={{ left: useCompactChrome ? '50%' : 'calc(50% - 5.75rem)' }}
+            >
                 {!useCompactChrome && (
                     <div className="flex items-center border-r border-border/30 pr-2">
                         <NavMainActions
@@ -119,7 +122,7 @@ export const Navbar: React.FC = () => {
                 )}
             </div>
 
-            <div className="flex items-center justify-end gap-3 min-w-0">
+            <div className="absolute right-4 top-1/2 z-30 flex -translate-y-1/2 items-center justify-end gap-3 min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
                     {!useCompactChrome && <div className="h-4 w-px bg-border mx-1" />}
                     <Button
