@@ -79,6 +79,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     });
     const isFirstLoad = useRef(true);
     const lastHandledRunRequestRef = useRef<number | null>(null);
+    const lastExternalSqlRef = useRef(externalSql);
     const lastSuccessHistoryAtRef = useRef(0);
     const lastErrorHistoryAtRef = useRef(0);
     const editorRef = useRef<SqlEditorHandle | null>(null);
@@ -124,10 +125,13 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     }, [query, limit, tabId, updateTabMetadata]);
 
     useEffect(() => {
-        if (typeof externalSql === 'string' && externalSql !== query) {
-            setQuery(externalSql);
+        if (typeof externalSql !== 'string' || lastExternalSqlRef.current === externalSql) {
+            return;
         }
-    }, [externalSql, query]);
+
+        lastExternalSqlRef.current = externalSql;
+        setQuery(externalSql);
+    }, [externalSql]);
 
     useEffect(() => {
         if (!externalRunRequest || lastHandledRunRequestRef.current === externalRunRequest) {
