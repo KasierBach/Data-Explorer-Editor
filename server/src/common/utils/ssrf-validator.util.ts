@@ -2,7 +2,10 @@ import * as dns from 'dns';
 import * as net from 'net';
 import { promisify } from 'util';
 
-const lookup = promisify(dns.lookup);
+const lookupAll = promisify(dns.lookup) as unknown as (
+  hostname: string,
+  options: dns.LookupAllOptions,
+) => Promise<dns.LookupAddress[]>;
 const resolveSrv = promisify(dns.resolveSrv);
 
 function isDevelopment() {
@@ -30,6 +33,20 @@ async function isSafeResolvedAddress(address: string): Promise<boolean> {
   return !isPrivateIp(address);
 }
 
+async function areAllResolvedAddressesSafe(
+  addresses: dns.LookupAddress[],
+): Promise<boolean> {
+  if (!addresses.length) return false;
+
+  for (const result of addresses) {
+    if (!(await isSafeResolvedAddress(result.address))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 async function validateMongoSrvHost(host: string): Promise<boolean> {
   const records = await resolveSrv(`_mongodb._tcp.${host}`);
   if (!records.length) {
@@ -38,9 +55,9 @@ async function validateMongoSrvHost(host: string): Promise<boolean> {
 
   for (const record of records) {
     const targetHost = normalizeHost(record.name);
-    const result = await lookup(targetHost);
+    const results = await lookupAll(targetHost, { all: true });
 
-    if (!(await isSafeResolvedAddress(result.address))) {
+    if (!(await areAllResolvedAddressesSafe(results))) {
       return false;
     }
   }
@@ -120,9 +137,9 @@ export async function validateHost(host: string): Promise<boolean> {
       return !isPrivateIp(normalizedHost);
     }
 
-    // Resolve domain to IP (prevents DNS Rebinding if checked before connection)
-    const result = await lookup(normalizedHost);
-    return isSafeResolvedAddress(result.address);
+    // Resolve every address so one safe A/AAAA record cannot hide a private one.
+    const results = await lookupAll(normalizedHost, { all: true });
+    return areAllResolvedAddressesSafe(results);
   } catch {
     try {
       return await validateMongoSrvHost(normalizedHost);

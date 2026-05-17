@@ -555,14 +555,16 @@ export class AiProviderRunnerService {
     let fullText = '';
     try {
       let doneStream = false;
+      let lineBuffer = '';
       while (!doneStream) {
         const { done, value } = await this.readWithTimeout(
           reader,
           `${provider} stream chunk`,
         );
         if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        lineBuffer += decoder.decode(value, { stream: true });
+        const lines = lineBuffer.split(/\r?\n/);
+        lineBuffer = lines.pop() || '';
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const data = line.slice(6).trim();
@@ -570,6 +572,25 @@ export class AiProviderRunnerService {
               doneStream = true;
               break;
             }
+            try {
+              const parsed = JSON.parse(data);
+              const text = parsed.choices?.[0]?.delta?.content || '';
+              if (text) {
+                fullText += text;
+                yield { type: 'chunk', text };
+              }
+            } catch {
+              /* skip invalid JSON */
+            }
+          }
+        }
+      }
+      lineBuffer += decoder.decode();
+      if (lineBuffer && !doneStream) {
+        const line = lineBuffer.trimEnd();
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data !== '[DONE]') {
             try {
               const parsed = JSON.parse(data);
               const text = parsed.choices?.[0]?.delta?.content || '';

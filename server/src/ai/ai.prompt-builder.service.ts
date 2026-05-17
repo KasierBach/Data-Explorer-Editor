@@ -164,16 +164,12 @@ ${responseFormat}`;
     message: string;
     sql?: string;
     explanation?: string;
-    thought?: string;
     recommendations?: AiRecommendation[];
   } {
     try {
-      // 1. Try to extract reasoning/thought from tags if exists (common in modern reasoning models)
-      const thoughtMatch = fullText.match(/<thought>([\s\S]*?)<\/thought>/);
-      const thoughtFromTags = thoughtMatch ? thoughtMatch[1].trim() : undefined;
-      const remainingText = thoughtMatch
-        ? fullText.replace(thoughtMatch[0], '').trim()
-        : fullText;
+      const remainingText = fullText
+        .replace(/<thought>[\s\S]*?(?:<\/thought>|$)/gi, '')
+        .trim();
 
       let cleanJsonStr = remainingText;
       const matchIndex = remainingText.indexOf('{');
@@ -200,11 +196,14 @@ ${responseFormat}`;
         message: parsed.message || (matchIndex !== -1 ? '' : remainingText),
         sql: parsed.sql || undefined,
         explanation: parsed.explanation || undefined,
-        thought: parsed.thought || thoughtFromTags, // Prioritize JSON, fallback to tags
         recommendations: this.normalizeRecommendations(parsed.recommendations),
       };
     } catch {
-      return { message: fullText };
+      return {
+        message: fullText
+          .replace(/<thought>[\s\S]*?(?:<\/thought>|$)/gi, '')
+          .trim(),
+      };
     }
   }
 

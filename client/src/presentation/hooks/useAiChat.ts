@@ -22,7 +22,6 @@ interface AiStreamDoneData {
     sql?: string;
     explanation?: string;
     recommendations?: AiMessage['recommendations'];
-    thought?: string;
     provider?: string;
     model?: string;
     routingMode?: string;
@@ -138,30 +137,11 @@ async function readExcelAsText(arrayBuffer: ArrayBuffer, fileName: string): Prom
     }
 }
 
-// Extract the "message" field content from partial JSON streaming output
-function parsePartialAiResponse(raw: string): { message: string, thought?: string } {
-    const result = { message: '', thought: undefined as string | undefined };
-    
-    // 1. Try <thought> tags (common in reasoning models)
-    const tagMatch = raw.match(/<thought>([\s\S]*?)(?:<\/thought>|$)/);
-    if (tagMatch) {
-        result.thought = tagMatch[1].trim();
-        // Remove the thought part to try parsing the rest as JSON if needed
-        const remaining = raw.replace(tagMatch[0], '').trim();
-        if (remaining.startsWith('{')) raw = remaining;
-    }
+// Extract only user-facing content from partial JSON streaming output.
+function parsePartialAiResponse(raw: string): { message: string } {
+    const result = { message: '' };
+    raw = raw.replace(/<thought>[\s\S]*?(?:<\/thought>|$)/gi, '').trim();
 
-    // 2. Try JSON "thought" field
-    const thoughtMatch = raw.match(/"thought"\s*:\s*"((?:[^"\\]|\\.)*)"?/s);
-    if (thoughtMatch) {
-        try {
-            result.thought = JSON.parse('"' + thoughtMatch[1] + '"');
-        } catch {
-            result.thought = thoughtMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
-        }
-    }
-
-    // 3. Try JSON "message" field
     const msgMatch = raw.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"?/s);
     if (msgMatch) {
         try {
@@ -169,12 +149,9 @@ function parsePartialAiResponse(raw: string): { message: string, thought?: strin
         } catch {
             result.message = msgMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
         }
-    } else if (!result.thought && raw.trim() && !raw.trim().startsWith('{')) {
+    } else if (raw.trim() && !raw.trim().startsWith('{')) {
         // Fallback for non-JSON or partial raw text
         result.message = raw;
-    } else if (raw.trim() && !raw.trim().startsWith('{')) {
-        // Handle text outside of tags or JSON
-        result.message = raw.replace(/<thought>[\s\S]*?(?:<\/thought>|$)/, '').trim();
     }
 
     return result;
@@ -325,7 +302,7 @@ export function useAiChat() {
     };
 
     const lastUpdateRef = useRef<number>(0);
-    const pendingUpdateRef = useRef<{ message: string, thought?: string } | null>(null);
+    const pendingUpdateRef = useRef<{ message: string } | null>(null);
 
     const removeAttachment = (index: number) => {
         setAttachments(prev => prev.filter((_, i) => i !== index));
@@ -348,7 +325,6 @@ export function useAiChat() {
                 if (now - lastUpdateRef.current > 40) { // 40ms = 25fps, very smooth but low CPU
                     updateAiMessage(chatId, aiMessageId, { 
                         content: parsed.message,
-                        thought: parsed.thought
                     });
                     lastUpdateRef.current = now;
                     pendingUpdateRef.current = null;
@@ -365,7 +341,6 @@ export function useAiChat() {
                     sql: event.data.sql || undefined,
                     explanation: event.data.explanation || undefined,
                     recommendations: event.data.recommendations || undefined,
-                    thought: event.data.thought || undefined,
                     modelInfo: {
                         provider: event.data.provider,
                         model: event.data.model,
@@ -379,7 +354,6 @@ export function useAiChat() {
                     sql: event.data.sql,
                     explanation: event.data.explanation,
                     recommendations: event.data.recommendations,
-                    thought: event.data.thought,
                     modelInfo: {
                         provider: event.data.provider,
                         model: event.data.model,
@@ -482,7 +456,6 @@ export function useAiChat() {
             if (pendingUpdateRef.current) {
                 updateAiMessage(chatId, aiMsgId, { 
                     content: pendingUpdateRef.current.message,
-                    thought: pendingUpdateRef.current.thought
                 });
             }
         } catch (error) {

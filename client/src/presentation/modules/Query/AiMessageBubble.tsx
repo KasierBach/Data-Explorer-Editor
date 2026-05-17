@@ -117,20 +117,6 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                         </div>
                     )}
 
-                    {msg.role === 'ai' && msg.thought && (
-                        <div className="mb-3">
-                            <details className="group/thought">
-                                <summary className="flex items-center gap-1 cursor-pointer select-none text-[10.5px] text-muted-foreground/60 font-medium list-none py-1 hover:text-muted-foreground/80 transition-colors [&::-webkit-details-marker]:hidden">
-                                    <ChevronDown className="w-3.5 h-3.5 group-open/thought:rotate-180 transition-transform duration-200" />
-                                    <span>Reasoning</span>
-                                </summary>
-                                <div className="ml-1.5 mt-1 pl-3 border-l-[1.5px] border-muted-foreground/20 text-[10.5px] text-muted-foreground/50 italic leading-relaxed">
-                                    {msg.thought}
-                                </div>
-                            </details>
-                        </div>
-                    )}
-
                     {isEditing ? (
                         <div className="flex flex-col gap-2 w-full">
                             <textarea

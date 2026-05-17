@@ -26,7 +26,7 @@ Current release focus: **v3.6.0** tightens AI provider routing, connection safet
 - **Context-Aware SQL Generation**: Describe complex data needs in natural language and the AI generates SQL based on your live schema and foreign key relationships.
 - **Vision Integration**: Upload screenshots of DB diagrams or whiteboards for AI-assisted schema reconstruction and query help.
 - **Global Assistant Panel**: A resizable, toggleable sidebar available across major modules with SSE-based streaming responses.
-- **Provider-Aware Routing**: Gemini remains the premium lane, while Cerebras and OpenRouter can be configured as lower-cost, fast, or fallback lanes.
+- **Provider-Aware Routing**: Gemini remains the premium lane, while Cerebras, OpenRouter, and Groq can be configured as lower-cost, fast, or fallback lanes.
 - **Dedicated AI Services**: Prompt building, schema context assembly, provider execution, connection context, and routing are separated into focused services for easier testing and safer future changes.
 - **Intelligent Model Fallback**: The AI layer can iterate through providers and models when a requested lane fails, helping keep generation more resilient without hanging the backend.
 - **Surgical Precision Autocomplete**: Inline AI suggestions prioritize exact SQL syntax completion without unnecessary explanations.
@@ -120,7 +120,7 @@ Current release focus: **v3.6.0** tightens AI provider routing, connection safet
 |---|---|
 | **Architecture** | NestJS |
 | **ORM / Persistence** | Prisma |
-| **AI Engine** | Google Generative AI (Gemini API), Cerebras/OpenRouter-compatible routing, SSE Streaming |
+| **AI Engine** | Google Generative AI (Gemini API), Cerebras/OpenRouter/Groq-compatible routing, SSE Streaming |
 | **Engines Support** | `pg`, `mysql2`, `mssql`, `mongodb`, `@clickhouse/client` |
 | **Security** | JWT, Passport.js, AES-256-GCM encryption |
 | **Infrastructure** | Redis, BullMQ for background jobs, Search indexing |
@@ -232,7 +232,7 @@ Data Explorer/
 ### 4. Using the AI Assistant
 - **Contextual Knowledge**: The assistant is aware of your active connection, schema context, and current workspace state.
 - **Vision Features**: Drop in screenshots or reference material for AI-assisted schema and SQL help.
-- **Routing Modes**: Use premium Gemini for harder work, with optional Cerebras/OpenRouter lanes for cheaper, faster, or fallback chat flows.
+- **Routing Modes**: Use premium Gemini for harder work, with optional Cerebras/OpenRouter/Groq lanes for cheaper, faster, or fallback chat flows.
 - **Operational Safety**: Provider requests include timeout and stream-idle limits so failed or slow model lanes do not block the app indefinitely.
 - **Prompt Engineering**: Ask practical questions like:
   - `"Summarize the relationship between orders and customers"`
@@ -386,6 +386,9 @@ The backend reads configuration from `server/.env`. The frontend reads `VITE_API
 | `OPENROUTER_API_KEY` | No | Optional fallback AI provider key used when you want more free/cheap routing options. |
 | `OPENROUTER_BASE_URL` | No | Base URL for OpenRouter. Default: `https://openrouter.ai/api/v1`. |
 | `OPENROUTER_CHAT_MODEL` | No | OpenRouter model slug to use in `Auto` / `Fast` mode. |
+| `GROQ_API_KEY` | No | Optional Groq key for low-latency OpenAI-compatible AI routing. |
+| `GROQ_BASE_URL` | No | Base URL for Groq. Default: `https://api.groq.com/openai/v1`. |
+| `GROQ_CHAT_MODEL` | No | Groq model slug used in `Auto` / `Fast` mode. Default: `meta-llama/llama-4-scout-17b-16e-instruct`. |
 | `JWT_SECRET` | Yes | Strong secret used to sign access tokens. Placeholder values are rejected. |
 | `REFRESH_TOKEN_SECRET` | No | Recommended separate secret for refresh-token cookies. If omitted, the app falls back to `JWT_SECRET`. |
 | `ENCRYPTION_KEY` | Yes | Exactly **32 characters**, used to encrypt saved database connection passwords. |

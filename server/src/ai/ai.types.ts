@@ -36,7 +36,6 @@ export interface ChatResult {
   message: string;
   sql?: string;
   explanation?: string;
-  thought?: string;
   recommendations?: AiRecommendation[];
   provider: AiProvider;
   model: string;

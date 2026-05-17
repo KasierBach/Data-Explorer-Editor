@@ -19,6 +19,8 @@ export function NoSqlShell() {
     const setSidebarWidth = useAppStore(state => state.setSidebarWidth);
     const isAiPanelOpen = useAppStore(state => state.isAiPanelOpen);
     const setAiPanelOpen = useAppStore(state => state.setAiPanelOpen);
+    const isResultPanelOpen = useAppStore(state => state.isResultPanelOpen);
+    const toggleResultPanel = useAppStore(state => state.toggleResultPanel);
     const isDesktopModeOnMobile = useAppStore(state => state.isDesktopModeOnMobile);
     const toggleDesktopModeOnMobile = useAppStore(state => state.toggleDesktopModeOnMobile);
     const lang = useAppStore(state => state.lang);
@@ -200,6 +202,8 @@ export function NoSqlShell() {
                     onToggleSidebar={handleToggleSidebar}
                     onToggleAi={handleToggleAiPanel}
                     onToggleDesktopMode={toggleDesktopModeOnMobile}
+                    onToggleResults={toggleResultPanel}
+                    resultsOpen={isResultPanelOpen}
                 />
             )}
 
