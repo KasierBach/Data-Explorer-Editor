@@ -33,6 +33,7 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/throttler": "^6.5.0",
+    "@prisma/adapter-pg": "^6.19.2",
     "@prisma/client": "^6.19.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/nodemailer": "^7.0.11",

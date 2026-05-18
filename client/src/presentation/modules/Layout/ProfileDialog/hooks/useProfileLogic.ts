@@ -13,12 +13,13 @@ export const useProfileLogic = (isOpen: boolean, initialTab?: string, onClose?: 
     const { isLoading: isProfileLoading, state: profileState, handleSaveProfile, handleUploadAvatar } = useUserProfile(isOpen);
     const { isLoading: isSettingsLoading, appearanceState, notificationsState, handleSaveSettings } = useUserSettings(isOpen);
     const { isLoading: isSecurityLoading, state: securityState, handleChangePassword, handleDeleteAccount } = useAccountSecurity(onClose);
-    const { isLoading: isBillingLoading, handleUpdateBilling } = useBilling();
+    const { isLoading: isBillingLoading, handleStartCheckout, handleRefreshBilling } = useBilling();
 
     const isLoading = isProfileLoading || isSettingsLoading || isSecurityLoading || isBillingLoading;
 
     useEffect(() => {
         if (!isOpen) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Dialog must resync when opened from a specific menu tab.
         setActiveTab(initialTab || 'profile');
     }, [isOpen, initialTab]);
 
@@ -37,7 +38,8 @@ export const useProfileLogic = (isOpen: boolean, initialTab?: string, onClose?: 
             handleSaveSettings,
             handleChangePassword,
             handleDeleteAccount,
-            handleUpdateBilling,
+            handleStartCheckout,
+            handleRefreshBilling,
             handleApiCall: apiService.request.bind(apiService) // For backward compatibility
         }
     };

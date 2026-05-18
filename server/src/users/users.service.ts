@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -46,6 +47,9 @@ export class UsersService {
         plan: true,
         billingDate: true,
         paymentMethod: true,
+        planExpiresAt: true,
+        subscriptionStatus: true,
+        paymentProvider: true,
       },
     });
     if (!user) throw new NotFoundException('User not found');
@@ -98,23 +102,11 @@ export class UsersService {
   }
 
   async updateBilling(userId: string, dto: UpdateBillingDto) {
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        plan: dto.plan,
-        paymentMethod: dto.paymentMethod,
-        billingDate:
-          dto.plan === 'pro'
-            ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-            : null,
-      },
-      select: {
-        id: true,
-        plan: true,
-        billingDate: true,
-        paymentMethod: true,
-      },
-    });
+    void userId;
+    void dto;
+    throw new BadRequestException(
+      'Use /billing/checkout to change billing plans',
+    );
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto) {

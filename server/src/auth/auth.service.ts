@@ -4,6 +4,7 @@ import {
   ConflictException,
   OnModuleInit,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 
@@ -36,6 +37,7 @@ import { AuditService, AuditAction } from '../audit/audit.service';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
+  private readonly logger = new Logger(AuthService.name);
   private readonly SALT_ROUNDS = 10;
   private readonly VERIFY_OTP_EXPIRY = 15;
   private readonly RESET_OTP_EXPIRY = 5;
@@ -149,12 +151,15 @@ export class AuthService implements OnModuleInit {
       const loginTime = new Date().toLocaleString('vi-VN', {
         timeZone: 'Asia/Ho_Chi_Minh',
       });
-      void this.mailService.sendSecurityAlertEmail(
-        user.email,
-        displayName,
-        clientIp,
-        loginTime,
-      );
+      void this.mailService
+        .sendSecurityAlertEmail(user.email, displayName, clientIp, loginTime)
+        .catch((error: unknown) => {
+          this.logger.warn(
+            `Security alert email failed for ${user.email}: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        });
     }
 
     await this.prisma.user.update({

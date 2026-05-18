@@ -3,6 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
+  engineType = "client"
 }
 
 datasource db {
@@ -93,10 +94,13 @@ model User {
   productUpdates     Boolean @default(false)
   securityAlerts      Boolean @default(true)
 
-  // Billing (Mock)
+  // Billing
   plan               String   @default("free") // "free", "pro"
   billingDate        DateTime?
-  paymentMethod      String?  // e.g., "Visa ending in 4242"
+  paymentMethod      String?
+  planExpiresAt      DateTime?
+  subscriptionStatus String   @default("inactive")
+  paymentProvider    String?
 
   // Onboarding Data (Progressive Profiling)
   isOnboarded Boolean  @default(false)
@@ -132,6 +136,47 @@ model User {
   versionHistories VersionHistory[]
   organizationMembers OrganizationMember[]
   createdTeamspaces Teamspace[]
+  payments Payment[]
+  billingSubscription BillingSubscription?
+}
+
+model BillingSubscription {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planCode      String
+  status        String   @default("inactive")
+  provider      String?
+  startsAt      DateTime?
+  expiresAt     DateTime?
+  lastPaymentId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, expiresAt])
+}
+
+model Payment {
+  id                    String   @id @default(uuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider              String
+  planCode              String
+  amountVnd             Int
+  displayAmountUsd      String
+  status                String   @default("pending")
+  providerOrderId       String   @unique
+  providerRequestId     String?
+  providerTransactionId String?
+  checkoutUrl           String?
+  rawPayload            Json?
+  paidAt                DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([provider, status])
 }
 
 model AiChat {

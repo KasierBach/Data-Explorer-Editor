@@ -31,6 +31,7 @@ const VisualizePage = lazy(() => import('@/presentation/pages/VisualizePage').th
 const AdminDashboardPage = lazy(() => import('@/presentation/pages/Admin/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })))
 const ChangelogPage = lazy(() => import('@/presentation/pages/ChangelogPage').then((m) => ({ default: m.ChangelogPage })))
 const TeamPage = lazy(() => import('@/presentation/pages/TeamPage').then((m) => ({ default: m.TeamPage })))
+const BillingReturnPage = lazy(() => import('@/presentation/pages/BillingReturnPage').then((m) => ({ default: m.BillingReturnPage })))
 
 function RouteFallback() {
   return (
@@ -101,6 +102,7 @@ export function App() {
               <Route path="/docs" element={<DocumentationPage />} />
               <Route path="/changelog" element={<ChangelogPage />} />
               <Route path="/teams" element={<RequireAuth><TeamPage /></RequireAuth>} />
+              <Route path="/billing/return" element={<RequireAuth><BillingReturnPage /></RequireAuth>} />
 
               <Route path="/admin" element={<RequireAuth requireAdmin={true}><AdminDashboardPage /></RequireAuth>} />
 

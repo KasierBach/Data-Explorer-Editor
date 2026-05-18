@@ -28,6 +28,9 @@ export interface AuthUser {
     plan?: string;
     billingDate?: string;
     paymentMethod?: string;
+    planExpiresAt?: string;
+    subscriptionStatus?: string;
+    paymentProvider?: string;
 }
 
 interface AuthResetState {

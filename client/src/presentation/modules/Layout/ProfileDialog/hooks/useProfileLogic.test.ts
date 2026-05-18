@@ -68,9 +68,22 @@ describe('useProfileLogic', () => {
     mockUseUserSettings.mockReturnValue({
       isLoading: false,
       appearanceState: {
+        theme: 'dark',
+        setTheme: vi.fn(),
         language: 'en',
+        setLanguage: vi.fn(),
+        setAppTheme: vi.fn(),
       },
-      notificationsState: {},
+      notificationsState: {
+        emailNotifications: true,
+        setEmailNotifications: vi.fn(),
+        failedQueryAlerts: true,
+        setFailedQueryAlerts: vi.fn(),
+        productUpdates: false,
+        setProductUpdates: vi.fn(),
+        securityAlerts: true,
+        setSecurityAlerts: vi.fn(),
+      },
       handleSaveSettings: vi.fn(),
     });
 
@@ -90,7 +103,8 @@ describe('useProfileLogic', () => {
 
     mockUseBilling.mockReturnValue({
       isLoading: false,
-      handleUpdateBilling: vi.fn(),
+      handleStartCheckout: vi.fn(),
+      handleRefreshBilling: vi.fn(),
     });
   });
 

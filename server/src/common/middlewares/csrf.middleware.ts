@@ -14,6 +14,8 @@ export class CsrfMiddleware implements NestMiddleware {
       '/api/auth/forgot-password',
       '/api/auth/reset-password',
       '/api/auth/exchange-oauth-code',
+      '/api/billing/webhooks/momo',
+      '/api/billing/webhooks/zalopay',
     ]);
 
     if (

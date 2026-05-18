@@ -38,6 +38,7 @@ import { VersionHistoryModule } from './version-history/version-history.module';
 import { PresenceModule } from './presence/presence.module';
 import { RedisModule } from './redis/redis.module';
 import { NoSqlModule } from './nosql/nosql.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -109,6 +110,7 @@ import { NoSqlModule } from './nosql/nosql.module';
     PresenceModule,
     RedisModule,
     NoSqlModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [
