@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from '@/core/services/store';
 import { apiService } from '@/core/services/api.service';
 import { useUserProfile } from './useUserProfile';
@@ -16,6 +16,11 @@ export const useProfileLogic = (isOpen: boolean, initialTab?: string, onClose?: 
     const { isLoading: isBillingLoading, handleUpdateBilling } = useBilling();
 
     const isLoading = isProfileLoading || isSettingsLoading || isSecurityLoading || isBillingLoading;
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setActiveTab(initialTab || 'profile');
+    }, [isOpen, initialTab]);
 
     return {
         user,

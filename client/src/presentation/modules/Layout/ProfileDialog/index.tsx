@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { Button } from '@/presentation/components/ui/button';
 import { User, X, Settings, CreditCard, Bell, Palette, Shield, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
@@ -23,6 +24,7 @@ interface ProfileDialogProps {
 }
 
 export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, initialTab }) => {
+    const contentRef = useRef<HTMLDivElement | null>(null);
     const {
         user,
         isLoading,
@@ -50,6 +52,19 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
         toast.info(`${feature} ${t('not_implemented_suffix')}`);
     };
 
+    useLayoutEffect(() => {
+        if (!isOpen || !contentRef.current) return;
+
+        const contentNode = contentRef.current;
+        contentNode.scrollTop = 0;
+
+        const frameId = window.requestAnimationFrame(() => {
+            contentNode.scrollTop = 0;
+        });
+
+        return () => window.cancelAnimationFrame(frameId);
+    }, [activeTab, isOpen]);
+
     if (!isOpen) return null;
 
     const tabsList = [
@@ -61,9 +76,9 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
         { id: 'advanced', label: 'Advanced Settings', icon: Settings },
     ];
 
-    return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-2 backdrop-blur-sm sm:p-4">
-            <div className="bg-background border rounded-xl shadow-2xl w-full max-w-4xl h-[min(600px,calc(100dvh-1rem))] max-h-[calc(100dvh-1rem)] flex flex-col relative animate-in fade-in zoom-in-95 duration-200 overflow-hidden sm:h-[600px] sm:flex-row">
+    const dialogContent = (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-2 backdrop-blur-sm sm:p-4">
+            <div className="bg-background border rounded-xl shadow-2xl w-full max-w-4xl flex flex-col sm:flex-row relative animate-in fade-in zoom-in-95 duration-200 overflow-hidden" style={{ height: 'min(600px, calc(100dvh - 1rem))', maxHeight: 'calc(100dvh - 1rem)' }}>
                 {/* Close Button */}
                 <button
                     onClick={onClose}
@@ -108,7 +123,11 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 overflow-y-auto p-4 relative sm:p-8">
+                <div
+                    key={activeTab}
+                    ref={contentRef}
+                    className="relative flex-1 min-h-0 min-w-0 overflow-y-auto p-4 sm:p-8"
+                >
                     {activeTab === 'profile' && (
                         <ProfileTab user={user} t={t} profileState={profileState} isLoading={isLoading} actions={actions} />
                     )}
@@ -131,4 +150,6 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
             </div>
         </div>
     );
+
+    return ReactDOM.createPortal(dialogContent, document.body);
 };
