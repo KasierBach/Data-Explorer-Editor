@@ -124,7 +124,6 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
 
                 {/* Content Area */}
                 <div
-                    key={activeTab}
                     ref={contentRef}
                     className="relative flex-1 min-h-0 min-w-0 overflow-y-auto p-4 sm:p-8"
                 >
@@ -150,6 +149,8 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
             </div>
         </div>
     );
+
+    if (typeof document === 'undefined' || !document.body) return null;
 
     return ReactDOM.createPortal(dialogContent, document.body);
 };
