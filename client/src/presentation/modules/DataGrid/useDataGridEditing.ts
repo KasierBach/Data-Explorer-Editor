@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
@@ -44,19 +44,19 @@ export function useDataGridEditing({
     const [isInserting, setIsInserting] = useState(false);
     const [newRowData, setNewRowData] = useState<Record<string, string>>({});
 
-    const getAdapter = () => {
+    const getAdapter = useCallback(() => {
         if (!activeConnection) throw new Error("No active connection");
         return connectionService.getAdapter(activeConnection.id, activeConnection.type);
-    };
+    }, [activeConnection]);
 
-    const handleCellChange = (rowId: string, colName: string, value: string) => {
+    const handleCellChange = useCallback((rowId: string, colName: string, value: string) => {
         setPendingChanges(prev => ({
             ...prev,
             [rowId]: { ...(prev[rowId] || {}), [colName]: value },
         }));
-    };
+    }, []);
 
-    const handleSaveData = async () => {
+    const handleSaveData = useCallback(async () => {
         if (!activeConnection || !pkField) return;
         setIsSaving(true);
         try {
@@ -80,9 +80,9 @@ export function useDataGridEditing({
         } finally {
             setIsSaving(false);
         }
-    };
+    }, [activeConnection, pkField, getAdapter, dbName, schema, cleanTableName, tableId, pendingChanges, refetch]);
 
-    const handleSaveSchema = async (operations: SchemaOperation[]) => {
+    const handleSaveSchema = useCallback(async (operations: SchemaOperation[]) => {
         if (!activeConnection || !metadata) return;
         setIsSaving(true);
         try {
@@ -100,9 +100,9 @@ export function useDataGridEditing({
         } finally {
             setIsSaving(false);
         }
-    };
+    }, [activeConnection, metadata, getAdapter, dbName, schema, cleanTableName, tableId, refetch]);
 
-    const handleDeleteRows = async () => {
+    const handleDeleteRows = useCallback(async () => {
         if (!activeConnection || !metadata || selectedRows.size === 0 || !pkField) return;
         if (!confirm(`Delete ${selectedRows.size} row(s)? This cannot be undone.`)) return;
 
@@ -124,9 +124,9 @@ export function useDataGridEditing({
         } finally {
             setIsSaving(false);
         }
-    };
+    }, [activeConnection, metadata, selectedRows, pkField, getAdapter, dbName, schema, cleanTableName, tableId, refetch]);
 
-    const handleInsertRow = async () => {
+    const handleInsertRow = useCallback(async () => {
         if (!activeConnection || !metadata) return;
         
         const data: RowData = {};
@@ -158,32 +158,32 @@ export function useDataGridEditing({
         } finally {
             setIsSaving(false);
         }
-    };
+    }, [activeConnection, metadata, newRowData, getAdapter, dbName, schema, cleanTableName, tableId, refetch]);
 
-    const toggleEditMode = () => {
+    const toggleEditMode = useCallback(() => {
         if (isEditMode) {
             setPendingChanges({});
             setIsEditMode(false);
         } else {
             setIsEditMode(true);
         }
-    };
+    }, [isEditMode]);
 
-    const toggleRowSelection = (pkValue: string) => {
+    const toggleRowSelection = useCallback((pkValue: string) => {
         setSelectedRows(prev => {
             const next = new Set(prev);
             if (next.has(pkValue)) next.delete(pkValue);
             else next.add(pkValue);
             return next;
         });
-    };
+    }, []);
 
-    const toggleInsertMode = () => {
-        setIsInserting(!isInserting);
+    const toggleInsertMode = useCallback(() => {
+        setIsInserting(prev => !prev);
         setNewRowData({});
-    };
+    }, []);
 
-    return {
+    return useMemo(() => ({
         isEditMode,
         pendingChanges,
         isSaving,
@@ -199,5 +199,20 @@ export function useDataGridEditing({
         toggleEditMode,
         toggleRowSelection,
         toggleInsertMode,
-    };
+    }), [
+        isEditMode, 
+        pendingChanges, 
+        isSaving, 
+        selectedRows, 
+        isInserting, 
+        newRowData, 
+        handleCellChange, 
+        handleSaveData, 
+        handleSaveSchema, 
+        handleDeleteRows, 
+        handleInsertRow, 
+        toggleEditMode, 
+        toggleRowSelection, 
+        toggleInsertMode
+    ]);
 }

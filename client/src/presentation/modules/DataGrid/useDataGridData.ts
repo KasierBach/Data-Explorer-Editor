@@ -36,7 +36,7 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
     const dialect: 'mysql' | 'postgres' = activeConnection?.type === 'mysql' ? 'mysql' : 'postgres';
     const isLargeDataset = tableId === 'large_dataset' || tableId === 'tbl-large';
 
-    // Fetch Metadata
+    // Fetch Metadata with long-term cache (5 minutes)
     const { data: metadata, isLoading: isLoadingMeta } = useQuery({
         queryKey: ['metadata', activeConnectionId, tableId],
         queryFn: async () => {
@@ -44,10 +44,12 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
             const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
             return adapter.getMetadata(tableId);
         },
-        enabled: !!activeConnectionId
+        enabled: !!activeConnectionId,
+        staleTime: Infinity, // Metadata doesn't change unless schema changes
+        refetchOnWindowFocus: false,
     });
 
-    // Fetch Data (with pagination)
+    // Fetch Data with smart cache (30 seconds)
     const { data: queryResult, isLoading: isLoadingData, isFetching: isFetchingData, refetch } = useQuery({
         queryKey: ['data', activeConnectionId, tableId, isLargeDataset, page, pageSize],
         queryFn: async () => {
@@ -73,7 +75,10 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
                 }
             );
         },
-        enabled: !!activeConnectionId && !!metadata
+        enabled: !!activeConnectionId && !!metadata,
+        staleTime: 60 * 1000, // Keep data fresh for 1 minute
+        gcTime: 15 * 60 * 1000,
+        refetchOnWindowFocus: false, // CRITICAL: Stop the flickering/delay on refocus
     });
 
     const pkField = metadata?.columns?.find(c => c.isPrimaryKey)?.name;

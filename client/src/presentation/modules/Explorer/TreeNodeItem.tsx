@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import {
     ChevronRight,
     ChevronDown,
@@ -24,7 +24,7 @@ import { useAppStore } from '@/core/services/store';
 
 import { SidebarContextMenu } from './SidebarContextMenu';
 
-const FileIcon = ({ type, className }: { type: string, className?: string }) => {
+const FileIcon = memo(({ type, className }: { type: string, className?: string }) => {
     switch (type) {
         case 'database':
             return <Database className={cn("w-4 h-4 text-cyan-500 fill-cyan-500/10", className)} />;
@@ -62,7 +62,9 @@ const FileIcon = ({ type, className }: { type: string, className?: string }) => 
         default:
             return <Box className={cn("w-4 h-4 text-slate-400", className)} />;
     }
-};
+});
+
+FileIcon.displayName = 'FileIcon';
 
 interface TreeNodeProps {
     node: TreeNode;
@@ -70,44 +72,38 @@ interface TreeNodeProps {
     connectionId?: string | null;
 }
 
-export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level, connectionId: connectionIdProp }) => {
-    const { activeConnectionId: storeActiveId, expandedNodes, toggleNodeExpansion } = useAppStore();
-    const connectionId = connectionIdProp || storeActiveId;
-    const isExpanded = expandedNodes.includes(node.id);
-    const toggleExpansion = toggleNodeExpansion;
-
-    const { data: children, isLoading } = useDatabaseHierarchy(isExpanded ? node.id : null, connectionId);
+export const TreeNodeItem: React.FC<TreeNodeProps> = memo(({ node, level, connectionId: connectionIdProp }) => {
+    // Individual selectors to prevent infinite loops (Zustand best practice)
+    const storeActiveId = useAppStore(state => state.activeConnectionId);
+    const expandedNodes = useAppStore(state => state.expandedNodes);
+    const toggleExpansion = useAppStore(state => state.toggleNodeExpansion);
     const openTab = useAppStore(state => state.openTab);
     const activeDatabase = useAppStore(state => state.activeDatabase);
     const setActiveDatabase = useAppStore(state => state.setActiveDatabase);
-
     const setNosqlDatabase = useAppStore(state => state.setNosqlDatabase);
     const setNosqlCollection = useAppStore(state => state.setNosqlCollection);
     const nosqlActiveCollection = useAppStore(state => state.nosqlActiveCollection);
-    const activeConnection = useAppStore(state => state.connections.find(c => c.id === connectionId));
-    const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
-
     const nosqlActiveDatabase = useAppStore(state => state.nosqlActiveDatabase);
+    
+    const connectionId = connectionIdProp || storeActiveId;
+    const activeConnection = useAppStore(state => state.connections.find(c => c.id === connectionId));
+
+    const isExpanded = expandedNodes.includes(node.id);
+    const { data: children, isLoading } = useDatabaseHierarchy(isExpanded ? node.id : null, connectionId);
+    
+    const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
     const isActiveDb = node.type === 'database' && (isNoSql ? nosqlActiveDatabase === node.name : activeDatabase === node.name);
 
     const handleToggle = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (node.type === 'database') {
-            if (node.hasChildren) {
-                toggleExpansion(node.id);
-            }
-            if (isNoSql) {
-                setNosqlDatabase(node.name);
-            } else {
-                setActiveDatabase(node.name);
-            }
+            if (node.hasChildren) toggleExpansion(node.id);
+            if (isNoSql) setNosqlDatabase(node.name);
+            else setActiveDatabase(node.name);
         } else if (node.type === 'collection') {
             setNosqlCollection(node.name);
         } else {
-            // Other nodes: normal toggle
-            if (node.hasChildren) {
-                toggleExpansion(node.id);
-            }
+            if (node.hasChildren) toggleExpansion(node.id);
         }
     };
 
@@ -155,13 +151,12 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level, connectionI
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                     <FileIcon type={node.type} className={cn("shrink-0 transition-all group-hover:drop-shadow-[0_0_3px_rgba(59,130,246,0.3)]", node.type === 'folder' ? node.name : '')} />
                     <span className={cn(
-                        "truncate font-medium transition-colors",
-                        node.type === 'database' || node.type === 'schema' ? "text-foreground/90 font-semibold text-xs uppercase tracking-tight" : "text-foreground/80 group-hover:text-foreground"
+                        "truncate font-medium transition-colors text-[13px]",
+                        node.type === 'database' || node.type === 'schema' ? "text-foreground/90 font-semibold uppercase tracking-tight" : "text-foreground/80 group-hover:text-foreground"
                     )}>
                         {node.name}
                     </span>
 
-                    {/* Optional indicator for child count if we had it, or just small deco */}
                     {node.hasChildren && !isExpanded && !isActiveDb && (
                         <div className="w-1.5 h-1.5 rounded-full bg-blue-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                     )}
@@ -175,7 +170,6 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level, connectionI
 
             {isExpanded && (
                 <div className="relative">
-                    {/* Continuous vertical line for hierarchy depth */}
                     <div
                         className="absolute left-[13px] top-0 bottom-0 w-px bg-border/40"
                         style={{ left: `${level * 12 + 11}px` }}
@@ -194,4 +188,6 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = ({ node, level, connectionI
             )}
         </SidebarContextMenu>
     );
-};
+});
+
+TreeNodeItem.displayName = 'TreeNodeItem';
