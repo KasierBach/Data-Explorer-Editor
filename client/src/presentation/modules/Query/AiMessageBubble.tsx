@@ -1,4 +1,4 @@
-import React, { Suspense, useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import { 
     ChevronDown, Play, Copy, Database, LineChart, Wrench, 
@@ -8,8 +8,7 @@ import type { AiMessage } from '@/core/services/store';
 import { useAppStore } from '@/core/services/store';
 import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const AiMarkdownContent = React.lazy(() => import('./AiMarkdownContent').then((module) => ({ default: module.AiMarkdownContent })));
+import { AiMarkdownContent } from './AiMarkdownContent';
 
 type FieldSizingStyle = React.CSSProperties & {
     fieldSizing?: 'content';
@@ -150,9 +149,7 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                             {msg.content && <div className="whitespace-pre-wrap">{msg.content}</div>}
                         </div>
                     ) : (
-                        <Suspense fallback={<div className="whitespace-pre-wrap">{msg.content}</div>}>
-                            <AiMarkdownContent content={msg.content} />
-                        </Suspense>
+                        <AiMarkdownContent content={msg.content} />
                     )}
 
                     {msg.sql && (

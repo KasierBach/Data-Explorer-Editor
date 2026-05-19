@@ -223,7 +223,10 @@ export class OrganizationService {
   }
 
   static async updateOrganization(id: string, payload: UpdateOrganizationPayload): Promise<OrganizationEntity> {
-    return apiService.patch<OrganizationEntity>(`/organizations/${id}`, payload);
+    return apiService.request<OrganizationEntity>(`/organizations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
   }
 
   static async deleteOrganization(id: string): Promise<void> {
@@ -261,7 +264,10 @@ export class OrganizationService {
   }
 
   static async updateMemberRole(id: string, userId: string, role: string): Promise<OrganizationMemberEntity> {
-    return apiService.patch<OrganizationMemberEntity>(`/organizations/${id}/members/${userId}`, { role });
+    return apiService.request<OrganizationMemberEntity>(`/organizations/${id}/members/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    });
   }
 
   static async removeMember(id: string, userId: string): Promise<void> {

@@ -125,7 +125,9 @@ export class NoSqlService {
     connectionId: string,
     database: string,
     collection: string,
+    userId: string,
   ) {
+    await this.connectionsService.getPool(connectionId, database, userId);
     const cacheKey = this.getSchemaCacheKey(connectionId, database, collection);
     await this.redisService.del(cacheKey);
   }

@@ -34,11 +34,13 @@ export class NoSqlController {
       database: string;
       collection: string;
     },
+    @Req() req: any,
   ) {
     await this.nosqlService.clearSchemaCache(
       body.connectionId,
       body.database,
       body.collection,
+      req.user.id,
     );
     return { success: true };
   }

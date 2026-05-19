@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Client as SshClient } from 'ssh2';
 import { createServer, Server } from 'net';
+import { validateHost } from '../common/utils/ssrf-validator.util';
 
 export interface SshTunnelConfig {
   sshHost: string;
@@ -50,7 +51,8 @@ export class SshTunnelService {
   }
 
   async openTunnel(key: string, config: SshTunnelConfig): Promise<number> {
-    if (this.isInternalIp(config.dbHost)) {
+    const isSafeTarget = await validateHost(config.dbHost);
+    if (!isSafeTarget) {
       throw new Error(
         `Connection to internal host ${config.dbHost} is forbidden for security reasons.`,
       );

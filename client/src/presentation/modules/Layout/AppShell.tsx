@@ -6,6 +6,7 @@ import { Navbar } from './Navbar';
 import { ConnectionDialog } from '@/presentation/modules/Connection/ConnectionDialog';
 import { AiAssistant } from '@/presentation/modules/Query/AiAssistant';
 import { cn } from "@/lib/utils";
+import '@/lib/monaco';
 import { useResizablePanel } from '@/presentation/hooks/useResizablePanel';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { useGlobalShortcuts } from '@/presentation/hooks/useGlobalShortcuts';

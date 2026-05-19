@@ -11,8 +11,13 @@ import { UpdateOrganizationDto } from '../dto/update-organization.dto';
 import { OrganizationRole } from '../entities/organization-role.enum';
 import { AuditService, AuditAction } from '../../audit/audit.service';
 import { PermissionsService } from '../../permissions/services/permissions.service';
+import { Permission } from '../../permissions/enums/permission.enum';
 import { ResourceType } from '../../permissions/enums/resource-type.enum';
-import { type ResourcePermissionPolicy } from '../../permissions/types/resource-permission-policy';
+import {
+  isResourcePermissionPolicy,
+  normalizePermissionList,
+  type ResourcePermissionPolicy,
+} from '../../permissions/types/resource-permission-policy';
 import { MailService } from '../../mail/mail.service';
 import { UserUtils } from '../../users/user.utils';
 
@@ -408,7 +413,7 @@ export class OrganizationsService {
   }
 
   async listConnections(organizationId: string, userId: string) {
-    await this.ensureMemberAccess(organizationId, userId);
+    const memberRole = await this.getRequiredMemberRole(organizationId, userId);
 
     const [connections, resourcePolicies] = await Promise.all([
       this.prisma.connection.findMany({
@@ -430,11 +435,14 @@ export class OrganizationsService {
       this.repository.findResources(organizationId, ResourceType.CONNECTION),
     ]);
 
-    return this.attachResourcePolicies(connections, resourcePolicies);
+    return this.filterReadableResources(
+      this.attachResourcePolicies(connections, resourcePolicies),
+      memberRole,
+    );
   }
 
   async listQueries(organizationId: string, userId: string) {
-    await this.ensureMemberAccess(organizationId, userId);
+    const memberRole = await this.getRequiredMemberRole(organizationId, userId);
 
     const [queries, resourcePolicies] = await Promise.all([
       this.prisma.savedQuery.findMany({
@@ -456,11 +464,14 @@ export class OrganizationsService {
       this.repository.findResources(organizationId, ResourceType.QUERY),
     ]);
 
-    return this.attachResourcePolicies(queries, resourcePolicies);
+    return this.filterReadableResources(
+      this.attachResourcePolicies(queries, resourcePolicies),
+      memberRole,
+    );
   }
 
   async listDashboards(organizationId: string, userId: string) {
-    await this.ensureMemberAccess(organizationId, userId);
+    const memberRole = await this.getRequiredMemberRole(organizationId, userId);
 
     const [dashboards, resourcePolicies] = await Promise.all([
       this.prisma.dashboard.findMany({
@@ -480,7 +491,10 @@ export class OrganizationsService {
       this.repository.findResources(organizationId, ResourceType.DASHBOARD),
     ]);
 
-    return this.attachResourcePolicies(dashboards, resourcePolicies);
+    return this.filterReadableResources(
+      this.attachResourcePolicies(dashboards, resourcePolicies),
+      memberRole,
+    );
   }
 
   async ensureResourcePolicy(
@@ -568,6 +582,18 @@ export class OrganizationsService {
     return role;
   }
 
+  private async getRequiredMemberRole(
+    organizationId: string,
+    userId: string,
+  ): Promise<OrganizationRole> {
+    const member = await this.repository.findMember(organizationId, userId);
+    if (!member) {
+      throw new ForbiddenException('You are not a member');
+    }
+
+    return member.role as OrganizationRole;
+  }
+
   private attachResourcePolicies<T extends { id: string }>(
     items: T[],
     resourcePolicies: Array<{
@@ -591,6 +617,28 @@ export class OrganizationsService {
       permissions: policyMap.get(item.id)?.permissions ?? null,
       teamspaceId: policyMap.get(item.id)?.teamspaceId ?? null,
     }));
+  }
+
+  private filterReadableResources<T extends { permissions?: unknown }>(
+    items: T[],
+    role: OrganizationRole,
+  ) {
+    return items.filter((item) =>
+      this.getResourcePermissionsForRole(role, item.permissions).includes(
+        Permission.READ,
+      ),
+    );
+  }
+
+  private getResourcePermissionsForRole(
+    role: OrganizationRole,
+    permissions: unknown,
+  ): Permission[] {
+    if (isResourcePermissionPolicy(permissions)) {
+      return normalizePermissionList(permissions[role]);
+    }
+
+    return this.permissions.getRolePermissions(role);
   }
 
   private toEntity(organization: any, currentUserId: string) {
