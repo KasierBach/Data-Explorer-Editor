@@ -202,4 +202,10 @@ export interface IDatabaseStrategy {
     connectionInfo: unknown,
   ): Promise<TreeNodeResult[]>;
   seedData(pool: unknown): Promise<QueryResult>;
+  getSampleRows(
+    pool: unknown,
+    schema: string,
+    table: string,
+    limit: number,
+  ): Promise<Record<string, unknown>[]>;
 }

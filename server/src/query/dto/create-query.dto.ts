@@ -39,4 +39,9 @@ export class CreateQueryDto {
   @IsBoolean()
   @IsOptional()
   confirmed?: boolean;
+
+  /** Set to false when the caller already has a trusted row count */
+  @IsBoolean()
+  @IsOptional()
+  includeTotalCount?: boolean;
 }

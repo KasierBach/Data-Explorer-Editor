@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     useReactTable,
     getCoreRowModel,
@@ -11,6 +11,7 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/presentation/components/ui/button';
+import { Input } from '@/presentation/components/ui/input';
 import {
     RefreshCw, LayoutGrid, Download, Plus, Trash2,
     FileJson, FileText, FileCode, Check, X, Upload, ArrowRightLeft, MoreHorizontal, PencilLine, GripVertical
@@ -29,24 +30,35 @@ import { useDataGridData } from './useDataGridData';
 import { useDataGridEditing } from './useDataGridEditing';
 import { exportCSV, exportJSON, exportSQL, copyRowAsSQL, type ExportContext } from './DataGridExport';
 import { BulkImportDialog } from './BulkImportDialog';
+import { BulkReplaceDialog } from './BulkReplaceDialog';
 import { MigrationHubDialog } from '../Migration/MigrationHubDialog';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
 import type { DatabaseValue, RowData } from '@/core/domain/entities';
 import { CellValueDialog } from './CellValueDialog';
+import { toast } from 'sonner';
 import {
+    advanceMomentumScroll,
     buildColumnOrderStorageKey,
     buildColumnSizingStorageKey,
     getAutoFitColumnWidth,
     getInitialColumnWidth,
+    normalizeMomentumWheelDelta,
     normalizeColumnOrder,
     previewDatabaseValue,
     reorderColumnIds,
+    shouldUseMomentumWheel,
     type SelectedCellState,
 } from './dataGridUtils';
+import type { BulkReplaceTargetRow, BulkSearchMatch } from './bulkReplaceUtils';
 
 interface DataGridProps {
     tableId: string;
+}
+
+interface ActiveGridSearch {
+    matches: BulkSearchMatch[];
+    activeIndex: number;
 }
 
 const DataGridRow = React.memo(({
@@ -58,7 +70,9 @@ const DataGridRow = React.memo(({
     copyRowAsSQL,
     schema,
     tableName,
-    dialect
+    dialect,
+    matchedCellKeys,
+    activeCellKey,
 }: any) => {
     const pkValue = pkField ? String(row.original[pkField]) : row.id;
     const isSelected = editing.selectedRows.has(pkValue);
@@ -76,12 +90,21 @@ const DataGridRow = React.memo(({
             }}
         >
             {row.getVisibleCells().map((cell: any, cellIdx: number) => (
+                (() => {
+                    const cellKey = `${pkValue}::${cell.column.id}`;
+                    const isMatchedCell = cellIdx > 0 && matchedCellKeys.has(cellKey);
+                    const isActiveCell = cellIdx > 0 && activeCellKey === cellKey;
+
+                    return (
                 <td
                     key={cell.id}
                     className={cn(
                         "px-3 py-0.5 border-r border-border/30 whitespace-nowrap overflow-hidden text-ellipsis last:border-r-0 text-foreground/90 font-mono text-[11px]",
                         !editing.isEditMode && cellIdx > 0 && "cursor-pointer",
+                        isMatchedCell && "bg-amber-500/12",
+                        isActiveCell && "bg-amber-500/20 ring-1 ring-inset ring-amber-400/60",
                     )}
+                    data-cell-key={cellKey}
                     style={{ width: cell.column.getSize() }}
                     onClick={
                         cellIdx === 0
@@ -110,6 +133,8 @@ const DataGridRow = React.memo(({
                         </div>
                     )}
                 </td>
+                    );
+                })()
             ))}
         </tr>
     );
@@ -122,11 +147,17 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const [globalFilter, setGlobalFilter] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'design'>('grid');
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+    const [isBulkReplaceOpen, setIsBulkReplaceOpen] = useState(false);
     const [isMigrationDialogOpen, setIsMigrationDialogOpen] = useState(false);
+    const [activeSearch, setActiveSearch] = useState<ActiveGridSearch | null>(null);
     const [selectedCell, setSelectedCell] = useState<SelectedCellState | null>(null);
     const [draggingColumnId, setDraggingColumnId] = useState<string | null>(null);
     const [dropTargetColumnId, setDropTargetColumnId] = useState<string | null>(null);
+    const [pageJumpValue, setPageJumpValue] = useState('1');
     const tableContainerRef = useRef<HTMLDivElement>(null);
+    const wheelMomentumFrameRef = useRef<number | null>(null);
+    const wheelMomentumVelocityRef = useRef(0);
+    const wheelMomentumLastTsRef = useRef<number | null>(null);
 
     const { tabs, activeTabId, setTabPagination, connections, activeConnectionId } = useAppStore();
     const activeTab = tabs.find((t: Tab) => t.id === activeTabId);
@@ -152,6 +183,13 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         refetch, dbName, schema, cleanTableName, dialect, pkField,
     } = useDataGridData({ tableId });
     const tableName = cleanTableName || tableId;
+    const effectiveTotalCount = queryResult?.totalCount ?? metadata?.rowCount;
+    const totalPages = effectiveTotalCount
+        ? Math.max(1, Math.ceil(effectiveTotalCount / pagination.pageSize))
+        : null;
+    const rowOverscan = isCompactMobileLayout
+        ? 6
+        : Math.min(16, Math.max(8, Math.ceil(pagination.pageSize / 100)));
 
     const editing = useDataGridEditing({
         tableId, metadata, dbName, schema, cleanTableName, pkField, refetch,
@@ -233,6 +271,18 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         );
     }, [columnSizing, columnSizingStorageKey]);
 
+    useEffect(() => {
+        setPageJumpValue(String(pagination.pageIndex + 1));
+    }, [pagination.pageIndex]);
+
+    useEffect(() => () => {
+        if (wheelMomentumFrameRef.current !== null) {
+            window.cancelAnimationFrame(wheelMomentumFrameRef.current);
+        }
+        wheelMomentumVelocityRef.current = 0;
+        wheelMomentumLastTsRef.current = null;
+    }, []);
+
     const handleOpenCellInspector = (
         value: DatabaseValue,
         columnName: string,
@@ -255,6 +305,102 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         setDraggingColumnId(null);
         setDropTargetColumnId(null);
     };
+
+    const commitPageJump = () => {
+        const parsedPage = Number.parseInt(pageJumpValue, 10);
+
+        if (!Number.isFinite(parsedPage)) {
+            setPageJumpValue(String(pagination.pageIndex + 1));
+            return;
+        }
+
+        const normalizedPage = Math.max(
+            1,
+            totalPages ? Math.min(parsedPage, totalPages) : parsedPage,
+        );
+
+        setTabPagination(tableId, normalizedPage, pagination.pageSize);
+        setPageJumpValue(String(normalizedPage));
+    };
+
+    const stopMomentumScroll = useCallback(() => {
+        if (wheelMomentumFrameRef.current !== null) {
+            window.cancelAnimationFrame(wheelMomentumFrameRef.current);
+            wheelMomentumFrameRef.current = null;
+        }
+        wheelMomentumVelocityRef.current = 0;
+        wheelMomentumLastTsRef.current = null;
+    }, []);
+
+    const stepMomentumScroll = useCallback((timestamp: number) => {
+        const container = tableContainerRef.current;
+        if (!container) {
+            stopMomentumScroll();
+            return;
+        }
+
+        const previousTimestamp = wheelMomentumLastTsRef.current;
+        const frameRatio = previousTimestamp === null
+            ? 1
+            : Math.min(1.6, Math.max(0.75, (timestamp - previousTimestamp) / 16.67));
+        wheelMomentumLastTsRef.current = timestamp;
+
+        const maxScrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+        const step = advanceMomentumScroll(
+            container.scrollTop,
+            wheelMomentumVelocityRef.current,
+            maxScrollTop,
+            frameRatio,
+        );
+
+        container.scrollTop = step.nextScrollTop;
+        wheelMomentumVelocityRef.current = step.nextVelocity;
+
+        if (step.done) {
+            stopMomentumScroll();
+            return;
+        }
+
+        wheelMomentumFrameRef.current = window.requestAnimationFrame(stepMomentumScroll);
+    }, [stopMomentumScroll]);
+
+    const handleMomentumWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+        const container = tableContainerRef.current;
+        if (!container) return;
+
+        if (
+            event.ctrlKey ||
+            event.shiftKey ||
+            !shouldUseMomentumWheel(event.deltaX, event.deltaY, event.deltaMode)
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+
+        const normalizedDelta = normalizeMomentumWheelDelta(
+            event.deltaY,
+            event.deltaMode,
+            container.clientHeight,
+        );
+        const velocityBoost = normalizedDelta / 8;
+
+        wheelMomentumVelocityRef.current = Math.max(
+            -56,
+            Math.min(56, wheelMomentumVelocityRef.current + velocityBoost),
+        );
+
+        if (wheelMomentumFrameRef.current === null) {
+            wheelMomentumLastTsRef.current = null;
+            wheelMomentumFrameRef.current = window.requestAnimationFrame(stepMomentumScroll);
+        }
+    }, [stepMomentumScroll]);
+
+    const handleGridScroll = useCallback(() => {
+        if (wheelMomentumFrameRef.current !== null) return;
+        wheelMomentumVelocityRef.current = 0;
+        wheelMomentumLastTsRef.current = null;
+    }, []);
 
     // Build columns
     const tableColumns = useMemo(() => {
@@ -358,7 +504,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
             }
         },
         manualPagination: true, // Always manual now because we paginate server-side
-        pageCount: queryResult?.totalCount ? Math.ceil(queryResult.totalCount / pageSize) : -1,
+        pageCount: effectiveTotalCount ? Math.ceil(effectiveTotalCount / pageSize) : -1,
     });
 
     const { rows } = table.getRowModel();
@@ -367,8 +513,111 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         count: rows.length,
         getScrollElement: () => tableContainerRef.current,
         estimateSize: () => 36,
-        overscan: 50,
+        overscan: rowOverscan,
     });
+    const virtualRows = rowVirtualizer.getVirtualItems();
+    const topSpacerHeight = virtualRows[0]?.start ?? 0;
+    const bottomSpacerHeight = virtualRows.length > 0
+        ? rowVirtualizer.getTotalSize() - (virtualRows[virtualRows.length - 1]?.end ?? 0)
+        : 0;
+    const totalRowsLabel = (effectiveTotalCount ?? rows.length).toLocaleString();
+    const bulkSearchButtonLabel = editing.isEditMode ? 'Find / Replace' : 'Find';
+    const pageReplaceTargets = useMemo<BulkReplaceTargetRow[]>(
+        () => rows.map((row, rowIndex) => ({
+            rowId: pkField ? String(row.original[pkField]) : row.id,
+            rowIndex,
+            values: row.original,
+        })),
+        [pkField, rows],
+    );
+    const filteredReplaceTargets = useMemo<BulkReplaceTargetRow[]>(
+        () => pageReplaceTargets,
+        [pageReplaceTargets],
+    );
+    const selectedReplaceTargets = useMemo<BulkReplaceTargetRow[]>(
+        () => pageReplaceTargets.filter((row) => editing.selectedRows.has(row.rowId)),
+        [editing.selectedRows, pageReplaceTargets],
+    );
+    const matchedCellKeys = useMemo(
+        () => new Set(activeSearch?.matches.map((match) => match.cellKey) ?? []),
+        [activeSearch],
+    );
+    const activeSearchMatch = activeSearch?.matches.length
+        ? activeSearch.matches[Math.min(activeSearch.activeIndex, activeSearch.matches.length - 1)]
+        : null;
+    const activeSearchCellKey = activeSearchMatch?.cellKey ?? null;
+
+    const clearSearchResults = useCallback(() => {
+        setActiveSearch(null);
+    }, []);
+
+    const handleApplyBulkReplace = (updatesByRow: Record<string, RowData>, summary: { matchedRows: number; matchedCells: number }) => {
+        clearSearchResults();
+        editing.applyPendingChangesBatch(updatesByRow);
+        toast.success(`Staged ${summary.matchedCells} replacements across ${summary.matchedRows} row(s)`);
+    };
+    const handleApplySearch = (matches: BulkSearchMatch[], summary: { matchedRows: number; matchedCells: number }) => {
+        if (matches.length === 0) {
+            setActiveSearch(null);
+            toast.info('No matches found');
+            return;
+        }
+
+        setActiveSearch({
+            matches,
+            activeIndex: 0,
+        });
+        toast.success(`Found ${summary.matchedCells} matches across ${summary.matchedRows} row(s)`);
+    };
+    const goToSearchMatch = useCallback((direction: -1 | 1) => {
+        setActiveSearch((current) => {
+            if (!current || current.matches.length === 0) return current;
+
+            const nextIndex = (current.activeIndex + direction + current.matches.length) % current.matches.length;
+            return {
+                ...current,
+                activeIndex: nextIndex,
+            };
+        });
+    }, []);
+
+    useEffect(() => {
+        if (!activeSearchMatch) return;
+
+        rowVirtualizer.scrollToIndex(activeSearchMatch.rowIndex, { align: 'center' });
+
+        const revealCell = () => {
+            const cellElement = tableContainerRef.current?.querySelector<HTMLElement>(
+                `[data-cell-key="${activeSearchMatch.cellKey}"]`,
+            );
+
+            if (cellElement) {
+                cellElement.scrollIntoView({ block: 'nearest', inline: 'center' });
+                return;
+            }
+
+            window.requestAnimationFrame(() => {
+                const deferredCellElement = tableContainerRef.current?.querySelector<HTMLElement>(
+                    `[data-cell-key="${activeSearchMatch.cellKey}"]`,
+                );
+                deferredCellElement?.scrollIntoView({ block: 'nearest', inline: 'center' });
+            });
+        };
+
+        window.requestAnimationFrame(revealCell);
+    }, [activeSearchMatch, rowVirtualizer]);
+
+    useEffect(() => {
+        setActiveSearch(null);
+        stopMomentumScroll();
+    }, [globalFilter, pageIndex, pageSize, queryResult?.rows, stopMomentumScroll, tableId]);
+
+    useEffect(() => {
+        if (!editing.isEditMode) {
+            setIsBulkReplaceOpen(false);
+            setActiveSearch(null);
+        }
+    }, [editing.isEditMode]);
 
     // Export context
     const exportCtx: ExportContext = {
@@ -439,6 +688,18 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                 {editing.isEditMode ? 'Cancel' : 'Edit'}
                             </Button>
 
+                            {editing.isEditMode && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setIsBulkReplaceOpen(true)}
+                                    className="h-7 px-2 text-[11px] gap-1.5 shrink-0"
+                                >
+                                    <ArrowRightLeft className="w-3 h-3" />
+                                    {isSmallMobile ? 'Find' : bulkSearchButtonLabel}
+                                </Button>
+                            )}
+
                             {Object.keys(editing.pendingChanges).length > 0 && (
                                 <Button
                                     variant="default"
@@ -499,7 +760,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
 
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono uppercase shrink-0">
                                 <span className="bg-muted px-1.5 py-1 rounded border border-border/50">
-                                    {queryResult?.totalCount?.toLocaleString() || rows.length.toLocaleString()} rows
+                                    {totalRowsLabel} rows
                                 </span>
                                 {queryResult?.durationMs && <span className="opacity-70">{queryResult.durationMs}ms</span>}
                             </div>
@@ -529,6 +790,17 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                 {editing.isEditMode ? 'Cancel Edit' : 'Edit Data'}
                             </Button>
                         </div>
+
+                        {editing.isEditMode && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setIsBulkReplaceOpen(true)}
+                                className="h-7 text-[11px] gap-1 px-2"
+                            >
+                                <ArrowRightLeft className="w-3 h-3" /> {bulkSearchButtonLabel}
+                            </Button>
+                        )}
 
                         {Object.keys(editing.pendingChanges).length > 0 && (
                             <Button variant="default" size="sm" onClick={editing.handleSaveData} disabled={editing.isSaving || dataEditsDisabled} className="h-6 px-3 text-[11px] bg-green-600 hover:bg-green-700 text-white ml-2">
@@ -588,13 +860,60 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
 
                         <div className="text-[10px] text-muted-foreground ml-auto flex items-center gap-3 pr-2 font-mono uppercase">
                             <span className="bg-muted px-1.5 rounded border border-border/50">
-                                {queryResult?.totalCount?.toLocaleString() || rows.length.toLocaleString()} TOTAL ROWS
+                                {totalRowsLabel} TOTAL ROWS
                             </span>
                             {queryResult?.durationMs && <span className="opacity-70">{queryResult.durationMs}MS</span>}
                         </div>
                     </>
                 )}
             </div>
+
+            {activeSearchMatch && activeSearch && (
+                <div className={cn(
+                    "border-b border-amber-500/20 bg-amber-500/5 px-3 py-2",
+                    "flex items-center justify-between gap-3",
+                    isCompactMobileLayout && "flex-col items-start"
+                )}>
+                    <div className="min-w-0 flex items-center gap-3 text-xs text-foreground">
+                        <span className="rounded border border-amber-500/20 bg-amber-500/10 px-2 py-1 font-semibold uppercase tracking-wide text-[10px] text-amber-300">
+                            Find
+                        </span>
+                        <span className="font-medium">
+                            {activeSearch.activeIndex + 1} / {activeSearch.matches.length}
+                        </span>
+                        <span className="truncate text-muted-foreground">
+                            {activeSearchMatch.columnId}: {activeSearchMatch.preview}
+                        </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-[11px]"
+                            onClick={() => goToSearchMatch(-1)}
+                        >
+                            Prev
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-[11px]"
+                            onClick={() => goToSearchMatch(1)}
+                        >
+                            Next
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-[11px] text-amber-300 hover:text-amber-200"
+                            onClick={clearSearchResults}
+                        >
+                            Clear
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             {activeConnection && (readOnlyConnection || queryExecutionDisabled || schemaChangesDisabled || importExportDisabled) && (
                 <div className="mx-2 mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
@@ -612,7 +931,12 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
             {/* Main Content */}
             <div className="flex-1 relative overflow-hidden bg-background">
                 {viewMode === 'grid' && (
-                    <div ref={tableContainerRef} className="h-full overflow-auto relative scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
+                    <div
+                        ref={tableContainerRef}
+                        onWheel={handleMomentumWheel}
+                        onScroll={handleGridScroll}
+                        className="h-full overflow-auto relative scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent"
+                    >
                         <div style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
                             <table className="table-fixed text-xs text-left border-collapse" style={{ width: table.getTotalSize() }}>
                                 <thead className="bg-muted sticky top-0 z-20 shadow-sm border-b">
@@ -730,13 +1054,13 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                     ))}
                                 </thead>
                                 <tbody>
-                                    {rowVirtualizer.getVirtualItems()[0]?.start > 0 && (
-                                        <tr><td style={{ height: `${rowVirtualizer.getVirtualItems()[0].start}px` }} colSpan={table.getVisibleFlatColumns().length} /></tr>
+                                    {topSpacerHeight > 0 && (
+                                        <tr><td style={{ height: `${topSpacerHeight}px` }} colSpan={table.getVisibleFlatColumns().length} /></tr>
                                     )}
                                     {isLoadingData && rows.length === 0 ? (
                                         <tr><td colSpan={tableColumns.length} className="p-8 text-center text-muted-foreground">Loading Data...</td></tr>
                                     ) : (
-                                        rowVirtualizer.getVirtualItems().map(virtualRow => {
+                                        virtualRows.map(virtualRow => {
                                             const row = rows[virtualRow.index];
                                             if (!row) return null;
                                             return (
@@ -751,14 +1075,15 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                                     schema={schema}
                                                     tableName={cleanTableName || tableId}
                                                     dialect={dialect}
+                                                    matchedCellKeys={matchedCellKeys}
+                                                    activeCellKey={activeSearchCellKey}
                                                 />
                                             );
                                         })
                                     )}
-                                    {rowVirtualizer.getVirtualItems().length > 0 &&
-                                        rowVirtualizer.getTotalSize() - (rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end || 0) > 0 && (
-                                            <tr><td style={{ height: `${rowVirtualizer.getTotalSize() - (rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end || 0)}px` }} colSpan={table.getVisibleFlatColumns().length} /></tr>
-                                        )}
+                                    {bottomSpacerHeight > 0 && (
+                                        <tr><td style={{ height: `${bottomSpacerHeight}px` }} colSpan={table.getVisibleFlatColumns().length} /></tr>
+                                    )}
                                 </tbody>
                                 {editing.isInserting && metadata?.columns && (
                                     <tfoot className="border-t-2 border-green-500/30">
@@ -815,19 +1140,50 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                 >
                                     ◀
                                 </Button>
-                                <span className="min-w-[40px] text-center">
-                                    {pagination.pageIndex + 1} / {queryResult?.totalCount ? Math.ceil(queryResult.totalCount / pagination.pageSize) : '?'}
-                                </span>
+                                <div className="flex items-center gap-1">
+                                    <Input
+                                        value={pageJumpValue}
+                                        onChange={(e) => {
+                                            const nextValue = e.target.value.replace(/\D/g, '');
+                                            setPageJumpValue(nextValue);
+                                        }}
+                                        onBlur={commitPageJump}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                commitPageJump();
+                                            }
+                                            if (e.key === 'Escape') {
+                                                setPageJumpValue(String(pagination.pageIndex + 1));
+                                            }
+                                        }}
+                                        inputMode="numeric"
+                                        aria-label="Jump to page"
+                                        className="h-5 w-12 border-border/40 bg-transparent px-1 text-center text-[10px] font-semibold tracking-normal"
+                                    />
+                                    <span className="min-w-[38px] text-center">
+                                        / {totalPages ?? '?'}
+                                    </span>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-5 px-1.5 text-[9px] font-bold hover:bg-muted"
+                                        onClick={commitPageJump}
+                                    >
+                                        GO
+                                    </Button>
+                                </div>
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     className="h-5 w-5 p-0 hover:bg-muted"
-                                    disabled={queryResult?.totalCount ? (pagination.pageIndex + 1) * pagination.pageSize >= queryResult.totalCount : rows.length < pagination.pageSize}
+                                    disabled={effectiveTotalCount ? (pagination.pageIndex + 1) * pagination.pageSize >= effectiveTotalCount : rows.length < pagination.pageSize}
                                     onClick={() => setTabPagination(tableId, pagination.pageIndex + 2, pagination.pageSize)}
                                 >
                                     ▶
                                 </Button>
                             </div>
+                            <span className="text-[9px] opacity-70">PAGE</span>
                             <div className="h-3 w-[1px] bg-border mx-1" />
                             <select
                                 className="bg-transparent border-none outline-none cursor-pointer hover:text-foreground text-[9px] font-bold py-0 h-4"
@@ -847,6 +1203,21 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                     <span>{schema}</span>
                 </div>
             </div>
+
+            <BulkReplaceDialog
+                open={isBulkReplaceOpen}
+                onOpenChange={setIsBulkReplaceOpen}
+                allowReplace={editing.isEditMode && !dataEditsDisabled}
+                columns={metadata?.columns || []}
+                pageTargets={pageReplaceTargets}
+                filteredTargets={filteredReplaceTargets}
+                selectedTargets={selectedReplaceTargets}
+                pendingChanges={editing.pendingChanges}
+                onApply={handleApplyBulkReplace}
+                onSearch={handleApplySearch}
+                onClearSearch={clearSearchResults}
+                hasSearchResults={Boolean(activeSearch?.matches.length)}
+            />
 
             <BulkImportDialog
                 open={isImportDialogOpen}

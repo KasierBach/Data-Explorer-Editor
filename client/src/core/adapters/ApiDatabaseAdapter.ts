@@ -71,6 +71,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
             limit?: number;
             offset?: number;
             confirmed?: boolean;
+            includeTotalCount?: boolean;
         } = {
             connectionId: this.connectionId,
             sql: sql,
@@ -80,6 +81,9 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         if (context?.limit !== undefined) body.limit = context.limit;
         if (context?.offset !== undefined) body.offset = context.offset;
         if (context?.confirmed) body.confirmed = true;
+        if (context?.includeTotalCount !== undefined) {
+            body.includeTotalCount = context.includeTotalCount;
+        }
 
         try {
             return await apiService.post<QueryResult>('/query', body);

@@ -728,4 +728,26 @@ export class MongoDbStrategy implements IDatabaseStrategy {
       rowCount: 1,
     };
   }
+  async getSampleRows(
+    client: MongoClient,
+    schema: string,
+    table: string,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    const db = client.db();
+    const rows = await db
+      .collection(table)
+      .find({})
+      .limit(limit)
+      .toArray();
+    return rows.map((row) => {
+      const cleanRow = { ...row };
+      for (const key of Object.keys(cleanRow)) {
+        if (cleanRow[key]?._bsontype === 'ObjectId') {
+          cleanRow[key] = cleanRow[key].toString();
+        }
+      }
+      return cleanRow;
+    });
+  }
 }

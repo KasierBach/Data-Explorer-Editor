@@ -527,4 +527,20 @@ export class MysqlStrategy implements IDatabaseStrategy {
         `;
     return this.executeQuery(pool, sql);
   }
+
+  async getSampleRows(
+    pool: Pool,
+    schema: string,
+    table: string,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    const quotedTable = this.quoteTable(schema, table);
+    // In MySQL, we might need the schema name if it's the database name
+    const sql = `SELECT * FROM \`${schema}\`.\`${table}\` LIMIT ${limit}`;
+    const result = await this.executeQuery(pool, sql).catch(async () => {
+        // Fallback if schema prefix fails
+        return this.executeQuery(pool, `SELECT * FROM \`${table}\` LIMIT ${limit}`);
+    });
+    return result.rows;
+  }
 }

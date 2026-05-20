@@ -127,4 +127,39 @@ describe('QueryService', () => {
       'main',
     ]);
   });
+
+  it('skips total-count side query when caller disables it', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+    freshnessService.buildKey.mockResolvedValue('freshness:query:key');
+    cacheManager.get.mockResolvedValue(undefined);
+    strategy.executeQuery.mockResolvedValue({ rows: [{ id: 1 }] });
+
+    const result = await service.executeQuery(
+      {
+        connectionId: 'conn-1',
+        sql: 'SELECT * FROM users',
+        limit: 1000,
+        offset: 0,
+        includeTotalCount: false,
+      } as any,
+      'user-1',
+    );
+
+    expect(strategy.executeQuery).toHaveBeenCalledTimes(1);
+    expect(result.totalCount).toBeUndefined();
+    expect(freshnessService.buildKey).toHaveBeenCalledWith(
+      'query',
+      ['conn-1', 'main'],
+      ['select * from users', 'limit:1000', 'offset:0', 'total:0'],
+    );
+  });
 });

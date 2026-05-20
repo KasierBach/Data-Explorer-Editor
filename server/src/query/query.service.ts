@@ -47,11 +47,12 @@ export class QueryService {
     connectionId: string,
     sql: string,
     database?: string,
-    options?: { limit?: number; offset?: number },
+    options?: { limit?: number; offset?: number; includeTotalCount?: boolean },
   ): Promise<string> {
     const optionParts = [
       options?.limit !== undefined ? `limit:${options.limit}` : null,
       options?.offset !== undefined ? `offset:${options.offset}` : null,
+      options?.includeTotalCount === false ? 'total:0' : null,
     ].filter((part): part is string => Boolean(part));
 
     return this.freshnessService.buildKey(
@@ -281,8 +282,15 @@ export class QueryService {
   }
 
   async executeQuery(createQueryDto: CreateQueryDto, userId: string) {
-    const { connectionId, sql, database, limit, offset, confirmed } =
-      createQueryDto;
+    const {
+      connectionId,
+      sql,
+      database,
+      limit,
+      offset,
+      confirmed,
+      includeTotalCount,
+    } = createQueryDto;
     const connection = await this.connectionsService.findOne(
       connectionId,
       userId,
@@ -310,6 +318,7 @@ export class QueryService {
         {
           limit,
           offset,
+          includeTotalCount,
         },
       );
       const isCacheable = this.isCacheableQuery(sql);
@@ -328,7 +337,10 @@ export class QueryService {
       }
 
       // Attempt to get totalCount for table views (standard SELECT * queries)
-      if (sql.trim().toUpperCase().startsWith('SELECT * FROM')) {
+      if (
+        includeTotalCount !== false &&
+        sql.trim().toUpperCase().startsWith('SELECT * FROM')
+      ) {
         try {
           const match = sql.match(/FROM\s+([\w"`.[\]]+)/i);
           if (match) {

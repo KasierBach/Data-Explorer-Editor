@@ -367,4 +367,15 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
     });
     return { rows: [], columns: [], rowCount: 0 };
   }
+
+  async getSampleRows(
+    pool: ClickHouseClient,
+    schema: string,
+    table: string,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    const quotedTable = this.quoteTable(schema, table);
+    const result = await this.executeQuery(pool, `SELECT * FROM ${quotedTable} LIMIT ${limit}`);
+    return result.rows;
+  }
 }

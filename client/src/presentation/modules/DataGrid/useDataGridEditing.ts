@@ -56,6 +56,21 @@ export function useDataGridEditing({
         }));
     }, []);
 
+    const applyPendingChangesBatch = useCallback((updatesByRow: Record<string, RowData>) => {
+        setPendingChanges(prev => {
+            const next = { ...prev };
+
+            for (const [rowId, updates] of Object.entries(updatesByRow)) {
+                next[rowId] = {
+                    ...(next[rowId] || {}),
+                    ...updates,
+                };
+            }
+
+            return next;
+        });
+    }, []);
+
     const handleSaveData = useCallback(async () => {
         if (!activeConnection || !pkField) return;
         setIsSaving(true);
@@ -192,6 +207,7 @@ export function useDataGridEditing({
         newRowData,
         setNewRowData,
         handleCellChange,
+        applyPendingChangesBatch,
         handleSaveData,
         handleSaveSchema,
         handleDeleteRows,
@@ -207,6 +223,7 @@ export function useDataGridEditing({
         isInserting, 
         newRowData, 
         handleCellChange, 
+        applyPendingChangesBatch,
         handleSaveData, 
         handleSaveSchema, 
         handleDeleteRows, 

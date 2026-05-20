@@ -701,4 +701,15 @@ export class PostgresStrategy implements IDatabaseStrategy {
         `;
     return this.executeQuery(pool, sql);
   }
+
+  async getSampleRows(
+    pool: Pool,
+    schema: string,
+    table: string,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    const quotedTable = this.quoteTable(schema, table);
+    const result = await this.executeQuery(pool, `SELECT * FROM ${quotedTable} LIMIT ${limit}`);
+    return result.rows;
+  }
 }

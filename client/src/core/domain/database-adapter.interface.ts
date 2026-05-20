@@ -10,6 +10,7 @@ export interface QueryExecutionContext {
     limit?: number;
     offset?: number;
     confirmed?: boolean;
+    includeTotalCount?: boolean;
 }
 
 export interface SchemaOperation {

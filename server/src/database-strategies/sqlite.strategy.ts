@@ -363,4 +363,15 @@ export class SqliteStrategy implements IDatabaseStrategy {
     `;
     return this.executeQuery(pool, sql);
   }
+
+  async getSampleRows(
+    pool: Database.Database,
+    schema: string,
+    table: string,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    const sql = `SELECT * FROM ${this.quoteIdentifier(table)} LIMIT ${limit}`;
+    const result = await this.executeQuery(pool, sql);
+    return result.rows;
+  }
 }

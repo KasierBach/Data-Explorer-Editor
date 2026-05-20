@@ -82,58 +82,60 @@ export const NoSqlGridView: React.FC<NoSqlGridViewProps> = ({ data }) => {
             ref={parentRef}
             className="w-full h-full overflow-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 bg-background relative"
         >
-            <table className="w-full text-[11px] text-left border-collapse font-mono table-fixed">
-                <thead className="bg-muted/90 backdrop-blur-md sticky top-0 z-20 shadow-sm ring-1 ring-black/5">
+            <div className="min-w-full inline-block align-middle">
+                {/* Header */}
+                <div className="sticky top-0 z-20 bg-muted/90 backdrop-blur-md shadow-sm ring-1 ring-black/5 flex border-b border-border/50">
+                    <div className="w-12 flex-none p-2 text-center text-[9px] text-muted-foreground/50 font-black tracking-tighter uppercase flex items-center justify-center border-r border-border/30 bg-muted/10">#</div>
                     {table.getHeaderGroups().map(headerGroup => (
-                        <tr key={headerGroup.id}>
-                            <th className="p-2 border-b border-r border-border/50 text-center text-[9px] w-12 text-muted-foreground/50 font-black tracking-tighter">#</th>
+                        <React.Fragment key={headerGroup.id}>
                             {headerGroup.headers.map(header => (
-                                <th 
+                                <div 
                                     key={header.id} 
                                     style={{ width: header.getSize() }}
-                                    className="p-3 px-4 border-b border-r border-border/50 font-bold text-muted-foreground/70 whitespace-nowrap bg-muted/10 uppercase tracking-wider overflow-hidden truncate"
+                                    className="flex-none p-3 px-4 font-bold text-muted-foreground/70 whitespace-nowrap bg-muted/5 uppercase tracking-wider overflow-hidden truncate text-[10px] border-r border-border/30 last:border-r-0"
                                 >
                                     {flexRender(header.column.columnDef.header, header.getContext())}
-                                </th>
+                                </div>
                             ))}
-                        </tr>
+                        </React.Fragment>
                     ))}
-                </thead>
-                <tbody style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative', display: 'block' }}>
+                </div>
+
+                {/* Body */}
+                <div 
+                    style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}
+                    className="w-full font-mono text-[11px]"
+                >
                     {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                         const row = tableRows[virtualRow.index];
                         return (
-                            <tr 
+                            <div 
                                 key={row.id} 
-                                className="hover:bg-blue-500/[0.04] transition-colors group border-b border-border/30 flex items-center"
+                                className="hover:bg-blue-500/[0.04] transition-colors group border-b border-border/10 flex items-center absolute top-0 left-0 w-full"
                                 style={{
                                     height: `${virtualRow.size}px`,
                                     transform: `translateY(${virtualRow.start}px)`,
-                                    position: 'absolute',
-                                    top: 0,
-                                    left: 0,
-                                    width: '100%',
                                 }}
                             >
-                                <td className="w-12 h-full flex items-center justify-center border-r border-border/30 bg-muted/5 text-[9px] text-muted-foreground/40 group-hover:text-muted-foreground group-hover:bg-muted/10 transition-colors">
+                                <div className="w-12 h-full flex-none flex items-center justify-center border-r border-border/30 bg-muted/5 text-[9px] text-muted-foreground/40 group-hover:text-muted-foreground group-hover:bg-muted/10 transition-colors">
                                     {virtualRow.index + 1}
-                                </td>
+                                </div>
                                 {row.getVisibleCells().map(cell => (
-                                    <td 
+                                    <div 
                                         key={cell.id} 
                                         style={{ width: cell.column.getSize() }}
-                                        className="h-full flex items-center px-4 border-r border-border/30 last:border-r-0 truncate text-foreground/90 font-medium"
+                                        className="h-full flex-none flex items-center px-4 border-r border-border/10 last:border-r-0 truncate text-foreground/90 font-medium"
                                     >
                                         <div className="truncate w-full">
                                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                                         </div>
-                                    </td>
+                                    </div>
                                 ))}
-                            </tr>
+                            </div>
                         );
                     })}
-                </tbody>
-            </table>
+                </div>
+            </div>
         </div>
     );
 };

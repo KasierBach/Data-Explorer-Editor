@@ -616,4 +616,15 @@ export class MssqlStrategy implements IDatabaseStrategy {
         `;
     return this.executeQuery(pool, sql);
   }
+
+  async getSampleRows(
+    pool: mssql.ConnectionPool,
+    schema: string,
+    table: string,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    const quotedTable = this.quoteTable(schema, table);
+    const result = await this.executeQuery(pool, `SELECT TOP ${limit} * FROM ${quotedTable}`);
+    return result.rows;
+  }
 }

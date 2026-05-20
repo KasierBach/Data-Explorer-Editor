@@ -11,9 +11,98 @@ const MIN_COLUMN_WIDTH = 96;
 const MAX_COLUMN_WIDTH = 2000;
 const DEFAULT_COLUMN_WIDTH = 180;
 const AVERAGE_CHARACTER_WIDTH = 7.4;
+const GRID_WHEEL_LINE_HEIGHT = 32;
+const GRID_WHEEL_PAGE_RATIO = 0.72;
+const GRID_WHEEL_MIN_DELTA = 40;
+const GRID_WHEEL_MAX_DELTA = 220;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+export function shouldUseMomentumWheel(
+  deltaX: number,
+  deltaY: number,
+  deltaMode: number,
+) {
+  if (deltaY === 0) return false;
+  if (Math.abs(deltaX) > Math.abs(deltaY)) return false;
+
+  // Let precision trackpads keep the browser's native inertial behavior.
+  if (deltaMode === 0 && Math.abs(deltaY) < GRID_WHEEL_MIN_DELTA) {
+    return false;
+  }
+
+  return true;
+}
+
+export function normalizeMomentumWheelDelta(
+  deltaY: number,
+  deltaMode: number,
+  viewportHeight: number,
+) {
+  if (deltaY === 0) return 0;
+
+  let pixelDelta = deltaY;
+
+  if (deltaMode === 1) {
+    pixelDelta *= GRID_WHEEL_LINE_HEIGHT;
+  } else if (deltaMode === 2) {
+    pixelDelta *= Math.max(
+      160,
+      viewportHeight * GRID_WHEEL_PAGE_RATIO,
+    );
+  }
+
+  const magnitude = clamp(
+    Math.abs(pixelDelta),
+    GRID_WHEEL_MIN_DELTA,
+    GRID_WHEEL_MAX_DELTA,
+  );
+
+  return Math.sign(pixelDelta) * magnitude;
+}
+
+export interface MomentumScrollStep {
+  nextScrollTop: number;
+  nextVelocity: number;
+  done: boolean;
+}
+
+export function advanceMomentumScroll(
+  currentScrollTop: number,
+  velocity: number,
+  maxScrollTop: number,
+  frameRatio = 1,
+): MomentumScrollStep {
+  if (velocity === 0) {
+    return {
+      nextScrollTop: currentScrollTop,
+      nextVelocity: 0,
+      done: true,
+    };
+  }
+
+  const nextScrollTopRaw = currentScrollTop + velocity * frameRatio;
+  const nextScrollTop = clamp(nextScrollTopRaw, 0, maxScrollTop);
+  const hitBoundary = nextScrollTop !== nextScrollTopRaw;
+
+  if (hitBoundary) {
+    return {
+      nextScrollTop,
+      nextVelocity: 0,
+      done: true,
+    };
+  }
+
+  const nextVelocity = velocity * Math.pow(0.88, frameRatio);
+  const done = Math.abs(nextVelocity) < 0.35;
+
+  return {
+    nextScrollTop,
+    nextVelocity: done ? 0 : nextVelocity,
+    done,
+  };
 }
 
 export function serializeDatabaseValue(

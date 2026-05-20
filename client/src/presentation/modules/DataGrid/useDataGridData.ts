@@ -37,7 +37,11 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
     const isLargeDataset = tableId === 'large_dataset' || tableId === 'tbl-large';
 
     // Fetch Metadata with long-term cache (5 minutes)
-    const { data: metadata, isLoading: isLoadingMeta } = useQuery({
+    const {
+        data: metadata,
+        isLoading: isLoadingMeta,
+        refetch: refetchMetadata,
+    } = useQuery({
         queryKey: ['metadata', activeConnectionId, tableId],
         queryFn: async () => {
             if (!activeConnection) throw new Error("No active connection");
@@ -50,7 +54,12 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
     });
 
     // Fetch Data with smart cache (30 seconds)
-    const { data: queryResult, isLoading: isLoadingData, isFetching: isFetchingData, refetch } = useQuery({
+    const {
+        data: queryResult,
+        isLoading: isLoadingData,
+        isFetching: isFetchingData,
+        refetch: refetchData,
+    } = useQuery({
         queryKey: ['data', activeConnectionId, tableId, isLargeDataset, page, pageSize],
         queryFn: async () => {
             if (!activeConnection) throw new Error("No active connection");
@@ -70,6 +79,7 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
                 `SELECT * FROM ${qSchema}.${qTable}`,
                 { 
                     database: dbName,
+                    includeTotalCount: false,
                     limit: pageSize,
                     offset: offset
                 }
@@ -79,9 +89,14 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
         staleTime: 60 * 1000, // Keep data fresh for 1 minute
         gcTime: 15 * 60 * 1000,
         refetchOnWindowFocus: false, // CRITICAL: Stop the flickering/delay on refocus
+        placeholderData: (previousData) => previousData,
     });
 
     const pkField = metadata?.columns?.find(c => c.isPrimaryKey)?.name;
+    const refetch = () => {
+        void refetchMetadata();
+        void refetchData();
+    };
 
     return {
         metadata,

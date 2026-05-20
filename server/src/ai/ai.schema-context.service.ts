@@ -12,6 +12,7 @@ import { FreshnessService } from '../common/freshness/freshness.service';
 interface SchemaTable {
   name: string;
   schema: string;
+  sampleData?: Record<string, unknown>[];
 }
 
 function formatSchemaDefaultValue(value: unknown): string {
@@ -40,7 +41,7 @@ export class AiSchemaContextService {
       ? await this.freshnessService.buildKey(
           'ai-schema',
           [connectionId, database || 'default'],
-          ['schema-context'],
+          ['schema-context-v2'], // Versioned key for new format
         )
       : null;
 
@@ -54,7 +55,11 @@ export class AiSchemaContextService {
       const schemas = await strategy.getSchemas(pool, database);
       const allTables: SchemaTable[] = [];
       const columnMap = new Map<string, ColumnInfo[]>();
-      const skipSchemas = ['pg_catalog', 'information_schema', 'pg_toast'];
+      const skipSchemas = ['pg_catalog', 'information_schema', 'pg_toast', 'sys', 'performance_schema', 'mysql'];
+
+      // Limit table gathering to prevent context overflow
+      let tableCount = 0;
+      const MAX_TABLES = 100;
 
       for (const schema of schemas) {
         const schemaName =
@@ -66,20 +71,34 @@ export class AiSchemaContextService {
         try {
           const tables = await strategy.getTables(pool, schemaName, database);
           for (const table of tables) {
+            if (tableCount >= MAX_TABLES) break;
+            
             const tableName =
               typeof table === 'string'
                 ? table
                 : (table as { name?: string }).name;
             if (!tableName) continue;
-            allTables.push({ name: tableName, schema: schemaName });
+            
+            const tableObj: SchemaTable = { name: tableName, schema: schemaName };
+            allTables.push(tableObj);
+            tableCount++;
 
             try {
               const cols = await strategy.getColumns(
                 pool,
                 schemaName,
                 tableName,
+                database
               );
               columnMap.set(`${schemaName}.${tableName}`, cols);
+
+              // Gather sample data to provide real data type context to AI
+              if (tableCount < 30) {
+                const sample = await strategy.getSampleRows(pool, schemaName, tableName, 2).catch(() => []);
+                if (sample && sample.length > 0) {
+                  tableObj.sampleData = sample;
+                }
+              }
             } catch {
               // Continue building partial schema context.
             }
@@ -87,11 +106,12 @@ export class AiSchemaContextService {
         } catch {
           // Continue building partial schema context.
         }
+        if (tableCount >= MAX_TABLES) break;
       }
 
       let relationships: Relationship[] = [];
       try {
-        relationships = await strategy.getRelationships(pool);
+        relationships = await strategy.getRelationships(pool, database);
       } catch {
         // Relationships are optional for some engines.
       }
@@ -115,7 +135,7 @@ export class AiSchemaContextService {
       }
 
       this.logger.log(
-        `[AiSchemaContextService] Schema context built: ${allTables.length} tables found`,
+        `[AiSchemaContextService] Schema context built: ${allTables.length} tables with sample data`,
       );
     } catch (error) {
       this.logger.error(
@@ -159,11 +179,27 @@ export class AiSchemaContextService {
             : '';
         context += `    - ${col.name} ${col.type} ${nullable}${pk}${def}\n`;
       }
+
+      if (table.sampleData && table.sampleData.length > 0) {
+        context += '  SAMPLE DATA:\n';
+        table.sampleData.forEach(row => {
+          context += `    - ${JSON.stringify(row)}\n`;
+        });
+      }
     }
 
     if (relationships && relationships.length > 0) {
+      const uniqueRels = relationships.filter((rel, index, self) => 
+        index === self.findIndex((r) => (
+          r.source_table === rel.source_table && 
+          r.source_column === rel.source_column && 
+          r.target_table === rel.target_table && 
+          r.target_column === rel.target_column
+        ))
+      );
+
       context += '\nRELATIONSHIPS (Foreign Keys):\n';
-      for (const rel of relationships) {
+      for (const rel of uniqueRels) {
         context += `  ${rel.source_table}.${rel.source_column} -> ${rel.target_table}.${rel.target_column}\n`;
       }
     }
