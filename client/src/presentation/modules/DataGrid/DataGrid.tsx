@@ -51,6 +51,7 @@ import {
     type SelectedCellState,
 } from './dataGridUtils';
 import type { BulkReplaceTargetRow, BulkSearchMatch } from './bulkReplaceUtils';
+import { getDataGridText } from './dataGridI18n';
 
 interface DataGridProps {
     tableId: string;
@@ -61,9 +62,28 @@ interface ActiveGridSearch {
     activeIndex: number;
 }
 
+import type { Row } from '@tanstack/react-table';
+import type { TableColumn, TableMetadata } from '@/core/domain/entities';
+
+interface DataGridRowProps {
+    row: Row<RowData>;
+    editing: ReturnType<typeof useDataGridEditing>;
+    lang: 'vi' | 'en';
+    pkField: string | null | undefined;
+    metadata: TableMetadata | undefined;
+    handleOpenCellInspector: (val: DatabaseValue, col: string, type: string, rowId: string) => void;
+    copyRowAsSQL: (row: RowData, cols: TableColumn[], schema: string, table: string, dialect: 'postgres' | 'mysql') => void;
+    schema: string;
+    tableName: string;
+    dialect: 'postgres' | 'mysql';
+    matchedCellKeys: Set<string>;
+    activeCellKey: string | null;
+}
+
 const DataGridRow = React.memo(({
     row,
     editing,
+    lang,
     pkField,
     metadata,
     handleOpenCellInspector,
@@ -73,7 +93,7 @@ const DataGridRow = React.memo(({
     dialect,
     matchedCellKeys,
     activeCellKey,
-}: any) => {
+}: DataGridRowProps) => {
     const pkValue = pkField ? String(row.original[pkField]) : row.id;
     const isSelected = editing.selectedRows.has(pkValue);
 
@@ -89,7 +109,7 @@ const DataGridRow = React.memo(({
                 copyRowAsSQL(row.original, metadata?.columns || [], schema, tableName, dialect);
             }}
         >
-            {row.getVisibleCells().map((cell: any, cellIdx: number) => (
+            {row.getVisibleCells().map((cell, cellIdx: number) => (
                 (() => {
                     const cellKey = `${pkValue}::${cell.column.id}`;
                     const isMatchedCell = cellIdx > 0 && matchedCellKeys.has(cellKey);
@@ -116,12 +136,12 @@ const DataGridRow = React.memo(({
                             ? () => handleOpenCellInspector(
                                 row.original[cell.column.id],
                                 cell.column.id,
-                                metadata?.columns.find((item: any) => item.name === cell.column.id)?.type || 'unknown',
+                                metadata?.columns.find((item: TableColumn) => item.name === cell.column.id)?.type || 'unknown',
                                 `row ${pkValue}`,
                             )
                             : undefined
                     }
-                    title={cellIdx > 0 ? 'Double-click to inspect full value' : undefined}
+                    title={cellIdx > 0 ? (lang === 'vi' ? 'Nhấn đúp để xem đầy đủ giá trị' : 'Double-click to inspect full value') : undefined}
                 >
                     {cellIdx === 0 ? (
                         <span className={`cursor-pointer ${isSelected ? 'text-blue-500 font-bold' : ''}`}>
@@ -159,7 +179,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const wheelMomentumVelocityRef = useRef(0);
     const wheelMomentumLastTsRef = useRef<number | null>(null);
 
-    const { tabs, activeTabId, setTabPagination, connections, activeConnectionId } = useAppStore();
+    const { tabs, activeTabId, setTabPagination, connections, activeConnectionId, lang } = useAppStore();
     const activeTab = tabs.find((t: Tab) => t.id === activeTabId);
     const activeConnection = connections.find((connection) => connection.id === activeConnectionId);
     const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
@@ -521,7 +541,8 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         ? rowVirtualizer.getTotalSize() - (virtualRows[virtualRows.length - 1]?.end ?? 0)
         : 0;
     const totalRowsLabel = (effectiveTotalCount ?? rows.length).toLocaleString();
-    const bulkSearchButtonLabel = editing.isEditMode ? 'Find / Replace' : 'Find';
+    const text = useMemo(() => getDataGridText(lang), [lang]);
+    const bulkSearchButtonLabel = editing.isEditMode ? text.findReplace : text.find;
     const pageReplaceTargets = useMemo<BulkReplaceTargetRow[]>(
         () => rows.map((row, rowIndex) => ({
             rowId: pkField ? String(row.original[pkField]) : row.id,
@@ -531,8 +552,12 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         [pkField, rows],
     );
     const filteredReplaceTargets = useMemo<BulkReplaceTargetRow[]>(
-        () => pageReplaceTargets,
-        [pageReplaceTargets],
+        () => table.getFilteredRowModel().rows.map((row, rowIndex) => ({
+            rowId: pkField ? String(row.original[pkField]) : row.id,
+            rowIndex,
+            values: row.original,
+        })),
+        [table, pkField],
     );
     const selectedReplaceTargets = useMemo<BulkReplaceTargetRow[]>(
         () => pageReplaceTargets.filter((row) => editing.selectedRows.has(row.rowId)),
@@ -554,12 +579,12 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const handleApplyBulkReplace = (updatesByRow: Record<string, RowData>, summary: { matchedRows: number; matchedCells: number }) => {
         clearSearchResults();
         editing.applyPendingChangesBatch(updatesByRow);
-        toast.success(`Staged ${summary.matchedCells} replacements across ${summary.matchedRows} row(s)`);
+        toast.success(text.stagedReplacements(summary.matchedCells, summary.matchedRows));
     };
     const handleApplySearch = (matches: BulkSearchMatch[], summary: { matchedRows: number; matchedCells: number }) => {
         if (matches.length === 0) {
             setActiveSearch(null);
-            toast.info('No matches found');
+            toast.info(text.noMatchesFound);
             return;
         }
 
@@ -567,7 +592,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
             matches,
             activeIndex: 0,
         });
-        toast.success(`Found ${summary.matchedCells} matches across ${summary.matchedRows} row(s)`);
+        toast.success(text.findResults(summary.matchedCells, summary.matchedRows));
     };
     const goToSearchMatch = useCallback((direction: -1 | 1) => {
         setActiveSearch((current) => {
@@ -629,13 +654,13 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     };
 
     const mobileActionLabel = editing.selectedRows.size > 0
-        ? `Delete (${editing.selectedRows.size})`
-        : 'Actions';
+        ? text.delete(editing.selectedRows.size)
+        : text.actions;
 
     // --- Loading state ---
     if (isLoadingMeta) return (
         <div className="p-4 text-xs text-muted-foreground italic flex items-center gap-2">
-            <RefreshCw className="w-3 h-3 animate-spin" /> Loading Schema...
+            <RefreshCw className="w-3 h-3 animate-spin" /> {text.loadingSchema}
         </div>
     );
 
@@ -647,6 +672,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                 metadata={metadata}
                 onSave={editing.handleSaveSchema}
                 onCancel={() => setViewMode('grid')}
+                lang={lang}
                 isReadOnly={readOnlyConnection}
                 schemaChangesAllowed={!schemaChangesDisabled}
             />
@@ -685,7 +711,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                 )}
                             >
                                 <PencilLine className="w-3 h-3" />
-                                {editing.isEditMode ? 'Cancel' : 'Edit'}
+                                {editing.isEditMode ? text.cancel : text.edit}
                             </Button>
 
                             {editing.isEditMode && (
@@ -696,7 +722,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                     className="h-7 px-2 text-[11px] gap-1.5 shrink-0"
                                 >
                                     <ArrowRightLeft className="w-3 h-3" />
-                                    {isSmallMobile ? 'Find' : bulkSearchButtonLabel}
+                                    {isSmallMobile ? text.find : bulkSearchButtonLabel}
                                 </Button>
                             )}
 
@@ -709,7 +735,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                     className="h-7 px-3 text-[11px] bg-green-600 hover:bg-green-700 text-white shrink-0"
                                 >
                                     {editing.isSaving ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : null}
-                                    Save ({Object.keys(editing.pendingChanges).length})
+                                    {text.save} ({Object.keys(editing.pendingChanges).length})
                                 </Button>
                             )}
                         </div>
@@ -718,10 +744,10 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                             <div className="flex items-center gap-2 min-w-0">
                                 <Button variant="ghost" size="sm" onClick={() => refetch()} className="h-8 px-2 text-[11px] gap-1 shrink-0" disabled={editing.isEditMode}>
                                     <RefreshCw className="w-3.5 h-3.5" />
-                                    {!isSmallMobile && 'Refresh'}
+                                    {!isSmallMobile && text.refresh}
                                 </Button>
 
-                                <FilterPopover onFilterChange={setGlobalFilter} currentFilter={globalFilter} />
+                                <FilterPopover lang={lang} onFilterChange={setGlobalFilter} currentFilter={globalFilter} />
 
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -738,20 +764,20 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                             <FileJson className="w-3 h-3" /> JSON
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => exportSQL(exportCtx)} className="gap-2 text-xs">
-                                            <FileCode className="w-3 h-3" /> SQL (INSERT)
+                                            <FileCode className="w-3 h-3" /> {lang === 'vi' ? 'SQL (THEM)' : 'SQL (INSERT)'}
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={editing.toggleInsertMode} disabled={dataEditsDisabled} className="gap-2 text-xs">
-                                            <Plus className="w-3 h-3" /> {editing.isInserting ? 'Cancel Insert' : 'Insert Row'}
+                                            <Plus className="w-3 h-3" /> {editing.isInserting ? text.cancelInsert : text.insertRow}
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)} disabled={importExportDisabled} className="gap-2 text-xs">
-                                            <Upload className="w-3 h-3" /> Import
+                                            <Upload className="w-3 h-3" /> {text.import}
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => setIsMigrationDialogOpen(true)} disabled={queryExecutionDisabled} className="gap-2 text-xs">
-                                            <ArrowRightLeft className="w-3 h-3" /> Transfer
+                                            <ArrowRightLeft className="w-3 h-3" /> {text.transfer}
                                         </DropdownMenuItem>
                                         {editing.selectedRows.size > 0 && (
                                             <DropdownMenuItem onClick={editing.handleDeleteRows} disabled={editing.isSaving || dataEditsDisabled} className="gap-2 text-xs text-red-500 focus:text-red-500">
-                                                <Trash2 className="w-3 h-3" /> Delete ({editing.selectedRows.size})
+                                                <Trash2 className="w-3 h-3" /> {text.delete(editing.selectedRows.size)}
                                             </DropdownMenuItem>
                                         )}
                                     </DropdownMenuContent>
@@ -787,7 +813,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                 disabled={dataEditsDisabled}
                                 className={`h-6 px-2 text-[11px] gap-1.5 rounded-sm ${editing.isEditMode ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' : ''}`}
                             >
-                                {editing.isEditMode ? 'Cancel Edit' : 'Edit Data'}
+                                {editing.isEditMode ? text.cancelEdit : text.editData}
                             </Button>
                         </div>
 
@@ -805,20 +831,20 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                         {Object.keys(editing.pendingChanges).length > 0 && (
                             <Button variant="default" size="sm" onClick={editing.handleSaveData} disabled={editing.isSaving || dataEditsDisabled} className="h-6 px-3 text-[11px] bg-green-600 hover:bg-green-700 text-white ml-2">
                                 {editing.isSaving ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : null}
-                                Save Changes ({Object.keys(editing.pendingChanges).length})
+                                {text.saveChanges} ({Object.keys(editing.pendingChanges).length})
                             </Button>
                         )}
 
                         <div className="h-4 w-[1px] bg-border mx-1" />
 
                         <Button variant="ghost" size="sm" onClick={() => refetch()} className="h-7 text-[11px] gap-1 px-2" disabled={editing.isEditMode}>
-                            <RefreshCw className="w-3 h-3" /> Refresh
+                            <RefreshCw className="w-3 h-3" /> {text.refresh}
                         </Button>
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-7 text-[11px] gap-1 px-2">
-                                    <Download className="w-3 h-3" /> Export
+                                    <Download className="w-3 h-3" /> {text.export}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
@@ -829,7 +855,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                     <FileJson className="w-3 h-3" /> JSON
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => exportSQL(exportCtx)} className="gap-2 text-xs">
-                                    <FileCode className="w-3 h-3" /> SQL (INSERT)
+                                    <FileCode className="w-3 h-3" /> {lang === 'vi' ? 'SQL (THEM)' : 'SQL (INSERT)'}
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -837,30 +863,30 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                         <div className="h-4 w-[1px] bg-border mx-1" />
 
                         <Button variant="ghost" size="sm" onClick={editing.toggleInsertMode} disabled={dataEditsDisabled} className={`h-7 text-[11px] gap-1 px-2 ${editing.isInserting ? 'text-green-500' : ''}`}>
-                            <Plus className="w-3 h-3" /> Insert Row
+                            <Plus className="w-3 h-3" /> {text.insertRow}
                         </Button>
 
                         <Button variant="ghost" size="sm" onClick={() => setIsImportDialogOpen(true)} disabled={importExportDisabled} className="h-7 text-[11px] gap-1 px-2 text-blue-500 hover:text-blue-600">
-                            <Upload className="w-3 h-3" /> Import
+                            <Upload className="w-3 h-3" /> {text.import}
                         </Button>
 
                         <Button variant="ghost" size="sm" onClick={() => setIsMigrationDialogOpen(true)} disabled={queryExecutionDisabled} className="h-7 text-[11px] gap-1 px-2 text-purple-500 hover:text-purple-600">
-                            <ArrowRightLeft className="w-3 h-3" /> Transfer
+                            <ArrowRightLeft className="w-3 h-3" /> {text.transfer}
                         </Button>
 
                         {editing.selectedRows.size > 0 && (
                             <Button variant="ghost" size="sm" onClick={editing.handleDeleteRows} disabled={editing.isSaving || dataEditsDisabled} className="h-7 text-[11px] gap-1 px-2 text-red-500 hover:text-red-600 hover:bg-red-500/10">
-                                <Trash2 className="w-3 h-3" /> Delete ({editing.selectedRows.size})
+                                <Trash2 className="w-3 h-3" /> {text.delete(editing.selectedRows.size)}
                             </Button>
                         )}
 
                         <div className="h-4 w-[1px] bg-border mx-1" />
 
-                        <FilterPopover onFilterChange={setGlobalFilter} currentFilter={globalFilter} />
+                        <FilterPopover lang={lang} onFilterChange={setGlobalFilter} currentFilter={globalFilter} />
 
                         <div className="text-[10px] text-muted-foreground ml-auto flex items-center gap-3 pr-2 font-mono uppercase">
                             <span className="bg-muted px-1.5 rounded border border-border/50">
-                                {totalRowsLabel} TOTAL ROWS
+                                {totalRowsLabel} {text.totalRows}
                             </span>
                             {queryResult?.durationMs && <span className="opacity-70">{queryResult.durationMs}MS</span>}
                         </div>
@@ -876,7 +902,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                 )}>
                     <div className="min-w-0 flex items-center gap-3 text-xs text-foreground">
                         <span className="rounded border border-amber-500/20 bg-amber-500/10 px-2 py-1 font-semibold uppercase tracking-wide text-[10px] text-amber-300">
-                            Find
+                            {text.find}
                         </span>
                         <span className="font-medium">
                             {activeSearch.activeIndex + 1} / {activeSearch.matches.length}
@@ -893,7 +919,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                             className="h-7 px-2 text-[11px]"
                             onClick={() => goToSearchMatch(-1)}
                         >
-                            Prev
+                            {text.prev}
                         </Button>
                         <Button
                             variant="ghost"
@@ -901,7 +927,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                             className="h-7 px-2 text-[11px]"
                             onClick={() => goToSearchMatch(1)}
                         >
-                            Next
+                            {text.next}
                         </Button>
                         <Button
                             variant="ghost"
@@ -909,7 +935,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                             className="h-7 px-2 text-[11px] text-amber-300 hover:text-amber-200"
                             onClick={clearSearchResults}
                         >
-                            Clear
+                            {text.clear}
                         </Button>
                     </div>
                 </div>
@@ -918,13 +944,13 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
             {activeConnection && (readOnlyConnection || queryExecutionDisabled || schemaChangesDisabled || importExportDisabled) && (
                 <div className="mx-2 mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
                     {readOnlyConnection
-                        ? 'This connection is read-only. Editing, schema design, import, and destructive actions are locked.'
+                        ? text.readOnlyLocked
                         : queryExecutionDisabled
-                            ? 'Query execution is disabled for this connection.'
-                            : `Restricted connection: ${[
-                                schemaChangesDisabled ? 'schema changes disabled' : null,
-                                importExportDisabled ? 'import/export disabled' : null,
-                            ].filter(Boolean).join(' • ')}`}
+                            ? text.queryExecutionDisabled
+                            : text.restrictedConnection([
+                                schemaChangesDisabled ? text.schemaChangesDisabled : null,
+                                importExportDisabled ? text.importExportDisabled : null,
+                            ].filter((value): value is string => Boolean(value)))}
                 </div>
             )}
 
@@ -995,7 +1021,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                                                     setDraggingColumnId(null);
                                                                     setDropTargetColumnId(null);
                                                                 }}
-                                                                title="Drag to reorder column"
+                                                                title={lang === 'vi' ? 'Kéo để đổi thứ tự cột' : 'Drag to reorder column'}
                                                             >
                                                                 <GripVertical className="h-3 w-3" />
                                                             </button>
@@ -1045,7 +1071,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                                                 event.stopPropagation();
                                                                 header.getResizeHandler()(event);
                                                             }}
-                                                            title="Drag to resize. Double-click to auto-fit."
+                                                            title={lang === 'vi' ? 'Kéo để đổi độ rộng. Nhấn đúp để vừa nội dung.' : 'Drag to resize. Double-click to auto-fit.'}
                                                         />
                                                     )}
                                                 </th>
@@ -1058,7 +1084,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                         <tr><td style={{ height: `${topSpacerHeight}px` }} colSpan={table.getVisibleFlatColumns().length} /></tr>
                                     )}
                                     {isLoadingData && rows.length === 0 ? (
-                                        <tr><td colSpan={tableColumns.length} className="p-8 text-center text-muted-foreground">Loading Data...</td></tr>
+                                        <tr><td colSpan={tableColumns.length} className="p-8 text-center text-muted-foreground">{text.loadingData}</td></tr>
                                     ) : (
                                         virtualRows.map(virtualRow => {
                                             const row = rows[virtualRow.index];
@@ -1068,6 +1094,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                                     key={row.id}
                                                     row={row}
                                                     editing={editing}
+                                                    lang={lang}
                                                     pkField={pkField}
                                                     metadata={metadata}
                                                     handleOpenCellInspector={handleOpenCellInspector}
@@ -1105,10 +1132,10 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                             <td colSpan={metadata.columns.length + 1} className="px-2 py-1">
                                                 <div className="flex items-center gap-1">
                                                     <Button size="sm" onClick={editing.handleInsertRow} disabled={editing.isSaving || dataEditsDisabled} className="h-6 px-3 text-[10px] bg-green-600 hover:bg-green-700 text-white gap-1">
-                                                        <Check className="w-3 h-3" /> Insert
+                                                        <Check className="w-3 h-3" /> {text.insert}
                                                     </Button>
                                                     <Button variant="ghost" size="sm" onClick={editing.toggleInsertMode} className="h-6 px-2 text-[10px] gap-1">
-                                                        <X className="w-3 h-3" /> Cancel
+                                                        <X className="w-3 h-3" /> {text.cancel}
                                                     </Button>
                                                 </div>
                                             </td>
@@ -1126,7 +1153,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                 <div className="flex items-center gap-6">
                     <span className="flex items-center gap-1.5">
                         <div className={`w-1.5 h-1.5 rounded-full ${isFetchingData ? 'bg-blue-500 animate-pulse' : 'bg-green-500'}`} />
-                        {isLargeDataset ? 'VIRTUALIZED (ALL)' : `PAGE ${pagination.pageIndex + 1}`}
+                        {isLargeDataset ? text.virtualizedAll : text.pageLabel(pagination.pageIndex + 1)}
                     </span>
                     {!isLargeDataset && (
                         <div className="flex items-center gap-3 ml-2">
@@ -1158,7 +1185,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                             }
                                         }}
                                         inputMode="numeric"
-                                        aria-label="Jump to page"
+                                        aria-label={text.jumpToPage}
                                         className="h-5 w-12 border-border/40 bg-transparent px-1 text-center text-[10px] font-semibold tracking-normal"
                                     />
                                     <span className="min-w-[38px] text-center">
@@ -1170,7 +1197,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                         className="h-5 px-1.5 text-[9px] font-bold hover:bg-muted"
                                         onClick={commitPageJump}
                                     >
-                                        GO
+                                        {text.go}
                                     </Button>
                                 </div>
                                 <Button
@@ -1183,17 +1210,17 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                     ▶
                                 </Button>
                             </div>
-                            <span className="text-[9px] opacity-70">PAGE</span>
+                            <span className="text-[9px] opacity-70">{lang === 'vi' ? 'TRANG' : 'PAGE'}</span>
                             <div className="h-3 w-[1px] bg-border mx-1" />
                             <select
                                 className="bg-transparent border-none outline-none cursor-pointer hover:text-foreground text-[9px] font-bold py-0 h-4"
                                 value={pagination.pageSize}
                                 onChange={(e) => setTabPagination(tableId, 1, Number(e.target.value))}
                             >
-                                <option value="50">50 / PAGE</option>
-                                <option value="100">100 / PAGE</option>
-                                <option value="500">500 / PAGE</option>
-                                <option value="1000">1000 / PAGE</option>
+                                <option value="50">50 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
+                                <option value="100">100 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
+                                <option value="500">500 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
+                                <option value="1000">1000 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
                             </select>
                         </div>
                     )}
@@ -1217,6 +1244,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                 onSearch={handleApplySearch}
                 onClearSearch={clearSearchResults}
                 hasSearchResults={Boolean(activeSearch?.matches.length)}
+                lang={lang}
             />
 
             <BulkImportDialog
@@ -1242,6 +1270,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                 onOpenChange={(open) => {
                     if (!open) setSelectedCell(null);
                 }}
+                lang={lang}
             />
         </div>
     );

@@ -41,4 +41,19 @@ describe('AuthService - login', () => {
       }),
     );
   });
+
+  it('returns English invalid-credentials copy when the caller requests en', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue(null);
+
+    await expect(
+      (authService as any).login(
+        {
+          email: 'missing@example.com',
+          password: 'pw',
+        } as LoginDto,
+        undefined,
+        'en',
+      ),
+    ).rejects.toThrow('Invalid credentials');
+  });
 });

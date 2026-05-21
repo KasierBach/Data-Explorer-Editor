@@ -30,12 +30,15 @@ export class AiPromptBuilderService {
       context,
     );
 
-    const isNoSql = databaseType === 'mongodb' || databaseType === 'redis' || databaseType?.includes('mongodb');
+    const isNoSql =
+      databaseType === 'mongodb' ||
+      databaseType === 'redis' ||
+      databaseType?.includes('mongodb');
 
     const sqlRules = hasDbContext
-      ? (isNoSql 
-          ? Prompts.NOSQL_RULES_LIVE.replace('{engine}', databaseType)
-          : Prompts.SQL_RULES_LIVE.replace('{engine}', databaseType))
+      ? isNoSql
+        ? Prompts.NOSQL_RULES_LIVE.replace('{engine}', databaseType)
+        : Prompts.SQL_RULES_LIVE.replace('{engine}', databaseType)
       : Prompts.SQL_RULES_NONE;
 
     const modeSection =

@@ -55,7 +55,14 @@ export class AiSchemaContextService {
       const schemas = await strategy.getSchemas(pool, database);
       const allTables: SchemaTable[] = [];
       const columnMap = new Map<string, ColumnInfo[]>();
-      const skipSchemas = ['pg_catalog', 'information_schema', 'pg_toast', 'sys', 'performance_schema', 'mysql'];
+      const skipSchemas = [
+        'pg_catalog',
+        'information_schema',
+        'pg_toast',
+        'sys',
+        'performance_schema',
+        'mysql',
+      ];
 
       // Limit table gathering to prevent context overflow
       let tableCount = 0;
@@ -72,14 +79,17 @@ export class AiSchemaContextService {
           const tables = await strategy.getTables(pool, schemaName, database);
           for (const table of tables) {
             if (tableCount >= MAX_TABLES) break;
-            
+
             const tableName =
               typeof table === 'string'
                 ? table
                 : (table as { name?: string }).name;
             if (!tableName) continue;
-            
-            const tableObj: SchemaTable = { name: tableName, schema: schemaName };
+
+            const tableObj: SchemaTable = {
+              name: tableName,
+              schema: schemaName,
+            };
             allTables.push(tableObj);
             tableCount++;
 
@@ -88,13 +98,15 @@ export class AiSchemaContextService {
                 pool,
                 schemaName,
                 tableName,
-                database
+                database,
               );
               columnMap.set(`${schemaName}.${tableName}`, cols);
 
               // Gather sample data to provide real data type context to AI
               if (tableCount < 30) {
-                const sample = await strategy.getSampleRows(pool, schemaName, tableName, 2).catch(() => []);
+                const sample = await strategy
+                  .getSampleRows(pool, schemaName, tableName, 2)
+                  .catch(() => []);
                 if (sample && sample.length > 0) {
                   tableObj.sampleData = sample;
                 }
@@ -182,20 +194,23 @@ export class AiSchemaContextService {
 
       if (table.sampleData && table.sampleData.length > 0) {
         context += '  SAMPLE DATA:\n';
-        table.sampleData.forEach(row => {
+        table.sampleData.forEach((row) => {
           context += `    - ${JSON.stringify(row)}\n`;
         });
       }
     }
 
     if (relationships && relationships.length > 0) {
-      const uniqueRels = relationships.filter((rel, index, self) => 
-        index === self.findIndex((r) => (
-          r.source_table === rel.source_table && 
-          r.source_column === rel.source_column && 
-          r.target_table === rel.target_table && 
-          r.target_column === rel.target_column
-        ))
+      const uniqueRels = relationships.filter(
+        (rel, index, self) =>
+          index ===
+          self.findIndex(
+            (r) =>
+              r.source_table === rel.source_table &&
+              r.source_column === rel.source_column &&
+              r.target_table === rel.target_table &&
+              r.target_column === rel.target_column,
+          ),
       );
 
       context += '\nRELATIONSHIPS (Foreign Keys):\n';

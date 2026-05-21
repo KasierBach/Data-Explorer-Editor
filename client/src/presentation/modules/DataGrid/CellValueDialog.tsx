@@ -8,11 +8,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/presentation/components/ui/dialog';
+import type { AppLang } from '@/core/utils/i18n';
 import type { SelectedCellState } from './dataGridUtils';
 import { serializeDatabaseValue } from './dataGridUtils';
+import { getDataGridText } from './dataGridI18n';
 
 interface CellValueDialogProps {
   cell: SelectedCellState | null;
+  lang: AppLang;
   onOpenChange: (open: boolean) => void;
 }
 
@@ -27,8 +30,11 @@ function isStructuredValue(value: SelectedCellState['value']) {
 
 export function CellValueDialog({
   cell,
+  lang,
   onOpenChange,
 }: CellValueDialogProps) {
+  const text = getDataGridText(lang);
+
   const handleCopy = async () => {
     if (!cell) return;
 
@@ -36,9 +42,9 @@ export function CellValueDialog({
       await navigator.clipboard.writeText(
         serializeDatabaseValue(cell.value, true),
       );
-      toast.success(`Copied ${cell.columnName}`);
+      toast.success(text.copiedColumn(cell.columnName));
     } catch {
-      toast.error('Unable to copy value');
+      toast.error(text.unableToCopyValue);
     }
   };
 
@@ -53,10 +59,10 @@ export function CellValueDialog({
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-2">
               <DialogTitle className="text-base font-semibold text-foreground">
-                {cell?.columnName || 'Cell value'}
+                {cell?.columnName || text.cellValue}
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Full value preview for the selected cell.
+                {text.fullValuePreview}
               </DialogDescription>
             </div>
             <Button
@@ -68,7 +74,7 @@ export function CellValueDialog({
               className="h-8 gap-1.5 text-[11px]"
             >
               <Copy className="h-3.5 w-3.5" />
-              Copy value
+              {text.copyValue}
             </Button>
           </div>
           {cell ? (

@@ -89,7 +89,7 @@ export function QueryProjectPanel({
     const folderGroups = useMemo(() => {
         const grouped = new Map<string, SavedQuery[]>();
         for (const query of savedQueries) {
-            const key = query.folderId?.trim() || (lang === 'vi' ? 'Khong thu muc' : 'No folder');
+            const key = query.folderId?.trim() || (lang === 'vi' ? 'Không có thư mục' : 'No folder');
             const bucket = grouped.get(key) ?? [];
             bucket.push(query);
             grouped.set(key, bucket);
@@ -158,7 +158,7 @@ export function QueryProjectPanel({
                                     >
                                         <div className="truncate text-sm font-medium">{query.name}</div>
                                         <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                                            {query.folderId || (lang === 'vi' ? 'Khong thu muc' : 'No folder')}
+                                            {query.folderId || (lang === 'vi' ? 'Không có thư mục' : 'No folder')}
                                         </div>
                                     </button>
                                     <div className="flex items-center gap-1">
@@ -207,7 +207,7 @@ export function QueryProjectPanel({
                     )}
                 </SectionCard>
 
-                <SectionCard title={lang === 'vi' ? 'Thu muc' : 'Folders'} icon={LayoutGrid} count={folderGroups.length}>
+                <SectionCard title={lang === 'vi' ? 'Thư mục' : 'Folders'} icon={LayoutGrid} count={folderGroups.length}>
                     {folderGroups.length === 0 ? (
                         <div className="rounded-md border border-dashed px-3 py-4 text-xs text-muted-foreground">
                             {lang === 'vi'

@@ -623,8 +623,12 @@ export class MssqlStrategy implements IDatabaseStrategy {
     table: string,
     limit: number,
   ): Promise<Record<string, unknown>[]> {
+    const sanitizedLimit = SqlUtil.sanitizeLimit(limit);
     const quotedTable = this.quoteTable(schema, table);
-    const result = await this.executeQuery(pool, `SELECT TOP ${limit} * FROM ${quotedTable}`);
+    const result = await this.executeQuery(
+      pool,
+      `SELECT TOP ${sanitizedLimit} * FROM ${quotedTable}`,
+    );
     return result.rows;
   }
 }

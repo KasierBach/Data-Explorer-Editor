@@ -7,27 +7,32 @@ import {
     PopoverTrigger,
 } from '../../components/ui/popover';
 import { Filter, X } from 'lucide-react';
+import type { AppLang } from '@/core/utils/i18n';
+import { getDataGridText } from './dataGridI18n';
 
 interface FilterPopoverProps {
+    lang: AppLang;
     currentFilter: string;
     onFilterChange: (value: string) => void;
 }
 
-export const FilterPopover: React.FC<FilterPopoverProps> = ({ currentFilter, onFilterChange }) => {
+export const FilterPopover: React.FC<FilterPopoverProps> = ({ lang, currentFilter, onFilterChange }) => {
+    const text = getDataGridText(lang);
+
     return (
         <Popover>
             <PopoverTrigger asChild>
                 <Button variant={currentFilter ? "secondary" : "ghost"} size="sm" className={currentFilter ? "text-blue-500" : ""}>
                     <Filter className="w-3 h-3 mr-1" />
-                    {currentFilter ? 'Filtered' : 'Filter'}
+                    {currentFilter ? text.filtered : text.filter}
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[min(20rem,calc(100vw-1rem))] p-3" align="start">
                 <div className="space-y-4">
-                    <h4 className="font-medium text-xs text-muted-foreground uppercase">Global Search</h4>
+                    <h4 className="font-medium text-xs text-muted-foreground uppercase">{text.globalSearch}</h4>
                     <div className="flex gap-2">
                         <Input
-                            placeholder="Type to search..."
+                            placeholder={text.typeToSearch}
                             value={currentFilter}
                             onChange={(e) => onFilterChange(e.target.value)}
                             className="h-8 text-xs"
@@ -39,7 +44,7 @@ export const FilterPopover: React.FC<FilterPopoverProps> = ({ currentFilter, onF
                         )}
                     </div>
                     <div className="text-[10px] text-muted-foreground">
-                        Filters across all columns locally.
+                        {text.filtersAcrossAllColumns}
                     </div>
                 </div>
             </PopoverContent>

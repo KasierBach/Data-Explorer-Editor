@@ -45,8 +45,16 @@ export class SqlUtil {
       }
       return `${paginated} OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY;`;
     } else {
-      // Postgres & MySQL use LIMIT X OFFSET Y
       return `${trimmed} LIMIT ${limit} OFFSET ${offset};`;
     }
+  }
+
+  /**
+   * Sanitizes a limit parameter to ensure it is a safe positive integer.
+   */
+  static sanitizeLimit(limit: number, max: number = 1000): number {
+    const val = typeof limit === 'number' ? limit : parseInt(String(limit), 10);
+    if (isNaN(val) || val <= 0) return 50;
+    return Math.min(val, max);
   }
 }

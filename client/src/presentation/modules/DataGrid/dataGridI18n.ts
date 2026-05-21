@@ -1,0 +1,106 @@
+import { pickLocalizedText, type AppLang } from '@/core/utils/i18n';
+
+export function getDataGridText(lang: AppLang) {
+  return {
+    active: pickLocalizedText(lang, 'Đang chọn', 'Active'),
+    actions: pickLocalizedText(lang, 'Hành động', 'Actions'),
+    addColumn: pickLocalizedText(lang, 'Thêm cột', 'Add Column'),
+    allTextColumns: pickLocalizedText(lang, 'Tất cả cột text', 'All text columns'),
+    applyReplace: pickLocalizedText(lang, 'Áp dụng thay', 'Apply Replace'),
+    cancel: pickLocalizedText(lang, 'Hủy', 'Cancel'),
+    cancelEdit: pickLocalizedText(lang, 'Hủy sửa', 'Cancel Edit'),
+    cancelInsert: pickLocalizedText(lang, 'Hủy thêm', 'Cancel Insert'),
+    caseSensitive: pickLocalizedText(lang, 'Phân biệt hoa thường', 'Case sensitive'),
+    cellValue: pickLocalizedText(lang, 'Giá trị ô', 'Cell value'),
+    changesSaved: pickLocalizedText(lang, 'Đã lưu thay đổi', 'Changes saved'),
+    clear: pickLocalizedText(lang, 'Xóa', 'Clear'),
+    clearSearch: pickLocalizedText(lang, 'Xóa tìm kiếm', 'Clear Search'),
+    columnDefinitions: pickLocalizedText(lang, 'Định nghĩa cột', 'Column Definitions'),
+    columnName: pickLocalizedText(lang, 'Tên cột', 'Column Name'),
+    copyObject: pickLocalizedText(lang, 'Sao chép đối tượng', 'Copy object'),
+    copyValue: pickLocalizedText(lang, 'Sao chép giá trị', 'Copy value'),
+    copiedColumn: (columnName: string) =>
+      pickLocalizedText(lang, `Đã sao chép ${columnName}`, `Copied ${columnName}`),
+    currentFilteredRows: (count: number) =>
+      pickLocalizedText(lang, `Dòng đã lọc hiện tại (${count})`, `Current filtered rows (${count})`),
+    currentPage: (count: number) =>
+      pickLocalizedText(lang, `Trang hiện tại (${count})`, `Current page (${count})`),
+    delete: (count?: number) =>
+      typeof count === 'number'
+        ? pickLocalizedText(lang, `Xóa (${count})`, `Delete (${count})`)
+        : pickLocalizedText(lang, 'Xóa', 'Delete'),
+    deleteConfirm: (count: number) =>
+      pickLocalizedText(
+        lang,
+        `Xóa ${count} dòng? Hành động này không thể hoàn tác.`,
+        `Delete ${count} row(s)? This cannot be undone.`,
+      ),
+    edit: pickLocalizedText(lang, 'Sửa', 'Edit'),
+    editData: pickLocalizedText(lang, 'Sửa dữ liệu', 'Edit Data'),
+    enterAtLeastOneValue: pickLocalizedText(lang, 'Nhập ít nhất một giá trị', 'Enter at least one value'),
+    exactMatch: pickLocalizedText(lang, 'Khớp chính xác', 'Exact match'),
+    export: pickLocalizedText(lang, 'Xuất', 'Export'),
+    filter: pickLocalizedText(lang, 'Lọc', 'Filter'),
+    filtered: pickLocalizedText(lang, 'Đã lọc', 'Filtered'),
+    filtersAcrossAllColumns: pickLocalizedText(lang, 'Lọc cục bộ trên tất cả các cột.', 'Filters across all columns locally.'),
+    find: pickLocalizedText(lang, 'Tìm', 'Find'),
+    findMatches: pickLocalizedText(lang, 'Tìm kết quả', 'Find Matches'),
+    findReplace: pickLocalizedText(lang, 'Tìm / Thay', 'Find / Replace'),
+    findResults: (cells: number, rows: number) =>
+      pickLocalizedText(lang, `Tìm thấy ${cells} kết quả trong ${rows} dòng`, `Found ${cells} matches across ${rows} row(s)`),
+    fullValuePreview: pickLocalizedText(lang, 'Xem đầy đủ giá trị của ô đang chọn.', 'Full value preview for the selected cell.'),
+    go: pickLocalizedText(lang, 'Đi', 'Go'),
+    globalSearch: pickLocalizedText(lang, 'Tìm kiếm toàn cục', 'Global Search'),
+    import: pickLocalizedText(lang, 'Nhập', 'Import'),
+    importExportDisabled: pickLocalizedText(lang, 'Tắt import/export cho kết nối này.', 'Import/export disabled for this connection.'),
+    insert: pickLocalizedText(lang, 'Thêm', 'Insert'),
+    insertRow: pickLocalizedText(lang, 'Thêm dòng', 'Insert Row'),
+    jumpToPage: pickLocalizedText(lang, 'Nhập số trang', 'Jump to page'),
+    loadingData: pickLocalizedText(lang, 'Đang tải dữ liệu...', 'Loading Data...'),
+    loadingSchema: pickLocalizedText(lang, 'Đang tải cấu trúc...', 'Loading Schema...'),
+    matchMode: pickLocalizedText(lang, 'Kiểu khớp', 'Match mode'),
+    next: pickLocalizedText(lang, 'Sau', 'Next'),
+    noMatchesFound: pickLocalizedText(lang, 'Không tìm thấy kết quả', 'No matches found'),
+    noTextColumns: pickLocalizedText(lang, 'Không có cột dạng text để thao tác trong bảng hiện tại.', 'No text-like columns are available for this operation in the current table.'),
+    pageLabel: (page: number) => pickLocalizedText(lang, `Trang ${page}`, `Page ${page}`),
+    prev: pickLocalizedText(lang, 'Trước', 'Prev'),
+    queryExecutionDisabled: pickLocalizedText(lang, 'Kết nối này đã tắt chạy query.', 'Query execution is disabled for this connection.'),
+    readOnlyLocked: pickLocalizedText(lang, 'Kết nối chỉ đọc: khóa sửa dữ liệu, thiết kế schema, import và thao tác phá hủy.', 'This connection is read-only. Editing, schema design, import, and destructive actions are locked.'),
+    refresh: pickLocalizedText(lang, 'Làm mới', 'Refresh'),
+    replace: pickLocalizedText(lang, 'Thay', 'Replace'),
+    replaceModeRequiresEdit: pickLocalizedText(lang, 'Chế độ thay chỉ mở khi bạn bật Edit Data.', 'Replace mode is available after you turn on Edit Data.'),
+    replaceWith: pickLocalizedText(lang, 'Thay bằng', 'Replace with'),
+    restrictedConnection: (restrictions: string[]) =>
+      pickLocalizedText(lang, `Kết nối hạn chế: ${restrictions.join(' • ')}`, `Restricted connection: ${restrictions.join(' • ')}`),
+    rowInserted: pickLocalizedText(lang, 'Thêm dòng thành công', 'Row inserted successfully'),
+    rowsLabel: pickLocalizedText(lang, 'dòng', 'rows'),
+    rowsMatched: (count: number) => pickLocalizedText(lang, `${count} dòng khớp`, `${count} rows matched`),
+    save: pickLocalizedText(lang, 'Lưu', 'Save'),
+    saveChanges: pickLocalizedText(lang, 'Lưu thay đổi', 'Save Changes'),
+    schemaChangesDisabled: pickLocalizedText(lang, 'Tắt thay đổi schema cho kết nối này.', 'Schema changes disabled for this connection.'),
+    schemaUpdated: pickLocalizedText(lang, 'Đã cập nhật schema', 'Schema updated'),
+    searchDescription: pickLocalizedText(lang, 'Tìm trên các ô dạng text và highlight kết quả trong grid hiện tại.', 'Search across text-like cells and highlight matching values in the current grid.'),
+    searchDescriptionWithReplace: pickLocalizedText(lang, 'Tìm trên các ô dạng text và highlight kết quả trong grid hiện tại. Bật Edit Data nếu bạn muốn stage thao tác thay.', 'Search across text-like cells and highlight matching values in the current grid. Turn on Edit Data if you want to stage a replace.'),
+    searchSummary: pickLocalizedText(lang, 'Kết quả được tính trên giá trị hiện tại của grid và cả các thay đổi đang stage, sau đó được highlight lại trong bảng.', 'Matches are calculated from the current grid values plus any staged edits, then highlighted back in the table.'),
+    searchText: pickLocalizedText(lang, 'Nội dung tìm', 'Find'),
+    selectedRows: (count: number) => pickLocalizedText(lang, `Dòng đã chọn (${count})`, `Selected rows (${count})`),
+    stageReplaceDescription: pickLocalizedText(lang, 'Stage một đợt thay text vào phiên sửa hiện tại. Bạn vẫn cần lưu thay đổi sau khi áp dụng.', 'Stage a batch text replacement into the current edit session. You will still need to save changes after applying.'),
+    stagedReplaceSource: pickLocalizedText(lang, 'Chỉ các giá trị string trong cột dạng text mới bị đổi. Các thay đổi đang stage hiện có sẽ được dùng làm nguồn cho các lần replace tiếp theo.', 'Only string values in text-like columns are changed. Existing staged edits are used as the source for repeated replace runs.'),
+    stagedReplacements: (cells: number, rows: number) =>
+      pickLocalizedText(lang, `Đã stage ${cells} thay đổi trên ${rows} dòng`, `Staged ${cells} replacements across ${rows} row(s)`),
+    targetColumn: pickLocalizedText(lang, 'Cột mục tiêu', 'Target column'),
+    tableDesigner: pickLocalizedText(lang, 'Thiết kế bảng', 'Table Designer'),
+    textToReplace: pickLocalizedText(lang, 'Nội dung cần thay', 'Text to replace'),
+    textToSearch: pickLocalizedText(lang, 'Nội dung cần tìm', 'Text to search'),
+    totalRows: pickLocalizedText(lang, 'TỔNG SỐ DÒNG', 'TOTAL ROWS'),
+    transfer: pickLocalizedText(lang, 'Chuyển', 'Transfer'),
+    typeToSearch: pickLocalizedText(lang, 'Nhập để tìm...', 'Type to search...'),
+    unableToCopyValue: pickLocalizedText(lang, 'Không thể sao chép giá trị', 'Unable to copy value'),
+    updatedCells: (count: number, mode: 'find' | 'replace') =>
+      mode === 'find'
+        ? pickLocalizedText(lang, `${count} ô tìm thấy`, `${count} cells found`)
+        : pickLocalizedText(lang, `${count} ô sẽ được cập nhật`, `${count} cells will be updated`),
+    virtualizedAll: pickLocalizedText(lang, 'Ảo hóa toàn bộ', 'Virtualized (All)'),
+    wholeWord: pickLocalizedText(lang, 'Trọn từ', 'Whole word'),
+  };
+}

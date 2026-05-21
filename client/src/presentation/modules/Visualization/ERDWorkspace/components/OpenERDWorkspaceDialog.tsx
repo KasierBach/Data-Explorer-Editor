@@ -92,7 +92,7 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
         event.stopPropagation();
         const confirmed = window.confirm(
             lang === 'vi'
-                ? `Xoa workspace "${workspace.name}"?`
+                ? `Xóa workspace "${workspace.name}"?`
                 : `Delete workspace "${workspace.name}"?`,
         );
         if (!confirmed) return;
@@ -124,7 +124,7 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                     <div className="relative">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                         <Input
-                            placeholder={lang === 'vi' ? 'Tim workspace...' : 'Search workspaces...'}
+                            placeholder={lang === 'vi' ? 'Tìm workspace...' : 'Search workspaces...'}
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             className="pl-8 h-8 text-sm"
@@ -140,7 +140,7 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                                 <p className="text-sm">
                                     {workspaces.length === 0
                                         ? (lang === 'vi' ? 'Chua co workspace ERD nao' : 'No ERD workspaces yet')
-                                        : (lang === 'vi' ? 'Khong tim thay workspace nao' : 'No matches found')}
+                                        : (lang === 'vi' ? 'Không tìm thấy workspace nào' : 'No matches found')}
                                 </p>
                             </div>
                         ) : (
@@ -214,7 +214,7 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                                                 className="h-6 gap-1 px-3 text-xs"
                                             >
                                                 <Clock className="h-3 w-3" />
-                                                {lang === 'vi' ? 'Lich su' : 'History'}
+                                                {lang === 'vi' ? 'Lịch sử' : 'History'}
                                             </Button>
                                         )}
                                         <Button
@@ -288,7 +288,7 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                 open={isVersionHistoryOpen}
                 onOpenChange={setIsVersionHistoryOpen}
                 lang={lang}
-                title={lang === 'vi' ? 'Lich su workspace ERD' : 'ERD Workspace History'}
+                title={lang === 'vi' ? 'Lịch sử workspace ERD' : 'ERD Workspace History'}
                 resourceType="ERD"
                 resourceId={selectedWorkspace?.id ?? null}
                 emptyMessage={lang === 'vi' ? 'Chua co phien ban nao' : 'No versions yet'}

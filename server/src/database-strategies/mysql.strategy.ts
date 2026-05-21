@@ -534,12 +534,15 @@ export class MysqlStrategy implements IDatabaseStrategy {
     table: string,
     limit: number,
   ): Promise<Record<string, unknown>[]> {
-    const quotedTable = this.quoteTable(schema, table);
+    const sanitizedLimit = SqlUtil.sanitizeLimit(limit);
     // In MySQL, we might need the schema name if it's the database name
-    const sql = `SELECT * FROM \`${schema}\`.\`${table}\` LIMIT ${limit}`;
+    const sql = `SELECT * FROM \`${schema}\`.\`${table}\` LIMIT ${sanitizedLimit}`;
     const result = await this.executeQuery(pool, sql).catch(async () => {
-        // Fallback if schema prefix fails
-        return this.executeQuery(pool, `SELECT * FROM \`${table}\` LIMIT ${limit}`);
+      // Fallback if schema prefix fails
+      return this.executeQuery(
+        pool,
+        `SELECT * FROM \`${table}\` LIMIT ${sanitizedLimit}`,
+      );
     });
     return result.rows;
   }

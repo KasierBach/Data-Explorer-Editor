@@ -735,11 +735,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
     limit: number,
   ): Promise<Record<string, unknown>[]> {
     const db = client.db();
-    const rows = await db
-      .collection(table)
-      .find({})
-      .limit(limit)
-      .toArray();
+    const rows = await db.collection(table).find({}).limit(limit).toArray();
     return rows.map((row) => {
       const cleanRow = { ...row };
       for (const key of Object.keys(cleanRow)) {

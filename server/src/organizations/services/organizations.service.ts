@@ -125,7 +125,7 @@ export class OrganizationsService {
 
     const inviter = await this.prisma.user.findUnique({
       where: { id: inviterId },
-      select: { firstName: true, lastName: true, email: true },
+      select: { firstName: true, lastName: true, email: true, language: true },
     });
     const inviterName = UserUtils.getDisplayName(
       inviter?.firstName,
@@ -135,7 +135,7 @@ export class OrganizationsService {
 
     const user = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
-      select: { id: true, email: true },
+      select: { id: true, email: true, language: true },
     });
 
     if (user) {
@@ -186,6 +186,7 @@ export class OrganizationsService {
         inviterName,
         role,
         this.getInvitationLoginUrl(),
+        user?.language === 'en' || inviter?.language === 'en' ? 'en' : 'vi',
       )
       .catch((error) => {
         console.warn(

@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAppStore } from '@/core/services/store';
 
 // ─── Type Definitions ───
 
@@ -16,6 +17,7 @@ interface JsonNodeProps {
     depth: number;
     isLast: boolean;
     defaultExpanded?: boolean;
+    lang: 'vi' | 'en';
 }
 
 // ─── Helper: Determine Value Display ───
@@ -46,7 +48,7 @@ const getObjectEntries = (value: unknown): [string, unknown][] => (
 
 // ─── JsonNode (Recursive) ───
 
-const JsonNode: React.FC<JsonNodeProps> = React.memo(({ label, value, depth, isLast, defaultExpanded = false }) => {
+const JsonNode: React.FC<JsonNodeProps> = React.memo(({ label, value, depth, isLast, defaultExpanded = false, lang }) => {
     const [isExpanded, setIsExpanded] = useState(defaultExpanded || depth < 1);
     const [copied, setCopied] = useState(false);
 
@@ -75,7 +77,7 @@ const JsonNode: React.FC<JsonNodeProps> = React.memo(({ label, value, depth, isL
                 <button 
                     onClick={handleCopy}
                     className="ml-auto opacity-0 group-hover/node:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted"
-                    title="Copy value"
+                    title={lang === 'vi' ? 'Sao chép giá trị' : 'Copy value'}
                 >
                     {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
                 </button>
@@ -99,7 +101,9 @@ const JsonNode: React.FC<JsonNodeProps> = React.memo(({ label, value, depth, isL
                 <span className="text-muted-foreground ml-1">{bracketOpen}</span>
                 {!isExpanded && (
                     <span className="text-muted-foreground/60 text-xs ml-1">
-                        {childCount} {isArray ? (childCount === 1 ? 'item' : 'items') : (childCount === 1 ? 'key' : 'keys')}
+                        {lang === 'vi'
+                          ? `${childCount} ${isArray ? 'phan tu' : 'khoa'}`
+                          : `${childCount} ${isArray ? (childCount === 1 ? 'item' : 'items') : (childCount === 1 ? 'key' : 'keys')}`}
                         <span className="ml-1">{bracketClose}</span>
                         {!isLast && ','}
                     </span>
@@ -107,7 +111,7 @@ const JsonNode: React.FC<JsonNodeProps> = React.memo(({ label, value, depth, isL
                 <button 
                     onClick={handleCopy}
                     className="ml-auto opacity-0 group-hover/node:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted"
-                    title="Copy object"
+                    title={lang === 'vi' ? 'Sao chép đối tượng' : 'Copy object'}
                 >
                     {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
                 </button>
@@ -121,6 +125,7 @@ const JsonNode: React.FC<JsonNodeProps> = React.memo(({ label, value, depth, isL
                             value={val} 
                             depth={depth + 1}
                             isLast={idx === entries.length - 1}
+                            lang={lang}
                         />
                     ))}
                     <div style={{ paddingLeft: `${depth * 20}px` }} className="text-muted-foreground pl-5">
@@ -137,6 +142,7 @@ JsonNode.displayName = 'JsonNode';
 // ─── JsonTreeView (Public Component) ───
 
 export const JsonTreeView: React.FC<JsonTreeViewProps> = ({ data, initialExpanded = true, className }) => {
+    const lang = useAppStore((state) => state.lang);
     const isArray = Array.isArray(data);
     const entries = getObjectEntries(data);
 
@@ -151,6 +157,7 @@ export const JsonTreeView: React.FC<JsonTreeViewProps> = ({ data, initialExpande
                     depth={1}
                     isLast={idx === entries.length - 1}
                     defaultExpanded={initialExpanded}
+                    lang={lang}
                 />
             ))}
             <span className="text-muted-foreground">{isArray ? ']' : '}'}</span>

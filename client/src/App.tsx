@@ -34,9 +34,10 @@ const TeamPage = lazy(() => import('@/presentation/pages/TeamPage').then((m) => 
 const BillingReturnPage = lazy(() => import('@/presentation/pages/BillingReturnPage').then((m) => ({ default: m.BillingReturnPage })))
 
 function RouteFallback() {
+  const { lang } = useAppStore()
   return (
     <div className="flex h-dvh min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-      Loading...
+      {lang === 'vi' ? 'Đang tải...' : 'Loading...'}
     </div>
   )
 }

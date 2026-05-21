@@ -15,6 +15,7 @@ import type {
 import { SchemaOperation } from '../query/dto/schema-operations.types';
 import { Injectable } from '@nestjs/common';
 import Database from 'better-sqlite3';
+import { SqlUtil } from '../utils/sql.util';
 
 @Injectable()
 export class SqliteStrategy implements IDatabaseStrategy {
@@ -370,7 +371,8 @@ export class SqliteStrategy implements IDatabaseStrategy {
     table: string,
     limit: number,
   ): Promise<Record<string, unknown>[]> {
-    const sql = `SELECT * FROM ${this.quoteIdentifier(table)} LIMIT ${limit}`;
+    const sanitizedLimit = SqlUtil.sanitizeLimit(limit);
+    const sql = `SELECT * FROM ${this.quoteIdentifier(table)} LIMIT ${sanitizedLimit}`;
     const result = await this.executeQuery(pool, sql);
     return result.rows;
   }

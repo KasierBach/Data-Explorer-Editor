@@ -14,6 +14,8 @@ import {
   type CollaborationThread,
   type CollaborationResourceType,
 } from '@/core/services/CollaborationService';
+import { useAppStore } from '@/core/services/store';
+import { getTeamText } from '../teamI18n';
 import { toast } from 'sonner';
 
 interface TeamCommentsDrawerProps {
@@ -33,6 +35,8 @@ export function TeamCommentsDrawer({
   resourceId,
   resourceName,
 }: TeamCommentsDrawerProps) {
+  const { lang } = useAppStore();
+  const text = getTeamText(lang);
   const [threads, setThreads] = useState<CollaborationThread[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -41,9 +45,8 @@ export function TeamCommentsDrawer({
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
   const title = useMemo(() => {
-    if (!resourceName) return 'Comments';
-    return `Comments for ${resourceName}`;
-  }, [resourceName]);
+    return text.commentsTitle(resourceName);
+  }, [resourceName, text]);
 
   useEffect(() => {
     if (!open || !organizationId || !resourceType || !resourceId) {
@@ -61,7 +64,7 @@ export function TeamCommentsDrawer({
         }
       } catch (error) {
         console.error('[TeamCommentsDrawer] Failed to load comments', error);
-        toast.error('Failed to load comments');
+        toast.error(text.failedLoadComments);
         if (mounted) {
           setThreads([]);
         }
@@ -94,7 +97,7 @@ export function TeamCommentsDrawer({
       setBody('');
     } catch (error) {
       console.error('[TeamCommentsDrawer] Failed to post comment', error);
-      toast.error('Failed to post comment');
+      toast.error(text.failedPostComment);
     } finally {
       setSubmitting(false);
     }
@@ -115,7 +118,7 @@ export function TeamCommentsDrawer({
       setReplyingTo(null);
     } catch (error) {
       console.error('[TeamCommentsDrawer] Failed to post reply', error);
-      toast.error('Failed to post reply');
+      toast.error(text.failedPostReply);
     } finally {
       setSubmitting(false);
     }
@@ -129,7 +132,7 @@ export function TeamCommentsDrawer({
       await reloadThreads();
     } catch (error) {
       console.error('[TeamCommentsDrawer] Failed to resolve comment', error);
-      toast.error('Failed to resolve thread');
+      toast.error(text.failedResolveThread);
     } finally {
       setSubmitting(false);
     }
@@ -154,7 +157,7 @@ export function TeamCommentsDrawer({
             {title}
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            Use @username to mention teammates in a thread.
+            {text.commentsDescription}
           </DialogDescription>
         </DialogHeader>
 
@@ -163,11 +166,11 @@ export function TeamCommentsDrawer({
             {loading ? (
               <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading comments...
+                {text.commentsLoading}
               </div>
             ) : threads.length === 0 ? (
               <div className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-                No comments yet. Start the conversation for this resource.
+                {text.commentsEmpty}
               </div>
             ) : (
               threads.map((thread) => (
@@ -187,7 +190,7 @@ export function TeamCommentsDrawer({
                       {thread.resolvedAt ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[10px] font-medium text-emerald-600">
                           <CheckCircle2 className="h-3 w-3" />
-                          Resolved
+                          {text.resolved}
                         </span>
                       ) : (
                         <Button
@@ -199,7 +202,7 @@ export function TeamCommentsDrawer({
                           disabled={submitting}
                         >
                           <RotateCcw className="mr-1 h-3 w-3" />
-                          Resolve
+                          {text.resolve}
                         </Button>
                       )}
                     </div>
@@ -247,7 +250,7 @@ export function TeamCommentsDrawer({
                       onClick={() => setReplyingTo((current) => current === thread.threadId ? null : thread.threadId)}
                     >
                       <Reply className="mr-1 h-3 w-3" />
-                      Reply
+                      {text.reply}
                     </Button>
                   </div>
 
@@ -255,7 +258,7 @@ export function TeamCommentsDrawer({
                     <div className="space-y-2 rounded-md border bg-background p-3">
                       <textarea
                         className="min-h-[84px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none"
-                        placeholder="Write a reply..."
+                        placeholder={text.commentReplyPlaceholder}
                         value={replyBodies[thread.threadId] ?? ''}
                         onChange={(e) =>
                           setReplyBodies((prev) => ({
@@ -266,7 +269,7 @@ export function TeamCommentsDrawer({
                       />
                       <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" size="sm" onClick={() => setReplyingTo(null)}>
-                          Cancel
+                          {text.cancel}
                         </Button>
                         <Button
                           type="button"
@@ -274,7 +277,7 @@ export function TeamCommentsDrawer({
                           onClick={() => submitReply(thread.threadId)}
                           disabled={submitting}
                         >
-                          Reply
+                          {text.reply}
                         </Button>
                       </div>
                     </div>
@@ -287,7 +290,7 @@ export function TeamCommentsDrawer({
           <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
             <textarea
               className="min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none"
-              placeholder="Add a comment..."
+              placeholder={text.commentPlaceholder}
               value={body}
               onChange={(e) => setBody(e.target.value)}
             />
@@ -296,10 +299,10 @@ export function TeamCommentsDrawer({
 
         <DialogFooter className="gap-2">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Close
+            {text.close}
           </Button>
           <Button type="button" onClick={submitRootComment} disabled={submitting || !body.trim()}>
-            {submitting ? 'Posting...' : 'Comment'}
+            {submitting ? text.commentSubmitting : text.commentSubmit}
           </Button>
         </DialogFooter>
       </DialogContent>

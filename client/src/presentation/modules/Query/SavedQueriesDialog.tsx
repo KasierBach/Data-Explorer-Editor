@@ -200,7 +200,7 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                                                 className="h-6 px-3 text-xs gap-1"
                                             >
                                                 <Clock className="w-3 h-3" />
-                                                {lang === 'vi' ? 'Lich su' : 'History'}
+                                                {lang === 'vi' ? 'Lịch sử' : 'History'}
                                             </Button>
                                         )}
                                         <Button
@@ -265,7 +265,7 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                 open={isVersionHistoryOpen}
                 onOpenChange={setIsVersionHistoryOpen}
                 lang={lang}
-                title={lang === 'vi' ? 'Lich su saved query' : 'Saved Query History'}
+                title={lang === 'vi' ? 'Lịch sử saved query' : 'Saved Query History'}
                 resourceType="QUERY"
                 resourceId={selectedQuery?.id ?? null}
                 emptyMessage={lang === 'vi' ? 'Chua co phien ban nao' : 'No versions yet'}

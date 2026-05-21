@@ -3,6 +3,8 @@ import { Button } from '@/presentation/components/ui/button';
 import { RefreshCw, Plus, Trash2, Save, Link as LinkIcon, ArrowRightLeft } from 'lucide-react';
 import type { TableMetadata, TableColumn } from '@/core/domain/entities';
 import type { SchemaOperation } from '@/core/domain/database-adapter.interface';
+import type { AppLang } from '@/core/utils/i18n';
+import { getDataGridText } from './dataGridI18n';
 
 
 interface TableDesignerProps {
@@ -10,11 +12,13 @@ interface TableDesignerProps {
     metadata: TableMetadata;
     onSave: (operations: SchemaOperation[]) => void;
     onCancel: () => void;
+    lang: AppLang;
     isReadOnly?: boolean;
     schemaChangesAllowed?: boolean;
 }
 
-export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadata, onSave, onCancel, isReadOnly = false, schemaChangesAllowed = true }) => {
+export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadata, onSave, onCancel, lang, isReadOnly = false, schemaChangesAllowed = true }) => {
+    const text = getDataGridText(lang);
     const [columns, setColumns] = useState<TableColumn[]>([...metadata.columns]);
     const [relationships, setRelationships] = useState<{ id: string, source: string, targetTable: string, targetColumn: string }[]>([]);
     const [isSaving, setIsSaving] = useState(false);
@@ -41,7 +45,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
         setRelationships(relationships.filter(r => r.id !== id));
     };
 
-    const handleUpdateRelationship = (id: string, updates: any) => {
+    const handleUpdateRelationship = (id: string, updates: Partial<{ source: string, targetTable: string, targetColumn: string }>) => {
         setRelationships(relationships.map(r => r.id === id ? { ...r, ...updates } : r));
     };
 
@@ -95,17 +99,17 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                         <RefreshCw className="w-5 h-5 text-blue-500" />
                     </div>
                     <div>
-                        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">Table Designer</h3>
+                        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">{text.tableDesigner}</h3>
                         <p className="text-base font-bold text-foreground">{tableName}</p>
                     </div>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="ghost" size="sm" onClick={onCancel} className="h-9 px-4 text-xs font-semibold hover:bg-muted/50 rounded-lg transition-all">
-                        Cancel
+                        {text.cancel}
                     </Button>
                     <Button variant="default" size="sm" onClick={handleSave} disabled={isSaving || isBlocked} className="h-9 px-5 text-xs font-bold bg-blue-600 hover:bg-blue-700 shadow-xl shadow-blue-500/20 active:scale-95 transition-all rounded-lg">
                         {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                        Save Changes
+                        {text.saveChanges}
                     </Button>
                 </div>
             </div>
@@ -116,7 +120,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                     {isBlocked && (
                         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-[11px] text-amber-500/80 leading-relaxed shadow-sm flex items-center gap-3 animate-in fade-in duration-500">
                              <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                             {isReadOnly ? 'Read-only connection: Design is locked.' : 'Schema changes disabled for this connection.'}
+                             {isReadOnly ? text.readOnlyLocked : text.schemaChangesDisabled}
                         </div>
                     )}
 
@@ -124,11 +128,11 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                     <div className="space-y-4">
                         <div className="flex items-end justify-between px-1">
                             <div>
-                                <h4 className="text-[11px] font-bold uppercase text-muted-foreground tracking-widest pl-1">Column Definitions</h4>
+                                <h4 className="text-[11px] font-bold uppercase text-muted-foreground tracking-widest pl-1">{text.columnDefinitions}</h4>
                                 <div className="h-0.5 w-12 bg-blue-500/50 mt-1 rounded-full" />
                             </div>
                             <Button variant="outline" size="sm" onClick={handleAddColumn} disabled={isBlocked} className="h-8 text-[11px] font-bold gap-1.5 border-dashed border-2 hover:bg-blue-500/5 hover:border-blue-500/50 hover:text-blue-500 transition-all rounded-lg">
-                                <Plus className="w-3.5 h-3.5" /> Add Column
+                                <Plus className="w-3.5 h-3.5" /> {text.addColumn}
                             </Button>
                         </div>
 
@@ -137,7 +141,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                                 <thead className="bg-muted/80 backdrop-blur-md border-b sticky top-0 z-20">
                                     <tr>
                                         <th className="p-3.5 font-bold border-r border-border/50 w-12 text-center text-muted-foreground/40 font-mono">#</th>
-                                        <th className="p-3.5 font-bold border-r border-border/50">Column Name</th>
+                                        <th className="p-3.5 font-bold border-r border-border/50">{text.columnName}</th>
                                         <th className="p-3.5 font-bold border-r border-border/50 w-48">Type</th>
                                         <th className="p-3.5 font-bold border-r border-border/50 w-24 text-center">Null</th>
                                         <th className="p-3.5 font-bold border-r border-border/50 w-24 text-center text-yellow-500/80">PK</th>

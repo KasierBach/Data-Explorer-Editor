@@ -18,12 +18,12 @@ export function AdminDashboardPage() {
         {
             key: 'users' as const,
             icon: Users,
-            label: lang === 'vi' ? 'Quan ly nguoi dung' : 'User Management',
+            label: lang === 'vi' ? 'Quản lý người dùng' : 'User Management',
         },
         {
             key: 'audit' as const,
             icon: Shield,
-            label: lang === 'vi' ? 'Nhat ky he thong' : 'Audit Logs',
+            label: lang === 'vi' ? 'Nhật ký hệ thống' : 'Audit Logs',
         },
     ];
 
@@ -37,12 +37,12 @@ export function AdminDashboardPage() {
                     <div className="flex min-w-0 items-center gap-2">
                         <Shield className="h-5 w-5 shrink-0 text-primary" />
                         <div className="min-w-0">
-                            <div className="truncate font-bold text-base sm:text-lg">Admin Panel</div>
+                            <div className="truncate font-bold text-base sm:text-lg">{lang === 'vi' ? 'Bang quan tri' : 'Admin Panel'}</div>
                             {isCompactMobileLayout && (
                                 <div className="text-[11px] text-muted-foreground">
                                     {activeTab === 'users'
-                                        ? (lang === 'vi' ? 'Nguoi dung' : 'Users')
-                                        : (lang === 'vi' ? 'Nhat ky' : 'Audit')}
+                                        ? (lang === 'vi' ? 'Người dùng' : 'Users')
+                                        : (lang === 'vi' ? 'Nhật ký' : 'Audit')}
                                 </div>
                             )}
                         </div>
@@ -74,8 +74,8 @@ export function AdminDashboardPage() {
                 <header className="hidden h-14 items-center border-b bg-card px-6 md:flex">
                     <h1 className="text-lg font-semibold">
                         {activeTab === 'users'
-                            ? (lang === 'vi' ? 'Quan ly nguoi dung' : 'User Management')
-                            : (lang === 'vi' ? 'Nhat ky he thong' : 'Audit Logs')}
+                            ? (lang === 'vi' ? 'Quản lý người dùng' : 'User Management')
+                            : (lang === 'vi' ? 'Nhật ký hệ thống' : 'Audit Logs')}
                     </h1>
                 </header>
                 <main className="flex-1 overflow-auto p-4 sm:p-6">

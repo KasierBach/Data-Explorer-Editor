@@ -49,12 +49,12 @@ export function AuditLogsView() {
     }, [fetchLogs]);
 
     const getLogMetadata = (action: string) => {
-        if (action.startsWith('AUTH:')) return { color: 'text-blue-500', bg: 'bg-blue-500/10', icon: Shield, label: lang === 'vi' ? 'Bao mat' : 'Security' };
-        if (action.startsWith('DB:')) return { color: 'text-emerald-500', bg: 'bg-emerald-500/10', icon: Database, label: lang === 'vi' ? 'Du lieu' : 'Data' };
-        if (action.startsWith('TEAM:')) return { color: 'text-cyan-500', bg: 'bg-cyan-500/10', icon: MessageSquare, label: lang === 'vi' ? 'Nhom' : 'Team' };
-        if (action.startsWith('USER:')) return { color: 'text-orange-500', bg: 'bg-orange-500/10', icon: Users, label: lang === 'vi' ? 'Nguoi dung' : 'User' };
-        if (action.startsWith('SYSTEM:')) return { color: 'text-purple-500', bg: 'bg-purple-500/10', icon: Settings, label: lang === 'vi' ? 'He thong' : 'System' };
-        return { color: 'text-muted-foreground', bg: 'bg-muted/10', icon: Activity, label: lang === 'vi' ? 'Khac' : 'Other' };
+        if (action.startsWith('AUTH:')) return { color: 'text-blue-500', bg: 'bg-blue-500/10', icon: Shield, label: lang === 'vi' ? 'Bảo mật' : 'Security' };
+        if (action.startsWith('DB:')) return { color: 'text-emerald-500', bg: 'bg-emerald-500/10', icon: Database, label: lang === 'vi' ? 'Dữ liệu' : 'Data' };
+        if (action.startsWith('TEAM:')) return { color: 'text-cyan-500', bg: 'bg-cyan-500/10', icon: MessageSquare, label: lang === 'vi' ? 'Nhóm' : 'Team' };
+        if (action.startsWith('USER:')) return { color: 'text-orange-500', bg: 'bg-orange-500/10', icon: Users, label: lang === 'vi' ? 'Người dùng' : 'User' };
+        if (action.startsWith('SYSTEM:')) return { color: 'text-purple-500', bg: 'bg-purple-500/10', icon: Settings, label: lang === 'vi' ? 'Hệ thống' : 'System' };
+        return { color: 'text-muted-foreground', bg: 'bg-muted/10', icon: Activity, label: lang === 'vi' ? 'Khác' : 'Other' };
     };
 
     const filteredLogs = useMemo(() => (
@@ -71,7 +71,7 @@ export function AuditLogsView() {
             <div className="space-y-4 p-12 text-center">
                 <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
                 <p className="animate-pulse text-xs text-muted-foreground">
-                    {lang === 'vi' ? 'Dang tai nhat ky...' : 'Loading audit logs...'}
+                    {lang === 'vi' ? 'Đang tải nhật ký...' : 'Loading audit logs...'}
                 </p>
             </div>
         );
@@ -83,7 +83,7 @@ export function AuditLogsView() {
                 <div className="relative w-full sm:w-80">
                     <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground opacity-50" />
                     <Input
-                        placeholder={lang === 'vi' ? 'Tim kiem hanh dong hoac nguoi dung...' : 'Search actions or users...'}
+                        placeholder={lang === 'vi' ? 'Tìm kiếm hành động hoặc người dùng...' : 'Search actions or users...'}
                         className="h-9 pl-9 text-xs"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -98,7 +98,7 @@ export function AuditLogsView() {
                             className="h-8 px-3 text-[10px] font-bold uppercase tracking-wider"
                             onClick={() => setCategoryFilter(cat)}
                         >
-                            {cat === 'all' ? (lang === 'vi' ? 'Tat ca' : 'All') : cat}
+                            {cat === 'all' ? (lang === 'vi' ? 'Tất cả' : 'All') : cat}
                         </Button>
                     ))}
                 </div>
@@ -109,7 +109,7 @@ export function AuditLogsView() {
                     <div className="divide-y divide-border/30">
                         {filteredLogs.length === 0 ? (
                             <div className="px-6 py-12 text-center italic text-muted-foreground">
-                                {lang === 'vi' ? 'Khong tim thay nhat ky nao phu hop.' : 'No matching audit logs found.'}
+                                {lang === 'vi' ? 'Không tìm thấy nhật ký nào phù hợp.' : 'No matching audit logs found.'}
                             </div>
                         ) : (
                             filteredLogs.map((log) => {
@@ -137,7 +137,7 @@ export function AuditLogsView() {
                                         <div className="grid gap-3 sm:grid-cols-2">
                                             <div>
                                                 <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                                                    {lang === 'vi' ? 'Nguoi dung' : 'User'}
+                                                    {lang === 'vi' ? 'Người dùng' : 'User'}
                                                 </div>
                                                 {log.user ? (
                                                     <div className="mt-1">
@@ -152,7 +152,7 @@ export function AuditLogsView() {
                                             </div>
                                             <div>
                                                 <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                                                    {lang === 'vi' ? 'IP va thoi gian' : 'IP and time'}
+                                                    {lang === 'vi' ? 'IP và thời gian' : 'IP and time'}
                                                 </div>
                                                 <div className="mt-1 break-all font-mono text-xs text-muted-foreground">
                                                     {log.ipAddress || 'unknown'}
@@ -173,16 +173,16 @@ export function AuditLogsView() {
                             <thead>
                                 <tr className="border-b bg-muted/30">
                                     <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                        {lang === 'vi' ? 'Hanh dong' : 'Action'}
+                                        {lang === 'vi' ? 'Hành động' : 'Action'}
                                     </th>
                                     <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                        {lang === 'vi' ? 'Nguoi dung' : 'User'}
+                                        {lang === 'vi' ? 'Người dùng' : 'User'}
                                     </th>
                                     <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                        {lang === 'vi' ? 'IP va thiet bi' : 'IP & Device'}
+                                        {lang === 'vi' ? 'IP và thiết bị' : 'IP & Device'}
                                     </th>
                                     <th className="px-6 py-4 text-right text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                        {lang === 'vi' ? 'Thoi gian' : 'Time'}
+                                        {lang === 'vi' ? 'Thời gian' : 'Time'}
                                     </th>
                                     <th className="w-10 px-3 py-4"></th>
                                 </tr>
@@ -191,7 +191,7 @@ export function AuditLogsView() {
                                 {filteredLogs.length === 0 ? (
                                     <tr>
                                         <td colSpan={5} className="px-6 py-12 text-center italic text-muted-foreground">
-                                            {lang === 'vi' ? 'Khong tim thay nhat ky nao phu hop.' : 'No matching audit logs found.'}
+                                            {lang === 'vi' ? 'Không tìm thấy nhật ký nào phù hợp.' : 'No matching audit logs found.'}
                                         </td>
                                     </tr>
                                 ) : (
@@ -261,7 +261,7 @@ export function AuditLogsView() {
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Info className="h-5 w-5 text-primary" />
-                            {lang === 'vi' ? 'Chi tiet nhat ky' : 'Audit Log Details'}
+                            {lang === 'vi' ? 'Chi tiết nhật ký' : 'Audit Log Details'}
                         </DialogTitle>
                         <DialogDescription>
                             {selectedLog?.action} - {selectedLog?.createdAt ? new Date(selectedLog.createdAt).toLocaleString() : ''}
@@ -272,7 +272,7 @@ export function AuditLogsView() {
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-1 rounded-xl bg-muted/30 p-3">
                                 <div className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-                                    {lang === 'vi' ? 'Nguoi dung' : 'User'}
+                                    {lang === 'vi' ? 'Người dùng' : 'User'}
                                 </div>
                                 <div className="text-sm font-bold">
                                     {selectedLog?.user ? `${selectedLog.user.firstName} ${selectedLog.user.lastName}` : 'System'}
@@ -281,7 +281,7 @@ export function AuditLogsView() {
                             </div>
                             <div className="space-y-1 rounded-xl bg-muted/30 p-3">
                                 <div className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-                                    {lang === 'vi' ? 'Dia chi' : 'Location'}
+                                    {lang === 'vi' ? 'Địa chỉ' : 'Location'}
                                 </div>
                                 <div className="break-all font-mono text-sm font-bold">{selectedLog?.ipAddress || 'unknown'}</div>
                                 <div className="text-xs text-muted-foreground">ID: {selectedLog?.id?.substring(0, 8)}...</div>
@@ -290,14 +290,14 @@ export function AuditLogsView() {
 
                         <div className="space-y-2">
                             <div className="px-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-                                {lang === 'vi' ? 'Du lieu chi tiet' : 'Extended Data'}
+                                {lang === 'vi' ? 'Dữ liệu chi tiết' : 'Extended Data'}
                             </div>
                             <div className="custom-scrollbar max-h-[300px] overflow-auto rounded-2xl border border-border/30 bg-muted/50 p-4 font-mono text-[11px] whitespace-pre-wrap break-words">
                                 {selectedLog?.details ? (
                                     JSON.stringify(JSON.parse(selectedLog.details), null, 4)
                                 ) : (
                                     <span className="italic opacity-50">
-                                        {lang === 'vi' ? 'Khong co du lieu chi tiet' : 'No extended data available'}
+                                        {lang === 'vi' ? 'Không có dữ liệu chi tiết' : 'No extended data available'}
                                     </span>
                                 )}
                             </div>

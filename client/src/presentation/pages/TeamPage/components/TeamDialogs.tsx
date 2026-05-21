@@ -17,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/presentation/components/ui/select';
+import { useAppStore } from '@/core/services/store';
+import { getTeamText } from '../teamI18n';
 
 export function InviteMemberDialog({
   open,
@@ -35,18 +37,19 @@ export function InviteMemberDialog({
   onRoleChange: (role: string) => void;
   onInvite: () => void;
 }) {
+  const { lang } = useAppStore();
+  const text = getTeamText(lang);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Invite Member</DialogTitle>
-          <DialogDescription>
-            Send a pending invitation so the person can accept it from their team inbox.
-          </DialogDescription>
+          <DialogTitle>{text.inviteMemberTitle}</DialogTitle>
+          <DialogDescription>{text.inviteMemberDescription}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div>
-            <label className="text-sm font-medium">Email</label>
+            <label className="text-sm font-medium">{text.email}</label>
             <Input
               type="email"
               placeholder="colleague@company.com"
@@ -55,24 +58,24 @@ export function InviteMemberDialog({
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Role</label>
+            <label className="text-sm font-medium">{text.languageRole}</label>
             <Select value={role} onValueChange={onRoleChange}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ADMIN">Admin</SelectItem>
-                <SelectItem value="MEMBER">Member</SelectItem>
-                <SelectItem value="VIEWER">Viewer</SelectItem>
+                <SelectItem value="ADMIN">{text.admin}</SelectItem>
+                <SelectItem value="MEMBER">{text.member}</SelectItem>
+                <SelectItem value="VIEWER">{lang === 'vi' ? 'Người xem' : 'Viewer'}</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {text.cancel}
           </Button>
-          <Button onClick={onInvite}>Send Invite</Button>
+          <Button onClick={onInvite}>{lang === 'vi' ? 'Gửi lời mời' : 'Send Invite'}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -89,6 +92,8 @@ export function CreateTeamDialog({
   onCreate: (name: string) => void;
 }) {
   const [name, setName] = useState('');
+  const { lang } = useAppStore();
+  const text = getTeamText(lang);
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -101,14 +106,12 @@ export function CreateTeamDialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create New Team</DialogTitle>
-          <DialogDescription>
-            Create a new organization workspace for shared resources and collaboration.
-          </DialogDescription>
+          <DialogTitle>{text.createTeamTitle}</DialogTitle>
+          <DialogDescription>{text.createTeamDescription}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           <div>
-            <label className="text-sm font-medium">Team Name</label>
+            <label className="text-sm font-medium">{text.teamName}</label>
             <Input
               placeholder="Engineering Team"
               value={name}
@@ -118,9 +121,9 @@ export function CreateTeamDialog({
           </div>
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {text.cancel}
             </Button>
-            <Button type="submit">Create</Button>
+            <Button type="submit">{text.create}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -139,6 +142,8 @@ export function CreateTeamspaceDialog({
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const { lang } = useAppStore();
+  const text = getTeamText(lang);
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -152,14 +157,12 @@ export function CreateTeamspaceDialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create Teamspace</DialogTitle>
-          <DialogDescription>
-            Group shared connections, queries, and dashboards into a lightweight workspace.
-          </DialogDescription>
+          <DialogTitle>{text.createTeamspaceTitle}</DialogTitle>
+          <DialogDescription>{text.createTeamspaceDescription}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-2">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Name</label>
+            <label className="text-sm font-medium">{text.name}</label>
             <Input
               placeholder="Data Platform"
               value={name}
@@ -168,9 +171,9 @@ export function CreateTeamspaceDialog({
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Description</label>
+            <label className="text-sm font-medium">{text.description}</label>
             <Textarea
-              placeholder="Optional note about this teamspace"
+              placeholder={lang === 'vi' ? 'Ghi chu tuy chon cho teamspace nay' : 'Optional note about this teamspace'}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               rows={3}
@@ -178,9 +181,9 @@ export function CreateTeamspaceDialog({
           </div>
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {text.cancel}
             </Button>
-            <Button type="submit">Create</Button>
+            <Button type="submit">{text.create}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -4,6 +4,7 @@ import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
 import type { DatabaseValue, RowData, TableMetadata } from '@/core/domain/entities';
 import type { SchemaOperation } from '@/core/domain/database-adapter.interface';
+import { getDataGridText } from './dataGridI18n';
 
 interface UseDataGridEditingParams {
     tableId: string;
@@ -34,8 +35,9 @@ function parseEditableValue(value: string): DatabaseValue {
 export function useDataGridEditing({
     tableId, metadata, dbName, schema, cleanTableName, pkField, refetch,
 }: UseDataGridEditingParams) {
-    const { activeConnectionId, connections } = useAppStore();
+    const { activeConnectionId, connections, lang } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
+    const text = getDataGridText(lang);
 
     const [isEditMode, setIsEditMode] = useState(false);
     const [pendingChanges, setPendingChanges] = useState<Record<string, RowData>>({});
@@ -89,13 +91,13 @@ export function useDataGridEditing({
             setPendingChanges({});
             setIsEditMode(false);
             refetch();
-            toast.success('Changes saved');
+            toast.success(text.changesSaved);
         } catch (error) {
             toast.error(getErrorMessage(error));
         } finally {
             setIsSaving(false);
         }
-    }, [activeConnection, pkField, getAdapter, dbName, schema, cleanTableName, tableId, pendingChanges, refetch]);
+    }, [activeConnection, pkField, getAdapter, dbName, schema, cleanTableName, tableId, pendingChanges, refetch, text]);
 
     const handleSaveSchema = useCallback(async (operations: SchemaOperation[]) => {
         if (!activeConnection || !metadata) return;
@@ -109,17 +111,17 @@ export function useDataGridEditing({
                 operations,
             });
             refetch();
-            toast.success('Schema updated');
+            toast.success(text.schemaUpdated);
         } catch (error) {
             toast.error(getErrorMessage(error));
         } finally {
             setIsSaving(false);
         }
-    }, [activeConnection, metadata, getAdapter, dbName, schema, cleanTableName, tableId, refetch]);
+    }, [activeConnection, metadata, getAdapter, dbName, schema, cleanTableName, tableId, refetch, text]);
 
     const handleDeleteRows = useCallback(async () => {
         if (!activeConnection || !metadata || selectedRows.size === 0 || !pkField) return;
-        if (!confirm(`Delete ${selectedRows.size} row(s)? This cannot be undone.`)) return;
+        if (!confirm(text.deleteConfirm(selectedRows.size))) return;
 
         setIsSaving(true);
         try {
@@ -132,14 +134,14 @@ export function useDataGridEditing({
                 pkValues: [...selectedRows].map(v => isNaN(Number(v)) ? v : Number(v)),
             });
             setSelectedRows(new Set());
-            toast.success(`${selectedRows.size} row(s) deleted`);
+            toast.success(text.delete(selectedRows.size));
             refetch();
         } catch (error) {
             toast.error(getErrorMessage(error));
         } finally {
             setIsSaving(false);
         }
-    }, [activeConnection, metadata, selectedRows, pkField, getAdapter, dbName, schema, cleanTableName, tableId, refetch]);
+    }, [activeConnection, metadata, selectedRows, pkField, getAdapter, dbName, schema, cleanTableName, tableId, refetch, text]);
 
     const handleInsertRow = useCallback(async () => {
         if (!activeConnection || !metadata) return;
@@ -151,7 +153,7 @@ export function useDataGridEditing({
         });
 
         if (Object.keys(data).length === 0) { 
-            toast.error('Enter at least one value'); 
+            toast.error(text.enterAtLeastOneValue); 
             return; 
         }
 
@@ -166,14 +168,14 @@ export function useDataGridEditing({
             });
             setNewRowData({});
             setIsInserting(false);
-            toast.success('Row inserted successfully');
+            toast.success(text.rowInserted);
             refetch();
         } catch (error) {
             toast.error(getErrorMessage(error));
         } finally {
             setIsSaving(false);
         }
-    }, [activeConnection, metadata, newRowData, getAdapter, dbName, schema, cleanTableName, tableId, refetch]);
+    }, [activeConnection, metadata, newRowData, getAdapter, dbName, schema, cleanTableName, tableId, refetch, text]);
 
     const toggleEditMode = useCallback(() => {
         if (isEditMode) {

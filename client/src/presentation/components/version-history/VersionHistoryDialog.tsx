@@ -132,7 +132,7 @@ export function VersionHistoryDialog<TResource, TSnapshot = Record<string, unkno
                         ) : versionsQuery.isLoading ? (
                             <div className="flex h-full items-center justify-center gap-2 px-4 text-sm text-muted-foreground">
                                 <RefreshCw className="h-4 w-4 animate-spin" />
-                                {lang === 'vi' ? 'Dang tai lich su phien ban...' : 'Loading version history...'}
+                                {lang === 'vi' ? 'Đang tải lịch sử phiên bản...' : 'Loading version history...'}
                             </div>
                         ) : versions.length === 0 ? (
                             <div className="flex h-full items-center justify-center px-4 text-sm text-muted-foreground">
@@ -195,7 +195,7 @@ export function VersionHistoryDialog<TResource, TSnapshot = Record<string, unkno
                         ) : detailQuery.isLoading ? (
                             <div className="flex h-full items-center justify-center gap-2 px-4 text-sm text-muted-foreground">
                                 <RefreshCw className="h-4 w-4 animate-spin" />
-                                {lang === 'vi' ? 'Dang tai ban chup...' : 'Loading snapshot...'}
+                                {lang === 'vi' ? 'Đang tải bản chụp...' : 'Loading snapshot...'}
                             </div>
                         ) : detailQuery.data ? (
                             <div className="flex-1 overflow-auto bg-muted/10 p-3 text-xs">

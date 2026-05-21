@@ -80,17 +80,19 @@ export const NoSqlGridView: React.FC<NoSqlGridViewProps> = ({ data }) => {
     return (
         <div 
             ref={parentRef}
+            role="table"
             className="w-full h-full overflow-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 bg-background relative"
         >
             <div className="min-w-full inline-block align-middle">
                 {/* Header */}
-                <div className="sticky top-0 z-20 bg-muted/90 backdrop-blur-md shadow-sm ring-1 ring-black/5 flex border-b border-border/50">
-                    <div className="w-12 flex-none p-2 text-center text-[9px] text-muted-foreground/50 font-black tracking-tighter uppercase flex items-center justify-center border-r border-border/30 bg-muted/10">#</div>
+                <div role="row" className="sticky top-0 z-20 bg-muted/90 backdrop-blur-md shadow-sm ring-1 ring-black/5 flex border-b border-border/50">
+                    <div role="columnheader" className="w-12 flex-none p-2 text-center text-[9px] text-muted-foreground/50 font-black tracking-tighter uppercase flex items-center justify-center border-r border-border/30 bg-muted/10">#</div>
                     {table.getHeaderGroups().map(headerGroup => (
                         <React.Fragment key={headerGroup.id}>
                             {headerGroup.headers.map(header => (
                                 <div 
                                     key={header.id} 
+                                    role="columnheader"
                                     style={{ width: header.getSize() }}
                                     className="flex-none p-3 px-4 font-bold text-muted-foreground/70 whitespace-nowrap bg-muted/5 uppercase tracking-wider overflow-hidden truncate text-[10px] border-r border-border/30 last:border-r-0"
                                 >
@@ -111,18 +113,20 @@ export const NoSqlGridView: React.FC<NoSqlGridViewProps> = ({ data }) => {
                         return (
                             <div 
                                 key={row.id} 
+                                role="row"
                                 className="hover:bg-blue-500/[0.04] transition-colors group border-b border-border/10 flex items-center absolute top-0 left-0 w-full"
                                 style={{
                                     height: `${virtualRow.size}px`,
                                     transform: `translateY(${virtualRow.start}px)`,
                                 }}
                             >
-                                <div className="w-12 h-full flex-none flex items-center justify-center border-r border-border/30 bg-muted/5 text-[9px] text-muted-foreground/40 group-hover:text-muted-foreground group-hover:bg-muted/10 transition-colors">
+                                <div role="rowheader" className="w-12 h-full flex-none flex items-center justify-center border-r border-border/30 bg-muted/5 text-[9px] text-muted-foreground/40 group-hover:text-muted-foreground group-hover:bg-muted/10 transition-colors">
                                     {virtualRow.index + 1}
                                 </div>
                                 {row.getVisibleCells().map(cell => (
                                     <div 
                                         key={cell.id} 
+                                        role="cell"
                                         style={{ width: cell.column.getSize() }}
                                         className="h-full flex-none flex items-center px-4 border-r border-border/10 last:border-r-0 truncate text-foreground/90 font-medium"
                                     >

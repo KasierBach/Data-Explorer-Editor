@@ -29,6 +29,7 @@ import {
   getRefreshTokenCookieOptions,
   REFRESH_TOKEN_COOKIE,
 } from './auth-cookie.util';
+import { resolveRequestLanguage } from '../common/utils/i18n.util';
 
 @Controller('auth')
 export class AuthController {
@@ -42,10 +43,15 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async login(
     @Body() loginDto: LoginDto,
+    @Req() req: Request,
     @Ip() ip: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.authService.login(loginDto, ip);
+    const session = await this.authService.login(
+      loginDto,
+      ip,
+      resolveRequestLanguage(req.headers['accept-language']),
+    );
     res.cookie(
       REFRESH_TOKEN_COOKIE,
       session.refreshToken,
@@ -62,8 +68,11 @@ export class AuthController {
   }
 
   @Post('register')
-  async register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  async register(@Body() registerDto: RegisterDto, @Req() req: Request) {
+    return this.authService.register(
+      registerDto,
+      resolveRequestLanguage(req.headers['accept-language']),
+    );
   }
 
   @Post('verify-email')
@@ -71,9 +80,13 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async verifyEmail(
     @Body() dto: VerifyEmailDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.authService.verifyEmail(dto);
+    const session = await this.authService.verifyEmail(
+      dto,
+      resolveRequestLanguage(req.headers['accept-language']),
+    );
     res.cookie(
       REFRESH_TOKEN_COOKIE,
       session.refreshToken,
@@ -92,22 +105,31 @@ export class AuthController {
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: 60000 } })
-  async resendVerification(@Body() dto: ResendVerificationDto) {
-    return this.authService.resendVerificationEmail(dto);
+  async resendVerification(@Body() dto: ResendVerificationDto, @Req() req: Request) {
+    return this.authService.resendVerificationEmail(
+      dto,
+      resolveRequestLanguage(req.headers['accept-language']),
+    );
   }
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: 60000 } })
-  async forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto);
+  async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
+    return this.authService.forgotPassword(
+      dto,
+      resolveRequestLanguage(req.headers['accept-language']),
+    );
   }
 
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async resetPassword(@Body() dto: ResetPasswordWithOtpDto) {
-    return this.authService.resetPasswordWithOtp(dto);
+  async resetPassword(@Body() dto: ResetPasswordWithOtpDto, @Req() req: Request) {
+    return this.authService.resetPasswordWithOtp(
+      dto,
+      resolveRequestLanguage(req.headers['accept-language']),
+    );
   }
 
   @Post('exchange-oauth-code')
@@ -115,9 +137,13 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async exchangeOauthCode(
     @Body() dto: ExchangeOauthCodeDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const session = await this.authService.exchangeOauthCode(dto.code);
+    const session = await this.authService.exchangeOauthCode(
+      dto.code,
+      resolveRequestLanguage(req.headers['accept-language']),
+    );
     res.cookie(
       REFRESH_TOKEN_COOKIE,
       session.refreshToken,
@@ -140,7 +166,10 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const refreshToken = extractCookie(req, REFRESH_TOKEN_COOKIE);
-    const session = await this.authService.refreshSession(refreshToken);
+    const session = await this.authService.refreshSession(
+      refreshToken,
+      resolveRequestLanguage(req.headers['accept-language']),
+    );
     res.cookie(
       REFRESH_TOKEN_COOKIE,
       session.refreshToken,
@@ -160,7 +189,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = extractCookie(req, REFRESH_TOKEN_COOKIE);
-    const result = await this.authService.logout(refreshToken);
+    const result = await this.authService.logout(
+      refreshToken,
+      resolveRequestLanguage(req.headers['accept-language']),
+    );
     res.cookie(REFRESH_TOKEN_COOKIE, '', getClearedRefreshTokenCookieOptions());
     return result;
   }

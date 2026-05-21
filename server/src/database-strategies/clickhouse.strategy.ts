@@ -14,6 +14,7 @@ import type {
 import { SchemaOperation } from '../query/dto/schema-operations.types';
 import { Injectable } from '@nestjs/common';
 import { createClient, ClickHouseClient } from '@clickhouse/client';
+import { SqlUtil } from '../utils/sql.util';
 
 @Injectable()
 export class ClickHouseStrategy implements IDatabaseStrategy {
@@ -374,8 +375,12 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
     table: string,
     limit: number,
   ): Promise<Record<string, unknown>[]> {
+    const sanitizedLimit = SqlUtil.sanitizeLimit(limit);
     const quotedTable = this.quoteTable(schema, table);
-    const result = await this.executeQuery(pool, `SELECT * FROM ${quotedTable} LIMIT ${limit}`);
+    const result = await this.executeQuery(
+      pool,
+      `SELECT * FROM ${quotedTable} LIMIT ${sanitizedLimit}`,
+    );
     return result.rows;
   }
 }

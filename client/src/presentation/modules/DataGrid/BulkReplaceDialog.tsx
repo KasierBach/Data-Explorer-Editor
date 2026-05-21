@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import {
@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/presentation/components/ui/dialog';
 import type { RowData, TableColumn } from '@/core/domain/entities';
+import type { AppLang } from '@/core/utils/i18n';
 import {
   ALL_TEXT_COLUMNS,
   buildBulkSearchPlan,
@@ -21,11 +22,13 @@ import {
   type BulkReplaceTargetRow,
   type BulkSearchMatch,
 } from './bulkReplaceUtils';
+import { getDataGridText } from './dataGridI18n';
 
 interface BulkReplaceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   allowReplace: boolean;
+  lang: AppLang;
   columns: TableColumn[];
   pageTargets: BulkReplaceTargetRow[];
   filteredTargets: BulkReplaceTargetRow[];
@@ -58,6 +61,7 @@ export function BulkReplaceDialog({
   open,
   onOpenChange,
   allowReplace,
+  lang,
   columns,
   pageTargets,
   filteredTargets,
@@ -68,6 +72,7 @@ export function BulkReplaceDialog({
   onClearSearch,
   hasSearchResults,
 }: BulkReplaceDialogProps) {
+  const text = getDataGridText(lang);
   const textColumns = useMemo(
     () => columns.filter((column) => getTextColumnIds([column]).length > 0),
     [columns],
@@ -83,10 +88,9 @@ export function BulkReplaceDialog({
   const [replaceText, setReplaceText] = useState('');
   const [matchMode, setMatchMode] = useState<BulkReplaceMatchMode>('contains');
   const [caseSensitive, setCaseSensitive] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open && !prevOpen) {
+    setPrevOpen(true);
     setMode('find');
     setScope(
       getDefaultScope({
@@ -100,13 +104,17 @@ export function BulkReplaceDialog({
     setReplaceText('');
     setMatchMode('contains');
     setCaseSensitive(false);
-  }, [open, pageTargets.length, filteredTargets.length, selectedTargets.length]);
+  } else if (!open && prevOpen) {
+    setPrevOpen(false);
+  }
 
-  useEffect(() => {
-    if (!allowReplace) {
-      setMode('find');
-    }
-  }, [allowReplace]);
+  const [prevAllowReplace, setPrevAllowReplace] = useState(allowReplace);
+  if (!allowReplace && prevAllowReplace) {
+    setPrevAllowReplace(false);
+    setMode('find');
+  } else if (allowReplace && !prevAllowReplace) {
+    setPrevAllowReplace(true);
+  }
 
   const targetRows = useMemo(() => {
     switch (scope) {
@@ -192,21 +200,21 @@ export function BulkReplaceDialog({
       <DialogContent className="max-w-[calc(100vw-1rem)] border-border/60 bg-background/95 p-0 shadow-2xl backdrop-blur-xl sm:max-w-2xl">
         <DialogHeader className="border-b border-border/60 px-5 py-4">
           <DialogTitle className="text-base font-semibold text-foreground">
-            {allowReplace ? 'Find & Replace' : 'Find'}
+            {allowReplace ? text.findReplace : text.find}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             {!allowReplace
-              ? 'Search across text-like cells and highlight matching values in the current grid. Turn on Edit Data if you want to stage a replace.'
+              ? text.searchDescriptionWithReplace
               : mode === 'find'
-              ? 'Search across text-like cells and highlight matching values in the current grid.'
-              : 'Stage a batch text replacement into the current edit session. You will still need to save changes after applying.'}
+              ? text.searchDescription
+              : text.stageReplaceDescription}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 px-5 py-4">
           {textColumnIds.length === 0 ? (
             <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
-              No text-like columns are available for this operation in the current table.
+              {text.noTextColumns}
             </div>
           ) : (
             <>
@@ -217,19 +225,19 @@ export function BulkReplaceDialog({
                     onClick={() => setMode('find')}
                     className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${mode === 'find' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                   >
-                    Find
+                    {text.find}
                   </button>
                   <button
                     type="button"
                     onClick={() => setMode('replace')}
                     className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${mode === 'replace' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
                   >
-                    Replace
+                    {text.replace}
                   </button>
                 </div>
               ) : (
                 <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                  Replace mode is available after you turn on <span className="font-medium text-foreground">Edit Data</span>.
+                  {text.replaceModeRequiresEdit}
                 </div>
               )}
 
@@ -242,25 +250,25 @@ export function BulkReplaceDialog({
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   >
                     <option value="selected" disabled={selectedTargets.length === 0}>
-                      Selected rows ({selectedTargets.length})
+                      {text.selectedRows(selectedTargets.length)}
                     </option>
                     <option value="page">
-                      Current page ({pageTargets.length})
+                      {text.currentPage(pageTargets.length)}
                     </option>
                     <option value="filtered">
-                      Current filtered rows ({filteredTargets.length})
+                      {text.currentFilteredRows(filteredTargets.length)}
                     </option>
                   </select>
                 </label>
 
                 <label className="space-y-1.5 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">Target column</span>
+                  <span className="font-medium text-foreground">{text.targetColumn}</span>
                   <select
                     value={columnId}
                     onChange={(event) => setColumnId(event.target.value)}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   >
-                    <option value={ALL_TEXT_COLUMNS}>All text columns</option>
+                    <option value={ALL_TEXT_COLUMNS}>{text.allTextColumns}</option>
                     {textColumns.map((column) => (
                       <option key={column.name} value={column.name}>
                         {column.name} ({column.type})
@@ -272,22 +280,22 @@ export function BulkReplaceDialog({
 
               <div className={`grid gap-4 ${mode === 'replace' ? 'md:grid-cols-2' : 'md:grid-cols-1'}`}>
                 <label className="space-y-1.5 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">Find</span>
+                  <span className="font-medium text-foreground">{text.searchText}</span>
                   <Input
                     value={findText}
                     onChange={(event) => setFindText(event.target.value)}
-                    placeholder={mode === 'find' ? 'Text to search' : 'Text to replace'}
+                    placeholder={mode === 'find' ? text.textToSearch : text.textToReplace}
                     className="h-10"
                   />
                 </label>
 
                 {mode === 'replace' && (
                   <label className="space-y-1.5 text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">Replace with</span>
+                    <span className="font-medium text-foreground">{text.replaceWith}</span>
                     <Input
                       value={replaceText}
                       onChange={(event) => setReplaceText(event.target.value)}
-                      placeholder="Replacement text"
+                      placeholder={text.replaceWith}
                       className="h-10"
                     />
                   </label>
@@ -296,15 +304,15 @@ export function BulkReplaceDialog({
 
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
                 <label className="space-y-1.5 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">Match mode</span>
+                  <span className="font-medium text-foreground">{text.matchMode}</span>
                   <select
                     value={matchMode}
                     onChange={(event) => setMatchMode(event.target.value as BulkReplaceMatchMode)}
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   >
                     <option value="contains">Contains</option>
-                    <option value="exact">Exact match</option>
-                    <option value="whole-word">Whole word</option>
+                    <option value="exact">{text.exactMatch}</option>
+                    <option value="whole-word">{text.wholeWord}</option>
                   </select>
                 </label>
 
@@ -315,19 +323,19 @@ export function BulkReplaceDialog({
                     onChange={(event) => setCaseSensitive(event.target.checked)}
                     className="h-4 w-4 rounded border-border bg-background"
                   />
-                  Case sensitive
+                  {text.caseSensitive}
                 </label>
               </div>
 
               <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
                 <div className="flex flex-wrap items-center gap-3">
-                  <span>{preview.matchedRows} rows matched</span>
-                  <span>{preview.matchedCells} cells {mode === 'find' ? 'found' : 'will be updated'}</span>
+                  <span>{text.rowsMatched(preview.matchedRows)}</span>
+                  <span>{text.updatedCells(preview.matchedCells, mode)}</span>
                 </div>
                 <div className="mt-1 opacity-80">
                   {mode === 'find' || !allowReplace
-                    ? 'Matches are calculated from the current grid values plus any staged edits, then highlighted back in the table.'
-                    : 'Only string values in text-like columns are changed. Existing staged edits are used as the source for repeated replace runs.'}
+                    ? text.searchSummary
+                    : text.stagedReplaceSource}
                 </div>
               </div>
             </>
@@ -337,14 +345,14 @@ export function BulkReplaceDialog({
         <DialogFooter className="border-t border-border/60 px-5 py-4">
           {mode === 'find' && hasSearchResults && (
             <Button variant="ghost" onClick={onClearSearch}>
-              Clear Search
+              {text.clearSearch}
             </Button>
           )}
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
+            {text.cancel}
           </Button>
           <Button onClick={handleApply} disabled={!canApply}>
-            {mode === 'find' || !allowReplace ? 'Find Matches' : 'Apply Replace'}
+            {mode === 'find' || !allowReplace ? text.findMatches : text.applyReplace}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,12 +1,30 @@
 import {
-  Injectable,
-  UnauthorizedException,
   ConflictException,
-  OnModuleInit,
-  NotFoundException,
+  Injectable,
   Logger,
+  NotFoundException,
+  OnModuleInit,
+  UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { AuditAction, AuditService } from '../audit/audit.service';
+import {
+  normalizeAppLanguage,
+  pickLocalizedText,
+  type AppLanguage,
+} from '../common/utils/i18n.util';
+import { MailService } from '../mail/mail.service';
+import { OtpService } from '../otp/otp.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { SeedService } from '../seed/seed.service';
+import { UserUtils } from '../users/user.utils';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ResetPasswordWithOtpDto } from './dto/reset-password-otp.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { TokenService } from './token.service';
 
 interface SessionUser {
   id: string;
@@ -20,20 +38,8 @@ interface SessionUser {
   isEmailVerified?: boolean;
   lastLoginIp?: string | null;
   securityAlerts?: boolean;
+  language?: string | null;
 }
-import { PrismaService } from '../prisma/prisma.service';
-import { MailService } from '../mail/mail.service';
-import { OtpService } from '../otp/otp.service';
-import { SeedService } from '../seed/seed.service';
-import { TokenService } from './token.service';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { ResetPasswordWithOtpDto } from './dto/reset-password-otp.dto';
-import { VerifyEmailDto } from './dto/verify-email.dto';
-import { ResendVerificationDto } from './dto/resend-verification.dto';
-import { UserUtils } from '../users/user.utils';
-import { AuditService, AuditAction } from '../audit/audit.service';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -89,7 +95,38 @@ export class AuthService implements OnModuleInit {
     });
   }
 
-  async login(loginDto: LoginDto, clientIp?: string) {
+  private resolveLanguage(
+    preferred?: string | null,
+    fallback: AppLanguage = 'vi',
+  ): AppLanguage {
+    return normalizeAppLanguage(preferred ?? fallback);
+  }
+
+  private t(lang: AppLanguage, vi: string, en: string): string {
+    return pickLocalizedText(lang, vi, en);
+  }
+
+  private providerLoginMessage(provider: string, lang: AppLanguage): string {
+    return this.t(
+      lang,
+      `Tài khoản này được đăng nhập bằng ${provider}. Vui lòng đăng nhập qua ${provider}.`,
+      `This account uses ${provider} sign-in. Please continue with ${provider}.`,
+    );
+  }
+
+  private genericOtpSentMessage(lang: AppLanguage): string {
+    return this.t(
+      lang,
+      'Nếu email đã được đăng ký, mã OTP đã được gửi.',
+      'If the email is registered, an OTP has been sent.',
+    );
+  }
+
+  async login(
+    loginDto: LoginDto,
+    clientIp?: string,
+    lang: AppLanguage = 'vi',
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { email: loginDto.email },
     });
@@ -100,12 +137,16 @@ export class AuthService implements OnModuleInit {
         details: { email: loginDto.email, reason: 'User not found' },
         ipAddress: clientIp,
       });
-      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
+      throw new UnauthorizedException(
+        this.t(lang, 'Thông tin đăng nhập không hợp lệ', 'Invalid credentials'),
+      );
     }
+
+    const userLang = this.resolveLanguage(user.language, lang);
 
     if (!user.password && user.provider !== 'local') {
       throw new UnauthorizedException(
-        `Tài khoản này được đăng nhập bằng ${user.provider}. Vui lòng đăng nhập qua ${user.provider}.`,
+        this.providerLoginMessage(user.provider, userLang),
       );
     }
 
@@ -113,6 +154,7 @@ export class AuthService implements OnModuleInit {
       loginDto.password,
       user.password!,
     );
+
     if (!isPasswordValid) {
       await this.auditService.log({
         action: AuditAction.AUTH_LOGIN_FAILED,
@@ -120,18 +162,32 @@ export class AuthService implements OnModuleInit {
         details: { email: loginDto.email, reason: 'Invalid password' },
         ipAddress: clientIp,
       });
-      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ');
+      throw new UnauthorizedException(
+        this.t(
+          userLang,
+          'Thông tin đăng nhập không hợp lệ',
+          'Invalid credentials',
+        ),
+      );
     }
 
     if (user.isBanned) {
       throw new UnauthorizedException(
-        'Tài khoản của bạn đã bị khóa bởi quản trị viên.',
+        this.t(
+          userLang,
+          'Tài khoản của bạn đã bị khóa bởi quản trị viên.',
+          'Your account has been banned by an administrator.',
+        ),
       );
     }
 
     if (!user.isEmailVerified) {
       throw new UnauthorizedException({
-        message: 'Vui lòng xác minh địa chỉ email',
+        message: this.t(
+          userLang,
+          'Vui lòng xác minh địa chỉ email',
+          'Please verify your email address',
+        ),
         unverified: true,
         email: user.email,
       });
@@ -148,11 +204,21 @@ export class AuthService implements OnModuleInit {
         user.lastName,
         user.email,
       );
-      const loginTime = new Date().toLocaleString('vi-VN', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-      });
+      const loginTime = new Date().toLocaleString(
+        userLang === 'vi' ? 'vi-VN' : 'en-US',
+        {
+          timeZone: 'Asia/Ho_Chi_Minh',
+        },
+      );
+
       void this.mailService
-        .sendSecurityAlertEmail(user.email, displayName, clientIp, loginTime)
+        .sendSecurityAlertEmail(
+          user.email,
+          displayName,
+          clientIp,
+          loginTime,
+          userLang,
+        )
         .catch((error: unknown) => {
           this.logger.warn(
             `Security alert email failed for ${user.email}: ${
@@ -177,13 +243,20 @@ export class AuthService implements OnModuleInit {
     return this.issueSession(user);
   }
 
-  async register(registerDto: RegisterDto) {
+  async register(registerDto: RegisterDto, lang: AppLanguage = 'vi') {
+    const preferredLang = this.resolveLanguage(lang);
     const existingUser = await this.prisma.user.findUnique({
       where: { email: registerDto.email },
     });
 
     if (existingUser && existingUser.isEmailVerified) {
-      throw new ConflictException('Email này đã được sử dụng.');
+      throw new ConflictException(
+        this.t(
+          preferredLang,
+          'Email này đã được sử dụng.',
+          'This email is already in use.',
+        ),
+      );
     }
 
     const hashedPassword = await bcrypt.hash(
@@ -191,7 +264,6 @@ export class AuthService implements OnModuleInit {
       this.SALT_ROUNDS,
     );
     const { firstName, lastName } = UserUtils.parseName(registerDto.name);
-
     const otp = this.otpService.generateOtp();
     const hashedOtp = await this.otpService.hashOtp(otp);
     const expiry = this.otpService.getExpiryDate(this.VERIFY_OTP_EXPIRY);
@@ -204,6 +276,7 @@ export class AuthService implements OnModuleInit {
           password: hashedPassword,
           firstName,
           lastName,
+          language: preferredLang,
           verifyOtp: hashedOtp,
           verifyOtpExpiry: expiry,
         },
@@ -219,6 +292,7 @@ export class AuthService implements OnModuleInit {
           provider: 'local',
           isOnboarded: false,
           isEmailVerified: false,
+          language: preferredLang,
           verifyOtp: hashedOtp,
           verifyOtpExpiry: expiry,
         },
@@ -230,8 +304,9 @@ export class AuthService implements OnModuleInit {
       lastName,
       registerDto.email,
     );
+
     void this.mailService
-      .sendVerificationEmail(user.email, displayName, otp)
+      .sendVerificationEmail(user.email, displayName, otp, preferredLang)
       .catch((err) => {
         console.error(
           'Failed to send verification email in background:',
@@ -246,39 +321,62 @@ export class AuthService implements OnModuleInit {
     });
 
     return {
-      message:
+      message: this.t(
+        preferredLang,
         'Đăng ký thành công. Vui lòng kiểm tra email để nhận mã xác minh.',
+        'Registration successful. Please check your email for the verification code.',
+      ),
       unverified: true,
       email: user.email,
     };
   }
 
-  async verifyEmail(dto: VerifyEmailDto) {
+  async verifyEmail(dto: VerifyEmailDto, lang: AppLanguage = 'vi') {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
 
     if (!user) {
-      throw new NotFoundException('Không tìm thấy tài khoản.');
+      throw new NotFoundException(
+        this.t(lang, 'Không tìm thấy tài khoản.', 'Account not found.'),
+      );
     }
+
+    const userLang = this.resolveLanguage(user.language, lang);
 
     if (user.isEmailVerified) {
       return this.issueSession(user);
     }
 
     if (!user.verifyOtp || !user.verifyOtpExpiry) {
-      throw new UnauthorizedException('Mã xác minh không hợp lệ.');
+      throw new UnauthorizedException(
+        this.t(
+          userLang,
+          'Mã xác minh không hợp lệ.',
+          'Verification code is invalid.',
+        ),
+      );
     }
 
     if (this.otpService.isExpired(user.verifyOtpExpiry)) {
       throw new UnauthorizedException(
-        'Mã xác minh đã hết hạn. Vui lòng nhận mã mới.',
+        this.t(
+          userLang,
+          'Mã xác minh đã hết hạn. Vui lòng nhận mã mới.',
+          'Verification code expired. Please request a new one.',
+        ),
       );
     }
 
     const isOtpValid = await this.otpService.verifyOtp(dto.otp, user.verifyOtp);
     if (!isOtpValid) {
-      throw new UnauthorizedException('Mã xác minh không đúng.');
+      throw new UnauthorizedException(
+        this.t(
+          userLang,
+          'Mã xác minh không đúng.',
+          'Verification code is incorrect.',
+        ),
+      );
     }
 
     const updatedUser = await this.prisma.user.update({
@@ -293,17 +391,30 @@ export class AuthService implements OnModuleInit {
     return this.issueSession(updatedUser);
   }
 
-  async resendVerificationEmail(dto: ResendVerificationDto) {
+  async resendVerificationEmail(
+    dto: ResendVerificationDto,
+    lang: AppLanguage = 'vi',
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
 
     if (!user) {
-      throw new NotFoundException('Không tìm thấy tài khoản.');
+      throw new NotFoundException(
+        this.t(lang, 'Không tìm thấy tài khoản.', 'Account not found.'),
+      );
     }
 
+    const userLang = this.resolveLanguage(user.language, lang);
+
     if (user.isEmailVerified) {
-      throw new ConflictException('Tài khoản này đã được xác minh.');
+      throw new ConflictException(
+        this.t(
+          userLang,
+          'Tài khoản này đã được xác minh.',
+          'This account is already verified.',
+        ),
+      );
     }
 
     const otp = this.otpService.generateOtp();
@@ -320,23 +431,36 @@ export class AuthService implements OnModuleInit {
       user.lastName,
       user.email,
     );
-    await this.mailService.sendVerificationEmail(user.email, displayName, otp);
+    await this.mailService.sendVerificationEmail(
+      user.email,
+      displayName,
+      otp,
+      userLang,
+    );
 
-    return { message: 'Mã xác minh mới đã được gửi.' };
+    return {
+      message: this.t(
+        userLang,
+        'Mã xác minh mới đã được gửi.',
+        'A new verification code has been sent.',
+      ),
+    };
   }
 
-  async forgotPassword(dto: ForgotPasswordDto) {
+  async forgotPassword(dto: ForgotPasswordDto, lang: AppLanguage = 'vi') {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
 
     if (!user) {
-      return { message: 'If the email is registered, an OTP has been sent.' };
+      return { message: this.genericOtpSentMessage(lang) };
     }
+
+    const userLang = this.resolveLanguage(user.language, lang);
 
     if (user.provider !== 'local') {
       throw new ConflictException(
-        `Tài khoản này được đăng nhập bằng ${user.provider}. Vui lòng đăng nhập qua ${user.provider}.`,
+        this.providerLoginMessage(user.provider, userLang),
       );
     }
 
@@ -354,19 +478,35 @@ export class AuthService implements OnModuleInit {
       user.lastName,
       user.email,
     );
-    await this.mailService.sendPasswordResetEmail(user.email, displayName, otp);
+    await this.mailService.sendPasswordResetEmail(
+      user.email,
+      displayName,
+      otp,
+      userLang,
+    );
 
-    return { message: 'If the email is registered, an OTP has been sent.' };
+    return { message: this.genericOtpSentMessage(userLang) };
   }
 
-  async resetPasswordWithOtp(dto: ResetPasswordWithOtpDto) {
+  async resetPasswordWithOtp(
+    dto: ResetPasswordWithOtpDto,
+    lang: AppLanguage = 'vi',
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
 
     if (!user || !user.resetOtp || !user.resetOtpExpiry) {
-      throw new UnauthorizedException('Mã không hợp lệ hoặc đã hết hạn.');
+      throw new UnauthorizedException(
+        this.t(
+          lang,
+          'Mã không hợp lệ hoặc đã hết hạn.',
+          'The code is invalid or has expired.',
+        ),
+      );
     }
+
+    const userLang = this.resolveLanguage(user.language, lang);
 
     if (this.otpService.isExpired(user.resetOtpExpiry)) {
       await this.prisma.user.update({
@@ -374,13 +514,23 @@ export class AuthService implements OnModuleInit {
         data: { resetOtp: null, resetOtpExpiry: null },
       });
       throw new UnauthorizedException(
-        'Mã OTP đã hết hạn. Vui lòng yêu cầu lại.',
+        this.t(
+          userLang,
+          'Mã OTP đã hết hạn. Vui lòng yêu cầu lại.',
+          'The OTP has expired. Please request a new one.',
+        ),
       );
     }
 
     const isOtpValid = await this.otpService.verifyOtp(dto.otp, user.resetOtp);
     if (!isOtpValid) {
-      throw new UnauthorizedException('Mã xác minh không đúng.');
+      throw new UnauthorizedException(
+        this.t(
+          userLang,
+          'Mã xác minh không đúng.',
+          'Verification code is incorrect.',
+        ),
+      );
     }
 
     const hashedPassword = await bcrypt.hash(dto.newPassword, this.SALT_ROUNDS);
@@ -395,57 +545,100 @@ export class AuthService implements OnModuleInit {
       },
     });
 
-    return { message: 'Cập nhật mật khẩu thành công.' };
+    return {
+      message: this.t(
+        userLang,
+        'Cập nhật mật khẩu thành công.',
+        'Password updated successfully.',
+      ),
+    };
   }
 
-  async exchangeOauthCode(code: string) {
+  async exchangeOauthCode(code: string, lang: AppLanguage = 'vi') {
     const payload = this.tokenService.verifyOauthExchangeToken(code);
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
 
     if (!user) {
-      throw new UnauthorizedException('OAuth account not found.');
+      throw new UnauthorizedException(
+        this.t(lang, 'Không tìm thấy tài khoản OAuth.', 'OAuth account not found.'),
+      );
     }
 
+    const userLang = this.resolveLanguage(user.language, lang);
+
     if (user.isBanned) {
-      throw new UnauthorizedException('Account is banned.');
+      throw new UnauthorizedException(
+        this.t(
+          userLang,
+          'Tài khoản của bạn đã bị khóa bởi quản trị viên.',
+          'Your account has been banned by an administrator.',
+        ),
+      );
     }
 
     return this.issueSession(user);
   }
 
-  async refreshSession(refreshToken?: string) {
+  async refreshSession(
+    refreshToken?: string,
+    lang: AppLanguage = 'vi',
+  ) {
     const payload = this.tokenService.verifyRefreshToken(refreshToken);
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
 
     if (!user || !user.refreshTokenHash || !user.refreshTokenExpiry) {
-      throw new UnauthorizedException('Refresh session not found.');
+      throw new UnauthorizedException(
+        this.t(lang, 'Không tìm thấy phiên làm việc.', 'Refresh session not found.'),
+      );
     }
 
+    const userLang = this.resolveLanguage(user.language, lang);
+
     if (user.isBanned) {
-      throw new UnauthorizedException('Account is banned.');
+      throw new UnauthorizedException(
+        this.t(
+          userLang,
+          'Tài khoản của bạn đã bị khóa bởi quản trị viên.',
+          'Your account has been banned by an administrator.',
+        ),
+      );
     }
 
     if (user.refreshTokenExpiry.getTime() < Date.now()) {
       await this.revokeRefreshSession(user.id);
-      throw new UnauthorizedException('Refresh token expired.');
+      throw new UnauthorizedException(
+        this.t(
+          userLang,
+          'Refresh token đã hết hạn.',
+          'Refresh token expired.',
+        ),
+      );
     }
 
     const isMatch = await bcrypt.compare(refreshToken!, user.refreshTokenHash);
     if (!isMatch) {
       await this.revokeRefreshSession(user.id);
-      throw new UnauthorizedException('Refresh token is invalid.');
+      throw new UnauthorizedException(
+        this.t(
+          userLang,
+          'Refresh token không hợp lệ.',
+          'Refresh token is invalid.',
+        ),
+      );
     }
 
     return this.issueSession(user);
   }
 
-  async logout(refreshToken?: string) {
+  async logout(refreshToken?: string, lang: AppLanguage = 'vi') {
     if (!refreshToken) {
-      return { message: 'Logged out.' };
+      return {
+        message: this.t(lang, 'Đã đăng xuất.', 'Logged out.'),
+      };
     }
 
     try {
@@ -457,6 +650,8 @@ export class AuthService implements OnModuleInit {
       // Ignore invalid refresh tokens while still clearing cookies on the client.
     }
 
-    return { message: 'Logged out.' };
+    return {
+      message: this.t(lang, 'Đã đăng xuất.', 'Logged out.'),
+    };
   }
 }

@@ -152,7 +152,7 @@ export const ExplorerSidebar: React.FC = memo(() => {
                         <div className="w-6 h-6 rounded-lg bg-blue-500/10 flex items-center justify-center">
                             <Layers className="w-3.5 h-3.5 text-blue-500" />
                         </div>
-                        <h2 className="font-bold text-[10px] uppercase tracking-[0.2em] text-muted-foreground/80">Explorer</h2>
+                        <h2 className="font-bold text-[10px] uppercase tracking-[0.2em] text-muted-foreground/80">{lang === 'vi' ? 'Trinh duyet' : 'Explorer'}</h2>
                     </div>
                     <div className="flex items-center gap-1">
                         <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={handleSyncIndex} disabled={isSyncing}>
@@ -173,7 +173,9 @@ export const ExplorerSidebar: React.FC = memo(() => {
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 transition-colors group-focus-within:text-blue-500" />
                             <Input
-                                placeholder={explorerSearchMode === 'local' ? (lang === 'vi' ? "Find entities..." : "Find entities...") : "Global Search..."}
+                                placeholder={explorerSearchMode === 'local'
+                                  ? (lang === 'vi' ? 'Tìm đối tượng...' : 'Find entities...')
+                                  : (lang === 'vi' ? 'Tìm kiếm toàn cục...' : 'Global Search...')}
                                 className="h-9 text-xs pl-9 pr-8 bg-muted/40 border-none ring-1 ring-border/50 focus:ring-blue-500/40 rounded-xl"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -212,7 +214,7 @@ export const ExplorerSidebar: React.FC = memo(() => {
                         <SidebarContextMenu type="connection" onAction={(action) => action === 'refresh' && handleRefresh()}>
                             <div className="flex items-center py-2 px-3 rounded-xl mb-1 bg-blue-500/5 border border-blue-500/10 text-blue-600/90 shadow-sm">
                                 <Database className="w-4 h-4 mr-2.5 text-blue-500" />
-                                <span className="truncate flex-1 font-bold">{activeConnection?.name || 'Local Instance'}</span>
+                                <span className="truncate flex-1 font-bold">{activeConnection?.name || (lang === 'vi' ? 'Máy cục bộ' : 'Local Instance')}</span>
                             </div>
                             <div className="space-y-0.5">
                                 {filteredNodes.map(node => (

@@ -100,7 +100,7 @@ function matchExact(
 ): { matched: boolean } {
   const matched = caseSensitive
     ? source === findText
-    : source.localeCompare(findText, undefined, { sensitivity: 'accent' }) === 0;
+    : source.localeCompare(findText, undefined, { sensitivity: 'base' }) === 0;
 
   return { matched };
 }

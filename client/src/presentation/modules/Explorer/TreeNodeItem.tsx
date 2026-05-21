@@ -84,6 +84,7 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = memo(({ node, level, connec
     const setNosqlCollection = useAppStore(state => state.setNosqlCollection);
     const nosqlActiveCollection = useAppStore(state => state.nosqlActiveCollection);
     const nosqlActiveDatabase = useAppStore(state => state.nosqlActiveDatabase);
+    const lang = useAppStore(state => state.lang);
     
     const connectionId = connectionIdProp || storeActiveId;
     const activeConnection = useAppStore(state => state.connections.find(c => c.id === connectionId));
@@ -162,7 +163,7 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = memo(({ node, level, connec
                     )}
                     {isActiveDb && (
                         <div className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-500 text-[8px] font-black uppercase tracking-wider">
-                            ACTIVE
+                            {lang === 'vi' ? 'ĐANG CHỌN' : 'ACTIVE'}
                         </div>
                     )}
                 </div>
@@ -178,7 +179,7 @@ export const TreeNodeItem: React.FC<TreeNodeProps> = memo(({ node, level, connec
                     {isLoading && (
                         <div className="pl-12 text-[10px] text-muted-foreground/60 py-1 flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full border border-blue-500/30 border-t-blue-500 animate-spin" />
-                            Loading...
+                            {lang === 'vi' ? 'Đang tải...' : 'Loading...'}
                         </div>
                     )}
                     {children?.map(child => (

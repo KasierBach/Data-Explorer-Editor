@@ -135,7 +135,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                         <button
                             onClick={onSaveToDashboard}
                             className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
-                            title={lang === 'vi' ? 'Luu vao dashboard' : 'Save to dashboard'}
+                            title={lang === 'vi' ? 'Lưu vào dashboard' : 'Save to dashboard'}
                         >
                             <LayoutDashboard className="w-3.5 h-3.5" />
                         </button>

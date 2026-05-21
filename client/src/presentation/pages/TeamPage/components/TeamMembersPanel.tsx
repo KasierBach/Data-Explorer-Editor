@@ -7,7 +7,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/presentation/components/ui/select';
+import { useAppStore } from '@/core/services/store';
 import type { OrganizationMemberEntity } from '@/core/services/OrganizationService';
+import { getTeamText } from '../teamI18n';
 
 function getDisplayName(person?: { firstName?: string | null; lastName?: string | null; email?: string | null }) {
   if (!person) {
@@ -27,6 +29,9 @@ function MemberRoleControl({
   canManage: boolean;
   onUpdateRole: (userId: string, role: string) => void;
 }) {
+  const { lang } = useAppStore();
+  const text = getTeamText(lang);
+
   if (canManage && member.role !== 'OWNER') {
     return (
       <Select value={member.role} onValueChange={(value) => onUpdateRole(member.userId, value)}>
@@ -34,9 +39,9 @@ function MemberRoleControl({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="ADMIN">Admin</SelectItem>
-          <SelectItem value="MEMBER">Member</SelectItem>
-          <SelectItem value="VIEWER">Viewer</SelectItem>
+          <SelectItem value="ADMIN">{text.admin}</SelectItem>
+          <SelectItem value="MEMBER">{text.member}</SelectItem>
+          <SelectItem value="VIEWER">{text.viewer}</SelectItem>
         </SelectContent>
       </Select>
     );
@@ -63,10 +68,13 @@ export function TeamMembersPanel({
   onUpdateRole: (userId: string, role: string) => void;
   onRemoveMember: (userId: string) => void;
 }) {
+  const { lang } = useAppStore();
+  const text = getTeamText(lang);
+
   if (members.length === 0) {
     return (
       <div className="overflow-hidden rounded-lg border">
-        <div className="px-4 py-8 text-center text-sm text-muted-foreground">No members yet.</div>
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">{text.noMembersYet}</div>
       </div>
     );
   }
@@ -86,7 +94,7 @@ export function TeamMembersPanel({
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Role</div>
+                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{text.role}</div>
                   <MemberRoleControl member={member} canManage={canManage} onUpdateRole={onUpdateRole} />
                 </div>
                 {canManage && member.role !== 'OWNER' && (
@@ -97,7 +105,7 @@ export function TeamMembersPanel({
                     onClick={() => onRemoveMember(member.userId)}
                   >
                     <Trash2 className="h-4 w-4" />
-                    <span className="ml-2 sm:hidden">Remove member</span>
+                    <span className="ml-2 sm:hidden">{text.removeMember}</span>
                   </Button>
                 )}
               </div>
@@ -108,9 +116,9 @@ export function TeamMembersPanel({
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
-              <th className="px-4 py-2 text-left font-medium">Member</th>
-              <th className="px-4 py-2 text-left font-medium">Role</th>
-              <th className="px-4 py-2 text-right font-medium">Actions</th>
+              <th className="px-4 py-2 text-left font-medium">{text.member}</th>
+              <th className="px-4 py-2 text-left font-medium">{text.role}</th>
+              <th className="px-4 py-2 text-right font-medium">{text.actions}</th>
             </tr>
           </thead>
           <tbody>

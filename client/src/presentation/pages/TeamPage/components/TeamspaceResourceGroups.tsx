@@ -4,6 +4,7 @@ import { Button } from '@/presentation/components/ui/button';
 import type { TeamspaceEntity } from '@/core/services/TeamspaceService';
 import { useResourcePresence } from '@/presentation/hooks/useResourcePresence';
 import { PresenceBadge } from '@/presentation/components/presence/PresenceBadge';
+import { getTeamText } from '../teamI18n';
 
 type TeamspaceGroupedResource<T> = {
   teamspace: TeamspaceEntity | null;
@@ -54,6 +55,7 @@ export function TeamspaceCard({
   lang: 'vi' | 'en';
   onDelete: (teamspaceId: string) => void;
 }) {
+  const text = getTeamText(lang);
   const presence = useResourcePresence(
     organizationId
       ? {
@@ -86,7 +88,7 @@ export function TeamspaceCard({
         <PresenceBadge
           entries={presence.entries}
           isLoading={presence.isLoading}
-          label={lang === 'vi' ? 'Teamspace live' : 'Teamspace live'}
+          label={lang === 'vi' ? 'Teamspace dang hoat dong' : 'Teamspace live'}
           emptyLabel={lang === 'vi' ? 'Chua co ai dang hoat dong' : 'No one active yet'}
           className="w-full justify-between"
         />
@@ -101,7 +103,7 @@ export function TeamspaceCard({
             onClick={() => onDelete(teamspace.id)}
           >
             <Trash2 className="mr-1 h-3.5 w-3.5" />
-            {lang === 'vi' ? 'Xoa' : 'Delete'}
+            {text.delete ?? (lang === 'vi' ? 'Xoa' : 'Delete')}
           </Button>
         </div>
       )}
@@ -115,15 +117,19 @@ export function TeamspaceResourceGroups<T extends { id: string; teamspaceId?: st
   loading,
   emptyMessage,
   renderItem,
+  lang,
 }: {
   items: T[];
   teamspaces: TeamspaceEntity[];
   loading: boolean;
   emptyMessage: string;
   renderItem: (item: T) => React.ReactNode;
+  lang: 'vi' | 'en';
 }) {
+  const text = getTeamText(lang);
+
   if (loading) {
-    return <div className="px-4 py-8 text-center text-sm text-muted-foreground">Loading...</div>;
+    return <div className="px-4 py-8 text-center text-sm text-muted-foreground">{text.loading}</div>;
   }
 
   if (items.length === 0) {
@@ -139,10 +145,12 @@ export function TeamspaceResourceGroups<T extends { id: string; teamspaceId?: st
           <div className="flex items-center justify-between gap-3 border-b bg-muted/30 px-4 py-2">
             <div className="min-w-0">
               <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                {section.teamspace?.name ?? 'Unassigned'}
+                {section.teamspace?.name ?? text.unassigned}
               </div>
               <div className="text-[11px] text-muted-foreground">
-                {section.items.length} resource{section.items.length === 1 ? '' : 's'}
+                {lang === 'vi'
+                  ? `${section.items.length} tai nguyen`
+                  : `${section.items.length} resource${section.items.length === 1 ? '' : 's'}`}
               </div>
             </div>
           </div>

@@ -708,8 +708,12 @@ export class PostgresStrategy implements IDatabaseStrategy {
     table: string,
     limit: number,
   ): Promise<Record<string, unknown>[]> {
+    const sanitizedLimit = SqlUtil.sanitizeLimit(limit);
     const quotedTable = this.quoteTable(schema, table);
-    const result = await this.executeQuery(pool, `SELECT * FROM ${quotedTable} LIMIT ${limit}`);
+    const result = await this.executeQuery(
+      pool,
+      `SELECT * FROM ${quotedTable} LIMIT ${sanitizedLimit}`,
+    );
     return result.rows;
   }
 }

@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MailTemplates } from './mail.templates';
+import {
+  pickLocalizedText,
+  type AppLanguage,
+} from '../common/utils/i18n.util';
 
 @Injectable()
 export class MailService {
@@ -81,18 +85,30 @@ export class MailService {
     to: string,
     name: string,
     otp: string,
+    lang: AppLanguage = 'vi',
   ): Promise<void> {
-    const html = MailTemplates.getVerificationEmail(name, otp);
-    await this.send(to, 'Xác minh địa chỉ Email - Data Explorer ✉️', html);
+    const html = MailTemplates.getVerificationEmail(name, otp, lang);
+    const subject = pickLocalizedText(
+      lang,
+      'Xác minh địa chỉ email - Data Explorer ✉️',
+      'Verify your email address - Data Explorer ✉️',
+    );
+    await this.send(to, subject, html);
   }
 
   async sendPasswordResetEmail(
     to: string,
     name: string,
     otp: string,
+    lang: AppLanguage = 'vi',
   ): Promise<void> {
-    const html = MailTemplates.getPasswordResetEmail(name, otp);
-    await this.send(to, 'Mã OTP đặt lại mật khẩu - Data Explorer 🔑', html);
+    const html = MailTemplates.getPasswordResetEmail(name, otp, lang);
+    const subject = pickLocalizedText(
+      lang,
+      'Mã OTP đặt lại mật khẩu - Data Explorer 🔑',
+      'Password reset OTP - Data Explorer 🔑',
+    );
+    await this.send(to, subject, html);
   }
 
   async sendSecurityAlertEmail(
@@ -100,9 +116,15 @@ export class MailService {
     name: string,
     ip: string,
     time: string,
+    lang: AppLanguage = 'vi',
   ): Promise<void> {
-    const html = MailTemplates.getSecurityAlertEmail(name, ip, time);
-    await this.send(to, '🚨 Cảnh báo bảo mật - Đăng nhập từ IP mới', html);
+    const html = MailTemplates.getSecurityAlertEmail(name, ip, time, lang);
+    const subject = pickLocalizedText(
+      lang,
+      '🚨 Cảnh báo bảo mật - Đăng nhập từ IP mới',
+      '🚨 Security alert - New IP login detected',
+    );
+    await this.send(to, subject, html);
   }
 
   async sendTeamInvitationEmail(
@@ -111,13 +133,20 @@ export class MailService {
     inviterName: string,
     role: string,
     loginUrl: string,
+    lang: AppLanguage = 'vi',
   ): Promise<void> {
     const html = MailTemplates.getTeamInvitationEmail(
       teamName,
       inviterName,
       role,
       loginUrl,
+      lang,
     );
-    await this.send(to, `Lời mời tham gia team ${teamName}`, html);
+    const subject = pickLocalizedText(
+      lang,
+      `Lời mời tham gia team ${teamName}`,
+      `Invitation to join ${teamName}`,
+    );
+    await this.send(to, subject, html);
   }
 }
