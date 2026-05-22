@@ -12,6 +12,27 @@ import type {
 export class AiRoutingService {
   constructor(private readonly configService: ConfigService) {}
 
+  private getBeeknoeePlan(requestedModel?: string): ProviderPlan | null {
+    const apiKey = this.configService.get<string>('BEEKNOEE_API_KEY');
+    if (!apiKey) return null;
+
+    const fallbackModel =
+      this.configService.get<string>('BEEKNOEE_CHAT_MODEL') || 'glm-4.7-flash';
+    const normalizedModel =
+      requestedModel && requestedModel !== 'default'
+        ? requestedModel
+        : fallbackModel;
+
+    return {
+      provider: 'beeknoee',
+      apiKey,
+      baseUrl:
+        this.configService.get<string>('BEEKNOEE_BASE_URL') ||
+        'https://platform.beeknoee.com/api/v1',
+      model: normalizedModel,
+    };
+  }
+
   getGeminiModelList(requestedModel?: string): string[] {
     const legacyMap: Record<string, string> = {
       'gemini-3-pro': 'gemini-3-pro-preview',
@@ -140,7 +161,7 @@ export class AiRoutingService {
           'https://api.cerebras.ai/v1',
         model:
           this.configService.get<string>('CEREBRAS_CHAT_MODEL') ||
-          'llama3.1-8b',
+          'gpt-oss-120b',
       });
     }
 
@@ -170,7 +191,16 @@ export class AiRoutingService {
     // Detect if user explicitly picked a non-Gemini model from the UI
     let requestedPlan: ProviderPlan | null = null;
     if (params.model) {
-      if (params.model.startsWith('groq:')) {
+      if (params.model.startsWith('beeknoee:')) {
+        const modelName = params.model.slice('beeknoee:'.length);
+        const beeknoeePlan = this.getBeeknoeePlan(modelName);
+        if (!beeknoeePlan) {
+          throw new Error(
+            'Beeknoee provider is not configured. Set BEEKNOEE_API_KEY to use Beeknoee models.',
+          );
+        }
+        requestedPlan = beeknoeePlan;
+      } else if (params.model.startsWith('groq:')) {
         // Groq model — strip prefix
         const modelName = params.model.slice('groq:'.length);
         const groqConfig = lowCostPlans.find((p) => p.provider === 'groq');

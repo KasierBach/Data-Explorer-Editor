@@ -8,6 +8,7 @@ import { useAppStore } from '@/core/services/store';
 import { AiChatList } from './AiChatList';
 import { AiMessageBubble } from './AiMessageBubble';
 import { AiChatInput } from './AiChatInput';
+import { getAssistantModelCatalog } from './assistantModelCatalog';
 
 interface AiAssistantProps {
     onInsertQuery: (sql: string) => void;
@@ -65,43 +66,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         { id: 'gemini-only', label: 'Gemini Only', description: 'Always use the selected Gemini model. Best for consistency, highest cost.' },
     ], []);
 
-    const MODELS = useMemo(() => [
-        {
-            group: 'Google (Gemini)',
-            items: [
-                { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (High)', isNew: true },
-                { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (Reasoning)', isNew: true },
-                { id: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite (Fast)', isNew: true },
-                { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash (Fast)' },
-                { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Balanced)' },
-                { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Balanced)' },
-                { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (Fast)' },
-            ],
-        },
-        {
-            group: 'Groq (Fast & Free)',
-            items: [
-                { id: 'groq:llama-3.3-70b-versatile', label: 'Llama 3.3 70B' },
-                { id: 'groq:meta-llama/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout 17B', isNew: true },
-                { id: 'groq:mixtral-8x7b-32768', label: 'Mixtral 8x7B' },
-                { id: 'groq:gemma2-9b-it', label: 'Gemma 2 9B' },
-                { id: 'groq:llama-3.1-8b-instant', label: 'Llama 3.1 8B' },
-            ],
-        },
-        {
-            group: 'OpenRouter (Free)',
-            items: [
-                { id: 'google/gemma-4-31b-it:free', label: 'Gemma 4 31B' },
-                { id: 'google/gemma-4-26b-a4b-it:free', label: 'Gemma 4 26B' },
-                { id: 'minimax/minimax-m2.5:free', label: 'MiniMax 2.5' },
-                { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'NVIDIA Nemotron 120B' },
-                { id: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B' },
-                { id: 'z-ai/glm-4.5-air:free', label: 'GLM 4.5 Air' },
-                { id: 'z-ai/glm-5.1', label: 'GLM 5.1 (Reasoning)', isNew: true },
-                { id: 'openrouter/owl-alpha', label: 'Owl Alpha (Reasoner)', isNew: true },
-            ],
-        },
-    ], []);
+    const MODELS = useMemo(() => getAssistantModelCatalog(), []);
 
     const contextMenuRef = useRef<HTMLDivElement>(null);
 

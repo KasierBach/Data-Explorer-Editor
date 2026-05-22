@@ -2,6 +2,7 @@ export type AiProvider =
   | 'gemini'
   | 'cerebras'
   | 'openrouter'
+  | 'beeknoee'
   | 'zhipu'
   | 'groq';
 export type AiRoutingMode = 'auto' | 'fast' | 'best' | 'gemini-only';

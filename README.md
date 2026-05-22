@@ -389,6 +389,9 @@ The backend reads configuration from `server/.env`. The frontend reads `VITE_API
 | `GROQ_API_KEY` | No | Optional Groq key for low-latency OpenAI-compatible AI routing. |
 | `GROQ_BASE_URL` | No | Base URL for Groq. Default: `https://api.groq.com/openai/v1`. |
 | `GROQ_CHAT_MODEL` | No | Groq model slug used in `Auto` / `Fast` mode. Default: `meta-llama/llama-4-scout-17b-16e-instruct`. |
+| `BEEKNOEE_API_KEY` | No | Optional Beeknoee key used when a user explicitly selects a Beeknoee model in AI Assistant. |
+| `BEEKNOEE_BASE_URL` | No | Base URL for Beeknoee's OpenAI-compatible API. Default: `https://platform.beeknoee.com/api/v1`. |
+| `BEEKNOEE_CHAT_MODEL` | No | Default Beeknoee chat model slug. Current recommended value: `glm-4.7-flash`. |
 | `JWT_SECRET` | Yes | Strong secret used to sign access tokens. Placeholder values are rejected. |
 | `REFRESH_TOKEN_SECRET` | No | Recommended separate secret for refresh-token cookies. If omitted, the app falls back to `JWT_SECRET`. |
 | `ENCRYPTION_KEY` | Yes | Exactly **32 characters**, used to encrypt saved database connection passwords. |
