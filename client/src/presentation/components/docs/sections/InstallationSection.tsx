@@ -62,12 +62,20 @@ export function InstallationSection({ lang }: Props) {
                         <p className="mt-3" />
                         <CodeComment>{t ? 'Tùy chọn cho AI routing' : 'Optional for AI routing'}</CodeComment>
                         <CodeLine>GEMINI_API_KEY=...</CodeLine>
+                        <CodeLine>AI_PROVIDER_TIMEOUT_MS=60000</CodeLine>
+                        <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=60000</CodeLine>
                         <CodeLine>CEREBRAS_API_KEY=...</CodeLine>
                         <CodeLine>CEREBRAS_BASE_URL=https://api.cerebras.ai/v1</CodeLine>
                         <CodeLine>CEREBRAS_CHAT_MODEL=llama3.1-8b</CodeLine>
                         <CodeLine>OPENROUTER_API_KEY=...</CodeLine>
                         <CodeLine>OPENROUTER_BASE_URL=https://openrouter.ai/api/v1</CodeLine>
-                        <CodeLine>OPENROUTER_CHAT_MODEL=openrouter/auto</CodeLine>
+                        <CodeLine>OPENROUTER_CHAT_MODEL=</CodeLine>
+                        <CodeLine>GROQ_API_KEY=...</CodeLine>
+                        <CodeLine>GROQ_BASE_URL=https://api.groq.com/openai/v1</CodeLine>
+                        <CodeLine>GROQ_CHAT_MODEL=meta-llama/llama-4-scout-17b-16e-instruct</CodeLine>
+                        <CodeLine>BEEKNOEE_API_KEY=...</CodeLine>
+                        <CodeLine>BEEKNOEE_BASE_URL=https://platform.beeknoee.com/api/v1</CodeLine>
+                        <CodeLine>BEEKNOEE_CHAT_MODEL=glm-4.7-flash</CodeLine>
                     </CodeBlock>
                 </StepBlock>
 

@@ -71,7 +71,7 @@ export const DOCS_STRUCTURE: DocSection[] = [
         items: [
             { id: 'ai-service', title: 'AI Routing & Assistant', titleEn: 'AI Routing & Assistant' },
             { id: 'sql-generation', title: 'Tạo mã SQL', titleEn: 'SQL Generation' },
-            { id: 'vision', title: 'Thị giác Gemini', titleEn: 'Gemini Vision' },
+            { id: 'vision', title: 'AI Vision & ảnh đính kèm', titleEn: 'AI Vision & Attachments' },
             { id: 'explain', title: 'Giải thích truy vấn', titleEn: 'Query Explanation' },
         ]
     },

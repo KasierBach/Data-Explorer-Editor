@@ -7,10 +7,10 @@ export function VisionSection({ lang }: Props) {
     const t = lang === 'vi';
     return (
         <DocPageLayout
-            title={t ? 'Tích hợp Gemini Vision' : 'Gemini Vision Integration'}
+            title={t ? 'AI Vision & ảnh đính kèm' : 'AI Vision & Attachments'}
             subtitle={t
-                ? 'Chuyển đổi sơ đồ vẽ tay trên bảng trắng hoặc ảnh chụp màn hình thành bảng dữ liệu SQL thực thi trong tích tắc.'
-                : 'Convert hand-drawn diagrams on a whiteboard or screenshots into executable SQL table definitions in an instant.'}
+                ? 'Dùng các provider có hỗ trợ vision để biến screenshot, sơ đồ ER, ảnh bảng trắng và file đính kèm liên quan thành SQL hoặc ngữ cảnh phân tích dùng được ngay.'
+                : 'Use vision-capable providers to turn screenshots, ER diagrams, whiteboard photos, and related attachments into executable SQL or richer analysis context.'}
         >
             {/* Hero Visual */}
             <div className="relative group rounded-[32px] overflow-hidden border-2 border-dashed border-primary/20 hover:border-primary/50 transition-all bg-card/50">
@@ -22,8 +22,8 @@ export function VisionSection({ lang }: Props) {
                     <div className="space-y-2">
                         <h3 className="text-2xl font-bold italic tracking-tighter">Image-to-Schema</h3>
                         <p className="text-sm text-muted-foreground max-w-md leading-relaxed">{t
-                            ? 'Chỉ cần kéo và thả hình ảnh sơ đồ ER, ảnh chụp bảng trắng, hoặc thậm chí screenshot ứng dụng vào khung chat AI — Gemini Vision sẽ phân tích và tạo ra CREATE TABLE statements tương ứng.'
-                            : 'Simply drag and drop ER diagram images, whiteboard photos, or even app screenshots into the AI chat frame — Gemini Vision will analyze and generate corresponding CREATE TABLE statements.'}</p>
+                            ? 'Chỉ cần kéo và thả hình ảnh sơ đồ ER, ảnh chụp bảng trắng, hoặc screenshot ứng dụng vào khung chat AI — hệ thống sẽ tự route sang provider có hỗ trợ vision để phân tích và tạo ra SQL hoặc giải thích phù hợp.'
+                            : 'Simply drag and drop ER diagram images, whiteboard photos, or app screenshots into the AI chat frame — the system will route the request to a vision-capable provider and generate SQL or targeted analysis.'}</p>
                     </div>
                 </div>
             </div>
@@ -33,9 +33,9 @@ export function VisionSection({ lang }: Props) {
                 <div className="space-y-4">
                     {[
                         { step: '1', title: t ? 'Mở AI Chat Panel' : 'Open AI Chat Panel', desc: t ? 'Nhấn Ctrl+I hoặc click biểu tượng Sparkles (✨) trên thanh toolbar để mở panel AI Assistant bên phải màn hình.' : 'Press Ctrl+I or click the Sparkles icon (✨) on the toolbar to open the AI Assistant panel on the right side.' },
-                        { step: '2', title: t ? 'Kéo thả hình ảnh' : 'Drag & Drop Image', desc: t ? 'Kéo file hình ảnh (PNG, JPG, WEBP) trực tiếp vào khung chat. Hoặc click vào biểu tượng đính kèm (📎) để chọn file từ máy. Hình ảnh sẽ hiển thị preview trong khung chat.' : 'Drag an image file (PNG, JPG, WEBP) directly into the chat frame. Or click the attachment icon (📎) to select a file. The image will show a preview in the chat.' },
+                        { step: '2', title: t ? 'Kéo thả hình ảnh' : 'Drag & Drop Image', desc: t ? 'Kéo file hình ảnh (PNG, JPG, WEBP) trực tiếp vào khung chat. Hoặc click vào biểu tượng đính kèm (📎) để chọn file từ máy. Hình ảnh sẽ hiển thị preview và prompt sẽ được route qua lane vision nếu có Gemini, Beeknoee hoặc OpenRouter phù hợp.' : 'Drag an image file (PNG, JPG, WEBP) directly into the chat frame, or click the attachment icon (📎). The image preview appears inline and the prompt is routed through a vision-capable Gemini, Beeknoee, or OpenRouter lane when available.' },
                         { step: '3', title: t ? 'Viết mô tả (tùy chọn)' : 'Add Description (Optional)', desc: t ? 'Bạn có thể thêm mô tả bổ sung: "Tạo schema PostgreSQL từ sơ đồ này với kiểu UUID cho primary key" hoặc "Sử dụng naming convention snake_case". Nếu không ghi gì, AI sẽ tự suy luận từ hình ảnh.' : 'You can add additional description: "Create PostgreSQL schema from this diagram with UUID primary keys" or "Use snake_case naming convention". If blank, AI will infer from the image.' },
-                        { step: '4', title: t ? 'Nhận kết quả SQL' : 'Receive SQL Result', desc: t ? 'AI phân tích hình ảnh, nhận diện các bảng, cột, kiểu dữ liệu và mối quan hệ, rồi tạo ra CREATE TABLE statements hoàn chỉnh với foreign keys. SQL được stream trực tiếp vào chat.' : 'AI analyzes the image, identifies tables, columns, data types, and relationships, then generates complete CREATE TABLE statements with foreign keys. SQL is streamed directly into the chat.' },
+                        { step: '4', title: t ? 'Nhận kết quả SQL' : 'Receive SQL Result', desc: t ? 'AI phân tích hình ảnh, nhận diện các bảng, cột, kiểu dữ liệu và mối quan hệ, rồi tạo ra CREATE TABLE statements hoàn chỉnh với foreign keys. Nếu ảnh không phải schema, AI vẫn có thể dùng nó làm context để giải thích query, debug hoặc gợi ý bước tiếp theo.' : 'AI analyzes the image, identifies tables, columns, data types, and relationships, then generates complete CREATE TABLE statements with foreign keys. If the image is not a schema, it can still be used as context for query explanation, debugging, or next-step suggestions.' },
                         { step: '5', title: t ? 'Copy hoặc Insert vào Editor' : 'Copy or Insert into Editor', desc: t ? 'Click nút "Copy" để sao chép SQL vào clipboard, hoặc click "Insert to Editor" để chèn trực tiếp vào tab SQL đang mở. Sau đó bạn có thể chỉnh sửa và thực thi.' : 'Click "Copy" to copy SQL to clipboard, or "Insert to Editor" to insert directly into the open SQL tab. You can then edit and execute.' },
                     ].map((item, i) => (
                         <div key={i} className="flex gap-4 items-start p-5 border rounded-2xl bg-muted/10">
@@ -65,6 +65,15 @@ export function VisionSection({ lang }: Props) {
                     ))}
                 </div>
             </DocSection>
+
+            <Callout type="warning">
+                <p className="font-bold">{t ? 'Cần provider có vision' : 'Vision provider required'}</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                    {t
+                        ? 'Để dùng ảnh đính kèm, bạn cần cấu hình ít nhất một trong các biến: GEMINI_API_KEY, BEEKNOEE_API_KEY hoặc OPENROUTER_API_KEY. Nếu không có provider vision, app sẽ từ chối các tác vụ phân tích ảnh.'
+                        : 'To use image attachments, configure at least one of GEMINI_API_KEY, BEEKNOEE_API_KEY, or OPENROUTER_API_KEY. Without a vision-capable provider, the app will reject image-analysis tasks.'}
+                </p>
+            </Callout>
 
             {/* Tips */}
             <Callout type="tip">

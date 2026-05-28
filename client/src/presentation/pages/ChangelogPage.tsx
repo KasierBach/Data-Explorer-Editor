@@ -17,12 +17,100 @@ export const ChangelogPage: React.FC = () => {
     };
 
     const releases = [
+        // v3.6.2 - May 28, 2026
+        {
+            version: 'v3.6.2',
+            date: lang === 'vi' ? '28 Tháng 5, 2026' : 'May 28, 2026',
+            title: lang === 'vi' ? 'AI Vision Mở Rộng & Catalog Model Mới' : 'Expanded AI Vision & New Model Catalog',
+            badge: 'LATEST',
+            features: [
+                {
+                    icon: <Sparkles className="w-5 h-5 text-purple-400" />,
+                    title: lang === 'vi' ? 'Ảnh đính kèm & vision-aware routing' : 'Image attachments & vision-aware routing',
+                    desc: lang === 'vi'
+                        ? 'AI chat giờ nhận ảnh đính kèm trực tiếp trong prompt và tự ưu tiên lane có hỗ trợ vision khi tác vụ cần phân tích hình ảnh hoặc sơ đồ.'
+                        : 'AI chat now accepts direct image attachments in prompts and automatically prioritizes vision-capable lanes for screenshots, diagrams, and image-based tasks.'
+                },
+                {
+                    icon: <Globe className="w-5 h-5 text-blue-400" />,
+                    title: lang === 'vi' ? 'Beeknoee chính thức vào routing' : 'Beeknoee added to routing',
+                    desc: lang === 'vi'
+                        ? 'Bổ sung provider Beeknoee vào hệ thống routing, kèm cấu hình môi trường riêng để chọn model rõ ràng thay vì nhét vào fallback ngầm.'
+                        : 'Added Beeknoee as a first-class routing provider with dedicated environment configuration instead of hiding it behind implicit fallback paths.'
+                },
+                {
+                    icon: <Database className="w-5 h-5 text-emerald-400" />,
+                    title: lang === 'vi' ? 'Catalog model riêng & MiniMax M2.7' : 'Dedicated model catalog & MiniMax M2.7',
+                    desc: lang === 'vi'
+                        ? 'Tách danh sách model AI Assistant thành catalog riêng, đồng thời mở rộng picker với Qwen 3 235B, GLM 4.7 Flash và MiniMax M2.7.'
+                        : 'Split the AI Assistant model list into a dedicated catalog and expanded the picker with Qwen 3 235B, GLM 4.7 Flash, and MiniMax M2.7.'
+                },
+                {
+                    icon: <Code2 className="w-5 h-5 text-cyan-400" />,
+                    title: lang === 'vi' ? 'AI chat composer bóng bẩy hơn' : 'Polished AI chat composer',
+                    desc: lang === 'vi'
+                        ? 'Làm mới AiChatInput với styling tốt hơn, animation mượt hơn, hiển thị icon model rõ hơn và trải nghiệm nhập prompt trực quan hơn.'
+                        : 'Refreshed AiChatInput with better styling, smoother animation, clearer model icons, and a more expressive prompt composition experience.'
+                },
+                {
+                    icon: <Zap className="w-5 h-5 text-yellow-400" />,
+                    title: lang === 'vi' ? 'Timeout AI 60 giây cho payload nặng' : '60-second AI timeouts for heavier payloads',
+                    desc: lang === 'vi'
+                        ? 'Tăng timeout provider lên 60 giây để ổn định hơn khi gửi prompt dài, schema lớn hoặc ảnh có kích thước đáng kể.'
+                        : 'Raised provider timeouts to 60 seconds so larger prompts, heavier schema context, and image payloads complete more reliably.'
+                }
+            ]
+        },
+        // v3.6.1 - May 21, 2026
+        {
+            version: 'v3.6.1',
+            date: lang === 'vi' ? '21 Tháng 5, 2026' : 'May 21, 2026',
+            title: lang === 'vi' ? 'Billing Thật, Quyền Truy Cập Chặt Hơn & Trợ Lý AI Giàu Ngữ Cảnh' : 'Real Billing, Tighter Access Control & Richer AI Context',
+            badge: '',
+            features: [
+                {
+                    icon: <Database className="w-5 h-5 text-emerald-400" />,
+                    title: lang === 'vi' ? 'Billing checkout thật với MoMo/ZaloPay' : 'Real billing checkout with MoMo/ZaloPay',
+                    desc: lang === 'vi'
+                        ? 'Thay pricing mock bằng flow thanh toán thật, có bảng plan, lưu subscription, webhook xử lý trạng thái và màn hình return cho checkout.'
+                        : 'Replaced mock pricing with a real checkout flow including plan definitions, subscription persistence, payment webhooks, and billing return handling.'
+                },
+                {
+                    icon: <ShieldCheck className="w-5 h-5 text-red-400" />,
+                    title: lang === 'vi' ? 'Permission lọc theo resource & hardening bảo mật' : 'Resource-level permissions & security hardening',
+                    desc: lang === 'vi'
+                        ? 'Siết quyền truy cập connections, queries, dashboards theo resource policy thực tế, đồng thời tăng cường SSRF protection cho SSH tunnel và các đường AI nhạy cảm.'
+                        : 'Tightened access to connections, queries, and dashboards using resource-level policies while further hardening SSH tunnel SSRF protection and sensitive AI paths.'
+                },
+                {
+                    icon: <Zap className="w-5 h-5 text-amber-400" />,
+                    title: lang === 'vi' ? 'DataGrid nhanh hơn, sâu hơn' : 'Faster, deeper DataGrid workflows',
+                    desc: lang === 'vi'
+                        ? 'Thêm cell inspector, bulk replace, highlight tìm kiếm, cuộn mượt hơn, virtualization tốt hơn cho NoSQL grid và caching thông minh hơn cho metadata/query.'
+                        : 'Added a cell inspector, bulk replace, search highlighting, smoother scrolling, stronger NoSQL virtualization, and smarter metadata/query caching.'
+                },
+                {
+                    icon: <Sparkles className="w-5 h-5 text-blue-400" />,
+                    title: lang === 'vi' ? 'AI hiểu schema tốt hơn & prompt context giàu hơn' : 'Smarter schema-aware AI context',
+                    desc: lang === 'vi'
+                        ? 'AI schema context giờ có thêm sample rows, luật chuyên biệt cho NoSQL, giới hạn chống overflow và autocomplete chính xác hơn nhờ hiểu kiểu dữ liệu tốt hơn.'
+                        : 'AI context now includes sample rows, NoSQL-specific rules, overflow guards, and more accurate autocomplete thanks to stronger type awareness.'
+                },
+                {
+                    icon: <Globe className="w-5 h-5 text-cyan-400" />,
+                    title: lang === 'vi' ? 'Đa ngôn ngữ vi/en xuyên suốt' : 'End-to-end vi/en localization',
+                    desc: lang === 'vi'
+                        ? 'Triển khai i18n cho client, server, email templates và auth flow để thông báo, lỗi và UI chính đều có thể hiển thị nhất quán bằng tiếng Việt hoặc tiếng Anh.'
+                        : 'Rolled out i18n across the client, server, email templates, and auth flows so key UI, errors, and notifications can stay consistent in Vietnamese or English.'
+                }
+            ]
+        },
         // v3.6.0 - Mid May 2026
         {
             version: 'v3.6.0',
             date: lang === 'vi' ? 'Giữa Tháng 5, 2026' : 'Mid May, 2026',
             title: lang === 'vi' ? 'Kiến trúc Cơ sở AI & AI Reasoning Xuyên thấu' : 'AI foundational Architecture & Reasoning Transparency',
-            badge: 'LATEST',
+            badge: '',
             features: [
                 {
                     icon: <Sparkles className="w-5 h-5 text-purple-400" />,

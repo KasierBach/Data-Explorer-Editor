@@ -129,9 +129,19 @@ export function TechStackSection({ lang }: Props) {
                                     role: t ? 'General chat và prompt nhẹ để giảm tần suất gọi Gemini.' : 'General chat and light prompts to reduce Gemini usage.'
                                 },
                                 {
-                                    service: 'OpenRouter fallback lane',
-                                    model: 'openrouter/auto',
-                                    role: t ? 'Fallback lane tùy chọn khi muốn thêm provider ngoài Gemini/Cerebras.' : 'Optional fallback lane when you want a provider beyond Gemini/Cerebras.'
+                                    service: 'Groq fast lane',
+                                    model: 'Llama 4 Scout / Llama 3.x',
+                                    role: t ? 'Lane tốc độ cao cho các vòng lặp chat nhanh và task cần độ trễ thấp.' : 'A high-speed lane for rapid chat iteration and lower-latency tasks.'
+                                },
+                                {
+                                    service: 'Beeknoee explicit lane',
+                                    model: 'GLM 4.7 Flash / Qwen 3 235B / MiniMax M2.7',
+                                    role: t ? 'Provider explicit từ model catalog khi bạn muốn khóa model cụ thể thay vì chỉ dựa vào fallback.' : 'An explicit provider from the model catalog when you want to lock to a concrete model instead of relying only on fallback.'
+                                },
+                                {
+                                    service: 'OpenRouter flexible lane',
+                                    model: 'Configurable by env or explicit picker',
+                                    role: t ? 'Lane linh hoạt cho fallback đa model và một số vision-compatible flows ngoài Gemini.' : 'A flexible lane for multi-model fallback and some vision-compatible flows beyond Gemini.'
                                 },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/20 transition-colors">

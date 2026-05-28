@@ -12,11 +12,11 @@
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![Framer_Motion](https://img.shields.io/badge/Framer_Motion-12-0055FF?logo=framer&logoColor=white)](https://www.framer.com/motion/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](#license)
-[![Version](https://img.shields.io/badge/Version-3.6.0-blue.svg)](https://github.com/KasierBach/Data-Explorer-Editor/releases)
+[![Version](https://img.shields.io/badge/Version-3.6.2-blue.svg)](https://github.com/KasierBach/Data-Explorer-Editor/releases)
 
 **Data Explorer** is a high-fidelity, high-performance database management and visualization IDE. It provides a unified, intelligent interface for developers and data engineers to explore, query, and visualize multi-engine databases, all supercharged by a context-aware AI.
 
-Current release focus: **v3.6.0** tightens AI provider routing, connection safety, responsive desktop/mobile chrome, server-side lint quality, and database-tool workflows across SQL, NoSQL, ERD, migration, and team collaboration surfaces.
+Current release focus: **v3.6.2** adds Beeknoee-backed model routing, image-aware AI workflows, dedicated model catalog management, richer billing and access-control surfaces, and broader UX polish across SQL, NoSQL, docs, and the landing experience.
 
 ---
 

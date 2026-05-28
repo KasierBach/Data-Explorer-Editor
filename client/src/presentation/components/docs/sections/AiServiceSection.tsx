@@ -18,8 +18,8 @@ export function AiServiceSection({ lang }: Props) {
                 <InfoCard icon={<Route className="w-6 h-6 text-blue-500" />} title={t ? 'Routing thông minh' : 'Smart routing'} color="blue">
                     <p>
                         {t
-                            ? 'AI có thể ưu tiên lane rẻ hơn cho câu hỏi nhẹ, rồi fallback sang model mạnh hơn khi câu hỏi dài, cần suy luận sâu, hoặc cần hình ảnh/current context.'
-                            : 'AI can prefer a cheaper lane for lightweight prompts, then fall back to stronger models when the task is longer, needs deeper reasoning, or requires image/current context.'}
+                            ? 'AI có thể ưu tiên lane rẻ hơn cho câu hỏi nhẹ, rồi fallback sang model mạnh hơn khi câu hỏi dài, cần suy luận sâu, hoặc cần image/current context. Từ v3.6.2, ảnh đính kèm và model picker explicit cũng tham gia trực tiếp vào quyết định route.'
+                            : 'AI can prefer a cheaper lane for lightweight prompts, then fall back to stronger models when the task is longer, needs deeper reasoning, or requires image/current context. In v3.6.2, image attachments and explicit model picks now directly influence routing.'}
                     </p>
                 </InfoCard>
                 <InfoCard icon={<Gauge className="w-6 h-6 text-emerald-500" />} title={t ? 'SSE thời gian thực' : 'Realtime SSE'} color="emerald">
@@ -78,12 +78,19 @@ export function AiServiceSection({ lang }: Props) {
             </DocSection>
 
             <DocSection title={t ? 'Provider lanes hiện có' : 'Available provider lanes'}>
-                <div className="grid md:grid-cols-3 gap-4">
+                <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-4">
                     <InfoCard icon={<Bot className="w-5 h-5 text-violet-500" />} title="Gemini" color="purple">
                         <p className="text-xs">
                             {t
                                 ? 'Lane chất lượng cao cho reasoning dài, image input, query generation khó, và những câu cần độ tin cậy cao hơn.'
                                 : 'Higher-quality lane for longer reasoning, image input, harder query generation, and prompts that need stronger reliability.'}
+                        </p>
+                    </InfoCard>
+                    <InfoCard icon={<Sparkles className="w-5 h-5 text-emerald-500" />} title="Beeknoee" color="emerald">
+                        <p className="text-xs">
+                            {t
+                                ? 'Lane explicit model mới trong catalog, phù hợp khi bạn muốn chọn thẳng GLM 4.7 Flash, Qwen 3 235B hoặc MiniMax M2.7 thay vì chỉ dựa vào fallback.'
+                                : 'A newer explicit-model lane in the catalog, ideal when you want to target GLM 4.7 Flash, Qwen 3 235B, or MiniMax M2.7 directly instead of relying only on fallback.'}
                         </p>
                     </InfoCard>
                     <InfoCard icon={<Sparkles className="w-5 h-5 text-cyan-500" />} title="Cerebras / cheap lane" color="blue">
@@ -93,14 +100,41 @@ export function AiServiceSection({ lang }: Props) {
                                 : 'Lower-cost lane for general chat, concept explanations, and short prompts that do not need image/search.'}
                         </p>
                     </InfoCard>
-                    <InfoCard icon={<Image className="w-5 h-5 text-emerald-500" />} title={t ? 'Vision path' : 'Vision path'} color="emerald">
+                    <InfoCard icon={<Bot className="w-5 h-5 text-amber-500" />} title="Groq" color="amber">
                         <p className="text-xs">
                             {t
-                                ? 'Ảnh và sơ đồ vẫn đi qua lane có hỗ trợ vision. Đây là lý do image-based tasks thường được route khác với chat văn bản.'
-                                : 'Images and diagrams still use a vision-capable lane. That is why image-based tasks are often routed differently from plain text chat.'}
+                                ? 'Lane phản hồi nhanh cho chat ngắn, iteration nhanh và các tác vụ cần latency thấp khi bạn đã cấu hình GROQ_API_KEY.'
+                                : 'A fast-response lane for short chats, rapid iteration, and low-latency tasks when GROQ_API_KEY is configured.'}
+                        </p>
+                    </InfoCard>
+                    <InfoCard icon={<Image className="w-5 h-5 text-emerald-500" />} title={t ? 'OpenRouter / vision path' : 'OpenRouter / vision path'} color="emerald">
+                        <p className="text-xs">
+                            {t
+                                ? 'OpenRouter vẫn là lane linh hoạt cho model đa dạng và cũng có thể đóng vai trò vision path khi Gemini không phải lựa chọn duy nhất.'
+                                : 'OpenRouter remains the flexible multi-model lane and can also act as a vision path when Gemini is not your only option.'}
                         </p>
                     </InfoCard>
                 </div>
+            </DocSection>
+
+            <DocSection title={t ? 'Model picker & catalog explicit' : 'Explicit model picker & catalog'}>
+                <Prose>
+                    {t
+                        ? 'Từ v3.6.2, AI Assistant không còn chỉ xoay quanh fallback ngầm. Bạn có thể chọn model cụ thể ngay từ catalog theo nhóm Gemini, Beeknoee, Groq và OpenRouter. Những model dạng `beeknoee:<slug>` sẽ route thẳng sang provider Beeknoee nếu API key đã được cấu hình.'
+                        : 'As of v3.6.2, the AI Assistant is no longer driven only by implicit fallback. You can pick concrete models from grouped Gemini, Beeknoee, Groq, and OpenRouter catalogs. Models shaped like `beeknoee:<slug>` route directly to Beeknoee when its API key is configured.'}
+                </Prose>
+                <ul className="mt-6 grid gap-3">
+                    {[
+                        t ? 'Gemini catalog: lane chất lượng cao cho reasoning, schema analysis, vision và các prompt dài.' : 'Gemini catalog: the higher-quality lane for reasoning, schema analysis, vision, and longer prompts.',
+                        t ? 'Beeknoee catalog: hiện có GLM 4.7 Flash, Qwen 3 235B A22B Instruct 2507 và MiniMax M2.7.' : 'Beeknoee catalog: currently includes GLM 4.7 Flash, Qwen 3 235B A22B Instruct 2507, and MiniMax M2.7.',
+                        t ? 'Groq catalog: ưu tiên tốc độ cho iteration nhanh và chat nhẹ.' : 'Groq catalog: optimized for speed in fast iteration and lightweight chat.',
+                        t ? 'OpenRouter catalog: useful for broader model choice, fallback diversity, and some vision-compatible flows.' : 'OpenRouter catalog: useful for broader model choice, fallback diversity, and some vision-compatible flows.'
+                    ].map((item) => (
+                        <li key={item} className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                            {item}
+                        </li>
+                    ))}
+                </ul>
             </DocSection>
 
             <DocSection title={t ? 'Action cards & typed recommendations' : 'Action cards & typed recommendations'}>
@@ -128,8 +162,8 @@ export function AiServiceSection({ lang }: Props) {
                     <InfoCard icon={<Shield className="w-5 h-5 text-emerald-500" />} title={t ? 'Được gửi có chọn lọc' : 'Sent selectively'} color="emerald">
                         <p className="text-xs">
                             {t
-                                ? 'Schema context, active database, prompt hiện tại, và file/ảnh đính kèm liên quan có thể được gửi để tăng độ chính xác của câu trả lời.'
-                                : 'Schema context, the active database, the current prompt, and relevant attached files/images may be sent to improve accuracy.'}
+                                ? 'Schema context, active database, prompt hiện tại, và file/ảnh đính kèm liên quan có thể được gửi để tăng độ chính xác của câu trả lời. Điều này bao gồm ảnh, text file, PDF đã parse text, hoặc spreadsheet đã được chuyển thành nội dung đọc được.'
+                                : 'Schema context, the active database, the current prompt, and relevant attached files/images may be sent to improve accuracy. This can include images, text files, parsed PDFs, or spreadsheets converted into readable context.'}
                         </p>
                     </InfoCard>
                     <InfoCard icon={<Shield className="w-5 h-5 text-rose-500" />} title={t ? 'Không gửi mặc định' : 'Not sent by default'} color="red">
@@ -158,8 +192,8 @@ export function AiServiceSection({ lang }: Props) {
             <Callout type="tip">
                 <p className="text-sm font-medium">
                     {t
-                        ? 'Mẹo: nếu bạn chỉ muốn tiết kiệm chi phí, dùng Auto hoặc Fast / Cheap. Nếu bạn đang làm schema analysis dài, query khó, hoặc vision, hãy chuyển sang Best Quality hoặc Gemini Only.'
-                        : 'Tip: if your goal is cost savings, use Auto or Fast / Cheap. For longer schema analysis, difficult queries, or vision tasks, switch to Best Quality or Gemini Only.'}
+                        ? 'Mẹo: nếu bạn chỉ muốn tiết kiệm chi phí, dùng Auto hoặc Fast / Cheap. Nếu bạn đang làm schema analysis dài, query khó, vision, hoặc gửi file lớn, hãy chuyển sang Best Quality hoặc chọn explicit model phù hợp trong catalog. Timeout mặc định hiện là 60 giây cho các payload nặng hơn.'
+                        : 'Tip: if your goal is cost savings, use Auto or Fast / Cheap. For longer schema analysis, difficult queries, vision tasks, or larger attachments, switch to Best Quality or pick an explicit model from the catalog. The default timeout is now 60 seconds for heavier payloads.'}
                 </p>
             </Callout>
         </DocPageLayout>

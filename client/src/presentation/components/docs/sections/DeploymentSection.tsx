@@ -67,6 +67,7 @@ export function DeploymentSection({ lang }: Props) {
                         { icon: <Shield className="w-4 h-4" />, key: 'REFRESH_TOKEN_SECRET', descVi: 'Khuyến nghị dùng secret riêng cho refresh token cookie. Nếu để trống, app sẽ fallback về JWT_SECRET.', descEn: 'Recommended separate secret for the refresh-token cookie. If omitted, the app falls back to JWT_SECRET.' },
                         { icon: <Shield className="w-4 h-4" />, key: 'ENCRYPTION_KEY', descVi: 'Phải đúng 32 ký tự để mã hóa saved connection passwords.', descEn: 'Must be exactly 32 characters to encrypt saved connection passwords.' },
                         { icon: <Globe className="w-4 h-4" />, key: 'FRONTEND_URL', descVi: 'Origin frontend thật dùng cho CORS và OAuth redirects.', descEn: 'The real frontend origin used for CORS and OAuth redirects.' },
+                        { icon: <Globe className="w-4 h-4" />, key: 'API_PUBLIC_URL', descVi: 'Public API base URL; cần cho billing return/webhook flows.', descEn: 'Public API base URL; required for billing return and webhook flows.' },
                         { icon: <Database className="w-4 h-4" />, key: 'REDIS_URL', descVi: 'URL kết nối Redis cho caching và rate-limiting.', descEn: 'Redis connection URL for caching and rate-limiting.' },
                         { icon: <KeyRound className="w-4 h-4" />, key: 'ADMIN_EMAIL', descVi: 'Email admin khởi tạo (Seeding).', descEn: 'Initial admin email (Seeding).' },
                         { icon: <KeyRound className="w-4 h-4" />, key: 'ADMIN_PASSWORD', descVi: 'Mật khẩu admin khởi tạo. Khuyên dùng mật khẩu mạnh.', descEn: 'Initial admin password. Strong password recommended.' }
@@ -103,19 +104,36 @@ export function DeploymentSection({ lang }: Props) {
                 <CodeBlock title={t ? 'Optional AI lanes' : 'Optional AI lanes'}>
                     <CodeComment>{t ? 'Premium lane' : 'Premium lane'}</CodeComment>
                     <CodeLine>GEMINI_API_KEY=...</CodeLine>
-                    <CodeLine>AI_PROVIDER_TIMEOUT_MS=15000</CodeLine>
-                    <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=15000</CodeLine>
+                    <CodeLine>AI_PROVIDER_TIMEOUT_MS=60000</CodeLine>
+                    <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=60000</CodeLine>
                     <p className="mt-3" />
                     <CodeComment>{t ? 'Lower-cost lane' : 'Lower-cost lane'}</CodeComment>
                     <CodeLine>CEREBRAS_API_KEY=...</CodeLine>
                     <CodeLine>CEREBRAS_BASE_URL=https://api.cerebras.ai/v1</CodeLine>
                     <CodeLine>CEREBRAS_CHAT_MODEL=llama3.1-8b</CodeLine>
                     <p className="mt-3" />
-                    <CodeComment>{t ? 'Fallback lane' : 'Fallback lane'}</CodeComment>
+                    <CodeComment>{t ? 'Flexible / fallback lane' : 'Flexible / fallback lane'}</CodeComment>
                     <CodeLine>OPENROUTER_API_KEY=...</CodeLine>
                     <CodeLine>OPENROUTER_BASE_URL=https://openrouter.ai/api/v1</CodeLine>
-                    <CodeLine>OPENROUTER_CHAT_MODEL=openrouter/auto</CodeLine>
+                    <CodeLine>OPENROUTER_CHAT_MODEL=</CodeLine>
+                    <p className="mt-3" />
+                    <CodeComment>{t ? 'Low-latency lane' : 'Low-latency lane'}</CodeComment>
+                    <CodeLine>GROQ_API_KEY=...</CodeLine>
+                    <CodeLine>GROQ_BASE_URL=https://api.groq.com/openai/v1</CodeLine>
+                    <CodeLine>GROQ_CHAT_MODEL=meta-llama/llama-4-scout-17b-16e-instruct</CodeLine>
+                    <p className="mt-3" />
+                    <CodeComment>{t ? 'Explicit Beeknoee lane' : 'Explicit Beeknoee lane'}</CodeComment>
+                    <CodeLine>BEEKNOEE_API_KEY=...</CodeLine>
+                    <CodeLine>BEEKNOEE_BASE_URL=https://platform.beeknoee.com/api/v1</CodeLine>
+                    <CodeLine>BEEKNOEE_CHAT_MODEL=glm-4.7-flash</CodeLine>
                 </CodeBlock>
+                <Callout type="info">
+                    <p className="text-sm">
+                        {t
+                            ? 'Nếu bạn muốn dùng ảnh đính kèm trong AI chat ở production, hãy cấu hình ít nhất một lane có vision như Gemini, Beeknoee hoặc OpenRouter.'
+                            : 'If you want image attachments to work in production AI chat, configure at least one vision-capable lane such as Gemini, Beeknoee, or OpenRouter.'}
+                    </p>
+                </Callout>
             </DocSection>
 
             <DocSection title={t ? '5. Những lỗi deploy hay gặp' : '5. Common deployment failures'}>

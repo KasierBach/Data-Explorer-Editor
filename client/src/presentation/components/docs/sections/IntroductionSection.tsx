@@ -19,17 +19,24 @@ export function IntroductionSection({ lang }: Props) {
                     ? 'Data Explorer không chỉ là một SQL Client thông thường. Đây là một hệ sinh thái được tối ưu hóa để rút ngắn khoảng cách giữa ý tưởng và dữ liệu, sử dụng sức mạnh của các Large Language Models (LLMs) thế hệ mới nhất để biến ngôn ngữ tự nhiên thành những truy vấn phức tạp.'
                     : 'Data Explorer is more than just a regular SQL Client. It is an ecosystem optimized to bridge the gap between idea and data, using the power of the latest Large Language Models (LLMs) to turn natural language into complex queries.'}
             </Prose>
+            <Callout type="info">
+                <p className="text-sm">
+                    {t
+                        ? 'Điểm nhấn của v3.6.2: ảnh đính kèm đi thẳng vào AI chat, catalog model explicit với Beeknoee/Groq/OpenRouter, timeout AI 60 giây cho payload nặng hơn, billing checkout thật, phân quyền resource chặt hơn và i18n vi/en xuyên client lẫn server.'
+                        : 'v3.6.2 highlights: image attachments flow directly into AI chat, the model catalog now exposes explicit Beeknoee/Groq/OpenRouter options, AI timeouts are 60 seconds for heavier payloads, billing is now real, resource permissions are tighter, and vi/en localization runs across both client and server.'}
+                </p>
+            </Callout>
             {/* Overview Cards */}
             <FeatureGrid>
                 <InfoCard icon={<Database className="w-6 h-6 text-blue-500" />} title={t ? 'Hỗ trợ Đa Engine' : 'Multi-Engine Support'} color="blue">
                     <p>{t
-                        ? 'Kết nối bản địa tới PostgreSQL, MySQL và SQL Server thông qua một giao diện thống nhất. Mỗi engine sử dụng driver riêng biệt được tối ưu hóa cho hiệu suất tốt nhất — không chỉ là một wrapper chung chung.'
-                        : 'Native connections to PostgreSQL, MySQL and SQL Server through a unified interface. Each engine uses its own optimized driver for maximum performance — not just a generic wrapper.'}</p>
+                        ? 'Kết nối bản địa tới PostgreSQL, MySQL, SQL Server và MongoDB/Atlas thông qua một giao diện thống nhất. Mỗi engine sử dụng driver riêng biệt được tối ưu hóa cho hiệu suất tốt nhất — không chỉ là một wrapper chung chung.'
+                        : 'Native connections to PostgreSQL, MySQL, SQL Server, and MongoDB/Atlas through a unified interface. Each engine uses its own optimized driver for maximum performance — not just a generic wrapper.'}</p>
                 </InfoCard>
                 <InfoCard icon={<BookOpen className="w-6 h-6 text-purple-500" />} title={t ? 'AI Assistant đa lane' : 'Multi-lane AI Assistant'} color="purple">
                     <p>{t
-                        ? 'Kết hợp AI routing, Gemini, và lane chi phí thấp hơn để hỗ trợ general chat, SQL generation, schema analysis, typed recommendations, và vision flows.'
-                        : 'Combines AI routing, Gemini, and lower-cost lanes to support general chat, SQL generation, schema analysis, typed recommendations, and vision flows.'}</p>
+                        ? 'Kết hợp AI routing, Gemini, Beeknoee, Groq, OpenRouter và lane chi phí thấp hơn để hỗ trợ general chat, SQL generation, schema analysis, typed recommendations, attachment context, và vision flows.'
+                        : 'Combines AI routing, Gemini, Beeknoee, Groq, OpenRouter, and lower-cost lanes to support general chat, SQL generation, schema analysis, typed recommendations, attachment context, and vision flows.'}</p>
                 </InfoCard>
             </FeatureGrid>
 
