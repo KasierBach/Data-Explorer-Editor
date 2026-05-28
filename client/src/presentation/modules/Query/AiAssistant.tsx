@@ -121,16 +121,6 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         if (activeAiChatId) handleEditSubmit(activeAiChatId, messageId, content);
     }, [activeAiChatId, handleEditSubmit]);
 
-    // Close context menus on click outside
-    useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
-            const target = e.target as Node;
-            if (contextMenuRef.current && !contextMenuRef.current.contains(target)) setShowContextMenu(false);
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
     // --- Chat History View ---
     if (showHistory) {
         return <AiChatList onClose={onClose} onHideHistory={() => setShowHistory(false)} />;

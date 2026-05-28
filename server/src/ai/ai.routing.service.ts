@@ -248,9 +248,15 @@ export class AiRoutingService {
       params.image,
     );
 
-    if (params.image && geminiPlans.length === 0) {
+    if (
+      params.image &&
+      geminiPlans.length === 0 &&
+      !lowCostPlans.some(
+        (p) => p.provider === 'openrouter' || p.provider === 'beeknoee',
+      )
+    ) {
       throw new Error(
-        'Image analysis currently requires Gemini. Set GEMINI_API_KEY or remove the image attachment.',
+        'Image analysis requires a vision-capable provider. Set GEMINI_API_KEY, BEEKNOEE_API_KEY or OPENROUTER_API_KEY.',
       );
     }
 

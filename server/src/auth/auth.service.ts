@@ -122,11 +122,7 @@ export class AuthService implements OnModuleInit {
     );
   }
 
-  async login(
-    loginDto: LoginDto,
-    clientIp?: string,
-    lang: AppLanguage = 'vi',
-  ) {
+  async login(loginDto: LoginDto, clientIp?: string, lang: AppLanguage = 'vi') {
     const user = await this.prisma.user.findUnique({
       where: { email: loginDto.email },
     });
@@ -562,7 +558,11 @@ export class AuthService implements OnModuleInit {
 
     if (!user) {
       throw new UnauthorizedException(
-        this.t(lang, 'Không tìm thấy tài khoản OAuth.', 'OAuth account not found.'),
+        this.t(
+          lang,
+          'Không tìm thấy tài khoản OAuth.',
+          'OAuth account not found.',
+        ),
       );
     }
 
@@ -581,10 +581,7 @@ export class AuthService implements OnModuleInit {
     return this.issueSession(user);
   }
 
-  async refreshSession(
-    refreshToken?: string,
-    lang: AppLanguage = 'vi',
-  ) {
+  async refreshSession(refreshToken?: string, lang: AppLanguage = 'vi') {
     const payload = this.tokenService.verifyRefreshToken(refreshToken);
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
@@ -592,7 +589,11 @@ export class AuthService implements OnModuleInit {
 
     if (!user || !user.refreshTokenHash || !user.refreshTokenExpiry) {
       throw new UnauthorizedException(
-        this.t(lang, 'Không tìm thấy phiên làm việc.', 'Refresh session not found.'),
+        this.t(
+          lang,
+          'Không tìm thấy phiên làm việc.',
+          'Refresh session not found.',
+        ),
       );
     }
 
@@ -611,11 +612,7 @@ export class AuthService implements OnModuleInit {
     if (user.refreshTokenExpiry.getTime() < Date.now()) {
       await this.revokeRefreshSession(user.id);
       throw new UnauthorizedException(
-        this.t(
-          userLang,
-          'Refresh token đã hết hạn.',
-          'Refresh token expired.',
-        ),
+        this.t(userLang, 'Refresh token đã hết hạn.', 'Refresh token expired.'),
       );
     }
 

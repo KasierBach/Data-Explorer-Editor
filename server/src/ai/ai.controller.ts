@@ -37,6 +37,7 @@ export class AiController {
       model,
       mode,
       routingMode,
+      history,
     } = body;
 
     const { connection, schemaContext } =
@@ -58,6 +59,7 @@ export class AiController {
         image,
         context,
         routingMode,
+        history,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -117,6 +119,7 @@ export class AiController {
         image,
         context,
         routingMode,
+        history,
       });
 
       for await (const event of stream) {

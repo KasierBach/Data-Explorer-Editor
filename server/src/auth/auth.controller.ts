@@ -105,7 +105,10 @@ export class AuthController {
   @Post('resend-verification')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 3, ttl: 60000 } })
-  async resendVerification(@Body() dto: ResendVerificationDto, @Req() req: Request) {
+  async resendVerification(
+    @Body() dto: ResendVerificationDto,
+    @Req() req: Request,
+  ) {
     return this.authService.resendVerificationEmail(
       dto,
       resolveRequestLanguage(req.headers['accept-language']),
@@ -125,7 +128,10 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async resetPassword(@Body() dto: ResetPasswordWithOtpDto, @Req() req: Request) {
+  async resetPassword(
+    @Body() dto: ResetPasswordWithOtpDto,
+    @Req() req: Request,
+  ) {
     return this.authService.resetPasswordWithOtp(
       dto,
       resolveRequestLanguage(req.headers['accept-language']),

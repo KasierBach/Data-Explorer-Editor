@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MailTemplates } from './mail.templates';
-import {
-  pickLocalizedText,
-  type AppLanguage,
-} from '../common/utils/i18n.util';
+import { pickLocalizedText, type AppLanguage } from '../common/utils/i18n.util';
 
 @Injectable()
 export class MailService {

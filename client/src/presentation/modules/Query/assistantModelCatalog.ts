@@ -29,6 +29,7 @@ export function getAssistantModelCatalog(): AssistantModelGroup[] {
       items: [
         { id: 'beeknoee:glm-4.7-flash', label: 'GLM 4.7 Flash', isNew: true },
         { id: 'beeknoee:qwen-3-235b-a22b-instruct-2507', label: 'Qwen 3 235B A22B Instruct 2507', isNew: true },
+        { id: 'beeknoee:minimax/minimax-m2.7', label: 'MiniMax M2.7', isNew: true },
       ],
     },
     {
@@ -51,7 +52,6 @@ export function getAssistantModelCatalog(): AssistantModelGroup[] {
         { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'NVIDIA Nemotron 120B' },
         { id: 'openai/gpt-oss-120b:free', label: 'GPT OSS 120B' },
         { id: 'z-ai/glm-4.5-air:free', label: 'GLM 4.5 Air' },
-        { id: 'z-ai/glm-5.1', label: 'GLM 5.1 (Reasoning)', isNew: true },
         { id: 'openrouter/owl-alpha', label: 'Owl Alpha (Reasoner)', isNew: true },
       ],
     },

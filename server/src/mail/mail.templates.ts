@@ -1,7 +1,4 @@
-import {
-  pickLocalizedText,
-  type AppLanguage,
-} from '../common/utils/i18n.util';
+import { pickLocalizedText, type AppLanguage } from '../common/utils/i18n.util';
 
 export class MailTemplates {
   private static wrap(
@@ -262,7 +259,11 @@ export class MailTemplates {
       `<strong style="color:#f1f5f9;">${inviterName}</strong> đã mời bạn tham gia team <strong style="color:#f1f5f9;">${teamName}</strong> với vai trò <strong style="color:#f1f5f9;">${this.getRoleLabel(role, lang)}</strong>.`,
       `<strong style="color:#f1f5f9;">${inviterName}</strong> invited you to join <strong style="color:#f1f5f9;">${teamName}</strong> as <strong style="color:#f1f5f9;">${this.getRoleLabel(role, lang)}</strong>.`,
     );
-    const cta = pickLocalizedText(lang, 'Mở Data Explorer', 'Open Data Explorer');
+    const cta = pickLocalizedText(
+      lang,
+      'Mở Data Explorer',
+      'Open Data Explorer',
+    );
     const instructions = pickLocalizedText(
       lang,
       'Nếu bạn đã có tài khoản với email này, chỉ cần đăng nhập là team sẽ xuất hiện tự động. Nếu chưa có tài khoản, hãy đăng ký bằng đúng email này để được thêm vào team sau khi đăng nhập.',

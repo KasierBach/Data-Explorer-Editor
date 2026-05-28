@@ -19,7 +19,7 @@ function createConfig(
   };
 
   return {
-    get: jest.fn((key: string) => ({ ...defaults, ...overrides }[key])),
+    get: jest.fn((key: string) => ({ ...defaults, ...overrides })[key]),
   } as unknown as ConfigService;
 }
 

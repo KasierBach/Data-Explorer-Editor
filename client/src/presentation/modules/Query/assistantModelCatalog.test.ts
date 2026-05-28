@@ -17,6 +17,10 @@ describe('assistantModelCatalog', () => {
           id: 'beeknoee:qwen-3-235b-a22b-instruct-2507',
           label: 'Qwen 3 235B A22B Instruct 2507',
         }),
+        expect.objectContaining({
+          id: 'beeknoee:minimax/minimax-m2.7',
+          label: 'MiniMax M2.7',
+        }),
       ]),
     );
   });

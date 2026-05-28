@@ -75,6 +75,7 @@ ${responseFormat}`;
     systemPrompt: string,
     context?: string,
     history: any[] = [],
+    image?: string,
   ) {
     const userText = context
       ? `${prompt}\n\nAdditional context:\n${context}`
@@ -100,7 +101,22 @@ ${responseFormat}`;
       }
     }
 
-    messages.push({ role: 'user', content: userText });
+    if (image) {
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: userText },
+          {
+            type: 'image_url',
+            image_url: {
+              url: image, // OpenRouter handles base64 data:image/jpeg;base64,... directly
+            },
+          },
+        ],
+      });
+    } else {
+      messages.push({ role: 'user', content: userText });
+    }
 
     return messages;
   }
