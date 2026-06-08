@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
+import type { PersistedAiMessagePayload } from '../ai.types';
 
 export class CreateAiChatDto {
   @IsString()
@@ -20,7 +21,8 @@ export class UpdateAiChatDto {
 
 export class AiMessageDto {
   @IsString()
-  role: string;
+  @IsIn(['user', 'ai'])
+  role: 'user' | 'ai';
 
   @IsString()
   content: string;
@@ -38,7 +40,7 @@ export class AiMessageDto {
   error?: boolean;
 
   @IsOptional()
-  attachments?: any;
+  attachments?: PersistedAiMessagePayload;
 }
 
 export class AddMessageDto extends AiMessageDto {}

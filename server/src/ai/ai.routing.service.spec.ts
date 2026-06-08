@@ -42,6 +42,7 @@ describe('AiRoutingService', () => {
       baseUrl: 'https://platform.beeknoee.com/api/v1',
       model: 'glm-4.7-flash',
     });
+    expect(result.routeDecision.responseFormat).toBe('structured');
   });
 
   it('does not add Beeknoee to the default auto provider chain', () => {
@@ -58,5 +59,97 @@ describe('AiRoutingService', () => {
     expect(result.plans.some((plan) => plan.provider === 'beeknoee')).toBe(
       false,
     );
+    expect(result.routeDecision.responseFormat).toBe('structured');
+  });
+
+  it('puts an explicitly selected Gemini model first in the provider chain', () => {
+    const service = new AiRoutingService(createConfig());
+
+    const result = service.buildPlanChain(
+      {
+        prompt: 'Explain this query',
+        model: 'gemini-2.5-flash',
+        routingMode: 'auto',
+      },
+      true,
+    );
+
+    expect(result.plans[0]).toMatchObject({
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+    });
+  });
+
+  it('routes image prompts through vision-capable lanes only when the default low-cost models are text-only', () => {
+    const service = new AiRoutingService(createConfig());
+
+    const result = service.buildPlanChain(
+      {
+        prompt: 'Describe the screenshot and explain the issue',
+        image: 'data:image/png;base64,abc',
+        routingMode: 'auto',
+      },
+      true,
+    );
+
+    expect(result.plans.length).toBeGreaterThan(0);
+    expect(result.plans.every((plan) => plan.provider === 'gemini')).toBe(true);
+  });
+
+  it('keeps an explicitly selected vision-capable OpenRouter model first for image prompts', () => {
+    const service = new AiRoutingService(createConfig());
+
+    const result = service.buildPlanChain(
+      {
+        prompt: 'Describe this ERD screenshot',
+        image: 'data:image/png;base64,abc',
+        model: 'openai/gpt-4o-mini',
+        routingMode: 'auto',
+      },
+      true,
+    );
+
+    expect(result.plans[0]).toMatchObject({
+      provider: 'openrouter',
+      model: 'openai/gpt-4o-mini',
+    });
+    expect(result.plans.some((plan) => plan.provider === 'gemini')).toBe(true);
+  });
+
+  it('flags live-search prompts and keeps them in chat mode by default', () => {
+    const service = new AiRoutingService(createConfig());
+
+    const result = service.detectPromptNeeds(
+      'What is the latest PostgreSQL news today?',
+    );
+
+    expect(result.needsLiveSearch).toBe(true);
+    expect(result.responseFormat).toBe('chat');
+    expect(result.reasons).toContain('current-info');
+  });
+
+  it('flags accented Vietnamese current-events prompts for live search', () => {
+    const service = new AiRoutingService(createConfig());
+
+    const result = service.detectPromptNeeds(
+      'Tin tức mới nhất hôm nay là gì?',
+      'Cho mình cập nhật thị trường và giá vàng',
+    );
+
+    expect(result.needsLiveSearch).toBe(true);
+    expect(result.responseFormat).toBe('chat');
+    expect(result.reasons).toContain('current-info');
+  });
+
+  it('marks SQL authoring prompts as structured responses', () => {
+    const service = new AiRoutingService(createConfig());
+
+    const result = service.detectPromptNeeds(
+      'Write me a SQL query to list slow orders by customer',
+      'Need exact columns',
+    );
+
+    expect(result.responseFormat).toBe('structured');
+    expect(result.reasons).toContain('structured-db-response');
   });
 });

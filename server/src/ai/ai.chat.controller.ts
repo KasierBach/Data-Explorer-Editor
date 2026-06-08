@@ -64,6 +64,16 @@ export class AiChatController {
     return this.aiChatService.addMessage(req.user.id, id, dto);
   }
 
+  @Patch(':id/messages/:messageId')
+  updateMessage(
+    @Request() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Param('messageId') messageId: string,
+    @Body() dto: AddMessageDto,
+  ) {
+    return this.aiChatService.updateMessage(req.user.id, id, messageId, dto);
+  }
+
   @Delete(':id/messages/after/:messageId')
   deleteMessagesAfter(
     @Request() req: AuthenticatedRequest,

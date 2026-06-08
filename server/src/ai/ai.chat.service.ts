@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateAiChatDto,
@@ -13,6 +14,12 @@ import {
 @Injectable()
 export class AiChatService {
   constructor(private prisma: PrismaService) {}
+
+  private toPrismaMessagePayload(dto: AddMessageDto) {
+    return dto.attachments === undefined
+      ? Prisma.JsonNull
+      : (dto.attachments as Prisma.InputJsonValue);
+  }
 
   async getChats(userId: string) {
     return this.prisma.aiChat.findMany({
@@ -95,7 +102,42 @@ export class AiChatService {
         sql: dto.sql,
         explanation: dto.explanation,
         error: dto.error || false,
-        attachments: dto.attachments ? dto.attachments : null,
+        attachments: this.toPrismaMessagePayload(dto),
+      },
+    });
+  }
+
+  async updateMessage(
+    userId: string,
+    chatId: string,
+    messageId: string,
+    dto: AddMessageDto,
+  ) {
+    const chat = await this.prisma.aiChat.findUnique({ where: { id: chatId } });
+    if (!chat) throw new NotFoundException('Chat not found');
+    if (chat.userId !== userId) throw new ForbiddenException('Access denied');
+
+    const target = await this.prisma.aiMessage.findUnique({
+      where: { id: messageId },
+      select: { id: true, chatId: true },
+    });
+    if (!target || target.chatId !== chatId)
+      throw new NotFoundException('Message not found');
+
+    await this.prisma.aiChat.update({
+      where: { id: chatId },
+      data: { updatedAt: new Date() },
+    });
+
+    return this.prisma.aiMessage.update({
+      where: { id: messageId },
+      data: {
+        role: dto.role,
+        content: dto.content,
+        sql: dto.sql,
+        explanation: dto.explanation,
+        error: dto.error || false,
+        attachments: this.toPrismaMessagePayload(dto),
       },
     });
   }

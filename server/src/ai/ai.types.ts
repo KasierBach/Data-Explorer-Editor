@@ -5,7 +5,10 @@ export type AiProvider =
   | 'beeknoee'
   | 'zhipu'
   | 'groq';
+export type AiChatRole = 'user' | 'ai';
+export type AiChatMode = 'planning' | 'fast';
 export type AiRoutingMode = 'auto' | 'fast' | 'best' | 'gemini-only';
+export type AiResponseFormat = 'chat' | 'structured';
 export type AiRecommendationType =
   | 'query_fix'
   | 'index_suggestion'
@@ -21,16 +24,50 @@ export interface AiRecommendation {
   fields?: string[];
 }
 
+export interface ChatHistoryMessage {
+  role: AiChatRole;
+  content: string;
+}
+
+export interface AiMessageModelInfo {
+  provider?: AiProvider;
+  model?: string;
+  routingMode?: AiRoutingMode;
+}
+
+export interface AiMessageAttachment {
+  type: string;
+  label: string;
+  preview?: string;
+  data?: string;
+}
+
+export interface AiMessagePayloadEnvelope {
+  items?: AiMessageAttachment[];
+  modelInfo?: AiMessageModelInfo;
+  recommendations?: AiRecommendation[];
+}
+
+export interface AiPromptCapabilities {
+  liveWebSearch?: boolean;
+  citations?: boolean;
+  visionInput?: boolean;
+}
+
+export type PersistedAiMessagePayload =
+  | AiMessageAttachment[]
+  | AiMessagePayloadEnvelope;
+
 export interface ChatParams {
   model?: string;
-  mode?: string;
+  mode?: AiChatMode;
   prompt: string;
   schemaContext?: string;
   databaseType?: string;
   image?: string;
   context?: string;
-  routingMode?: string;
-  history?: any[];
+  routingMode?: AiRoutingMode;
+  history?: ChatHistoryMessage[];
 }
 
 export interface ChatResult {
@@ -38,6 +75,7 @@ export interface ChatResult {
   sql?: string;
   explanation?: string;
   recommendations?: AiRecommendation[];
+  sources?: string[];
   provider: AiProvider;
   model: string;
   routingMode: AiRoutingMode;
@@ -54,10 +92,22 @@ export interface RouteDecision {
   preferGemini: boolean;
   complexityScore: number;
   reasons: string[];
+  needsLiveSearch: boolean;
+  responseFormat: AiResponseFormat;
 }
 
-export interface StreamEvent {
-  type: 'chunk' | 'done' | 'error';
-  text?: string;
-  data?: any;
+export interface StreamDoneData {
+  message: string;
+  sql?: string;
+  explanation?: string;
+  recommendations?: AiRecommendation[];
+  sources?: string[];
+  provider: AiProvider;
+  model: string;
+  routingMode: AiRoutingMode;
 }
+
+export type StreamEvent =
+  | { type: 'chunk'; text: string }
+  | { type: 'done'; data: StreamDoneData }
+  | { type: 'error'; text: string };

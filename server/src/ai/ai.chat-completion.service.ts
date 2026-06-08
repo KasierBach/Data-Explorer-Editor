@@ -18,7 +18,7 @@ export class AiChatCompletionService {
   ) {}
 
   async chat(params: ChatParams): Promise<ChatResult> {
-    const { routingMode, plans } = this.routingService.buildPlanChain(
+    const { routingMode, plans, routeDecision } = this.routingService.buildPlanChain(
       params,
       this.providerRunner.isGeminiAvailable(),
     );
@@ -27,13 +27,19 @@ export class AiChatCompletionService {
     for (const plan of plans) {
       try {
         if (plan.provider === 'gemini') {
-          return await this.providerRunner.runGemini(plan, params, routingMode);
+          return await this.providerRunner.runGemini(
+            plan,
+            params,
+            routingMode,
+            routeDecision,
+          );
         }
 
         return await this.providerRunner.runOpenAiCompatible(
           plan,
           params,
           routingMode,
+          routeDecision,
         );
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
@@ -49,7 +55,7 @@ export class AiChatCompletionService {
   }
 
   async *chatStream(params: ChatParams): AsyncGenerator<StreamEvent> {
-    const { routingMode, plans } = this.routingService.buildPlanChain(
+    const { routingMode, plans, routeDecision } = this.routingService.buildPlanChain(
       params,
       this.providerRunner.isGeminiAvailable(),
     );
@@ -58,7 +64,12 @@ export class AiChatCompletionService {
     for (const plan of plans) {
       try {
         if (plan.provider === 'gemini') {
-          yield* this.providerRunner.streamGemini(plan, params, routingMode);
+          yield* this.providerRunner.streamGemini(
+            plan,
+            params,
+            routingMode,
+            routeDecision,
+          );
           return;
         }
 
@@ -66,6 +77,7 @@ export class AiChatCompletionService {
           plan,
           params,
           routingMode,
+          routeDecision,
         );
         return;
       } catch (error) {

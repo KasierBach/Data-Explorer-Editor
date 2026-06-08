@@ -14,7 +14,7 @@ interface AiQueryBoxProps {
 }
 
 export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConnectionId, currentDatabase }) => {
-    const { lang } = useAppStore();
+    const { lang, aiModel, aiRoutingMode } = useAppStore();
     const [query, setQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [explanation, setExplanation] = useState<string | null>(null);
@@ -30,7 +30,10 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
             const result = await apiService.post<{ sql: string, explanation: string }>('/ai/nlp-to-sql', {
                 connectionId: currentConnectionId,
                 database: currentDatabase,
-                prompt: query
+                prompt: query,
+                model: aiModel,
+                mode: 'fast',
+                routingMode: aiRoutingMode,
             });
 
             const generatedSql = result.sql?.trim() || '';

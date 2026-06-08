@@ -1,7 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AI_CONSTANTS } from './ai.constants';
+import {
+  supportsLiveWebSearch,
+  supportsVision,
+} from './ai.provider-capabilities';
 import type {
+  AiChatMode,
+  AiResponseFormat,
   AiRoutingMode,
   ChatParams,
   ProviderPlan,
@@ -39,7 +45,6 @@ export class AiRoutingService {
       'gemini-3.1-pro': 'gemini-3.1-pro-preview',
     };
 
-    // Only accept models that look like Gemini models
     const isGeminiModel =
       requestedModel &&
       (requestedModel.startsWith('gemini-') || legacyMap[requestedModel]);
@@ -52,7 +57,7 @@ export class AiRoutingService {
       : ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3-flash'];
   }
 
-  normalizeRoutingMode(routingMode?: string): AiRoutingMode {
+  normalizeRoutingMode(routingMode?: AiRoutingMode | string): AiRoutingMode {
     if (
       routingMode === 'fast' ||
       routingMode === 'best' ||
@@ -64,40 +69,66 @@ export class AiRoutingService {
     return 'auto';
   }
 
+  private foldSignalText(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D');
+  }
+
   detectPromptNeeds(
     prompt: string,
     context?: string,
     schemaContext?: string,
-    mode?: string,
+    mode?: AiChatMode,
     image?: string,
   ): RouteDecision {
     const combined = `${prompt}\n${context || ''}`.toLowerCase();
+    const foldedCombined = this.foldSignalText(combined).toLowerCase();
     const reasons: string[] = [];
     let complexityScore = 0;
 
     const currentInfoPattern =
-      /\b(latest|current|today|news|recent|now|this week|this month|202[6-9]|search web|browse|up to date)\b/i;
+      /\b(latest|current|today|news|recent|now|this week|this month|202[6-9]|search web|browse|up to date|weather|price|market|stock|tim tren mang|hom nay|moi nhat|tin tuc|thoi tiet|thi truong|gia)\b/i;
     const deepReasoningPattern =
       /\b(architecture|refactor|migration|optimi[sz]e|performance|debug|root cause|trade[- ]?off|step[- ]?by[- ]?step|thorough|deep dive|analyze)\b/i;
     const complexDataPattern =
       /\b(index|join|execution plan|explain|schema design|normalization|aggregation|pipeline|relationship|foreign key)\b/i;
+    const structuredDbPattern =
+      /\b(sql|query|select|insert|update|delete|drop|alter|create table|join|where|group by|order by|limit|optimi[sz]e|explain|schema|migration|ddl|aggregation|pipeline|foreign key|write (me )?(a )?(query|sql))\b/i;
+
+    const needsLiveSearch =
+      currentInfoPattern.test(combined) ||
+      currentInfoPattern.test(foldedCombined);
+    const responseFormat: AiResponseFormat =
+      structuredDbPattern.test(combined) ||
+      structuredDbPattern.test(foldedCombined)
+        ? 'structured'
+        : 'chat';
 
     if (image) {
       complexityScore += AI_CONSTANTS.COMPLEXITY_IMAGE_WEIGHT;
       reasons.push('image-attached');
     }
 
-    if (currentInfoPattern.test(combined)) {
+    if (needsLiveSearch) {
       complexityScore += AI_CONSTANTS.COMPLEXITY_CURRENT_INFO_WEIGHT;
       reasons.push('current-info');
     }
 
-    if (deepReasoningPattern.test(combined)) {
+    if (
+      deepReasoningPattern.test(combined) ||
+      deepReasoningPattern.test(foldedCombined)
+    ) {
       complexityScore += AI_CONSTANTS.COMPLEXITY_DEEP_REASONING_WEIGHT;
       reasons.push('deep-reasoning');
     }
 
-    if (complexDataPattern.test(combined)) {
+    if (
+      complexDataPattern.test(combined) ||
+      complexDataPattern.test(foldedCombined)
+    ) {
       complexityScore += AI_CONSTANTS.COMPLEXITY_COMPLEX_DATA_WEIGHT;
       reasons.push('complex-db-task');
     }
@@ -124,10 +155,16 @@ export class AiRoutingService {
       reasons.push('planning-mode');
     }
 
+    if (responseFormat === 'structured') {
+      reasons.push('structured-db-response');
+    }
+
     return {
       preferGemini: complexityScore >= AI_CONSTANTS.COMPLEXITY_GEMINI_THRESHOLD,
       complexityScore,
       reasons,
+      needsLiveSearch,
+      responseFormat,
     };
   }
 
@@ -184,11 +221,14 @@ export class AiRoutingService {
   buildPlanChain(
     params: ChatParams,
     geminiAvailable: boolean,
-  ): { routingMode: AiRoutingMode; plans: ProviderPlan[] } {
+  ): {
+    routingMode: AiRoutingMode;
+    plans: ProviderPlan[];
+    routeDecision: RouteDecision;
+  } {
     const routingMode = this.normalizeRoutingMode(params.routingMode);
     const lowCostPlans = this.getLowCostPlans();
 
-    // Detect if user explicitly picked a non-Gemini model from the UI
     let requestedPlan: ProviderPlan | null = null;
     if (params.model) {
       if (params.model.startsWith('beeknoee:')) {
@@ -201,14 +241,14 @@ export class AiRoutingService {
         }
         requestedPlan = beeknoeePlan;
       } else if (params.model.startsWith('groq:')) {
-        // Groq model — strip prefix
         const modelName = params.model.slice('groq:'.length);
         const groqConfig = lowCostPlans.find((p) => p.provider === 'groq');
         if (groqConfig) {
           requestedPlan = { ...groqConfig, model: modelName };
         }
+      } else if (params.model.startsWith('gemini-')) {
+        requestedPlan = { provider: 'gemini', model: params.model };
       } else if (params.model.includes('/') || params.model.includes(':')) {
-        // OpenRouter model format: "provider/model-name" or "model:variant"
         const orConfig = lowCostPlans.find((p) => p.provider === 'openrouter');
         if (orConfig) {
           requestedPlan = { ...orConfig, model: params.model };
@@ -221,23 +261,19 @@ export class AiRoutingService {
       }
     }
 
-    // Build Gemini plans — always available as fallback unless gemini-only is off and model is locked
     const geminiPlans = geminiAvailable
-      ? this.getGeminiModelList(requestedPlan ? undefined : params.model).map(
-          (model) => ({ provider: 'gemini' as const, model }),
-        )
+      ? (
+          requestedPlan?.provider === 'gemini'
+            ? [requestedPlan.model, ...this.getGeminiModelList()]
+            : this.getGeminiModelList(requestedPlan ? undefined : params.model)
+        ).map((model) => ({ provider: 'gemini' as const, model }))
       : [];
 
-    // Cerebras-only plan for fallback
     const cerebrasPlans = lowCostPlans.filter((p) => p.provider === 'cerebras');
-
-    // Groq plan for fallback
     const groqPlans = lowCostPlans.filter((p) => p.provider === 'groq');
-
-    // OpenRouter default plan (only if no explicit requestedPlan overrides it)
     const openRouterDefaultPlans =
       requestedPlan?.provider === 'openrouter'
-        ? [] // skip default OR since requestedPlan IS the OR model
+        ? []
         : lowCostPlans.filter((p) => p.provider === 'openrouter');
 
     const routeDecision = this.detectPromptNeeds(
@@ -248,23 +284,12 @@ export class AiRoutingService {
       params.image,
     );
 
-    if (
-      params.image &&
-      geminiPlans.length === 0 &&
-      !lowCostPlans.some(
-        (p) => p.provider === 'openrouter' || p.provider === 'beeknoee',
-      )
-    ) {
-      throw new Error(
-        'Image analysis requires a vision-capable provider. Set GEMINI_API_KEY, BEEKNOEE_API_KEY or OPENROUTER_API_KEY.',
-      );
-    }
-
     const orderedPlans: ProviderPlan[] = [];
     const push = (plan: ProviderPlan) => {
       if (
         !orderedPlans.some(
-          (e) => e.provider === plan.provider && e.model === plan.model,
+          (existing) =>
+            existing.provider === plan.provider && existing.model === plan.model,
         )
       ) {
         orderedPlans.push(plan);
@@ -272,24 +297,15 @@ export class AiRoutingService {
     };
     const pushAll = (plans: ProviderPlan[]) => plans.forEach(push);
 
-    const needsSearch =
-      /\b(latest|current|today|news|recent|now|search web|tìm trên mạng|hôm nay|mới nhất|giá|thời tiết|thị trường|tin tức)\b/i.test(
-        params.prompt,
-      );
-
     if (routingMode === 'gemini-only') {
-      // Gemini only — no cheap fallbacks
       pushAll(geminiPlans);
       if (orderedPlans.length === 0) pushAll(lowCostPlans);
-    } else if (needsSearch) {
-      // Web search needed — only Gemini supports it. Skip free providers.
+    } else if (routeDecision.needsLiveSearch) {
       pushAll(geminiPlans);
       if (orderedPlans.length === 0) pushAll(lowCostPlans);
     } else if (requestedPlan) {
-      // CRITICAL: User picked a model. Use it FIRST.
       push(requestedPlan);
 
-      // Further fallback to Gemini if task is complex
       if (routeDecision.preferGemini || routingMode === 'best') {
         pushAll(geminiPlans);
       }
@@ -301,25 +317,47 @@ export class AiRoutingService {
       params.image ||
       routeDecision.preferGemini
     ) {
-      // High complexity: OpenRouter & Groq first, then Gemini, Cerebras last
       pushAll(openRouterDefaultPlans);
       pushAll(groqPlans);
       pushAll(geminiPlans);
       pushAll(cerebrasPlans);
     } else {
-      // Default auto / fast: OpenRouter & Groq first, then Gemini, Cerebras last
       pushAll(openRouterDefaultPlans);
       pushAll(groqPlans);
       pushAll(geminiPlans);
       pushAll(cerebrasPlans);
     }
 
-    if (orderedPlans.length === 0) {
+    const capabilityFilteredPlans = orderedPlans.filter((plan) => {
+      if (params.image && !supportsVision(plan)) {
+        return false;
+      }
+
+      if (routeDecision.needsLiveSearch && !supportsLiveWebSearch(plan)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    if (params.image && capabilityFilteredPlans.length === 0) {
+      throw new Error(
+        'Image analysis requires a configured vision-capable lane. Use Gemini or choose a vision-capable OpenRouter model.',
+      );
+    }
+
+    if (routeDecision.needsLiveSearch && capabilityFilteredPlans.length === 0) {
+      throw new Error(
+        'Live search requires a configured search-capable lane. Use Gemini or configure an OpenRouter lane for web-backed requests.',
+      );
+    }
+
+    if (capabilityFilteredPlans.length === 0) {
       throw new Error(
         'No AI provider is configured. Set GEMINI_API_KEY or configure CEREBRAS_API_KEY / OPENROUTER_API_KEY.',
       );
     }
 
-    return { routingMode, plans: orderedPlans };
+    return { routingMode, plans: capabilityFilteredPlans, routeDecision };
   }
 }

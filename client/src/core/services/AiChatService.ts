@@ -9,15 +9,15 @@ interface AiChatResponse {
 }
 
 interface AiMessageResponse {
-    id: string;
-    role: 'user' | 'ai' | 'model';
-    content: string;
-    sql?: string;
-    explanation?: string;
-    thought?: string;
-    error?: boolean;
-    attachments?: unknown;
-    createdAt: string;
+  id: string;
+  role: 'user' | 'ai' | 'model';
+  content: string;
+  sql?: string;
+  explanation?: string;
+  thought?: string;
+  error?: boolean;
+  attachments?: AiMessageStoragePayload;
+  createdAt: string;
 }
 
 interface AiChatDetailResponse {
@@ -26,7 +26,22 @@ interface AiChatDetailResponse {
 
 type CreateChatResponse = AiChatResponse;
 
-function isAttachmentPayloadItem(value: unknown): value is { type: string; label: string; preview?: string } {
+interface AiMessagePayloadItem {
+    type: string;
+    label: string;
+    preview?: string;
+    data?: string;
+}
+
+interface AiMessagePayloadEnvelope {
+    items?: AiMessagePayloadItem[];
+    modelInfo?: AiMessage['modelInfo'];
+    recommendations?: AiMessage['recommendations'];
+}
+
+type AiMessageStoragePayload = AiMessagePayloadItem[] | AiMessagePayloadEnvelope;
+
+function isAiMessagePayloadItem(value: unknown): value is AiMessagePayloadItem {
     if (!value || typeof value !== 'object') return false;
     const candidate = value as { type?: unknown; label?: unknown };
     return typeof candidate.type === 'string' && typeof candidate.label === 'string';
@@ -38,20 +53,20 @@ function getPayloadRecord(payload: unknown) {
         : null;
 }
 
-function normalizeAttachmentPayload(payload: unknown): {
+function normalizeAiMessageStoragePayload(payload: unknown): {
     attachments?: { type: string; label: string; preview?: string }[];
     modelInfo?: AiMessage['modelInfo'];
     recommendations?: AiMessage['recommendations'];
 } {
     if (Array.isArray(payload)) {
-        return { attachments: payload.filter(isAttachmentPayloadItem) };
+        return { attachments: payload.filter(isAiMessagePayloadItem) };
     }
 
     const payloadRecord = getPayloadRecord(payload);
     if (payloadRecord) {
         const items = payloadRecord.items;
         return {
-            attachments: Array.isArray(items) ? items.filter(isAttachmentPayloadItem) : undefined,
+            attachments: Array.isArray(items) ? items.filter(isAiMessagePayloadItem) : undefined,
             modelInfo: getPayloadRecord(payloadRecord.modelInfo) as AiMessage['modelInfo'] | undefined,
             recommendations: Array.isArray(payloadRecord.recommendations)
                 ? payloadRecord.recommendations as AiMessage['recommendations']
@@ -60,6 +75,19 @@ function normalizeAttachmentPayload(payload: unknown): {
     }
 
     return {};
+}
+
+function buildAiMessageStoragePayload(message: Partial<AiMessage>): AiMessageStoragePayload | undefined {
+    const hasMetadata = !!message.modelInfo || !!message.recommendations;
+    if (!hasMetadata) {
+        return message.attachments;
+    }
+
+    return {
+        items: message.attachments || [],
+        modelInfo: message.modelInfo,
+        recommendations: message.recommendations,
+    };
 }
 
 export class AiChatService {
@@ -86,7 +114,7 @@ export class AiChatService {
             explanation: m.explanation,
             thought: m.thought,
             error: m.error,
-            ...normalizeAttachmentPayload(m.attachments),
+            ...normalizeAiMessageStoragePayload(m.attachments),
             timestamp: new Date(m.createdAt).getTime()
         }));
     }
@@ -100,13 +128,7 @@ export class AiChatService {
     }
 
     static async saveMessage(chatId: string, message: Partial<AiMessage>): Promise<void> {
-        const attachmentsPayload = message.modelInfo || message.recommendations
-            ? {
-                items: message.attachments || [],
-                modelInfo: message.modelInfo,
-                recommendations: message.recommendations,
-            }
-            : message.attachments;
+        const messagePayload = buildAiMessageStoragePayload(message);
 
         await apiService.post(`/ai/chats/${chatId}/messages`, {
             role: message.role,
@@ -115,7 +137,21 @@ export class AiChatService {
             explanation: message.explanation,
             thought: message.thought,
             error: message.error || false,
-            attachments: attachmentsPayload
+            attachments: messagePayload
+        });
+    }
+
+    static async updateMessage(chatId: string, messageId: string, message: Partial<AiMessage>): Promise<void> {
+        const messagePayload = buildAiMessageStoragePayload(message);
+
+        await apiService.patch(`/ai/chats/${chatId}/messages/${messageId}`, {
+            role: message.role,
+            content: message.content,
+            sql: message.sql,
+            explanation: message.explanation,
+            thought: message.thought,
+            error: message.error || false,
+            attachments: messagePayload,
         });
     }
 

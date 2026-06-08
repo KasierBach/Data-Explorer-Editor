@@ -84,6 +84,7 @@ export class AiController {
       model,
       mode,
       routingMode,
+      history,
     } = body;
 
     res.setHeader('Content-Type', 'text/event-stream');
@@ -167,7 +168,7 @@ export class AiController {
     @Body() body: GenerateSqlDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    const { connectionId, database, prompt } = body;
+    const { connectionId, database, prompt, model, mode, routingMode } = body;
 
     const { connection, schemaContext } =
       await this.connectionService.getConnectionContext(
@@ -183,6 +184,9 @@ export class AiController {
         query: prompt,
         databaseType: connection.type,
         schemaContext,
+        model,
+        mode,
+        routingMode,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';

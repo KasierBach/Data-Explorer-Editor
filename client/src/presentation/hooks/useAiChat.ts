@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useAppStore, type AiMessage } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { findReplaySourceUserMessage } from './aiChatReplay';
 
 export interface Attachment {
     id?: string;
@@ -364,9 +365,17 @@ export function useAiChat() {
                 return raw;
             }
             if (event.type === 'error') {
+                const errorContent = `❌ ${event.text}`;
                 updateAiMessage(chatId, aiMessageId, {
-                    content: `❌ ${event.text}`,
+                    content: errorContent,
                     error: true,
+                });
+                void store.syncAiMessage(chatId, {
+                    id: aiMessageId,
+                    role: 'ai',
+                    content: errorContent,
+                    error: true,
+                    timestamp: Date.now(),
                 });
             }
         } catch { /* skip malformed */ }
@@ -461,9 +470,24 @@ export function useAiChat() {
         } catch (error) {
             const errorMessage = getErrorMessage(error);
             if ((error instanceof DOMException && error.name === 'AbortError') || errorMessage === 'Aborted') {
-                updateAiMessage(chatId, aiMsgId, { content: (rawText ? parsePartialAiResponse(rawText).message : '') + '\n\n[Đã dừng bởi người dùng]' });
+                const abortedContent = (rawText ? parsePartialAiResponse(rawText).message : '') + '\n\n[Đã dừng bởi người dùng]';
+                updateAiMessage(chatId, aiMsgId, { content: abortedContent });
+                void store.syncAiMessage(chatId, {
+                    id: aiMsgId,
+                    role: 'ai',
+                    content: abortedContent,
+                    timestamp: Date.now(),
+                });
             } else {
-                updateAiMessage(chatId, aiMsgId, { content: `❌ Lỗi: ${errorMessage}`, error: true });
+                const failedContent = `❌ Lỗi: ${errorMessage}`;
+                updateAiMessage(chatId, aiMsgId, { content: failedContent, error: true });
+                void store.syncAiMessage(chatId, {
+                    id: aiMsgId,
+                    role: 'ai',
+                    content: failedContent,
+                    error: true,
+                    timestamp: Date.now(),
+                });
             }
         } finally {
             setIsLoading(false);
@@ -520,29 +544,26 @@ export function useAiChat() {
         await triggerGenerate(activeAiChatId, currentInput, currentAttachments);
     }, [input, attachments, isLoading, activeAiChatId, activeConnection, addAiMessage, triggerGenerate]);
 
-    const handleRegenerate = useCallback(async (chatId: string) => {
+    const handleRegenerate = useCallback(async (chatId: string, aiMessageId?: string) => {
         const chat = store.aiChats.find(c => c.id === chatId);
         if (!chat || isLoading) return;
 
-        // Find last user message
         const messages = chat.messages || [];
-        const lastUserMsgIndex = [...messages].reverse().findIndex(m => m.role === 'user');
-        if (lastUserMsgIndex === -1) return;
+        const lastUserMsg = findReplaySourceUserMessage(messages, aiMessageId);
+        if (!lastUserMsg) return;
 
-        const lastUserMsg = messages[messages.length - 1 - lastUserMsgIndex];
-        
-        // Remove subsequent messages
         await store.editAiMessage(chatId, lastUserMsg.id, lastUserMsg.content);
-        
-        // Trigger generation
         await triggerGenerate(chatId, lastUserMsg.content, toTriggerAttachments(lastUserMsg.attachments));
     }, [store, isLoading, triggerGenerate]);
 
     const handleEditSubmit = useCallback(async (chatId: string, messageId: string, newContent: string) => {
         if (isLoading) return;
-        
+
+        const chat = store.aiChats.find(c => c.id === chatId);
+        const messageToReplay = chat?.messages.find(m => m.id === messageId);
+
         await store.editAiMessage(chatId, messageId, newContent);
-        await triggerGenerate(chatId, newContent, []);
+        await triggerGenerate(chatId, newContent, toTriggerAttachments(messageToReplay?.attachments));
     }, [isLoading, store, triggerGenerate]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {

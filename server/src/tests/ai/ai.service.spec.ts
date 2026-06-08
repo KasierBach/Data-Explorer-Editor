@@ -56,4 +56,64 @@ describe('AiService', () => {
       expect(chatService.chat).toHaveBeenCalledWith({ prompt: 'Test prompt' });
     });
   });
+
+  describe('generateSql', () => {
+    it('routes SQL generation through the shared chat pipeline', async () => {
+      chatService.chat.mockResolvedValue({
+        message: 'Generated SQL ready.',
+        sql: 'SELECT * FROM users LIMIT 10',
+        explanation: 'Reads the latest users.',
+        provider: 'openrouter',
+        model: 'openai/gpt-4o-mini',
+        routingMode: 'auto',
+      });
+
+      const result = await service.generateSql({
+        query: 'Show the latest users',
+        databaseType: 'postgres',
+        schemaContext: 'TABLE users(id uuid)',
+        model: 'openrouter:openai/gpt-4o-mini',
+        routingMode: 'auto',
+      });
+
+      expect(chatService.chat).toHaveBeenCalledWith(
+        expect.objectContaining({
+          databaseType: 'postgres',
+          schemaContext: 'TABLE users(id uuid)',
+          mode: 'fast',
+          routingMode: 'auto',
+        }),
+      );
+      expect(
+        (chatService.chat.mock.calls[0]?.[0]?.prompt as string) || '',
+      ).toContain('Generate an executable SQL query');
+      expect(result).toEqual({
+        sql: 'SELECT * FROM users LIMIT 10',
+        explanation: 'Reads the latest users.',
+      });
+    });
+
+    it('normalizes MongoDB payloads from the shared chat pipeline into executable JSON', async () => {
+      chatService.chat.mockResolvedValue({
+        message: 'Generated Mongo payload ready.',
+        sql: '[{ "$match": { "status": "active" } }]',
+        explanation: 'Filters active orders.',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        routingMode: 'auto',
+      });
+
+      const result = await service.generateSql({
+        query: 'For collection "orders": show active orders',
+        databaseType: 'mongodb',
+      });
+
+      expect(JSON.parse(result.sql)).toEqual({
+        action: 'aggregate',
+        collection: 'orders',
+        pipeline: [{ $match: { status: 'active' } }],
+      });
+      expect(result.explanation).toBe('Filters active orders.');
+    });
+  });
 });

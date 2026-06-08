@@ -1,33 +1,36 @@
 import { Injectable } from '@nestjs/common';
 import * as Prompts from './ai.prompts';
-import type { AiRecommendation, AiRecommendationType } from './ai.types';
+import type {
+  AiChatMode,
+  AiPromptCapabilities,
+  AiRecommendation,
+  AiRecommendationType,
+  AiResponseFormat,
+  ChatHistoryMessage,
+} from './ai.types';
 
 @Injectable()
 export class AiPromptBuilderService {
   buildSystemPrompt(params: {
-    prompt?: string;
-    context?: string;
-    mode?: string;
+    mode?: AiChatMode;
     schemaContext?: string;
     databaseType?: string;
     locale?: string;
+    responseFormat?: AiResponseFormat;
+    capabilities?: AiPromptCapabilities;
   }): string {
     const {
-      prompt = '',
-      context = '',
       mode = 'planning',
       schemaContext,
       databaseType = 'postgres',
       locale = 'en-US',
+      responseFormat = 'chat',
+      capabilities = {},
     } = params;
     const hasDbContext = !!(
       schemaContext &&
       schemaContext.trim().length > 0 &&
       !schemaContext.includes('Could not load')
-    );
-    const shouldUseStructuredOutput = this.shouldUseStructuredOutput(
-      prompt,
-      context,
     );
 
     const isNoSql =
@@ -46,9 +49,11 @@ export class AiPromptBuilderService {
     const dbContextSection = hasDbContext
       ? `# ACTIVE DATABASE CONTEXT\n\n**Engine**: ${databaseType}\n\n${schemaContext}`
       : `# DATABASE CONTEXT\n\nNo database schema is currently loaded.`;
-    const responseFormat = shouldUseStructuredOutput
-      ? Prompts.RESPONSE_FORMAT_STRUCTURED
-      : Prompts.RESPONSE_FORMAT_CHAT;
+    const capabilitySection = this.buildCapabilitySection(capabilities);
+    const responseSection =
+      responseFormat === 'structured'
+        ? Prompts.RESPONSE_FORMAT_STRUCTURED
+        : Prompts.RESPONSE_FORMAT_CHAT;
 
     const now = new Date();
     const dateStr = now.toLocaleDateString(locale, {
@@ -62,38 +67,52 @@ export class AiPromptBuilderService {
       minute: '2-digit',
     });
 
-    return `${Prompts.SYSTEM_IDENTITY}\n\n## CURRENT TIME CONTEXT:\n- Today is: ${dateStr}\n- Local time: ${timeStr}\n\n---
-# CORE MISSION\n\n${Prompts.CORE_MISSION}\n\n---
-# SQL RULES\n\n${sqlRules}\n\n---
-${modeSection}\n\n---
-${dbContextSection}\n\n---
-${responseFormat}`;
+    return [
+      `<identity>\n${Prompts.SYSTEM_IDENTITY}\n</identity>`,
+      `<time_context>\n- Today is: ${dateStr}\n- Local time: ${timeStr}\n</time_context>`,
+      `<global_rules>\n${Prompts.TRUTH_AND_SAFETY_RULES}\n</global_rules>`,
+      `<mission>\n${Prompts.CORE_MISSION}\n</mission>`,
+      `<task_mode>\n${modeSection}\n</task_mode>`,
+      `<capabilities>\n${capabilitySection}\n</capabilities>`,
+      `<database_rules>\n${sqlRules}\n</database_rules>`,
+      `<database_context>\n${dbContextSection}\n</database_context>`,
+      `<output_contract>\n${responseSection}\n</output_contract>`,
+    ].join('\n\n');
   }
 
   buildOpenAiMessages(
     prompt: string,
     systemPrompt: string,
     context?: string,
-    history: any[] = [],
+    history: ChatHistoryMessage[] = [],
     image?: string,
   ) {
     const userText = context
       ? `${prompt}\n\nAdditional context:\n${context}`
       : prompt;
 
-    const messages: any[] = [{ role: 'system', content: systemPrompt }];
+    const messages: Array<
+      | { role: 'system'; content: string }
+      | { role: 'assistant' | 'user'; content: string }
+      | {
+          role: 'user';
+          content: Array<
+            | { type: 'text'; text: string }
+            | { type: 'image_url'; image_url: { url: string } }
+          >;
+        }
+    > = [{ role: 'system', content: systemPrompt }];
 
-    // Map history to OpenAI format
     if (history && history.length > 0) {
       for (let i = 0; i < history.length; i++) {
         const msg = history[i];
-        // Skip the last user message if it's identical to the current prompt to avoid duplication
         if (
           i === history.length - 1 &&
           msg.role === 'user' &&
           msg.content === prompt
-        )
+        ) {
           continue;
+        }
         messages.push({
           role: msg.role === 'ai' ? 'assistant' : 'user',
           content: msg.content,
@@ -109,7 +128,7 @@ ${responseFormat}`;
           {
             type: 'image_url',
             image_url: {
-              url: image, // OpenRouter handles base64 data:image/jpeg;base64,... directly
+              url: image,
             },
           },
         ],
@@ -124,12 +143,16 @@ ${responseFormat}`;
   buildGeminiContents(
     prompt: string,
     context?: string,
-    history: any[] = [],
+    history: ChatHistoryMessage[] = [],
     image?: string,
   ) {
-    const contents: any[] = [];
+    const contents: Array<{
+      role: 'model' | 'user';
+      parts: Array<
+        { text: string } | { inlineData: { mimeType: string; data: string } }
+      >;
+    }> = [];
 
-    // Map history to Gemini format
     if (history && history.length > 0) {
       for (let i = 0; i < history.length; i++) {
         const msg = history[i];
@@ -137,8 +160,9 @@ ${responseFormat}`;
           i === history.length - 1 &&
           msg.role === 'user' &&
           msg.content === prompt
-        )
+        ) {
           continue;
+        }
         contents.push({
           role: msg.role === 'ai' ? 'model' : 'user',
           parts: [{ text: msg.content }],
@@ -146,7 +170,6 @@ ${responseFormat}`;
       }
     }
 
-    // Add current message
     const currentParts = this.prepareGeminiParts(prompt, context, image);
     contents.push({
       role: 'user',
@@ -188,6 +211,7 @@ ${responseFormat}`;
     sql?: string;
     explanation?: string;
     recommendations?: AiRecommendation[];
+    sources?: string[];
   } {
     try {
       const remainingText = fullText
@@ -220,6 +244,7 @@ ${responseFormat}`;
         sql: parsed.sql || undefined,
         explanation: parsed.explanation || undefined,
         recommendations: this.normalizeRecommendations(parsed.recommendations),
+        sources: this.normalizeSources(parsed.sources),
       };
     } catch {
       return {
@@ -262,30 +287,35 @@ ${responseFormat}`;
         groundingChunks?: Array<{ web?: { title?: string; uri?: string } }>;
       };
     }>;
-  }): string {
+  }): string[] {
     const candidate = response.candidates?.[0];
-    if (!candidate?.groundingMetadata?.groundingChunks) return '';
+    if (!candidate?.groundingMetadata?.groundingChunks) return [];
 
     const urls = candidate.groundingMetadata.groundingChunks
       .filter(
-        (c): c is { web: { title: string; uri: string } } =>
-          !!c.web?.uri && !!c.web?.title,
+        (chunk): chunk is { web: { title: string; uri: string } } =>
+          !!chunk.web?.uri && !!chunk.web?.title,
       )
-      .map((c) => ({
-        title: c.web.title,
-        url: c.web.uri,
-      }));
+      .map((chunk) => chunk.web.uri);
 
-    const uniqueUrls = urls.filter(
-      (item, index, array) =>
-        array.findIndex((entry) => entry.url === item.url) === index,
-    );
+    return this.normalizeSources(urls) || [];
+  }
 
-    if (uniqueUrls.length === 0) return '';
+  mergeSources(...sourceLists: Array<string[] | undefined>): string[] | undefined {
+    return this.normalizeSources(sourceLists.flatMap((list) => list || []));
+  }
 
-    return `\n\n---\n**Nguon tham khao**\n${uniqueUrls
-      .map((item) => `- [${item.title}](${item.url})`)
-      .join('\n')}`;
+  appendSourcesToMessage(message: string, sources?: string[]): string {
+    if (!sources?.length) {
+      return message;
+    }
+
+    const missingSources = sources.filter((source) => !message.includes(source));
+    if (missingSources.length === 0) {
+      return message;
+    }
+
+    return `${message}${this.buildSourcesMarkdown(missingSources)}`;
   }
 
   extractOpenAiStreamText(payload: {
@@ -299,6 +329,20 @@ ${responseFormat}`;
       return delta.map((item) => item?.text || '').join('');
     }
     return '';
+  }
+
+  private buildCapabilitySection(capabilities: AiPromptCapabilities): string {
+    const sections = [
+      capabilities.liveWebSearch
+        ? Prompts.LIVE_RESEARCH_ENABLED
+        : Prompts.LIVE_RESEARCH_DISABLED,
+    ];
+
+    if (capabilities.visionInput) {
+      sections.push(Prompts.VISION_INPUT_ENABLED);
+    }
+
+    return sections.join('\n\n');
   }
 
   private normalizeRecommendations(
@@ -365,32 +409,43 @@ ${responseFormat}`;
     return normalized.length ? normalized : undefined;
   }
 
-  private shouldUseStructuredOutput(prompt: string, context?: string): boolean {
-    const combined = `${prompt}\n${context || ''}`.toLowerCase();
+  private normalizeSources(value: unknown): string[] | undefined {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
 
-    return [
-      /\bsql\b/,
-      /\bquery\b/,
-      /\bselect\b/,
-      /\binsert\b/,
-      /\bupdate\b/,
-      /\bdelete\b/,
-      /\bdrop\b/,
-      /\balter\b/,
-      /\bcreate table\b/,
-      /\bjoin\b/,
-      /\bwhere\b/,
-      /\bgroup by\b/,
-      /\border by\b/,
-      /\blimit\b/,
-      /\boptimi[sz]e\b/,
-      /\bexplain\b/,
-      /\bschema\b/,
-      /\bmigration\b/,
-      /\bddl\b/,
-      /\bexecute\b/,
-      /\brun\b/,
-      /\bwrite (me )?(a )?(query|sql)\b/,
-    ].some((pattern) => pattern.test(combined));
+    const normalized = value
+      .flatMap((entry) => {
+        if (typeof entry !== 'string') {
+          return [];
+        }
+
+        const candidate = entry.trim();
+        if (!candidate) {
+          return [];
+        }
+
+        try {
+          const url = new URL(candidate);
+          if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+            return [];
+          }
+          return [url.toString()];
+        } catch {
+          return [];
+        }
+      })
+      .filter(
+        (entry, index, array) => array.findIndex((item) => item === entry) === index,
+      )
+      .slice(0, 6);
+
+    return normalized.length ? normalized : undefined;
+  }
+
+  private buildSourcesMarkdown(sources: string[]): string {
+    return `\n\n---\n**Sources**\n${sources
+      .map((source) => `- [${source}](${source})`)
+      .join('\n')}`;
   }
 }
