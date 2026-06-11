@@ -14,7 +14,7 @@ import { CreateCheckoutDto } from './dto/create-checkout.dto';
 
 @Controller('billing')
 export class BillingController {
-  constructor(private readonly billingService: BillingService) { }
+  constructor(private readonly billingService: BillingService) {}
 
   @Get('plans')
   getPlans() {

@@ -301,7 +301,9 @@ export class AiPromptBuilderService {
     return this.normalizeSources(urls) || [];
   }
 
-  mergeSources(...sourceLists: Array<string[] | undefined>): string[] | undefined {
+  mergeSources(
+    ...sourceLists: Array<string[] | undefined>
+  ): string[] | undefined {
     return this.normalizeSources(sourceLists.flatMap((list) => list || []));
   }
 
@@ -310,7 +312,9 @@ export class AiPromptBuilderService {
       return message;
     }
 
-    const missingSources = sources.filter((source) => !message.includes(source));
+    const missingSources = sources.filter(
+      (source) => !message.includes(source),
+    );
     if (missingSources.length === 0) {
       return message;
     }
@@ -436,7 +440,8 @@ export class AiPromptBuilderService {
         }
       })
       .filter(
-        (entry, index, array) => array.findIndex((item) => item === entry) === index,
+        (entry, index, array) =>
+          array.findIndex((item) => item === entry) === index,
       )
       .slice(0, 6);
 

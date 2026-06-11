@@ -33,7 +33,8 @@ const OPENAI_RECOMMENDATION_SCHEMA = {
     },
     chartType: {
       type: 'string',
-      description: 'Optional chart type if this suggestion is about visualization.',
+      description:
+        'Optional chart type if this suggestion is about visualization.',
     },
     fields: {
       type: 'array',
@@ -112,7 +113,8 @@ const GEMINI_RECOMMENDATION_SCHEMA: ResponseSchema = {
     },
     chartType: {
       type: SchemaType.STRING,
-      description: 'Optional chart type if this suggestion is about visualization.',
+      description:
+        'Optional chart type if this suggestion is about visualization.',
     },
     fields: {
       type: SchemaType.ARRAY,

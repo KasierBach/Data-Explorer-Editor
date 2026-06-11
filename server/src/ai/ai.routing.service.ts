@@ -57,7 +57,7 @@ export class AiRoutingService {
       : ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3-flash'];
   }
 
-  normalizeRoutingMode(routingMode?: AiRoutingMode | string): AiRoutingMode {
+  normalizeRoutingMode(routingMode?: string): AiRoutingMode {
     if (
       routingMode === 'fast' ||
       routingMode === 'best' ||
@@ -262,10 +262,9 @@ export class AiRoutingService {
     }
 
     const geminiPlans = geminiAvailable
-      ? (
-          requestedPlan?.provider === 'gemini'
-            ? [requestedPlan.model, ...this.getGeminiModelList()]
-            : this.getGeminiModelList(requestedPlan ? undefined : params.model)
+      ? (requestedPlan?.provider === 'gemini'
+          ? [requestedPlan.model, ...this.getGeminiModelList()]
+          : this.getGeminiModelList(requestedPlan ? undefined : params.model)
         ).map((model) => ({ provider: 'gemini' as const, model }))
       : [];
 
@@ -289,7 +288,8 @@ export class AiRoutingService {
       if (
         !orderedPlans.some(
           (existing) =>
-            existing.provider === plan.provider && existing.model === plan.model,
+            existing.provider === plan.provider &&
+            existing.model === plan.model,
         )
       ) {
         orderedPlans.push(plan);

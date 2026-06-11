@@ -11,6 +11,17 @@ import {
   buildOpenAiStructuredResponseFormat,
 } from './ai.structured-output';
 import { AI_CONSTANTS } from './ai.constants';
+import {
+  buildOpenAiCompatibleHeaders,
+  extractProviderErrorMessage,
+  getRetryDelayMs,
+  isGeminiStructuredOutputUnsupportedError,
+  isRetryableTransportError,
+  isTransientOpenAiStatus,
+  readProviderErrorPayload,
+  shouldRetryWithoutStructuredOutput,
+  sleep,
+} from './ai.openai-compatible.utils';
 import type {
   AiPromptCapabilities,
   AiProvider,
@@ -135,37 +146,6 @@ export class AiProviderRunnerService {
     };
   }
 
-  private isTransientOpenAiStatus(status: number): boolean {
-    return [408, 409, 425, 429, 500, 502, 503, 504].includes(status);
-  }
-
-  private isRetryableTransportError(error: unknown): boolean {
-    if (!(error instanceof Error)) return false;
-
-    const message = error.message.toLowerCase();
-    return (
-      error.name === 'AbortError' ||
-      message.includes('timed out') ||
-      message.includes('fetch failed') ||
-      message.includes('network') ||
-      message.includes('econnreset') ||
-      message.includes('econnrefused') ||
-      message.includes('etimedout') ||
-      message.includes('socket hang up')
-    );
-  }
-
-  private getRetryDelayMs(attempt: number): number {
-    return (
-      AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_BASE_DELAY_MS *
-      Math.pow(2, attempt)
-    );
-  }
-
-  private async sleep(ms: number) {
-    await new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
   private async executeOpenAiRequestWithRetry(
     label: string,
     send: (attempt: number) => Promise<Response>,
@@ -177,22 +157,19 @@ export class AiProviderRunnerService {
         const response = await send(attempt);
         if (
           !response.ok &&
-          this.isTransientOpenAiStatus(response.status) &&
+          isTransientOpenAiStatus(response.status) &&
           attempt < maxAttempts - 1
         ) {
           this.logger.warn(
             `${label} failed with ${response.status}. Retrying (${attempt + 2}/${maxAttempts})...`,
           );
-          await this.sleep(this.getRetryDelayMs(attempt));
+          await sleep(getRetryDelayMs(attempt));
           continue;
         }
 
         return response;
       } catch (error) {
-        if (
-          !this.isRetryableTransportError(error) ||
-          attempt >= maxAttempts - 1
-        ) {
+        if (!isRetryableTransportError(error) || attempt >= maxAttempts - 1) {
           throw error;
         }
 
@@ -201,7 +178,7 @@ export class AiProviderRunnerService {
         this.logger.warn(
           `${label} failed with transient transport error: ${message}. Retrying (${attempt + 2}/${maxAttempts})...`,
         );
-        await this.sleep(this.getRetryDelayMs(attempt));
+        await sleep(getRetryDelayMs(attempt));
       }
     }
 
@@ -222,93 +199,6 @@ export class AiProviderRunnerService {
     });
   }
 
-  private async readProviderErrorPayload(response: Response): Promise<unknown> {
-    const candidate = response as Response & {
-      clone?: () => Response;
-      json?: () => Promise<unknown>;
-      text?: () => Promise<string>;
-    };
-    const jsonSource =
-      typeof candidate.clone === 'function' ? candidate.clone() : candidate;
-    const jsonPayload =
-      typeof jsonSource.json === 'function'
-        ? await jsonSource.json().catch(() => undefined)
-        : undefined;
-    if (jsonPayload !== undefined) {
-      return jsonPayload;
-    }
-
-    const textSource =
-      typeof candidate.clone === 'function' ? candidate.clone() : candidate;
-    const textPayload =
-      typeof textSource.text === 'function'
-        ? await textSource.text().catch(() => '')
-        : '';
-    return textPayload ? { error: { message: textPayload } } : {};
-  }
-
-  private extractProviderErrorMessage(errorPayload: unknown): string {
-    if (typeof errorPayload === 'string') {
-      return errorPayload;
-    }
-    if (typeof errorPayload !== 'object' || errorPayload === null) {
-      return '';
-    }
-
-    const candidate = errorPayload as {
-      error?: { message?: string };
-      message?: string;
-    };
-    if (typeof candidate.error?.message === 'string') {
-      return candidate.error.message;
-    }
-    if (typeof candidate.message === 'string') {
-      return candidate.message;
-    }
-    return '';
-  }
-
-  private shouldRetryWithoutStructuredOutput(
-    response: Response,
-    errorPayload: unknown,
-  ): boolean {
-    if (![400, 404, 415, 422].includes(response.status)) {
-      return false;
-    }
-
-    const message = this.extractProviderErrorMessage(errorPayload).toLowerCase();
-    if (!message) {
-      return false;
-    }
-
-    return (
-      message.includes('response_format') ||
-      message.includes('json_schema') ||
-      message.includes('structured output') ||
-      message.includes('response schema') ||
-      message.includes('responseschema') ||
-      message.includes('response mime') ||
-      message.includes('responsemimetype') ||
-      message.includes('application/json')
-    );
-  }
-
-  private isGeminiStructuredOutputUnsupportedError(error: unknown): boolean {
-    if (!(error instanceof Error)) {
-      return false;
-    }
-
-    const message = error.message.toLowerCase();
-    return (
-      message.includes('responseschema') ||
-      message.includes('response schema') ||
-      message.includes('responsemimetype') ||
-      message.includes('response mime') ||
-      message.includes('application/json') ||
-      message.includes('structured output')
-    );
-  }
-
   private getOpenAiSearchAttempt(
     plan: ProviderPlan,
     params: ChatParams,
@@ -324,7 +214,9 @@ export class AiProviderRunnerService {
     return {
       searchEnabled,
       model,
-      prompt: searchEnabled ? `[SEARCH ONLINE] ${params.prompt}` : params.prompt,
+      prompt: searchEnabled
+        ? `[SEARCH ONLINE] ${params.prompt}`
+        : params.prompt,
       capabilities: this.buildCapabilities(searchEnabled),
     };
   }
@@ -413,7 +305,10 @@ export class AiProviderRunnerService {
     try {
       const response = await fetch(`${plan.baseUrl}/chat/completions`, {
         method: 'POST',
-        headers: this.getOpenAiCompatibleHeaders(plan),
+        headers: buildOpenAiCompatibleHeaders(
+          plan,
+          this.configService.get<string>('FRONTEND_URL'),
+        ),
         body: JSON.stringify({
           model: plan.model,
           messages: this.promptBuilder.buildOpenAiMessages(
@@ -430,9 +325,9 @@ export class AiProviderRunnerService {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
+        const error = await readProviderErrorPayload(response);
         throw new Error(
-          `${plan.provider} completion error (${response.status}): ${error.error?.message || response.statusText}`,
+          `${plan.provider} completion error (${response.status}): ${extractProviderErrorMessage(error) || response.statusText}`,
         );
       }
 
@@ -505,7 +400,7 @@ export class AiProviderRunnerService {
     } catch (error) {
       if (
         structuredGenerationConfig &&
-        this.isGeminiStructuredOutputUnsupportedError(error)
+        isGeminiStructuredOutputUnsupportedError(error)
       ) {
         this.logger.warn(
           `Gemini model ${plan.model} rejected structured output config. Retrying without provider-level schema enforcement...`,
@@ -527,11 +422,16 @@ export class AiProviderRunnerService {
 
     const sources = this.promptBuilder.mergeSources(
       parsed.sources,
-      searchEnabled ? this.promptBuilder.extractSources(result.response) : undefined,
+      searchEnabled
+        ? this.promptBuilder.extractSources(result.response)
+        : undefined,
     );
     return {
       ...parsed,
-      message: this.promptBuilder.appendSourcesToMessage(parsed.message, sources),
+      message: this.promptBuilder.appendSourcesToMessage(
+        parsed.message,
+        sources,
+      ),
       sources,
       provider: 'gemini',
       model: plan.model,
@@ -558,14 +458,10 @@ export class AiProviderRunnerService {
     let structuredResponseFormat = buildOpenAiStructuredResponseFormat(
       routeDecision.responseFormat,
     );
-    let systemPrompt = this.buildSystemPromptForRequest(
-      params,
-      routeDecision,
-      {
-        ...searchAttempt.capabilities,
-        visionInput: !!params.image,
-      },
-    );
+    let systemPrompt = this.buildSystemPromptForRequest(params, routeDecision, {
+      ...searchAttempt.capabilities,
+      visionInput: !!params.image,
+    });
     let requestTimeout = this.createAbortController(
       `${plan.provider} request (${modelToUse})`,
     );
@@ -578,7 +474,10 @@ export class AiProviderRunnerService {
         );
         return fetch(`${plan.baseUrl}/chat/completions`, {
           method: 'POST',
-          headers: this.getOpenAiCompatibleHeaders(plan),
+          headers: buildOpenAiCompatibleHeaders(
+            plan,
+            this.configService.get<string>('FRONTEND_URL'),
+          ),
           body: JSON.stringify({
             model: modelToUse,
             messages: this.promptBuilder.buildOpenAiMessages(
@@ -604,7 +503,7 @@ export class AiProviderRunnerService {
       );
 
       while (!response.ok) {
-        const errorPayload = await this.readProviderErrorPayload(response);
+        const errorPayload = await readProviderErrorPayload(response);
 
         if (
           modelToUse.endsWith(':online') &&
@@ -631,7 +530,7 @@ export class AiProviderRunnerService {
 
         if (
           structuredResponseFormat &&
-          this.shouldRetryWithoutStructuredOutput(response, errorPayload)
+          shouldRetryWithoutStructuredOutput(response, errorPayload)
         ) {
           this.logger.warn(
             `${plan.provider} model ${modelToUse} rejected response_format json_schema. Retrying without provider-level schema enforcement...`,
@@ -645,7 +544,7 @@ export class AiProviderRunnerService {
         }
 
         throw new Error(
-          `${plan.provider} error (${response.status}): ${this.extractProviderErrorMessage(errorPayload) || response.statusText}`,
+          `${plan.provider} error (${response.status}): ${extractProviderErrorMessage(errorPayload) || response.statusText}`,
         );
       }
 
@@ -660,7 +559,10 @@ export class AiProviderRunnerService {
       const sources = this.promptBuilder.mergeSources(parsed.sources);
       return {
         ...parsed,
-        message: this.promptBuilder.appendSourcesToMessage(parsed.message, sources),
+        message: this.promptBuilder.appendSourcesToMessage(
+          parsed.message,
+          sources,
+        ),
         sources,
         provider: plan.provider,
         model: modelToUse,
@@ -729,7 +631,7 @@ export class AiProviderRunnerService {
     } catch (error) {
       if (
         structuredGenerationConfig &&
-        this.isGeminiStructuredOutputUnsupportedError(error)
+        isGeminiStructuredOutputUnsupportedError(error)
       ) {
         this.logger.warn(
           `Gemini model ${plan.model} rejected structured output config for streaming. Retrying without provider-level schema enforcement...`,
@@ -760,10 +662,11 @@ export class AiProviderRunnerService {
       }
     }
 
-    const aggregatedResponse = await this.withTimeout<EnhancedGenerateContentResponse>(
-      result.response,
-      `Gemini stream finalize (${plan.model})`,
-    );
+    const aggregatedResponse =
+      await this.withTimeout<EnhancedGenerateContentResponse>(
+        result.response,
+        `Gemini stream finalize (${plan.model})`,
+      );
     const parsed = this.promptBuilder.parseAiResponse(fullText);
     this.promptBuilder.assertUsableStructuredResponse(
       parsed,
@@ -781,7 +684,10 @@ export class AiProviderRunnerService {
       type: 'done',
       data: {
         ...parsed,
-        message: this.promptBuilder.appendSourcesToMessage(parsed.message, sources),
+        message: this.promptBuilder.appendSourcesToMessage(
+          parsed.message,
+          sources,
+        ),
         sources,
         provider: 'gemini',
         model: plan.model,
@@ -806,14 +712,10 @@ export class AiProviderRunnerService {
     let structuredResponseFormat = buildOpenAiStructuredResponseFormat(
       routeDecision.responseFormat,
     );
-    let systemPrompt = this.buildSystemPromptForRequest(
-      params,
-      routeDecision,
-      {
-        ...searchAttempt.capabilities,
-        visionInput: !!params.image,
-      },
-    );
+    let systemPrompt = this.buildSystemPromptForRequest(params, routeDecision, {
+      ...searchAttempt.capabilities,
+      visionInput: !!params.image,
+    });
     let requestTimeout = this.createAbortController(
       `${plan.provider} stream request (${modelToUse})`,
     );
@@ -826,7 +728,10 @@ export class AiProviderRunnerService {
         );
         return fetch(`${plan.baseUrl}/chat/completions`, {
           method: 'POST',
-          headers: this.getOpenAiCompatibleHeaders(plan),
+          headers: buildOpenAiCompatibleHeaders(
+            plan,
+            this.configService.get<string>('FRONTEND_URL'),
+          ),
           body: JSON.stringify({
             model: modelToUse,
             messages: this.promptBuilder.buildOpenAiMessages(
@@ -853,7 +758,7 @@ export class AiProviderRunnerService {
       );
 
       while (!response.ok) {
-        const errorPayload = await this.readProviderErrorPayload(response);
+        const errorPayload = await readProviderErrorPayload(response);
 
         if (
           modelToUse.endsWith(':online') &&
@@ -880,7 +785,7 @@ export class AiProviderRunnerService {
 
         if (
           structuredResponseFormat &&
-          this.shouldRetryWithoutStructuredOutput(response, errorPayload)
+          shouldRetryWithoutStructuredOutput(response, errorPayload)
         ) {
           this.logger.warn(
             `${plan.provider} model ${modelToUse} rejected stream response_format json_schema. Retrying without provider-level schema enforcement...`,
@@ -894,7 +799,7 @@ export class AiProviderRunnerService {
         }
 
         throw new Error(
-          `${plan.provider} Stream API error [${response.status}]: ${JSON.stringify(errorPayload)}`,
+          `${plan.provider} Stream API error [${response.status}]: ${extractProviderErrorMessage(errorPayload) || response.statusText}`,
         );
       }
 
@@ -997,24 +902,5 @@ export class AiProviderRunnerService {
       reader.releaseLock();
       abortController.clear();
     }
-  }
-
-  private getOpenAiCompatibleHeaders(
-    plan: ProviderPlan,
-  ): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    if (plan.apiKey && plan.apiKey !== 'no-key') {
-      headers['Authorization'] = `Bearer ${plan.apiKey}`;
-    }
-    if (plan.provider === 'openrouter') {
-      headers['HTTP-Referer'] =
-        this.configService.get<string>('FRONTEND_URL') ||
-        'http://localhost:5173';
-      headers['X-Title'] = 'Data Explorer';
-    }
-    return headers;
   }
 }

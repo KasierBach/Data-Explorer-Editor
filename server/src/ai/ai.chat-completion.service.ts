@@ -18,10 +18,11 @@ export class AiChatCompletionService {
   ) {}
 
   async chat(params: ChatParams): Promise<ChatResult> {
-    const { routingMode, plans, routeDecision } = this.routingService.buildPlanChain(
-      params,
-      this.providerRunner.isGeminiAvailable(),
-    );
+    const { routingMode, plans, routeDecision } =
+      this.routingService.buildPlanChain(
+        params,
+        this.providerRunner.isGeminiAvailable(),
+      );
     let lastError: Error | null = null;
 
     for (const plan of plans) {
@@ -55,10 +56,11 @@ export class AiChatCompletionService {
   }
 
   async *chatStream(params: ChatParams): AsyncGenerator<StreamEvent> {
-    const { routingMode, plans, routeDecision } = this.routingService.buildPlanChain(
-      params,
-      this.providerRunner.isGeminiAvailable(),
-    );
+    const { routingMode, plans, routeDecision } =
+      this.routingService.buildPlanChain(
+        params,
+        this.providerRunner.isGeminiAvailable(),
+      );
     let lastError: Error | null = null;
 
     for (const plan of plans) {

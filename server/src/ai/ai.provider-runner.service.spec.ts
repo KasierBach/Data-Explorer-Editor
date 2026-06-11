@@ -31,7 +31,8 @@ describe('AiProviderRunnerService streaming', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetch.mockReset();
-    (globalThis as { fetch?: typeof fetch }).fetch = mockFetch as unknown as typeof fetch;
+    (globalThis as { fetch?: typeof fetch }).fetch =
+      mockFetch as unknown as typeof fetch;
     service = new AiProviderRunnerService(
       { get: jest.fn(() => undefined) } as unknown as ConfigService,
       new AiPromptBuilderService(),
@@ -299,7 +300,9 @@ describe('AiProviderRunnerService streaming', () => {
 
     expect(result.sources).toEqual(['https://example.com/news']);
     expect(result.message).toContain('Latest market snapshot');
-    expect(result.message).toContain('[https://example.com/news](https://example.com/news)');
+    expect(result.message).toContain(
+      '[https://example.com/news](https://example.com/news)',
+    );
   });
 
   it('rejects empty structured responses from openai-compatible completion lanes', async () => {
@@ -345,7 +348,10 @@ describe('AiProviderRunnerService streaming', () => {
         },
       ],
     });
-    const response = createSseResponse([`data: ${payload}\n`, 'data: [DONE]\n']);
+    const response = createSseResponse([
+      `data: ${payload}\n`,
+      'data: [DONE]\n',
+    ]);
     const streamFetch = (
       service as unknown as {
         streamFetch: (
@@ -407,9 +413,9 @@ describe('AiProviderRunnerService streaming', () => {
     const call = generateContent.mock.calls[0]?.[0];
     expect(call?.generationConfig?.responseMimeType).toBe('application/json');
     expect(call?.generationConfig?.responseSchema?.type).toBe('object');
-    expect(call?.generationConfig?.responseSchema?.properties?.message?.type).toBe(
-      'string',
-    );
+    expect(
+      call?.generationConfig?.responseSchema?.properties?.message?.type,
+    ).toBe('string');
     expect(result.message).toBe('Gemini ready');
   });
 });

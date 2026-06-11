@@ -155,7 +155,7 @@ describe('QueryService', () => {
     );
 
     expect(strategy.executeQuery).toHaveBeenCalledTimes(1);
-    expect(result.totalCount).toBeUndefined();
+    expect(result).not.toHaveProperty('totalCount');
     expect(freshnessService.buildKey).toHaveBeenCalledWith(
       'query',
       ['conn-1', 'main'],

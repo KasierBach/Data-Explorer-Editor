@@ -14,8 +14,7 @@ import { toast } from 'sonner';
 import { useAppStore } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
 import { queryService } from '@/core/services/QueryService';
-import { ErdWorkspaceService, type SaveErdWorkspacePayload } from '@/core/services/ErdWorkspaceService';
-import { ApiError } from '@/core/services/api.service';
+import { ErdWorkspaceService } from '@/core/services/ErdWorkspaceService';
 import { MetadataService } from '@/core/services/MetadataService';
 import { SearchService, type SearchResult } from '@/core/services/SearchService';
 import type { ErdWorkspaceEntity, JsonValue, TableColumn, TableMetadata, TreeNode } from '@/core/domain/entities';
@@ -29,6 +28,7 @@ import {
     type EdgeRouting,
 } from './workspace-layout';
 import { applyAutoLayout } from './erd-auto-layout';
+import { useErdWorkspace } from './hooks/useErdWorkspace';
 
 type ErdHierarchyNode = TreeNode & {
     schema?: string;
@@ -103,7 +103,6 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     const isFirstLoad = useRef(true);
-    const hasShownWorkspaceWarning = useRef(false);
 
     const handleSetSelectedDatabase = useCallback((value: string | undefined) => {
         setLocalSelectedDatabase(value);
@@ -164,6 +163,29 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         setCollapsedTables(new Set(normalized.collapsedTables));
     }, [setEdges, setNodes]);
 
+    const {
+        handleWorkspaceListError,
+        saveWorkspace,
+        loadWorkspace: loadSavedWorkspace,
+        deleteWorkspace,
+    } = useErdWorkspace({
+        connectionId,
+        selectedDatabase,
+        currentWorkspaceId,
+        setCurrentWorkspaceId,
+        setCurrentWorkspaceName,
+        setCurrentWorkspaceNotes,
+        buildWorkspaceLayout,
+        applyWorkspaceLayout,
+        handleSetSelectedDatabase,
+        lang,
+    });
+
+    const loadWorkspace = useCallback(async (workspace: ErdWorkspaceEntity) => {
+        setSearchTerm('');
+        await loadSavedWorkspace(workspace);
+    }, [loadSavedWorkspace]);
+
     useEffect(() => {
         if (databaseProp) {
             handleSetSelectedDatabase(databaseProp);
@@ -177,30 +199,6 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             connectionService.setActiveConnection(connection);
         }
     }, [connectionId, connections]);
-
-    const handleWorkspaceListError = useCallback((error: unknown) => {
-        console.error('[ERD] Failed to load saved workspaces', error);
-
-        if (hasShownWorkspaceWarning.current) return;
-        hasShownWorkspaceWarning.current = true;
-
-        const isStorageUnavailable =
-            error instanceof ApiError &&
-            (error.reason === 'ERD_WORKSPACE_STORAGE_UNAVAILABLE' || error.statusCode === 503);
-
-        toast.error(
-            isStorageUnavailable
-                ? (lang === 'vi' ? 'Kho workspace ERD chÆ°a sáºµn sÃ ng' : 'ERD workspace storage is not ready yet')
-                : (lang === 'vi' ? 'KhÃ´ng thá»ƒ táº£i danh sÃ¡ch workspace ERD' : 'Failed to load ERD workspaces'),
-            {
-                description: isStorageUnavailable
-                    ? (lang === 'vi'
-                        ? 'Trang ERD váº«n dÃ¹ng Ä‘Æ°á»£c, nhÆ°ng báº¡n cáº§n sync schema backend Ä‘á»ƒ lÆ°u workspace.'
-                        : 'The ERD page still works, but the backend schema must be synced before workspaces can be saved.')
-                    : (error instanceof Error ? error.message : undefined),
-            },
-        );
-    }, [lang]);
 
     const { data: erdWorkspaces = [], isLoading: isLoadingWorkspaces } = useQuery({
         queryKey: ['erd-workspaces', connectionId],
@@ -379,55 +377,6 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
         return map;
     }, [relationships]);
-
-    const saveWorkspace = useCallback(async (values: { name: string; notes: string }) => {
-        if (!connectionId) {
-            throw new Error(lang === 'vi' ? 'Chưa có connection để lưu workspace.' : 'No connection selected for this workspace.');
-        }
-
-        const payload: Partial<SaveErdWorkspacePayload> = {
-            name: values.name,
-            notes: values.notes,
-            connectionId,
-            database: selectedDatabase,
-            layout: buildWorkspaceLayout(),
-        };
-
-        const workspace = currentWorkspaceId
-            ? await ErdWorkspaceService.updateWorkspace(currentWorkspaceId, payload)
-            : await ErdWorkspaceService.createWorkspace(payload as SaveErdWorkspacePayload);
-
-        setCurrentWorkspaceId(workspace.id);
-        setCurrentWorkspaceName(workspace.name);
-        setCurrentWorkspaceNotes(workspace.notes || '');
-
-        await queryClient.invalidateQueries({ queryKey: ['erd-workspaces', connectionId] });
-        toast.success(lang === 'vi' ? 'Đã lưu workspace ERD' : 'ERD workspace saved');
-    }, [buildWorkspaceLayout, connectionId, currentWorkspaceId, lang, queryClient, selectedDatabase]);
-
-    const loadWorkspace = useCallback(async (workspace: ErdWorkspaceEntity) => {
-        if (workspace.database !== selectedDatabase) {
-            handleSetSelectedDatabase(workspace.database || undefined);
-        }
-
-        setSearchTerm('');
-        applyWorkspaceLayout(workspace.layout);
-        setCurrentWorkspaceId(workspace.id);
-        setCurrentWorkspaceName(workspace.name);
-        setCurrentWorkspaceNotes(workspace.notes || '');
-        toast.success(lang === 'vi' ? 'Đã mở workspace ERD' : 'ERD workspace loaded');
-    }, [applyWorkspaceLayout, handleSetSelectedDatabase, lang, selectedDatabase]);
-
-    const deleteWorkspace = useCallback(async (workspace: ErdWorkspaceEntity) => {
-        await ErdWorkspaceService.deleteWorkspace(workspace.id);
-        if (workspace.id === currentWorkspaceId) {
-            setCurrentWorkspaceId(null);
-            setCurrentWorkspaceName(null);
-            setCurrentWorkspaceNotes('');
-        }
-        await queryClient.invalidateQueries({ queryKey: ['erd-workspaces', connectionId] });
-        toast.success(lang === 'vi' ? 'Đã xóa workspace ERD' : 'ERD workspace deleted');
-    }, [connectionId, currentWorkspaceId, lang, queryClient]);
 
     const handleRefreshMetadata = useCallback(async () => {
         if (!connectionId) return;
