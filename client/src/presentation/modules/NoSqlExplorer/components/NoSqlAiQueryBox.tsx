@@ -14,6 +14,11 @@ interface NoSqlAiQueryBoxProps {
     collectionName?: string;
 }
 
+interface QuickPrompt {
+    label: string;
+    prompt: string;
+}
+
 const MUTATING_MONGO_ACTIONS = new Set([
     'insertOne',
     'insertMany',
@@ -47,6 +52,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
 
     const activeConnection = connections.find((connection) => connection.id === currentConnectionId);
     const isRedis = activeConnection?.type === 'redis';
+    const isReadOnly = !!activeConnection?.readOnly;
     const commandLabel = isRedis ? 'Redis Command' : 'MQL';
     const generatorLabel = isRedis ? 'AI Redis Generator' : 'AI MQL Generator';
     const collapsedPrompt = isRedis
@@ -63,6 +69,71 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
         : (lang === 'vi'
             ? 'Mô tả yêu cầu truy vấn MongoDB của bạn...'
             : 'Describe your MongoDB query request...');
+    const capabilityTags = isRedis
+        ? ['scan', 'get', 'set', 'del']
+        : isReadOnly
+            ? ['find', 'aggregate']
+            : ['find', 'aggregate', 'update', 'delete'];
+    const capabilityNote = isRedis
+        ? (lang === 'vi'
+            ? 'AI có thể gợi ý lệnh đọc và ghi Redis. Hãy nói rõ thao tác nếu bạn muốn set hoặc xóa key.'
+            : 'AI can suggest both read and write Redis commands. Be explicit when you want to set or delete keys.')
+        : isReadOnly
+            ? (lang === 'vi'
+                ? 'Kết nối đang ở chế độ chỉ đọc nên AI chỉ nên sinh find hoặc aggregate cho collection này.'
+                : 'This connection is read-only, so AI should only generate find or aggregate commands for this collection.')
+            : (lang === 'vi'
+                ? 'AI có thể sinh find, aggregate, update và delete. Với lệnh ghi dữ liệu, hãy dùng từ rõ ràng như update/delete/remove để hệ thống biết bạn thật sự muốn mutate.'
+                : 'AI can generate find, aggregate, update, and delete commands. For write operations, use explicit verbs like update/delete/remove so the workspace knows you intend to mutate data.');
+    const quickPrompts: QuickPrompt[] = isRedis
+        ? [
+            {
+                label: lang === 'vi' ? 'Quét session' : 'Scan sessions',
+                prompt: 'Scan session:* and return the first 20 matching keys.',
+            },
+            {
+                label: lang === 'vi' ? 'Xem TTL key' : 'Inspect TTL',
+                prompt: 'Show the TTL for user:123 and explain the command before running it.',
+            },
+            {
+                label: lang === 'vi' ? 'Xóa key cũ' : 'Delete old key',
+                prompt: 'Delete the cache key report:daily:stale and explain the impact.',
+            },
+        ]
+        : isReadOnly
+            ? [
+                {
+                    label: lang === 'vi' ? 'Top categories' : 'Top categories',
+                    prompt: 'Find the top 10 categories by document count in this collection.',
+                },
+                {
+                    label: lang === 'vi' ? 'Đơn mới nhất' : 'Latest orders',
+                    prompt: 'Find the latest 20 documents sorted by createdAt descending.',
+                },
+                {
+                    label: lang === 'vi' ? 'Pipeline mẫu' : 'Sample pipeline',
+                    prompt: 'Build an aggregation pipeline that groups documents by status and counts each group.',
+                },
+            ]
+            : [
+                {
+                    label: lang === 'vi' ? 'Top categories' : 'Top categories',
+                    prompt: 'Find the top 10 categories by document count in this collection.',
+                },
+                {
+                    label: lang === 'vi' ? 'Update trạng thái' : 'Update status',
+                    prompt: 'Update all documents with status "pending" to "archived" using updateMany and explain the filter.',
+                },
+                {
+                    label: lang === 'vi' ? 'Xóa log cũ' : 'Delete old logs',
+                    prompt: 'Delete documents older than 30 days using deleteMany and explain the filter before running it.',
+                },
+            ];
+
+    const handleApplyQuickPrompt = (prompt: string) => {
+        setQuery(prompt);
+        textareaRef.current?.focus();
+    };
 
     const handleGenerate = async () => {
         if (!query.trim() || !currentConnectionId) return;
@@ -88,9 +159,12 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
             const isTooLong = generatedCommand.length > 1200 || generatedCommand.split('\n').length > 20;
 
             if (generatedCommand && !isRedis && !explicitMutationIntent && (isMutatingCommand || isTooLong)) {
-                setExplanation(result.explanation || (lang === 'vi'
-                    ? 'Kết quả AI có thay đổi dữ liệu hoặc quá dài nên chưa được chèn tự động.'
-                    : 'The AI result mutates data or is too large, so it was not inserted automatically.'));
+                const safeguardExplanation = lang === 'vi'
+                    ? 'AI đã sinh lệnh ghi dữ liệu hoặc câu lệnh quá dài nên chưa chèn tự động. Nếu bạn thật sự muốn mutate, hãy ghi rõ update/delete/remove trong prompt rồi review trước khi chạy.'
+                    : 'The AI generated a write command or a very large payload, so it was not inserted automatically. If you truly want to mutate data, mention update/delete/remove explicitly and review the command before running it.';
+                setExplanation(result.explanation
+                    ? `${result.explanation} ${safeguardExplanation}`
+                    : safeguardExplanation);
                 toast.warning(lang === 'vi'
                     ? 'Lệnh NoSQL chưa được chèn tự động vì có thể ghi dữ liệu hoặc quá dài'
                     : 'NoSQL command was not inserted automatically because it may write data or is too large');
@@ -187,6 +261,45 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
                                         ? (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'CMD + ENTER ĐỂ CHẠY' : 'CTRL + ENTER ĐỂ CHẠY')
                                         : (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'CMD + ENTER TO RUN' : 'CTRL + ENTER TO RUN')}
                                 </span>
+                            </div>
+                        </div>
+
+                        <div className="rounded-xl border border-green-500/10 bg-green-500/5 p-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                                {capabilityTags.map((tag) => (
+                                    <span
+                                        key={tag}
+                                        className="rounded-full border border-green-500/20 bg-background/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-green-300"
+                                    >
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+                            <p className="mt-2 text-[11px] leading-relaxed text-green-100/75">
+                                {capabilityNote}
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between px-1">
+                                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">
+                                    {lang === 'vi' ? 'Prompt gợi ý' : 'Prompt shortcuts'}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground/50">
+                                    {lang === 'vi' ? 'Bấm để chèn nhanh' : 'Tap to insert'}
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {quickPrompts.map((item) => (
+                                    <button
+                                        key={item.label}
+                                        type="button"
+                                        onClick={() => handleApplyQuickPrompt(item.prompt)}
+                                        className="rounded-full border border-white/10 bg-background/60 px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-green-500/30 hover:text-green-300"
+                                    >
+                                        {item.label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 

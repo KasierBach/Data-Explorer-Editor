@@ -14,7 +14,7 @@ import { CreateCheckoutDto } from './dto/create-checkout.dto';
 
 @Controller('billing')
 export class BillingController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(private readonly billingService: BillingService) { }
 
   @Get('plans')
   getPlans() {
@@ -46,8 +46,8 @@ export class BillingController {
   }
 
   @Post('webhooks/momo')
-  handleMomoWebhook(@Body() payload: unknown) {
-    return this.billingService.handleProviderWebhook('momo', payload);
+  async handleMomoWebhook(@Body() payload: unknown) {
+    return await this.billingService.handleProviderWebhook('momo', payload);
   }
 
   @Post('webhooks/zalopay')

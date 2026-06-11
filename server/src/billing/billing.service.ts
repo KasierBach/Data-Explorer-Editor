@@ -23,7 +23,7 @@ export class BillingService {
     private readonly prisma: PrismaService,
     @Inject(PAYMENT_PROVIDER_ADAPTERS)
     private readonly providers: PaymentProvider[],
-  ) {}
+  ) { }
 
   getPlans() {
     return [
@@ -131,7 +131,12 @@ export class BillingService {
       return { paymentId: payment.id, status: 'paid', idempotent: true };
     }
 
-    const plan = getBillingPlan(payment.planCode);
+    let plan;
+    try {
+      plan = getBillingPlan(payment.planCode);
+    } catch {
+      throw new BadRequestException('Invalid plan code in payment record');
+    }
     const failedStatus = verified.status === 'failed' ? 'failed' : 'pending';
 
     if (verified.status !== 'paid') {

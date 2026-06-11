@@ -26,10 +26,10 @@ function getEditorTheme(): EditorTheme {
 export const MqlEditor: React.FC<MqlEditorProps> = ({ value, onChange, onRun, height = '100%' }) => {
     const [theme, setTheme] = React.useState<EditorTheme>(() => getEditorTheme());
     const editorRef = useRef<MqlEditorHandle | null>(null);
-    const { activeConnectionId, activeDatabase } = useAppStore();
+    const { nosqlActiveConnectionId, nosqlActiveDatabase } = useAppStore();
     
     const monaco = useMonaco();
-    useAiGhostText(monaco, activeConnectionId, activeDatabase || undefined, 'json');
+    useAiGhostText(monaco, nosqlActiveConnectionId, nosqlActiveDatabase || undefined, 'json');
 
     useEffect(() => {
         const observer = new MutationObserver((mutations) => {
@@ -59,7 +59,7 @@ export const MqlEditor: React.FC<MqlEditorProps> = ({ value, onChange, onRun, he
 
     return (
         <Editor
-            key={`mql-editor-${activeConnectionId}`}
+            key={`mql-editor-${nosqlActiveConnectionId ?? 'nosql'}`}
             height={height}
             defaultLanguage="json"
             value={value}

@@ -19,7 +19,7 @@ export const NavMainActions: React.FC<NavMainActionsProps> = ({
     isNoSql
 }) => {
     const { 
-        setNosqlViewMode, 
+        setNosqlViewMode,
         nosqlActiveCollection, 
         nosqlActiveConnectionId 
     } = useAppStore();
@@ -38,11 +38,7 @@ export const NavMainActions: React.FC<NavMainActionsProps> = ({
 
     const handleVisualizeClick = () => {
         if (isNoSql) {
-            if (nosqlActiveCollection) {
-                setNosqlViewMode('charts');
-            } else {
-                onNavigate('/nosql-explorer/visualize');
-            }
+            onNavigate('/nosql-explorer/visualize');
         } else {
             onNavigate('/sql-explorer/visualize');
         }
@@ -68,7 +64,7 @@ export const NavMainActions: React.FC<NavMainActionsProps> = ({
                 size="sm"
                 className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
                 onClick={handleVisualizeClick}
-                disabled={isNoSql ? (!currentConnectionId && !nosqlActiveCollection) : false} 
+                disabled={isNoSql ? !currentConnectionId : false} 
             >
                 <PieChart className="w-4 h-4 text-emerald-500" />
                 <span className="font-semibold">{lang === 'vi' ? 'Trực quan' : 'Visualize'}</span>

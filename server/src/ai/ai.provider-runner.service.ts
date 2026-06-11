@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import type {
+  EnhancedGenerateContentResponse,
+  GenerateContentStreamResult,
+} from '@google/generative-ai';
 import { AiPromptBuilderService } from './ai.prompt-builder.service';
 import {
   buildGeminiStructuredGenerationConfig,
@@ -711,7 +715,7 @@ export class AiProviderRunnerService {
       params.history,
       params.image,
     );
-    const generateStream = () =>
+    const generateStream = (): Promise<GenerateContentStreamResult> =>
       this.withTimeout(
         model.generateContentStream({
           contents,
@@ -719,7 +723,7 @@ export class AiProviderRunnerService {
         }),
         `Gemini stream bootstrap (${plan.model})`,
       );
-    let result;
+    let result: GenerateContentStreamResult;
     try {
       result = await generateStream();
     } catch (error) {
@@ -738,9 +742,12 @@ export class AiProviderRunnerService {
     }
 
     let fullText = '';
-    const iterator = result.stream[Symbol.asyncIterator]();
+    const iterator: AsyncGenerator<EnhancedGenerateContentResponse> =
+      result.stream;
     while (true) {
-      const nextChunk = await this.withTimeout(
+      const nextChunk = await this.withTimeout<
+        IteratorResult<EnhancedGenerateContentResponse, unknown>
+      >(
         iterator.next(),
         `Gemini stream (${plan.model})`,
         this.getStreamIdleTimeoutMs(),
@@ -753,7 +760,7 @@ export class AiProviderRunnerService {
       }
     }
 
-    const aggregatedResponse = await this.withTimeout(
+    const aggregatedResponse = await this.withTimeout<EnhancedGenerateContentResponse>(
       result.response,
       `Gemini stream finalize (${plan.model})`,
     );
