@@ -1,6 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
 import { BillingService } from './billing.service';
-import type { PrismaService } from '../prisma/prisma.service';
 import type {
   PaymentProvider,
   VerifiedPayment,
@@ -78,9 +77,7 @@ describe('BillingService', () => {
   it('creates checkout from the server-side plan catalog amount only', async () => {
     const prisma = createPrisma();
     const provider = createProvider();
-    const service = new BillingService(prisma as unknown as PrismaService, [
-      provider,
-    ]);
+    const service = new BillingService(prisma, [provider]);
 
     const checkout = await service.createCheckout('user_1', {
       provider: 'momo',
@@ -115,9 +112,7 @@ describe('BillingService', () => {
   it('activates Pro only after a valid provider webhook', async () => {
     const prisma = createPrisma();
     const provider = createProvider();
-    const service = new BillingService(prisma as unknown as PrismaService, [
-      provider,
-    ]);
+    const service = new BillingService(prisma, [provider]);
 
     const result = await service.handleProviderWebhook('momo', {
       resultCode: 0,
@@ -144,9 +139,7 @@ describe('BillingService', () => {
       providerOrderId: 'momo_order_1',
       rawPayload: {},
     });
-    const service = new BillingService(prisma as unknown as PrismaService, [
-      provider,
-    ]);
+    const service = new BillingService(prisma, [provider]);
 
     await expect(service.handleProviderWebhook('momo', {})).rejects.toThrow(
       BadRequestException,

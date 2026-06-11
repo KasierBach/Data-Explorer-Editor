@@ -23,7 +23,7 @@ export class BillingService {
     private readonly prisma: PrismaService,
     @Inject(PAYMENT_PROVIDER_ADAPTERS)
     private readonly providers: PaymentProvider[],
-  ) {}
+  ) { }
 
   getPlans() {
     return [

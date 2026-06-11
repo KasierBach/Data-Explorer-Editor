@@ -18,7 +18,13 @@ import { DatabaseStrategyFactory } from '../database-strategies';
 import { AuditService, AuditAction } from '../audit/audit.service';
 import { Connection } from '../connections/entities/connection.entity';
 import { FreshnessService } from '../common/freshness/freshness.service';
-import { evaluateQueryExecutionPolicy } from './query-execution-policy.util';
+import {
+  analyzeDestructiveSql,
+  containsMultipleStatements,
+  getMongoActionFromPayload,
+  isMongoActionAllowedOnReadOnly,
+  isSqlAllowedOnReadOnly,
+} from './query-guard.util';
 import {
   getErrorMessage,
   isForbiddenException,
@@ -159,83 +165,120 @@ export class QueryService {
   // ─── Query Execution ───
 
   private async assertQueryAllowed(
-    connection: Connection,
+    connection: any,
     sql: string,
     userId: string,
     database?: string,
     confirmed?: boolean,
   ) {
-    const action = 'execute_query';
-    const decision = evaluateQueryExecutionPolicy({
-      allowQueryExecution: connection.allowQueryExecution,
-      readOnly: connection.readOnly,
-      type: connection.type,
-      sql,
-      confirmed,
-    });
-
-    if (decision.kind === 'allow') {
-      return;
-    }
-
-    if (decision.kind === 'block') {
+    // 1. Check if query execution is enabled at all
+    if (!connection.allowQueryExecution) {
       await this.blockOperation(userId, {
         connectionId: connection.id,
         database,
-        action,
-        reason: decision.reason,
-        message: decision.message,
-        sqlSnippet: decision.sqlSnippet,
-        extra: decision.extra,
+        action: 'execute_query',
+        reason: 'QUERY_EXECUTION_DISABLED',
+        message: 'Query execution is disabled for this connection.',
       });
+    }
+
+    // 2. Block multi-statement SQL (prevents piggyback injection like "SELECT 1; DROP TABLE users")
+    if (connection.type !== 'mongodb' && connection.type !== 'mongodb+srv') {
+      if (containsMultipleStatements(sql)) {
+        await this.blockOperation(userId, {
+          connectionId: connection.id,
+          database,
+          action: 'execute_query',
+          reason: 'MULTI_STATEMENT_BLOCKED',
+          message:
+            'Multi-statement queries are not allowed. Please execute one statement at a time.',
+          sqlSnippet: sql.slice(0, 120),
+        });
+      }
+    }
+
+    // 3. MongoDB read-only check
+    if (connection.type === 'mongodb' || connection.type === 'mongodb+srv') {
+      const action = getMongoActionFromPayload(sql);
+      if (connection.readOnly && !isMongoActionAllowedOnReadOnly(action)) {
+        await this.blockOperation(userId, {
+          connectionId: connection.id,
+          database,
+          action: 'execute_query',
+          reason: 'READ_ONLY_CONNECTION',
+          message:
+            'This connection is read-only. Only read operations are allowed.',
+          extra: { mongoAction: action },
+        });
+      }
       return;
     }
 
-    if (decision.kind === 'confirmation_required') {
-      const details = {
+    // 4. Read-only connection: block all non-read queries
+    if (connection.readOnly && !isSqlAllowedOnReadOnly(sql)) {
+      await this.blockOperation(userId, {
         connectionId: connection.id,
         database,
-        sqlSnippet: decision.sqlSnippet,
-        severity: decision.analysis.severity,
-        keywords: decision.analysis.keywords,
-        affectedObject: decision.analysis.affectedObject,
-      };
-
-      await this.auditService.log({
-        action: AuditAction.DB_QUERY_BLOCKED,
-        userId,
-        details: {
-          ...details,
-          action,
-          reason: 'DESTRUCTIVE_REQUIRES_CONFIRMATION',
-        },
-      });
-
-      throw new ForbiddenException({
-        message: decision.message,
-        reason: 'DESTRUCTIVE_REQUIRES_CONFIRMATION',
-        action,
-        details: {
-          requiresConfirmation: true,
-          analysis: decision.analysis,
-        },
+        action: 'execute_query',
+        reason: 'READ_ONLY_CONNECTION',
+        message: 'This connection is read-only. Only read queries are allowed.',
+        sqlSnippet: sql.slice(0, 120),
       });
     }
 
-    const details = {
-      connectionId: connection.id,
-      database,
-      sqlSnippet: decision.sqlSnippet,
-      severity: decision.analysis.severity,
-      keywords: decision.analysis.keywords,
-      affectedObject: decision.analysis.affectedObject,
-    };
+    // 5. Non-readOnly connection: detect destructive SQL and require confirmation
+    if (!connection.readOnly) {
+      const analysis = analyzeDestructiveSql(sql);
 
-    await this.auditService.log({
-      action: AuditAction.DB_QUERY_DESTRUCTIVE_CONFIRMED,
-      userId,
-      details,
-    });
+      if (analysis.isDestructive && !confirmed) {
+        // Log the attempt
+        await this.auditService.log({
+          action: AuditAction.DB_QUERY_BLOCKED,
+          userId,
+          details: {
+            connectionId: connection.id,
+            database,
+            action: 'execute_query',
+            reason: 'DESTRUCTIVE_REQUIRES_CONFIRMATION',
+            sqlSnippet: sql.slice(0, 200),
+            severity: analysis.severity,
+            keywords: analysis.keywords,
+            affectedObject: analysis.affectedObject,
+          },
+        });
+
+        // Return a structured response that the frontend will intercept
+        throw new ForbiddenException({
+          message: `This query contains destructive operations (${analysis.keywords.join(', ')}). Please confirm to proceed.`,
+          reason: 'DESTRUCTIVE_REQUIRES_CONFIRMATION',
+          action: 'execute_query',
+          details: {
+            requiresConfirmation: true,
+            analysis: {
+              severity: analysis.severity,
+              keywords: analysis.keywords,
+              affectedObject: analysis.affectedObject,
+            },
+          },
+        });
+      }
+
+      // If confirmed, log it as a confirmed destructive query
+      if (analysis.isDestructive && confirmed) {
+        await this.auditService.log({
+          action: AuditAction.DB_QUERY_DESTRUCTIVE_CONFIRMED,
+          userId,
+          details: {
+            connectionId: connection.id,
+            database,
+            sqlSnippet: sql.slice(0, 200),
+            severity: analysis.severity,
+            keywords: analysis.keywords,
+            affectedObject: analysis.affectedObject,
+          },
+        });
+      }
+    }
   }
 
   async executeQuery(createQueryDto: CreateQueryDto, userId: string) {

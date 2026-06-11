@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ErdWorkspaceService, type SaveErdWorkspacePayload } from '@/core/services/ErdWorkspaceService';
-import type { ErdWorkspaceEntity, JsonValue } from '@/core/domain/entities';
+import type { ErdWorkspaceEntity } from '@/core/domain/entities';
 import { ApiError } from '@/core/services/api.service';
-import type { ErdWorkspaceLayout } from '../workspace-layout';
 
 interface UseErdWorkspaceOptions {
     connectionId: string;
@@ -13,8 +12,8 @@ interface UseErdWorkspaceOptions {
     setCurrentWorkspaceId: (id: string | null) => void;
     setCurrentWorkspaceName: (name: string | null) => void;
     setCurrentWorkspaceNotes: (notes: string) => void;
-    buildWorkspaceLayout: () => ErdWorkspaceLayout;
-    applyWorkspaceLayout: (layout?: Record<string, JsonValue> | null) => void;
+    buildWorkspaceLayout: () => Record<string, unknown>;
+    applyWorkspaceLayout: (layout: Record<string, unknown> | null) => void;
     handleSetSelectedDatabase: (db: string | undefined) => void;
     lang: string;
 }
@@ -33,10 +32,6 @@ export function useErdWorkspace({
 }: UseErdWorkspaceOptions) {
     const queryClient = useQueryClient();
     const hasShownWorkspaceWarning = useRef(false);
-
-    useEffect(() => {
-        hasShownWorkspaceWarning.current = false;
-    }, [connectionId]);
 
     const handleWorkspaceListError = useCallback((error: unknown) => {
         console.error('[ERD] Failed to load saved workspaces', error);
@@ -102,7 +97,7 @@ export function useErdWorkspace({
             handleSetSelectedDatabase(workspace.database || undefined);
         }
 
-        applyWorkspaceLayout(workspace.layout);
+        applyWorkspaceLayout(workspace.layout as Record<string, unknown>);
         setCurrentWorkspaceId(workspace.id);
         setCurrentWorkspaceName(workspace.name);
         setCurrentWorkspaceNotes(workspace.notes || '');

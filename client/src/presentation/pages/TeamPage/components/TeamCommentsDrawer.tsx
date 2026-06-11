@@ -78,7 +78,7 @@ export function TeamCommentsDrawer({
     return () => {
       mounted = false;
     };
-  }, [open, organizationId, resourceId, resourceType, text.failedLoadComments]);
+  }, [open, organizationId, resourceType, resourceId]);
 
   useEffect(() => {
     setBody('');

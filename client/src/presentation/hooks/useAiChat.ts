@@ -171,9 +171,7 @@ export function useAiChat() {
     const {
         activeConnectionId, connections, activeDatabase,
         activeAiChatId, addAiMessage, updateAiMessage, tabs, activeTabId,
-        aiModel, aiMode, aiRoutingMode, aiChats,
-        nosqlMqlQuery, nosqlActiveCollection, nosqlSchemaStats,
-        syncAiMessage, editAiMessage,
+        aiModel, aiMode, aiRoutingMode,
     } = store;
 
     const activeConnection = connections.find(c => c.id === activeConnectionId);
@@ -259,7 +257,7 @@ export function useAiChat() {
 
     const handlePasteQuery = () => {
         if (activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv') {
-            const mql = nosqlMqlQuery;
+            const mql = store.nosqlMqlQuery;
             if (mql && mql.trim()) {
                 setAttachments(prev => [...prev, {
                     type: 'sql',
@@ -283,15 +281,15 @@ export function useAiChat() {
         if (activeConnection && activeDatabase) {
             const isNoSql = activeConnection.type === 'mongodb' || activeConnection.type === 'mongodb+srv';
             
-            if (isNoSql && nosqlActiveCollection) {
-                const schemaStr = nosqlSchemaStats ?
-                    `Schema cho collection "${nosqlActiveCollection}":\n` +
-                    formatNoSqlSchemaFields(nosqlSchemaStats, true)
-                    : `Collection đang mở: ${nosqlActiveCollection} (Chưa chạy phân tích Schema)`;
+            if (isNoSql && store.nosqlActiveCollection) {
+                const schemaStr = store.nosqlSchemaStats ? 
+                    `Schema cho collection "${store.nosqlActiveCollection}":\n` + 
+                    formatNoSqlSchemaFields(store.nosqlSchemaStats, true)
+                    : `Collection đang mở: ${store.nosqlActiveCollection} (Chưa chạy phân tích Schema)`;
 
                 setAttachments(prev => [...prev, {
                     type: 'table',
-                    label: `Schema: ${nosqlActiveCollection}`,
+                    label: `Schema: ${store.nosqlActiveCollection}`,
                     data: schemaStr,
                 }]);
             } else {
@@ -350,7 +348,7 @@ export function useAiChat() {
                         routingMode: event.data.routingMode,
                     },
                 });
-                syncAiMessage(chatId, {
+                store.syncAiMessage(chatId, {
                     id: aiMessageId,
                     role: 'ai',
                     content: finalMsgContent,
@@ -372,7 +370,7 @@ export function useAiChat() {
                     content: errorContent,
                     error: true,
                 });
-                void syncAiMessage(chatId, {
+                void store.syncAiMessage(chatId, {
                     id: aiMessageId,
                     role: 'ai',
                     content: errorContent,
@@ -382,7 +380,7 @@ export function useAiChat() {
             }
         } catch { /* skip malformed */ }
         return raw;
-    }, [syncAiMessage, updateAiMessage]);
+    }, [store, updateAiMessage]);
 
     const triggerGenerate = useCallback(async (chatId: string, prompt: string, customAttachments: Attachment[] = [], customImageData?: string) => {
         setIsLoading(true);
@@ -407,16 +405,16 @@ export function useAiChat() {
             }
 
             const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';
-            if (isNoSql && nosqlActiveCollection && !customAttachments.some(a => a.type === 'table')) {
-                const schemaSummary = nosqlSchemaStats ?
-                     `[NOSQL SCHEMA] Collection: ${nosqlActiveCollection}\nFields: ` +
-                     formatNoSqlSchemaFields(nosqlSchemaStats)
-                     : `[NOSQL CONTEXT] Collection: ${nosqlActiveCollection}`;
+            if (isNoSql && store.nosqlActiveCollection && !customAttachments.some(a => a.type === 'table')) {
+                const schemaSummary = store.nosqlSchemaStats ? 
+                     `[NOSQL SCHEMA] Collection: ${store.nosqlActiveCollection}\nFields: ` + 
+                     formatNoSqlSchemaFields(store.nosqlSchemaStats)
+                     : `[NOSQL CONTEXT] Collection: ${store.nosqlActiveCollection}`;
                 contextParts.unshift(schemaSummary);
             }
 
             // Prepare chat history (filtered to only past messages)
-            const chat = aiChats.find(c => c.id === chatId);
+            const chat = store.aiChats.find(c => c.id === chatId);
             const history = chat?.messages?.filter(m => m.id !== aiMsgId) || [];
 
             const response = await adapter.generateSqlStream({
@@ -474,7 +472,7 @@ export function useAiChat() {
             if ((error instanceof DOMException && error.name === 'AbortError') || errorMessage === 'Aborted') {
                 const abortedContent = (rawText ? parsePartialAiResponse(rawText).message : '') + '\n\n[Đã dừng bởi người dùng]';
                 updateAiMessage(chatId, aiMsgId, { content: abortedContent });
-                void syncAiMessage(chatId, {
+                void store.syncAiMessage(chatId, {
                     id: aiMsgId,
                     role: 'ai',
                     content: abortedContent,
@@ -483,7 +481,7 @@ export function useAiChat() {
             } else {
                 const failedContent = `❌ Lỗi: ${errorMessage}`;
                 updateAiMessage(chatId, aiMsgId, { content: failedContent, error: true });
-                void syncAiMessage(chatId, {
+                void store.syncAiMessage(chatId, {
                     id: aiMsgId,
                     role: 'ai',
                     content: failedContent,
@@ -497,7 +495,7 @@ export function useAiChat() {
             pendingUpdateRef.current = null;
             abortControllerRef.current = null;
         }
-    }, [addAiMessage, aiChats, aiMode, aiModel, aiRoutingMode, activeConnection?.type, activeDatabase, nosqlActiveCollection, nosqlSchemaStats, processSseLine, syncAiMessage, updateAiMessage]);
+    }, [addAiMessage, updateAiMessage, processSseLine, activeDatabase, aiModel, aiMode, aiRoutingMode, activeConnection?.type, store.nosqlActiveCollection, store.nosqlSchemaStats, store.aiChats]);
 
     const handleStop = useCallback(() => {
         if (abortControllerRef.current) {
@@ -547,26 +545,26 @@ export function useAiChat() {
     }, [input, attachments, isLoading, activeAiChatId, activeConnection, addAiMessage, triggerGenerate]);
 
     const handleRegenerate = useCallback(async (chatId: string, aiMessageId?: string) => {
-        const chat = aiChats.find(c => c.id === chatId);
+        const chat = store.aiChats.find(c => c.id === chatId);
         if (!chat || isLoading) return;
 
         const messages = chat.messages || [];
         const lastUserMsg = findReplaySourceUserMessage(messages, aiMessageId);
         if (!lastUserMsg) return;
 
-        await editAiMessage(chatId, lastUserMsg.id, lastUserMsg.content);
+        await store.editAiMessage(chatId, lastUserMsg.id, lastUserMsg.content);
         await triggerGenerate(chatId, lastUserMsg.content, toTriggerAttachments(lastUserMsg.attachments));
-    }, [aiChats, editAiMessage, isLoading, triggerGenerate]);
+    }, [store, isLoading, triggerGenerate]);
 
     const handleEditSubmit = useCallback(async (chatId: string, messageId: string, newContent: string) => {
         if (isLoading) return;
 
-        const chat = aiChats.find(c => c.id === chatId);
+        const chat = store.aiChats.find(c => c.id === chatId);
         const messageToReplay = chat?.messages.find(m => m.id === messageId);
 
-        await editAiMessage(chatId, messageId, newContent);
+        await store.editAiMessage(chatId, messageId, newContent);
         await triggerGenerate(chatId, newContent, toTriggerAttachments(messageToReplay?.attachments));
-    }, [aiChats, editAiMessage, isLoading, triggerGenerate]);
+    }, [isLoading, store, triggerGenerate]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) {

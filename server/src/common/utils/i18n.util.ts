@@ -9,7 +9,7 @@ export function normalizeAppLanguage(value?: string | null): AppLanguage {
 }
 
 export function pickLocalizedText(
-  lang: string | null | undefined,
+  lang: AppLanguage | string | null | undefined,
   vi: string,
   en: string,
 ): string {

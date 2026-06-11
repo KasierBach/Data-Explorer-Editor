@@ -47,7 +47,6 @@ export const NoSqlGridView: React.FC<NoSqlGridViewProps> = ({ data }) => {
         }));
     }, [columns]);
 
-    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data: rows,
         columns: tableColumns,

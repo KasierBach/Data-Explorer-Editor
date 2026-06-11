@@ -4,15 +4,11 @@ describe('AiChatService', () => {
   it('updates an existing message instead of creating a duplicate row during edit', async () => {
     const prisma = {
       aiChat: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ id: 'chat-1', userId: 'user-1' }),
+        findUnique: jest.fn().mockResolvedValue({ id: 'chat-1', userId: 'user-1' }),
         update: jest.fn().mockResolvedValue({}),
       },
       aiMessage: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ id: 'msg-1', chatId: 'chat-1' }),
+        findUnique: jest.fn().mockResolvedValue({ id: 'msg-1', chatId: 'chat-1' }),
         update: jest.fn().mockResolvedValue({ id: 'msg-1' }),
       },
     };
@@ -22,13 +18,7 @@ describe('AiChatService', () => {
     await (service as any).updateMessage('user-1', 'chat-1', 'msg-1', {
       role: 'user',
       content: 'updated prompt',
-      attachments: [
-        {
-          type: 'image',
-          label: 'diagram.png',
-          data: 'data:image/png;base64,abc',
-        },
-      ],
+      attachments: [{ type: 'image', label: 'diagram.png', data: 'data:image/png;base64,abc' }],
     });
 
     expect(prisma.aiChat.update).toHaveBeenCalledWith({
@@ -39,13 +29,7 @@ describe('AiChatService', () => {
       where: { id: 'msg-1' },
       data: expect.objectContaining({
         content: 'updated prompt',
-        attachments: [
-          {
-            type: 'image',
-            label: 'diagram.png',
-            data: 'data:image/png;base64,abc',
-          },
-        ],
+        attachments: [{ type: 'image', label: 'diagram.png', data: 'data:image/png;base64,abc' }],
       }),
     });
   });
@@ -53,15 +37,11 @@ describe('AiChatService', () => {
   it('rejects updates when the message does not belong to the requested chat', async () => {
     const prisma = {
       aiChat: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ id: 'chat-1', userId: 'user-1' }),
+        findUnique: jest.fn().mockResolvedValue({ id: 'chat-1', userId: 'user-1' }),
         update: jest.fn(),
       },
       aiMessage: {
-        findUnique: jest
-          .fn()
-          .mockResolvedValue({ id: 'msg-2', chatId: 'chat-2' }),
+        findUnique: jest.fn().mockResolvedValue({ id: 'msg-2', chatId: 'chat-2' }),
         update: jest.fn(),
       },
     };
