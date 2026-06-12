@@ -1,73 +1,47 @@
-# React + TypeScript + Vite
+# Data Explorer Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The `client/` workspace is the React 19 + Vite frontend for Data Explorer v3.6.2. It contains the SQL IDE, NoSQL workspace, AI assistant panel, team surfaces, docs pages, dashboards, and the landing experience.
 
-Currently, two official plugins are available:
+## Main areas
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- `src/presentation/modules/Query`: SQL editor, results panel, AI assistant integration, history, and execution actions
+- `src/presentation/modules/NoSqlExplorer`: MongoDB-oriented workspace, Tree JSON browsing, schema analysis, visualization, and aggregation builder flows
+- `src/presentation/modules/Visualization`: ERD and relational visual workspaces
+- `src/presentation/modules/Dashboard`: metrics, charts, and overview surfaces
+- `src/presentation/modules/Layout`: shell, navbar, mobile/desktop mode behavior, dialogs, and top-level chrome
+- `src/presentation/components/docs`: in-app bilingual documentation system
+- `src/core` and `src/infrastructure`: shared state, API wiring, and frontend plumbing
 
-## React Compiler
+## Local setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd client
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+If you need to point the UI at a custom backend, create `client/.env` with:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_API_URL=http://localhost:3001/api
 ```
+
+The default local frontend URL is `http://localhost:5173`.
+
+## Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the Vite dev server |
+| `npm run build` | Type-check and build the production bundle |
+| `npm run lint` | Lint the client codebase |
+| `npm run test` | Run Vitest |
+| `npm run preview` | Preview the built frontend locally |
+
+## Notes
+
+- The root repo script `npm run dev` starts both server and client together, but it still expects `server/node_modules` and `client/node_modules` to be installed first.
+- The in-app docs page is the most detailed product guide for end users and operators.
+- The backend must expose a reachable `VITE_API_URL`, otherwise login, query execution, AI calls, and live workspace data will fail in the client.
+
+For the broader project overview, combined setup instructions, and env matrix, see `../README.md`.

@@ -24,16 +24,16 @@ export function TechStackSection({ lang }: Props) {
                         </thead>
                         <tbody className="divide-y">
                             {[
-                                { tech: 'React', ver: '19.x', role: t ? 'Nền tảng giao diện chính cho toàn bộ ứng dụng client.' : 'Primary UI foundation for the entire client application.' },
-                                { tech: 'Vite', ver: '7.x', role: t ? 'Dev server và build pipeline tốc độ cao.' : 'Fast dev server and build pipeline.' },
-                                { tech: 'TypeScript', ver: '5.9.x', role: t ? 'Type safety xuyên suốt frontend và backend.' : 'Type safety across frontend and backend.' },
-                                { tech: 'Tailwind CSS', ver: '4.x', role: t ? 'Styling utility-first cho toàn bộ surface UI.' : 'Utility-first styling across the whole UI surface.' },
-                                { tech: 'Framer Motion', ver: '12.x', role: t ? 'Thư viện animation cao cấp cho các hiệu ứng chuyển cảnh và tương tác.' : 'Premium animation library for transitions and interactions.' },
-                                { tech: 'Zustand', ver: '5.x', role: t ? 'State management dạng slice cho tabs, AI chat, connections và UI shell.' : 'Slice-based state management for tabs, AI chat, connections, and the shell.' },
-                                { tech: 'Monaco Editor', ver: '0.5.x', role: t ? 'SQL editor chính với shortcut, formatting, và completions.' : 'Primary SQL editor with shortcuts, formatting, and completions.' },
-                                { tech: '@tanstack/react-query', ver: '5.x', role: t ? 'Server state, caching, và request synchronization.' : 'Server state, caching, and request synchronization.' },
-                                { tech: '@xyflow/react', ver: '12.x', role: t ? 'Canvas engine cho ERD/visual diagram flow.' : 'Canvas engine for ERD and visual diagram flows.' },
-                                { tech: 'Lucide Icons', ver: '0.4.x', role: t ? 'Bộ icon vector hiện đại và linh hoạt.' : 'Modern and flexible vector icon set.' },
+                                { tech: 'React', ver: '19.2.x', role: t ? 'Nền tảng giao diện chính cho toàn bộ ứng dụng client.' : 'Primary UI foundation for the entire client application.' },
+                                { tech: 'Vite', ver: '7.3.x', role: t ? 'Dev server và build pipeline tốc độ cao.' : 'Fast dev server and build pipeline.' },
+                                { tech: 'TypeScript', ver: '5.9.x', role: t ? 'Type safety cho client app; backend hiện dùng TypeScript riêng trong server package.' : 'Type safety for the client app; the backend currently uses its own TypeScript toolchain in the server package.' },
+                                { tech: 'Tailwind CSS', ver: '4.1.x', role: t ? 'Styling utility-first cho toàn bộ surface UI.' : 'Utility-first styling across the whole UI surface.' },
+                                { tech: 'Framer Motion', ver: '12.38.x', role: t ? 'Animation layer cho chuyển cảnh, drawer, AI bubbles, và motion UI.' : 'Animation layer for transitions, drawers, AI bubbles, and motion-heavy UI.' },
+                                { tech: 'Zustand', ver: '5.0.x', role: t ? 'State management dạng slice cho tabs, AI chat, connections và UI shell.' : 'Slice-based state management for tabs, AI chat, connections, and the shell.' },
+                                { tech: '@monaco-editor/react', ver: '4.7.x', role: t ? 'Wrapper Monaco cho SQL editor, MQL editor, shortcut, formatting và completions.' : 'The Monaco wrapper used for the SQL editor, MQL editor, shortcuts, formatting, and completions.' },
+                                { tech: '@tanstack/react-query', ver: '5.90.x', role: t ? 'Server state, caching, và request synchronization.' : 'Server state, caching, and request synchronization.' },
+                                { tech: '@xyflow/react', ver: '12.10.x', role: t ? 'Canvas engine cho ERD/visual diagram flow.' : 'Canvas engine for ERD and visual diagram flows.' },
+                                { tech: 'lucide-react', ver: '0.563.x', role: t ? 'Bộ icon vector hiện đại và linh hoạt.' : 'Modern and flexible vector icon set.' },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/20 transition-colors">
                                     <td className="p-4 font-bold text-primary">{row.tech}</td>
@@ -59,13 +59,13 @@ export function TechStackSection({ lang }: Props) {
                         <tbody className="divide-y">
                             {[
                                 { tech: 'NestJS', ver: '11.x', role: t ? 'Framework backend chính với module boundaries và DI.' : 'Primary backend framework with module boundaries and DI.' },
-                                { tech: 'Prisma', ver: '6.x', role: t ? 'ORM cho metadata app: users, connections, saved queries, dashboards.' : 'ORM for app metadata: users, connections, saved queries, and dashboards.' },
-                                { tech: 'BullMQ', ver: '5.x', role: t ? 'Quản lý hàng đợi tác vụ nền (background jobs) hiệu năng cao.' : 'High-performance background job queue management.' },
-                                { tech: 'ioredis', ver: '5.x', role: t ? 'Thư viện kết nối Redis mạnh mẽ và tin cậy.' : 'Robust and reliable Redis client library.' },
+                                { tech: 'Prisma', ver: '6.19.x', role: t ? 'ORM cho metadata app: users, connections, saved queries, dashboards, billing metadata, và team entities.' : 'ORM for app metadata: users, connections, saved queries, dashboards, billing metadata, and team entities.' },
+                                { tech: 'BullMQ', ver: '5.74.x', role: t ? 'Quản lý hàng đợi tác vụ nền, hiện thấy rõ nhất ở migration và các workflow async.' : 'Background job queue management, currently most visible in migration and async workflows.' },
+                                { tech: 'ioredis', ver: '5.10.x', role: t ? 'Kết nối Redis cho presence, notifications, cache, search index và internal coordination.' : 'Redis connectivity for presence, notifications, cache, search indexing, and internal coordination.' },
                                 { tech: 'Passport + JWT', ver: '11.x / 4.x', role: t ? 'Email login, Google/GitHub OAuth, JWT session flow.' : 'Email login, Google/GitHub OAuth, and JWT session flow.' },
-                                { tech: 'pg / mysql2 / mssql', ver: 'latest', role: t ? 'Native database drivers cho SQL execution linh hoạt.' : 'Native database drivers for flexible SQL execution.' },
-                                { tech: 'mongodb', ver: '6.x', role: t ? 'Driver MongoDB cho NoSQL workspace.' : 'MongoDB driver for NoSQL workspace.' },
-                                { tech: 'RxJS', ver: '7.x', role: t ? 'Xử lý luồng dữ liệu không đồng bộ, đặc biệt là AI SSE.' : 'Async stream processing, especially for AI SSE.' },
+                                { tech: 'pg / mysql2 / mssql', ver: '8.18 / 3.16 / 12.2', role: t ? 'Native database drivers cho SQL execution linh hoạt.' : 'Native database drivers for flexible SQL execution.' },
+                                { tech: 'mongodb', ver: '7.1.x', role: t ? 'MongoDB driver cho NoSQL workspace và document-oriented execution.' : 'MongoDB driver for the NoSQL workspace and document-oriented execution.' },
+                                { tech: 'RxJS', ver: '7.8.x', role: t ? 'Xử lý luồng dữ liệu không đồng bộ, đặc biệt là AI SSE.' : 'Async stream processing, especially for AI SSE.' },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/20 transition-colors">
                                     <td className="p-4 font-bold text-primary">{row.tech}</td>
@@ -119,29 +119,34 @@ export function TechStackSection({ lang }: Props) {
                         <tbody className="divide-y">
                             {[
                                 {
-                                    service: 'Gemini premium lane',
-                                    model: 'Gemini Suite (Pro/Flash 1.5, 2.0, 3.0, 3.1)',
-                                    role: t ? 'Luôn cập nhật và hỗ trợ các thế hệ model mới nhất của Google cho mọi nhu cầu xử lý dữ liệu.' : 'Always up-to-date with support for Google\'s latest model generations for all data processing needs.'
+                                    service: 'Gemini default high-quality lane',
+                                    model: 'gemini-3.5-flash / gemini-3.1-pro-preview / gemini-2.5-flash',
+                                    role: t ? 'Lane mặc định mạnh nhất cho reasoning, attachment-aware work, và các request cần độ ổn định cao.' : 'The strongest default lane for reasoning, attachment-aware work, and requests that need higher reliability.'
                                 },
                                 {
-                                    service: 'Cerebras cheap lane',
-                                    model: 'llama3.1-8b / 70b',
-                                    role: t ? 'General chat và prompt nhẹ để giảm tần suất gọi Gemini.' : 'General chat and light prompts to reduce Gemini usage.'
+                                    service: 'OpenRouter default auto lane',
+                                    model: 'Env default hoặc model explicit từ catalog',
+                                    role: t ? 'Lane linh hoạt cho auto chain mặc định, một phần vision flow, và web-backed search tùy model.' : 'The flexible lane behind the default auto chain, part of the vision flow, and some web-backed search paths depending on the model.'
                                 },
                                 {
                                     service: 'Groq fast lane',
-                                    model: 'Llama 4 Scout / Llama 3.x',
-                                    role: t ? 'Lane tốc độ cao cho các vòng lặp chat nhanh và task cần độ trễ thấp.' : 'A high-speed lane for rapid chat iteration and lower-latency tasks.'
+                                    model: 'Llama 4 Scout / Llama 3.3 70B / Mixtral',
+                                    role: t ? 'Lane độ trễ thấp cho chat nhanh và iteration ngắn.' : 'The low-latency lane for rapid chat and short iteration loops.'
+                                },
+                                {
+                                    service: 'Cerebras low-cost lane',
+                                    model: 'Env-configured text model',
+                                    role: t ? 'Lane chi phí thấp hơn cho prompt nhẹ, không phải đường chính cho vision hoặc live search.' : 'A lower-cost lane for lighter prompts, not the main path for vision or live search.'
                                 },
                                 {
                                     service: 'Beeknoee explicit lane',
                                     model: 'GLM 4.7 Flash / Qwen 3 235B / MiniMax M2.7',
-                                    role: t ? 'Provider explicit từ model catalog khi bạn muốn khóa model cụ thể thay vì chỉ dựa vào fallback.' : 'An explicit provider from the model catalog when you want to lock to a concrete model instead of relying only on fallback.'
+                                    role: t ? 'Provider explicit từ model catalog khi bạn muốn khóa model cụ thể thay vì chỉ dựa vào fallback mặc định.' : 'An explicit provider from the model catalog when you want to lock to a concrete model instead of relying on default fallback.'
                                 },
                                 {
-                                    service: 'OpenRouter flexible lane',
-                                    model: 'Configurable by env or explicit picker',
-                                    role: t ? 'Lane linh hoạt cho fallback đa model và một số vision-compatible flows ngoài Gemini.' : 'A flexible lane for multi-model fallback and some vision-compatible flows beyond Gemini.'
+                                    service: 'TokenRouter explicit lane',
+                                    model: 'MiniMax-M3',
+                                    role: t ? 'Lane explicit mới cho `tokenrouter:MiniMax-M3`; hiện được wiring như vision-capable nhưng không phải live-search lane mặc định.' : 'The newer explicit lane for `tokenrouter:MiniMax-M3`; currently wired as vision-capable, but not as a default live-search lane.'
                                 },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/20 transition-colors">
@@ -156,8 +161,8 @@ export function TechStackSection({ lang }: Props) {
                 <Callout type="info">
                     <p className="text-muted-foreground">
                         {t
-                            ? 'AI panel hiện hỗ trợ các routing mode như Auto, Fast / Cheap, Best Quality và Gemini Only. UI cũng hiển thị provider/model thực tế đã trả lời để tránh nhầm lẫn khi routing đang hoạt động.'
-                            : 'The AI panel now supports routing modes such as Auto, Fast / Cheap, Best Quality, and Gemini Only. The UI also shows the actual provider/model that answered so routing decisions stay transparent.'}
+                            ? 'AI panel hiện hỗ trợ các routing mode như Auto, Fast / Cheap, Best Quality và Gemini Only. UI cũng hiển thị provider/model thực tế đã trả lời để tránh nhầm lẫn khi routing đang hoạt động. Trong wiring hiện tại, Beeknoee và TokenRouter là explicit lanes, không tự chui vào auto chain mặc định.'
+                            : 'The AI panel now supports routing modes such as Auto, Fast / Cheap, Best Quality, and Gemini Only. The UI also shows the actual provider/model that answered so routing decisions stay transparent. In the current wiring, Beeknoee and TokenRouter are explicit lanes and do not insert themselves into the default auto chain.'}
                     </p>
                 </Callout>
             </DocSection>
@@ -174,10 +179,10 @@ export function TechStackSection({ lang }: Props) {
                         </thead>
                         <tbody className="divide-y">
                             {[
-                                { tech: 'Vitest', ver: '3.x', role: t ? 'Frontend unit tests và component tests.' : 'Frontend unit tests and component tests.' },
-                                { tech: 'React Testing Library', ver: '16.x', role: t ? 'UI testing theo hành vi người dùng.' : 'User-behavior-oriented UI testing.' },
-                                { tech: 'Jest', ver: '29.x', role: t ? 'Backend test runner cho NestJS services/controllers.' : 'Backend test runner for NestJS services and controllers.' },
-                                { tech: 'ts-jest', ver: '29.x', role: t ? 'TypeScript transform cho backend test suite.' : 'TypeScript transform for the backend test suite.' },
+                                { tech: 'Vitest', ver: '4.1.x', role: t ? 'Frontend unit tests và component tests.' : 'Frontend unit tests and component tests.' },
+                                { tech: 'React Testing Library', ver: '16.3.x', role: t ? 'UI testing theo hành vi người dùng.' : 'User-behavior-oriented UI testing.' },
+                                { tech: 'Jest', ver: '30.x', role: t ? 'Backend test runner cho NestJS services/controllers.' : 'Backend test runner for NestJS services and controllers.' },
+                                { tech: 'ts-jest', ver: '29.2.x', role: t ? 'TypeScript transform cho backend test suite.' : 'TypeScript transform for the backend test suite.' },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/10 transition-colors">
                                     <td className="p-4 font-bold text-primary">{row.tech}</td>

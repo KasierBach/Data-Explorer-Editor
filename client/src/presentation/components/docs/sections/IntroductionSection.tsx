@@ -22,8 +22,8 @@ export function IntroductionSection({ lang }: Props) {
             <Callout type="info">
                 <p className="text-sm">
                     {t
-                        ? 'Điểm nhấn của v3.6.2: ảnh đính kèm đi thẳng vào AI chat, catalog model explicit với Beeknoee/Groq/OpenRouter, timeout AI 60 giây cho payload nặng hơn, billing checkout thật, phân quyền resource chặt hơn và i18n vi/en xuyên client lẫn server.'
-                        : 'v3.6.2 highlights: image attachments flow directly into AI chat, the model catalog now exposes explicit Beeknoee/Groq/OpenRouter options, AI timeouts are 60 seconds for heavier payloads, billing is now real, resource permissions are tighter, and vi/en localization runs across both client and server.'}
+                        ? 'Điểm nhấn của v3.6.2: ảnh đính kèm đi thẳng vào AI chat, catalog model explicit có thêm Beeknoee/Groq/OpenRouter/TokenRouter, billing checkout thật, phân quyền resource chặt hơn, và i18n vi/en chạy xuyên client lẫn server. Phần timeout AI hiện cũng đã được cấu hình rõ bằng env thay vì chỉ là hành vi ngầm.'
+                        : 'v3.6.2 highlights: image attachments now flow directly into AI chat, the explicit model catalog includes Beeknoee/Groq/OpenRouter/TokenRouter, billing is now real, resource permissions are tighter, and vi/en localization runs across both client and server. AI timeout behavior is also documented and configurable via env instead of remaining implicit.'}
                 </p>
             </Callout>
             {/* Overview Cards */}
@@ -35,8 +35,8 @@ export function IntroductionSection({ lang }: Props) {
                 </InfoCard>
                 <InfoCard icon={<BookOpen className="w-6 h-6 text-purple-500" />} title={t ? 'AI Assistant đa lane' : 'Multi-lane AI Assistant'} color="purple">
                     <p>{t
-                        ? 'Kết hợp AI routing, Gemini, Beeknoee, Groq, OpenRouter và lane chi phí thấp hơn để hỗ trợ general chat, SQL generation, schema analysis, typed recommendations, attachment context, và vision flows.'
-                        : 'Combines AI routing, Gemini, Beeknoee, Groq, OpenRouter, and lower-cost lanes to support general chat, SQL generation, schema analysis, typed recommendations, attachment context, and vision flows.'}</p>
+                        ? 'Kết hợp AI routing, Gemini, OpenRouter, Groq, Cerebras, và các lane explicit như Beeknoee hoặc TokenRouter để hỗ trợ general chat, SQL generation, schema analysis, typed recommendations, attachment context, và vision flows.'
+                        : 'Combines AI routing, Gemini, OpenRouter, Groq, Cerebras, and explicit lanes such as Beeknoee or TokenRouter to support general chat, SQL generation, schema analysis, typed recommendations, attachment context, and vision flows.'}</p>
                 </InfoCard>
             </FeatureGrid>
 
@@ -65,18 +65,21 @@ export function IntroductionSection({ lang }: Props) {
             <DocSection title={t ? 'Bắt đầu nhanh trong 60 giây' : 'Quick Start in 60 Seconds'}>
                 <Prose>
                     {t
-                        ? 'Dưới đây là cách nhanh nhất để chạy Data Explorer trên máy của bạn. Chỉ cần 3 lệnh terminal:'
-                        : 'Here\'s the fastest way to run Data Explorer on your machine. Just 3 terminal commands:'}
+                        ? 'Dưới đây là đường chạy nhanh nhất sau khi bạn đã chuẩn bị `server/.env` theo trang Installation. Mục tiêu của đoạn này là boot app thật bằng các lệnh đang tồn tại trong repo hiện tại, không phải pseudo-script cũ.'
+                        : 'Here is the fastest path once you have prepared `server/.env` as described on the Installation page. The goal is to boot the real app using commands that actually exist in the current repo, not older pseudo-scripts.'}
                 </Prose>
                 <CodeBlock title={t ? 'Khởi động nhanh' : 'Quick Start'}>
-                    <CodeComment>{t ? 'Clone và cài đặt' : 'Clone and install'}</CodeComment>
+                    <CodeComment>{t ? 'Clone và cài đủ dependency cho root + hai workspace' : 'Clone and install root + workspace dependencies'}</CodeComment>
                     <CodeLine>git clone https://github.com/KasierBach/Data-Explorer-Editor.git</CodeLine>
                     <CodeLine>cd Data-Explorer-Editor</CodeLine>
+                    <CodeLine>npm install</CodeLine>
+                    <CodeLine>npm install --prefix server</CodeLine>
+                    <CodeLine>npm install --prefix client</CodeLine>
                     <p className="mt-3" />
-                    <CodeComment>{t ? 'Cài đặt dependencies cho cả client và server' : 'Install dependencies for both client and server'}</CodeComment>
-                    <CodeLine>npm run install:all</CodeLine>
+                    <CodeComment>{t ? 'Đồng bộ schema metadata app' : 'Sync the app metadata schema'}</CodeComment>
+                    <CodeLine>cd server && npx prisma db push && cd ..</CodeLine>
                     <p className="mt-3" />
-                    <CodeComment>{t ? 'Khởi động toàn bộ dự án (server + client)' : 'Start the entire project (server + client)'}</CodeComment>
+                    <CodeComment>{t ? 'Khởi động toàn bộ dự án (server + client)' : 'Start the full project (server + client)'}</CodeComment>
                     <CodeLine>npm run dev</CodeLine>
                     <p className="mt-3" />
                     <CodeComment>{t ? 'Mở trình duyệt tại http://localhost:5173' : 'Open browser at http://localhost:5173'}</CodeComment>

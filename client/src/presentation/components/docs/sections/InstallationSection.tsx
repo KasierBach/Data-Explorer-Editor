@@ -33,19 +33,21 @@ export function InstallationSection({ lang }: Props) {
             </div>
 
             <DocSection title={t ? 'Local setup chuẩn' : 'Standard local setup'}>
-                <StepBlock step={1} title={t ? 'Clone repo và cài dependencies' : 'Clone the repo and install dependencies'}>
+                <StepBlock step={1} title={t ? 'Clone repo và cài dependency cho root + từng workspace' : 'Clone the repo and install root + workspace dependencies'}>
                     <CodeBlock title="Terminal">
                         <CodeLine>git clone https://github.com/KasierBach/Data-Explorer-Editor.git</CodeLine>
                         <CodeLine>cd Data-Explorer-Editor</CodeLine>
                         <CodeLine>npm install</CodeLine>
+                        <CodeLine>npm install --prefix server</CodeLine>
+                        <CodeLine>npm install --prefix client</CodeLine>
                     </CodeBlock>
                 </StepBlock>
 
                 <StepBlock step={2} title={t ? 'Tạo file server/.env' : 'Create server/.env'}>
                     <Prose>
                         {t
-                            ? 'Local run cần app metadata database, JWT secret đủ mạnh, encryption key đúng 32 ký tự, và FRONTEND_URL. OAuth và AI provider là tùy chọn.'
-                            : 'A local run needs an app metadata database, a strong JWT secret, an encryption key with exactly 32 characters, and FRONTEND_URL. OAuth and AI providers are optional.'}
+                            ? 'Local run cần app metadata database, Redis, JWT secret đủ mạnh, encryption key đúng 32 ký tự, và FRONTEND_URL. OAuth và AI provider là tùy chọn.'
+                            : 'A local run needs an app metadata database, Redis, a strong JWT secret, an encryption key with exactly 32 characters, and FRONTEND_URL. OAuth and AI providers are optional.'}
                     </Prose>
                     <CodeBlock title="server/.env">
                         <CodeComment>{t ? 'Bắt buộc' : 'Required'}</CodeComment>
@@ -62,8 +64,8 @@ export function InstallationSection({ lang }: Props) {
                         <p className="mt-3" />
                         <CodeComment>{t ? 'Tùy chọn cho AI routing' : 'Optional for AI routing'}</CodeComment>
                         <CodeLine>GEMINI_API_KEY=...</CodeLine>
-                        <CodeLine>AI_PROVIDER_TIMEOUT_MS=60000</CodeLine>
-                        <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=60000</CodeLine>
+                        <CodeLine>AI_PROVIDER_TIMEOUT_MS=15000</CodeLine>
+                        <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=15000</CodeLine>
                         <CodeLine>CEREBRAS_API_KEY=...</CodeLine>
                         <CodeLine>CEREBRAS_BASE_URL=https://api.cerebras.ai/v1</CodeLine>
                         <CodeLine>CEREBRAS_CHAT_MODEL=llama3.1-8b</CodeLine>
@@ -76,6 +78,9 @@ export function InstallationSection({ lang }: Props) {
                         <CodeLine>BEEKNOEE_API_KEY=...</CodeLine>
                         <CodeLine>BEEKNOEE_BASE_URL=https://platform.beeknoee.com/api/v1</CodeLine>
                         <CodeLine>BEEKNOEE_CHAT_MODEL=glm-4.7-flash</CodeLine>
+                        <CodeLine>TOKENROUTER_API_KEY=...</CodeLine>
+                        <CodeLine>TOKENROUTER_BASE_URL=https://api.tokenrouter.com/v1</CodeLine>
+                        <CodeLine>TOKENROUTER_CHAT_MODEL=MiniMax-M3</CodeLine>
                     </CodeBlock>
                 </StepBlock>
 
@@ -107,8 +112,8 @@ export function InstallationSection({ lang }: Props) {
             <DocSection title={t ? 'Chạy từ root repo' : 'Run from the repo root'}>
                 <Prose>
                     {t
-                        ? 'Nếu bạn muốn bật toàn bộ stack development bằng một lệnh, root repo đã có script `npm run dev`.'
-                        : 'If you want to boot the whole development stack with one command, the repo root already provides `npm run dev`.'}
+                        ? 'Nếu bạn muốn bật toàn bộ stack development bằng một lệnh, root repo đã có script `npm run dev`. Lưu ý: script này chỉ hoạt động khi `server/node_modules` và `client/node_modules` đã được cài trước.'
+                        : 'If you want to boot the whole development stack with one command, the repo root already provides `npm run dev`. Note that this works only after `server/node_modules` and `client/node_modules` have already been installed.'}
                 </Prose>
                 <CodeBlock title="Terminal">
                     <CodeLine>npm run dev</CodeLine>
@@ -118,8 +123,8 @@ export function InstallationSection({ lang }: Props) {
             <DocSection title={t ? 'Docker notes' : 'Docker notes'}>
                 <Prose>
                     {t
-                        ? 'Docker phù hợp khi bạn muốn metadata database cục bộ ổn định hoặc không muốn cài PostgreSQL trực tiếp trên máy. Với code hiện tại, đường manual setup + `prisma db push` vẫn là lối dev đơn giản nhất.'
-                        : 'Docker is a good fit if you want a stable local metadata database or do not want to install PostgreSQL directly on your machine. With the current codebase, manual setup + `prisma db push` is still the easiest development path.'}
+                        ? 'Docker phù hợp khi bạn muốn metadata database cục bộ ổn định hoặc không muốn cài PostgreSQL trực tiếp trên máy. Với code hiện tại, đường manual setup + `prisma db push` vẫn là lối dev đơn giản nhất; còn dependency của `server` và `client` vẫn nên được cài riêng nếu bạn chạy dev ngoài container.'
+                        : 'Docker is a good fit if you want a stable local metadata database or do not want to install PostgreSQL directly on your machine. With the current codebase, manual setup + `prisma db push` is still the easiest development path, and `server`/`client` dependencies should still be installed separately when you run dev outside containers.'}
                 </Prose>
                 <CodeBlock title="Docker">
                     <CodeLine>docker-compose up --build -d</CodeLine>
@@ -156,6 +161,13 @@ export function InstallationSection({ lang }: Props) {
                     {t
                         ? 'Production hiện nên build backend bằng `npx prisma db push && npm run build` thay vì `prisma migrate deploy`, vì migration history hiện tại của repo chưa sẵn sàng cho PostgreSQL deploy flow chuẩn.'
                         : 'Production should currently build the backend with `npx prisma db push && npm run build` instead of `prisma migrate deploy`, because the repo’s migration history is not yet aligned with a clean PostgreSQL deploy flow.'}
+                </p>
+            </Callout>
+            <Callout type="tip">
+                <p className="text-sm">
+                    {t
+                        ? 'Lưu ý về timeout AI: example file trong repo hiện dùng `15000ms` cho local/dev để fail nhanh hơn khi debug. Ở production, bạn có thể tăng giá trị này nếu workflow của bạn thường xuyên có prompt dài hoặc attachment nặng.'
+                        : 'AI timeout note: the example files in the repo currently use `15000ms` for local/dev so failures surface faster while debugging. In production, you can raise that value if your workflows often involve long prompts or heavy attachments.'}
                 </p>
             </Callout>
         </DocPageLayout>

@@ -1,5 +1,5 @@
 import { Key, Server, Globe, Database, Mail, Shield } from 'lucide-react';
-import { DocPageLayout, DocSection } from '../primitives';
+import { Callout, DocPageLayout, DocSection, Prose } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
@@ -44,12 +44,12 @@ export function EnvVarsSection({ lang }: Props) {
             icon: <Key className="w-5 h-5 text-amber-500" />,
             vars: [
                 { name: 'GEMINI_API_KEY', desc: t ? 'Google Gemini key cho lane chất lượng cao và vision' : 'Google Gemini key for the higher-quality and vision lane', example: 'AIzaSy...' },
-                { name: 'AI_PROVIDER_TIMEOUT_MS', desc: t ? 'Timeout tổng cho provider requests; mặc định hiện tại là 60000ms' : 'Overall timeout for provider requests; the current default is 60000ms', example: '60000' },
-                { name: 'AI_STREAM_IDLE_TIMEOUT_MS', desc: t ? 'Timeout khi stream bị stall; mặc định hiện tại là 60000ms' : 'Timeout for stalled streams; the current default is 60000ms', example: '60000' },
+                { name: 'AI_PROVIDER_TIMEOUT_MS', desc: t ? 'Timeout tổng cho provider requests. Code fallback hiện tại là 60000ms, còn file example trong repo đang đặt 15000ms để fail nhanh hơn khi local/dev' : 'Overall timeout for provider requests. The code fallback is currently 60000ms, while the repo example files use 15000ms to fail faster in local/dev', example: '15000' },
+                { name: 'AI_STREAM_IDLE_TIMEOUT_MS', desc: t ? 'Timeout khi stream bị stall. Nếu không đặt riêng, service sẽ fallback về AI_PROVIDER_TIMEOUT_MS; code mặc định hiện tại là 60000ms' : 'Timeout for stalled streams. If omitted, the service falls back to AI_PROVIDER_TIMEOUT_MS; the code default is currently 60000ms', example: '15000' },
                 { name: 'CEREBRAS_API_KEY', desc: t ? 'Cerebras key cho lane chi phí thấp hơn' : 'Cerebras key for a lower-cost lane', example: 'cbr-...' },
                 { name: 'CEREBRAS_BASE_URL', desc: t ? 'Base URL của Cerebras OpenAI-compatible endpoint' : 'Base URL for the Cerebras OpenAI-compatible endpoint', example: 'https://api.cerebras.ai/v1' },
                 { name: 'CEREBRAS_CHAT_MODEL', desc: t ? 'Model mặc định của lane Cerebras' : 'Default model for the Cerebras lane', example: 'llama3.1-8b' },
-                { name: 'OPENROUTER_API_KEY', desc: t ? 'OpenRouter key cho fallback đa model và một số vision flows' : 'OpenRouter key for multi-model fallback and some vision flows', example: 'sk-or-...' },
+                { name: 'OPENROUTER_API_KEY', desc: t ? 'OpenRouter key cho default auto chain, fallback đa model, và một số lane vision hoặc web-backed search tùy model' : 'OpenRouter key for the default auto chain, multi-model fallback, and some vision or web-backed search lanes depending on the chosen model', example: 'sk-or-...' },
                 { name: 'OPENROUTER_BASE_URL', desc: t ? 'Base URL của OpenRouter' : 'Base URL for OpenRouter', example: 'https://openrouter.ai/api/v1' },
                 { name: 'OPENROUTER_CHAT_MODEL', desc: t ? 'Model mặc định của lane OpenRouter' : 'Default model for the OpenRouter lane', example: '' },
                 { name: 'GROQ_API_KEY', desc: t ? 'Groq key cho lane phản hồi nhanh' : 'Groq key for the low-latency lane', example: 'gsk-...' },
@@ -58,6 +58,9 @@ export function EnvVarsSection({ lang }: Props) {
                 { name: 'BEEKNOEE_API_KEY', desc: t ? 'Beeknoee key để bật explicit provider routing trong model catalog' : 'Beeknoee key that enables explicit provider routing from the model catalog', example: 'sk-bee-...' },
                 { name: 'BEEKNOEE_BASE_URL', desc: t ? 'Base URL của Beeknoee API' : 'Base URL for the Beeknoee API', example: 'https://platform.beeknoee.com/api/v1' },
                 { name: 'BEEKNOEE_CHAT_MODEL', desc: t ? 'Fallback model mặc định của Beeknoee khi bạn không khóa model cụ thể' : 'Default Beeknoee fallback model when no explicit model is locked', example: 'glm-4.7-flash' },
+                { name: 'TOKENROUTER_API_KEY', desc: t ? 'TokenRouter key để bật explicit provider routing cho các model như `tokenrouter:MiniMax-M3`' : 'TokenRouter key that enables explicit provider routing for models such as `tokenrouter:MiniMax-M3`', example: 'sk-tr-...' },
+                { name: 'TOKENROUTER_BASE_URL', desc: t ? 'Base URL của TokenRouter OpenAI-compatible endpoint' : 'Base URL for the TokenRouter OpenAI-compatible endpoint', example: 'https://api.tokenrouter.com/v1' },
+                { name: 'TOKENROUTER_CHAT_MODEL', desc: t ? 'Model mặc định của lane TokenRouter khi bạn chọn explicit provider mà không override model khác' : 'Default model for the TokenRouter lane when you choose the explicit provider without overriding it further', example: 'MiniMax-M3' },
             ]
         },
         {
@@ -104,6 +107,20 @@ export function EnvVarsSection({ lang }: Props) {
                 : 'A comprehensive list of all .env configurations required to operate the Data Explorer ecosystem.'}
         >
             <div className="space-y-12">
+                <DocSection title={t ? 'Cách đọc phần env này' : 'How to read this env reference'}>
+                    <Prose>
+                        {t
+                            ? 'Data Explorer hiện có hai lớp tài liệu env đáng chú ý trong repo: `.env.example` ở root để nhìn toàn hệ thống theo kiểu Docker-friendly, và `server/.env.example` để nhìn backend runtime trực tiếp. Bảng dưới đây gộp cả hai góc nhìn để bạn không phải nhảy qua lại giữa nhiều file khi cấu hình local, staging, hoặc production.'
+                            : 'Data Explorer currently exposes two important env references in the repo: the root `.env.example` for a Docker-friendly full-system view, and `server/.env.example` for the direct backend runtime view. The tables below combine those perspectives so you do not have to jump between multiple files when configuring local, staging, or production environments.'}
+                    </Prose>
+                    <Callout type="info">
+                        <p className="text-sm">
+                            {t
+                                ? 'Lưu ý thực tế: một số giá trị trong example file được chọn để thuận tiện cho local/dev, còn code fallback trong service có thể khác. Ví dụ, timeout AI trong code mặc định là 60000ms nhưng example file hiện đang để 15000ms để fail sớm và dễ debug hơn.'
+                                : 'Practical note: some example values are tuned for local/dev convenience, while code-level fallbacks can differ. For example, the AI service defaults to 60000ms in code, but the example env files currently use 15000ms to fail sooner and stay easier to debug.'}
+                        </p>
+                    </Callout>
+                </DocSection>
                 {categories.map((cat, i) => (
                     <DocSection key={i} title={cat.title} icon={cat.icon}>
                         <div className="overflow-x-auto overflow-y-visible">

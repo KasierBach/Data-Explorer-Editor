@@ -1,47 +1,109 @@
-# HƯỚNG DẪN "SỐNG SÓT" VÀ LÀM CHỦ DỰ ÁN DATA EXPLORER
+# HƯỚNG DẪN NẮM DỰ ÁN DATA EXPLORER TRONG 15 PHÚT
+
 > [!IMPORTANT]
-> Đây là tài liệu tóm tắt nhanh để bạn có thể trả lời Team Lead và nắm bắt dự án trong 15 phút.
+> Đây là bản tóm tắt thực dụng để bạn nắm nhanh dự án, giải thích được với lead, và không bị lạc khi vào codebase.
 
-## 1. TỔNG QUAN DỰ ÁN (MỤC TIÊU)
-- **Tên dự án:** Data Explorer (v3.5.0)
-- **Mục tiêu:** Một công cụ quản trị Database hiện đại, cho phép người dùng kỹ thuật và không kỹ thuật (non-tech) có thể tương tác với SQL/NoSQL thông qua AI.
-- **Giá trị cốt lõi:**
-    - Chat với Database (AI Assistant).
-    - Tự động vẽ biểu đồ (Visualization).
-    - Hỗ trợ đa nền tảng (MySQL, PostgreSQL, MongoDB).
-    - Làm việc nhóm thời gian thực (Collaboration/Presence).
+## 1. Dự án này là gì?
 
-## 2. KIẾN TRÚC CÔNG NGHỆ (TECH STACK)
-Hãy thuộc lòng các thành phần này:
-- **Frontend:** React 19 + Vite (Nhanh nhất hiện nay).
-- **Styling:** Tailwind CSS (Vite Plugin).
-- **State Management:** Zustand (Thay thế cho Redux, nhẹ và nhanh hơn).
-- **Data Fetching:** TanStack Query v5 (Quản lý cache và loading cực tốt).
-- **Backend:** NestJS (Framework Node.js mạnh mẽ nhất, dùng kiến trúc Module-based).
-- **ORM (Database Layer):** Prisma (Giúp code tương tác với DB như đang dùng Object).
-- **Deployment:** Docker & Docker Compose.
+- **Tên dự án:** Data Explorer
+- **Phiên bản đang được tài liệu hóa:** `v3.6.2`
+- **Mục tiêu:** Xây một IDE quản trị dữ liệu hiện đại cho cả SQL lẫn NoSQL, có AI hỗ trợ thật sự chứ không chỉ là chat cho vui.
+- **Người dùng chính:** developer, data engineer, analyst, team nội bộ cần quản lý kết nối, truy vấn, trực quan dữ liệu, và cộng tác.
 
-## 3. CÁCH HỆ THỐNG VẬN HÀNH (LUỒNG DỮ LIỆU)
-Khi sếp hỏi "Dữ liệu đi từ đâu đến đâu?", hãy trả lời như sau:
-1. **User Request:** Người dùng nhập câu hỏi vào AI Assistant (`AiAssistant.tsx`).
-2. **Logic Layer:** Hook `useAiChat.ts` xử lý dữ liệu, đính kèm thông tin Schema của DB.
-3. **Service Layer:** Gọi xuống Backend qua `apiService.ts`.
-4. **Backend Processing:** NestJS nhận yêu cầu, gọi lên mô hình AI (Gemini/OpenRouter), nhận về câu lệnh SQL.
-5. **Database Execution:** Backend chạy câu lệnh SQL đó vào DB thực tế của người dùng, lấy kết quả trả về.
-6. **Visualization:** Dòng dữ liệu trả về được đưa vào `useVisualizeLogic.ts` để tự động chọn loại biểu đồ phù hợp (Bar, Line, Pie) qua thư viện Recharts.
+## 2. Giá trị cốt lõi của sản phẩm
 
-## 4. CÁC TỪ KHÓA BẠN CẦN "CHÉM" KHI BỊ HỎI VỀ CODE
-- **"Separation of Concerns":** "Em tách biệt hoàn toàn giữa giao diện (Presentation) và nghiệp vụ (Core) để dễ bảo trì."
-- **"Streaming AI":** "Em dùng SSE (Server-Sent Events) thay vì WebSocket để tối ưu băng thông cho việc hiển thị tin nhắn AI dần dần."
-- **"Dependency Injection":** (Nói về Backend) "Em dùng thế mạnh của NestJS để quản lý các Service, giúp hệ thống dễ mở rộng và viết Test."
-- **"Optimistic Updates":** "Em dùng React Query để hiển thị ngay kết quả lên UI trước khi Server phản hồi, tạo cảm giác cực nhanh cho người dùng."
+- **Một nơi cho nhiều hệ DB:** PostgreSQL, MySQL, SQL Server, ClickHouse, MongoDB, MongoDB Atlas (SRV).
+- **AI gắn với context thật:** AI biết connection hiện tại, schema, route người dùng đang đứng, và có thể hỗ trợ SQL, phân tích schema, vision, cùng các tác vụ hỏi đáp khác.
+- **Có guardrail thật:** read-only, execution policy, timeout AI, secret validation, OAuth flow an toàn hơn, mã hóa mật khẩu connection.
+- **Cộng tác và vận hành:** có teams, presence, notifications, activity, billing, docs trong app, cùng Redis để chống “app chạy được nhưng không vận hành được”.
 
-## 5. BẢN ĐỒ THƯ MỤC THẦN THÁNH (DÀNH CHO BẠN)
-- `client/src/core/services/api.service.ts`: Cổng gọi API.
-- `client/src/core/services/store/`: Nơi lưu trữ "biến dùng chung" của cả app.
-- `client/src/presentation/modules/Query/AiAssistant.tsx`: Giao diện Chat AI.
-- `client/src/presentation/modules/Visualization/`: Nơi xử lý vẽ biểu đồ (Visualization).
-- `server/src/`: Toàn bộ logic Backend (Auth, Chat, Connection).
+## 3. Tech stack cần nhớ
 
----
-*Tài liệu này được biên soạn để giúp bạn không bị "lạc" trong quá trình Vibe Coding.*
+- **Frontend:** React 19, Vite, TypeScript, Zustand, TanStack Query, Tailwind CSS, Radix UI
+- **Backend:** NestJS, Prisma, Redis, BullMQ
+- **AI layer:** Gemini + các lane OpenAI-compatible như OpenRouter, Groq, Cerebras, Beeknoee, TokenRouter
+- **Visualization:** React Flow, Recharts, Monaco Editor
+- **Hạ tầng local/dev:** PostgreSQL cho metadata app, Redis cho cache/queue/presence/search index
+
+## 4. Luồng hệ thống chạy như thế nào?
+
+Khi có một request “nhờ AI viết SQL” hoặc “phân tích dữ liệu”, luồng thường là:
+
+1. **Người dùng thao tác ở frontend**
+   - Ví dụ trong SQL editor, NoSQL workspace, hoặc AI Assistant panel.
+2. **Frontend gom context**
+   - Connection hiện tại, schema metadata, tab đang mở, loại nhiệm vụ, attachment nếu có.
+3. **Frontend gọi backend**
+   - Qua lớp API service, không gọi provider AI trực tiếp từ client.
+4. **Backend định tuyến và chuẩn hóa task**
+   - Xác định đây là chat thường, SQL generation, vision, current-info request, hay tác vụ có explicit provider/model.
+5. **AI provider được chọn**
+   - Có thể là Gemini, OpenRouter, Groq, Cerebras, Beeknoee, hoặc TokenRouter tùy routing mode và explicit selection.
+6. **Backend trả kết quả hoặc chạy tiếp workflow**
+   - Với SQL: có thể sinh query, validate, rồi đưa sang query execution path.
+   - Với NoSQL: có thể hỗ trợ MQL, aggregation, schema reasoning, hoặc insight từ result set.
+7. **Frontend render kết quả**
+   - Text stream qua SSE, bảng dữ liệu, insight card, chart, schema panel, hoặc ERD.
+
+## 5. Redis quan trọng ở đâu?
+
+Redis trong dự án này không phải “có thì tốt”.
+
+Nó đang gánh các việc như:
+
+- cache metadata và kết quả đọc lặp
+- notifications / SSE coordination
+- rate limiting xuyên nhiều instance
+- background jobs / queue
+- presence của workspace/team
+- search index để tìm bảng, collection, metadata nhanh
+
+Nói ngắn gọn: nếu PostgreSQL là nơi giữ dữ liệu cấu hình chính, thì Redis là lớp runtime coordination.
+
+## 6. Những điểm dễ bị hiểu sai
+
+- **Không phải chỉ có Gemini**
+  - Hệ AI hiện có nhiều lane; Gemini là premium lane, còn một số provider khác phục vụ fallback, tốc độ, chi phí, hoặc explicit selection.
+- **Không phải cứ có AI là có web search**
+  - Khả năng “search/current info” phụ thuộc wiring thực tế của provider lane, không phải cứ model nói chuyện giống có internet là thật sự có internet.
+- **Không phải root `npm install` là đủ**
+  - Repo này không dùng workspaces đầy đủ, nên `server` và `client` vẫn cần cài dependency riêng nếu chạy local ngoài Docker.
+- **Không phải Redis là một workspace độc lập cho user**
+  - Redis hiện là hạ tầng backend/runtime, chưa phải Redis Explorer hoàn chỉnh cho người dùng cuối.
+
+## 7. Các thư mục nên nhớ
+
+- `client/src/presentation/modules/Query`
+  - SQL editor, AI assistant, history, results
+- `client/src/presentation/modules/NoSqlExplorer`
+  - Không gian NoSQL, tree JSON, schema analysis, aggregation builder
+- `client/src/presentation/modules/Visualization`
+  - ERD và trực quan dữ liệu
+- `client/src/presentation/components/docs`
+  - Hệ thống docs song ngữ trong app
+- `server/src/ai`
+  - AI routing, prompt building, provider execution, streaming
+- `server/src/query`
+  - Query execution, guardrails, results
+- `server/src/nosql`
+  - API cho NoSQL workspace
+- `server/src/redis`, `server/src/notifications`, `server/src/presence`, `server/src/search`
+  - Runtime infrastructure dựa trên Redis
+
+## 8. Cách nói ngắn gọn với lead
+
+Nếu cần tóm một câu:
+
+> Data Explorer là một IDE dữ liệu đa hệ quản trị, có SQL + NoSQL + AI + collaboration, với backend NestJS/Prisma/Redis và frontend React/Vite, đang được đẩy mạnh theo hướng vừa vận hành được thật vừa có trải nghiệm dùng tốt.
+
+## 9. Nếu mới vào codebase thì nên đọc gì trước?
+
+1. `README.md`
+2. `client/src/presentation/pages/DocumentationPage.tsx` và các section docs
+3. `server/.env.example`
+4. `server/src/ai`
+5. `client/src/presentation/modules/Query` và `NoSqlExplorer`
+
+## 10. Một câu chốt
+
+Đừng nhìn dự án này như “một trang query có thêm chat AI”. Thực tế nó đang là một nền quản trị dữ liệu nhiều lớp: connection management, execution safety, AI orchestration, NoSQL tooling, collaboration, billing, và runtime infrastructure.

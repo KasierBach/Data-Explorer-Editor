@@ -68,7 +68,7 @@ export function DeploymentSection({ lang }: Props) {
                         { icon: <Shield className="w-4 h-4" />, key: 'ENCRYPTION_KEY', descVi: 'Phải đúng 32 ký tự để mã hóa saved connection passwords.', descEn: 'Must be exactly 32 characters to encrypt saved connection passwords.' },
                         { icon: <Globe className="w-4 h-4" />, key: 'FRONTEND_URL', descVi: 'Origin frontend thật dùng cho CORS và OAuth redirects.', descEn: 'The real frontend origin used for CORS and OAuth redirects.' },
                         { icon: <Globe className="w-4 h-4" />, key: 'API_PUBLIC_URL', descVi: 'Public API base URL; cần cho billing return/webhook flows.', descEn: 'Public API base URL; required for billing return and webhook flows.' },
-                        { icon: <Database className="w-4 h-4" />, key: 'REDIS_URL', descVi: 'URL kết nối Redis cho caching và rate-limiting.', descEn: 'Redis connection URL for caching and rate-limiting.' },
+                        { icon: <Database className="w-4 h-4" />, key: 'REDIS_URL', descVi: 'URL kết nối Redis cho caching, queue, notifications, presence, search index và rate-limiting.', descEn: 'Redis connection URL for caching, queues, notifications, presence, search indexing, and rate-limiting.' },
                         { icon: <KeyRound className="w-4 h-4" />, key: 'ADMIN_EMAIL', descVi: 'Email admin khởi tạo (Seeding).', descEn: 'Initial admin email (Seeding).' },
                         { icon: <KeyRound className="w-4 h-4" />, key: 'ADMIN_PASSWORD', descVi: 'Mật khẩu admin khởi tạo. Khuyên dùng mật khẩu mạnh.', descEn: 'Initial admin password. Strong password recommended.' }
                     ].map((env) => (
@@ -104,8 +104,8 @@ export function DeploymentSection({ lang }: Props) {
                 <CodeBlock title={t ? 'Optional AI lanes' : 'Optional AI lanes'}>
                     <CodeComment>{t ? 'Premium lane' : 'Premium lane'}</CodeComment>
                     <CodeLine>GEMINI_API_KEY=...</CodeLine>
-                    <CodeLine>AI_PROVIDER_TIMEOUT_MS=60000</CodeLine>
-                    <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=60000</CodeLine>
+                    <CodeLine>AI_PROVIDER_TIMEOUT_MS=15000</CodeLine>
+                    <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=15000</CodeLine>
                     <p className="mt-3" />
                     <CodeComment>{t ? 'Lower-cost lane' : 'Lower-cost lane'}</CodeComment>
                     <CodeLine>CEREBRAS_API_KEY=...</CodeLine>
@@ -126,12 +126,17 @@ export function DeploymentSection({ lang }: Props) {
                     <CodeLine>BEEKNOEE_API_KEY=...</CodeLine>
                     <CodeLine>BEEKNOEE_BASE_URL=https://platform.beeknoee.com/api/v1</CodeLine>
                     <CodeLine>BEEKNOEE_CHAT_MODEL=glm-4.7-flash</CodeLine>
+                    <p className="mt-3" />
+                    <CodeComment>{t ? 'Explicit TokenRouter lane' : 'Explicit TokenRouter lane'}</CodeComment>
+                    <CodeLine>TOKENROUTER_API_KEY=...</CodeLine>
+                    <CodeLine>TOKENROUTER_BASE_URL=https://api.tokenrouter.com/v1</CodeLine>
+                    <CodeLine>TOKENROUTER_CHAT_MODEL=MiniMax-M3</CodeLine>
                 </CodeBlock>
                 <Callout type="info">
                     <p className="text-sm">
                         {t
-                            ? 'Nếu bạn muốn dùng ảnh đính kèm trong AI chat ở production, hãy cấu hình ít nhất một lane có vision như Gemini, Beeknoee hoặc OpenRouter.'
-                            : 'If you want image attachments to work in production AI chat, configure at least one vision-capable lane such as Gemini, Beeknoee, or OpenRouter.'}
+                            ? 'Nếu bạn muốn dùng ảnh đính kèm trong AI chat ở production, hãy cấu hình ít nhất một lane có vision thật như Gemini, một model OpenRouter hỗ trợ ảnh, hoặc TokenRouter khi bạn dùng explicit `MiniMax-M3`.'
+                            : 'If you want image attachments to work in production AI chat, configure at least one true vision lane such as Gemini, an image-capable OpenRouter model, or TokenRouter when you explicitly use `MiniMax-M3`.'}
                     </p>
                 </Callout>
             </DocSection>

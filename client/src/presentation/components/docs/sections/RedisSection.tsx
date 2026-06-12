@@ -24,8 +24,8 @@ export function RedisSection({ lang }: Props) {
                 <InfoCard icon={<Activity className="w-6 h-6 text-rose-500" />} title="BullMQ Queues" color="red">
                     <p>
                         {t
-                            ? 'Xử lý các tác vụ nền như gửi email, export dữ liệu lớn và các task AI chạy lâu.'
-                            : 'Handles background tasks such as email delivery, large data exports, and long-running AI tasks.'}
+                            ? 'Xử lý các workflow nền có hàng đợi, hiện thấy rõ nhất ở migration và các tác vụ async không nên chặn request chính.'
+                            : 'Handles queued background workflows, currently most visible in migration and other async work that should not block the main request path.'}
                     </p>
                 </InfoCard>
                 <InfoCard icon={<ShieldAlert className="w-6 h-6 text-amber-500" />} title="Rate Limiting" color="amber">
@@ -41,8 +41,8 @@ export function RedisSection({ lang }: Props) {
             <DocSection title={t ? 'Vai trò của Redis trong hệ thống' : 'Redis Roles in the Ecosystem'} icon={<Server className="w-5 h-5"/>}>
                 <Prose>
                     {t
-                        ? 'Trong Data Explorer, Redis không chỉ là cache đơn thuần mà đóng vai trò là "xương sống" cho giao tiếp không đồng bộ giữa các module backend.'
-                        : 'In Data Explorer, Redis is more than just a cache; it serves as the "backbone" for asynchronous communication between backend modules.'}
+                        ? 'Trong Data Explorer, Redis không chỉ là cache đơn thuần mà là lớp phối hợp cho nhiều năng lực backend: cache, BullMQ, throttling, notifications, presence, và search index. Nói cách khác, nó là hạ tầng runtime thực thụ chứ không còn là “phần tăng tốc nếu có thì tốt”.'
+                        : 'In Data Explorer, Redis is more than a simple cache. It coordinates multiple backend capabilities: cache, BullMQ, throttling, notifications, presence, and search indexing. In other words, it is real runtime infrastructure rather than a nice-to-have accelerator.'}
                 </Prose>
                 <div className="grid md:grid-cols-2 gap-8 mt-10">
                     <div className="space-y-4">
@@ -52,8 +52,8 @@ export function RedisSection({ lang }: Props) {
                         </h4>
                         <p className="text-sm text-muted-foreground leading-relaxed">
                             {t
-                                ? 'Khi bạn yêu cầu export một bảng dữ liệu 1 triệu dòng, backend sẽ đẩy một job vào Redis. Worker sẽ lấy job này ra xử lý mà không làm treo request của bạn.'
-                                : 'When you request to export a table with 1 million rows, the backend pushes a job to Redis. A worker then processes this job without blocking your request.'}
+                                ? 'Khi một workflow không nên giữ request đồng bộ quá lâu, backend có thể đẩy job vào Redis để worker xử lý riêng. Trong repo hiện tại, dấu vết rõ nhất của mô hình này nằm ở migration queue và các tác vụ nội bộ async.'
+                                : 'When a workflow should not keep a synchronous request open for too long, the backend can push a job into Redis so a worker handles it separately. In the current repo, the clearest example of this pattern is the migration queue and related internal async work.'}
                         </p>
                     </div>
                     <div className="space-y-4">
@@ -102,6 +102,16 @@ export function RedisSection({ lang }: Props) {
                                 <td className="py-3 px-4 text-muted-foreground">Rate Limiter</td>
                                 <td className="py-3 px-4 italic text-xs">Integer (Request counters)</td>
                             </tr>
+                            <tr className="border-b border-white/5">
+                                <td className="py-3 px-4 font-mono font-bold text-emerald-400">presence:*</td>
+                                <td className="py-3 px-4 text-muted-foreground">Presence service</td>
+                                <td className="py-3 px-4 italic text-xs">Expiring sets / presence heartbeats</td>
+                            </tr>
+                            <tr>
+                                <td className="py-3 px-4 font-mono font-bold text-fuchsia-400">search_index:*</td>
+                                <td className="py-3 px-4 text-muted-foreground">Search service</td>
+                                <td className="py-3 px-4 italic text-xs">Indexed metadata for global search</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -111,8 +121,8 @@ export function RedisSection({ lang }: Props) {
             <DocSection title={t ? 'Vòng đời tác vụ BullMQ' : 'BullMQ Job Lifecycle'}>
                 <Prose>
                     {t
-                        ? 'Các task nặng như Export hoặc AI Vision Processing trải qua 3 giai đoạn chính trong Redis:'
-                        : 'Heavy tasks like Export or AI Vision Processing go through 3 main stages in Redis:'}
+                        ? 'Các workflow queue-based như migration hoặc các tác vụ async dài hơn sẽ đi qua 3 giai đoạn chính trong Redis:'
+                        : 'Queue-based workflows such as migration or longer async tasks go through three main stages in Redis:'}
                 </Prose>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                     <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5">
@@ -187,15 +197,15 @@ export function RedisSection({ lang }: Props) {
                         <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
                             <p>
                                 {t
-                                    ? 'Trang ERD hiện đã được tích hợp bộ lọc thông minh dựa trên Redis Index. Khi bạn tìm kiếm bảng để thêm vào sơ đồ:'
-                                    : 'The ERD page now integrates smart filtering based on the Redis Index. When searching for tables to add to your diagram:'}
+                                    ? 'Cùng một lớp search/index này cũng là nền để các bề mặt như ERD, global search, và các luồng chọn bảng có thể phản hồi nhanh mà không phải query lại metadata nguồn ở mỗi lần gõ:'
+                                    : 'That same search/index layer is what lets surfaces such as ERD, global search, and table-picking flows stay responsive without re-querying source metadata on every keystroke:'}
                             </p>
                             <ul className="list-disc pl-5 space-y-2">
                                 <li>
-                                    <strong className="text-white">{t ? 'Smart Suggestions' : 'Smart Suggestions'}:</strong> {t ? 'Tự động gợi ý các bảng liên quan hoặc từ các database khác mà chưa được tải vào view hiện tại.' : 'Automatically suggests related tables or entities from other databases not yet loaded in the current view.'}
+                                    <strong className="text-white">{t ? 'Smart Suggestions' : 'Smart Suggestions'}:</strong> {t ? 'Cho phép gợi ý bảng hoặc thực thể liên quan dựa trên index đã sync trước đó.' : 'Enables suggestions for related tables or entities based on a previously synced index.'}
                                 </li>
                                 <li>
-                                    <strong className="text-white">{t ? 'Zero Latency' : 'Zero Latency'}:</strong> {t ? 'Việc tìm kiếm bảng diễn ra trên Redis thay vì query DB nguồn, đảm bảo trải nghiệm kéo thả không bị gián đoạn.' : 'Table lookups happen on Redis instead of querying the source DB, ensuring an uninterrupted drag-and-drop experience.'}
+                                    <strong className="text-white">{t ? 'Low Re-query Pressure' : 'Low Re-query Pressure'}:</strong> {t ? 'Việc tra cứu diễn ra trên lớp index Redis thay vì luôn phải chạm lại DB nguồn, giảm độ trễ và tải không cần thiết.' : 'Lookups happen against the Redis-backed index instead of constantly hitting the source database again, reducing latency and unnecessary load.'}
                                 </li>
                             </ul>
                         </div>
@@ -203,17 +213,17 @@ export function RedisSection({ lang }: Props) {
                 </div>
             </DocSection>
 
-            {/* Roadmap */}
-            <DocSection title={t ? 'Lộ trình phát triển' : 'Future Roadmap'}>
+            {/* Current boundary */}
+            <DocSection title={t ? 'Ranh giới sản phẩm hiện tại' : 'Current product boundary'}>
                 <div className="p-6 rounded-3xl bg-blue-500/5 border border-blue-500/10">
                     <h4 className="font-bold text-blue-400 mb-2 flex items-center gap-2">
                         <Activity className="w-4 h-4" />
-                        {t ? 'Hệ thống Redis Explorer' : 'Redis Explorer System'}
+                        {t ? 'Redis hiện là hạ tầng, chưa phải workspace riêng' : 'Redis is infrastructure today, not a dedicated workspace'}
                     </h4>
                     <p className="text-sm text-muted-foreground">
                         {t
-                            ? 'Dù hiện tại chỉ đóng vai trò hạ tầng, phiên bản 3.x tiếp theo đang phát triển Redis Strategy cho phép bạn kết nối và khám phá các key, TTL, và kiểu dữ liệu Redis trực tiếp từ giao diện NoSQL Workspace.'
-                            : 'While currently serving as infrastructure, the upcoming 3.x release is developing a Redis Strategy that will allow you to connect and explore keys, TTLs, and Redis data types directly from the NoSQL Workspace UI.'}
+                            ? 'Trong codebase hiện tại, Redis phục vụ cache, queue, notification stream, presence, throttling và search index. Nó chưa được mở ra thành một Redis Explorer hoàn chỉnh cho người dùng cuối, nên docs phần này nên được đọc như tài liệu kiến trúc/vận hành hơn là hướng dẫn sử dụng một workspace Redis riêng.'
+                            : 'In the current codebase, Redis powers cache, queues, notification streams, presence, throttling, and the search index. It is not yet exposed as a full Redis Explorer for end users, so this section should be read as architecture and operations documentation rather than a guide to a dedicated Redis workspace.'}
                     </p>
                 </div>
             </DocSection>

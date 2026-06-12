@@ -24,7 +24,7 @@ export function PrerequisitesSection({ lang }: Props) {
                     <Database className="w-6 h-6 text-emerald-500 mb-4" />
                     <h4 className="font-bold text-sm mb-2">Persistence</h4>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        {t ? 'Một PostgreSQL riêng cho metadata app: users, connections, saved queries, dashboards, audit, v.v.' : 'A dedicated PostgreSQL database for app metadata: users, connections, saved queries, dashboards, audit, and more.'}
+                        {t ? 'Một PostgreSQL riêng cho metadata app và một Redis instance cho cache, queue, notifications, presence, và throttling.' : 'A dedicated PostgreSQL database for app metadata plus a Redis instance for cache, queues, notifications, presence, and throttling.'}
                     </p>
                 </div>
                 <div className="p-6 border rounded-3xl bg-violet-500/5 border-violet-500/10">
@@ -39,7 +39,7 @@ export function PrerequisitesSection({ lang }: Props) {
             <DocSection title={t ? 'Yêu cầu hệ thống' : 'System requirements'}>
                 <div className="space-y-6">
                     <Prose>
-                        {t ? 'Repo hiện chạy tốt nhất với full-stack TypeScript, npm, và một PostgreSQL metadata database mà Prisma có thể đồng bộ bằng `db push`.' : 'The repo currently runs best with full-stack TypeScript, npm, and a PostgreSQL metadata database that Prisma can sync through `db push`.'}
+                        {t ? 'Repo hiện chạy tốt nhất với full-stack TypeScript, npm, một PostgreSQL metadata database mà Prisma có thể đồng bộ bằng `db push`, và một Redis endpoint ổn định cho cache, background jobs, search index, notifications, cùng rate limiting.' : 'The repo currently runs best with full-stack TypeScript, npm, a PostgreSQL metadata database that Prisma can sync through `db push`, and a stable Redis endpoint for cache, background jobs, search indexing, notifications, and rate limiting.'}
                     </Prose>
                     <FeatureGrid>
                         <InfoCard icon={<Code className="w-5 h-5" />} title="Node.js" color="orange">
@@ -90,8 +90,14 @@ export function PrerequisitesSection({ lang }: Props) {
                         {
                             label: t ? 'AI providers' : 'AI providers',
                             desc: t
-                                ? 'Backend cần outbound HTTPS (443) tới provider bạn bật: Gemini, Cerebras, hoặc OpenRouter. Nếu không có key hoặc không reach được provider, app sẽ fallback hoặc vô hiệu hóa lane đó.'
-                                : 'The backend needs outbound HTTPS (443) to whichever providers you enable: Gemini, Cerebras, or OpenRouter. If a provider key is missing or the provider is unreachable, the app will fallback or disable that lane.'
+                                ? 'Backend cần outbound HTTPS (443) tới provider bạn bật: Gemini, OpenRouter, Groq, Cerebras, Beeknoee, hoặc TokenRouter. Nếu key thiếu hoặc provider không reach được, lane đó sẽ bị loại khỏi chuỗi chạy thay vì được giả vờ là đang sẵn sàng.'
+                                : 'The backend needs outbound HTTPS (443) to whichever providers you enable: Gemini, OpenRouter, Groq, Cerebras, Beeknoee, or TokenRouter. If a key is missing or the provider is unreachable, that lane is removed from the execution chain rather than treated as if it were available.'
+                        },
+                        {
+                            label: t ? 'Redis / dịch vụ nội bộ' : 'Redis / internal services',
+                            desc: t
+                                ? 'Nếu `REDIS_URL` không hoạt động, các lớp như BullMQ, throttling, presence, notification stream, và một phần caching/search sẽ không ổn định. Đây không chỉ là “optional optimization” nữa trong cấu trúc repo hiện tại.'
+                                : 'If `REDIS_URL` is not working, BullMQ, throttling, presence, notification streaming, and part of the caching/search layer become unstable. In the current repo structure this is no longer just an optional optimization.'
                         },
                         {
                             label: t ? 'Target databases' : 'Target databases',

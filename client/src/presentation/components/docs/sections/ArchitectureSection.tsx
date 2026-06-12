@@ -174,23 +174,72 @@ export function ArchitectureSection({ lang }: Props) {
                 </div>
             </DocSection>
 
-            <DocSection title={t ? 'Cấu trúc Thư mục (Pro-level Setup)' : 'Project Structure (Pro-level Setup)'}>
+            <DocSection title={t ? 'Những miền chức năng lớn đang có trong repo' : 'The major functional domains in the current repo'}>
+                <Prose>
+                    {t
+                        ? 'Điểm quan trọng với người mới vào dự án là: Data Explorer không còn chỉ là một SQL editor đơn lẻ. Repo hiện tại đã mở rộng thành một workspace dữ liệu có AI, NoSQL, cộng tác nhóm, xác thực nhiều lớp, thanh toán, sao lưu, và các trang marketing/docs đi kèm.'
+                        : 'The important thing for new contributors is that Data Explorer is no longer just a standalone SQL editor. The current repo has grown into a broader data workspace with AI, NoSQL, team collaboration, layered authentication, billing, backup, and marketing/docs surfaces.'}
+                </Prose>
+
+                <div className="mt-8 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-2xl border border-border/60 bg-card/40 p-5">
+                        <h4 className="text-sm font-bold">{t ? 'Backend domains' : 'Backend domains'}</h4>
+                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                            {t
+                                ? 'Những nhóm thư mục đáng chú ý nhất hiện tại gồm `query`, `metadata`, `nosql`, `ai`, `auth`, `otp`, `billing`, `collaboration`, `organizations`, `permissions`, `teamspaces`, `notifications`, `presence`, `redis`, `mail`, và `database-strategies`. Chúng cho thấy server đang đóng cả vai trò query engine, AI orchestration layer, và business platform.'
+                                : 'The most important folder groups now include `query`, `metadata`, `nosql`, `ai`, `auth`, `otp`, `billing`, `collaboration`, `organizations`, `permissions`, `teamspaces`, `notifications`, `presence`, `redis`, `mail`, and `database-strategies`. Together they show that the server acts as a query engine, an AI orchestration layer, and a business platform.'}
+                        </p>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-card/40 p-5">
+                        <h4 className="text-sm font-bold">{t ? 'Client surfaces' : 'Client surfaces'}</h4>
+                        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                            {t
+                                ? 'Ở phía client, các module lớn nhất hiện tại là `Query`, `NoSqlExplorer`, `Visualization`, `Explorer`, `Dashboard`, `Connection`, `Layout`, và `LandingPage`. Trên mặt page, repo còn có `DocumentationPage`, `TeamPage`, `LoginPage`, `OnboardingPage`, `BillingReturnPage`, `ERDPage`, và `VisualizePage`.'
+                                : 'On the client, the major modules currently include `Query`, `NoSqlExplorer`, `Visualization`, `Explorer`, `Dashboard`, `Connection`, `Layout`, and `LandingPage`. At the page level, the repo also ships `DocumentationPage`, `TeamPage`, `LoginPage`, `OnboardingPage`, `BillingReturnPage`, `ERDPage`, and `VisualizePage`.'}
+                        </p>
+                    </div>
+                </div>
+
+                <Callout type="info">
+                    <p className="text-sm">
+                        {t
+                            ? 'Đây là lý do docs và kiến trúc nên được đọc theo “khối chức năng” thay vì chỉ theo cây thư mục. Một thay đổi nhỏ ở AI routing hoặc team permissions có thể chạm đồng thời vào editor, assistant, billing entitlement, và UI trạng thái người dùng.'
+                            : 'This is why the docs and architecture should be read by functional domain, not just by folder tree. A small change in AI routing or team permissions can touch the editor, assistant, billing entitlements, and user-state UI at the same time.'}
+                    </p>
+                </Callout>
+            </DocSection>
+
+            <DocSection title={t ? 'Cấu trúc thư mục theo bề mặt hiện tại' : 'Project structure by current product surface'}>
                 <CodeBlock title="Directory Tree">
                     <CodeLine>server/</CodeLine>
                     <CodeLine> ├── src/</CodeLine>
                     <CodeLine> │    ├── auth/           # {t ? 'Auth, JWT, OAuth, session flows' : 'Auth, JWT, OAuth, session flows'}</CodeLine>
+                    <CodeLine> │    ├── otp/            # {t ? 'OTP verification and email confirmation' : 'OTP verification and email confirmation'}</CodeLine>
                     <CodeLine> │    ├── connections/    # {t ? 'Connection records + safety policies' : 'Connection records + safety policies'}</CodeLine>
                     <CodeLine> │    ├── query/          # {t ? 'SQL execution và guardrails' : 'SQL execution and guardrails'}</CodeLine>
+                    <CodeLine> │    ├── nosql/          # {t ? 'NoSQL execution, parsing, and Mongo-oriented flows' : 'NoSQL execution, parsing, and Mongo-oriented flows'}</CodeLine>
                     <CodeLine> │    ├── ai/             # {t ? 'AI routing, prompts, provider runners' : 'AI routing, prompts, provider runners'}</CodeLine>
+                    <CodeLine> │    ├── billing/        # {t ? 'Plans, checkout providers, and entitlements' : 'Plans, checkout providers, and entitlements'}</CodeLine>
+                    <CodeLine> │    ├── collaboration/  # {t ? 'Comments, team activity, shared review context' : 'Comments, team activity, shared review context'}</CodeLine>
+                    <CodeLine> │    ├── organizations/  # {t ? 'Organization ownership and membership flows' : 'Organization ownership and membership flows'}</CodeLine>
+                    <CodeLine> │    ├── permissions/    # {t ? 'Per-resource access control and labels' : 'Per-resource access control and labels'}</CodeLine>
+                    <CodeLine> │    ├── teamspaces/     # {t ? 'Workspace grouping for team resources' : 'Workspace grouping for team resources'}</CodeLine>
+                    <CodeLine> │    ├── notifications/  # {t ? 'In-app notices and delivery orchestration' : 'In-app notices and delivery orchestration'}</CodeLine>
+                    <CodeLine> │    ├── presence/       # {t ? 'Team presence and real-time collaboration hints' : 'Team presence and real-time collaboration hints'}</CodeLine>
                     <CodeLine> │    ├── saved-queries/  # {t ? 'Shared saved queries' : 'Shared saved queries'}</CodeLine>
                     <CodeLine> │    ├── dashboards/     # {t ? 'Dashboards và widgets' : 'Dashboards and widgets'}</CodeLine>
                     <CodeLine> │    ├── database-strategies/ # {t ? 'Engine-specific DB strategies' : 'Engine-specific DB strategies'}</CodeLine>
-                    <CodeLine> │    └── metadata/       # {t ? 'Schema/context builders' : 'Schema/context builders'}</CodeLine>
+                    <CodeLine> │    ├── metadata/       # {t ? 'Schema/context builders' : 'Schema/context builders'}</CodeLine>
+                    <CodeLine> │    ├── redis/          # {t ? 'Caching and presence backing services' : 'Caching and presence backing services'}</CodeLine>
+                    <CodeLine> │    └── mail/           # {t ? 'Transactional email integration' : 'Transactional email integration'}</CodeLine>
                     <CodeLine>client/</CodeLine>
                     <CodeLine> ├── src/</CodeLine>
                     <CodeLine> │    ├── core/           # {t ? 'Adapters, domain entities, app services' : 'Adapters, domain entities, app services'}</CodeLine>
                     <CodeLine> │    ├── infrastructure/ # {t ? 'Infra glue cho client' : 'Client-side infrastructure glue'}</CodeLine>
                     <CodeLine> │    ├── presentation/   # {t ? 'Pages, modules, docs, UI shell' : 'Pages, modules, docs, UI shell'}</CodeLine>
+                    <CodeLine> │    │    ├── modules/   # {t ? 'SQL, NoSQL, visualization, landing, layout' : 'SQL, NoSQL, visualization, landing, layout'}</CodeLine>
+                    <CodeLine> │    │    ├── pages/     # {t ? 'Docs, auth, team, billing return, ERD, visualize' : 'Docs, auth, team, billing return, ERD, visualize'}</CodeLine>
+                    <CodeLine> │    │    └── components/# {t ? 'Shared UI and documentation sections' : 'Shared UI and documentation sections'}</CodeLine>
                     <CodeLine> │    └── test/           # {t ? 'Frontend test setup' : 'Frontend test setup'}</CodeLine>
                 </CodeBlock>
             </DocSection>

@@ -32,8 +32,8 @@ export function SqlGenerationSection({ lang }: Props) {
                             step: '02',
                             title: t ? 'Provider-aware routing' : 'Provider-aware routing',
                             desc: t
-                                ? 'Routing mode trong UI quyết định lane nào được ưu tiên. Prompt nhẹ có thể đi qua Cerebras hoặc OpenRouter trước; image, vision, hoặc task khó hơn có thể được đẩy sang Gemini.'
-                                : 'The routing mode in the UI decides which lane is preferred. Light prompts can go through Cerebras or OpenRouter first; images, vision, or harder tasks can be escalated to Gemini.'
+                                ? 'Routing mode trong UI chỉ là một lớp. Chain thực tế còn phụ thuộc explicit model/provider bạn chọn, việc prompt có ảnh hay không, và việc request có bị nhận diện là current-info hay không. Với SQL work thông thường, app ưu tiên chain text-capable an toàn; nếu bạn khóa vào Beeknoee, Groq, hoặc TokenRouter thì provider đó sẽ được thử trước.'
+                                : 'The routing mode in the UI is only one layer. The real chain also depends on any explicit model/provider selection, whether the prompt includes an image, and whether the request is detected as current-information work. For normal SQL tasks, the app prefers a safe text-capable chain; if you lock into Beeknoee, Groq, or TokenRouter, that provider is tried first.'
                         },
                         {
                             step: '03',
@@ -61,22 +61,22 @@ export function SqlGenerationSection({ lang }: Props) {
                             icon: <Route className="w-5 h-5 text-primary" />,
                             title: 'Auto',
                             desc: t
-                                ? 'Cân bằng cost và quality. Prompt nhẹ có thể dùng lane rẻ hơn trước; task khó hơn hoặc cần vision có thể lên Gemini.'
-                                : 'Balances cost and quality. Lighter prompts may use cheaper lanes first; harder or vision-heavy tasks can escalate to Gemini.'
+                                ? 'Mode mặc định cho phần lớn SQL work. App bắt đầu từ auto chain phù hợp rồi lọc theo capability thay vì luôn đẩy thẳng sang lane đắt nhất.'
+                                : 'The default mode for most SQL work. The app starts from the appropriate auto chain and then filters it by capability instead of always jumping straight to the most expensive lane.'
                         },
                         {
                             icon: <Cpu className="w-5 h-5 text-primary" />,
                             title: 'Fast / Cheap',
                             desc: t
-                                ? 'Ưu tiên lane rẻ hơn để giảm tần suất gọi Gemini, nhưng vẫn có thể fallback nếu cần.'
-                                : 'Prefers lower-cost lanes to reduce Gemini usage, while still allowing fallback when needed.'
+                                ? 'Thiên về iteration nhanh và lane rẻ hơn, nhưng không ghi đè được explicit provider nếu bạn đã khóa model cụ thể.'
+                                : 'Leans toward quicker iteration and cheaper lanes, but it does not override an explicit provider if you already locked the model.'
                         },
                         {
                             icon: <Sparkles className="w-5 h-5 text-primary" />,
                             title: 'Best Quality',
                             desc: t
-                                ? 'Đẩy task lên lane chất lượng cao sớm hơn để tối đa độ chắc tay trong phân tích/query work.'
-                                : 'Escalates work to the higher-quality lane earlier to maximize reliability for analysis and query work.'
+                                ? 'Hữu ích khi task cần reasoning, explain, rewrite, hoặc optimization sâu hơn. Nó nghiêng về lane mạnh hơn sớm hơn, nhất là khi prompt dài và context dày.'
+                                : 'Useful when a task needs heavier reasoning, explanation, rewriting, or optimization. It leans toward stronger lanes earlier, especially for long prompts with dense context.'
                         },
                         {
                             icon: <Shield className="w-5 h-5 text-primary" />,
@@ -92,6 +92,13 @@ export function SqlGenerationSection({ lang }: Props) {
                         </div>
                     ))}
                 </div>
+                <Callout type="info">
+                    <p className="text-sm">
+                        {t
+                            ? 'Điểm rất dễ hiểu sai: nếu prompt bị nhận diện là cần thông tin hiện thời như “mới nhất”, “hôm nay”, hay “giá hiện tại”, router sẽ nghiêng về live-search chat behavior thay vì coi đó là một SQL generation request thuần.'
+                            : 'One easy misunderstanding: if a prompt is detected as a current-information request such as “latest”, “today”, or “current price”, the router will lean toward live-search chat behavior instead of treating it as a pure SQL generation request.'}
+                    </p>
+                </Callout>
             </DocSection>
 
             <DocSection title={t ? 'Prompt test hiệu quả' : 'Effective prompt patterns'}>

@@ -16,7 +16,7 @@
 
 **Data Explorer** is a high-fidelity, high-performance database management and visualization IDE. It provides a unified, intelligent interface for developers and data engineers to explore, query, and visualize multi-engine databases, all supercharged by a context-aware AI.
 
-Current release focus: **v3.6.2** adds Beeknoee-backed model routing, image-aware AI workflows, dedicated model catalog management, richer billing and access-control surfaces, and broader UX polish across SQL, NoSQL, docs, and the landing experience.
+Current release focus: **v3.6.2** adds image-aware AI workflows, explicit Beeknoee and TokenRouter model lanes, richer NoSQL tooling, dedicated model catalog management, billing and access-control hardening, and broader UX polish across SQL, NoSQL, docs, and the landing experience.
 
 ---
 
@@ -26,7 +26,7 @@ Current release focus: **v3.6.2** adds Beeknoee-backed model routing, image-awar
 - **Context-Aware SQL Generation**: Describe complex data needs in natural language and the AI generates SQL based on your live schema and foreign key relationships.
 - **Vision Integration**: Upload screenshots of DB diagrams or whiteboards for AI-assisted schema reconstruction and query help.
 - **Global Assistant Panel**: A resizable, toggleable sidebar available across major modules with SSE-based streaming responses.
-- **Provider-Aware Routing**: Gemini remains the premium lane, while Cerebras, OpenRouter, and Groq can be configured as lower-cost, fast, or fallback lanes.
+- **Provider-Aware Routing**: Gemini remains the premium lane, Cerebras/OpenRouter/Groq can be configured as lower-cost, fast, or fallback lanes, and Beeknoee or TokenRouter can be chosen explicitly when you want tighter model control.
 - **Dedicated AI Services**: Prompt building, schema context assembly, provider execution, connection context, and routing are separated into focused services for easier testing and safer future changes.
 - **Intelligent Model Fallback**: The AI layer can iterate through providers and models when a requested lane fails, helping keep generation more resilient without hanging the backend.
 - **Surgical Precision Autocomplete**: Inline AI suggestions prioritize exact SQL syntax completion without unnecessary explanations.
@@ -40,7 +40,7 @@ Current release focus: **v3.6.2** adds Beeknoee-backed model routing, image-awar
   - **SQL Server** (Azure SQL, Local MSSQL)
   - **ClickHouse**
   - **MongoDB** and **MongoDB Atlas (SRV)**
-  - **Redis** (for caching and session storage)
+  - **Redis** (runtime infrastructure for caching, queues, notifications, presence, and search indexing)
 - **Enterprise-Grade Credential Protection**: Saved connection passwords are encrypted using **AES-256-GCM** before persistence.
 - **Connection Safety Controls**: Each saved connection can now be configured as read-only and can independently allow or block query execution, schema changes, and import/export flows.
 - **Connection Health Visibility**: Saved connections track their last health-check result, latency, and last successful connection timestamp so operators can spot broken credentials or degraded endpoints faster.
@@ -51,6 +51,7 @@ Current release focus: **v3.6.2** adds Beeknoee-backed model routing, image-awar
 ### Redis Infrastructure
 - **Caching Layer**: Redis backs repeated metadata reads and query results so the app stays responsive under load.
 - **Notification Bus**: SSE notifications are broadcast through Redis Pub/Sub for progress updates and system messages.
+- **Presence and Collaboration**: Team presence and shared workspace signals are coordinated through Redis-backed flows.
 - **Rate Limiting**: Redis keeps API throttling consistent across multiple backend instances.
 - **Background Work**: Export, sync, and other long-running tasks can be queued without blocking the UI.
 - **Search Indexing**: Global search and metadata lookups use Redis-backed indexing for fast workspace navigation.
@@ -120,10 +121,10 @@ Current release focus: **v3.6.2** adds Beeknoee-backed model routing, image-awar
 |---|---|
 | **Architecture** | NestJS |
 | **ORM / Persistence** | Prisma |
-| **AI Engine** | Google Generative AI (Gemini API), Cerebras/OpenRouter/Groq-compatible routing, SSE Streaming |
+| **AI Engine** | Gemini plus OpenAI-compatible provider routing (Cerebras, OpenRouter, Groq, Beeknoee, TokenRouter), SSE streaming, attachment-aware orchestration |
 | **Engines Support** | `pg`, `mysql2`, `mssql`, `mongodb`, `@clickhouse/client` |
 | **Security** | JWT, Passport.js, AES-256-GCM encryption |
-| **Infrastructure** | Redis, BullMQ for background jobs, Search indexing |
+| **Infrastructure** | Redis, BullMQ, SSE notifications, presence coordination, search indexing |
 
 ---
 
@@ -167,7 +168,7 @@ Data Explorer/
 ├── server/                                # NestJS backend API
 │   ├── prisma/                            # Prisma schema, migrations/config, and generated setup inputs
 │   └── src/
-│       ├── ai/                            # Gemini integration, prompts, chat, streaming, autocomplete
+│       ├── ai/                            # AI routing, provider runners, prompts, chat, streaming, autocomplete
 │       ├── audit/                         # Audit logging and audit history APIs
 │       ├── auth/                          # JWT auth, OAuth, token exchange, guards, roles
 │       ├── collaboration/                 # Shared workspace state and team collaboration logic
@@ -232,7 +233,7 @@ Data Explorer/
 ### 4. Using the AI Assistant
 - **Contextual Knowledge**: The assistant is aware of your active connection, schema context, and current workspace state.
 - **Vision Features**: Drop in screenshots or reference material for AI-assisted schema and SQL help.
-- **Routing Modes**: Use premium Gemini for harder work, with optional Cerebras/OpenRouter/Groq lanes for cheaper, faster, or fallback chat flows.
+- **Routing Modes**: Use premium Gemini for harder work, optional Cerebras/OpenRouter/Groq lanes for cheaper, faster, or fallback chat flows, and explicit Beeknoee or TokenRouter picks when you want to lock the provider/model.
 - **Operational Safety**: Provider requests include timeout and stream-idle limits so failed or slow model lanes do not block the app indefinitely.
 - **Prompt Engineering**: Ask practical questions like:
   - `"Summarize the relationship between orders and customers"`
@@ -241,12 +242,13 @@ Data Explorer/
 ### 5. Interactive Visualizations
 - **ERD Exploration**: Open the ERD module to inspect table relationships visually.
 - **Insights Dashboard**: Review health signals, charts, and high-level usage indicators.
-- **NoSQL Workspace**: MongoDB-oriented flows are fully unified with SQL workspace features (Shortcuts, Results Panel, Visualize).
+- **NoSQL Workspace**: MongoDB-oriented flows now include Tree JSON browsing, Auto-Flatten Grid, schema analysis, aggregation building, and result-driven insights in a dedicated workspace.
 - **Metadata Analytics**: Inspect schema version history and metadata freshness signals from the sidebar.
 
 ### 6. Redis Infrastructure
 - **Redis-backed Search**: The backend keeps a fast metadata index in Redis so global search and workspace lookups stay responsive.
 - **Notification Streaming**: Long-running operations publish progress through Redis Pub/Sub and SSE.
+- **Presence Coordination**: Team presence and collaborative status indicators rely on Redis-backed runtime state.
 - **Shared Throttling**: If you run multiple backend instances, Redis keeps rate limits aligned across the cluster.
 - **Job Processing**: Export and sync flows rely on Redis-backed queues so the UI stays responsive while work happens in the background.
 
@@ -258,8 +260,8 @@ Data Explorer/
 - **Node.js 20+**
 - **npm**
 - **PostgreSQL** for the app metadata database
-- **Redis** for caching, notifications, search, and background jobs
-- **Google Gemini API Key** (optional, only needed for AI features)
+- **Redis** for caching, notifications, presence, search, and background jobs
+- **At least one AI provider key** (optional, only needed for AI features such as Gemini, OpenRouter, Groq, Cerebras, Beeknoee, or TokenRouter)
 - **Docker and Docker Compose** (optional, for the containerized path)
 
 ---
@@ -290,7 +292,7 @@ This is the fastest way to run **Data Explorer** locally with PostgreSQL, Redis,
   - user: `postgres`
   - password: `postgres`
   - database: `data_explorer`
-- **Redis**: `localhost:6379` (for caching, notifications, and rate limiting)
+- **Redis**: `localhost:6379` (for caching, notifications, queues, presence, and search indexing)
 
 Note:
 - `docker-compose.yml` reads backend env vars from `server/.env`, not from the root `.env.example`.
@@ -376,8 +378,8 @@ The backend reads configuration from `server/.env`. The frontend reads `VITE_API
 | Variable | Required | Description |
 |---|---|---|
 | `DATABASE_URL` | Yes | Connection string for the app's central PostgreSQL database. Docker default: `postgresql://postgres:postgres@db:5432/data_explorer`. |
-| `REDIS_URL` | No | Redis connection string for caching, notifications, and throttling. Docker default: `redis://redis:6379`. |
-| `GEMINI_API_KEY` | No | Google Gemini API key used to enable AI features. |
+| `REDIS_URL` | No | Redis connection string for caching, notifications, queues, presence, search indexing, and throttling. Docker default: `redis://redis:6379`. |
+| `GEMINI_API_KEY` | No | Gemini API key used for the premium AI lane, vision-capable prompts, and current-info capable flows. |
 | `AI_PROVIDER_TIMEOUT_MS` | No | Timeout in milliseconds for AI provider requests. Default: `15000`. |
 | `AI_STREAM_IDLE_TIMEOUT_MS` | No | Idle timeout in milliseconds for streaming AI responses. Default: `15000`. |
 | `CEREBRAS_API_KEY` | No | Optional lower-cost AI provider key used by AI routing in `Auto` / `Fast` mode. |
@@ -392,6 +394,9 @@ The backend reads configuration from `server/.env`. The frontend reads `VITE_API
 | `BEEKNOEE_API_KEY` | No | Optional Beeknoee key used when a user explicitly selects a Beeknoee model in AI Assistant. |
 | `BEEKNOEE_BASE_URL` | No | Base URL for Beeknoee's OpenAI-compatible API. Default: `https://platform.beeknoee.com/api/v1`. |
 | `BEEKNOEE_CHAT_MODEL` | No | Default Beeknoee chat model slug. Current recommended value: `glm-4.7-flash`. |
+| `TOKENROUTER_API_KEY` | No | Optional TokenRouter key used when a user explicitly selects a TokenRouter model in AI Assistant. |
+| `TOKENROUTER_BASE_URL` | No | Base URL for TokenRouter's OpenAI-compatible API. Default: `https://api.tokenrouter.com/v1`. |
+| `TOKENROUTER_CHAT_MODEL` | No | Default TokenRouter chat model slug. Current recommended value: `MiniMax-M3`. |
 | `JWT_SECRET` | Yes | Strong secret used to sign access tokens. Placeholder values are rejected. |
 | `REFRESH_TOKEN_SECRET` | No | Recommended separate secret for refresh-token cookies. If omitted, the app falls back to `JWT_SECRET`. |
 | `ENCRYPTION_KEY` | Yes | Exactly **32 characters**, used to encrypt saved database connection passwords. |

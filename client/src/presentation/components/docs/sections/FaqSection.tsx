@@ -27,14 +27,14 @@ export function FaqSection({ lang }: Props) {
         {
             q: t ? 'AI hiện dùng Gemini hay gì khác?' : 'Does the AI only use Gemini?',
             a: t
-                ? 'Không còn chỉ là Gemini. App hiện có AI routing: Gemini vẫn là lane chất lượng cao, nhưng bạn có thể cấu hình thêm Cerebras và OpenRouter để giảm tần suất gọi Gemini. Routing mode trong UI sẽ quyết định ưu tiên lane nào, và mỗi response đều hiển thị provider/model thực tế.'
-                : 'No longer Gemini-only. The app now supports AI routing: Gemini remains the high-quality lane, but you can also configure Cerebras and OpenRouter to reduce Gemini usage. The routing mode in the UI controls which lane is preferred, and every response shows the actual provider/model that answered.',
+                ? 'Không còn chỉ là Gemini. App hiện có AI routing với Gemini, OpenRouter, Groq, Cerebras, và các lane explicit như Beeknoee hoặc TokenRouter. Routing mode trong UI quyết định hướng ưu tiên chung, nhưng explicit model/provider vẫn là nút điều khiển mạnh nhất. Mỗi response cũng hiển thị provider/model thực tế để bạn không bị nhầm lane.'
+                : 'No longer Gemini-only. The app now supports AI routing across Gemini, OpenRouter, Groq, Cerebras, and explicit lanes such as Beeknoee or TokenRouter. The routing mode in the UI sets the broad preference, but explicit model/provider selection remains the strongest control. Each response also shows the actual provider/model so the lane stays transparent.',
         },
         {
             q: t ? 'Tại sao AI trả lời khác nhau giữa các mode như Auto, Fast / Cheap và Gemini Only?' : 'Why do answers differ across Auto, Fast / Cheap, and Gemini Only?',
             a: t
-                ? 'Vì mỗi mode điều khiển router khác nhau. Auto cân bằng chi phí và chất lượng, Fast / Cheap ưu tiên lane rẻ hơn trước, Best Quality nghiêng về Gemini sớm hơn, còn Gemini Only luôn dùng model Gemini bạn đã chọn. Nếu provider rẻ trả lời không tốt hoặc fail, app có thể fallback tùy mode.'
-                : 'Because each mode steers the router differently. Auto balances cost and quality, Fast / Cheap prefers lower-cost lanes first, Best Quality leans toward Gemini earlier, and Gemini Only always uses the Gemini model you selected. If a cheaper provider performs badly or fails, the app can fallback depending on the active mode.',
+                ? 'Vì mode chỉ là một phần của router. Auto cân bằng chung, Fast / Cheap thiên về lane nhẹ hơn, Best Quality nghiêng về lane mạnh hơn, còn Gemini Only khóa hẳn vào Gemini. Nhưng kết quả cuối còn phụ thuộc explicit model/provider, việc prompt có ảnh hay không, và việc request có bị nhận diện là current-info hay không.'
+                : 'Because the mode is only one part of the router. Auto balances broadly, Fast / Cheap leans toward lighter lanes, Best Quality leans toward stronger lanes, and Gemini Only locks into Gemini. But the final result also depends on any explicit model/provider selection, whether the prompt contains an image, and whether the request is detected as current-information work.',
         },
         {
             q: t ? 'Tại sao tôi vẫn bị mất đăng nhập sau refresh hay restart?' : 'Why do I still lose my login after refresh or restart?',
