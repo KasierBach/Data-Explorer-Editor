@@ -3,6 +3,7 @@ export type AiProvider =
   | 'cerebras'
   | 'openrouter'
   | 'beeknoee'
+  | 'tokenrouter'
   | 'zhipu'
   | 'groq';
 export type AiChatRole = 'user' | 'ai';

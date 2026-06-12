@@ -7,6 +7,9 @@ function createConfig(
   const defaults: Record<string, string | undefined> = {
     BEEKNOEE_API_KEY: 'sk-bee-test',
     BEEKNOEE_BASE_URL: 'https://platform.beeknoee.com/api/v1',
+    TOKENROUTER_API_KEY: 'sk-tr-test',
+    TOKENROUTER_BASE_URL: 'https://api.tokenrouter.com/v1',
+    TOKENROUTER_CHAT_MODEL: 'MiniMax-M3',
     OPENROUTER_API_KEY: 'sk-or-test',
     OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1',
     OPENROUTER_CHAT_MODEL: 'openai/gpt-3.5-turbo',
@@ -62,6 +65,44 @@ describe('AiRoutingService', () => {
     expect(result.routeDecision.responseFormat).toBe('structured');
   });
 
+  it('routes an explicitly selected TokenRouter model to the TokenRouter provider plan first', () => {
+    const service = new AiRoutingService(createConfig());
+
+    const result = service.buildPlanChain(
+      {
+        prompt: 'Explain this query',
+        model: 'tokenrouter:MiniMax-M3',
+        routingMode: 'auto',
+      },
+      true,
+    );
+
+    expect(result.plans[0]).toMatchObject({
+      provider: 'tokenrouter',
+      apiKey: 'sk-tr-test',
+      baseUrl: 'https://api.tokenrouter.com/v1',
+      model: 'MiniMax-M3',
+    });
+    expect(result.routeDecision.responseFormat).toBe('structured');
+  });
+
+  it('does not add TokenRouter to the default auto provider chain', () => {
+    const service = new AiRoutingService(createConfig());
+
+    const result = service.buildPlanChain(
+      {
+        prompt: 'List slow queries in this schema',
+        routingMode: 'auto',
+      },
+      true,
+    );
+
+    expect(result.plans.some((plan) => plan.provider === 'tokenrouter')).toBe(
+      false,
+    );
+    expect(result.routeDecision.responseFormat).toBe('structured');
+  });
+
   it('puts an explicitly selected Gemini model first in the provider chain', () => {
     const service = new AiRoutingService(createConfig());
 
@@ -112,6 +153,26 @@ describe('AiRoutingService', () => {
     expect(result.plans[0]).toMatchObject({
       provider: 'openrouter',
       model: 'openai/gpt-4o-mini',
+    });
+    expect(result.plans.some((plan) => plan.provider === 'gemini')).toBe(true);
+  });
+
+  it('keeps an explicitly selected TokenRouter model first for image prompts when that model is vision-capable', () => {
+    const service = new AiRoutingService(createConfig());
+
+    const result = service.buildPlanChain(
+      {
+        prompt: 'Describe this screenshot',
+        image: 'data:image/png;base64,abc',
+        model: 'tokenrouter:MiniMax-M3',
+        routingMode: 'auto',
+      },
+      true,
+    );
+
+    expect(result.plans[0]).toMatchObject({
+      provider: 'tokenrouter',
+      model: 'MiniMax-M3',
     });
     expect(result.plans.some((plan) => plan.provider === 'gemini')).toBe(true);
   });

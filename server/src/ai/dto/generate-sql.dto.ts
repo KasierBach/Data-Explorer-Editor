@@ -7,7 +7,11 @@ import {
   IsString,
   ValidateNested,
 } from 'class-validator';
-import type { AiChatMode, AiRoutingMode, ChatHistoryMessage } from '../ai.types';
+import type {
+  AiChatMode,
+  AiRoutingMode,
+  ChatHistoryMessage,
+} from '../ai.types';
 
 class ChatHistoryMessageDto implements ChatHistoryMessage {
   @IsString()

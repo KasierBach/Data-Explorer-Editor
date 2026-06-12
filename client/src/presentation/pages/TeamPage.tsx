@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/presentation/components/ui/button';
 import { Textarea } from '@/presentation/components/ui/textarea';
@@ -160,32 +160,7 @@ export function TeamPage() {
   const [commentTarget, setCommentTarget] = useState<TeamCommentTarget | null>(null);
   const selectedOrgId = selectedOrg?.id ?? null;
 
-  useEffect(() => {
-    loadOrgs();
-    loadInvitations();
-  }, []);
-
-  useEffect(() => {
-    if (selectedOrgId) {
-      loadMembers(selectedOrgId);
-      loadTeamspaces(selectedOrgId);
-      loadResources(selectedOrgId);
-    }
-  }, [selectedOrgId]);
-
-  useEffect(() => {
-    if (selectedOrgId && activeTab === 'activity') {
-      loadActivity(selectedOrgId);
-    }
-  }, [activeTab, selectedOrgId]);
-
-  useEffect(() => {
-    setCommentTarget(null);
-    setBackupJson('');
-    setBackupSummary(null);
-  }, [selectedOrgId]);
-
-  async function loadOrgs() {
+  const loadOrgs = useCallback(async () => {
     try {
       const data = await OrganizationService.getMyOrganizations();
       setOrgs(data);
@@ -197,27 +172,27 @@ export function TeamPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [text.failedLoadTeams]);
 
-  async function loadInvitations() {
+  const loadInvitations = useCallback(async () => {
     try {
       const data = await OrganizationService.getMyInvitations();
       setInvitations(data);
     } catch {
       toast.error(text.failedLoadInvitations);
     }
-  }
+  }, [text.failedLoadInvitations]);
 
-  async function loadMembers(orgId: string) {
+  const loadMembers = useCallback(async (orgId: string) => {
     try {
       const data = await OrganizationService.getMembers(orgId);
       setMembers(data);
     } catch {
       toast.error(text.failedLoadMembers);
     }
-  }
+  }, [text.failedLoadMembers]);
 
-  async function loadResources(orgId: string) {
+  const loadResources = useCallback(async (orgId: string) => {
     setResourcesLoading(true);
     try {
       const [connections, queries, dashboards] = await Promise.all([
@@ -231,18 +206,18 @@ export function TeamPage() {
     } finally {
       setResourcesLoading(false);
     }
-  }
+  }, []);
 
-  async function loadTeamspaces(orgId: string) {
+  const loadTeamspaces = useCallback(async (orgId: string) => {
     try {
       const data = await TeamspaceService.getTeamspaces(orgId);
       setTeamspaces(data);
     } catch {
       toast.error(text.failedLoadTeamspaces);
     }
-  }
+  }, [text.failedLoadTeamspaces]);
 
-  async function loadActivity(orgId: string) {
+  const loadActivity = useCallback(async (orgId: string) => {
     setActivityLoading(true);
     try {
       const data = await CollaborationService.getOrganizationActivity(orgId, 50);
@@ -252,7 +227,32 @@ export function TeamPage() {
     } finally {
       setActivityLoading(false);
     }
-  }
+  }, [text.failedLoadActivity]);
+
+  useEffect(() => {
+    void loadOrgs();
+    void loadInvitations();
+  }, [loadInvitations, loadOrgs]);
+
+  useEffect(() => {
+    if (selectedOrgId) {
+      void loadMembers(selectedOrgId);
+      void loadTeamspaces(selectedOrgId);
+      void loadResources(selectedOrgId);
+    }
+  }, [loadMembers, loadResources, loadTeamspaces, selectedOrgId]);
+
+  useEffect(() => {
+    if (selectedOrgId && activeTab === 'activity') {
+      void loadActivity(selectedOrgId);
+    }
+  }, [activeTab, loadActivity, selectedOrgId]);
+
+  useEffect(() => {
+    setCommentTarget(null);
+    setBackupJson('');
+    setBackupSummary(null);
+  }, [selectedOrgId]);
 
   async function handleExportBackup() {
     if (!selectedOrg) return;

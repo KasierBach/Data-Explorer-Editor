@@ -214,9 +214,7 @@ export class AiPromptBuilderService {
     sources?: string[];
   } {
     try {
-      const remainingText = fullText
-        .replace(/<thought>[\s\S]*?(?:<\/thought>|$)/gi, '')
-        .trim();
+      const remainingText = this.stripHiddenReasoningBlocks(fullText).trim();
 
       let cleanJsonStr = remainingText;
       const matchIndex = remainingText.indexOf('{');
@@ -248,11 +246,16 @@ export class AiPromptBuilderService {
       };
     } catch {
       return {
-        message: fullText
-          .replace(/<thought>[\s\S]*?(?:<\/thought>|$)/gi, '')
-          .trim(),
+        message: this.stripHiddenReasoningBlocks(fullText).trim(),
       };
     }
+  }
+
+  private stripHiddenReasoningBlocks(fullText: string): string {
+    return fullText.replace(
+      /<(?:thought|think)>[\s\S]*?(?:<\/(?:thought|think)>|$)/gi,
+      '',
+    );
   }
 
   assertUsableStructuredResponse(
@@ -301,7 +304,9 @@ export class AiPromptBuilderService {
     return this.normalizeSources(urls) || [];
   }
 
-  mergeSources(...sourceLists: Array<string[] | undefined>): string[] | undefined {
+  mergeSources(
+    ...sourceLists: Array<string[] | undefined>
+  ): string[] | undefined {
     return this.normalizeSources(sourceLists.flatMap((list) => list || []));
   }
 
@@ -310,7 +315,9 @@ export class AiPromptBuilderService {
       return message;
     }
 
-    const missingSources = sources.filter((source) => !message.includes(source));
+    const missingSources = sources.filter(
+      (source) => !message.includes(source),
+    );
     if (missingSources.length === 0) {
       return message;
     }
@@ -436,7 +443,8 @@ export class AiPromptBuilderService {
         }
       })
       .filter(
-        (entry, index, array) => array.findIndex((item) => item === entry) === index,
+        (entry, index, array) =>
+          array.findIndex((item) => item === entry) === index,
       )
       .slice(0, 6);
 

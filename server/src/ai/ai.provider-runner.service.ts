@@ -157,8 +157,7 @@ export class AiProviderRunnerService {
 
   private getRetryDelayMs(attempt: number): number {
     return (
-      AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_BASE_DELAY_MS *
-      Math.pow(2, attempt)
+      AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_BASE_DELAY_MS * Math.pow(2, attempt)
     );
   }
 
@@ -276,7 +275,8 @@ export class AiProviderRunnerService {
       return false;
     }
 
-    const message = this.extractProviderErrorMessage(errorPayload).toLowerCase();
+    const message =
+      this.extractProviderErrorMessage(errorPayload).toLowerCase();
     if (!message) {
       return false;
     }
@@ -324,7 +324,9 @@ export class AiProviderRunnerService {
     return {
       searchEnabled,
       model,
-      prompt: searchEnabled ? `[SEARCH ONLINE] ${params.prompt}` : params.prompt,
+      prompt: searchEnabled
+        ? `[SEARCH ONLINE] ${params.prompt}`
+        : params.prompt,
       capabilities: this.buildCapabilities(searchEnabled),
     };
   }
@@ -527,11 +529,16 @@ export class AiProviderRunnerService {
 
     const sources = this.promptBuilder.mergeSources(
       parsed.sources,
-      searchEnabled ? this.promptBuilder.extractSources(result.response) : undefined,
+      searchEnabled
+        ? this.promptBuilder.extractSources(result.response)
+        : undefined,
     );
     return {
       ...parsed,
-      message: this.promptBuilder.appendSourcesToMessage(parsed.message, sources),
+      message: this.promptBuilder.appendSourcesToMessage(
+        parsed.message,
+        sources,
+      ),
       sources,
       provider: 'gemini',
       model: plan.model,
@@ -558,14 +565,10 @@ export class AiProviderRunnerService {
     let structuredResponseFormat = buildOpenAiStructuredResponseFormat(
       routeDecision.responseFormat,
     );
-    let systemPrompt = this.buildSystemPromptForRequest(
-      params,
-      routeDecision,
-      {
-        ...searchAttempt.capabilities,
-        visionInput: !!params.image,
-      },
-    );
+    let systemPrompt = this.buildSystemPromptForRequest(params, routeDecision, {
+      ...searchAttempt.capabilities,
+      visionInput: !!params.image,
+    });
     let requestTimeout = this.createAbortController(
       `${plan.provider} request (${modelToUse})`,
     );
@@ -660,7 +663,10 @@ export class AiProviderRunnerService {
       const sources = this.promptBuilder.mergeSources(parsed.sources);
       return {
         ...parsed,
-        message: this.promptBuilder.appendSourcesToMessage(parsed.message, sources),
+        message: this.promptBuilder.appendSourcesToMessage(
+          parsed.message,
+          sources,
+        ),
         sources,
         provider: plan.provider,
         model: modelToUse,
@@ -760,10 +766,11 @@ export class AiProviderRunnerService {
       }
     }
 
-    const aggregatedResponse = await this.withTimeout<EnhancedGenerateContentResponse>(
-      result.response,
-      `Gemini stream finalize (${plan.model})`,
-    );
+    const aggregatedResponse =
+      await this.withTimeout<EnhancedGenerateContentResponse>(
+        result.response,
+        `Gemini stream finalize (${plan.model})`,
+      );
     const parsed = this.promptBuilder.parseAiResponse(fullText);
     this.promptBuilder.assertUsableStructuredResponse(
       parsed,
@@ -781,7 +788,10 @@ export class AiProviderRunnerService {
       type: 'done',
       data: {
         ...parsed,
-        message: this.promptBuilder.appendSourcesToMessage(parsed.message, sources),
+        message: this.promptBuilder.appendSourcesToMessage(
+          parsed.message,
+          sources,
+        ),
         sources,
         provider: 'gemini',
         model: plan.model,
@@ -806,14 +816,10 @@ export class AiProviderRunnerService {
     let structuredResponseFormat = buildOpenAiStructuredResponseFormat(
       routeDecision.responseFormat,
     );
-    let systemPrompt = this.buildSystemPromptForRequest(
-      params,
-      routeDecision,
-      {
-        ...searchAttempt.capabilities,
-        visionInput: !!params.image,
-      },
-    );
+    let systemPrompt = this.buildSystemPromptForRequest(params, routeDecision, {
+      ...searchAttempt.capabilities,
+      visionInput: !!params.image,
+    });
     let requestTimeout = this.createAbortController(
       `${plan.provider} stream request (${modelToUse})`,
     );

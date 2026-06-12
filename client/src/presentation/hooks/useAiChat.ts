@@ -495,7 +495,7 @@ export function useAiChat() {
             pendingUpdateRef.current = null;
             abortControllerRef.current = null;
         }
-    }, [addAiMessage, updateAiMessage, processSseLine, activeDatabase, aiModel, aiMode, aiRoutingMode, activeConnection?.type, store.nosqlActiveCollection, store.nosqlSchemaStats, store.aiChats]);
+    }, [addAiMessage, updateAiMessage, processSseLine, activeDatabase, aiModel, aiMode, aiRoutingMode, activeConnection?.type, store]);
 
     const handleStop = useCallback(() => {
         if (abortControllerRef.current) {

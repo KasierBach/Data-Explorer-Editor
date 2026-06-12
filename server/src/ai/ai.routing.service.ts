@@ -39,6 +39,27 @@ export class AiRoutingService {
     };
   }
 
+  private getTokenRouterPlan(requestedModel?: string): ProviderPlan | null {
+    const apiKey = this.configService.get<string>('TOKENROUTER_API_KEY');
+    if (!apiKey) return null;
+
+    const fallbackModel =
+      this.configService.get<string>('TOKENROUTER_CHAT_MODEL') || 'MiniMax-M3';
+    const normalizedModel =
+      requestedModel && requestedModel !== 'default'
+        ? requestedModel
+        : fallbackModel;
+
+    return {
+      provider: 'tokenrouter',
+      apiKey,
+      baseUrl:
+        this.configService.get<string>('TOKENROUTER_BASE_URL') ||
+        'https://api.tokenrouter.com/v1',
+      model: normalizedModel,
+    };
+  }
+
   getGeminiModelList(requestedModel?: string): string[] {
     const legacyMap: Record<string, string> = {
       'gemini-3-pro': 'gemini-3-pro-preview',
@@ -57,7 +78,7 @@ export class AiRoutingService {
       : ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3-flash'];
   }
 
-  normalizeRoutingMode(routingMode?: AiRoutingMode | string): AiRoutingMode {
+  normalizeRoutingMode(routingMode?: string): AiRoutingMode {
     if (
       routingMode === 'fast' ||
       routingMode === 'best' ||
@@ -240,6 +261,15 @@ export class AiRoutingService {
           );
         }
         requestedPlan = beeknoeePlan;
+      } else if (params.model.startsWith('tokenrouter:')) {
+        const modelName = params.model.slice('tokenrouter:'.length);
+        const tokenRouterPlan = this.getTokenRouterPlan(modelName);
+        if (!tokenRouterPlan) {
+          throw new Error(
+            'TokenRouter provider is not configured. Set TOKENROUTER_API_KEY to use TokenRouter models.',
+          );
+        }
+        requestedPlan = tokenRouterPlan;
       } else if (params.model.startsWith('groq:')) {
         const modelName = params.model.slice('groq:'.length);
         const groqConfig = lowCostPlans.find((p) => p.provider === 'groq');
@@ -262,10 +292,9 @@ export class AiRoutingService {
     }
 
     const geminiPlans = geminiAvailable
-      ? (
-          requestedPlan?.provider === 'gemini'
-            ? [requestedPlan.model, ...this.getGeminiModelList()]
-            : this.getGeminiModelList(requestedPlan ? undefined : params.model)
+      ? (requestedPlan?.provider === 'gemini'
+          ? [requestedPlan.model, ...this.getGeminiModelList()]
+          : this.getGeminiModelList(requestedPlan ? undefined : params.model)
         ).map((model) => ({ provider: 'gemini' as const, model }))
       : [];
 
@@ -289,7 +318,8 @@ export class AiRoutingService {
       if (
         !orderedPlans.some(
           (existing) =>
-            existing.provider === plan.provider && existing.model === plan.model,
+            existing.provider === plan.provider &&
+            existing.model === plan.model,
         )
       ) {
         orderedPlans.push(plan);

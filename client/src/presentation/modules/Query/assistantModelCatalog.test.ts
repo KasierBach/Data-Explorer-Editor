@@ -24,4 +24,21 @@ describe('assistantModelCatalog', () => {
       ]),
     );
   });
+
+  it('includes a dedicated TokenRouter provider group for AI Assistant', () => {
+    const groups = getAssistantModelCatalog();
+    const tokenRouterGroup = groups.find(
+      (group) => group.group === 'TokenRouter',
+    );
+
+    expect(tokenRouterGroup).toBeDefined();
+    expect(tokenRouterGroup?.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'tokenrouter:MiniMax-M3',
+          label: 'MiniMax M3',
+        }),
+      ]),
+    );
+  });
 });

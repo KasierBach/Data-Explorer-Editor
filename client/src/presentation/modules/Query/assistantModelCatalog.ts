@@ -33,6 +33,12 @@ export function getAssistantModelCatalog(): AssistantModelGroup[] {
       ],
     },
     {
+      group: 'TokenRouter',
+      items: [
+        { id: 'tokenrouter:MiniMax-M3', label: 'MiniMax M3', isNew: true },
+      ],
+    },
+    {
       group: 'Groq (Fast & Free)',
       items: [
         { id: 'groq:llama-3.3-70b-versatile', label: 'Llama 3.3 70B' },

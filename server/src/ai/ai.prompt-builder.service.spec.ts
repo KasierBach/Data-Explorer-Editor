@@ -20,6 +20,17 @@ describe('AiPromptBuilderService', () => {
     expect(JSON.stringify(parsed)).not.toContain('private');
   });
 
+  it('strips think-tag reasoning blocks from provider responses', () => {
+    const parsed = service.parseAiResponse(
+      '<think>hidden reasoning</think>{"message":"pong"}',
+    );
+
+    expect(parsed).toMatchObject({
+      message: 'pong',
+    });
+    expect(JSON.stringify(parsed)).not.toContain('hidden reasoning');
+  });
+
   it('keeps valid source URLs from structured model responses', () => {
     const parsed = service.parseAiResponse(
       '{"message":"Fresh answer","sources":["https://example.com/a","notaurl","https://example.com/a"]}',

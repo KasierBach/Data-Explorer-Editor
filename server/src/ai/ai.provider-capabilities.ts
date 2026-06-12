@@ -13,6 +13,8 @@ const OPENROUTER_VISION_PATTERNS = [
   /owl-alpha/i,
 ];
 
+const TOKENROUTER_VISION_PATTERNS = [/^minimax-m3$/i];
+
 function matchesAnyPattern(value: string, patterns: RegExp[]) {
   return patterns.some((pattern) => pattern.test(value));
 }
@@ -25,6 +27,8 @@ export function supportsVision(
       return true;
     case 'openrouter':
       return matchesAnyPattern(plan.model, OPENROUTER_VISION_PATTERNS);
+    case 'tokenrouter':
+      return matchesAnyPattern(plan.model, TOKENROUTER_VISION_PATTERNS);
     default:
       return false;
   }

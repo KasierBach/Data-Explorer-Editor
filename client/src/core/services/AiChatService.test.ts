@@ -17,7 +17,7 @@ describe('AiChatService', () => {
       json: () => Promise.resolve({}),
     });
 
-    await (AiChatService as any).updateMessage('chat-1', 'msg-1', {
+    await AiChatService.updateMessage('chat-1', 'msg-1', {
       role: 'user',
       content: 'updated prompt',
     });

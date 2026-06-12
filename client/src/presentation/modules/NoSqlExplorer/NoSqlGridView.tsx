@@ -47,6 +47,8 @@ export const NoSqlGridView: React.FC<NoSqlGridViewProps> = ({ data }) => {
         }));
     }, [columns]);
 
+    // TanStack Table intentionally returns a mutable instance; this component does not memoize it downstream.
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data: rows,
         columns: tableColumns,
