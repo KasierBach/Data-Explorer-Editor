@@ -59,8 +59,13 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
     options?: { limit?: number; offset?: number },
   ): Promise<QueryResult> {
     let safeSql = sql;
-    if (!/LIMIT\s+\d+/i.test(safeSql)) {
-      safeSql += ' LIMIT 50000';
+    if (options?.limit !== undefined) {
+      const trimmed = safeSql.trim().replace(/;$/, '');
+      if (!/\b(LIMIT|OFFSET|FETCH)\b/i.test(trimmed)) {
+        safeSql = `${trimmed} LIMIT ${options.limit}`;
+      }
+    } else if (!/LIMIT\s+\d+/i.test(safeSql)) {
+      safeSql = `${safeSql.trim().replace(/;$/, '')} LIMIT 50000`;
     }
     if (options?.offset !== undefined) {
       safeSql += ` OFFSET ${options.offset}`;

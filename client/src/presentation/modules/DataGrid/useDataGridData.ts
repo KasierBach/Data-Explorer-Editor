@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore } from '@/core/services/store';
-import { parseNodeId, getQuotedIdentifier } from '@/core/utils/id-parser';
+import { parseNodeId } from '@/core/utils/id-parser';
 import type { QueryResult, TableMetadata } from '@/core/domain/entities';
 
 interface DataGridDataParams {
@@ -34,7 +34,7 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
 
     const { dbName, schema, table: cleanTableName } = parseNodeId(tableId);
     const dialect: 'mysql' | 'postgres' = activeConnection?.type === 'mysql' ? 'mysql' : 'postgres';
-    const isLargeDataset = tableId === 'large_dataset' || tableId === 'tbl-large';
+    const resolvedTableName = cleanTableName || tableId;
 
     // Fetch Metadata with long-term cache (5 minutes)
     const {
@@ -60,30 +60,20 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
         isFetching: isFetchingData,
         refetch: refetchData,
     } = useQuery({
-        queryKey: ['data', activeConnectionId, tableId, isLargeDataset, page, pageSize],
+        queryKey: ['data', activeConnectionId, tableId, page, pageSize],
         queryFn: async () => {
             if (!activeConnection) throw new Error("No active connection");
+            if (!resolvedTableName) throw new Error("No table selected");
             const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
-
-            if (isLargeDataset) {
-                return adapter.executeQuery(
-                    `SELECT * FROM ${getQuotedIdentifier(cleanTableName || tableId, dialect)} -- large_dataset`,
-                    dbName ? { database: dbName } : undefined
-                );
-            }
-
-            const qSchema = getQuotedIdentifier(schema, dialect);
-            const qTable = getQuotedIdentifier(cleanTableName || tableId, dialect);
             
-            return adapter.executeQuery(
-                `SELECT * FROM ${qSchema}.${qTable}`,
-                { 
-                    database: dbName,
-                    includeTotalCount: false,
-                    limit: pageSize,
-                    offset: offset
-                }
-            );
+            return adapter.fetchTableWindow({
+                database: dbName,
+                schema,
+                table: resolvedTableName,
+                includeTotalCount: true,
+                limit: pageSize,
+                offset,
+            });
         },
         enabled: !!activeConnectionId && !!metadata,
         staleTime: 60 * 1000, // Keep data fresh for 1 minute

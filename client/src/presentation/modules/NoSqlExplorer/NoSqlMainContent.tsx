@@ -352,6 +352,21 @@ export const NoSqlMainContent: React.FC = () => {
                 </div>
               )}
 
+              {result?.truncated && (
+                <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-full shrink-0">
+                  <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-amber-500/80">
+                    {lang === 'vi' ? 'Giới hạn' : 'Capped'}
+                  </span>
+                  {result.appliedLimit && (
+                    <span className="text-[10px] font-medium text-amber-500/70">
+                      {result.appliedLimit.toLocaleString(
+                        lang === 'vi' ? 'vi-VN' : 'en-US',
+                      )}
+                    </span>
+                  )}
+                </div>
+              )}
+
               <Button
                 variant="ghost"
                 size="sm"

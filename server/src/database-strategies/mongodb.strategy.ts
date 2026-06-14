@@ -31,6 +31,31 @@ const inferType = (value: unknown): string => {
 @Injectable()
 export class MongoDbStrategy implements IDatabaseStrategy {
   private readonly logger = new Logger(MongoDbStrategy.name);
+  private readonly DEFAULT_RESULT_LIMIT = 50_000;
+
+  private resolveResultLimit(
+    payload: Record<string, unknown>,
+    options?: { limit?: number; offset?: number },
+  ) {
+    const payloadLimit =
+      typeof payload.limit === 'number'
+        ? payload.limit
+        : typeof (payload.options as { limit?: unknown } | undefined)?.limit ===
+            'number'
+          ? ((payload.options as { limit: number }).limit ?? undefined)
+          : undefined;
+    const requestedLimit = options?.limit ?? payloadLimit;
+    const appliedLimit = Math.min(
+      requestedLimit ?? this.DEFAULT_RESULT_LIMIT,
+      this.DEFAULT_RESULT_LIMIT,
+    );
+
+    return {
+      appliedLimit,
+      limitSource: requestedLimit !== undefined ? 'requested' : 'protective_default',
+    } as const;
+  }
+
   async createPool(
     connectionConfig: any,
     databaseOverride?: string,
@@ -137,24 +162,51 @@ export class MongoDbStrategy implements IDatabaseStrategy {
     let result: any;
     let rows: any[] = [];
     let columns: string[] = [];
+    let truncated = false;
+    let appliedLimit: number | undefined;
+    let appliedOffset: number | undefined;
+    let limitSource: QueryResult['limitSource'];
 
     switch (payload.action) {
       case 'find': {
-        const limit = options?.limit || Math.min(payload.limit || 50000, 50000);
+        const limitMeta = this.resolveResultLimit(
+          payload,
+          options,
+        );
+        appliedLimit = limitMeta.appliedLimit;
+        limitSource = limitMeta.limitSource;
         const skip = options?.offset || 0;
+        appliedOffset = skip;
         result = await col
           .find(filter, payload.options || {})
           .skip(skip)
-          .limit(limit)
+          .limit(appliedLimit)
           .maxTimeMS(30000)
           .toArray();
         rows = result;
         break;
       }
-      case 'aggregate':
-        result = await col.aggregate(pipeline).maxTimeMS(30000).toArray();
-        rows = result.slice(0, 50000); // Slice aggregation result to avoid OOM
+      case 'aggregate': {
+        const limitMeta = this.resolveResultLimit(
+          payload,
+          options,
+        );
+        appliedLimit = limitMeta.appliedLimit;
+        limitSource = limitMeta.limitSource;
+        const aggregateOptions = { ...(payload.options || {}) };
+        if ('limit' in aggregateOptions) {
+          delete aggregateOptions.limit;
+        }
+
+        const aggregateCursor = col
+          .aggregate(pipeline, aggregateOptions)
+          .maxTimeMS(30000)
+          .limit(appliedLimit + 1);
+        result = await aggregateCursor.toArray();
+        truncated = result.length > appliedLimit;
+        rows = result.slice(0, appliedLimit);
         break;
+      }
       case 'count':
         result = await col.countDocuments(filter, payload.options || {});
         rows = [{ count: result }];
@@ -227,7 +279,15 @@ export class MongoDbStrategy implements IDatabaseStrategy {
       return cleanRow;
     });
 
-    return { rows, columns, rowCount: rows.length };
+    return {
+      rows,
+      columns,
+      rowCount: rows.length,
+      truncated: truncated || undefined,
+      appliedLimit,
+      appliedOffset,
+      limitSource,
+    };
   }
 
   async updateRow(

@@ -81,4 +81,64 @@ describe('ConnectionsService security', () => {
     );
     expect(prismaMock.connection.create).not.toHaveBeenCalled();
   });
+
+  it('cleans up stale pools once they exceed the TTL window', async () => {
+    prismaMock.connection.findUnique.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+    });
+
+    const now = Date.now();
+    (service as any).pools.set('conn-1:db_a', {
+      pool: { id: 'stale' },
+      lastAccessed: now - 16 * 60 * 1000,
+      createdAt: now - 16 * 60 * 1000,
+      connectionId: 'conn-1',
+      database: 'db_a',
+    });
+    (service as any).pools.set('conn-1:db_b', {
+      pool: { id: 'fresh' },
+      lastAccessed: now,
+      createdAt: now,
+      connectionId: 'conn-1',
+      database: 'db_b',
+    });
+
+    await (service as any).cleanupPools();
+
+    expect(strategyMock.closePool).toHaveBeenCalledWith({ id: 'stale' });
+    expect((service as any).pools.has('conn-1:db_a')).toBe(false);
+    expect((service as any).pools.has('conn-1:db_b')).toBe(true);
+  });
+
+  it('trims oldest idle pools when the soft pool limit is exceeded', async () => {
+    prismaMock.connection.findUnique.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+    });
+
+    const now = Date.now();
+    (service as any).MAX_ACTIVE_POOLS = 1;
+    (service as any).POOL_PRESSURE_IDLE_MS = 0;
+    (service as any).pools.set('conn-1:db_a', {
+      pool: { id: 'oldest' },
+      lastAccessed: now - 10_000,
+      createdAt: now - 10_000,
+      connectionId: 'conn-1',
+      database: 'db_a',
+    });
+    (service as any).pools.set('conn-1:db_b', {
+      pool: { id: 'newer' },
+      lastAccessed: now - 1_000,
+      createdAt: now - 1_000,
+      connectionId: 'conn-1',
+      database: 'db_b',
+    });
+
+    await (service as any).cleanupPools();
+
+    expect(strategyMock.closePool).toHaveBeenCalledWith({ id: 'oldest' });
+    expect((service as any).pools.has('conn-1:db_a')).toBe(false);
+    expect((service as any).pools.has('conn-1:db_b')).toBe(true);
+  });
 });

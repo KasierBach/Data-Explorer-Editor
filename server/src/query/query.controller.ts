@@ -10,6 +10,7 @@ import {
 import { Request } from 'express';
 import { QueryService } from './query.service';
 import { CreateQueryDto } from './dto/create-query.dto';
+import { FetchTableWindowDto } from './dto/fetch-table-window.dto';
 import { UpdateRowDto } from './dto/update-row.dto';
 import { InsertRowDto } from './dto/insert-row.dto';
 import { DeleteRowsDto } from './dto/delete-rows.dto';
@@ -37,6 +38,17 @@ export class QueryController {
     @Req() req: RequestWithUser,
   ) {
     return this.queryService.executeQuery(createQueryDto, req.user.id);
+  }
+
+  @Post('table-window')
+  fetchTableWindow(
+    @Body() fetchTableWindowDto: FetchTableWindowDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.queryService.fetchTableWindow(
+      fetchTableWindowDto,
+      req.user.id,
+    );
   }
 
   @Patch('row')

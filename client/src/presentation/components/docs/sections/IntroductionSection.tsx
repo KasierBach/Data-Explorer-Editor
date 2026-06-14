@@ -22,8 +22,8 @@ export function IntroductionSection({ lang }: Props) {
             <Callout type="info">
                 <p className="text-sm">
                     {t
-                        ? 'Điểm nhấn của v3.6.2: ảnh đính kèm đi thẳng vào AI chat, catalog model explicit có thêm Beeknoee/Groq/OpenRouter/TokenRouter, billing checkout thật, phân quyền resource chặt hơn, và i18n vi/en chạy xuyên client lẫn server. Phần timeout AI hiện cũng đã được cấu hình rõ bằng env thay vì chỉ là hành vi ngầm.'
-                        : 'v3.6.2 highlights: image attachments now flow directly into AI chat, the explicit model catalog includes Beeknoee/Groq/OpenRouter/TokenRouter, billing is now real, resource permissions are tighter, and vi/en localization runs across both client and server. AI timeout behavior is also documented and configurable via env instead of remaining implicit.'}
+                        ? 'Điểm nhấn của v3.6.2+: ảnh đính kèm đi thẳng vào AI chat, catalog model explicit có thêm Beeknoee/Groq/OpenRouter/TokenRouter, billing checkout thật, phân quyền resource chặt hơn, và i18n vi/en chạy xuyên client lẫn server. Đợt perf pass mới cũng làm rõ search index, table-window browsing, cap NoSQL aggregate, batch migration thích ứng và Redis guardrails.'
+                        : 'v3.6.2+ highlights: image attachments now flow directly into AI chat, the explicit model catalog includes Beeknoee/Groq/OpenRouter/TokenRouter, billing is now real, resource permissions are tighter, and vi/en localization runs across both client and server. The latest performance pass also clarified search indexing, table-window browsing, capped NoSQL aggregate execution, adaptive migration batching, and Redis guardrails.'}
                 </p>
             </Callout>
             {/* Overview Cards */}
@@ -98,8 +98,8 @@ export function IntroductionSection({ lang }: Props) {
                         {
                             title: t ? "Hiệu năng cực đỉnh" : "Extreme Performance",
                             desc: t
-                                ? "Xử lý hàng triệu bản ghi trực tiếp trên trình duyệt mà không lag. Monaco Editor được tối ưu để xử lý file SQL hàng chục nghìn dòng. Kết quả truy vấn được phân trang phía client với virtual scrolling."
-                                : "Handle millions of records directly in the browser without lag. Monaco Editor is optimized to handle SQL files with tens of thousands of lines. Query results use client-side pagination with virtual scrolling."
+                                ? "Tối ưu các đường nóng thực tế: global search dùng candidate index, duyệt bảng dùng server-side window rõ ràng, raw SQL có guardrail 50,000 rows, NoSQL aggregate cap trước khi materialize, và migration dùng batch sizing thích ứng."
+                                : "Optimizes practical hot paths: global search uses candidate indexes, table browsing uses explicit server-side windows, raw SQL has a 50,000-row guardrail, NoSQL aggregate caps before materialization, and migration uses adaptive batch sizing."
                         },
                         {
                             title: t ? "Bảo mật tuyệt đối" : "Absolute Security",

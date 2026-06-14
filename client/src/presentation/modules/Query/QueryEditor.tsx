@@ -169,6 +169,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const hasPersistentGuardrail = Boolean(
         activeConnection?.readOnly || activeConnection?.allowQueryExecution === false
     );
+    const protectiveLimit = results?.appliedLimit ?? 50000;
     const guardrailMessage = React.useMemo(() => {
         if (!activeConnection) return null;
         const parts: string[] = [];
@@ -178,11 +179,23 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         if (activeConnection.allowQueryExecution === false) {
             parts.push(lang === 'vi' ? 'đã tắt chạy truy vấn' : 'query execution is disabled');
         } else {
-            parts.push(lang === 'vi' ? `giới hạn ${limit === 'all' ? '50,000+' : limit} dòng` : `${limit === 'all' ? '50,000+' : limit} row limit`);
+            parts.push(
+                limit === 'all'
+                    ? (
+                        lang === 'vi'
+                            ? `bộ bảo vệ máy chủ: tối đa ${protectiveLimit.toLocaleString('vi-VN')} dòng`
+                            : `server guardrail: max ${protectiveLimit.toLocaleString('en-US')} rows`
+                    )
+                    : (
+                        lang === 'vi'
+                            ? `giới hạn yêu cầu: ${limit} dòng`
+                            : `requested limit: ${limit} rows`
+                    )
+            );
             parts.push(lang === 'vi' ? 'timeout ~30s' : '~30s timeout');
         }
         return parts.join(' • ');
-    }, [activeConnection, lang, limit]);
+    }, [activeConnection, lang, limit, protectiveLimit]);
     const resultColumns = React.useMemo(() => {
         if (results?.columns?.length) return results.columns;
         if (results?.rows?.length) return Object.keys(results.rows[0]);

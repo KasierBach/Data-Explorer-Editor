@@ -9,6 +9,7 @@ import {
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { CreateQueryDto } from './dto/create-query.dto';
+import { FetchTableWindowDto } from './dto/fetch-table-window.dto';
 import { UpdateRowDto } from './dto/update-row.dto';
 import { InsertRowDto } from './dto/insert-row.dto';
 import { DeleteRowsDto } from './dto/delete-rows.dto';
@@ -29,11 +30,16 @@ import {
   getErrorMessage,
   isForbiddenException,
 } from '../common/utils/error.util';
+import { SqlUtil } from '../utils/sql.util';
+import type { QueryResult } from '../database-strategies';
 
 @Injectable()
 export class QueryService {
   private readonly logger = new Logger(QueryService.name);
   private readonly QUERY_CACHE_TTL_MS = 60_000;
+  private readonly DEFAULT_QUERY_LIMIT = 50_000;
+  private readonly DEFAULT_TABLE_WINDOW_LIMIT = 100;
+  private readonly MAX_TABLE_WINDOW_LIMIT = 1_000;
 
   constructor(
     private readonly connectionsService: ConnectionsService,
@@ -85,6 +91,76 @@ export class QueryService {
       database || 'default',
     ]);
     this.logger.debug(`Freshness bumped for connection ${connectionId}`);
+  }
+
+  private extractCountValue(result: QueryResult): number | undefined {
+    if (!result.rows?.length) return undefined;
+
+    const firstRow = result.rows[0];
+    const countVal =
+      firstRow.total ??
+      firstRow.TOTAL ??
+      firstRow.count ??
+      firstRow.COUNT ??
+      firstRow[Object.keys(firstRow)[0]];
+    const parsed = Number.parseInt(String(countVal), 10);
+
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  private isSqlBrowseCapableConnection(type: Connection['type']): boolean {
+    return !['mongodb', 'mongodb+srv', 'mock'].includes(type);
+  }
+
+  private isSelectLikeQuery(sql: string): boolean {
+    return /^\s*(SELECT|WITH)\b/i.test(sql.trim());
+  }
+
+  private hasExplicitSqlLimit(sql: string): boolean {
+    return /\b(LIMIT|TOP|FETCH\s+NEXT)\b/i.test(sql);
+  }
+
+  private applyRawQueryMetadata(
+    result: QueryResult,
+    sql: string,
+    options: { limit?: number; offset?: number },
+  ): QueryResult {
+    const nextResult: QueryResult = { ...result };
+
+    if (options.offset !== undefined) {
+      nextResult.appliedOffset = options.offset;
+    }
+
+    if (!this.isSelectLikeQuery(sql)) {
+      nextResult.countStatus ??= 'skipped';
+      return nextResult;
+    }
+
+    if (options.limit !== undefined) {
+      nextResult.appliedLimit = options.limit;
+      nextResult.limitSource = 'requested';
+      return nextResult;
+    }
+
+    if (!this.hasExplicitSqlLimit(sql)) {
+      nextResult.appliedLimit = this.DEFAULT_QUERY_LIMIT;
+      nextResult.limitSource = 'protective_default';
+    }
+
+    return nextResult;
+  }
+
+  private async resolveTableCount(
+    strategy: { executeQuery: (pool: unknown, sql: string) => Promise<QueryResult> },
+    pool: unknown,
+    quotedTable: string,
+  ): Promise<number | undefined> {
+    const countResult = await strategy.executeQuery(
+      pool,
+      `SELECT COUNT(*) AS total FROM ${quotedTable}`,
+    );
+
+    return this.extractCountValue(countResult);
   }
 
   private async blockOperation(
@@ -330,11 +406,8 @@ export class QueryService {
         }
       }
 
-      const result = await strategy.executeQuery(pool, sql, { limit, offset });
-
-      if (isCacheable && result.rows) {
-        await this.cacheManager.set(cacheKey, result, this.QUERY_CACHE_TTL_MS);
-      }
+      let result = await strategy.executeQuery(pool, sql, { limit, offset });
+      result = this.applyRawQueryMetadata(result, sql, { limit, offset });
 
       // Attempt to get totalCount for table views (standard SELECT * queries)
       if (
@@ -354,17 +427,17 @@ export class QueryService {
                 : `SELECT COUNT(*) as total FROM ${tableRef}`;
 
             const countResult = await strategy.executeQuery(pool, countSql);
-            if (countResult.rows && countResult.rows.length > 0) {
-              const firstRow = countResult.rows[0];
-              const countVal =
-                firstRow.total ??
-                firstRow.TOTAL ??
-                firstRow.count ??
-                firstRow[Object.keys(firstRow)[0]];
-              result.totalCount = parseInt(String(countVal), 10);
+            const totalCount = this.extractCountValue(countResult);
+
+            if (totalCount !== undefined) {
+              result.totalCount = totalCount;
+              result.countStatus = 'available';
+            } else {
+              result.countStatus = 'unavailable';
             }
           }
         } catch (countError) {
+          result.countStatus = 'unavailable';
           this.logger.warn(
             'Failed to fetch total row count:',
             countError instanceof Error
@@ -372,6 +445,12 @@ export class QueryService {
               : String(countError),
           );
         }
+      } else if (includeTotalCount === false) {
+        result.countStatus = 'skipped';
+      }
+
+      if (isCacheable && result.rows) {
+        await this.cacheManager.set(cacheKey, result, this.QUERY_CACHE_TTL_MS);
       }
 
       await this.auditService.log({
@@ -392,6 +471,145 @@ export class QueryService {
       this.logger.error('Query Service Error Details:', getErrorMessage(error));
       throw new InternalServerErrorException(
         'Query execution failed. Please check your syntax or connection permissions.',
+      );
+    }
+  }
+
+  async fetchTableWindow(
+    fetchTableWindowDto: FetchTableWindowDto,
+    userId: string,
+  ) {
+    const {
+      connectionId,
+      database,
+      schema,
+      table,
+      includeTotalCount,
+      limit,
+      offset,
+    } = fetchTableWindowDto;
+
+    const connection = await this.connectionsService.findOne(
+      connectionId,
+      userId,
+    );
+
+    if (!connection.allowQueryExecution) {
+      await this.blockOperation(userId, {
+        connectionId: connection.id,
+        database: database || connection.database,
+        action: 'fetch_table_window',
+        reason: 'QUERY_EXECUTION_DISABLED',
+        message: 'Table browsing is disabled for this connection.',
+        extra: { table },
+      });
+    }
+
+    if (!this.isSqlBrowseCapableConnection(connection.type)) {
+      throw new BadRequestException(
+        `Table-window browsing is not supported for ${connection.type} connections.`,
+      );
+    }
+
+    const normalizedLimit = SqlUtil.sanitizeLimit(
+      limit ?? this.DEFAULT_TABLE_WINDOW_LIMIT,
+      this.MAX_TABLE_WINDOW_LIMIT,
+    );
+    const normalizedOffset = Math.max(0, offset ?? 0);
+
+    try {
+      const pool = await this.connectionsService.getPool(
+        connectionId,
+        database || connection.database,
+        userId,
+      );
+      const strategy = this.strategyFactory.getStrategy(connection.type);
+      const quotedTable = strategy.quoteTable(schema, table);
+      const baseSql = `SELECT * FROM ${quotedTable}`;
+      const cacheKey = await this.getQueryCacheKey(
+        connectionId,
+        `table-window:${baseSql}`,
+        database || connection.database,
+        {
+          limit: normalizedLimit,
+          offset: normalizedOffset,
+          includeTotalCount,
+        },
+      );
+
+      const cachedResult = await this.cacheManager.get<QueryResult>(cacheKey);
+      if (cachedResult) {
+        return { ...cachedResult, cached: true };
+      }
+
+      const result = await strategy.executeQuery(pool, baseSql, {
+        limit: normalizedLimit,
+        offset: normalizedOffset,
+      });
+
+      const response: QueryResult = {
+        ...result,
+        appliedLimit: normalizedLimit,
+        appliedOffset: normalizedOffset,
+        limitSource: 'table_window',
+      };
+
+      if (includeTotalCount !== false) {
+        try {
+          const totalCount = await this.resolveTableCount(
+            strategy,
+            pool,
+            quotedTable,
+          );
+          if (totalCount !== undefined) {
+            response.totalCount = totalCount;
+            response.countStatus = 'available';
+          } else {
+            response.countStatus = 'unavailable';
+          }
+        } catch (countError) {
+          response.countStatus = 'unavailable';
+          this.logger.warn(
+            'Failed to fetch table-window row count:',
+            countError instanceof Error
+              ? countError.message
+              : String(countError),
+          );
+        }
+      } else {
+        response.countStatus = 'skipped';
+      }
+
+      await this.cacheManager.set(
+        cacheKey,
+        response,
+        this.QUERY_CACHE_TTL_MS,
+      );
+
+      await this.auditService.log({
+        action: AuditAction.DB_QUERY_EXECUTE,
+        userId,
+        details: {
+          category: 'table_window',
+          connectionId,
+          database: database || connection.database,
+          schema,
+          table,
+          limit: normalizedLimit,
+          offset: normalizedOffset,
+        },
+      });
+
+      return response;
+    } catch (error) {
+      if (isForbiddenException(error)) throw error;
+
+      this.logger.error(
+        'Table Window Error Details:',
+        getErrorMessage(error),
+      );
+      throw new InternalServerErrorException(
+        'Table browsing failed. Please verify the selected table and connection permissions.',
       );
     }
   }

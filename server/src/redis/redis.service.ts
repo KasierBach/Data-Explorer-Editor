@@ -11,6 +11,7 @@ import Redis from 'ioredis';
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private client: Redis;
+  private readonly defaultScanCount = 100;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -71,10 +72,33 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Get all keys matching a pattern.
+   * Get all keys matching a pattern using incremental SCAN pages
+   * so large keyspaces do not block Redis like KEYS would.
    */
   async keys(pattern: string): Promise<string[]> {
-    return this.client.keys(pattern);
+    return this.scanKeys(pattern);
+  }
+
+  async scanKeys(
+    pattern: string,
+    count = this.defaultScanCount,
+  ): Promise<string[]> {
+    const discovered = new Set<string>();
+    let cursor = '0';
+
+    do {
+      const [nextCursor, batch] = await this.client.scan(
+        cursor,
+        'MATCH',
+        pattern,
+        'COUNT',
+        count,
+      );
+      cursor = nextCursor;
+      batch.forEach((key) => discovered.add(key));
+    } while (cursor !== '0');
+
+    return [...discovered];
   }
 
   /**

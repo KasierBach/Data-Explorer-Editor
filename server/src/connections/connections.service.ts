@@ -3,6 +3,7 @@ import {
   NotFoundException,
   OnModuleDestroy,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
@@ -18,8 +19,21 @@ import { getErrorMessage } from '../common/utils/error.util';
 
 @Injectable()
 export class ConnectionsService implements OnModuleDestroy {
-  private pools = new Map<string, { pool: any; lastAccessed: number }>();
+  private readonly logger = new Logger(ConnectionsService.name);
+  private pools = new Map<
+    string,
+    {
+      pool: any;
+      lastAccessed: number;
+      createdAt: number;
+      connectionId: string;
+      database: string | null;
+    }
+  >();
   private readonly POOL_TTL = 15 * 60 * 1000; // 15 mins
+  private readonly POOL_PRESSURE_IDLE_MS = 60 * 1000;
+  private readonly MAX_ACTIVE_POOLS = 30;
+  private readonly MAX_POOLS_PER_CONNECTION = 5;
   private readonly cleanupInterval: NodeJS.Timeout;
 
   constructor(
@@ -105,6 +119,65 @@ export class ConnectionsService implements OnModuleDestroy {
     }
   }
 
+  private getConnectionIdFromPoolKey(key: string) {
+    return key.split(':')[0];
+  }
+
+  private getPoolMetrics() {
+    const perConnection = new Map<string, number>();
+
+    for (const key of this.pools.keys()) {
+      const connectionId = this.getConnectionIdFromPoolKey(key);
+      perConnection.set(
+        connectionId,
+        (perConnection.get(connectionId) ?? 0) + 1,
+      );
+    }
+
+    return {
+      totalPools: this.pools.size,
+      perConnection,
+    };
+  }
+
+  private async trimIdlePoolsToSoftLimit(now: number) {
+    if (this.pools.size <= this.MAX_ACTIVE_POOLS) {
+      return;
+    }
+
+    const overflow = this.pools.size - this.MAX_ACTIVE_POOLS;
+    const idleCutoff = now - this.POOL_PRESSURE_IDLE_MS;
+    const victims = [...this.pools.entries()]
+      .filter(([, poolData]) => poolData.lastAccessed <= idleCutoff)
+      .sort((left, right) => left[1].lastAccessed - right[1].lastAccessed)
+      .slice(0, overflow)
+      .map(([key]) => key);
+
+    for (const key of victims) {
+      await this.closePoolByKey(key, { silent: true });
+    }
+
+    if (victims.length > 0) {
+      this.logger.warn(
+        `Trimmed ${victims.length} idle connection pool(s) under pressure.`,
+      );
+    }
+  }
+
+  private logPoolPressure(connectionId: string) {
+    const metrics = this.getPoolMetrics();
+    const connectionPoolCount = metrics.perConnection.get(connectionId) ?? 0;
+
+    if (
+      metrics.totalPools > this.MAX_ACTIVE_POOLS ||
+      connectionPoolCount > this.MAX_POOLS_PER_CONNECTION
+    ) {
+      this.logger.warn(
+        `Connection pools under pressure: total=${metrics.totalPools}, connection=${connectionId}, fanOut=${connectionPoolCount}.`,
+      );
+    }
+  }
+
   /**
    * Generic fallback for closing a pool when the strategy/connection is unavailable.
    */
@@ -129,7 +202,7 @@ export class ConnectionsService implements OnModuleDestroy {
     if (!poolData) return;
 
     try {
-      const id = key.split(':')[0];
+      const id = this.getConnectionIdFromPoolKey(key);
       const connection = await this.prisma.connection.findUnique({
         where: { id },
       });
@@ -164,6 +237,8 @@ export class ConnectionsService implements OnModuleDestroy {
         await this.closePoolByKey(key, { silent: true });
       }
     }
+
+    await this.trimIdlePoolsToSoftLimit(now);
   }
 
   async onModuleDestroy() {
@@ -348,6 +423,15 @@ export class ConnectionsService implements OnModuleDestroy {
       }
     }
 
+    const poolMetrics = this.getPoolMetrics();
+    const connectionPoolCount = poolMetrics.perConnection.get(id) ?? 0;
+    if (
+      poolMetrics.totalPools >= this.MAX_ACTIVE_POOLS ||
+      connectionPoolCount >= this.MAX_POOLS_PER_CONNECTION
+    ) {
+      await this.cleanupPools();
+    }
+
     const decryptedPassword = connection.password
       ? decryptAttribute(connection.password)
       : undefined;
@@ -388,7 +472,15 @@ export class ConnectionsService implements OnModuleDestroy {
         databaseOverride,
       );
 
-      this.pools.set(poolKey, { pool, lastAccessed: Date.now() });
+      const timestamp = Date.now();
+      this.pools.set(poolKey, {
+        pool,
+        lastAccessed: timestamp,
+        createdAt: timestamp,
+        connectionId: id,
+        database: databaseOverride || connection.database || null,
+      });
+      this.logPoolPressure(id);
       await this.updateHealthState(id, { status: 'healthy', connected: true });
       return pool;
     } catch (error) {

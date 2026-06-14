@@ -518,4 +518,41 @@ describe('MigrationService', () => {
     expect(review.canProceed).toBe(false);
     expect(review.blockers.join(' ')).toContain('missing source columns');
   });
+
+  it('should shrink the import batch size after a retryable target write failure', async () => {
+    const sourceStrategy = createMockStrategy();
+    const targetStrategy = createMockStrategy();
+
+    mockTargetConn.type = 'mssql';
+    targetStrategy.importData
+      .mockRejectedValueOnce(new Error('Request timeout while writing batch'))
+      .mockResolvedValue({ success: true, rowCount: 125 });
+
+    const stream = new PassThrough({ objectMode: true });
+    sourceStrategy.exportStream.mockResolvedValue(stream);
+
+    mockStrategyFactory.getStrategy
+      .mockReturnValueOnce(sourceStrategy)
+      .mockReturnValueOnce(targetStrategy);
+
+    const { jobId } = await service.startMigration('user-1', baseDto);
+    const pipeline = startPipeline(jobId, baseDto);
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    for (let i = 0; i < 125; i++) {
+      stream.write({ id: i, name: `user_${i}`, email: `user${i}@test.com` });
+    }
+    stream.end();
+
+    await pipeline;
+
+    const job = await service.getPublicJob(jobId, 'user-1');
+    expect(job.status).toBe('completed');
+    expect(targetStrategy.importData).toHaveBeenCalledTimes(4);
+    expect(targetStrategy.importData.mock.calls[0][1].data.length).toBe(125);
+    expect(targetStrategy.importData.mock.calls[1][1].data.length).toBe(62);
+    expect(targetStrategy.importData.mock.calls[2][1].data.length).toBe(62);
+    expect(targetStrategy.importData.mock.calls[3][1].data.length).toBe(1);
+  });
 });

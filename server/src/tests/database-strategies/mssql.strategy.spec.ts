@@ -113,4 +113,27 @@ describe('MssqlStrategy', () => {
       expect(result.rows.length).toBe(50000);
     });
   });
+
+  describe('importData', () => {
+    it('sends batched multi-row inserts instead of looping row-by-row', async () => {
+      mockRequest.query.mockResolvedValue({
+        rowsAffected: [2],
+      });
+
+      const result = await strategy.importData(mockPool, {
+        schema: 'dbo',
+        table: 'users',
+        data: [
+          { id: 1, email: 'ada@example.com' },
+          { id: 2, email: 'grace@example.com' },
+        ],
+      });
+
+      expect(mockRequest.input).toHaveBeenCalledTimes(4);
+      expect(mockRequest.query).toHaveBeenCalledWith(
+        'INSERT INTO [dbo].[users] ([id], [email]) VALUES (@r0_0, @r0_1), (@r1_0, @r1_1)',
+      );
+      expect(result).toEqual({ success: true, rowCount: 2 });
+    });
+  });
 });

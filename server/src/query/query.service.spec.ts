@@ -162,4 +162,109 @@ describe('QueryService', () => {
       ['select * from users', 'limit:1000', 'offset:0', 'total:0'],
     );
   });
+
+  it('returns explicit table windows with limit, offset, and a trusted total count', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+    freshnessService.buildKey.mockResolvedValue('freshness:table-window:key');
+    cacheManager.get.mockResolvedValue(undefined);
+    strategy.executeQuery
+      .mockResolvedValueOnce({
+        rows: [{ id: 1 }],
+        columns: ['id'],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [{ total: 42 }],
+        columns: ['total'],
+        rowCount: 1,
+      });
+
+    const result = await service.fetchTableWindow(
+      {
+        connectionId: 'conn-1',
+        database: 'main',
+        schema: 'public',
+        table: 'users',
+        limit: 25,
+        offset: 50,
+      } as any,
+      'user-1',
+    );
+
+    expect(strategy.quoteTable).toHaveBeenCalledWith('public', 'users');
+    expect(strategy.executeQuery).toHaveBeenNthCalledWith(
+      1,
+      {},
+      'SELECT * FROM public.users',
+      { limit: 25, offset: 50 },
+    );
+    expect(strategy.executeQuery).toHaveBeenNthCalledWith(
+      2,
+      {},
+      'SELECT COUNT(*) AS total FROM public.users',
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        totalCount: 42,
+        countStatus: 'available',
+        appliedLimit: 25,
+        appliedOffset: 50,
+        limitSource: 'table_window',
+      }),
+    );
+    expect(cacheManager.set).toHaveBeenCalledWith(
+      'freshness:table-window:key',
+      expect.objectContaining({
+        totalCount: 42,
+        countStatus: 'available',
+      }),
+      60_000,
+    );
+  });
+
+  it('marks raw select queries with the protective default limit when no explicit limit is requested', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+    freshnessService.buildKey.mockResolvedValue('freshness:query:key');
+    cacheManager.get.mockResolvedValue(undefined);
+    strategy.executeQuery.mockResolvedValue({
+      rows: [{ id: 1 }],
+      columns: ['id'],
+      rowCount: 1,
+    });
+
+    const result = await service.executeQuery(
+      {
+        connectionId: 'conn-1',
+        sql: 'SELECT * FROM users',
+        includeTotalCount: false,
+      } as any,
+      'user-1',
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        appliedLimit: 50_000,
+        limitSource: 'protective_default',
+        countStatus: 'skipped',
+      }),
+    );
+  });
 });

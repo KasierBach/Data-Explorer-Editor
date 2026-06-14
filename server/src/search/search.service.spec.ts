@@ -1,30 +1,38 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SearchService } from './search.service';
-import { ConfigService } from '@nestjs/config';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
-import { NotificationsService } from '../notifications/notifications.service';
-import Redis from 'ioredis';
 import { AiService } from '../ai/ai.service';
-
-jest.mock('ioredis');
+import { SearchIndexRepository } from './search-index.repository';
 
 describe('SearchService', () => {
   let service: SearchService;
-  let redisMock: jest.Mocked<Redis>;
   let connectionsService: jest.Mocked<ConnectionsService>;
   let strategyFactory: jest.Mocked<DatabaseStrategyFactory>;
+  let searchIndexRepository: {
+    search: jest.Mock;
+    replaceUserIndex: jest.Mock;
+    getSemanticFallbackNames: jest.Mock;
+    getItemsByNames: jest.Mock;
+  };
+  let aiService: {
+    suggestTablesBySemantic: jest.Mock;
+  };
 
   beforeEach(async () => {
+    searchIndexRepository = {
+      search: jest.fn(),
+      replaceUserIndex: jest.fn(),
+      getSemanticFallbackNames: jest.fn(),
+      getItemsByNames: jest.fn(),
+    };
+    aiService = {
+      suggestTablesBySemantic: jest.fn().mockResolvedValue([]),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SearchService,
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn().mockReturnValue('redis://localhost:6379'),
-          },
-        },
         {
           provide: ConnectionsService,
           useValue: { findAll: jest.fn(), getPool: jest.fn() },
@@ -34,14 +42,12 @@ describe('SearchService', () => {
           useValue: { getStrategy: jest.fn() },
         },
         {
-          provide: NotificationsService,
-          useValue: { emit: jest.fn() },
+          provide: AiService,
+          useValue: aiService,
         },
         {
-          provide: AiService,
-          useValue: {
-            suggestTablesBySemantic: jest.fn().mockResolvedValue([]),
-          },
+          provide: SearchIndexRepository,
+          useValue: searchIndexRepository,
         },
       ],
     }).compile();
@@ -49,10 +55,6 @@ describe('SearchService', () => {
     service = module.get<SearchService>(SearchService);
     connectionsService = module.get(ConnectionsService);
     strategyFactory = module.get(DatabaseStrategyFactory);
-
-    // Setup Redis mock
-    service.onModuleInit();
-    redisMock = (service as any).redis;
   });
 
   it('should be defined', () => {
@@ -60,33 +62,56 @@ describe('SearchService', () => {
   });
 
   describe('search', () => {
-    it('should return matched items from Redis', async () => {
-      const mockItems = [
-        JSON.stringify({ name: 'users', type: 'table', connectionName: 'DB1' }),
-        JSON.stringify({
-          name: 'orders',
-          type: 'table',
-          connectionName: 'DB1',
-        }),
-      ];
-
-      redisMock.smembers.mockResolvedValue(mockItems as any);
+    it('returns indexed keyword matches without triggering semantic fallback when the hit set is already strong', async () => {
+      searchIndexRepository.search.mockResolvedValue([
+        { id: '1', name: 'users', type: 'table', connectionName: 'DB1' },
+        { id: '2', name: 'users_archive', type: 'table', connectionName: 'DB1' },
+        { id: '3', name: 'users_shadow', type: 'table', connectionName: 'DB1' },
+        { id: '4', name: 'users_beta', type: 'table', connectionName: 'DB1' },
+        { id: '5', name: 'users_staging', type: 'table', connectionName: 'DB1' },
+      ]);
 
       const results = await service.search('user-1', 'user');
 
-      expect(results).toHaveLength(1);
+      expect(results).toHaveLength(5);
       expect(results[0].name).toBe('users');
+      expect(aiService.suggestTablesBySemantic).not.toHaveBeenCalled();
     });
 
-    it('should return empty array if no match', async () => {
-      redisMock.smembers.mockResolvedValue(['{"name":"other"}'] as any);
-      const results = await service.search('user-1', 'missing');
-      expect(results).toHaveLength(0);
+    it('merges semantic fallback suggestions only when keyword matches are sparse', async () => {
+      searchIndexRepository.search.mockResolvedValue([
+        { id: '1', name: 'audit_logs', type: 'table', connectionName: 'DB1' },
+      ]);
+      searchIndexRepository.getSemanticFallbackNames.mockResolvedValue([
+        'audit_logs',
+        'users',
+        'user_sessions',
+      ]);
+      aiService.suggestTablesBySemantic.mockResolvedValue([
+        'users',
+        'user_sessions',
+      ]);
+      searchIndexRepository.getItemsByNames.mockResolvedValue([
+        { id: '2', name: 'users', type: 'table', connectionName: 'DB1' },
+        { id: '3', name: 'user_sessions', type: 'table', connectionName: 'DB1' },
+      ]);
+
+      const results = await service.search('user-1', 'login history');
+
+      expect(results.map((result) => result.name)).toEqual([
+        'audit_logs',
+        'users',
+        'user_sessions',
+      ]);
+      expect(aiService.suggestTablesBySemantic).toHaveBeenCalledWith(
+        'login history',
+        ['audit_logs', 'users', 'user_sessions'],
+      );
     });
   });
 
   describe('syncIndex', () => {
-    it('should clear old index and index new connections', async () => {
+    it('rebuilds the repository index from tables and views across connections', async () => {
       const userId = 'user-1';
       const mockConn = { id: 'conn-1', name: 'Main DB', type: 'postgres' };
       connectionsService.findAll.mockResolvedValue([mockConn] as any);
@@ -105,8 +130,20 @@ describe('SearchService', () => {
 
       await service.syncIndex(userId);
 
-      expect(redisMock.del).toHaveBeenCalled();
-      expect(redisMock.sadd).toHaveBeenCalled();
+      expect(searchIndexRepository.replaceUserIndex).toHaveBeenCalledWith(
+        userId,
+        [
+          {
+            id: 't1',
+            name: 'users',
+            type: 'table',
+            connectionId: 'conn-1',
+            connectionName: 'Main DB',
+            database: 'postgres',
+            schema: 'public',
+          },
+        ],
+      );
     });
   });
 });

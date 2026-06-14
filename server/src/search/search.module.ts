@@ -1,15 +1,14 @@
 import { Module } from '@nestjs/common';
 import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
-import { ConfigModule } from '@nestjs/config';
 import { ConnectionsModule } from '../connections/connections.module';
-import { NotificationsModule } from '../notifications/notifications.module';
 import { AiModule } from '../ai/ai.module';
+import { SearchIndexRepository } from './search-index.repository';
 
 @Module({
-  imports: [ConfigModule, ConnectionsModule, NotificationsModule, AiModule],
+  imports: [ConnectionsModule, AiModule],
   controllers: [SearchController],
-  providers: [SearchService],
+  providers: [SearchService, SearchIndexRepository],
   exports: [SearchService],
 })
 export class SearchModule {}

@@ -13,6 +13,15 @@ export interface QueryExecutionContext {
     includeTotalCount?: boolean;
 }
 
+export interface TableWindowRequest {
+    database?: string;
+    schema?: string;
+    table: string;
+    limit?: number;
+    offset?: number;
+    includeTotalCount?: boolean;
+}
+
 export interface SchemaOperation {
     type: string;
     [key: string]: unknown;
@@ -78,6 +87,11 @@ export interface IDatabaseAdapter {
      * Executes a raw SQL query and returns the results.
      */
     executeQuery(sql: string, context?: QueryExecutionContext): Promise<QueryResult>;
+
+    /**
+     * Fetches a paginated table window for grid browsing.
+     */
+    fetchTableWindow(params: TableWindowRequest): Promise<QueryResult>;
 
     /**
      * Retrieves metadata (columns, constraints) for a specific table.

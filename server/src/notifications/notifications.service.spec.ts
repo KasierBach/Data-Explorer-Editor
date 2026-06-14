@@ -43,35 +43,41 @@ describe('NotificationsService', () => {
   it('should publish message to Redis on emit', async () => {
     await service.emit('user-1', 'info', 'Test message');
     expect(pubClientMock.publish).toHaveBeenCalledWith(
-      'notifications',
+      'notifications:user:user-1',
       expect.stringContaining('Test message'),
     );
   });
 
-  it('should stream events filtered by userId', async () => {
+  it('should stream events through a per-user Redis channel', async () => {
     const userId = 'user-1';
     const streamPromise = firstValueFrom(service.eventStream(userId));
+    expect(subClientMock.subscribe).toHaveBeenCalledWith(
+      'notifications:user:user-1',
+    );
 
     // Simulate Redis message arrival
     const messageHandler = subClientMock.on.mock.calls.find(
       (c) => c[0] === 'message',
     )[1];
 
-    // First message: wrong userId (should be filtered out by service)
+    // First message: different channel (should be ignored by service)
     messageHandler(
-      'notifications',
+      'notifications:user:other-user',
       JSON.stringify({ userId: 'other-user', data: { message: 'Ignored' } }),
     );
 
     // Send matching message shortly after
     setTimeout(() => {
       messageHandler(
-        'notifications',
+        'notifications:user:user-1',
         JSON.stringify({ userId: 'user-1', data: { message: 'Matched' } }),
       );
     }, 10);
 
     const event: any = await streamPromise;
     expect(event.data.message).toBe('Matched');
+    expect(subClientMock.unsubscribe).toHaveBeenCalledWith(
+      'notifications:user:user-1',
+    );
   });
 });

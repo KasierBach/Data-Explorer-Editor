@@ -26,7 +26,7 @@ describe('PresenceService', () => {
   } as any;
   const redisMock = {
     hset: jest.fn(),
-    hgetall: jest.fn(),
+    hscan: jest.fn(),
     expire: jest.fn(),
     hdel: jest.fn(),
     quit: jest.fn(),
@@ -55,7 +55,7 @@ describe('PresenceService', () => {
       username: 'ada',
       avatarUrl: null,
     });
-    redisMock.hgetall.mockResolvedValue({});
+    redisMock.hscan.mockResolvedValue(['0', []]);
 
     const result = await service.heartbeatTeamspace(
       'org-1',
@@ -77,28 +77,33 @@ describe('PresenceService', () => {
       id: 'member-1',
     });
     prismaMock.teamspace.findFirst.mockResolvedValue({ id: 'teamspace-1' });
-    redisMock.hgetall.mockResolvedValue({
-      fresh: JSON.stringify({
-        id: 'fresh',
-        email: 'fresh@example.com',
-        firstName: 'Fresh',
-        lastName: 'User',
-        username: 'fresh',
-        avatarUrl: null,
-        displayName: 'Fresh User',
-        lastSeen: Date.now(),
-      }),
-      stale: JSON.stringify({
-        id: 'stale',
-        email: 'stale@example.com',
-        firstName: 'Stale',
-        lastName: 'User',
-        username: 'stale',
-        avatarUrl: null,
-        displayName: 'Stale User',
-        lastSeen: Date.now() - 120_000,
-      }),
-    });
+    redisMock.hscan.mockResolvedValue([
+      '0',
+      [
+        'fresh',
+        JSON.stringify({
+          id: 'fresh',
+          email: 'fresh@example.com',
+          firstName: 'Fresh',
+          lastName: 'User',
+          username: 'fresh',
+          avatarUrl: null,
+          displayName: 'Fresh User',
+          lastSeen: Date.now(),
+        }),
+        'stale',
+        JSON.stringify({
+          id: 'stale',
+          email: 'stale@example.com',
+          firstName: 'Stale',
+          lastName: 'User',
+          username: 'stale',
+          avatarUrl: null,
+          displayName: 'Stale User',
+          lastSeen: Date.now() - 120_000,
+        }),
+      ],
+    ]);
 
     const result = await service.listTeamspacePresence(
       'org-1',
@@ -112,6 +117,68 @@ describe('PresenceService', () => {
       'presence:organizations:org-1:teamspaces:teamspace-1',
       'stale',
     );
+  });
+
+  it('walks Redis hashes through hscan pages instead of hgetall', async () => {
+    prismaMock.organizationMember.findUnique.mockResolvedValue({
+      id: 'member-1',
+    });
+    prismaMock.teamspace.findFirst.mockResolvedValue({ id: 'teamspace-1' });
+    redisMock.hscan
+      .mockResolvedValueOnce([
+        '1',
+        [
+          'user-1',
+          JSON.stringify({
+            id: 'user-1',
+            email: 'u1@example.com',
+            firstName: 'User',
+            lastName: 'One',
+            username: 'u1',
+            avatarUrl: null,
+            displayName: 'User One',
+            lastSeen: Date.now(),
+          }),
+        ],
+      ])
+      .mockResolvedValueOnce([
+        '0',
+        [
+          'user-2',
+          JSON.stringify({
+            id: 'user-2',
+            email: 'u2@example.com',
+            firstName: 'User',
+            lastName: 'Two',
+            username: 'u2',
+            avatarUrl: null,
+            displayName: 'User Two',
+            lastSeen: Date.now() - 1_000,
+          }),
+        ],
+      ]);
+
+    const result = await service.listTeamspacePresence(
+      'org-1',
+      'teamspace-1',
+      'user-1',
+    );
+
+    expect(redisMock.hscan).toHaveBeenNthCalledWith(
+      1,
+      'presence:organizations:org-1:teamspaces:teamspace-1',
+      '0',
+      'COUNT',
+      100,
+    );
+    expect(redisMock.hscan).toHaveBeenNthCalledWith(
+      2,
+      'presence:organizations:org-1:teamspaces:teamspace-1',
+      '1',
+      'COUNT',
+      100,
+    );
+    expect(result).toHaveLength(2);
   });
 
   it('blocks resource presence without read access', async () => {

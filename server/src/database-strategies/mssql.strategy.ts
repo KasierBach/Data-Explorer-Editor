@@ -159,16 +159,30 @@ export class MssqlStrategy implements IDatabaseStrategy {
   ): Promise<{ success: boolean; rowCount: number }> {
     const { schema, table, data } = params;
     if (!data || data.length === 0) return { success: true, rowCount: 0 };
+    const columns = Object.keys(data[0]);
+    if (columns.length === 0) return { success: false, rowCount: 0 };
 
-    let totalAffected = 0;
-    // For MSSQL, we'll use a simple loop for now.
-    // For production, we'd use a Table-Valued Parameter or Bulk Copy (bcp).
-    for (const row of data) {
-      const res = await this.insertRow(pool, { schema, table, data: row });
-      if (res.success) totalAffected += res.rowCount;
-    }
+    const quotedTable = this.quoteTable(schema, table);
+    const columnList = columns.map((column) => `[${column}]`).join(', ');
+    const valueGroups: string[] = [];
+    const request = pool.request();
 
-    return { success: true, rowCount: totalAffected };
+    data.forEach((row, rowIndex) => {
+      const placeholders = columns.map((column, columnIndex) => {
+        const paramName = `r${rowIndex}_${columnIndex}`;
+        request.input(paramName, row[column]);
+        return `@${paramName}`;
+      });
+      valueGroups.push(`(${placeholders.join(', ')})`);
+    });
+
+    const sql = `INSERT INTO ${quotedTable} (${columnList}) VALUES ${valueGroups.join(', ')}`;
+    const result = await request.query(sql);
+
+    return {
+      success: true,
+      rowCount: result.rowsAffected?.[0] ?? data.length,
+    };
   }
 
   async exportStream(

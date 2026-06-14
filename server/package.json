@@ -7,6 +7,9 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "node scripts/prisma-generate-safe.mjs && nest build",
+    "bench:search": "node --expose-gc scripts/benchmarks/search-benchmark.mjs",
+    "bench:query-window": "node --expose-gc scripts/benchmarks/query-window-benchmark.mjs",
+    "bench:migration": "node --expose-gc scripts/benchmarks/migration-benchmark.mjs",
     "prisma:generate": "npx prisma generate",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

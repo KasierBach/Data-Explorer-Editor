@@ -195,15 +195,13 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
 
     const pagination = useMemo(() => ({ pageIndex, pageSize }), [pageIndex, pageSize]);
 
-    const isLargeDataset = tableId === 'large_dataset' || tableId === 'tbl-large';
-
     // Custom hooks — data & editing logic
     const {
         metadata, queryResult, isLoadingMeta, isLoadingData, isFetchingData,
         refetch, dbName, schema, cleanTableName, dialect, pkField,
     } = useDataGridData({ tableId });
     const tableName = cleanTableName || tableId;
-    const effectiveTotalCount = queryResult?.totalCount ?? metadata?.rowCount;
+    const effectiveTotalCount = queryResult?.totalCount;
     const totalPages = effectiveTotalCount
         ? Math.max(1, Math.ceil(effectiveTotalCount / pagination.pageSize))
         : null;
@@ -1153,77 +1151,75 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                 <div className="flex items-center gap-6">
                     <span className="flex items-center gap-1.5">
                         <div className={`w-1.5 h-1.5 rounded-full ${isFetchingData ? 'bg-blue-500 animate-pulse' : 'bg-green-500'}`} />
-                        {isLargeDataset ? text.virtualizedAll : text.pageLabel(pagination.pageIndex + 1)}
+                        {text.pageLabel(pagination.pageIndex + 1)}
                     </span>
-                    {!isLargeDataset && (
-                        <div className="flex items-center gap-3 ml-2">
+                    <div className="flex items-center gap-3 ml-2">
+                        <div className="flex items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 w-5 p-0 hover:bg-muted"
+                                disabled={pagination.pageIndex === 0}
+                                onClick={() => setTabPagination(tableId, pagination.pageIndex, pagination.pageSize)}
+                            >
+                                ◀
+                            </Button>
                             <div className="flex items-center gap-1">
+                                <Input
+                                    value={pageJumpValue}
+                                    onChange={(e) => {
+                                        const nextValue = e.target.value.replace(/\D/g, '');
+                                        setPageJumpValue(nextValue);
+                                    }}
+                                    onBlur={commitPageJump}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            commitPageJump();
+                                        }
+                                        if (e.key === 'Escape') {
+                                            setPageJumpValue(String(pagination.pageIndex + 1));
+                                        }
+                                    }}
+                                    inputMode="numeric"
+                                    aria-label={text.jumpToPage}
+                                    className="h-5 w-12 border-border/40 bg-transparent px-1 text-center text-[10px] font-semibold tracking-normal"
+                                />
+                                <span className="min-w-[38px] text-center">
+                                    / {totalPages ?? '?'}
+                                </span>
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-5 w-5 p-0 hover:bg-muted"
-                                    disabled={pagination.pageIndex === 0}
-                                    onClick={() => setTabPagination(tableId, pagination.pageIndex, pagination.pageSize)}
+                                    className="h-5 px-1.5 text-[9px] font-bold hover:bg-muted"
+                                    onClick={commitPageJump}
                                 >
-                                    ◀
-                                </Button>
-                                <div className="flex items-center gap-1">
-                                    <Input
-                                        value={pageJumpValue}
-                                        onChange={(e) => {
-                                            const nextValue = e.target.value.replace(/\D/g, '');
-                                            setPageJumpValue(nextValue);
-                                        }}
-                                        onBlur={commitPageJump}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                commitPageJump();
-                                            }
-                                            if (e.key === 'Escape') {
-                                                setPageJumpValue(String(pagination.pageIndex + 1));
-                                            }
-                                        }}
-                                        inputMode="numeric"
-                                        aria-label={text.jumpToPage}
-                                        className="h-5 w-12 border-border/40 bg-transparent px-1 text-center text-[10px] font-semibold tracking-normal"
-                                    />
-                                    <span className="min-w-[38px] text-center">
-                                        / {totalPages ?? '?'}
-                                    </span>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-5 px-1.5 text-[9px] font-bold hover:bg-muted"
-                                        onClick={commitPageJump}
-                                    >
-                                        {text.go}
-                                    </Button>
-                                </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-5 w-5 p-0 hover:bg-muted"
-                                    disabled={effectiveTotalCount ? (pagination.pageIndex + 1) * pagination.pageSize >= effectiveTotalCount : rows.length < pagination.pageSize}
-                                    onClick={() => setTabPagination(tableId, pagination.pageIndex + 2, pagination.pageSize)}
-                                >
-                                    ▶
+                                    {text.go}
                                 </Button>
                             </div>
-                            <span className="text-[9px] opacity-70">{lang === 'vi' ? 'TRANG' : 'PAGE'}</span>
-                            <div className="h-3 w-[1px] bg-border mx-1" />
-                            <select
-                                className="bg-transparent border-none outline-none cursor-pointer hover:text-foreground text-[9px] font-bold py-0 h-4"
-                                value={pagination.pageSize}
-                                onChange={(e) => setTabPagination(tableId, 1, Number(e.target.value))}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 w-5 p-0 hover:bg-muted"
+                                disabled={effectiveTotalCount ? (pagination.pageIndex + 1) * pagination.pageSize >= effectiveTotalCount : rows.length < pagination.pageSize}
+                                onClick={() => setTabPagination(tableId, pagination.pageIndex + 2, pagination.pageSize)}
                             >
-                                <option value="50">50 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
-                                <option value="100">100 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
-                                <option value="500">500 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
-                                <option value="1000">1000 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
-                            </select>
+                                ▶
+                            </Button>
                         </div>
-                    )}
+                        <span className="text-[9px] opacity-70">{lang === 'vi' ? 'TRANG' : 'PAGE'}</span>
+                        <div className="h-3 w-[1px] bg-border mx-1" />
+                        <select
+                            className="bg-transparent border-none outline-none cursor-pointer hover:text-foreground text-[9px] font-bold py-0 h-4"
+                            value={pagination.pageSize}
+                            onChange={(e) => setTabPagination(tableId, 1, Number(e.target.value))}
+                        >
+                            <option value="50">50 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
+                            <option value="100">100 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
+                            <option value="500">500 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
+                            <option value="1000">1000 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
+                        </select>
+                    </div>
                 </div>
                 <div className="flex items-center gap-4 opacity-60">
                     <span>{cleanTableName || tableId}</span>

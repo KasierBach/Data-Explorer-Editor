@@ -64,7 +64,11 @@ export class NoSqlService {
     const strategy = this.strategyFactory.getStrategy('mongodb'); // Explicitly use mongodb for now
 
     // Get sample data
-    const query = JSON.stringify({ find: collection, limit: sampleSize });
+    const query = JSON.stringify({
+      action: 'find',
+      collection,
+      limit: sampleSize,
+    });
     const result = await strategy.executeQuery(pool, query);
     const data = result.rows || [];
 

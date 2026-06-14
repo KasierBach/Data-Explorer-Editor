@@ -9,6 +9,9 @@ interface NoSqlQueryResult {
     columns?: string[];
     rowCount?: number;
     durationMs?: number;
+    truncated?: boolean;
+    appliedLimit?: number;
+    limitSource?: 'requested' | 'protective_default' | 'table_window';
     summaryLabel?: string;
     summaryValue?: number;
     summaryHint?: string;
@@ -43,6 +46,38 @@ const toError = (error: unknown) => (
 const getNumericField = (row: RowData | undefined, field: string) => {
     const value = row?.[field];
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
+};
+
+const buildNoSqlLimitHint = (
+    action: string,
+    queryResult: {
+        truncated?: boolean;
+        appliedLimit?: number;
+        limitSource?: 'requested' | 'protective_default' | 'table_window';
+    },
+    lang: 'vi' | 'en',
+) => {
+    if (!queryResult.truncated || !queryResult.appliedLimit) {
+        return undefined;
+    }
+
+    const formattedLimit = queryResult.appliedLimit.toLocaleString(
+        lang === 'vi' ? 'vi-VN' : 'en-US',
+    );
+    const noun =
+        action === 'aggregate'
+            ? (lang === 'vi' ? 'kết quả pipeline' : 'pipeline results')
+            : (lang === 'vi' ? 'tài liệu' : 'documents');
+
+    if (queryResult.limitSource === 'requested') {
+        return lang === 'vi'
+            ? `Đang hiển thị ${formattedLimit} ${noun} đầu tiên theo giới hạn bạn yêu cầu.`
+            : `Showing the first ${formattedLimit} ${noun} requested by this query.`;
+    }
+
+    return lang === 'vi'
+        ? `Đang hiển thị ${formattedLimit} ${noun} đầu tiên vì bộ bảo vệ hiệu năng đã chặn phần còn lại.`
+        : `Showing the first ${formattedLimit} ${noun} because a performance guardrail capped the result set.`;
 };
 
 const summarizeNoSqlExecution = (
@@ -245,7 +280,9 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
                 durationMs,
                 summaryLabel: executionSummary.summaryLabel,
                 summaryValue: executionSummary.summaryValue,
-                summaryHint: executionSummary.summaryHint,
+                summaryHint:
+                    buildNoSqlLimitHint(action, queryResult, lang) ??
+                    executionSummary.summaryHint,
             };
 
             setResult(enrichedResult);

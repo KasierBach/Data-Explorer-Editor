@@ -7,17 +7,23 @@ import {
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { Subject, Observable } from 'rxjs';
-import { map, filter } from 'rxjs/operators';
+
+type NotificationPayload = {
+  userId?: string;
+  data: any;
+};
+
+type UserNotificationStream = {
+  subject: Subject<{ data: any }>;
+  subscribers: number;
+};
 
 @Injectable()
 export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NotificationsService.name);
   private pubClient: Redis;
   private subClient: Redis;
-  private readonly notificationSubject = new Subject<{
-    userId: string;
-    data: any;
-  }>();
+  private readonly userStreams = new Map<string, UserNotificationStream>();
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -28,32 +34,94 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     this.pubClient = new Redis(redisUrl);
     this.subClient = new Redis(redisUrl);
 
-    this.subClient.subscribe('notifications', (err) => {
-      if (err) {
-        this.logger.error(
-          'Failed to subscribe to notifications channel',
-          err.stack,
-        );
-      } else {
-        this.logger.log('Subscribed to Redis notifications channel');
-      }
-    });
-
     this.subClient.on('message', (channel, message) => {
-      if (channel === 'notifications') {
-        try {
-          const payload = JSON.parse(message);
-          this.notificationSubject.next(payload);
-        } catch (e) {
-          this.logger.error('Failed to parse notification message', e);
+      try {
+        const payload = JSON.parse(message) as NotificationPayload;
+        const userId = payload.userId ?? this.userIdFromChannel(channel);
+        if (!userId) {
+          return;
         }
+
+        const stream = this.userStreams.get(userId);
+        if (!stream) {
+          return;
+        }
+
+        stream.subject.next({ data: payload.data });
+      } catch (error) {
+        this.logger.error(
+          'Failed to parse notification message',
+          error instanceof Error ? error.stack : String(error),
+        );
       }
     });
   }
 
   onModuleDestroy() {
+    this.userStreams.forEach(({ subject }) => subject.complete());
+    this.userStreams.clear();
     this.pubClient.quit();
     this.subClient.quit();
+  }
+
+  private channelForUser(userId: string) {
+    return `notifications:user:${userId}`;
+  }
+
+  private userIdFromChannel(channel: string) {
+    if (!channel.startsWith('notifications:user:')) {
+      return null;
+    }
+
+    return channel.slice('notifications:user:'.length) || null;
+  }
+
+  private ensureStream(userId: string): UserNotificationStream {
+    const existing = this.userStreams.get(userId);
+    if (existing) {
+      return existing;
+    }
+
+    const stream: UserNotificationStream = {
+      subject: new Subject<{ data: any }>(),
+      subscribers: 0,
+    };
+    this.userStreams.set(userId, stream);
+    return stream;
+  }
+
+  private async subscribeToUser(userId: string) {
+    const channel = this.channelForUser(userId);
+    await this.subClient.subscribe(channel);
+    this.logger.debug(`Subscribed to notifications channel ${channel}`);
+  }
+
+  private async unsubscribeFromUser(userId: string) {
+    const channel = this.channelForUser(userId);
+    await this.subClient.unsubscribe(channel);
+    this.logger.debug(`Unsubscribed from notifications channel ${channel}`);
+  }
+
+  private releaseStream(userId: string) {
+    const stream = this.userStreams.get(userId);
+    if (!stream) {
+      return;
+    }
+
+    stream.subscribers = Math.max(0, stream.subscribers - 1);
+    if (stream.subscribers > 0) {
+      return;
+    }
+
+    this.userStreams.delete(userId);
+    stream.subject.complete();
+
+    void this.unsubscribeFromUser(userId).catch((error) => {
+      this.logger.error(
+        `Failed to unsubscribe notifications channel for user ${userId}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    });
   }
 
   async emit(userId: string, type: string, message: string, extra?: any) {
@@ -66,7 +134,10 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         ...extra,
       },
     };
-    await this.pubClient.publish('notifications', JSON.stringify(payload));
+    await this.pubClient.publish(
+      this.channelForUser(userId),
+      JSON.stringify(payload),
+    );
   }
 
   async emitMany(
@@ -82,14 +153,28 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   }
 
   eventStream(userId: string): Observable<any> {
-    return this.notificationSubject.asObservable().pipe(
-      map((payload) => {
-        if (!payload.userId || payload.userId === userId) {
-          return { data: payload.data };
-        }
-        return null;
-      }),
-      filter((event) => event !== null),
-    );
+    return new Observable((subscriber) => {
+      const stream = this.ensureStream(userId);
+      stream.subscribers += 1;
+
+      const subjectSubscription = stream.subject.subscribe({
+        next: (event) => subscriber.next(event),
+        error: (error) => subscriber.error(error),
+        complete: () => subscriber.complete(),
+      });
+
+      void this.subscribeToUser(userId).catch((error) => {
+        this.logger.error(
+          `Failed to subscribe notifications channel for user ${userId}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+        subscriber.error(error);
+      });
+
+      return () => {
+        subjectSubscription.unsubscribe();
+        this.releaseStream(userId);
+      };
+    });
   }
 }

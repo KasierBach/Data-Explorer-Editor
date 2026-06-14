@@ -7,6 +7,7 @@ import type {
     MutationResult,
     QueryExecutionContext,
     SchemaOperation,
+    TableWindowRequest,
 } from '../domain/database-adapter.interface';
 import type { DatabaseValue, QueryResult, RowData, TableMetadata, TreeNode } from '../domain/entities';
 import { apiService } from '../services/api.service';
@@ -101,6 +102,15 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
             }
             throw error;
         }
+    }
+
+    async fetchTableWindow(params: TableWindowRequest): Promise<QueryResult> {
+        if (!this.connectionId) throw new Error('Not connected');
+
+        return await apiService.post<QueryResult>('/query/table-window', {
+            ...params,
+            connectionId: this.connectionId,
+        });
     }
 
     async getMetadata(tableId: string): Promise<TableMetadata> {

@@ -211,7 +211,7 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                             <SelectItem value="500">500</SelectItem>
                             <SelectItem value="1000">1000</SelectItem>
                             <SelectItem value="5000">5000</SelectItem>
-                            <SelectItem value="all">{lang === 'vi' ? 'Không' : 'No Limit'}</SelectItem>
+                            <SelectItem value="all">{lang === 'vi' ? 'Tối đa 50k' : 'Max 50k'}</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>

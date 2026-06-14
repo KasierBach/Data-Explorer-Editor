@@ -51,6 +51,12 @@ export interface QueryResult {
   columns: string[];
   rowCount?: number;
   totalCount?: number;
+  truncated?: boolean;
+  countStatus?: 'available' | 'unavailable' | 'skipped';
+  appliedLimit?: number;
+  appliedOffset?: number;
+  limitSource?: 'requested' | 'protective_default' | 'table_window';
+  cached?: boolean;
 }
 
 export interface Relationship {

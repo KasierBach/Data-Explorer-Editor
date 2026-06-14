@@ -110,9 +110,13 @@ describe('MongoDbStrategy', () => {
         JSON.stringify(payload),
       );
 
-      expect(mockCollection.aggregate).toHaveBeenCalledWith([]);
+      expect(mockCollection.aggregate).toHaveBeenCalledWith([], {});
       expect(mockCollection.maxTimeMS).toHaveBeenCalledWith(30000);
+      expect(mockCollection.limit).toHaveBeenCalledWith(50001);
       expect(result.rows.length).toBe(50000);
+      expect(result.truncated).toBe(true);
+      expect(result.appliedLimit).toBe(50000);
+      expect(result.limitSource).toBe('protective_default');
     });
 
     it('should throw an error for invalid JSON payload', async () => {

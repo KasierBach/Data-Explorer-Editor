@@ -29,7 +29,7 @@ export function EditorSection({ lang }: Props) {
                     {
                         icon: <Shield className="w-8 h-8 text-rose-500" />,
                         title: t ? 'Safe Execution' : 'Safe Execution',
-                        desc: t ? 'Row limit, timeout hiển thị rõ trong toolbar, connection guardrails, và xác nhận khi chạy SQL do AI gợi ý giúp giảm rủi ro thao tác nhầm.' : 'Visible row limits, timeout guardrails, connection policies, and confirmation before running AI-generated SQL reduce accidental execution risk.'
+                        desc: t ? 'Toolbar hiển thị rõ giới hạn row, timeout, connection guardrails, và xác nhận khi chạy SQL do AI gợi ý. Chế độ “Tối đa 50k” là guardrail thật cho raw SQL, không phải no-limit.' : 'The toolbar shows row limits, timeout rules, connection guardrails, and confirmation before running AI-generated SQL. The “Max 50k” mode is a real raw-SQL guardrail, not a no-limit mode.'
                     }
                 ].map((item, i) => (
                     <div key={i} className="p-6 border rounded-3xl bg-card/50 space-y-4">
@@ -39,6 +39,14 @@ export function EditorSection({ lang }: Props) {
                     </div>
                 ))}
             </div>
+
+            <Callout type="info">
+                <p className="text-sm">
+                    {t
+                        ? 'Raw SQL vẫn đi qua endpoint thực thi chung và được bảo vệ bằng giới hạn server-side. Khi bạn chỉ đang duyệt bảng trong grid, app dùng `/query/table-window` để lấy đúng trang dữ liệu với `limit`, `offset`, `countStatus` và metadata giới hạn rõ ràng.'
+                        : 'Raw SQL still uses the general execution endpoint and remains protected by a server-side cap. When you are only browsing a table in the grid, the app uses `/query/table-window` to fetch the requested data page with explicit `limit`, `offset`, `countStatus`, and limit metadata.'}
+                </p>
+            </Callout>
 
             {/* Technical Inner Workings */}
             <DocSection title={t ? 'Cơ chế hoạt động (The Inner Workings)' : 'The Inner Workings'}>

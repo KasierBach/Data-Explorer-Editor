@@ -17,6 +17,11 @@ import { StartMigrationDto } from './dto/start-migration.dto';
 import { getErrorMessage } from '../common/utils/error.util';
 import { MigrationComparisonService } from './migration-comparison.service';
 import {
+  isRetryableMigrationBatchError,
+  planMigrationBatchSizing,
+  reduceMigrationBatchSize,
+} from './migration-batch-sizing.util';
+import {
   type MigrationConnection,
   type MigrationStage,
   type MigrationJob,
@@ -366,36 +371,93 @@ export class MigrationService {
 
       const stream = rawStream as MigrationStream;
 
-      const BATCH_SIZE = 2000;
+      let batchPlan = planMigrationBatchSizing({
+        targetType: context.targetConn!.type,
+        columnCount: context.sourceMetadata!.columns.length,
+      });
+      let currentBatchSize = batchPlan.recommendedBatchSize;
+      let batchPlanHydrated = false;
       let buffer: Record<string, unknown>[] = [];
       let isPaused = false;
+
+      const hydrateBatchPlan = (sampleRow: Record<string, unknown>) => {
+        if (batchPlanHydrated) return;
+
+        batchPlan = planMigrationBatchSizing({
+          targetType: context!.targetConn!.type,
+          columnCount: context!.sourceMetadata!.columns.length,
+          sampleRow,
+        });
+        currentBatchSize = batchPlan.recommendedBatchSize;
+        batchPlanHydrated = true;
+      };
 
       const flushBuffer = async () => {
         if (buffer.length === 0) return;
 
-        const batch = buffer;
+        const pendingRows = buffer;
         buffer = [];
 
-        await context!.targetStrategy!.importData(context!.targetPool, {
-          schema: this.comparisonService.normalizeSchemaName(
-            context!.targetConn!.type,
-            dto.targetSchema,
-          ),
-          table: this.comparisonService.normalizeTableName(dto.targetTable),
-          data: batch,
-        });
+        let cursor = 0;
+        while (cursor < pendingRows.length) {
+          const remainingRows = pendingRows.slice(cursor);
+          let attemptSize = Math.min(currentBatchSize, remainingRows.length);
 
-        await this.updateJob(jobId, (job) => {
-          job.processedRows += batch.length;
-          job.batchesProcessed += 1;
-        });
+          while (true) {
+            const batch = remainingRows.slice(0, attemptSize);
 
-        this.logger.verbose(`Migration ${jobId}: flushed ${batch.length} rows`);
+            try {
+              await context!.targetStrategy!.importData(context!.targetPool, {
+                schema: this.comparisonService.normalizeSchemaName(
+                  context!.targetConn!.type,
+                  dto.targetSchema,
+                ),
+                table: this.comparisonService.normalizeTableName(dto.targetTable),
+                data: batch,
+              });
+
+              await this.updateJob(jobId, (job) => {
+                job.processedRows += batch.length;
+                job.batchesProcessed += 1;
+              });
+
+              this.logger.verbose(
+                `Migration ${jobId}: flushed ${batch.length} rows (batch size ${attemptSize})`,
+              );
+              currentBatchSize = Math.max(
+                batchPlan.minimumBatchSize,
+                attemptSize,
+              );
+              cursor += batch.length;
+              break;
+            } catch (error) {
+              if (
+                !isRetryableMigrationBatchError(error) ||
+                attemptSize <= batchPlan.minimumBatchSize
+              ) {
+                throw error;
+              }
+
+              const reducedBatchSize = reduceMigrationBatchSize(
+                attemptSize,
+                batchPlan.minimumBatchSize,
+              );
+
+              this.logger.warn(
+                `Migration ${jobId}: reducing batch size from ${attemptSize} to ${reducedBatchSize} after import failure (${getErrorMessage(error)})`,
+              );
+
+              attemptSize = reducedBatchSize;
+              currentBatchSize = reducedBatchSize;
+            }
+          }
+        }
       };
 
       const handleChunk = async (chunk: Record<string, unknown>) => {
+        hydrateBatchPlan(chunk);
         buffer.push(chunk);
-        if (buffer.length < BATCH_SIZE) return;
+        if (buffer.length < currentBatchSize) return;
 
         if (typeof stream.pause === 'function' && !isPaused) {
           isPaused = true;

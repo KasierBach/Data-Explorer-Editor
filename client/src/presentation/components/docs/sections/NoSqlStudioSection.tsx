@@ -41,8 +41,8 @@ export function NoSqlStudioSection({ lang }: Props) {
                 <InfoCard icon={<Shield className="w-6 h-6 text-amber-500" />} title={t ? 'Guardrails rõ ràng' : 'Visible guardrails'} color="amber">
                     <p>
                         {t
-                            ? 'Không gian NoSQL luôn phản ánh trạng thái an toàn của kết nối như read-only, query execution disabled, và giới hạn kết quả để tránh thao tác nguy hiểm hoặc quá tải.'
-                            : 'The NoSQL workspace surfaces connection safety rules such as read-only mode, execution-disabled connections, and result limits so risky actions stay obvious.'}
+                            ? 'Không gian NoSQL luôn phản ánh trạng thái an toàn của kết nối như read-only, query execution disabled, giới hạn kết quả, và trạng thái `truncated` khi aggregate hoặc find bị cap.'
+                            : 'The NoSQL workspace surfaces connection safety rules such as read-only mode, execution-disabled connections, result limits, and `truncated` state when aggregate or find results are capped.'}
                     </p>
                 </InfoCard>
                 <InfoCard icon={<Bot className="w-6 h-6 text-cyan-500" />} title={t ? 'AI hiểu collection hiện tại' : 'AI understands the active collection'} color="cyan">
@@ -121,7 +121,8 @@ export function NoSqlStudioSection({ lang }: Props) {
                     <CodeLine>{'    { "$match": { "status": "paid" } },'}</CodeLine>
                     <CodeLine>{'    { "$group": { "_id": "$country", "total": { "$sum": 1 } } },'}</CodeLine>
                     <CodeLine>{'    { "$sort": { "total": -1 } }'}</CodeLine>
-                    <CodeLine>{'  ]'}</CodeLine>
+                    <CodeLine>{'  ],'}</CodeLine>
+                    <CodeLine>{'  "limit": 500'}</CodeLine>
                     <CodeLine>{'}'}</CodeLine>
                 </CodeBlock>
 
@@ -130,6 +131,14 @@ export function NoSqlStudioSection({ lang }: Props) {
                         {t
                             ? 'Các action như `insertOne`, `updateOne`, `updateMany`, `deleteOne`, hoặc `deleteMany` là mutation. App sẽ không nên coi chúng như “chạy vô tư như find”. Hãy dùng chúng với kết nối phù hợp, review kỹ filter, và ưu tiên chạy thử trên môi trường an toàn trước.'
                             : 'Actions such as `insertOne`, `updateOne`, `updateMany`, `deleteOne`, and `deleteMany` are mutations. The app should not treat them like harmless `find` operations. Use them on the right connection, review filters carefully, and prefer a safe environment first.'}
+                    </p>
+                </Callout>
+
+                <Callout type="info">
+                    <p className="text-sm">
+                        {t
+                            ? 'Với `aggregate`, backend áp giới hạn trên cursor trước khi gọi `toArray()`. Response có `appliedLimit`, `limitSource` và `truncated`, nên nếu kết quả bị cap thì UI sẽ nói rõ thay vì khiến bạn tưởng đó là toàn bộ collection.'
+                            : 'For `aggregate`, the backend applies the limit on the cursor before calling `toArray()`. Responses include `appliedLimit`, `limitSource`, and `truncated`, so capped results are surfaced clearly instead of looking like the full collection.'}
                     </p>
                 </Callout>
             </DocSection>
@@ -165,8 +174,8 @@ export function NoSqlStudioSection({ lang }: Props) {
                         </div>
                         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                             {t
-                                ? 'Panel kết quả còn là nơi app hiển thị summary label, số document đã về, gợi ý đọc kết quả theo grid/tree, và phản hồi ngắn cho mutation. Điều này giúp bạn không phải đoán liệu truy vấn vừa rồi “đã chạy đúng ý” hay chưa.'
-                                : 'The result panel also shows summary labels, returned document counts, suggestions about reading the result in grid/tree mode, and compact feedback for mutations. You do not have to guess whether the last run did what you intended.'}
+                                ? 'Panel kết quả còn là nơi app hiển thị summary label, số document đã về, badge khi kết quả bị cap, gợi ý đọc kết quả theo grid/tree, và phản hồi ngắn cho mutation. Điều này giúp bạn không phải đoán liệu truy vấn vừa rồi “đã chạy đúng ý” hay chưa.'
+                                : 'The result panel also shows summary labels, returned document counts, capped-result badges, suggestions about reading the result in grid/tree mode, and compact feedback for mutations. You do not have to guess whether the last run did what you intended.'}
                         </p>
                     </div>
                 </div>
@@ -201,8 +210,8 @@ export function NoSqlStudioSection({ lang }: Props) {
             <Callout type="tip">
                 <p className="text-sm font-medium">
                     {t
-                        ? 'Mẹo thực tế: hãy bắt đầu bằng `find` hoặc `aggregate` nhỏ để hiểu shape dữ liệu trước, sau đó mới viết mutation. Với collection lớn, ưu tiên tree/grid để xác nhận field thật sự tồn tại rồi mới chuyển sang schema analysis hoặc aggregation builder.'
-                        : 'Practical tip: start with a small `find` or `aggregate` to understand the data shape before writing mutations. On large collections, confirm fields in tree/grid first, then move into schema analysis or the aggregation builder.'}
+                        ? 'Mẹo thực tế: hãy bắt đầu bằng `find` hoặc `aggregate` nhỏ để hiểu shape dữ liệu trước, sau đó mới viết mutation. Với collection lớn, thêm `$match`, `$project` hoặc `limit` sớm để tránh pipeline quá rộng rồi mới chuyển sang schema analysis hoặc aggregation builder.'
+                        : 'Practical tip: start with a small `find` or `aggregate` to understand the data shape before writing mutations. On large collections, add `$match`, `$project`, or `limit` early so the pipeline stays narrow before moving into schema analysis or the aggregation builder.'}
                 </p>
             </Callout>
 

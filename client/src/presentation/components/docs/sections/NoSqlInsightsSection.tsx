@@ -91,8 +91,8 @@ export function NoSqlInsightsSection({ lang }: Props) {
             <DocSection title={t ? 'Schema Analysis thực sự nói cho bạn điều gì?' : 'What Schema Analysis really tells you'}>
                 <Prose>
                     {t
-                        ? 'Schema Analysis không biến MongoDB thành một schema cứng như SQL. Thay vào đó, nó quan sát mẫu document hiện có để trả lời các câu hỏi rất thực dụng: field nào xuất hiện đều, field nào chỉ có trong một nhóm nhỏ, kiểu dữ liệu nào bị trộn lẫn, và ví dụ giá trị nào đáng chú ý.'
-                        : 'Schema Analysis does not try to turn MongoDB into a rigid SQL-style schema. Instead, it inspects the current sample to answer practical questions: which fields are stable, which appear only in a small subset, where data types are mixed, and which values are worth noticing.'}
+                        ? 'Schema Analysis không biến MongoDB thành một schema cứng như SQL. Thay vào đó, nó quan sát mẫu document hiện có để trả lời các câu hỏi rất thực dụng: field nào xuất hiện đều, field nào chỉ có trong một nhóm nhỏ, kiểu dữ liệu nào bị trộn lẫn, và ví dụ giá trị nào đáng chú ý. Mẫu này có giới hạn runtime rõ ràng, nên kết quả là tín hiệu định hướng chứ không phải lời hứa tuyệt đối về toàn bộ collection.'
+                        : 'Schema Analysis does not try to turn MongoDB into a rigid SQL-style schema. Instead, it inspects the current sample to answer practical questions: which fields are stable, which appear only in a small subset, where data types are mixed, and which values are worth noticing. The sample has explicit runtime limits, so the result is directional evidence rather than an absolute promise about the whole collection.'}
                 </Prose>
 
                 <DocSubSection title={t ? 'Những gì nó phù hợp để hỗ trợ' : 'What it is good at'}>
@@ -117,8 +117,8 @@ export function NoSqlInsightsSection({ lang }: Props) {
                     <InfoCard icon={<BarChart3 className="w-5 h-5 text-orange-500" />} title={t ? 'Insight nhanh từ result set' : 'Fast insight from the current result set'} color="orange">
                         <p className="text-xs">
                             {t
-                                ? 'Phần visualize trong NoSQL thiên về việc rút ra nhóm metric, category nổi bật, hoặc so sánh nhanh trên kết quả hiện tại. Nó hợp để ra quyết định tiếp theo, không phải để thay thế dashboard lâu dài.'
-                                : 'The NoSQL visualize flow is designed for extracting grouped metrics, standout categories, or quick comparisons from the current result set. It helps you decide the next step, not replace a long-term dashboard.'}
+                                ? 'Phần visualize trong NoSQL thiên về việc rút ra nhóm metric, category nổi bật, hoặc so sánh nhanh trên kết quả hiện tại. Nếu result set đang bị cap, insight cũng chỉ phản ánh phần dữ liệu đã trả về. Nó hợp để ra quyết định tiếp theo, không phải để thay thế dashboard lâu dài.'
+                                : 'The NoSQL visualize flow is designed for extracting grouped metrics, standout categories, or quick comparisons from the current result set. If the result set is capped, the insight reflects only the returned data. It helps you decide the next step, not replace a long-term dashboard.'}
                         </p>
                     </InfoCard>
                     <InfoCard icon={<Bot className="w-5 h-5 text-cyan-500" />} title={t ? 'AI là lớp hỗ trợ tiếp theo' : 'AI is the next support layer'} color="cyan">
@@ -130,6 +130,14 @@ export function NoSqlInsightsSection({ lang }: Props) {
                     </InfoCard>
                 </div>
             </DocSection>
+
+            <Callout type="info">
+                <p className="text-sm">
+                    {t
+                        ? 'Khi backend trả `truncated`, hãy coi insight là bản đọc nhanh trên sample đã giới hạn. Nếu cần số liệu toàn collection, hãy tạo pipeline rõ ràng trong Aggregation Builder với `$match`, `$project`, `$group`, `$sort` và `$limit` có chủ đích.'
+                        : 'When the backend returns `truncated`, treat the insight as a quick read over a capped sample. If you need collection-wide numbers, build an intentional Aggregation Builder pipeline with `$match`, `$project`, `$group`, `$sort`, and `$limit`.'}
+                </p>
+            </Callout>
 
             <Callout type="tip">
                 <p className="text-sm font-medium">

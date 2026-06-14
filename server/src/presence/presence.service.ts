@@ -46,6 +46,7 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
   private redis: Redis | null = null;
   private readonly staleWindowMs = 90_000;
   private readonly presenceTtlSeconds = 180;
+  private readonly hashScanCount = 100;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -272,14 +273,40 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
     return this.list(scope);
   }
 
+  private async scanPresenceEntries(key: string) {
+    const redis = this.requireRedis();
+    const payload = new Map<string, string>();
+    let cursor = '0';
+
+    do {
+      const [nextCursor, batch] = await redis.hscan(
+        key,
+        cursor,
+        'COUNT',
+        this.hashScanCount,
+      );
+      cursor = nextCursor;
+
+      for (let index = 0; index < batch.length; index += 2) {
+        const userId = batch[index];
+        const rawEntry = batch[index + 1];
+        if (userId !== undefined && rawEntry !== undefined) {
+          payload.set(userId, rawEntry);
+        }
+      }
+    } while (cursor !== '0');
+
+    return payload;
+  }
+
   private async list(scope: PresenceScope): Promise<PresenceEntry[]> {
     const redis = this.requireRedis();
     const key = this.scopeKey(scope);
-    const payload = await redis.hgetall(key);
+    const payload = await this.scanPresenceEntries(key);
     const now = Date.now();
     const staleUserIds: string[] = [];
 
-    const entries = Object.entries(payload)
+    const entries = [...payload.entries()]
       .map(([userId, raw]) => {
         try {
           const parsed = JSON.parse(raw) as PresenceEntry;

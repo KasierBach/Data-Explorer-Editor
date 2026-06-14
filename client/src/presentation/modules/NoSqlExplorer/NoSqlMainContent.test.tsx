@@ -309,4 +309,53 @@ describe('NoSqlMainContent', () => {
 
     expect(setNosqlViewMode).toHaveBeenCalledWith('grid');
   });
+
+  it('surfaces a capped-result badge when the hook reports truncated NoSQL output', () => {
+    mockUseNoSqlQuery.mockReturnValue({
+      result: {
+        rows: [{ _id: '1' }],
+        rowCount: 1,
+        durationMs: 42,
+        summaryLabel: 'results',
+        summaryValue: 1,
+        summaryHint: 'Showing a capped preview.',
+        truncated: true,
+        appliedLimit: 50000,
+      },
+      isLoading: false,
+      error: null,
+      executeMql: vi.fn(),
+    });
+
+    mockUseAppStore.mockReturnValue({
+      nosqlActiveCollection: 'products',
+      nosqlActiveDatabase: 'warehouse',
+      setNosqlCollection: vi.fn(),
+      nosqlMqlQuery: '{\n  "action": "aggregate",\n  "collection": "products"\n}',
+      setNosqlMqlQuery: vi.fn(),
+      nosqlResult: [{ _id: '1' }],
+      nosqlViewMode: 'tree',
+      setNosqlViewMode,
+      nosqlActiveConnectionId: 'mongo-1',
+      connections: [
+        {
+          id: 'mongo-1',
+          type: 'mongodb',
+          readOnly: false,
+          allowQueryExecution: true,
+        },
+      ],
+      lang: 'en',
+      isResultPanelOpen: true,
+      toggleResultPanel,
+      defaultResultHeight: 300,
+      setDefaultResultHeight: vi.fn(),
+    } as never);
+
+    render(<NoSqlMainContent />);
+
+    expect(screen.getByText('Capped')).toBeInTheDocument();
+    expect(screen.getByText('50,000')).toBeInTheDocument();
+    expect(screen.getByText('Showing a capped preview.')).toBeInTheDocument();
+  });
 });

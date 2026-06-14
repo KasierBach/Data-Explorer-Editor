@@ -1,4 +1,4 @@
-import { DocPageLayout, DocSection, Prose } from '../primitives';
+import { Callout, DocPageLayout, DocSection, Prose } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
@@ -16,7 +16,7 @@ export function ResultsSection({ lang }: Props) {
                 {[
                     { title: t ? 'Sắp xếp thông minh' : 'Smart Sorting', desc: t ? 'Nhấn vào tiêu đề cột để sắp xếp tăng/giảm dần. Hỗ trợ sắp xếp đa cột bằng cách giữ Shift và click thêm cột. Tự động nhận diện kiểu dữ liệu (số, text, ngày) để sắp xếp chính xác.' : 'Click column headers to sort ascending/descending. Multi-column sort by holding Shift and clicking additional columns. Auto-detects data types (number, text, date) for accurate sorting.' },
                     { title: t ? 'Lọc nhanh (Quick Filter)' : 'Quick Filter', desc: t ? 'Thanh tìm kiếm trực tiếp trên lưới lọc bản ghi real-time khi bạn gõ. Hỗ trợ lọc theo cột cụ thể hoặc tìm kiếm toàn bộ bản ghi. Regex được hỗ trợ với prefix "re:".' : 'Search bar directly on the grid filters records in real-time as you type. Supports column-specific filtering or full-record search. Regex supported with "re:" prefix.' },
-                    { title: t ? 'Phân trang hiệu suất' : 'Performance Pagination', desc: t ? 'Xử lý hàng triệu bản ghi nhờ phân trang phía client với virtual scrolling. Chỉ render các dòng đang hiển thị — giữ tốc độ 60fps ngay cả với dataset 100K+ rows.' : 'Handles millions of records through client-side pagination with virtual scrolling. Only visible rows are rendered — maintaining 60fps even with 100K+ row datasets.' },
+                    { title: t ? 'Phân trang hiệu suất' : 'Performance Pagination', desc: t ? 'Khi duyệt bảng, lưới dùng cửa sổ dữ liệu phía server với limit/offset rõ ràng rồi mới render phần đang hiển thị. Raw SQL vẫn có guardrail tối đa 50,000 rows để tránh kéo quá nhiều dữ liệu vào trình duyệt.' : 'When browsing tables, the grid uses explicit server-side data windows with limit/offset before rendering the visible rows. Raw SQL still has a 50,000-row guardrail to avoid pulling too much data into the browser.' },
                 ].map((feature, i) => (
                     <div key={i} className="p-6 border rounded-2xl bg-card space-y-2 hover:border-primary/50 transition-colors">
                         <h4 className="font-bold text-primary">{feature.title}</h4>
@@ -24,6 +24,14 @@ export function ResultsSection({ lang }: Props) {
                     </div>
                 ))}
             </div>
+
+            <Callout type="info">
+                <p className="text-sm">
+                    {t
+                        ? 'Từ bản perf pass này, thao tác duyệt bảng dùng endpoint `/query/table-window` riêng. Response có `appliedLimit`, `appliedOffset`, `limitSource` và `countStatus`, nên UI có thể phân biệt giữa trang dữ liệu thật, giới hạn bảo vệ, và trường hợp không lấy được tổng số dòng.'
+                        : 'From this performance pass onward, table browsing uses a dedicated `/query/table-window` endpoint. Responses include `appliedLimit`, `appliedOffset`, `limitSource`, and `countStatus`, so the UI can distinguish real windows, protective caps, and unavailable counts.'}
+                </p>
+            </Callout>
 
             {/* Cell Interactions */}
             <DocSection title={t ? 'Tương tác với ô dữ liệu' : 'Cell Interactions'}>
@@ -86,10 +94,10 @@ export function ResultsSection({ lang }: Props) {
                     : 'After each query, the bottom status bar displays important information to help evaluate performance:'}</Prose>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {[
-                        { label: t ? 'Số bản ghi' : 'Rows', example: '1,247 rows' },
+                        { label: t ? 'Số bản ghi' : 'Rows', example: '100 / 1,247 rows' },
                         { label: t ? 'Thời gian thực thi' : 'Execution Time', example: '23ms' },
                         { label: t ? 'Số cột' : 'Columns', example: '8 columns' },
-                        { label: t ? 'Kích thước dữ liệu' : 'Data Size', example: '~245 KB' },
+                        { label: t ? 'Trạng thái giới hạn' : 'Limit Status', example: 'windowed' },
                     ].map((info, i) => (
                         <div key={i} className="p-4 border rounded-xl text-center bg-muted/10">
                             <span className="text-[10px] font-bold text-muted-foreground uppercase block">{info.label}</span>

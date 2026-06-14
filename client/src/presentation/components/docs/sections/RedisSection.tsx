@@ -1,5 +1,5 @@
 import { Database, Zap, ShieldAlert, Cpu, Activity, Server, Bell, Search, Share2 } from 'lucide-react';
-import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, CodeBlock, CodeComment, CodeLine } from '../primitives';
+import { Callout, DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, CodeBlock, CodeComment, CodeLine } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
@@ -105,16 +105,24 @@ export function RedisSection({ lang }: Props) {
                             <tr className="border-b border-white/5">
                                 <td className="py-3 px-4 font-mono font-bold text-emerald-400">presence:*</td>
                                 <td className="py-3 px-4 text-muted-foreground">Presence service</td>
-                                <td className="py-3 px-4 italic text-xs">Expiring sets / presence heartbeats</td>
+                                <td className="py-3 px-4 italic text-xs">Hash + TTL / HSCAN presence reads</td>
                             </tr>
                             <tr>
                                 <td className="py-3 px-4 font-mono font-bold text-fuchsia-400">search_index:*</td>
                                 <td className="py-3 px-4 text-muted-foreground">Search service</td>
-                                <td className="py-3 px-4 italic text-xs">Indexed metadata for global search</td>
+                                <td className="py-3 px-4 italic text-xs">Item payloads + token candidate indexes</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+
+                <Callout type="info">
+                    <p className="text-sm">
+                        {t
+                            ? 'Các tiện ích Redis mới tránh dùng `KEYS` trên keyspace lớn. `RedisService.keys()` hiện là wrapper tương thích dùng `SCAN`, presence đọc hash bằng `HSCAN`, và global search tra candidate index thay vì parse toàn bộ tập item trong service layer.'
+                            : '`KEYS` is no longer the preferred large-keyspace path. `RedisService.keys()` now remains as a compatibility wrapper over `SCAN`, presence reads hashes with `HSCAN`, and global search resolves candidate indexes instead of parsing the full item set in the service layer.'}
+                    </p>
+                </Callout>
             </DocSection>
 
             {/* BullMQ Lifecycle */}
@@ -168,8 +176,8 @@ export function RedisSection({ lang }: Props) {
                         </div>
                         <p className="text-sm text-muted-foreground leading-relaxed">
                             {t 
-                                ? 'Sử dụng Redis Pub/Sub kết hợp với SSE (Server-Sent Events) để đẩy thông báo ngay lập tức tới trình duyệt khi các tác vụ nặng (như sync dữ liệu hoặc export) hoàn tất.'
-                                : 'Uses Redis Pub/Sub combined with SSE (Server-Sent Events) to push instant notifications to the browser when long-running tasks (like data sync or export) complete.'}
+                                ? 'Sử dụng Redis Pub/Sub kết hợp với SSE (Server-Sent Events) để đẩy thông báo ngay lập tức tới trình duyệt. Kênh Pub/Sub được partition theo user (`notifications:user:<id>`) để giảm broadcast thừa khi nhiều người dùng đang online.'
+                                : 'Uses Redis Pub/Sub combined with SSE (Server-Sent Events) to push instant notifications to the browser. Pub/Sub channels are partitioned per user (`notifications:user:<id>`) to reduce unnecessary fan-out when many users are online.'}
                         </p>
                     </div>
                     <div className="p-6 rounded-3xl bg-emerald-500/5 border border-emerald-500/10 space-y-4">

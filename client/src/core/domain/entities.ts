@@ -64,6 +64,12 @@ export interface QueryResult {
     rowCount?: number; // Added to support row count in UI
     totalCount?: number; // Total rows in table for pagination
     durationMs?: number;
+    truncated?: boolean;
+    countStatus?: 'available' | 'unavailable' | 'skipped';
+    appliedLimit?: number;
+    appliedOffset?: number;
+    limitSource?: 'requested' | 'protective_default' | 'table_window';
+    cached?: boolean;
 }
 
 export interface DashboardWidget {

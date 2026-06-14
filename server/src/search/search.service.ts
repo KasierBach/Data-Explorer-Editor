@@ -1,49 +1,43 @@
 import {
   Injectable,
-  OnModuleInit,
-  OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
-import { NotificationsService } from '../notifications/notifications.service';
 import { AiService } from '../ai/ai.service';
+import { SearchIndexRepository } from './search-index.repository';
+import type { SearchIndexItem } from './search-index.types';
 
 @Injectable()
-export class SearchService implements OnModuleInit, OnModuleDestroy {
+export class SearchService {
   private readonly logger = new Logger(SearchService.name);
-  private redis: Redis;
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly connectionsService: ConnectionsService,
     private readonly strategyFactory: DatabaseStrategyFactory,
-    private readonly notificationsService: NotificationsService,
     private readonly aiService: AiService,
+    private readonly searchIndexRepository: SearchIndexRepository,
   ) {}
 
-  onModuleInit() {
-    const redisUrl =
-      this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
-    this.redis = new Redis(redisUrl);
-  }
+  private async suggestNames(userId: string, query: string) {
+    const names =
+      await this.searchIndexRepository.getSemanticFallbackNames(userId);
+    if (names.length === 0) {
+      return [] as string[];
+    }
 
-  onModuleDestroy() {
-    this.redis.quit();
-  }
-
-  private getIndexKey(userId: string) {
-    return `search_index:${userId}`;
+    const timeoutMs = 1_500;
+    const semanticPromise: Promise<string[]> =
+      this.aiService.suggestTablesBySemantic(query, names);
+    const timeoutPromise = new Promise<string[]>((resolve) => {
+        setTimeout(() => resolve([]), timeoutMs);
+      });
+    return Promise.race([semanticPromise, timeoutPromise]);
   }
 
   async syncIndex(userId: string) {
     const connections = await this.connectionsService.findAll(userId);
-    const indexKey = this.getIndexKey(userId);
-
-    // Clear existing index for this user
-    await this.redis.del(indexKey);
+    const indexedItems: SearchIndexItem[] = [];
 
     for (const conn of connections) {
       try {
@@ -97,12 +91,7 @@ export class SearchService implements OnModuleInit, OnModuleDestroy {
             schema: schemaName,
           }));
 
-          if (items.length > 0) {
-            await this.redis.sadd(
-              indexKey,
-              ...items.map((i) => JSON.stringify(i)),
-            );
-          }
+          indexedItems.push(...items);
         }
       } catch (err) {
         this.logger.error(
@@ -111,42 +100,31 @@ export class SearchService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    /* 
-        await this.notificationsService.emit(
-            userId,
-            'success',
-            `Global search index synced for ${connections.length} connections.`
-        );
-        */
+    await this.searchIndexRepository.replaceUserIndex(userId, indexedItems);
 
     return { success: true, message: 'Sync completed' };
   }
 
   async search(userId: string, query: string) {
-    const indexKey = this.getIndexKey(userId);
-    const allItems = await this.redis.smembers(indexKey);
-    const parsedItems = allItems.map((item) => JSON.parse(item));
-
-    const q = query.toLowerCase();
-
-    // 1. Keyword Search (Redis Index)
-    const keywordResults = parsedItems.filter(
-      (item) =>
-        item.name.toLowerCase().includes(q) ||
-        (item.schema && item.schema.toLowerCase().includes(q)),
+    const keywordResults = await this.searchIndexRepository.search(
+      userId,
+      query,
+      50,
     );
 
     // 2. Semantic Search (AI Fallback)
     // If results are few and query is meaningful, call AI
     if (keywordResults.length < 5 && query.length > 2) {
-      const tableNames = parsedItems.map((i) => i.name);
-      const aiTableSuggestions = await this.aiService.suggestTablesBySemantic(
-        query,
-        tableNames,
-      );
+      const aiTableSuggestions = await this.suggestNames(userId, query);
 
       if (aiTableSuggestions.length > 0) {
-        const aiResults = parsedItems
+        const aiResults = (
+          await this.searchIndexRepository.getItemsByNames(
+            userId,
+            aiTableSuggestions,
+            50,
+          )
+        )
           .filter((item) => aiTableSuggestions.includes(item.name))
           .map((item) => ({ ...item, isAiSuggested: true }));
 
@@ -164,8 +142,6 @@ export class SearchService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    return keywordResults
-      .sort((a, b) => a.name.length - b.name.length)
-      .slice(0, 50);
+    return keywordResults;
   }
 }
