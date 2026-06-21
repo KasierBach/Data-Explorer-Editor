@@ -88,7 +88,7 @@ class ApiService {
         });
 
         if (!response.ok) {
-          useAppStore.getState().logout();
+          useAppStore.getState().logout({ preserveWorkspace: true });
           return false;
         }
 
@@ -99,14 +99,14 @@ class ApiService {
         }>(response);
 
         if (!data?.access_token || !data.user) {
-          useAppStore.getState().logout();
+          useAppStore.getState().logout({ preserveWorkspace: true });
           return false;
         }
 
         useAppStore.getState().restoreSession(data.access_token, data.user, data.accessTokenExpiresAt ?? null);
         return true;
       } catch {
-        useAppStore.getState().logout();
+        useAppStore.getState().logout({ preserveWorkspace: true });
         return false;
       } finally {
         this.refreshPromise = null;
@@ -139,7 +139,7 @@ class ApiService {
 
     if (!response.ok) {
       if (response.status === 401) {
-        useAppStore.getState().logout();
+        useAppStore.getState().logout({ preserveWorkspace: true });
       }
       throw await this.buildApiError(response);
     }

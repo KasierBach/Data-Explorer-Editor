@@ -1,10 +1,12 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+﻿import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import {
     Sparkles, Plus, MessageSquare, Clock, X, Loader2
 } from 'lucide-react';
 import { useAiChat } from '@/presentation/hooks/useAiChat';
 import { useAppStore } from '@/core/services/store';
+import { updateAiPreferences, useAiPreferences } from '@/core/services/aiPreferences';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { AiChatList } from './AiChatList';
 import { AiMessageBubble } from './AiMessageBubble';
 import { AiChatInput } from './AiChatInput';
@@ -46,6 +48,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     const [showRoutingMenu, setShowRoutingMenu] = useState(false);
 
     const {
+        lang,
         aiModel, setAiModel,
         aiMode, setAiMode,
         aiRoutingMode, setAiRoutingMode,
@@ -53,6 +56,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         aiChats, activeAiChatId, createAiChat, setActiveAiChat, tabs, activeTabId,
         fetchAiChats, loadAiChatMessages, isFetchingAiChats
     } = useAppStore();
+    const text = getWorkspaceText(lang);
 
     const MODES = useMemo(() => [
         { id: 'planning', label: 'Planning', description: 'Agent can plan before executing tasks. Use for deep research, complex tasks, or collaborative work' },
@@ -66,7 +70,19 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         { id: 'gemini-only', label: 'Gemini Only', description: 'Always use the selected Gemini model. Best for consistency, highest cost.' },
     ], []);
 
-    const MODELS = useMemo(() => getAssistantModelCatalog(), []);
+    const preferences = useAiPreferences();
+    const MODELS = useMemo(() => getAssistantModelCatalog(preferences.customProviders), [preferences.customProviders]);
+    const assistantSelection = preferences.assistantModel || aiModel;
+    const handleAssistantModelChange = React.useCallback((value: string) => {
+        updateAiPreferences((current) => ({
+            ...current,
+            assistantModel: value,
+        }));
+
+        if (!value.startsWith('custom-provider:')) {
+            setAiModel(value);
+        }
+    }, [setAiModel]);
 
     const contextMenuRef = useRef<HTMLDivElement>(null);
 
@@ -138,10 +154,10 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                     </span>
                 </div>
                 <div className="flex items-center gap-0.5">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-violet-500/10" onClick={() => { createAiChat(); setShowHistory(false); }} title="Cuộc trò chuyện mới">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-violet-500/10" onClick={() => { createAiChat(); setShowHistory(false); }} title={text.aiAssistant.newConversation}>
                         <Plus className="w-3.5 h-3.5 text-violet-400" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted/50" onClick={() => setShowHistory(true)} title="Lịch sử chat">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted/50" onClick={() => setShowHistory(true)} title={text.aiAssistant.chatHistory}>
                         <Clock className="w-3.5 h-3.5" />
                     </Button>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose}>
@@ -155,7 +171,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                 <div className="px-3 py-1 border-b bg-muted/10 flex items-center gap-2">
                     <MessageSquare className="w-3 h-3 text-muted-foreground/70" />
                     <span className="text-[10px] text-muted-foreground truncate flex-1">{activeChat.title}</span>
-                    <span className="text-[9px] text-muted-foreground/40">{aiChats.length} chats</span>
+                    <span className="text-[9px] text-muted-foreground/40">{text.aiAssistant.chatCount(aiChats.length)}</span>
                 </div>
             )}
 
@@ -164,10 +180,10 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                 {!activeConnection && messages.length <= 1 && (
                     <div className="flex flex-col items-center justify-center p-6 my-4 border border-red-500/10 bg-red-500/5 rounded-xl text-center space-y-2 animate-in fade-in zoom-in-95">
                         <span className="text-xs font-bold text-red-500/80 uppercase tracking-widest">
-                            Chưa Kết Nối Database
+                            {text.aiAssistant.noDatabaseTitle}
                         </span>
                         <span className="text-[10px] text-muted-foreground leading-relaxed px-4">
-                            Bạn cần thiết lập Server & Database (hoặc NoSQL) ở sidebar để AI có thể tự động viết query chuẩn xác.
+                            {text.aiAssistant.noDatabaseDescription}
                         </span>
                     </div>
                 )}
@@ -186,7 +202,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                     <div className="flex justify-start">
                         <div className="bg-muted/30 rounded-lg p-2.5 border border-border/30 flex items-center gap-2">
                             <Loader2 className="w-3 h-3 animate-spin text-violet-400" />
-                            <span className="text-[10px] text-muted-foreground">Đang nghĩ...</span>
+                            <span className="text-[10px] text-muted-foreground">{text.aiAssistant.thinking}</span>
                         </div>
                     </div>
                 )}
@@ -208,8 +224,8 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                 handlePasteQuery={handlePasteQuery}
                 handleMentionTable={handleMentionTable}
                 fileInputRef={fileInputRef}
-                aiModel={aiModel}
-                setAiModel={setAiModel}
+                aiModel={assistantSelection}
+                setAiModel={handleAssistantModelChange}
                 aiMode={aiMode}
                 setAiMode={setAiMode}
                 aiRoutingMode={aiRoutingMode}
@@ -234,8 +250,11 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
 
             <div className="flex items-center justify-center mb-2 px-1">
                 <span className="text-[9px] text-muted-foreground/70">
-                    AI có thể trả lời KHÔNG CHÍNH XÁC — hãy kiểm tra lại trước khi chạy </span>
+                    {text.aiAssistant.disclaimer}
+                </span>
             </div>
         </div>
     );
 };
+
+

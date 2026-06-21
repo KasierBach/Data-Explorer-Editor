@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Clock3, FolderOpen, Pin, PinOff, Play, LayoutGrid, Tag, LibraryBig } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import type { QueryHistoryEntry, SavedQuery } from '@/core/services/store';
+import { formatWorkspaceRelativeTime, getWorkspaceText } from '@/core/utils/workspaceText';
 import { cn } from '@/lib/utils';
 
 interface QueryProjectPanelProps {
@@ -16,14 +17,8 @@ interface QueryProjectPanelProps {
     onOpenSavedQueries: () => void;
 }
 
-function formatRelativeTime(timestamp: number) {
-    const diffMs = Date.now() - timestamp;
-    const diffMinutes = Math.max(1, Math.round(diffMs / 60000));
-    if (diffMinutes < 60) return `${diffMinutes}m ago`;
-    const diffHours = Math.round(diffMinutes / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.round(diffHours / 24);
-    return `${diffDays}d ago`;
+function formatRelativeTime(lang: 'vi' | 'en', timestamp: number) {
+    return formatWorkspaceRelativeTime(lang, timestamp);
 }
 
 function SectionCard({
@@ -66,6 +61,7 @@ export function QueryProjectPanel({
     onTogglePinnedQuery,
     onOpenSavedQueries,
 }: QueryProjectPanelProps) {
+    const text = getWorkspaceText(lang);
     const pinnedQueries = useMemo(
         () => pinnedQueryIds
             .map((id) => savedQueries.find((query) => query.id === id))
@@ -89,7 +85,7 @@ export function QueryProjectPanel({
     const folderGroups = useMemo(() => {
         const grouped = new Map<string, SavedQuery[]>();
         for (const query of savedQueries) {
-            const key = query.folderId?.trim() || (lang === 'vi' ? 'Không có thư mục' : 'No folder');
+            const key = query.folderId?.trim() || text.queryProject.noFolder;
             const bucket = grouped.get(key) ?? [];
             bucket.push(query);
             grouped.set(key, bucket);
@@ -97,7 +93,7 @@ export function QueryProjectPanel({
         return Array.from(grouped.entries())
             .map(([folderName, items]) => ({ folderName, items }))
             .sort((a, b) => b.items.length - a.items.length);
-    }, [savedQueries, lang]);
+    }, [savedQueries, text]);
 
     const topTags = useMemo(() => {
         const counts = new Map<string, number>();
@@ -118,28 +114,24 @@ export function QueryProjectPanel({
                     <div className="flex items-center gap-2">
                         <LibraryBig className="h-4 w-4 text-primary" />
                         <div className="text-sm font-semibold">
-                            {lang === 'vi' ? 'Project query' : 'Query project'}
+                            {text.queryProject.title}
                         </div>
                     </div>
                     <p className="mt-1 text-[11px] text-muted-foreground">
-                        {lang === 'vi'
-                            ? 'Lua chon, pin, va mo lai query nhu mot IDE nho gon.'
-                            : 'Pin, group, and reopen queries like a lightweight IDE.'}
+                        {text.queryProject.description}
                     </p>
                 </div>
                 <Button variant="outline" size="sm" onClick={onOpenSavedQueries} className="h-8 gap-1.5 px-3 text-xs">
                     <FolderOpen className="h-3.5 w-3.5" />
-                    {lang === 'vi' ? 'Mo thu vien' : 'Open library'}
+                    {text.queryProject.openLibrary}
                 </Button>
             </div>
 
             <div className="grid gap-3 xl:grid-cols-3">
-                <SectionCard title={lang === 'vi' ? 'Da pin' : 'Pinned'} icon={Pin} count={pinnedQueries.length}>
+                <SectionCard title={text.queryProject.pinned} icon={Pin} count={pinnedQueries.length}>
                     {pinnedQueries.length === 0 ? (
                         <div className="rounded-md border border-dashed px-3 py-4 text-xs text-muted-foreground">
-                            {lang === 'vi'
-                                ? 'Pin query de giu lai cac truy van quan trong.'
-                                : 'Pin queries to keep the important ones nearby.'}
+                            {text.queryProject.pinHint}
                         </div>
                     ) : (
                         pinnedQueries.map((query) => (
@@ -175,12 +167,10 @@ export function QueryProjectPanel({
                     )}
                 </SectionCard>
 
-                <SectionCard title={lang === 'vi' ? 'Gan day' : 'Recent'} icon={Clock3} count={recentQueries.length}>
+                <SectionCard title={text.queryProject.recent} icon={Clock3} count={recentQueries.length}>
                     {recentQueries.length === 0 ? (
                         <div className="rounded-md border border-dashed px-3 py-4 text-xs text-muted-foreground">
-                            {lang === 'vi'
-                                ? 'Chua co lich su chay query.'
-                                : 'No query runs yet.'}
+                            {text.queryProject.noHistory}
                         </div>
                     ) : (
                         recentQueries.map((entry) => (
@@ -190,7 +180,7 @@ export function QueryProjectPanel({
                                 </pre>
                                 <div className="mt-2 flex items-center justify-between gap-2">
                                     <span className="text-[10px] text-muted-foreground">
-                                        {formatRelativeTime(entry.executedAt)}
+                                        {formatRelativeTime(lang, entry.executedAt)}
                                     </span>
                                     <Button
                                         variant="ghost"
@@ -199,7 +189,7 @@ export function QueryProjectPanel({
                                         onClick={() => onRunQuery(entry.sql)}
                                     >
                                         <Play className="h-3 w-3" />
-                                        {lang === 'vi' ? 'Chay' : 'Run'}
+                                        {text.queryProject.run}
                                     </Button>
                                 </div>
                             </div>
@@ -207,12 +197,10 @@ export function QueryProjectPanel({
                     )}
                 </SectionCard>
 
-                <SectionCard title={lang === 'vi' ? 'Thư mục' : 'Folders'} icon={LayoutGrid} count={folderGroups.length}>
+                <SectionCard title={text.queryProject.folders} icon={LayoutGrid} count={folderGroups.length}>
                     {folderGroups.length === 0 ? (
                         <div className="rounded-md border border-dashed px-3 py-4 text-xs text-muted-foreground">
-                            {lang === 'vi'
-                                ? 'Ban chua co saved query nao.'
-                                : 'No saved queries yet.'}
+                            {text.queryProject.noSavedQueries}
                         </div>
                     ) : (
                         folderGroups.map((folder) => (
@@ -221,7 +209,7 @@ export function QueryProjectPanel({
                                     <div className="min-w-0">
                                         <div className="truncate text-sm font-medium">{folder.folderName}</div>
                                         <div className="text-[10px] text-muted-foreground">
-                                            {folder.items.length} {lang === 'vi' ? 'query' : 'queries'}
+                                            {text.queryProject.queryCount(folder.items.length)}
                                         </div>
                                     </div>
                                 </div>
@@ -246,7 +234,7 @@ export function QueryProjectPanel({
                             <div className="mb-2 flex items-center gap-2">
                                 <Tag className="h-3.5 w-3.5 text-muted-foreground" />
                                 <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                                    {lang === 'vi' ? 'Tag pho bien' : 'Top tags'}
+                                    {text.queryProject.topTags}
                                 </div>
                             </div>
                             <div className="flex flex-wrap gap-1.5">

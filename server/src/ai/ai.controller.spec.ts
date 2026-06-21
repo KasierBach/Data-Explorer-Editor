@@ -5,6 +5,7 @@ import { AiConnectionService } from './ai.connection-service';
 
 describe('AiController', () => {
   let controller: AiController;
+  const originalFetch = global.fetch;
 
   const aiServiceMock = {
     chat: jest.fn(),
@@ -34,6 +35,10 @@ describe('AiController', () => {
     }).compile();
 
     controller = module.get<AiController>(AiController);
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
   });
 
   it('passes history into chatStream for streaming requests', async () => {
@@ -117,5 +122,33 @@ describe('AiController', () => {
       mode: 'fast',
       routingMode: 'auto',
     });
+  });
+
+  it('lists provider models from an openai-compatible endpoint', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        data: [{ id: 'z-model' }, { id: 'a-model' }, { id: 'a-model' }],
+      }),
+    }) as any;
+
+    await expect(
+      controller.listProviderModels({
+        baseUrl: 'https://provider.example.com/v1',
+        apiKey: 'sk-test',
+      }),
+    ).resolves.toEqual({
+      models: ['a-model', 'z-model'],
+    });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://provider.example.com/v1/models',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer sk-test',
+        }),
+      }),
+    );
   });
 });

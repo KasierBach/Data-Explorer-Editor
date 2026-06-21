@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { DashboardService } from '@/core/services/DashboardService';
 import { useAppStore } from '@/core/services/store';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { toast } from 'sonner';
 
 export interface SaveToDashboardFormValues {
@@ -40,6 +41,7 @@ export function useQueryDashboard({
 }: UseQueryDashboardOptions) {
     const queryClient = useQueryClient();
     const { activeConnectionId, connections, activeDatabase, openDashboardTab, lang } = useAppStore();
+    const text = getWorkspaceText(lang);
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const activeOrganizationId = activeConnection?.organizationId || undefined;
 
@@ -59,11 +61,11 @@ export function useQueryDashboard({
 
     const openDashboardDialog = () => {
         if (!results?.rows?.length) return;
-        const defaultName = currentSavedQueryName || tabTitle || (lang === 'vi' ? 'Query Widget' : 'Query Widget');
+        const defaultName = currentSavedQueryName || tabTitle || text.dashboard.defaultWidgetName;
         setDashboardDialogInitialValues({
             mode: 'new',
             dashboardId: '',
-            dashboardName: activeConnection?.name ? `${activeConnection.name} Dashboard` : 'New Dashboard',
+            dashboardName: activeConnection?.name ? `${activeConnection.name} Dashboard` : text.dashboard.newDashboard,
             dashboardDescription: '',
             visibility: 'private',
             organizationId: activeOrganizationId || '',
@@ -113,7 +115,7 @@ export function useQueryDashboard({
         queryClient.invalidateQueries({ queryKey: ['dashboards'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard', dashboardId] });
         openDashboardTab(updatedDashboard.id, dashboardName || updatedDashboard.name);
-        toast.success(lang === 'vi' ? 'Da luu widget vao dashboard' : 'Widget saved to dashboard');
+        toast.success(text.dashboard.saved);
     }, [
         results,
         activeConnection?.id,
@@ -125,7 +127,7 @@ export function useQueryDashboard({
         currentSavedQueryId,
         queryClient,
         openDashboardTab,
-        lang,
+        text,
     ]);
 
     return {

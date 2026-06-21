@@ -90,6 +90,7 @@ export class AiService {
     model?: string;
     mode?: AiChatMode;
     routingMode?: AiRoutingMode;
+    providerOverride?: ChatParams['providerOverride'];
   }): Promise<{ sql: string; explanation: string }> {
     const {
       query,
@@ -98,6 +99,7 @@ export class AiService {
       model,
       mode = 'fast',
       routingMode,
+      providerOverride,
     } = params;
 
     const result = await this.chatService.chat({
@@ -107,6 +109,7 @@ export class AiService {
       schemaContext,
       databaseType,
       routingMode,
+      providerOverride,
     });
 
     const sql = this.normalizeGeneratedCommand(result.sql, databaseType, query);
@@ -332,3 +335,4 @@ export class AiService {
     return trimmed;
   }
 }
+

@@ -3,6 +3,7 @@ import { useAppStore, type SavedQuery } from '@/core/services/store';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from "@/presentation/components/ui/dialog";
@@ -11,6 +12,7 @@ import { Input } from '@/presentation/components/ui/input';
 import { Search, FileCode, Trash2, FolderOpen, Clock, Database, UserRound, Tags, Pin, PinOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SavedQueryService } from '@/core/services/SavedQueryService';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { toast } from 'sonner';
 import { VersionHistoryDialog } from '@/presentation/components/version-history/VersionHistoryDialog';
 import { VersionHistoryService } from '@/core/services/VersionHistoryService';
@@ -29,6 +31,7 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
     onRestoreQuery,
 }) => {
     const { savedQueries, deleteSavedQuery, lang, pinnedQueryIds, togglePinnedQuery } = useAppStore();
+    const text = getWorkspaceText(lang);
     const [search, setSearch] = useState('');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
@@ -63,15 +66,15 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
             await SavedQueryService.deleteSavedQuery(id);
             deleteSavedQuery(id);
             if (selectedId === id) setSelectedId(null);
-            toast.success('Saved query deleted');
+            toast.success(text.savedQueries.deleted);
         } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to delete saved query');
+            toast.error(error instanceof Error ? error.message : text.savedQueries.deleteFailed);
         }
     };
 
     const formatDate = (ts: string) => {
         const d = new Date(ts);
-        return d.toLocaleDateString('vi-VN', {
+        return d.toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', {
             day: '2-digit', month: '2-digit', year: 'numeric',
             hour: '2-digit', minute: '2-digit'
         });
@@ -79,7 +82,7 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
 
     const getOwnerLabel = (query: SavedQuery) => {
         const owner = query.owner;
-        if (!owner) return 'Unknown owner';
+        if (!owner) return text.savedQueries.unknownOwner;
         return `${owner.firstName || ''} ${owner.lastName || ''}`.trim() || owner.email;
     };
 
@@ -89,8 +92,11 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                 <DialogHeader className="p-4 pb-2 border-b">
                     <DialogTitle className="flex items-center gap-2 text-base">
                         <FolderOpen className="w-4 h-4 text-blue-500" />
-                        Saved Queries
+                        {text.savedQueries.title}
                     </DialogTitle>
+                    <DialogDescription className="sr-only">
+                        {text.savedQueries.description}
+                    </DialogDescription>
                 </DialogHeader>
 
                 {/* Search */}
@@ -98,7 +104,7 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                     <div className="relative">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                         <Input
-                            placeholder="Search queries..."
+                            placeholder={text.savedQueries.searchPlaceholder}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="pl-8 h-8 text-sm"
@@ -149,7 +155,7 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                                                     togglePinnedQuery(q.id);
                                                 }}
                                                 className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-opacity"
-                                                title={pinnedQueryIds.includes(q.id) ? (lang === 'vi' ? 'Bo pin' : 'Unpin') : (lang === 'vi' ? 'Pin' : 'Pin')}
+                                                title={pinnedQueryIds.includes(q.id) ? text.savedQueries.unpin : text.savedQueries.pin}
                                             >
                                                 {pinnedQueryIds.includes(q.id) ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
                                             </Button>
@@ -190,7 +196,7 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                         {selectedQuery ? (
                             <>
                                 <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Preview</span>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{text.savedQueries.preview}</span>
                                     <div className="flex items-center gap-2">
                                         {selectedQuery.isOwner && (
                                             <Button
@@ -200,7 +206,7 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                                                 className="h-6 px-3 text-xs gap-1"
                                             >
                                                 <Clock className="w-3 h-3" />
-                                                {lang === 'vi' ? 'Lịch sử' : 'History'}
+                                                {text.savedQueries.history}
                                             </Button>
                                         )}
                                         <Button
@@ -209,7 +215,7 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                                             className="h-6 px-3 text-xs gap-1"
                                         >
                                             <FolderOpen className="w-3 h-3" />
-                                            Open
+                                            {text.savedQueries.open}
                                         </Button>
                                     </div>
                                 </div>
@@ -248,7 +254,7 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                             </>
                         ) : (
                             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                                Select a query to preview
+                                {text.savedQueries.selectToPreview}
                             </div>
                         )}
                     </div>
@@ -265,17 +271,17 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                 open={isVersionHistoryOpen}
                 onOpenChange={setIsVersionHistoryOpen}
                 lang={lang}
-                title={lang === 'vi' ? 'Lịch sử saved query' : 'Saved Query History'}
+                title={text.savedQueries.historyTitle}
                 resourceType="QUERY"
                 resourceId={selectedQuery?.id ?? null}
-                emptyMessage={lang === 'vi' ? 'Chua co phien ban nao' : 'No versions yet'}
+                emptyMessage={text.savedQueries.noVersions}
                 restoreVersion={VersionHistoryService.restoreSavedQueryVersion}
                 onRestored={onRestoreQuery}
                 renderSnapshot={(snapshot) => (
                     <div className="space-y-3">
                         <div className="space-y-1">
                             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                                {lang === 'vi' ? 'Ten' : 'Name'}
+                                {text.savedQueries.name}
                             </div>
                             <div className="font-medium">{snapshot.name}</div>
                         </div>

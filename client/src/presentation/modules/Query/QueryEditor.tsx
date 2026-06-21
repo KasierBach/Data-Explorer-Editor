@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
 import type { editor } from 'monaco-editor';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
+import { apiService, ApiError } from '@/core/services/api.service';
 import { useAppStore, type SavedQuery } from '@/core/services/store';
+import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
 import { SavedQueriesDialog } from './SavedQueriesDialog';
 import { QueryHistoryDialog } from './QueryHistoryDialog';
 import type { QueryResult } from '@/core/domain/entities';
@@ -12,7 +14,6 @@ import { useSchemaInfo } from '@/presentation/hooks/useSchemaInfo';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { useVerticalResizablePanel } from '@/presentation/hooks/useVerticalResizablePanel';
 import { cn } from '@/lib/utils';
-import { ApiError } from '@/core/services/api.service';
 import { SavedQueryService } from '@/core/services/SavedQueryService';
 import { OrganizationService } from '@/core/services/OrganizationService';
 import { SaveQueryDialog, type SaveQueryFormValues } from './SaveQueryDialog';
@@ -22,12 +23,26 @@ import { useQueryDashboard } from './hooks';
 import { QueryToolbar } from './components/QueryToolbar';
 import { useResourcePresence } from '@/presentation/hooks/useResourcePresence';
 import { PresenceBadge } from '@/presentation/components/presence/PresenceBadge';
+import { SqlSequenceDialog } from './SqlSequenceDialog';
+import { AiQueryExplanationDialog } from './AiQueryExplanationDialog';
 
 type SqlEditorHandle = editor.IStandaloneCodeEditor;
 
+type AiExplanationResponse = {
+    message?: string;
+    explanation?: string;
+};
+
+const SQL_SEQUENCE_TYPES = new Set(['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse']);
 
 function getErrorMessage(error: unknown) {
     return error instanceof Error ? error.message : 'Unexpected error';
+}
+
+function getExplainPrompt(lang: 'vi' | 'en') {
+    return lang === 'vi'
+        ? 'Giải thích câu SQL này theo đúng thứ tự thực thi. Không sinh SQL mới. Trả lời bằng markdown với các phần: Tóm tắt tổng thể, Giải thích từng bước, và Lưu ý/rủi ro nếu có. Nếu là nhiều statement, hãy giải thích lần lượt từng statement.'
+        : 'Explain this SQL in execution order. Do not generate new SQL. Return markdown with sections for overall summary, step-by-step explanation, and important notes or risks. If this is a multi-statement script, explain each statement in order.';
 }
 
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
@@ -35,13 +50,13 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const {
         activeConnectionId, connections, tabs, updateTabMetadata,
         activeDatabase, lang, isResultPanelOpen, toggleResultPanel,
-        defaultResultHeight, setDefaultResultHeight
+        defaultResultHeight, setDefaultResultHeight, aiModel, aiRoutingMode,
     } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const activeOrganizationId = activeConnection?.organizationId || undefined;
     const schemaInfo = useSchemaInfo();
+    const preferences = useAiPreferences();
 
-    // Find options for this tab
     const tab = tabs.find(t => t.id === tabId);
     const initialMetadata = tab?.metadata || {};
     const externalSql = tab?.metadata?.sql ?? tab?.initialSql ?? '';
@@ -56,19 +71,25 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         initialHeight: initialMetadata.resultHeight || defaultResultHeight || 300,
         minHeight: 150,
         maxHeight: 0.8,
-        onHeightChange: handleHeightChange
+        onHeightChange: handleHeightChange,
     });
 
     const [query, setQuery] = useState(initialMetadata.sql || tab?.initialSql || '');
     const [executedQuery, setExecutedQuery] = useState<string | null>(null);
-    const [limit, setLimit] = useState(initialMetadata.limit || "1000");
+    const [limit, setLimit] = useState(initialMetadata.limit || '1000');
     const [runNonce, setRunNonce] = useState(0);
-    const [activeResultTab, setActiveResultTab] = useState("data");
+    const [activeResultTab, setActiveResultTab] = useState('data');
     const [isSavedDialogOpen, setIsSavedDialogOpen] = useState(false);
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
     const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+    const [isSqlSequenceDialogOpen, setIsSqlSequenceDialogOpen] = useState(false);
     const [currentSavedQueryId, setCurrentSavedQueryId] = useState<string | null>(initialMetadata.savedQueryId || null);
     const [explainPlan, setExplainPlan] = useState<unknown>(null);
+    const [isAiExplainDialogOpen, setIsAiExplainDialogOpen] = useState(false);
+    const [isAiExplaining, setIsAiExplaining] = useState(false);
+    const [aiExplainSql, setAiExplainSql] = useState('');
+    const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+    const [aiExplainError, setAiExplainError] = useState<string | null>(null);
     const [saveDialogInitialValues, setSaveDialogInitialValues] = useState<SaveQueryFormValues>({
         name: '',
         visibility: 'private',
@@ -106,8 +127,13 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             intervalMs: 20_000,
         },
     );
+    const supportsSqlSequence = activeConnection ? SQL_SEQUENCE_TYPES.has(activeConnection.type) : false;
+    const assistantSelection = preferences.assistantModel || aiModel;
+    const resolvedExplain = React.useMemo(
+        () => resolveAiSelection(preferences.explainModel, assistantSelection, preferences.customProviders),
+        [preferences.explainModel, assistantSelection, preferences.customProviders],
+    );
 
-    // Persist SQL query to store
     useEffect(() => {
         if (isFirstLoad.current) {
             isFirstLoad.current = false;
@@ -117,7 +143,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         const timer = setTimeout(() => {
             updateTabMetadata(tabId, {
                 sql: query,
-                limit: limit
+                limit,
             });
         }, 500);
 
@@ -152,7 +178,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         queryKey: ['query-execution', activeConnectionId, activeDatabase, executedQuery, requestLimit, runNonce],
         queryFn: async () => {
             if (!executedQuery) return null;
-            if (!activeConnection) throw new Error("No active connection");
+            if (!activeConnection) throw new Error('No active connection');
 
             const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
             await adapter.connect(activeConnection);
@@ -163,11 +189,12 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             });
         },
         enabled: !!executedQuery && !!activeConnectionId && runNonce > 0,
-        retry: false
+        retry: false,
     });
+
     const blockedReason = (error as ApiError | null)?.reason;
     const hasPersistentGuardrail = Boolean(
-        activeConnection?.readOnly || activeConnection?.allowQueryExecution === false
+        activeConnection?.readOnly || activeConnection?.allowQueryExecution === false,
     );
     const protectiveLimit = results?.appliedLimit ?? 50000;
     const guardrailMessage = React.useMemo(() => {
@@ -190,24 +217,25 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                         lang === 'vi'
                             ? `giới hạn yêu cầu: ${limit} dòng`
                             : `requested limit: ${limit} rows`
-                    )
+                    ),
             );
             parts.push(lang === 'vi' ? 'timeout ~30s' : '~30s timeout');
         }
         return parts.join(' • ');
     }, [activeConnection, lang, limit, protectiveLimit]);
+
     const resultColumns = React.useMemo(() => {
         if (results?.columns?.length) return results.columns;
         if (results?.rows?.length) return Object.keys(results.rows[0]);
         return [];
     }, [results]);
+
     const resultNumericColumns = React.useMemo(() => {
         if (!results?.rows?.length) return [];
         const sample = results.rows[0];
         return resultColumns.filter((column) => typeof sample?.[column] === 'number');
     }, [results, resultColumns]);
 
-    // Dashboard hook — extracted from inline state + handlers
     const {
         isDashboardDialogOpen,
         setIsDashboardDialogOpen,
@@ -224,11 +252,13 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         currentSavedQueryName: currentSavedQuery?.name,
         tabTitle: tab?.title,
     });
+
     const { data: organizations = [] } = useQuery({
         queryKey: ['organizations'],
         queryFn: () => OrganizationService.getMyOrganizations(),
         enabled: isSaveDialogOpen || isDashboardDialogOpen,
     });
+
     const workspaceOptions = React.useMemo(
         () => organizations.map((organization) => ({
             id: organization.id,
@@ -237,7 +267,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         [organizations],
     );
 
-    // Record history on success/error
     useEffect(() => {
         if (!isSuccess || !results || !executedQuery || !dataUpdatedAt) {
             return;
@@ -248,7 +277,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         }
 
         lastSuccessHistoryAtRef.current = dataUpdatedAt;
-        setActiveResultTab("data");
+        setActiveResultTab('data');
         addQueryHistory({
             id: `history-${Date.now()}`,
             sql: executedQuery,
@@ -271,7 +300,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         }
 
         lastErrorHistoryAtRef.current = errorUpdatedAt;
-        setActiveResultTab("messages");
+        setActiveResultTab('messages');
         addQueryHistory({
             id: `history-${Date.now()}`,
             sql: executedQuery,
@@ -286,7 +315,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const handleRun = (overrideSql?: string) => {
         let sqlToExecute = overrideSql || query;
 
-        // Check if there is a selection
         if (!overrideSql && editorRef.current) {
             const selection = editorRef.current.getSelection();
             if (selection && !selection.isEmpty()) {
@@ -298,6 +326,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         }
 
         if (!sqlToExecute.trim()) return;
+        setExplainPlan(null);
         setExecutedQuery(sqlToExecute);
         setRunNonce((current) => current + 1);
     };
@@ -311,44 +340,33 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 if (selectedText && selectedText.trim()) sqlToExplain = selectedText;
             }
         }
-        if (!sqlToExplain.trim()) return;
-        if (!activeConnection) return;
 
-        // Use FORMAT JSON for structured plan data
-        const explainSql = `EXPLAIN (ANALYZE, FORMAT JSON) ${sqlToExplain}`;
-        setExecutedQuery(explainSql);
+        if (!sqlToExplain.trim() || !activeConnectionId) return;
+
         setExplainPlan(null);
+        setAiExplainSql(sqlToExplain);
+        setAiExplanation(null);
+        setAiExplainError(null);
+        setIsAiExplainDialogOpen(true);
+        setIsAiExplaining(true);
 
         try {
-            // Execute explain query directly
-            const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
-            const result = await adapter.executeQuery(
-                explainSql,
-                activeDatabase ? { database: activeDatabase } : undefined
-            );
-            setExplainPlan(result.rows);
-            setActiveResultTab('plan');
+            const result = await apiService.post<AiExplanationResponse>('/ai/generate-sql', {
+                connectionId: activeConnectionId,
+                database: activeDatabase || undefined,
+                prompt: getExplainPrompt(lang),
+                context: `SQL to explain:\n${sqlToExplain}`,
+                model: resolvedExplain.model,
+                mode: 'planning',
+                routingMode: aiRoutingMode,
+                providerOverride: resolvedExplain.providerOverride,
+            });
 
-            addQueryHistory({
-                id: `history-${Date.now()}`,
-                sql: explainSql,
-                database: activeDatabase || undefined,
-                connectionName: activeConnection?.name,
-                executedAt: Date.now(),
-                durationMs: result.durationMs,
-                status: 'success',
-            });
-        } catch (error) {
-            setActiveResultTab('messages');
-            addQueryHistory({
-                id: `history-${Date.now()}`,
-                sql: explainSql,
-                database: activeDatabase || undefined,
-                connectionName: activeConnection?.name,
-                executedAt: Date.now(),
-                status: 'error',
-                errorMessage: getErrorMessage(error),
-            });
+            setAiExplanation(result.message?.trim() || result.explanation?.trim() || null);
+        } catch (explainError) {
+            setAiExplainError(getErrorMessage(explainError));
+        } finally {
+            setIsAiExplaining(false);
         }
     };
 
@@ -360,8 +378,8 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                 keywordCase: 'upper',
             });
             setQuery(formatted);
-        } catch (e) {
-            console.error("Formatting failed", e);
+        } catch (formatError) {
+            console.error('Formatting failed', formatError);
         }
     };
 
@@ -373,7 +391,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         queryClient.removeQueries({ queryKey: ['query-execution', activeConnectionId] });
     };
 
-    // Save query
     const handleSave = useCallback(async () => {
         if (!query.trim()) return;
 
@@ -381,12 +398,12 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             try {
                 const updated = await SavedQueryService.updateSavedQuery(currentSavedQueryId, { sql: query });
                 saveQuery(updated);
-                toast.success(lang === 'vi' ? 'Da cap nhat saved query' : 'Saved query updated');
-            } catch (err) {
-                toast.error(getErrorMessage(err) || 'Failed to update saved query');
+                toast.success(lang === 'vi' ? 'Đã cập nhật truy vấn đã lưu' : 'Saved query updated');
+            } catch (saveError) {
+                toast.error(getErrorMessage(saveError) || 'Failed to update saved query');
             }
         } else {
-            const defaultName = lang === 'vi' ? `Truy van ${new Date().toLocaleString('vi-VN')}` : `Query ${new Date().toLocaleString('en-US')}`;
+            const defaultName = lang === 'vi' ? `Truy vấn ${new Date().toLocaleString('vi-VN')}` : `Query ${new Date().toLocaleString('en-US')}`;
             const currentVisibility = currentSavedQuery?.visibility === 'workspace' ? 'workspace' : 'private';
             setSaveDialogInitialValues({
                 name: currentSavedQuery?.name || defaultName,
@@ -416,7 +433,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         if (currentSavedQueryId && currentSavedQuery?.isOwner) {
             const updated = await SavedQueryService.updateSavedQuery(currentSavedQueryId, payload);
             saveQuery(updated);
-            toast.success(lang === 'vi' ? 'Da cap nhat saved query' : 'Saved query updated');
+            toast.success(lang === 'vi' ? 'Đã cập nhật truy vấn đã lưu' : 'Saved query updated');
             return;
         }
 
@@ -424,10 +441,9 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         saveQuery(created);
         setCurrentSavedQueryId(created.id);
         updateTabMetadata(tabId, { savedQueryId: created.id });
-        toast.success(lang === 'vi' ? 'Da luu saved query' : 'Query saved');
+        toast.success(lang === 'vi' ? 'Đã lưu truy vấn' : 'Query saved');
     }, [query, activeDatabase, activeConnection, currentSavedQueryId, currentSavedQuery, saveQuery, lang, tabId, updateTabMetadata]);
 
-    // Open saved query into a new tab
     const handleOpenSavedQuery = useCallback((sq: SavedQuery) => {
         openTab({
             id: `query-${Date.now()}`,
@@ -450,7 +466,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const handleSaveRef = useRef(handleSave);
     handleSaveRef.current = handleSave;
 
-    // Keyboard shortcuts
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
@@ -483,6 +498,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             <div className="flex flex-col h-full bg-background">
                 <QueryToolbar
                     isLoading={isLoading}
+                    isExplaining={isAiExplaining}
                     allowQueryExecution={activeConnection?.allowQueryExecution}
                     isCompactMobileLayout={isCompactMobileLayout}
                     isSmallMobile={isSmallMobile}
@@ -501,14 +517,16 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                     onSave={handleSave}
                     onOpenSaved={() => setIsSavedDialogOpen(true)}
                     onOpenHistory={() => setIsHistoryDialogOpen(true)}
-                    onExplain={handleExplain}
+                    onExplain={() => void handleExplain()}
                     onLimitChange={setLimit}
+                    showSqlSequence={supportsSqlSequence}
+                    onOpenSqlSequence={() => setIsSqlSequenceDialogOpen(true)}
                     rightSlot={currentSavedQuery?.organizationId ? (
                         <PresenceBadge
                             entries={queryPresence.entries}
                             isLoading={queryPresence.isLoading}
-                            label={lang === 'vi' ? 'Query live' : 'Query live'}
-                            emptyLabel={lang === 'vi' ? 'Chua ai mo query nay' : 'No one on this query'}
+                            label={lang === 'vi' ? 'Truy vấn đang mở' : 'Query live'}
+                            emptyLabel={lang === 'vi' ? 'Chưa ai mở truy vấn này' : 'No one on this query'}
                             className="max-w-[280px]"
                         />
                     ) : null}
@@ -516,12 +534,12 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
                 {activeConnection && (blockedReason || hasPersistentGuardrail) && (
                     <div className={cn(
-                        "mx-2 mt-2 rounded-lg border px-3 py-2 text-xs",
+                        'mx-2 mt-2 rounded-lg border px-3 py-2 text-xs',
                         activeConnection.allowQueryExecution === false
-                            ? "border-red-500/20 bg-red-500/10 text-red-400"
+                            ? 'border-red-500/20 bg-red-500/10 text-red-400'
                             : activeConnection.readOnly
-                                ? "border-amber-500/20 bg-amber-500/10 text-amber-400"
-                                : "border-blue-500/20 bg-blue-500/10 text-blue-400"
+                                ? 'border-amber-500/20 bg-amber-500/10 text-amber-400'
+                                : 'border-blue-500/20 bg-blue-500/10 text-blue-400',
                     )}>
                         <div className="font-semibold uppercase tracking-wide text-[10px]">
                             {blockedReason === 'READ_ONLY_CONNECTION'
@@ -538,11 +556,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                     </div>
                 )}
 
-
                 <div className="flex-1 flex flex-col min-h-0 relative">
-
-
-                    {/* Top Editor - takes remaining space */}
                     <div className="flex-1 min-h-0 relative">
                         <SqlEditor
                             value={query}
@@ -555,27 +569,25 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                         />
                     </div>
 
-                    {/* Resize Handle - Custom Separator */}
                     <div
                         onPointerDown={resizer.startResizing}
                         className={cn(
-                            "h-1.5 bg-muted/20 border-y border-border/10 cursor-row-resize flex items-center justify-center group transition-colors select-none z-20 touch-none",
-                            resizer.isDragging ? "bg-blue-500/20" : "hover:bg-blue-500/10",
-                            !isResultPanelOpen && "hidden"
+                            'h-1.5 bg-muted/20 border-y border-border/10 cursor-row-resize flex items-center justify-center group transition-colors select-none z-20 touch-none',
+                            resizer.isDragging ? 'bg-blue-500/20' : 'hover:bg-blue-500/10',
+                            !isResultPanelOpen && 'hidden',
                         )}
                     >
                         <div className={cn(
-                            "w-12 h-0.5 rounded-full bg-muted-foreground/20 group-hover:bg-blue-500/50 transition-colors",
-                            resizer.isDragging && "bg-blue-500"
+                            'w-12 h-0.5 rounded-full bg-muted-foreground/20 group-hover:bg-blue-500/50 transition-colors',
+                            resizer.isDragging && 'bg-blue-500',
                         )} />
                     </div>
 
-                    {/* Bottom Result Panel - with smooth transition */}
                     <div
                         style={{ height: isResultPanelOpen ? `${resizer.height}px` : '0px' }}
                         className={cn(
-                            "flex flex-col overflow-hidden bg-card shrink-0 relative z-10",
-                            resizer.isDragging ? "" : "transition-[height] duration-300 ease-in-out"
+                            'flex flex-col overflow-hidden bg-card shrink-0 relative z-10',
+                            resizer.isDragging ? '' : 'transition-[height] duration-300 ease-in-out',
                         )}
                     >
                         <QueryResults
@@ -593,8 +605,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                         />
                     </div>
                 </div>
-
-
             </div>
 
             <SavedQueriesDialog
@@ -620,6 +630,30 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                     handleRun(sql);
                 }}
             />
+            <SqlSequenceDialog
+                open={isSqlSequenceDialogOpen}
+                onOpenChange={setIsSqlSequenceDialogOpen}
+                lang={lang}
+                initialSql={query}
+                canRun={activeConnection?.allowQueryExecution !== false}
+                onApply={(sql) => {
+                    setQuery(sql);
+                    editorRef.current?.focus();
+                }}
+                onRun={(sql) => {
+                    setQuery(sql);
+                    handleRun(sql);
+                }}
+            />
+            <AiQueryExplanationDialog
+                open={isAiExplainDialogOpen}
+                onOpenChange={setIsAiExplainDialogOpen}
+                lang={lang}
+                sql={aiExplainSql}
+                explanation={aiExplanation}
+                isLoading={isAiExplaining}
+                error={aiExplainError}
+            />
             <SaveQueryDialog
                 open={isSaveDialogOpen}
                 onOpenChange={setIsSaveDialogOpen}
@@ -641,3 +675,5 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         </>
     );
 };
+
+

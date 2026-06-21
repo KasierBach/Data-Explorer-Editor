@@ -1,9 +1,11 @@
-import React, { useState, useRef } from 'react';
+﻿import React, { useState, useRef } from 'react';
 import { Sparkles, Loader2, Wand2, Info, X, Database } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Textarea } from '@/presentation/components/ui/textarea';
 import { apiService } from '@/core/services/api.service';
 import { useAppStore } from '@/core/services/store';
+import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -44,6 +46,10 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
     collectionName,
 }) => {
     const { lang, aiModel, aiRoutingMode, connections } = useAppStore();
+    const text = getWorkspaceText(lang);
+    const preferences = useAiPreferences();
+    const assistantSelection = preferences.assistantModel || aiModel;
+    const resolvedNoSql = resolveAiSelection(preferences.nosqlModel, assistantSelection, preferences.customProviders);
     const [query, setQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [explanation, setExplanation] = useState<string | null>(null);
@@ -53,79 +59,65 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
     const activeConnection = connections.find((connection) => connection.id === currentConnectionId);
     const isRedis = activeConnection?.type === 'redis';
     const isReadOnly = !!activeConnection?.readOnly;
-    const commandLabel = isRedis ? 'Redis Command' : 'MQL';
-    const generatorLabel = isRedis ? 'AI Redis Generator' : 'AI MQL Generator';
+    const commandLabel = isRedis ? text.noSqlAi.redisCommandLabel : text.noSqlAi.mqlCommandLabel;
+    const generatorLabel = isRedis ? text.noSqlAi.redisGeneratorTitle : text.noSqlAi.mqlGeneratorTitle;
     const collapsedPrompt = isRedis
-        ? (lang === 'vi'
-            ? 'Gõ yêu cầu để sinh lệnh Redis...'
-            : 'Type natural language to generate a Redis command...')
-        : (lang === 'vi'
-            ? 'Gõ yêu cầu để sinh MQL (vd: lọc các đơn hàng > 500k...)'
-            : 'Type natural language to generate MQL...');
+        ? text.noSqlAi.collapsedPromptRedis
+        : text.noSqlAi.collapsedPromptMongo;
     const expandedPlaceholder = isRedis
-        ? (lang === 'vi'
-            ? 'Mô tả lệnh Redis bạn cần (vd: quét session:*, lấy key user:123)...'
-            : 'Describe the Redis command you need...')
-        : (lang === 'vi'
-            ? 'Mô tả yêu cầu truy vấn MongoDB của bạn...'
-            : 'Describe your MongoDB query request...');
+        ? text.noSqlAi.expandedPlaceholderRedis
+        : text.noSqlAi.expandedPlaceholderMongo;
     const capabilityTags = isRedis
         ? ['scan', 'get', 'set', 'del']
         : isReadOnly
             ? ['find', 'aggregate']
             : ['find', 'aggregate', 'update', 'delete'];
     const capabilityNote = isRedis
-        ? (lang === 'vi'
-            ? 'AI có thể gợi ý lệnh đọc và ghi Redis. Hãy nói rõ thao tác nếu bạn muốn set hoặc xóa key.'
-            : 'AI can suggest both read and write Redis commands. Be explicit when you want to set or delete keys.')
+        ? text.noSqlAi.capabilityNoteRedis
         : isReadOnly
-            ? (lang === 'vi'
-                ? 'Kết nối đang ở chế độ chỉ đọc nên AI chỉ nên sinh find hoặc aggregate cho collection này.'
-                : 'This connection is read-only, so AI should only generate find or aggregate commands for this collection.')
-            : (lang === 'vi'
-                ? 'AI có thể sinh find, aggregate, update và delete. Với lệnh ghi dữ liệu, hãy dùng từ rõ ràng như update/delete/remove để hệ thống biết bạn thật sự muốn mutate.'
-                : 'AI can generate find, aggregate, update, and delete commands. For write operations, use explicit verbs like update/delete/remove so the workspace knows you intend to mutate data.');
+            ? text.noSqlAi.capabilityNoteReadOnly
+            : text.noSqlAi.capabilityNoteMutable;
     const quickPrompts: QuickPrompt[] = isRedis
         ? [
             {
-                label: lang === 'vi' ? 'Quét session' : 'Scan sessions',
+                label: text.noSqlAi.quickScanSessions,
                 prompt: 'Scan session:* and return the first 20 matching keys.',
             },
             {
-                label: lang === 'vi' ? 'Xem TTL key' : 'Inspect TTL',
+                label: text.noSqlAi.quickInspectTtl,
                 prompt: 'Show the TTL for user:123 and explain the command before running it.',
             },
             {
-                label: lang === 'vi' ? 'Xóa key cũ' : 'Delete old key',
+                label: text.noSqlAi.quickDeleteOldKey,
                 prompt: 'Delete the cache key report:daily:stale and explain the impact.',
             },
         ]
         : isReadOnly
             ? [
                 {
-                    label: lang === 'vi' ? 'Top categories' : 'Top categories',
+                    label: text.noSqlAi.quickTopCategories,
                     prompt: 'Find the top 10 categories by document count in this collection.',
                 },
                 {
-                    label: lang === 'vi' ? 'Đơn mới nhất' : 'Latest orders',
+                    label: text.noSqlAi.quickLatestOrders,
                     prompt: 'Find the latest 20 documents sorted by createdAt descending.',
                 },
                 {
-                    label: lang === 'vi' ? 'Pipeline mẫu' : 'Sample pipeline',
+                    label: text.noSqlAi.quickSamplePipeline,
                     prompt: 'Build an aggregation pipeline that groups documents by status and counts each group.',
                 },
             ]
             : [
                 {
-                    label: lang === 'vi' ? 'Top categories' : 'Top categories',
+                    label: text.noSqlAi.quickTopCategories,
                     prompt: 'Find the top 10 categories by document count in this collection.',
                 },
                 {
-                    label: lang === 'vi' ? 'Update trạng thái' : 'Update status',
+                    label: text.noSqlAi.quickUpdateStatus,
                     prompt: 'Update all documents with status "pending" to "archived" using updateMany and explain the filter.',
                 },
                 {
-                    label: lang === 'vi' ? 'Xóa log cũ' : 'Delete old logs',
+                    label: text.noSqlAi.quickDeleteOldLogs,
                     prompt: 'Delete documents older than 30 days using deleteMany and explain the filter before running it.',
                 },
             ];
@@ -147,9 +139,10 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
                 prompt: collectionName && !isRedis
                     ? `For collection "${collectionName}": ${query}`
                     : query,
-                model: aiModel,
+                model: resolvedNoSql.model,
                 mode: 'fast',
                 routingMode: aiRoutingMode,
+                providerOverride: resolvedNoSql.providerOverride,
             });
 
             const generatedCommand = result.sql?.trim() || '';
@@ -159,30 +152,22 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
             const isTooLong = generatedCommand.length > 1200 || generatedCommand.split('\n').length > 20;
 
             if (generatedCommand && !isRedis && !explicitMutationIntent && (isMutatingCommand || isTooLong)) {
-                const safeguardExplanation = lang === 'vi'
-                    ? 'AI đã sinh lệnh ghi dữ liệu hoặc câu lệnh quá dài nên chưa chèn tự động. Nếu bạn thật sự muốn mutate, hãy ghi rõ update/delete/remove trong prompt rồi review trước khi chạy.'
-                    : 'The AI generated a write command or a very large payload, so it was not inserted automatically. If you truly want to mutate data, mention update/delete/remove explicitly and review the command before running it.';
+                const safeguardExplanation = text.noSqlAi.safeguardExplanation;
                 setExplanation(result.explanation
                     ? `${result.explanation} ${safeguardExplanation}`
                     : safeguardExplanation);
-                toast.warning(lang === 'vi'
-                    ? 'Lệnh NoSQL chưa được chèn tự động vì có thể ghi dữ liệu hoặc quá dài'
-                    : 'NoSQL command was not inserted automatically because it may write data or is too large');
+                toast.warning(text.noSqlAi.safeguardWarning);
             } else if (generatedCommand) {
                 onGenerate(generatedCommand);
                 setExplanation(result.explanation);
-                toast.success(lang === 'vi'
-                    ? `Đã sinh ${commandLabel} thành công!`
-                    : `${commandLabel} generated successfully!`);
+                toast.success(text.noSqlAi.generatedSuccess(commandLabel));
             } else {
                 setExplanation(result.explanation);
-                toast.error(lang === 'vi'
-                    ? `Không thể sinh ${commandLabel} cho yêu cầu này.`
-                    : `Could not generate ${commandLabel} for this request.`);
+                toast.error(text.noSqlAi.generatedFailure(commandLabel));
             }
         } catch (err) {
             console.error('NLP to NoSQL command error:', err);
-            toast.error(lang === 'vi' ? 'Lỗi khi gọi AI.' : 'AI request failed.');
+            toast.error(text.noSqlAi.requestFailed);
         } finally {
             setIsLoading(false);
         }
@@ -220,7 +205,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
                         </div>
                         <div className="flex items-center space-x-2">
                             <div className="hidden sm:flex items-center px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-[10px] font-bold opacity-50 uppercase tracking-tighter text-green-400">
-                                NOSQL AI
+                                {text.noSqlAi.badge}
                             </div>
                             <Wand2 className="w-4 h-4 opacity-30 group-hover:opacity-100 transition-opacity text-green-400" />
                         </div>
@@ -258,8 +243,8 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
                                     query.length > 0 ? 'bg-green-500/20 text-green-400 border border-green-500/20' : 'text-muted-foreground/20 italic',
                                 )}>
                                     {lang === 'vi'
-                                        ? (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'CMD + ENTER ĐỂ CHẠY' : 'CTRL + ENTER ĐỂ CHẠY')
-                                        : (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? 'CMD + ENTER TO RUN' : 'CTRL + ENTER TO RUN')}
+                                        ? (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? text.noSqlAi.runHotkey.replace('CTRL', 'CMD') : text.noSqlAi.runHotkey)
+                                        : (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? text.noSqlAi.runHotkey.replace('CTRL', 'CMD') : text.noSqlAi.runHotkey)}
                                 </span>
                             </div>
                         </div>
@@ -283,10 +268,10 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
                         <div className="space-y-2">
                             <div className="flex items-center justify-between px-1">
                                 <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground/50">
-                                    {lang === 'vi' ? 'Prompt gợi ý' : 'Prompt shortcuts'}
+                                    {text.noSqlAi.shortcutTitle}
                                 </span>
                                 <span className="text-[10px] text-muted-foreground/50">
-                                    {lang === 'vi' ? 'Bấm để chèn nhanh' : 'Tap to insert'}
+                                    {text.noSqlAi.shortcutHint}
                                 </span>
                             </div>
                             <div className="flex flex-wrap gap-2">
@@ -319,7 +304,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
                                 <div className="flex items-center space-x-1.5 opacity-40 hover:opacity-100 transition-opacity cursor-help">
                                     <Database className="w-3.5 h-3.5" />
                                     <span className="text-[10px] font-bold uppercase tracking-widest leading-none">
-                                        {isRedis ? 'DB' : 'COLL'}: {collectionName || currentDatabase || (lang === 'vi' ? 'Mặc định' : 'Default')}
+                                        {isRedis ? 'DB' : 'COLL'}: {collectionName || currentDatabase || text.noSqlAi.defaultCollection}
                                     </span>
                                 </div>
                             </div>
@@ -330,7 +315,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
                                     className="h-8 px-3 rounded-lg text-xs"
                                     onClick={() => setIsExpanded(false)}
                                 >
-                                    {lang === 'vi' ? 'Đóng' : 'Cancel'}
+                                    {text.noSqlAi.cancel}
                                 </Button>
                                 <Button
                                     size="sm"
@@ -353,3 +338,5 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
         </div>
     );
 };
+
+

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Post,
   Body,
@@ -14,6 +15,32 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GenerateSqlDto } from './dto/generate-sql.dto';
 import { AutocompleteDto } from './dto/autocomplete.dto';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
+
+const normalizeProviderBaseUrl = (value: string) => value.trim().replace(/\/+$/, '');
+
+const extractProviderErrorMessage = (payload: unknown) => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  if (typeof record.message === 'string' && record.message.trim()) {
+    return record.message;
+  }
+
+  if (typeof record.error === 'string' && record.error.trim()) {
+    return record.error;
+  }
+
+  if (record.error && typeof record.error === 'object') {
+    const errorRecord = record.error as Record<string, unknown>;
+    if (typeof errorRecord.message === 'string' && errorRecord.message.trim()) {
+      return errorRecord.message;
+    }
+  }
+
+  return null;
+};
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard)
@@ -38,6 +65,7 @@ export class AiController {
       mode,
       routingMode,
       history,
+      providerOverride,
     } = body;
 
     const { connection, schemaContext } =
@@ -60,6 +88,7 @@ export class AiController {
         context,
         routingMode,
         history,
+        providerOverride,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -85,6 +114,7 @@ export class AiController {
       mode,
       routingMode,
       history,
+      providerOverride,
     } = body;
 
     res.setHeader('Content-Type', 'text/event-stream');
@@ -121,6 +151,7 @@ export class AiController {
         context,
         routingMode,
         history,
+        providerOverride,
       });
 
       for await (const event of stream) {
@@ -163,12 +194,88 @@ export class AiController {
     return { completion };
   }
 
+  @Post('provider-models')
+  async listProviderModels(
+    @Body() body: { baseUrl?: string; apiKey?: string },
+  ) {
+    const baseUrl =
+      typeof body?.baseUrl === 'string'
+        ? normalizeProviderBaseUrl(body.baseUrl)
+        : '';
+    const apiKey =
+      typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
+
+    if (!baseUrl) {
+      throw new BadRequestException('Base URL is required');
+    }
+
+    let requestUrl: string;
+    try {
+      requestUrl = new URL('models', `${baseUrl}/`).toString();
+    } catch {
+      throw new BadRequestException('Invalid Base URL');
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (apiKey) {
+      headers.Authorization = `Bearer ${apiKey}`;
+    }
+    if (baseUrl.includes('openrouter.ai')) {
+      headers['HTTP-Referer'] = process.env.FRONTEND_URL || 'http://localhost:5173';
+      headers['X-Title'] = 'Data Explorer';
+    }
+
+    let response: globalThis.Response;
+    try {
+      response = await fetch(requestUrl, {
+        method: 'GET',
+        headers,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to reach provider';
+      throw new BadRequestException(message);
+    }
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new BadRequestException(
+        extractProviderErrorMessage(payload) ||
+          `Provider returned ${response.status}`,
+      );
+    }
+
+    const models = Array.isArray((payload as { data?: unknown[] } | null)?.data)
+      ? Array.from(
+          new Set(
+            (payload as { data: Array<{ id?: unknown }> }).data
+              .map((item) =>
+                typeof item?.id === 'string' ? item.id.trim() : '',
+              )
+              .filter(Boolean),
+          ),
+        ).sort((left, right) => left.localeCompare(right))
+      : [];
+
+    return { models };
+  }
+
   @Post('nlp-to-sql')
   async nlpToSql(
     @Body() body: GenerateSqlDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    const { connectionId, database, prompt, model, mode, routingMode } = body;
+    const {
+      connectionId,
+      database,
+      prompt,
+      model,
+      mode,
+      routingMode,
+      providerOverride,
+    } = body;
 
     const { connection, schemaContext } =
       await this.connectionService.getConnectionContext(
@@ -187,6 +294,7 @@ export class AiController {
         model,
         mode,
         routingMode,
+        providerOverride,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';

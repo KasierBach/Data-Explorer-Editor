@@ -5,7 +5,8 @@ export type AiProvider =
   | 'beeknoee'
   | 'tokenrouter'
   | 'zhipu'
-  | 'groq';
+  | 'groq'
+  | 'custom';
 export type AiChatRole = 'user' | 'ai';
 export type AiChatMode = 'planning' | 'fast';
 export type AiRoutingMode = 'auto' | 'fast' | 'best' | 'gemini-only';
@@ -32,6 +33,7 @@ export interface ChatHistoryMessage {
 
 export interface AiMessageModelInfo {
   provider?: AiProvider;
+  providerLabel?: string;
   model?: string;
   routingMode?: AiRoutingMode;
 }
@@ -59,6 +61,14 @@ export type PersistedAiMessagePayload =
   | AiMessageAttachment[]
   | AiMessagePayloadEnvelope;
 
+export interface AiProviderOverride {
+  type: 'openai-compatible';
+  name: string;
+  baseUrl: string;
+  apiKey?: string;
+  model: string;
+}
+
 export interface ChatParams {
   model?: string;
   mode?: AiChatMode;
@@ -69,6 +79,7 @@ export interface ChatParams {
   context?: string;
   routingMode?: AiRoutingMode;
   history?: ChatHistoryMessage[];
+  providerOverride?: AiProviderOverride;
 }
 
 export interface ChatResult {
@@ -78,6 +89,7 @@ export interface ChatResult {
   recommendations?: AiRecommendation[];
   sources?: string[];
   provider: AiProvider;
+  providerLabel?: string;
   model: string;
   routingMode: AiRoutingMode;
 }
@@ -87,6 +99,7 @@ export interface ProviderPlan {
   model: string;
   apiKey?: string;
   baseUrl?: string;
+  displayName?: string;
 }
 
 export interface RouteDecision {
@@ -104,6 +117,7 @@ export interface StreamDoneData {
   recommendations?: AiRecommendation[];
   sources?: string[];
   provider: AiProvider;
+  providerLabel?: string;
   model: string;
   routingMode: AiRoutingMode;
 }

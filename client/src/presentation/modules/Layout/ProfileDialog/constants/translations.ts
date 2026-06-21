@@ -26,7 +26,7 @@ export const translations = {
         edit_label: 'Sửa',
         status_disabled: 'Trạng thái: Vô hiệu hóa',
         clear_local_workspace: 'Xóa không gian làm việc cục bộ',
-        clear_local_hint: 'Xóa tất cả các kết nối, tab và lịch sử truy vấn cục bộ khỏi trình duyệt này.',
+        clear_local_hint: 'Đặt lại tab, lịch sử truy vấn, bố cục bảng và trạng thái làm việc cục bộ trên trình duyệt này. Các dữ liệu đồng bộ từ server sẽ được tải lại sau khi đăng nhập.',
         clear_data_button: 'Xóa dữ liệu',
         tabs: {
             profile: 'Hồ sơ công khai',
@@ -34,6 +34,7 @@ export const translations = {
             billing: 'Thanh toán & Gói',
             notifications: 'Thông báo',
             security: 'Bảo mật',
+            ai: 'Cấu hình AI',
             advanced: 'Cài đặt nâng cao'
         },
         profile_subtitle: 'Đây là cách người khác sẽ thấy bạn trên trang web.',
@@ -121,7 +122,7 @@ export const translations = {
         edit_label: 'Edit',
         status_disabled: 'Status: Disabled',
         clear_local_workspace: 'Clear Local Workspace',
-        clear_local_hint: 'Delete all local connections, tabs, and query history from this browser.',
+        clear_local_hint: 'Reset tabs, query history, table layouts, and local workspace state in this browser. Server-synced data will load again after you sign in.',
         clear_data_button: 'Clear Data',
         tabs: {
             profile: 'Public Profile',
@@ -129,6 +130,7 @@ export const translations = {
             billing: 'Billing & Plan',
             notifications: 'Notifications',
             security: 'Security',
+            ai: 'Configure AI',
             advanced: 'Advanced Settings'
         },
         profile_subtitle: 'This is how others will see you on the site.',

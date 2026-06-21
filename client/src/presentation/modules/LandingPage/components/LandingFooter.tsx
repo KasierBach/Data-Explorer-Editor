@@ -53,7 +53,7 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ lang }) => {
 
                 <div className="border-t border-white/5 pt-10 flex flex-col md:flex-row items-center justify-between gap-6">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
-                        © 2026 ANTIGRAVITY ENGINE. {lang === 'vi' ? 'TẤT CẢ HỆ THỐNG ĐÃ ĐƯỢC MÃ HÓA.' : 'ALL SYSTEMS ENCRYPTED.'}
+                        © 2026 DATA EXPLORER. {lang === 'vi' ? 'XÂY DỰNG CHO NHÓM DỮ LIỆU HIỆN ĐẠI.' : 'BUILT FOR MODERN DATA TEAMS.'}
                     </p>
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-2">

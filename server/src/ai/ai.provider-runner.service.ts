@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type {
@@ -541,6 +541,7 @@ export class AiProviderRunnerService {
       ),
       sources,
       provider: 'gemini',
+      providerLabel: plan.displayName || 'gemini',
       model: plan.model,
       routingMode,
     };
@@ -669,6 +670,7 @@ export class AiProviderRunnerService {
         ),
         sources,
         provider: plan.provider,
+        providerLabel: plan.displayName || plan.provider,
         model: modelToUse,
         routingMode,
       };
@@ -794,8 +796,9 @@ export class AiProviderRunnerService {
         ),
         sources,
         provider: 'gemini',
-        model: plan.model,
-        routingMode,
+      providerLabel: plan.displayName || 'gemini',
+      model: plan.model,
+      routingMode,
       },
     };
   }
@@ -909,6 +912,7 @@ export class AiProviderRunnerService {
         requestTimeout,
         modelToUse,
         plan.provider,
+        plan.displayName || plan.provider,
         routingMode,
       );
     } finally {
@@ -921,6 +925,7 @@ export class AiProviderRunnerService {
     abortController: { clear: () => void; signal: AbortSignal },
     model: string,
     provider: AiProvider,
+    providerLabel: string,
     routingMode: AiRoutingMode,
   ): AsyncGenerator<StreamEvent> {
     const reader = response.body?.getReader();
@@ -995,6 +1000,7 @@ export class AiProviderRunnerService {
           ),
           sources,
           provider,
+          providerLabel,
           model,
           routingMode,
         },
@@ -1024,3 +1030,6 @@ export class AiProviderRunnerService {
     return headers;
   }
 }
+
+
+

@@ -50,6 +50,10 @@ vi.mock('./components/SecurityTab', () => ({
   SecurityTab: () => <div>Security content</div>,
 }));
 
+vi.mock('./components/AiConfigTab', () => ({
+  AiConfigTab: () => <div>AI config content</div>,
+}));
+
 vi.mock('./components/AdvancedTab', () => ({
   AdvancedTab: () => <div>Advanced content</div>,
 }));

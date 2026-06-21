@@ -1,6 +1,8 @@
-import { useState, useRef, useCallback } from 'react';
+﻿import { useState, useRef, useCallback, useMemo } from 'react';
 import { useAppStore, type AiMessage } from '@/core/services/store';
+import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
 import { connectionService } from '@/core/services/ConnectionService';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { findReplaySourceUserMessage } from './aiChatReplay';
 
@@ -24,6 +26,7 @@ interface AiStreamDoneData {
     explanation?: string;
     recommendations?: AiMessage['recommendations'];
     provider?: string;
+    providerLabel?: string;
     model?: string;
     routingMode?: string;
 }
@@ -52,15 +55,15 @@ function getFileExtension(name: string): string {
 }
 
 function getFileEmoji(ext: string): string {
-    if (['pdf'].includes(ext)) return '📄';
-    if (['csv', 'tsv'].includes(ext)) return '📊';
-    if (EXCEL_EXTENSIONS.has(ext)) return '📗';
-    if (['json', 'xml', 'yaml', 'yml'].includes(ext)) return '📋';
-    if (['sql'].includes(ext)) return '🗄️';
-    if (['md', 'txt', 'log'].includes(ext)) return '📝';
-    if (['py'].includes(ext)) return '🐍';
-    if (['js', 'ts', 'tsx', 'jsx'].includes(ext)) return '⚡';
-    return '📎';
+    if (['pdf'].includes(ext)) return '[PDF]';
+    if (['csv', 'tsv'].includes(ext)) return '[DATA]';
+    if (EXCEL_EXTENSIONS.has(ext)) return '[XLSX]';
+    if (['json', 'xml', 'yaml', 'yml'].includes(ext)) return '[JSON]';
+    if (['sql'].includes(ext)) return '[SQL]';
+    if (['md', 'txt', 'log'].includes(ext)) return '[TXT]';
+    if (['py'].includes(ext)) return '[PY]';
+    if (['js', 'ts', 'tsx', 'jsx'].includes(ext)) return '[JS]';
+    return '[FILE]';
 }
 
 function isNoSqlSchemaField(value: unknown): value is NoSqlSchemaField {
@@ -76,7 +79,7 @@ function formatNoSqlSchemaFields(stats: unknown, includeProbability = false) {
         .map((field) => {
             const typeNames = Object.keys(field.types).join('/');
             if (!includeProbability) return `${field.name} (${typeNames})`;
-            const probability = typeof field.probability === 'number' ? ` (${field.probability}% xuáº¥t hiá»‡n)` : '';
+            const probability = typeof field.probability === 'number' ? ` (${field.probability}% occurrence)` : '';
             return `- ${field.name}: ${typeNames}${probability}`;
         })
         .join(includeProbability ? '\n' : ', ');
@@ -168,6 +171,7 @@ export function useAiChat() {
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const store = useAppStore();
+    const text = getWorkspaceText(store.lang);
     const {
         activeConnectionId, connections, activeDatabase,
         activeAiChatId, addAiMessage, updateAiMessage, tabs, activeTabId,
@@ -176,6 +180,12 @@ export function useAiChat() {
 
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const activeTab = tabs.find(t => t.id === activeTabId);
+    const preferences = useAiPreferences();
+    const assistantSelection = preferences.assistantModel || aiModel;
+    const resolvedAssistant = useMemo(
+        () => resolveAiSelection(assistantSelection, aiModel, preferences.customProviders),
+        [assistantSelection, aiModel, preferences.customProviders],
+    );
 
     const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -203,9 +213,9 @@ export function useAiChat() {
             const text = await readPdfText(buffer);
             setAttachments(prev => [...prev, {
                 type: 'file',
-                label: `📄 ${file.name}`,
+                label: `PDF: ${file.name}`,
                 data: `[PDF File: ${file.name}]\n\n${text}`,
-                preview: `PDF • ${(file.size / 1024).toFixed(0)} KB`,
+                preview: `PDF - ${(file.size / 1024).toFixed(0)} KB`,
             }]);
             return;
         }
@@ -215,9 +225,9 @@ export function useAiChat() {
             const text = await readExcelAsText(buffer, file.name);
             setAttachments(prev => [...prev, {
                 type: 'file',
-                label: `📗 ${file.name}`,
+                label: `Excel: ${file.name}`,
                 data: `[Excel File: ${file.name}]\n\n${text}`,
-                preview: `Excel • ${(file.size / 1024).toFixed(0)} KB`,
+                preview: `Excel - ${(file.size / 1024).toFixed(0)} KB`,
             }]);
             return;
         }
@@ -230,7 +240,7 @@ export function useAiChat() {
                 type: 'file',
                 label: `${emoji} ${file.name}`,
                 data: `[File: ${file.name} (${ext || 'text'})]\n\n${truncated}`,
-                preview: `${ext.toUpperCase() || 'TEXT'} • ${(file.size / 1024).toFixed(0)} KB`,
+                preview: `${ext.toUpperCase() || 'TEXT'} - ${(file.size / 1024).toFixed(0)} KB`,
             }]);
             return;
         }
@@ -240,14 +250,14 @@ export function useAiChat() {
                 const text = await file.text();
                 setAttachments(prev => [...prev, {
                     type: 'file',
-                    label: `📎 ${file.name}`,
+                    label: `File: ${file.name}`,
                     data: `[File: ${file.name}]\n\n${text}`,
-                    preview: `${ext.toUpperCase()} • ${(file.size / 1024).toFixed(0)} KB`,
+                    preview: `${ext.toUpperCase()} - ${(file.size / 1024).toFixed(0)} KB`,
                 }]);
             } catch {
                 setAttachments(prev => [...prev, {
                     type: 'file',
-                    label: `❌ ${file.name}`,
+                    label: `Unreadable: ${file.name}`,
                     data: `[Cannot read file: ${file.name}. Unsupported binary format.]`,
                     preview: 'Unsupported',
                 }]);
@@ -270,7 +280,7 @@ export function useAiChat() {
             if (sql.trim()) {
                 setAttachments(prev => [...prev, {
                     type: 'sql',
-                    label: `SQL từ "${activeTab.title}"`,
+                    label: text.aiChat.sqlFromTab(activeTab.title),
                     data: sql,
                 }]);
             }
@@ -283,9 +293,9 @@ export function useAiChat() {
             
             if (isNoSql && store.nosqlActiveCollection) {
                 const schemaStr = store.nosqlSchemaStats ? 
-                    `Schema cho collection "${store.nosqlActiveCollection}":\n` + 
+                    `${text.aiChat.schemaPrefix(store.nosqlActiveCollection)}\n` +
                     formatNoSqlSchemaFields(store.nosqlSchemaStats, true)
-                    : `Collection đang mở: ${store.nosqlActiveCollection} (Chưa chạy phân tích Schema)`;
+                    : text.aiChat.collectionWithoutSchema(store.nosqlActiveCollection);
 
                 setAttachments(prev => [...prev, {
                     type: 'table',
@@ -296,7 +306,7 @@ export function useAiChat() {
                 setAttachments(prev => [...prev, {
                     type: 'table',
                     label: `DB: ${activeDatabase}`,
-                    data: `Database đang kết nối: ${activeConnection.name}, Database: ${activeDatabase}, Type: ${activeConnection.type}`,
+                    data: text.aiChat.databaseContext(activeConnection.name, activeDatabase, activeConnection.type),
                 }]);
             }
         }
@@ -343,7 +353,7 @@ export function useAiChat() {
                     explanation: event.data.explanation || undefined,
                     recommendations: event.data.recommendations || undefined,
                     modelInfo: {
-                        provider: event.data.provider,
+                        provider: event.data.providerLabel || event.data.provider,
                         model: event.data.model,
                         routingMode: event.data.routingMode,
                     },
@@ -356,7 +366,7 @@ export function useAiChat() {
                     explanation: event.data.explanation,
                     recommendations: event.data.recommendations,
                     modelInfo: {
-                        provider: event.data.provider,
+                        provider: event.data.providerLabel || event.data.provider,
                         model: event.data.model,
                         routingMode: event.data.routingMode,
                     },
@@ -365,7 +375,7 @@ export function useAiChat() {
                 return raw;
             }
             if (event.type === 'error') {
-                const errorContent = `❌ ${event.text}`;
+                const errorContent = text.aiChat.error(event.text || 'Unknown error');
                 updateAiMessage(chatId, aiMessageId, {
                     content: errorContent,
                     error: true,
@@ -380,7 +390,7 @@ export function useAiChat() {
             }
         } catch { /* skip malformed */ }
         return raw;
-    }, [store, updateAiMessage]);
+    }, [store, text, updateAiMessage]);
 
     const triggerGenerate = useCallback(async (chatId: string, prompt: string, customAttachments: Attachment[] = [], customImageData?: string) => {
         setIsLoading(true);
@@ -419,12 +429,13 @@ export function useAiChat() {
 
             const response = await adapter.generateSqlStream({
                 database: activeDatabase || undefined,
-                prompt: prompt || '(xem hình/context đính kèm)',
+                prompt: prompt || text.aiChat.attachmentOnlyPrompt,
                 image: imageData,
                 context: contextParts.length > 0 ? contextParts.join('\n\n') : undefined,
-                model: aiModel,
+                model: resolvedAssistant.model,
                 mode: aiMode,
                 routingMode: aiRoutingMode,
+                providerOverride: resolvedAssistant.providerOverride,
                 history: history.length > 0 ? history.map(m => ({ role: m.role, content: m.content })) : undefined,
             }, { signal: controller.signal });
 
@@ -470,7 +481,7 @@ export function useAiChat() {
         } catch (error) {
             const errorMessage = getErrorMessage(error);
             if ((error instanceof DOMException && error.name === 'AbortError') || errorMessage === 'Aborted') {
-                const abortedContent = (rawText ? parsePartialAiResponse(rawText).message : '') + '\n\n[Đã dừng bởi người dùng]';
+                const abortedContent = (rawText ? parsePartialAiResponse(rawText).message : '') + `\n\n[${text.aiChat.aborted}]`;
                 updateAiMessage(chatId, aiMsgId, { content: abortedContent });
                 void store.syncAiMessage(chatId, {
                     id: aiMsgId,
@@ -479,7 +490,7 @@ export function useAiChat() {
                     timestamp: Date.now(),
                 });
             } else {
-                const failedContent = `❌ Lỗi: ${errorMessage}`;
+                const failedContent = text.aiChat.error(errorMessage);
                 updateAiMessage(chatId, aiMsgId, { content: failedContent, error: true });
                 void store.syncAiMessage(chatId, {
                     id: aiMsgId,
@@ -495,7 +506,7 @@ export function useAiChat() {
             pendingUpdateRef.current = null;
             abortControllerRef.current = null;
         }
-    }, [addAiMessage, updateAiMessage, processSseLine, activeDatabase, aiModel, aiMode, aiRoutingMode, activeConnection?.type, store]);
+    }, [addAiMessage, updateAiMessage, processSseLine, activeDatabase, aiMode, aiRoutingMode, activeConnection?.type, resolvedAssistant.model, resolvedAssistant.providerOverride, store, text]);
 
     const handleStop = useCallback(() => {
         if (abortControllerRef.current) {
@@ -510,7 +521,7 @@ export function useAiChat() {
             addAiMessage(activeAiChatId, {
                 id: `msg-${Date.now()}`,
                 role: 'ai',
-                content: '⚠️ Chưa kết nối database. Hãy kết nối trước khi sử dụng AI.',
+                content: text.aiChat.noDatabaseMessage,
                 error: true,
                 timestamp: Date.now(),
             });
@@ -519,8 +530,8 @@ export function useAiChat() {
 
         const attachmentLabels = attachments.map(a => {
             if (a.type === 'image') return '';
-            if (a.type === 'sql') return `📋 SQL đính kèm`;
-            if (a.type === 'table') return `📊 ${a.label}`;
+            if (a.type === 'sql') return text.aiChat.attachedSql;
+            if (a.type === 'table') return a.label;
             return a.label;
         });
 
@@ -542,7 +553,7 @@ export function useAiChat() {
         setAttachments([]);
         
         await triggerGenerate(activeAiChatId, currentInput, currentAttachments);
-    }, [input, attachments, isLoading, activeAiChatId, activeConnection, addAiMessage, triggerGenerate]);
+    }, [input, attachments, isLoading, activeAiChatId, activeConnection, addAiMessage, text, triggerGenerate]);
 
     const handleRegenerate = useCallback(async (chatId: string, aiMessageId?: string) => {
         const chat = store.aiChats.find(c => c.id === chatId);
@@ -576,8 +587,9 @@ export function useAiChat() {
     const formatTime = (ts: number) => {
         const d = new Date(ts);
         const now = new Date();
-        if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        const locale = store.lang === 'en' ? 'en-US' : 'vi-VN';
+        if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleDateString(locale, { day: '2-digit', month: '2-digit' });
     };
 
     return {
@@ -586,3 +598,4 @@ export function useAiChat() {
         handleRegenerate, handleEditSubmit, handleStop
     };
 }
+

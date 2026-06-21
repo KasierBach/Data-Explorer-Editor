@@ -13,6 +13,7 @@ import { SiPostgresql, SiMysql, SiClickhouse, SiMongodb, SiRedis } from "react-i
 import { DiMsqlServer } from "react-icons/di"
 import { ConnectionService } from "@/core/services/ConnectionService"
 import { ShareConnectionDialog } from "../Connection/ShareConnectionDialog"
+import { pickFallbackConnectionId } from "./connectionSelectorUtils"
 
 /** Returns a database-type-specific icon and accent color. */
 const getDbBranding = (type?: string) => {
@@ -118,6 +119,13 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
 
     const activeConn = visibleConnections.find(c => c.id === currentConnectionId);
     const activeBranding = getDbBranding(activeConn?.type);
+    const fallbackConnectionId = React.useMemo(() => {
+        if (!currentConnectionId || activeConn?.lastHealthStatus !== 'error') {
+            return null;
+        }
+
+        return pickFallbackConnectionId(visibleConnections, currentConnectionId);
+    }, [activeConn?.lastHealthStatus, currentConnectionId, visibleConnections]);
 
     const runHealthCheck = React.useCallback(async (connectionId: string) => {
         setIsCheckingHealth(connectionId);
@@ -140,6 +148,14 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
             setIsCheckingHealth(null);
         }
     }, [updateConnection]);
+
+    React.useEffect(() => {
+        if (!fallbackConnectionId || activeConn?.lastHealthStatus !== 'error') {
+            return;
+        }
+
+        setCurrentConnectionId(fallbackConnectionId);
+    }, [activeConn?.lastHealthStatus, fallbackConnectionId, setCurrentConnectionId]);
 
     React.useEffect(() => {
         if (!currentConnectionId || checkedConnectionIds.current.has(currentConnectionId)) return;

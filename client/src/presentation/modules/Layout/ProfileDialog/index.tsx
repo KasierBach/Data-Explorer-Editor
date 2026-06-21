@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { Button } from '@/presentation/components/ui/button';
-import { User, X, Settings, CreditCard, Bell, Palette, Shield, LogOut } from 'lucide-react';
+import { User, X, Settings, CreditCard, Bell, Palette, Shield, LogOut, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useProfileLogic } from './hooks/useProfileLogic';
@@ -13,6 +13,7 @@ import { AppearanceTab } from './components/AppearanceTab';
 import { BillingTab } from './components/BillingTab';
 import { NotificationsTab } from './components/NotificationsTab';
 import { SecurityTab } from './components/SecurityTab';
+import { AiConfigTab } from './components/AiConfigTab';
 import { AdvancedTab } from './components/AdvancedTab';
 
 type TranslationNode = string | { [key: string]: TranslationNode };
@@ -73,6 +74,7 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
         { id: 'billing', label: 'Billing & Plan', icon: CreditCard },
         { id: 'notifications', label: 'Notifications', icon: Bell },
         { id: 'security', label: 'Security', icon: Shield },
+        { id: 'ai', label: 'Configure AI', icon: Bot },
         { id: 'advanced', label: 'Advanced Settings', icon: Settings },
     ];
 
@@ -141,6 +143,9 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                     )}
                     {activeTab === 'security' && (
                         <SecurityTab user={user} t={t} isLoading={isLoading} securityState={securityState} actions={{ ...actions, handleFeatureNotImplemented }} />
+                    )}
+                    {activeTab === 'ai' && (
+                        <AiConfigTab t={t} />
                     )}
                     {activeTab === 'advanced' && (
                         <AdvancedTab t={t} isLoading={isLoading} actions={actions} />

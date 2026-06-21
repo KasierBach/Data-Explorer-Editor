@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from "@/presentation/components/ui/dialog";
@@ -113,6 +114,11 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                             </Button>
                         )}
                     </DialogTitle>
+                    <DialogDescription className="sr-only">
+                        {lang === 'vi'
+                            ? 'Xem lịch sử truy vấn đã chạy, tìm kiếm lại và mở nhanh vào editor.'
+                            : 'Review executed query history, search past entries, and reopen them in the editor.'}
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex items-center gap-2 mb-3">

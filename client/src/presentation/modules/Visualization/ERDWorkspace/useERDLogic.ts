@@ -18,6 +18,7 @@ import { ErdWorkspaceService, type SaveErdWorkspacePayload } from '@/core/servic
 import { ApiError } from '@/core/services/api.service';
 import { MetadataService } from '@/core/services/MetadataService';
 import { SearchService, type SearchResult } from '@/core/services/SearchService';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 import type { ErdWorkspaceEntity, JsonValue, TableColumn, TableMetadata, TreeNode } from '@/core/domain/entities';
 import type { DatabaseRelationship } from '@/core/domain/database-adapter.interface';
 import type { ForeignKeyData } from '../ForeignKeyDialog';
@@ -62,6 +63,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         setActiveDatabase,
         setNosqlDatabase,
     } = useAppStore();
+    const text = getWorkspaceText(lang);
     const activeConnection = connections.find((connection) => connection.id === connectionId);
     const queryClient = useQueryClient();
 
@@ -190,17 +192,15 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
         toast.error(
             isStorageUnavailable
-                ? (lang === 'vi' ? 'Kho workspace ERD chÆ°a sáºµn sÃ ng' : 'ERD workspace storage is not ready yet')
-                : (lang === 'vi' ? 'KhÃ´ng thá»ƒ táº£i danh sÃ¡ch workspace ERD' : 'Failed to load ERD workspaces'),
+                ? text.erd.storageNotReady
+                : text.erd.loadFailed,
             {
                 description: isStorageUnavailable
-                    ? (lang === 'vi'
-                        ? 'Trang ERD váº«n dÃ¹ng Ä‘Æ°á»£c, nhÆ°ng báº¡n cáº§n sync schema backend Ä‘á»ƒ lÆ°u workspace.'
-                        : 'The ERD page still works, but the backend schema must be synced before workspaces can be saved.')
+                    ? text.erd.storageDescription
                     : (error instanceof Error ? error.message : undefined),
             },
         );
-    }, [lang]);
+    }, [text]);
 
     const { data: erdWorkspaces = [], isLoading: isLoadingWorkspaces } = useQuery({
         queryKey: ['erd-workspaces', connectionId],

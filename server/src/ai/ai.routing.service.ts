@@ -251,7 +251,15 @@ export class AiRoutingService {
     const lowCostPlans = this.getLowCostPlans();
 
     let requestedPlan: ProviderPlan | null = null;
-    if (params.model) {
+    if (params.providerOverride?.type === 'openai-compatible') {
+      requestedPlan = {
+        provider: 'custom',
+        model: params.providerOverride.model,
+        apiKey: params.providerOverride.apiKey || 'no-key',
+        baseUrl: params.providerOverride.baseUrl,
+        displayName: params.providerOverride.name,
+      };
+    } else if (params.model) {
       if (params.model.startsWith('beeknoee:')) {
         const modelName = params.model.slice('beeknoee:'.length);
         const beeknoeePlan = this.getBeeknoeePlan(modelName);
@@ -391,3 +399,4 @@ export class AiRoutingService {
     return { routingMode, plans: capabilityFilteredPlans, routeDecision };
   }
 }
+

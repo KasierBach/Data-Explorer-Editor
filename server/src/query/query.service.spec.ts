@@ -1,9 +1,10 @@
+﻿import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { QueryService } from './query.service';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
-import { AuditService } from '../audit/audit.service';
+import { AuditAction, AuditService } from '../audit/audit.service';
 import { FreshnessService } from '../common/freshness/freshness.service';
 
 describe('QueryService', () => {
@@ -143,7 +144,7 @@ describe('QueryService', () => {
     cacheManager.get.mockResolvedValue(undefined);
     strategy.executeQuery.mockResolvedValue({ rows: [{ id: 1 }] });
 
-    const result = await service.executeQuery(
+    const result = (await service.executeQuery(
       {
         connectionId: 'conn-1',
         sql: 'SELECT * FROM users',
@@ -152,7 +153,7 @@ describe('QueryService', () => {
         includeTotalCount: false,
       } as any,
       'user-1',
-    );
+    )) as any;
 
     expect(strategy.executeQuery).toHaveBeenCalledTimes(1);
     expect(result.totalCount).toBeUndefined();
@@ -160,6 +161,67 @@ describe('QueryService', () => {
       'query',
       ['conn-1', 'main'],
       ['select * from users', 'limit:1000', 'offset:0', 'total:0'],
+    );
+  });
+
+  it('runs multi-statement SQL sequentially and returns the final statement result', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+    strategy.executeQuery
+      .mockResolvedValueOnce({
+        rows: [{ sample: 'hello; world' }],
+        columns: ['sample'],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({
+        rows: [{ id: 2 }],
+        columns: ['id'],
+        rowCount: 1,
+      });
+
+    const result = await service.executeQuery(
+      {
+        connectionId: 'conn-1',
+        sql: "SELECT 'hello; world' AS sample; SELECT * FROM users",
+        limit: 10,
+        offset: 5,
+        includeTotalCount: false,
+      } as any,
+      'user-1',
+    );
+
+    expect(strategy.executeQuery).toHaveBeenNthCalledWith(
+      1,
+      {},
+      "SELECT 'hello; world' AS sample",
+      undefined,
+    );
+    expect(strategy.executeQuery).toHaveBeenNthCalledWith(
+      2,
+      {},
+      'SELECT * FROM users',
+      { limit: 10, offset: 5 },
+    );
+    expect(cacheManager.get).not.toHaveBeenCalled();
+    expect(freshnessService.buildKey).not.toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        rows: [{ id: 2 }],
+        columns: ['id'],
+        rowCount: 1,
+        appliedLimit: 10,
+        appliedOffset: 5,
+        limitSource: 'requested',
+        countStatus: 'skipped',
+      }),
     );
   });
 
@@ -228,6 +290,172 @@ describe('QueryService', () => {
         countStatus: 'available',
       }),
       60_000,
+    );
+  });
+
+  it('skips confirmation for create and insert statements', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+    strategy.executeQuery.mockResolvedValue({
+      rows: [],
+      columns: [],
+      rowCount: 0,
+    });
+
+    await expect(
+      service.executeQuery(
+        {
+          connectionId: 'conn-1',
+          sql: 'CREATE TABLE audit_log (id INT)',
+          includeTotalCount: false,
+        } as any,
+        'user-1',
+      ),
+    ).resolves.toBeDefined();
+
+    await expect(
+      service.executeQuery(
+        {
+          connectionId: 'conn-1',
+          sql: 'INSERT INTO audit_log (id) VALUES (1)',
+          includeTotalCount: false,
+        } as any,
+        'user-1',
+      ),
+    ).resolves.toBeDefined();
+
+    expect(auditService.log).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.DB_QUERY_BLOCKED,
+      }),
+    );
+  });
+
+  it('skips confirmation for targeted deletes with a WHERE clause', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+    strategy.executeQuery.mockResolvedValue({
+      rows: [],
+      columns: [],
+      rowCount: 1,
+    });
+
+    await expect(
+      service.executeQuery(
+        {
+          connectionId: 'conn-1',
+          sql: 'DELETE FROM audit_log WHERE id = 1',
+          includeTotalCount: false,
+        } as any,
+        'user-1',
+      ),
+    ).resolves.toBeDefined();
+
+    expect(auditService.log).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.DB_QUERY_BLOCKED,
+      }),
+    );
+  });
+
+  it('requires confirmation for deletes without a WHERE clause', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+
+    await expect(
+      service.executeQuery(
+        {
+          connectionId: 'conn-1',
+          sql: 'DELETE FROM audit_log',
+          includeTotalCount: false,
+        } as any,
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.DB_QUERY_BLOCKED,
+        details: expect.objectContaining({
+          reason: 'DESTRUCTIVE_REQUIRES_CONFIRMATION',
+          severity: 'high',
+        }),
+      }),
+    );
+  });
+
+  it('requires confirmation when a later statement in a SQL sequence is dangerous', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+
+    let thrown: ForbiddenException | null = null;
+    try {
+      await service.executeQuery(
+        {
+          connectionId: 'conn-1',
+          sql: 'CREATE TABLE temp_users (id INT); DELETE FROM audit_log',
+          includeTotalCount: false,
+        } as any,
+        'user-1',
+      );
+    } catch (error) {
+      thrown = error as ForbiddenException;
+    }
+
+    expect(thrown).toBeInstanceOf(ForbiddenException);
+    expect(strategy.executeQuery).not.toHaveBeenCalled();
+
+    const response = thrown?.getResponse() as any;
+    expect(response.message).toContain('Statement 2 of 2 requires confirmation.');
+    expect(response.details.analysis).toEqual(
+      expect.objectContaining({
+        severity: 'high',
+        statement: 'DELETE FROM audit_log',
+        statementIndex: 2,
+        statementCount: 2,
+        flaggedStatements: 1,
+        affectedObject: 'audit_log',
+      }),
+    );
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.DB_QUERY_BLOCKED,
+        details: expect.objectContaining({
+          flaggedStatementSnippet: 'DELETE FROM audit_log',
+          statementIndex: 2,
+          statementCount: 2,
+        }),
+      }),
     );
   });
 

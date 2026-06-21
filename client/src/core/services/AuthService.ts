@@ -42,7 +42,7 @@ export class AuthService {
         } catch {
             // Best effort. We still clear local auth state below.
         } finally {
-            useAppStore.getState().logout();
+            useAppStore.getState().logout({ preserveWorkspace: false });
             window.location.replace(redirectTo);
             setTimeout(() => {
                 apiService.endLogout();

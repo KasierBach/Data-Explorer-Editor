@@ -1,4 +1,4 @@
-import {
+﻿import {
   Injectable,
   BadRequestException,
   ForbiddenException,
@@ -20,11 +20,11 @@ import { AuditService, AuditAction } from '../audit/audit.service';
 import { Connection } from '../connections/entities/connection.entity';
 import { FreshnessService } from '../common/freshness/freshness.service';
 import {
-  analyzeDestructiveSql,
-  containsMultipleStatements,
+  analyzeSqlConfirmation,
   getMongoActionFromPayload,
   isMongoActionAllowedOnReadOnly,
   isSqlAllowedOnReadOnly,
+  splitSqlStatements,
 } from './query-guard.util';
 import {
   getErrorMessage,
@@ -238,7 +238,7 @@ export class QueryService {
     }
   }
 
-  // ─── Query Execution ───
+  // â”€â”€â”€ Query Execution â”€â”€â”€
 
   private async assertQueryAllowed(
     connection: any,
@@ -258,22 +258,7 @@ export class QueryService {
       });
     }
 
-    // 2. Block multi-statement SQL (prevents piggyback injection like "SELECT 1; DROP TABLE users")
-    if (connection.type !== 'mongodb' && connection.type !== 'mongodb+srv') {
-      if (containsMultipleStatements(sql)) {
-        await this.blockOperation(userId, {
-          connectionId: connection.id,
-          database,
-          action: 'execute_query',
-          reason: 'MULTI_STATEMENT_BLOCKED',
-          message:
-            'Multi-statement queries are not allowed. Please execute one statement at a time.',
-          sqlSnippet: sql.slice(0, 120),
-        });
-      }
-    }
-
-    // 3. MongoDB read-only check
+    // 2. MongoDB read-only check
     if (connection.type === 'mongodb' || connection.type === 'mongodb+srv') {
       const action = getMongoActionFromPayload(sql);
       if (connection.readOnly && !isMongoActionAllowedOnReadOnly(action)) {
@@ -290,7 +275,7 @@ export class QueryService {
       return;
     }
 
-    // 4. Read-only connection: block all non-read queries
+    // 3. Read-only connection: block all non-read queries
     if (connection.readOnly && !isSqlAllowedOnReadOnly(sql)) {
       await this.blockOperation(userId, {
         connectionId: connection.id,
@@ -302,12 +287,18 @@ export class QueryService {
       });
     }
 
-    // 5. Non-readOnly connection: detect destructive SQL and require confirmation
+    // 4. Non-readOnly connection: confirm only truly high-impact SQL
     if (!connection.readOnly) {
-      const analysis = analyzeDestructiveSql(sql);
+      const analysis = analyzeSqlConfirmation(sql);
+      const statementLabel =
+        analysis.statementCount && analysis.statementCount > 1 && analysis.statementIndex
+          ? `Statement ${analysis.statementIndex} of ${analysis.statementCount}`
+          : 'Statement';
+      const confirmationMessage =
+        analysis.summary ||
+        `This query contains destructive operations (${analysis.keywords.join(', ')}). Please confirm to proceed.`;
 
-      if (analysis.isDestructive && !confirmed) {
-        // Log the attempt
+      if (analysis.requiresConfirmation && !confirmed) {
         await this.auditService.log({
           action: AuditAction.DB_QUERY_BLOCKED,
           userId,
@@ -317,30 +308,35 @@ export class QueryService {
             action: 'execute_query',
             reason: 'DESTRUCTIVE_REQUIRES_CONFIRMATION',
             sqlSnippet: sql.slice(0, 200),
+            flaggedStatementSnippet: analysis.statement?.slice(0, 200),
             severity: analysis.severity,
             keywords: analysis.keywords,
             affectedObject: analysis.affectedObject,
+            objectType: analysis.objectType,
+            impactScope: analysis.impactScope,
+            summary: analysis.summary,
+            destructiveReason: analysis.reason,
+            statementIndex: analysis.statementIndex,
+            statementCount: analysis.statementCount,
+            flaggedStatements: analysis.flaggedStatements,
           },
         });
 
-        // Return a structured response that the frontend will intercept
         throw new ForbiddenException({
-          message: `This query contains destructive operations (${analysis.keywords.join(', ')}). Please confirm to proceed.`,
+          message:
+            analysis.statementCount && analysis.statementCount > 1
+              ? `${statementLabel} requires confirmation. ${confirmationMessage}`
+              : confirmationMessage,
           reason: 'DESTRUCTIVE_REQUIRES_CONFIRMATION',
           action: 'execute_query',
           details: {
             requiresConfirmation: true,
-            analysis: {
-              severity: analysis.severity,
-              keywords: analysis.keywords,
-              affectedObject: analysis.affectedObject,
-            },
+            analysis,
           },
         });
       }
 
-      // If confirmed, log it as a confirmed destructive query
-      if (analysis.isDestructive && confirmed) {
+      if (analysis.requiresConfirmation && confirmed) {
         await this.auditService.log({
           action: AuditAction.DB_QUERY_DESTRUCTIVE_CONFIRMED,
           userId,
@@ -348,9 +344,17 @@ export class QueryService {
             connectionId: connection.id,
             database,
             sqlSnippet: sql.slice(0, 200),
+            flaggedStatementSnippet: analysis.statement?.slice(0, 200),
             severity: analysis.severity,
             keywords: analysis.keywords,
             affectedObject: analysis.affectedObject,
+            objectType: analysis.objectType,
+            impactScope: analysis.impactScope,
+            summary: analysis.summary,
+            destructiveReason: analysis.reason,
+            statementIndex: analysis.statementIndex,
+            statementCount: analysis.statementCount,
+            flaggedStatements: analysis.flaggedStatements,
           },
         });
       }
@@ -387,42 +391,70 @@ export class QueryService {
       );
       const strategy = this.strategyFactory.getStrategy(connection.type);
 
-      const cacheKey = await this.getQueryCacheKey(
-        connectionId,
-        sql,
-        database || connection.database,
-        {
-          limit,
-          offset,
-          includeTotalCount,
-        },
-      );
-      const isCacheable = this.isCacheableQuery(sql);
+      const statements =
+        connection.type === 'mongodb' || connection.type === 'mongodb+srv'
+          ? [sql]
+          : splitSqlStatements(sql);
+      const executableStatements =
+        statements.length > 0 ? statements : [sql];
+      const finalSql = executableStatements[executableStatements.length - 1];
+      const isMultiStatement = executableStatements.length > 1;
 
-      if (isCacheable) {
+      const isCacheable =
+        !isMultiStatement && this.isCacheableQuery(finalSql);
+      const cacheKey = isCacheable
+        ? await this.getQueryCacheKey(
+            connectionId,
+            finalSql,
+            database || connection.database,
+            {
+              limit,
+              offset,
+              includeTotalCount,
+            },
+          )
+        : null;
+
+      if (cacheKey) {
         const cachedResult = await this.cacheManager.get(cacheKey);
         if (cachedResult) {
           return { ...cachedResult, cached: true };
         }
       }
 
-      let result = await strategy.executeQuery(pool, sql, { limit, offset });
-      result = this.applyRawQueryMetadata(result, sql, { limit, offset });
+      let result: QueryResult;
+      if (isMultiStatement) {
+        result = { rows: [], columns: [], countStatus: 'skipped' };
+        for (let index = 0; index < executableStatements.length; index++) {
+          const statement = executableStatements[index];
+          const isLastStatement = index === executableStatements.length - 1;
+          result = await strategy.executeQuery(
+            pool,
+            statement,
+            isLastStatement ? { limit, offset } : undefined,
+          );
+        }
+        result.countStatus ??= 'skipped';
+      } else {
+        result = await strategy.executeQuery(pool, finalSql, { limit, offset });
+      }
+      result = this.applyRawQueryMetadata(result, finalSql, { limit, offset });
 
       // Attempt to get totalCount for table views (standard SELECT * queries)
       if (
+        !isMultiStatement &&
         includeTotalCount !== false &&
-        sql.trim().toUpperCase().startsWith('SELECT * FROM')
+        finalSql.trim().toUpperCase().startsWith('SELECT * FROM')
       ) {
         try {
-          const match = sql.match(/FROM\s+([\w"`.[\]]+)/i);
+          const match = finalSql.match(/FROM\s+([\w"`.[\]]+)/i);
           if (match) {
             const tableRef = match[1];
             const countSql =
               connection.type === 'mongodb'
                 ? JSON.stringify({
                     action: 'count',
-                    collection: tableRef.replace(/['"`]/g, ''),
+                    collection: tableRef.replace(/[\'"`]/g, ''),
                   })
                 : `SELECT COUNT(*) as total FROM ${tableRef}`;
 
@@ -445,11 +477,11 @@ export class QueryService {
               : String(countError),
           );
         }
-      } else if (includeTotalCount === false) {
+      } else if (includeTotalCount === false || isMultiStatement) {
         result.countStatus = 'skipped';
       }
 
-      if (isCacheable && result.rows) {
+      if (cacheKey && result.rows) {
         await this.cacheManager.set(cacheKey, result, this.QUERY_CACHE_TTL_MS);
       }
 
@@ -743,7 +775,7 @@ export class QueryService {
     }
   }
 
-  // ─── Schema Operations ───
+  // â”€â”€â”€ Schema Operations â”€â”€â”€
 
   async updateSchema(updateSchemaDto: UpdateSchemaDto, userId: string) {
     const { connectionId, database, schema, table, operations } =
@@ -948,7 +980,7 @@ export class QueryService {
     }
   }
 
-  // ─── Data Import ───
+  // â”€â”€â”€ Data Import â”€â”€â”€
 
   async importData(
     body: { connectionId: string; schema: string; table: string; data: any[] },
@@ -1005,3 +1037,7 @@ export class QueryService {
     }
   }
 }
+
+
+
+

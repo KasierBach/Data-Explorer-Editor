@@ -11,7 +11,7 @@ import type {
 import { ApiError } from '@/core/services/api.service';
 import { VersionHistoryService } from '@/core/services/VersionHistoryService';
 import { Button } from '@/presentation/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/presentation/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/presentation/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 interface VersionHistoryDialogProps<TResource, TSnapshot = Record<string, unknown>> {
@@ -121,6 +121,11 @@ export function VersionHistoryDialog<TResource, TSnapshot = Record<string, unkno
                         {title}
                         {versionsQuery.isFetching && <RefreshCw className="ml-auto h-3.5 w-3.5 animate-spin text-muted-foreground" />}
                     </DialogTitle>
+                    <DialogDescription className="sr-only">
+                        {lang === 'vi'
+                            ? 'Xem lịch sử phiên bản và khôi phục lại bản phù hợp khi cần.'
+                            : 'Review version history and restore an earlier snapshot when needed.'}
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex min-h-[320px] flex-1 flex-col overflow-hidden md:flex-row">

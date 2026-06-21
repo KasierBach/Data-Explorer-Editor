@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/presentation/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/presentation/components/ui/dialog';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Label } from '@/presentation/components/ui/label';
@@ -11,6 +11,7 @@ import {
     SelectValue,
 } from '@/presentation/components/ui/select';
 import type { SavedQuery } from '@/core/services/store';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 export interface SaveQueryFormValues {
     name: string;
@@ -47,6 +48,7 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
     workspaceOptions = EMPTY_WORKSPACE_OPTIONS,
     onSubmit,
 }) => {
+    const text = getWorkspaceText(lang);
     const [form, setForm] = useState<SaveQueryFormValues>(initialValues);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -100,9 +102,12 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                 <DialogHeader>
                     <DialogTitle>
                         {currentQuery
-                            ? (lang === 'vi' ? 'Cập nhật saved query' : 'Update saved query')
-                            : (lang === 'vi' ? 'Lưu saved query' : 'Save query')}
+                            ? text.saveQuery.updateTitle
+                            : text.saveQuery.createTitle}
                     </DialogTitle>
+                    <DialogDescription className="sr-only">
+                        {text.saveQuery.description}
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4">
@@ -112,7 +117,7 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                         </div>
                     )}
                     <div className="space-y-1.5">
-                        <Label>{lang === 'vi' ? 'Tên hiển thị' : 'Display name'}</Label>
+                        <Label>{text.saveQuery.displayName}</Label>
                         <Input
                             value={form.name}
                             onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
@@ -122,7 +127,7 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label>{lang === 'vi' ? 'Quyền hiển thị' : 'Visibility'}</Label>
+                            <Label>{text.saveQuery.visibility}</Label>
                             <Select
                                 value={form.visibility}
                                 onValueChange={handleVisibilityChange}
@@ -131,9 +136,9 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="private">{lang === 'vi' ? 'Riêng tư' : 'Private'}</SelectItem>
+                                    <SelectItem value="private">{text.saveQuery.private}</SelectItem>
                                     {canShareToWorkspace && (
-                                        <SelectItem value="workspace">{lang === 'vi' ? 'Toàn workspace' : 'Workspace-wide'}</SelectItem>
+                                        <SelectItem value="workspace">{text.saveQuery.workspaceWide}</SelectItem>
                                     )}
                                 </SelectContent>
                             </Select>
@@ -142,13 +147,13 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                         <div className="space-y-1.5">
                             {form.visibility === 'workspace' && canShareToWorkspace ? (
                                 <>
-                                    <Label>{lang === 'vi' ? 'Workspace / Team' : 'Workspace / Team'}</Label>
+                                    <Label>{text.saveQuery.workspaceTeam}</Label>
                                     <Select
                                         value={form.organizationId}
                                         onValueChange={(value) => setForm((prev) => ({ ...prev, organizationId: value }))}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue placeholder={lang === 'vi' ? 'Chọn workspace' : 'Choose workspace'} />
+                                            <SelectValue placeholder={text.saveQuery.chooseWorkspace} />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {workspaceOptions.map((workspace) => (
@@ -161,7 +166,7 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                                 </>
                             ) : (
                                 <>
-                                    <Label>{lang === 'vi' ? 'Folder / Group' : 'Folder / Group'}</Label>
+                                    <Label>{text.saveQuery.folderGroup}</Label>
                                     <Input
                                         value={form.folderId}
                                         onChange={(e) => setForm((prev) => ({ ...prev, folderId: e.target.value }))}
@@ -174,7 +179,7 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
 
                     {form.visibility === 'workspace' && canShareToWorkspace && (
                         <div className="space-y-1.5">
-                            <Label>{lang === 'vi' ? 'Folder / Group' : 'Folder / Group'}</Label>
+                            <Label>{text.saveQuery.folderGroup}</Label>
                             <Input
                                 value={form.folderId}
                                 onChange={(e) => setForm((prev) => ({ ...prev, folderId: e.target.value }))}
@@ -184,7 +189,7 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                     )}
 
                     <div className="space-y-1.5">
-                        <Label>{lang === 'vi' ? 'Tags (phân tách bằng dấu phẩy)' : 'Tags (comma-separated)'}</Label>
+                        <Label>{text.saveQuery.tags}</Label>
                         <Input
                             value={form.tags}
                             onChange={(e) => setForm((prev) => ({ ...prev, tags: e.target.value }))}
@@ -193,27 +198,27 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label>{lang === 'vi' ? 'Mô tả' : 'Description'}</Label>
+                        <Label>{text.saveQuery.details}</Label>
                         <textarea
                             className="w-full min-h-[110px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                             value={form.description}
                             onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                            placeholder={lang === 'vi' ? 'Mô tả ngắn để đồng đội hiểu query này dùng làm gì.' : 'Short context so teammates know what this query is for.'}
+                            placeholder={text.saveQuery.detailsPlaceholder}
                         />
                     </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">
                     <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>
-                        {lang === 'vi' ? 'Hủy' : 'Cancel'}
+                        {text.saveQuery.cancel}
                     </Button>
                     <Button
                         onClick={handleSubmit}
                         disabled={isSaving || !form.name.trim() || (form.visibility === 'workspace' && !form.organizationId)}
                     >
                         {isSaving
-                            ? (lang === 'vi' ? 'Đang lưu...' : 'Saving...')
-                            : (currentQuery ? (lang === 'vi' ? 'Cập nhật' : 'Update') : (lang === 'vi' ? 'Lưu query' : 'Save query'))}
+                            ? text.saveQuery.saving
+                            : (currentQuery ? text.saveQuery.update : text.saveQuery.save)}
                     </Button>
                 </div>
             </DialogContent>

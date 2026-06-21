@@ -23,6 +23,28 @@ class ChatHistoryMessageDto implements ChatHistoryMessage {
   content: string;
 }
 
+class AiProviderOverrideDto {
+  @IsString()
+  @IsIn(['openai-compatible'])
+  type: 'openai-compatible';
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsString()
+  @IsNotEmpty()
+  baseUrl: string;
+
+  @IsString()
+  @IsOptional()
+  apiKey?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  model: string;
+}
+
 export class GenerateSqlDto {
   @IsNotEmpty()
   @IsString()
@@ -38,29 +60,34 @@ export class GenerateSqlDto {
 
   @IsOptional()
   @IsString()
-  image?: string; // base64 encoded image data
+  image?: string;
 
   @IsOptional()
   @IsString()
-  context?: string; // additional context (SQL, table schema, etc.)
+  context?: string;
 
   @IsOptional()
   @IsString()
-  model?: string; // Specific AI model to use
+  model?: string;
 
   @IsOptional()
   @IsString()
   @IsIn(['planning', 'fast'])
-  mode?: AiChatMode; // e.g. 'planning' or 'fast'
+  mode?: AiChatMode;
 
   @IsOptional()
   @IsString()
   @IsIn(['auto', 'fast', 'best', 'gemini-only'])
-  routingMode?: AiRoutingMode; // e.g. 'auto', 'fast', 'best', 'gemini-only'
+  routingMode?: AiRoutingMode;
 
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ChatHistoryMessageDto)
-  history?: ChatHistoryMessageDto[]; // Chat history for memory
+  history?: ChatHistoryMessageDto[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AiProviderOverrideDto)
+  providerOverride?: AiProviderOverrideDto;
 }

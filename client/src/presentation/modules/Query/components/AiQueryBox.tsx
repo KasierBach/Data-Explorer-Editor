@@ -1,9 +1,11 @@
-import React, { useState, useRef } from 'react';
+﻿import React, { useState, useRef } from 'react';
 import { Sparkles, Loader2, Wand2, Calculator, Info, X } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Textarea } from '@/presentation/components/ui/textarea';
 import { apiService } from '@/core/services/api.service';
 import { useAppStore } from '@/core/services/store';
+import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -15,6 +17,10 @@ interface AiQueryBoxProps {
 
 export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConnectionId, currentDatabase }) => {
     const { lang, aiModel, aiRoutingMode } = useAppStore();
+    const text = getWorkspaceText(lang);
+    const preferences = useAiPreferences();
+    const assistantSelection = preferences.assistantModel || aiModel;
+    const resolvedSql = resolveAiSelection(preferences.sqlModel, assistantSelection, preferences.customProviders);
     const [query, setQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [explanation, setExplanation] = useState<string | null>(null);
@@ -31,9 +37,10 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                 connectionId: currentConnectionId,
                 database: currentDatabase,
                 prompt: query,
-                model: aiModel,
+                model: resolvedSql.model,
                 mode: 'fast',
                 routingMode: aiRoutingMode,
+                providerOverride: resolvedSql.providerOverride,
             });
 
             const generatedSql = result.sql?.trim() || '';
@@ -42,24 +49,20 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
             const isTooLong = generatedSql.length > 500 || generatedSql.split('\n').length > 6;
 
             if (generatedSql && !explicitSchemaIntent && (isSchemaChangingSql || isTooLong)) {
-                setExplanation(result.explanation || (lang === 'vi'
-                    ? 'Kết quả AI quá dài hoặc có thay đổi schema nên chưa được chèn tự động.'
-                    : 'The AI result is too long or schema-changing, so it was not inserted automatically.'));
-                toast.warning(lang === 'vi'
-                    ? 'Kết quả AI bị từ chối chèn tự động do thao tác ghi/cấu trúc hoặc quá dài'
-                    : 'AI result was not inserted due to DML/schema modifications or excessive length');
+                setExplanation(result.explanation || text.aiQuery.autoInsertSkipped);
+                toast.warning(text.aiQuery.autoInsertWarning);
             } else if (generatedSql) {
                 onGenerate(generatedSql);
                 setExplanation(result.explanation);
-                toast.success(lang === 'vi' ? 'Đã sinh mã SQL thành công!' : 'SQL generated successfully!');
+                toast.success(text.aiQuery.generatedSuccess);
                 // Don't close immediately so user can see explanation
             } else {
                 setExplanation(result.explanation);
-                toast.error(lang === 'vi' ? 'Không thể sinh SQL cho yêu cầu này.' : 'Could not generate SQL for this request.');
+                toast.error(text.aiQuery.generatedFailure);
             }
         } catch (err) {
             console.error('NLP to SQL error:', err);
-            toast.error(lang === 'vi' ? 'Lỗi khi gọi AI.' : 'AI request failed.');
+            toast.error(text.aiQuery.requestFailed);
         } finally {
             setIsLoading(false);
         }
@@ -92,12 +95,12 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                                 <Sparkles className="w-4 h-4 text-blue-400" />
                             </div>
                             <span className="font-medium opacity-70">
-                                {lang === 'vi' ? "Gõ tiếng Việt để sinh SQL (vd: 10 khách hàng mới nhất...)" : "Type natural language to generate SQL..."}
+                                {text.aiQuery.collapsedPrompt}
                             </span>
                         </div>
                         <div className="flex items-center space-x-2">
                              <div className="hidden sm:flex items-center px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-[10px] font-bold opacity-50 uppercase tracking-tighter">
-                                AI POWERED
+                                {text.aiQuery.badge}
                              </div>
                              <Wand2 className="w-4 h-4 opacity-30 group-hover:opacity-100 transition-opacity" />
                         </div>
@@ -108,7 +111,7 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                             <div className="flex items-center space-x-2">
                                 <Sparkles className="w-3.5 h-3.5 text-blue-400" />
                                 <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
-                                    AI SQL Generator
+                                    {text.aiQuery.title}
                                 </h4>
                             </div>
                             <button 
@@ -123,7 +126,7 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                             <Textarea
                                 ref={textareaRef}
                                 autoFocus
-                                placeholder={lang === 'vi' ? "Mô tả yêu cầu của bạn bằng tiếng Việt hoặc tiếng Anh..." : "Describe what you want to query in natural language..."}
+                                placeholder={text.aiQuery.expandedPlaceholder}
                                 className="min-h-[100px] bg-muted/40 border-none ring-1 ring-white/5 focus-visible:ring-blue-500/30 text-sm resize-none pr-10 rounded-xl leading-relaxed"
                                 value={query}
                                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setQuery(e.target.value)}
@@ -134,7 +137,7 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                                     "text-[9px] font-bold py-0.5 px-1.5 rounded transition-all tracking-tighter",
                                     query.length > 0 ? "bg-blue-500/20 text-blue-400 border border-blue-500/20" : "text-muted-foreground/20 italic"
                                 )}>
-                                    CTRL + ENTER TO RUN
+                                    {text.aiQuery.hotkey}
                                 </span>
                             </div>
                         </div>
@@ -154,7 +157,7 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                             <div className="flex items-center space-x-4">
                                 <div className="flex items-center space-x-1.5 opacity-40 hover:opacity-100 transition-opacity cursor-help">
                                     <Calculator className="w-3.5 h-3.5" />
-                                    <span className="text-[10px] font-bold uppercase tracking-widest leading-none">RAG Context: ON</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-widest leading-none">{text.aiQuery.contextOn}</span>
                                 </div>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -164,7 +167,7 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                                     className="h-8 px-3 rounded-lg text-xs"
                                     onClick={() => setIsExpanded(false)}
                                 >
-                                    {lang === 'vi' ? 'Đóng' : 'Cancel'}
+                                    {text.aiQuery.cancel}
                                 </Button>
                                 <Button 
                                     size="sm" 
@@ -177,7 +180,7 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                                     ) : (
                                         <Wand2 className="w-3.5 h-3.5" />
                                     )}
-                                    <span>{lang === 'vi' ? 'Sinh SQL' : 'Generate SQL'}</span>
+                                    <span>{text.aiQuery.generate}</span>
                                 </Button>
                             </div>
                         </div>
@@ -187,3 +190,5 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
         </div>
     );
 };
+
+

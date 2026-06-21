@@ -1,16 +1,16 @@
-import React from 'react';
+﻿import React from 'react';
 import {
     AlignLeft,
     ChevronDown,
     Eraser,
     FolderOpen,
     History,
+    Layers,
     Loader2,
     Play,
     RefreshCw,
     Save,
     Sparkles,
-    Zap,
 } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import {
@@ -37,6 +37,7 @@ import { AiQueryBox } from './AiQueryBox';
 
 interface QueryToolbarProps {
     isLoading: boolean;
+    isExplaining?: boolean;
     allowQueryExecution?: boolean;
     isCompactMobileLayout: boolean;
     isSmallMobile: boolean;
@@ -45,6 +46,7 @@ interface QueryToolbarProps {
     activeConnectionId: string | null | undefined;
     activeDatabase?: string | null;
     rightSlot?: React.ReactNode;
+    showSqlSequence?: boolean;
     onRun: () => void;
     onGenerateSql: (sql: string) => void;
     onRefreshSchema: () => void | Promise<void>;
@@ -54,11 +56,13 @@ interface QueryToolbarProps {
     onOpenSaved: () => void;
     onOpenHistory: () => void;
     onExplain: () => void;
+    onOpenSqlSequence?: () => void;
     onLimitChange: (limit: string) => void;
 }
 
 export const QueryToolbar: React.FC<QueryToolbarProps> = ({
     isLoading,
+    isExplaining = false,
     allowQueryExecution,
     isCompactMobileLayout,
     isSmallMobile,
@@ -67,6 +71,7 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
     activeConnectionId,
     activeDatabase,
     rightSlot,
+    showSqlSequence,
     onRun,
     onGenerateSql,
     onRefreshSchema,
@@ -76,20 +81,22 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
     onOpenSaved,
     onOpenHistory,
     onExplain,
+    onOpenSqlSequence,
     onLimitChange,
 }) => {
     const isExecutionDisabled = isLoading || allowQueryExecution === false;
+    const explainLabel = lang === 'vi' ? 'Giải thích AI' : 'AI Explain';
 
     return (
-        <div className="p-1 px-1.5 border-b flex items-center justify-between bg-muted/30 min-h-[40px] overflow-hidden flex-nowrap">
-            <div className="flex items-center gap-0.5 min-w-0 flex-1 overflow-x-auto scrollbar-none py-0.5 flex-nowrap">
+        <div className="p-1 px-1.5 border-b flex items-center justify-between gap-2 bg-muted/30 min-h-[40px] overflow-hidden flex-nowrap">
+            <div className="flex items-center gap-0.5 min-w-0 flex-1 overflow-x-auto hide-scrollbar py-0.5 flex-nowrap">
                 <Button
                     size="sm"
                     onClick={onRun}
                     disabled={isExecutionDisabled}
                     className={cn(
-                        "h-8 gap-1.5 px-3 bg-green-600 hover:bg-green-700 text-white border-none shadow-sm transition-all",
-                        isCompactMobileLayout && "px-2"
+                        'h-8 gap-1.5 px-3 bg-green-600 hover:bg-green-700 text-white border-none shadow-sm transition-all shrink-0',
+                        isCompactMobileLayout && 'px-2'
                     )}
                 >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
@@ -98,20 +105,26 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                     </span>
                 </Button>
 
-                <div className="h-4 w-[1px] bg-border mx-1" />
+                <div className="h-4 w-[1px] bg-border mx-1 shrink-0" />
 
                 <Popover>
                     <PopoverTrigger asChild>
                         <Button
                             variant="outline"
                             size="sm"
-                            className="h-8 gap-1.5 px-3 border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-500 transition-all shadow-none"
+                            className="h-8 gap-1.5 px-3 shrink-0 border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-500 transition-all shadow-none"
                         >
                             <Sparkles className="w-3.5 h-3.5 fill-blue-500/20" />
                             <span className="font-medium">{isSmallMobile ? 'AI' : 'AI SQL'}</span>
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[min(450px,calc(100vw-1rem))] p-0 border-white/10 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden" align="start" sideOffset={10}>
+                    <PopoverContent
+                        className="w-[min(450px,calc(100vw-1rem))] p-0 border-white/10 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden"
+                        align="start"
+                        side="bottom"
+                        sideOffset={8}
+                        collisionPadding={12}
+                    >
                         <AiQueryBox
                             currentConnectionId={activeConnectionId || ''}
                             currentDatabase={activeDatabase || undefined}
@@ -119,6 +132,18 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                         />
                     </PopoverContent>
                 </Popover>
+
+                {showSqlSequence && onOpenSqlSequence && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={onOpenSqlSequence}
+                        className="h-8 gap-1.5 px-3 shrink-0 border-border/60 bg-background/80 shadow-none"
+                    >
+                        <Layers className="w-3.5 h-3.5" />
+                        <span className="font-medium">{isSmallMobile ? 'SQL' : (lang === 'vi' ? 'Chuỗi SQL' : 'SQL Sequence')}</span>
+                    </Button>
+                )}
 
                 {!isCompactMobileLayout && (
                     <>
@@ -155,15 +180,15 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                             <span className="whitespace-nowrap">{lang === 'vi' ? 'Lịch sử' : 'History'}</span>
                         </Button>
                         <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
-                        <Button variant="ghost" size="sm" onClick={onExplain} disabled={isExecutionDisabled} className="h-7 gap-1 px-1.5 text-xs text-orange-500 hover:text-orange-600 shrink-0" title="EXPLAIN ANALYZE">
-                            <Zap className="w-3.5 h-3.5" />
-                            <span className="whitespace-nowrap">{lang === 'vi' ? 'Giải thích' : 'Explain'}</span>
+                        <Button variant="ghost" size="sm" onClick={onExplain} disabled={isExplaining || !activeConnectionId} className="h-7 gap-1 px-1.5 text-xs text-orange-500 hover:text-orange-600 shrink-0" title={explainLabel}>
+                            {isExplaining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                            <span className="whitespace-nowrap">{explainLabel}</span>
                         </Button>
                     </>
                 ) : (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs">
+                            <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs shrink-0">
                                 <History className="w-4 h-4" />
                                 {lang === 'vi' ? 'Hành động' : 'Actions'}
                                 <ChevronDown className="w-3 h-3 opacity-50" />
@@ -186,10 +211,16 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                                 <History className="mr-2 h-4 w-4" />
                                 <span>{lang === 'vi' ? 'Lịch sử' : 'History'}</span>
                             </DropdownMenuItem>
+                            {showSqlSequence && onOpenSqlSequence && (
+                                <DropdownMenuItem onClick={onOpenSqlSequence}>
+                                    <Layers className="mr-2 h-4 w-4" />
+                                    <span>{lang === 'vi' ? 'Chuỗi SQL' : 'SQL Sequence'}</span>
+                                </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={onExplain} className="text-orange-500" disabled={allowQueryExecution === false}>
-                                <Zap className="mr-2 h-4 w-4" />
-                                <span>{lang === 'vi' ? 'Giải thích thực thi' : 'Explain Plan'}</span>
+                            <DropdownMenuItem onClick={onExplain} className="text-orange-500" disabled={isExplaining || !activeConnectionId}>
+                                {isExplaining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                <span>{explainLabel}</span>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={onClear} className="text-red-600">
@@ -203,7 +234,7 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                 <div className="flex items-center gap-1 px-1 shrink-0">
                     {!isCompactMobileLayout && <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{lang === 'vi' ? 'Giới hạn' : 'Limit'}</span>}
                     <Select value={limit} onValueChange={onLimitChange}>
-                        <SelectTrigger className="h-7 w-[80px] text-[10px] py-0 border-none bg-muted hover:bg-muted/80 focus:ring-0 shadow-none">
+                        <SelectTrigger className="h-7 w-[80px] text-[10px] py-0 border-none bg-muted hover:bg-muted/80 focus:ring-0 shadow-none shrink-0">
                             <SelectValue placeholder={lang === 'vi' ? 'Giới hạn' : 'Limit'} />
                         </SelectTrigger>
                         <SelectContent>
@@ -218,7 +249,7 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
             </div>
 
             {rightSlot && (
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 shrink-0">
                     {rightSlot}
                 </div>
             )}
