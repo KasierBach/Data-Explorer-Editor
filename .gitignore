@@ -23,3 +23,4 @@ mobile-audit/
 output/
 plan/
 /tmp/
+.playwright-cli/
