@@ -63,7 +63,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         setActiveDatabase,
         setNosqlDatabase,
     } = useAppStore();
-    const text = getWorkspaceText(lang);
+    const text = getWorkspaceText(lang).erd;
     const activeConnection = connections.find((connection) => connection.id === connectionId);
     const queryClient = useQueryClient();
 
@@ -192,11 +192,11 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
         toast.error(
             isStorageUnavailable
-                ? text.erd.storageNotReady
-                : text.erd.loadFailed,
+                ? text.storageNotReady
+                : text.loadFailed,
             {
                 description: isStorageUnavailable
-                    ? text.erd.storageDescription
+                    ? text.storageDescription
                     : (error instanceof Error ? error.message : undefined),
             },
         );
@@ -382,7 +382,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
     const saveWorkspace = useCallback(async (values: { name: string; notes: string }) => {
         if (!connectionId) {
-            throw new Error(lang === 'vi' ? 'Chưa có connection để lưu workspace.' : 'No connection selected for this workspace.');
+            throw new Error(text.noConnectionToSave);
         }
 
         const payload: Partial<SaveErdWorkspacePayload> = {
@@ -402,8 +402,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         setCurrentWorkspaceNotes(workspace.notes || '');
 
         await queryClient.invalidateQueries({ queryKey: ['erd-workspaces', connectionId] });
-        toast.success(lang === 'vi' ? 'Đã lưu workspace ERD' : 'ERD workspace saved');
-    }, [buildWorkspaceLayout, connectionId, currentWorkspaceId, lang, queryClient, selectedDatabase]);
+        toast.success(text.saved);
+    }, [buildWorkspaceLayout, connectionId, currentWorkspaceId, queryClient, selectedDatabase, text]);
 
     const loadWorkspace = useCallback(async (workspace: ErdWorkspaceEntity) => {
         if (workspace.database !== selectedDatabase) {
@@ -415,8 +415,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         setCurrentWorkspaceId(workspace.id);
         setCurrentWorkspaceName(workspace.name);
         setCurrentWorkspaceNotes(workspace.notes || '');
-        toast.success(lang === 'vi' ? 'Đã mở workspace ERD' : 'ERD workspace loaded');
-    }, [applyWorkspaceLayout, handleSetSelectedDatabase, lang, selectedDatabase]);
+        toast.success(text.loaded);
+    }, [applyWorkspaceLayout, handleSetSelectedDatabase, selectedDatabase, text]);
 
     const deleteWorkspace = useCallback(async (workspace: ErdWorkspaceEntity) => {
         await ErdWorkspaceService.deleteWorkspace(workspace.id);
@@ -426,33 +426,29 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             setCurrentWorkspaceNotes('');
         }
         await queryClient.invalidateQueries({ queryKey: ['erd-workspaces', connectionId] });
-        toast.success(lang === 'vi' ? 'Đã xóa workspace ERD' : 'ERD workspace deleted');
-    }, [connectionId, currentWorkspaceId, lang, queryClient]);
+        toast.success(text.deleted);
+    }, [connectionId, currentWorkspaceId, queryClient, text]);
 
     const handleRefreshMetadata = useCallback(async () => {
         if (!connectionId) return;
         setIsRefreshing(true);
         try {
             await MetadataService.refresh(connectionId, selectedDatabase);
-            toast.success(lang === 'vi' ? 'Đã làm mới metadata' : 'Metadata refreshed');
+            toast.success(text.metadataRefreshed);
             await queryClient.invalidateQueries({ queryKey: ['erd-hierarchy-v2'] });
             await queryClient.invalidateQueries({ queryKey: ['erd-databases'] });
             await queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
         } catch (error) {
-            toast.error(lang === 'vi' ? 'Không thể làm mới metadata' : 'Failed to refresh metadata', {
+            toast.error(text.metadataRefreshFailed, {
                 description: getErrorMessage(error)
             });
         } finally {
             setIsRefreshing(false);
         }
-    }, [connectionId, queryClient, selectedDatabase, lang]);
+    }, [connectionId, queryClient, selectedDatabase, text]);
 
     const handleRemoveConstraint = useCallback(async (tableName: string, type: 'pk' | 'fk', constraintName: string) => {
-        const confirmed = window.confirm(
-            lang === 'vi'
-                ? `Bạn có chắc muốn xóa ${type.toUpperCase()} (${constraintName}) này không?`
-                : `Are you sure you want to remove this ${type.toUpperCase()} (${constraintName})?`,
-        );
+        const confirmed = window.confirm(text.removeConstraintConfirm(type, constraintName));
         if (!confirmed) return;
 
         try {
@@ -462,15 +458,15 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 table: tableName,
                 operations: [{ type: type === 'pk' ? 'drop_pk' : 'drop_fk', name: constraintName, constraintName }],
             });
-            toast.success(lang === 'vi' ? `${type.toUpperCase()} đã được xóa thành công` : `${type.toUpperCase()} removed successfully`);
+            toast.success(text.removeConstraintSuccess(type));
             queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
             queryClient.invalidateQueries({ queryKey: ['erd-columns-v2'] });
         } catch (error) {
-            toast.error(lang === 'vi' ? `Không thể xóa ${type.toUpperCase()}` : `Failed to remove ${type.toUpperCase()}`, {
+            toast.error(text.removeConstraintFailed(type), {
                 description: getErrorMessage(error),
             });
         }
-    }, [connectionId, lang, queryClient, selectedDatabase]);
+    }, [connectionId, queryClient, selectedDatabase, text]);
 
     const handleEdgeMouseEnter = useCallback((event: React.MouseEvent, edge: Edge) => {
         setHoveredEdgeId(edge.id);
@@ -504,11 +500,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 return;
             }
 
-            const confirmed = window.confirm(
-                lang === 'vi'
-                    ? `Bạn có chắc muốn xóa ràng buộc khóa ngoại (${constraintName}) này không?`
-                    : `Are you sure you want to drop the foreign key constraint (${constraintName})?`,
-            );
+            const confirmed = window.confirm(text.removeRelationshipConfirm(constraintName));
             if (!confirmed) return;
 
             try {
@@ -518,17 +510,17 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                     table: edge.target as string,
                     operations: [{ type: 'drop_fk', name: constraintName, constraintName }],
                 });
-                toast.success(lang === 'vi' ? 'Đã xóa liên kết thành công' : 'Relationship removed successfully');
+                toast.success(text.removeRelationshipSuccess);
                 queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
                 queryClient.invalidateQueries({ queryKey: ['erd-columns-v2'] });
                 onEdgesChange([change]);
             } catch (error) {
-                toast.error(lang === 'vi' ? 'Không thể xóa liên kết' : 'Failed to remove relationship', {
+                toast.error(text.removeRelationshipFailed, {
                     description: getErrorMessage(error),
                 });
             }
         });
-    }, [connectionId, edges, fkConstraintMap, lang, onEdgesChange, queryClient, selectedDatabase]);
+    }, [connectionId, edges, fkConstraintMap, onEdgesChange, queryClient, selectedDatabase, text]);
 
     const onConnect = useCallback((params: Connection) => {
         if (params.source === params.target) return;
@@ -558,7 +550,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 }],
             });
 
-            toast.success(lang === 'vi' ? 'Đã tạo liên kết' : 'Relationship created');
+            toast.success(text.relationshipCreated);
             setEdges((currentEdges) => addEdge({
                 source: data.sourceTable,
                 target: data.targetTable,
@@ -572,7 +564,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             queryClient.invalidateQueries({ queryKey: ['erd-rels'] });
             queryClient.invalidateQueries({ queryKey: ['erd-columns-v2'] });
         } catch (error) {
-            toast.error(lang === 'vi' ? 'Không thể tạo liên kết' : 'Failed to create relationship', {
+            toast.error(text.relationshipCreateFailed, {
                 description: getErrorMessage(error),
             });
         }
@@ -772,10 +764,10 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 link.download = `erd-${selectedDatabase || 'diagram'}-${Date.now()}.png`;
                 link.href = dataUrl;
                 link.click();
-                toast.success(lang === 'vi' ? 'Đã xuất PNG' : 'Exported as PNG');
+                toast.success(text.exportedPng);
             });
         });
-    }, [lang, selectedDatabase]);
+    }, [selectedDatabase, text]);
 
     const handleExportSQL = useCallback(() => {
         if (!tableData || visibleTableNames.size === 0) return;
@@ -798,8 +790,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         link.download = `erd-${selectedDatabase || 'schema'}-${Date.now()}.sql`;
         link.href = url;
         link.click();
-        toast.success(lang === 'vi' ? 'Đã xuất SQL' : 'Exported as SQL');
-    }, [lang, selectedDatabase, tableData, visibleTableNames]);
+        toast.success(text.exportedSql);
+    }, [selectedDatabase, tableData, text, visibleTableNames]);
 
     useEffect(() => {
         if (isFirstLoad.current) {

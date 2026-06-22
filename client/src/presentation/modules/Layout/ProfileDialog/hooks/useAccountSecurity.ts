@@ -3,6 +3,7 @@ import { useAppStore } from '@/core/services/store';
 import { apiService } from '@/core/services/api.service';
 import { toast } from 'sonner';
 import { AuthService } from '@/core/services/AuthService';
+import { getProfileDialogText } from '../profileI18n';
 
 const getErrorMessage = (error: unknown) => (
     error instanceof Error ? error.message : 'Something went wrong'
@@ -10,6 +11,7 @@ const getErrorMessage = (error: unknown) => (
 
 export const useAccountSecurity = (onClose?: () => void) => {
     const { lang } = useAppStore();
+    const text = getProfileDialogText(lang);
     const [isLoading, setIsLoading] = useState(false);
 
     // Security State
@@ -19,14 +21,14 @@ export const useAccountSecurity = (onClose?: () => void) => {
 
     const handleChangePassword = async () => {
         if (newPassword !== confirmPassword) {
-            toast.error(lang === 'vi' ? "Mật khẩu xác nhận không khớp" : "Passwords do not match");
+            toast.error(text.passwordsDoNotMatch);
             return false;
         }
         
         setIsLoading(true);
         try {
             await apiService.post('/users/change-password', { currentPassword, newPassword });
-            toast.success(lang === 'vi' ? "Đổi mật khẩu thành công!" : "Password changed successfully!");
+            toast.success(text.passwordChanged);
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');

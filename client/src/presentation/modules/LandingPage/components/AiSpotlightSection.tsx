@@ -4,6 +4,7 @@ import { Database, Sparkles } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Badge } from '@/presentation/components/ui/badge';
 import { Card, CardContent } from '@/presentation/components/ui/card';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface AiSpotlightSectionProps {
     lang: string;
@@ -12,6 +13,7 @@ interface AiSpotlightSectionProps {
 
 export const AiSpotlightSection: React.FC<AiSpotlightSectionProps> = ({ lang, addToRevealRefs }) => {
     const navigate = useNavigate();
+    const text = getWorkspaceText(lang).aiSpotlight;
 
     return (
         <section className="py-12 md:py-16 relative overflow-hidden">
@@ -19,22 +21,20 @@ export const AiSpotlightSection: React.FC<AiSpotlightSectionProps> = ({ lang, ad
                 <div ref={addToRevealRefs} className="reveal bg-gradient-to-br from-blue-600/10 to-purple-600/10 rounded-[2rem] md:rounded-[3rem] p-6 md:p-12 border border-white/10 relative overflow-hidden flex flex-col lg:flex-row items-center gap-8 md:gap-12">
                     <div className="flex-1 text-center lg:text-left">
                         <Badge className="mb-4 md:mb-6 bg-purple-500/20 text-purple-400 border-purple-500/30 font-black tracking-[0.2em] px-4 py-1">
-                            {lang === 'vi' ? 'GEMINI 3.1 FLASH-LITE' : 'GEMINI 3.1 FLASH-LITE'}
+                            GEMINI 3.1 FLASH-LITE
                         </Badge>
                         <h1 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 md:mb-8 uppercase leading-none">
-                            {lang === 'vi' ? <>Trợ lý Dữ liệu <br /> AI Đa Phương Thức.</> : <>The Ultimate <br /> AI Data Assistant.</>}
+                            <>{text.titleLine1} <br /> {text.titleLine2}</>
                         </h1>
                         <p className="text-lg text-muted-foreground/80 mb-10 max-w-xl font-medium">
-                            {lang === 'vi'
-                                ? 'Phân tích tự động 100% Data Schema của bạn. Dùng ngôn ngữ tự nhiên để truy vấn dữ liệu phức tạp. Với Multimodal Vision, Gemini 3.1 còn có thể đọc sơ đồ ERD bằng hình ảnh và tái tạo cấu trúc DB.'
-                                : "Automatically parses 100% of your Data Schema. Use natural language to perform complex queries. With Multimodal Vision, the AI can even read ERD image diagrams and reconstruct DB structures."}
+                            {text.description}
                         </p>
                         <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
                             <Button size="lg" onClick={() => navigate('/sql-explorer')} className="rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black uppercase tracking-widest text-[10px] h-12 px-8">
-                                {lang === 'vi' ? 'Trò chuyện với Trợ lý' : 'Talk to Assistant'}
+                                {text.talkToAssistant}
                             </Button>
                             <Button size="lg" variant="ghost" onClick={() => navigate('/docs')} className="text-xs font-bold text-muted-foreground hover:text-white uppercase tracking-widest">
-                                {lang === 'vi' ? 'Tìm hiểu cách hoạt động' : 'Learn how it works'}
+                                {text.learnHowItWorks}
                             </Button>
                         </div>
                     </div>

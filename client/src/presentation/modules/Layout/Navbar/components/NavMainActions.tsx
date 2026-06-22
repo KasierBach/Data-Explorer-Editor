@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import { BarChart3, PieChart, GitGraph } from 'lucide-react';
 import { useAppStore } from '@/core/services/store';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface NavMainActionsProps {
     activeConnectionId: string | null;
@@ -11,17 +12,18 @@ interface NavMainActionsProps {
     isNoSql?: boolean;
 }
 
-export const NavMainActions: React.FC<NavMainActionsProps> = ({ 
-    activeConnectionId, 
-    openInsightsTab, 
-    onNavigate, 
+export const NavMainActions: React.FC<NavMainActionsProps> = ({
+    activeConnectionId,
+    openInsightsTab,
+    onNavigate,
     lang,
     isNoSql
 }) => {
-    const { 
+    const text = getWorkspaceText(lang).navMainActions;
+    const {
         setNosqlViewMode,
-        nosqlActiveCollection, 
-        nosqlActiveConnectionId 
+        nosqlActiveCollection,
+        nosqlActiveConnectionId
     } = useAppStore();
 
     const currentConnectionId = isNoSql ? nosqlActiveConnectionId : activeConnectionId;
@@ -55,7 +57,7 @@ export const NavMainActions: React.FC<NavMainActionsProps> = ({
                     disabled={!activeConnectionId}
                 >
                     <BarChart3 className="w-4 h-4 text-purple-600" />
-                    <span className="font-semibold">{lang === 'vi' ? 'Chi tiết' : 'Insights'}</span>
+                    <span className="font-semibold">{text.insights}</span>
                 </Button>
             )}
 
@@ -64,10 +66,10 @@ export const NavMainActions: React.FC<NavMainActionsProps> = ({
                 size="sm"
                 className="h-8 text-muted-foreground hover:text-foreground gap-1.5 px-3"
                 onClick={handleVisualizeClick}
-                disabled={isNoSql ? !currentConnectionId : false} 
+                disabled={isNoSql ? !currentConnectionId : false}
             >
                 <PieChart className="w-4 h-4 text-emerald-500" />
-                <span className="font-semibold">{lang === 'vi' ? 'Trực quan' : 'Visualize'}</span>
+                <span className="font-semibold">{text.visualize}</span>
             </Button>
 
             <Button
@@ -78,7 +80,7 @@ export const NavMainActions: React.FC<NavMainActionsProps> = ({
                 disabled={!currentConnectionId}
             >
                 <GitGraph className="w-4 h-4 text-blue-500" />
-                <span className="font-semibold">{lang === 'vi' ? 'Sơ đồ' : 'Diagram'}</span>
+                <span className="font-semibold">{text.diagram}</span>
             </Button>
         </div>
     );

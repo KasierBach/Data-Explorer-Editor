@@ -68,7 +68,7 @@ import type { TableColumn, TableMetadata } from '@/core/domain/entities';
 interface DataGridRowProps {
     row: Row<RowData>;
     editing: ReturnType<typeof useDataGridEditing>;
-    lang: 'vi' | 'en';
+    inspectValueHint: string;
     pkField: string | null | undefined;
     metadata: TableMetadata | undefined;
     handleOpenCellInspector: (val: DatabaseValue, col: string, type: string, rowId: string) => void;
@@ -83,7 +83,7 @@ interface DataGridRowProps {
 const DataGridRow = React.memo(({
     row,
     editing,
-    lang,
+    inspectValueHint,
     pkField,
     metadata,
     handleOpenCellInspector,
@@ -141,7 +141,7 @@ const DataGridRow = React.memo(({
                             )
                             : undefined
                     }
-                    title={cellIdx > 0 ? (lang === 'vi' ? 'Nhấn đúp để xem đầy đủ giá trị' : 'Double-click to inspect full value') : undefined}
+                    title={cellIdx > 0 ? inspectValueHint : undefined}
                 >
                     {cellIdx === 0 ? (
                         <span className={`cursor-pointer ${isSelected ? 'text-blue-500 font-bold' : ''}`}>
@@ -762,7 +762,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                             <FileJson className="w-3 h-3" /> JSON
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => exportSQL(exportCtx)} className="gap-2 text-xs">
-                                            <FileCode className="w-3 h-3" /> {lang === 'vi' ? 'SQL (THEM)' : 'SQL (INSERT)'}
+                                            <FileCode className="w-3 h-3" /> {text.insertSql}
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={editing.toggleInsertMode} disabled={dataEditsDisabled} className="gap-2 text-xs">
                                             <Plus className="w-3 h-3" /> {editing.isInserting ? text.cancelInsert : text.insertRow}
@@ -853,7 +853,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                     <FileJson className="w-3 h-3" /> JSON
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => exportSQL(exportCtx)} className="gap-2 text-xs">
-                                    <FileCode className="w-3 h-3" /> {lang === 'vi' ? 'SQL (THEM)' : 'SQL (INSERT)'}
+                                    <FileCode className="w-3 h-3" /> {text.insertSql}
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -1019,7 +1019,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                                                     setDraggingColumnId(null);
                                                                     setDropTargetColumnId(null);
                                                                 }}
-                                                                title={lang === 'vi' ? 'Kéo để đổi thứ tự cột' : 'Drag to reorder column'}
+                                                                title={text.dragReorderColumn}
                                                             >
                                                                 <GripVertical className="h-3 w-3" />
                                                             </button>
@@ -1069,7 +1069,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                                                 event.stopPropagation();
                                                                 header.getResizeHandler()(event);
                                                             }}
-                                                            title={lang === 'vi' ? 'Kéo để đổi độ rộng. Nhấn đúp để vừa nội dung.' : 'Drag to resize. Double-click to auto-fit.'}
+                                                            title={text.resizeColumnHint}
                                                         />
                                                     )}
                                                 </th>
@@ -1092,7 +1092,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                                     key={row.id}
                                                     row={row}
                                                     editing={editing}
-                                                    lang={lang}
+                                                    inspectValueHint={text.inspectValueHint}
                                                     pkField={pkField}
                                                     metadata={metadata}
                                                     handleOpenCellInspector={handleOpenCellInspector}
@@ -1207,17 +1207,17 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                 ▶
                             </Button>
                         </div>
-                        <span className="text-[9px] opacity-70">{lang === 'vi' ? 'TRANG' : 'PAGE'}</span>
+                        <span className="text-[9px] opacity-70">{text.pageUnit}</span>
                         <div className="h-3 w-[1px] bg-border mx-1" />
                         <select
                             className="bg-transparent border-none outline-none cursor-pointer hover:text-foreground text-[9px] font-bold py-0 h-4"
                             value={pagination.pageSize}
                             onChange={(e) => setTabPagination(tableId, 1, Number(e.target.value))}
                         >
-                            <option value="50">50 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
-                            <option value="100">100 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
-                            <option value="500">500 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
-                            <option value="1000">1000 / {lang === 'vi' ? 'TRANG' : 'PAGE'}</option>
+                            <option value="50">50 / {text.pageUnit}</option>
+                            <option value="100">100 / {text.pageUnit}</option>
+                            <option value="500">500 / {text.pageUnit}</option>
+                            <option value="1000">1000 / {text.pageUnit}</option>
                         </select>
                     </div>
                 </div>

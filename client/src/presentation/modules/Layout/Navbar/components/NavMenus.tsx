@@ -11,6 +11,7 @@ import {
 } from "@/presentation/components/ui/dropdown-menu"
 import { FileText, LifeBuoy, Github, Cloud, Copy, X } from 'lucide-react';
 import { useAppStore } from '@/core/services/store';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface NavMenusProps {
     lang: string;
@@ -28,6 +29,7 @@ export const NavMenus: React.FC<NavMenusProps> = ({
     isNoSql
 }) => {
     const { openTab, closeAllTabs, isResultPanelOpen, toggleResultPanel } = useAppStore();
+    const text = getWorkspaceText(lang).navMenus;
 
     const handleDuplicateTab = () => {
         const state = useAppStore.getState();
@@ -46,11 +48,11 @@ export const NavMenus: React.FC<NavMenusProps> = ({
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">
-                        {lang === 'vi' ? 'Tệp' : 'File'}
+                        {text.file}
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-64" sideOffset={8} align="start">
-                    <DropdownMenuLabel>{lang === 'vi' ? 'Thao tác Tệp' : 'File Operations'}</DropdownMenuLabel>
+                    <DropdownMenuLabel>{text.fileOperations}</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => {
                         if (isNoSql) {
@@ -61,17 +63,17 @@ export const NavMenus: React.FC<NavMenusProps> = ({
                         }
                     }}>
                         <FileText className="mr-2 h-4 w-4" />
-                        <span>{lang === 'vi' ? 'Truy vấn mới' : 'New Query'}</span>
+                        <span>{text.newQuery}</span>
                         <DropdownMenuShortcut>Ctrl+N</DropdownMenuShortcut>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleDuplicateTab} disabled={isNoSql}>
                         <Copy className="mr-2 h-4 w-4" />
-                        <span>{lang === 'vi' ? 'Nhân bản Tab' : 'Duplicate Tab'}</span>
+                        <span>{text.duplicateTab}</span>
                         <DropdownMenuShortcut>Ctrl+D</DropdownMenuShortcut>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={closeAllTabs} className="text-destructive focus:text-destructive" disabled={isNoSql}>
                         <X className="mr-2 h-4 w-4" />
-                        <span>{lang === 'vi' ? 'Đóng tất cả Tab' : 'Close All Tabs'}</span>
+                        <span>{text.closeAllTabs}</span>
                         <DropdownMenuShortcut>Ctrl+Shift+W</DropdownMenuShortcut>
                     </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -80,49 +82,49 @@ export const NavMenus: React.FC<NavMenusProps> = ({
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">
-                        {lang === 'vi' ? 'Sửa' : 'Edit'}
+                        {text.edit}
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-64" sideOffset={8} align="start">
-                    <DropdownMenuItem>{lang === 'vi' ? 'Hoàn tác' : 'Undo'} <DropdownMenuShortcut>Ctrl+Z</DropdownMenuShortcut></DropdownMenuItem>
-                    <DropdownMenuItem>{lang === 'vi' ? 'Lấy lại' : 'Redo'} <DropdownMenuShortcut>Ctrl+Y</DropdownMenuShortcut></DropdownMenuItem>
+                    <DropdownMenuItem>{text.undo} <DropdownMenuShortcut>Ctrl+Z</DropdownMenuShortcut></DropdownMenuItem>
+                    <DropdownMenuItem>{text.redo} <DropdownMenuShortcut>Ctrl+Y</DropdownMenuShortcut></DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>{lang === 'vi' ? 'Cắt' : 'Cut'} <DropdownMenuShortcut>Ctrl+X</DropdownMenuShortcut></DropdownMenuItem>
-                    <DropdownMenuItem>{lang === 'vi' ? 'Sao chép' : 'Copy'} <DropdownMenuShortcut>Ctrl+C</DropdownMenuShortcut></DropdownMenuItem>
-                    <DropdownMenuItem>{lang === 'vi' ? 'Dán' : 'Paste'} <DropdownMenuShortcut>Ctrl+V</DropdownMenuShortcut></DropdownMenuItem>
+                    <DropdownMenuItem>{text.cut} <DropdownMenuShortcut>Ctrl+X</DropdownMenuShortcut></DropdownMenuItem>
+                    <DropdownMenuItem>{text.copy} <DropdownMenuShortcut>Ctrl+C</DropdownMenuShortcut></DropdownMenuItem>
+                    <DropdownMenuItem>{text.paste} <DropdownMenuShortcut>Ctrl+V</DropdownMenuShortcut></DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
 
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">
-                        {lang === 'vi' ? 'Xem' : 'View'}
+                        {text.view}
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-64" sideOffset={8} align="start">
                     <DropdownMenuItem onClick={() => setSidebarOpen(!isSidebarOpen)}>
-                        {isSidebarOpen ? (lang === 'vi' ? "Ẩn thanh bên" : "Hide Sidebar") : (lang === 'vi' ? "Hiện thanh bên" : "Show Sidebar")}
+                        {isSidebarOpen ? text.hideSidebar : text.showSidebar}
                         <DropdownMenuShortcut>Ctrl+B</DropdownMenuShortcut>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={toggleResultPanel}>
-                        {isResultPanelOpen ? (lang === 'vi' ? "Ẩn bảng kết quả" : "Hide Result Panel") : (lang === 'vi' ? "Hiện bảng kết quả" : "Show Result Panel")}
+                        {isResultPanelOpen ? text.hideResultPanel : text.showResultPanel}
                         <DropdownMenuShortcut>Ctrl+J</DropdownMenuShortcut>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>{lang === 'vi' ? 'Cửa sổ toàn màn hình' : 'Toggle Full Screen'} <DropdownMenuShortcut>F11</DropdownMenuShortcut></DropdownMenuItem>
+                    <DropdownMenuItem>{text.toggleFullScreen} <DropdownMenuShortcut>F11</DropdownMenuShortcut></DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
 
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-8 text-muted-foreground hover:text-foreground data-[state=open]:bg-muted">
-                        {lang === 'vi' ? 'Trợ giúp' : 'Help'}
+                        {text.help}
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-64" sideOffset={8} align="start">
                     <DropdownMenuItem className="cursor-pointer" onClick={() => window.open('/docs', '_blank')}>
                         <LifeBuoy className="mr-2 h-4 w-4" />
-                        <span>{lang === 'vi' ? 'Tài liệu hướng dẫn' : 'Documentation'}</span>
+                        <span>{text.documentation}</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem className="cursor-pointer" onClick={() => window.open('https://github.com/KasierBach/Data-Explorer-Editor.git', '_blank')}>
                         <Github className="mr-2 h-4 w-4" />
@@ -131,11 +133,11 @@ export const NavMenus: React.FC<NavMenusProps> = ({
                     <DropdownMenuSeparator />
                     <DropdownMenuItem disabled>
                         <Cloud className="mr-2 h-4 w-4" />
-                        <span>{lang === 'vi' ? 'Kiểm tra cập nhật...' : 'Check for Updates...'}</span>
+                        <span>{text.checkUpdates}</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="opacity-50 text-[10px] flex justify-center py-1">
-                        Global Shortcuts: Ctrl+N, Ctrl+I, Ctrl+B, Ctrl+J
+                        {text.globalShortcuts}
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>

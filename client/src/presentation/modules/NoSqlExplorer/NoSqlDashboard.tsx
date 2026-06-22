@@ -4,14 +4,16 @@ import { Button } from '@/presentation/components/ui/button';
 import { Plus, Database, Search, Clock, BoxSelect, Trash, Loader2 } from 'lucide-react';
 import { ConnectionService } from '@/core/services/ConnectionService';
 import { LanguageSwitcher } from '@/presentation/components/shared/LanguageSwitcher';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 export const NoSqlDashboard: React.FC = () => {
     const { connections, setSidebarOpen, openConnectionDialog, removeConnection, setNosqlActiveConnectionId, lang } = useAppStore();
+    const text = getWorkspaceText(lang).noSqlDashboard;
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        if (!confirm(lang === 'vi' ? 'Bạn có chắc chắn muốn xóa kết nối này?' : 'Are you sure you want to delete this connection?')) return;
+        if (!confirm(text.confirmDeleteConnection)) return;
 
         setIsDeleting(id);
         try {
@@ -19,7 +21,7 @@ export const NoSqlDashboard: React.FC = () => {
             removeConnection(id);
         } catch (error) {
             console.error('Error deleting connection:', error);
-            alert(error instanceof Error ? error.message : 'Error deleting connection');
+            alert(error instanceof Error ? error.message : text.deleteConnectionFallback);
         } finally {
             setIsDeleting(null);
         }
@@ -37,7 +39,7 @@ export const NoSqlDashboard: React.FC = () => {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
-                                {lang === 'vi' ? 'Chào mừng bạn đến với Data Explorer' : 'Welcome to Data Explorer'}
+                                {text.welcomeTitle}
                             </h1>
                             <span className="hidden sm:inline-flex px-3 py-1 rounded-full bg-green-500/10 text-green-500 text-[10px] md:text-xs font-bold uppercase tracking-widest border border-green-500/20 whitespace-nowrap items-center gap-1.5">
                                 <Database className="w-3.5 h-3.5" /> NoSQL
@@ -46,9 +48,7 @@ export const NoSqlDashboard: React.FC = () => {
                         <LanguageSwitcher />
                     </div>
                     <p className="text-muted-foreground text-base md:text-lg max-w-3xl">
-                        {lang === 'vi'
-                            ? 'Làm việc trơn tru với MongoDB, chạy các truy vấn MQL và xử lý khối lượng dữ liệu JSON khổng lồ một cách dễ dàng.'
-                            : 'Work seamlessly with MongoDB, run MQL queries and handle massive JSON datasets with ease.'}
+                        {text.welcomeDescription}
                     </p>
                 </div>
 
@@ -60,9 +60,9 @@ export const NoSqlDashboard: React.FC = () => {
                                 <BoxSelect className="h-6 w-6" />
                             </div>
                             <div>
-                                <h3 className="font-semibold text-base md:text-lg">{lang === 'vi' ? 'Chọn Collection' : 'Select Collection'}</h3>
+                                <h3 className="font-semibold text-base md:text-lg">{text.selectCollectionTitle}</h3>
                                 <p className="text-xs md:text-sm text-muted-foreground mt-1 hidden sm:block">
-                                    {lang === 'vi' ? 'Mở thanh bên trái để chọn kết nối và collection làm việc.' : 'Open left sidebar to select a connection and collection.'}
+                                    {text.selectCollectionDescription}
                                 </p>
                             </div>
                         </div>
@@ -74,9 +74,9 @@ export const NoSqlDashboard: React.FC = () => {
                                 <Plus className="h-6 w-6" />
                             </div>
                             <div>
-                                <h3 className="font-semibold text-base md:text-lg">{lang === 'vi' ? 'Kết nối mới' : 'New Connection'}</h3>
+                                <h3 className="font-semibold text-base md:text-lg">{text.newConnectionTitle}</h3>
                                 <p className="text-xs md:text-sm text-muted-foreground mt-1 hidden sm:block">
-                                    {lang === 'vi' ? 'Thêm một cụm MongoDB Atlas hoặc Redis mới vào quản lý.' : 'Add a new MongoDB Atlas or Redis cluster for management.'}
+                                    {text.newConnectionDescription}
                                 </p>
                             </div>
                         </div>
@@ -88,9 +88,9 @@ export const NoSqlDashboard: React.FC = () => {
                                 <Search className="h-6 w-6" />
                             </div>
                             <div>
-                                <h3 className="font-semibold text-base md:text-lg">{lang === 'vi' ? 'Duyệt Document' : 'Browse Documents'}</h3>
+                                <h3 className="font-semibold text-base md:text-lg">{text.browseDocumentsTitle}</h3>
                                 <p className="text-xs md:text-sm text-muted-foreground mt-1 hidden sm:block">
-                                    {lang === 'vi' ? 'Khám phá các CSDL và collection thuộc về kết nối hiện tại.' : 'Explore databases and collections of the current connection.'}
+                                    {text.browseDocumentsDescription}
                                 </p>
                             </div>
                         </div>
@@ -102,7 +102,7 @@ export const NoSqlDashboard: React.FC = () => {
                     <div className="space-y-4 max-w-4xl">
                         <h2 className="text-xl font-semibold flex items-center gap-2">
                             <Clock className="h-5 w-5 text-muted-foreground" />
-                            {lang === 'vi' ? 'Kết nối NoSQL gần đây' : 'Recent NoSQL Connections'}
+                            {text.recentConnections}
                         </h2>
 
                         <div className="rounded-lg border bg-card">
@@ -123,7 +123,7 @@ export const NoSqlDashboard: React.FC = () => {
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0 ml-2">
                                                 <Button variant="outline" size="sm" className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-xs" onClick={() => { setNosqlActiveConnectionId(conn.id); setSidebarOpen(true); }}>
-                                                    {lang === 'vi' ? 'Mở' : 'Open'}
+                                                    {text.open}
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
@@ -140,7 +140,7 @@ export const NoSqlDashboard: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="p-8 text-center text-muted-foreground">
-                                    {lang === 'vi' ? 'Chưa có kết nối nào. Hãy tạo một cái để bắt đầu.' : 'No connections yet. Create one to get started.'}
+                                    {text.noConnections}
                                 </div>
                             )}
                         </div>

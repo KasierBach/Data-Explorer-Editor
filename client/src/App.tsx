@@ -12,6 +12,7 @@ import { useSyncConnections } from '@/presentation/hooks/useSyncConnections'
 import { useSyncSavedQueries } from '@/presentation/hooks/useSyncSavedQueries'
 import { AuthService } from '@/core/services/AuthService'
 import { useNotifications } from '@/presentation/hooks/useNotifications'
+import { getWorkspaceText } from '@/core/utils/workspaceText'
 
 import { Toaster } from 'sonner';
 import { DestructiveQueryDialog } from '@/presentation/components/Dialogs/DestructiveQueryDialog';
@@ -35,9 +36,10 @@ const BillingReturnPage = lazy(() => import('@/presentation/pages/BillingReturnP
 
 function RouteFallback() {
   const { lang } = useAppStore()
+  const text = getWorkspaceText(lang).app
   return (
     <div className="flex h-dvh min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-      {lang === 'vi' ? 'Đang tải...' : 'Loading...'}
+      {text.routeLoading}
     </div>
   )
 }

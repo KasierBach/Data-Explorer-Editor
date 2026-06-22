@@ -25,6 +25,7 @@ import { useResourcePresence } from '@/presentation/hooks/useResourcePresence';
 import { PresenceBadge } from '@/presentation/components/presence/PresenceBadge';
 import { SqlSequenceDialog } from './SqlSequenceDialog';
 import { AiQueryExplanationDialog } from './AiQueryExplanationDialog';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 type SqlEditorHandle = editor.IStandaloneCodeEditor;
 
@@ -39,12 +40,6 @@ function getErrorMessage(error: unknown) {
     return error instanceof Error ? error.message : 'Unexpected error';
 }
 
-function getExplainPrompt(lang: 'vi' | 'en') {
-    return lang === 'vi'
-        ? 'Giải thích câu SQL này theo đúng thứ tự thực thi. Không sinh SQL mới. Trả lời bằng markdown với các phần: Tóm tắt tổng thể, Giải thích từng bước, và Lưu ý/rủi ro nếu có. Nếu là nhiều statement, hãy giải thích lần lượt từng statement.'
-        : 'Explain this SQL in execution order. Do not generate new SQL. Return markdown with sections for overall summary, step-by-step explanation, and important notes or risks. If this is a multi-statement script, explain each statement in order.';
-}
-
 export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const queryClient = useQueryClient();
     const {
@@ -56,6 +51,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const activeOrganizationId = activeConnection?.organizationId || undefined;
     const schemaInfo = useSchemaInfo();
     const preferences = useAiPreferences();
+    const text = getWorkspaceText(lang).queryEditor;
 
     const tab = tabs.find(t => t.id === tabId);
     const initialMetadata = tab?.metadata || {};
@@ -201,28 +197,20 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         if (!activeConnection) return null;
         const parts: string[] = [];
         if (activeConnection.readOnly) {
-            parts.push(lang === 'vi' ? 'Kết nối đang ở chế độ chỉ đọc' : 'Connection is read-only');
+            parts.push(text.readOnlyGuardrail);
         }
         if (activeConnection.allowQueryExecution === false) {
-            parts.push(lang === 'vi' ? 'đã tắt chạy truy vấn' : 'query execution is disabled');
+            parts.push(text.executionDisabledGuardrail);
         } else {
             parts.push(
                 limit === 'all'
-                    ? (
-                        lang === 'vi'
-                            ? `bộ bảo vệ máy chủ: tối đa ${protectiveLimit.toLocaleString('vi-VN')} dòng`
-                            : `server guardrail: max ${protectiveLimit.toLocaleString('en-US')} rows`
-                    )
-                    : (
-                        lang === 'vi'
-                            ? `giới hạn yêu cầu: ${limit} dòng`
-                            : `requested limit: ${limit} rows`
-                    ),
+                    ? text.serverGuardrail(protectiveLimit.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US'))
+                    : text.requestedLimit(limit),
             );
-            parts.push(lang === 'vi' ? 'timeout ~30s' : '~30s timeout');
+            parts.push(text.timeoutGuardrail);
         }
         return parts.join(' • ');
-    }, [activeConnection, lang, limit, protectiveLimit]);
+    }, [activeConnection, lang, limit, protectiveLimit, text]);
 
     const resultColumns = React.useMemo(() => {
         if (results?.columns?.length) return results.columns;
@@ -354,7 +342,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             const result = await apiService.post<AiExplanationResponse>('/ai/generate-sql', {
                 connectionId: activeConnectionId,
                 database: activeDatabase || undefined,
-                prompt: getExplainPrompt(lang),
+                prompt: text.explainPrompt,
                 context: `SQL to explain:\n${sqlToExplain}`,
                 model: resolvedExplain.model,
                 mode: 'planning',
@@ -398,12 +386,12 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             try {
                 const updated = await SavedQueryService.updateSavedQuery(currentSavedQueryId, { sql: query });
                 saveQuery(updated);
-                toast.success(lang === 'vi' ? 'Đã cập nhật truy vấn đã lưu' : 'Saved query updated');
+                toast.success(text.savedQueryUpdated);
             } catch (saveError) {
                 toast.error(getErrorMessage(saveError) || 'Failed to update saved query');
             }
         } else {
-            const defaultName = lang === 'vi' ? `Truy vấn ${new Date().toLocaleString('vi-VN')}` : `Query ${new Date().toLocaleString('en-US')}`;
+            const defaultName = text.defaultQueryName(new Date().toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US'));
             const currentVisibility = currentSavedQuery?.visibility === 'workspace' ? 'workspace' : 'private';
             setSaveDialogInitialValues({
                 name: currentSavedQuery?.name || defaultName,
@@ -415,7 +403,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             });
             setIsSaveDialogOpen(true);
         }
-    }, [query, currentSavedQueryId, currentSavedQuery, saveQuery, lang, activeOrganizationId]);
+    }, [query, currentSavedQueryId, currentSavedQuery, saveQuery, lang, activeOrganizationId, text]);
 
     const handleSaveDialogSubmit = useCallback(async (values: SaveQueryFormValues) => {
         const payload = {
@@ -433,7 +421,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         if (currentSavedQueryId && currentSavedQuery?.isOwner) {
             const updated = await SavedQueryService.updateSavedQuery(currentSavedQueryId, payload);
             saveQuery(updated);
-            toast.success(lang === 'vi' ? 'Đã cập nhật truy vấn đã lưu' : 'Saved query updated');
+            toast.success(text.savedQueryUpdated);
             return;
         }
 
@@ -441,8 +429,8 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         saveQuery(created);
         setCurrentSavedQueryId(created.id);
         updateTabMetadata(tabId, { savedQueryId: created.id });
-        toast.success(lang === 'vi' ? 'Đã lưu truy vấn' : 'Query saved');
-    }, [query, activeDatabase, activeConnection, currentSavedQueryId, currentSavedQuery, saveQuery, lang, tabId, updateTabMetadata]);
+        toast.success(text.querySaved);
+    }, [query, activeDatabase, activeConnection, currentSavedQueryId, currentSavedQuery, saveQuery, tabId, text, updateTabMetadata]);
 
     const handleOpenSavedQuery = useCallback((sq: SavedQuery) => {
         openTab({
@@ -525,8 +513,8 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                         <PresenceBadge
                             entries={queryPresence.entries}
                             isLoading={queryPresence.isLoading}
-                            label={lang === 'vi' ? 'Truy vấn đang mở' : 'Query live'}
-                            emptyLabel={lang === 'vi' ? 'Chưa ai mở truy vấn này' : 'No one on this query'}
+                            label={text.presenceLabel}
+                            emptyLabel={text.presenceEmpty}
                             className="max-w-[280px]"
                         />
                     ) : null}
@@ -543,10 +531,10 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                     )}>
                         <div className="font-semibold uppercase tracking-wide text-[10px]">
                             {blockedReason === 'READ_ONLY_CONNECTION'
-                                ? (lang === 'vi' ? 'Truy vấn bị chặn bởi chế độ chỉ đọc' : 'Read-only protection active')
+                                ? text.blockedReadOnly
                                 : blockedReason === 'QUERY_EXECUTION_DISABLED'
-                                    ? (lang === 'vi' ? 'Truy vấn bị chặn bởi policy kết nối' : 'Execution blocked by connection policy')
-                                    : (lang === 'vi' ? 'Guardrails kết nối' : 'Connection guardrails')}
+                                    ? text.blockedPolicy
+                                    : text.connectionGuardrails}
                         </div>
                         <div className="mt-1 text-muted-foreground">
                             {blockedReason

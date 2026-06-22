@@ -14,6 +14,7 @@ import {
 } from '@/presentation/components/ui/select';
 import { ConnectionDialog } from '@/presentation/modules/Connection/ConnectionDialog';
 import { useNoSqlQuery } from '@/presentation/hooks/useNoSqlQuery';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 const isNoSqlConnectionType = (type: string) => {
   const normalizedType = type.toLowerCase();
@@ -27,6 +28,7 @@ export function VisualizePage() {
   const goBackPath = isNoSql ? '/nosql-explorer' : '/sql-explorer';
 
   const lang = useAppStore((state) => state.lang);
+  const text = getWorkspaceText(lang).visualizePage;
   const connections = useAppStore((state) => state.connections);
   const openConnectionDialog = useAppStore((state) => state.openConnectionDialog);
 
@@ -53,8 +55,10 @@ export function VisualizePage() {
   const activeConnection = filteredConnections.find(
     (connection) => connection.id === activeConnectionId,
   );
-  const hostLabel = lang === 'vi' ? 'cục bộ' : 'local';
-  const backLabel = lang === 'vi' ? 'Quay lại' : 'Go Back';
+  const hostLabel = text.hostLabel;
+  const backLabel = text.goBack;
+  const connectionCopy = isNoSql ? text.noConnections.nosql : text.noConnections.sql;
+  const selectConnectionTitle = isNoSql ? text.selectConnection.nosql : text.selectConnection.sql;
   const autoLoadKey = useMemo(() => {
     if (!isNoSql || !nosqlActiveConnectionId || !nosqlActiveCollection) {
       return null;
@@ -86,23 +90,15 @@ export function VisualizePage() {
       <div className="h-dvh min-h-screen w-full flex items-center justify-center bg-background page-enter">
         <div className="text-center space-y-4">
           <PieChart className="w-12 h-12 text-muted-foreground mx-auto" />
-          <h2 className="text-xl font-bold">
-            {lang === 'vi'
-              ? `Chưa có kết nối ${isNoSql ? 'NoSQL' : 'SQL'}`
-              : `No ${isNoSql ? 'NoSQL' : 'SQL'} Connections`}
-          </h2>
-          <p className="text-muted-foreground">
-            {lang === 'vi'
-              ? `Thêm kết nối ${isNoSql ? 'MongoDB hoặc Redis' : 'cơ sở dữ liệu SQL'} để bắt đầu trực quan hóa.`
-              : `Add a ${isNoSql ? 'MongoDB or Redis' : 'SQL database'} connection to start visualizing.`}
-          </p>
+          <h2 className="text-xl font-bold">{connectionCopy.title}</h2>
+          <p className="text-muted-foreground">{connectionCopy.description}</p>
           <div className="flex gap-2 justify-center">
             <Button variant="outline" onClick={() => navigate(goBackPath)}>
               {backLabel}
             </Button>
             <Button onClick={() => openConnectionDialog()}>
               <Plus className="w-4 h-4 mr-2" />
-              {lang === 'vi' ? 'Thêm kết nối' : 'Add Connection'}
+              {text.addConnection}
             </Button>
           </div>
         </div>
@@ -116,16 +112,8 @@ export function VisualizePage() {
       <div className="h-dvh min-h-screen w-full flex items-center justify-center bg-background page-enter">
         <div className="text-center space-y-4 max-w-sm">
           <Wifi className="w-12 h-12 text-muted-foreground mx-auto" />
-          <h2 className="text-xl font-bold">
-            {lang === 'vi'
-              ? `Chọn kết nối ${isNoSql ? 'NoSQL' : 'SQL'}`
-              : `Select ${isNoSql ? 'NoSQL' : 'SQL'} Connection`}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {lang === 'vi'
-              ? 'Chọn một kết nối cơ sở dữ liệu để bắt đầu trực quan hóa.'
-              : 'Choose a database connection to start visualizing.'}
-          </p>
+          <h2 className="text-xl font-bold">{selectConnectionTitle}</h2>
+          <p className="text-sm text-muted-foreground">{text.selectConnection.description}</p>
           <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
             {filteredConnections.map((connection) => (
               <button
@@ -164,18 +152,12 @@ export function VisualizePage() {
         <div className="h-dvh min-h-screen w-full flex items-center justify-center bg-background page-enter">
           <div className="max-w-lg text-center space-y-4 px-6">
             <PieChart className="w-12 h-12 text-emerald-500 mx-auto" />
-            <h2 className="text-xl font-bold">
-              {lang === 'vi' ? 'Chưa chọn collection' : 'No collection selected'}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {lang === 'vi'
-                ? 'Mở một collection trong không gian NoSQL trước, rồi chạy query hoặc pipeline để tạo tập dữ liệu cho trang trực quan này.'
-                : 'Open a collection in the NoSQL workspace first, then run a query or pipeline to build a result set for this page.'}
-            </p>
+            <h2 className="text-xl font-bold">{text.noCollectionTitle}</h2>
+            <p className="text-sm text-muted-foreground">{text.noCollectionDescription}</p>
             <div className="flex justify-center gap-2">
               <Button variant="outline" onClick={() => navigate(goBackPath)}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                {lang === 'vi' ? 'Về không gian NoSQL' : 'Back to NoSQL workspace'}
+                {text.backToNoSqlWorkspace}
               </Button>
             </div>
           </div>
@@ -190,16 +172,8 @@ export function VisualizePage() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
               <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
             </div>
-            <h2 className="text-xl font-bold">
-              {lang === 'vi'
-                ? 'Đang nạp dữ liệu trực quan'
-                : 'Loading visualization data'}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {lang === 'vi'
-                ? `Đang lấy mẫu tài liệu từ collection ${nosqlActiveCollection} để dựng chart đầu tiên.`
-                : `Fetching a document sample from ${nosqlActiveCollection} to build the first chart.`}
-            </p>
+            <h2 className="text-xl font-bold">{text.loadingVisualizationTitle}</h2>
+            <p className="text-sm text-muted-foreground">{text.loadingVisualizationDescription(nosqlActiveCollection)}</p>
           </div>
         </div>
       );
@@ -210,27 +184,19 @@ export function VisualizePage() {
         <div className="h-dvh min-h-screen w-full flex items-center justify-center bg-background page-enter">
           <div className="max-w-xl text-center space-y-4 px-6">
             <PieChart className="w-12 h-12 text-emerald-500 mx-auto" />
-            <h2 className="text-xl font-bold">
-              {lang === 'vi'
-                ? 'Chưa có dữ liệu để trực quan hóa'
-                : 'No results to visualize yet'}
-            </h2>
+            <h2 className="text-xl font-bold">{text.noResultsTitle}</h2>
             <p className="text-sm text-muted-foreground">
-              {lang === 'vi'
-                ? nosqlVisualizeError?.message
-                  ? `Không thể nạp dữ liệu mẫu cho ${nosqlActiveCollection}: ${nosqlVisualizeError.message}`
-                  : `Collection ${nosqlActiveCollection} chưa có tài liệu phù hợp để dựng chart. Hãy chạy query khác hoặc kiểm tra dữ liệu nguồn.`
-                : nosqlVisualizeError?.message
-                  ? `Could not load a sample from ${nosqlActiveCollection}: ${nosqlVisualizeError.message}`
-                  : `The ${nosqlActiveCollection} collection does not have chart-ready documents yet. Try another query or check the source data.`}
+              {nosqlVisualizeError?.message
+                ? text.noResultsErrorDescription(nosqlActiveCollection, nosqlVisualizeError.message)
+                : text.noResultsEmptyDescription(nosqlActiveCollection)}
             </p>
             <div className="flex justify-center gap-2">
               <Button onClick={() => void executeMql()}>
-                {lang === 'vi' ? 'Thử nạp lại' : 'Retry sample load'}
+                {text.retrySampleLoad}
               </Button>
               <Button variant="outline" onClick={() => navigate(goBackPath)}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                {lang === 'vi' ? 'Về trình soạn NoSQL' : 'Back to NoSQL editor'}
+                {text.backToNoSqlEditor}
               </Button>
             </div>
           </div>
@@ -258,14 +224,8 @@ export function VisualizePage() {
                     <PieChart className="w-4 h-4 text-emerald-500" />
                   </div>
                   <div>
-                    <h1 className="text-base font-bold">
-                      {lang === 'vi' ? 'Trực quan NoSQL' : 'NoSQL Visualize'}
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                      {lang === 'vi'
-                        ? 'Trang riêng để rút insight từ tập kết quả hiện tại, không còn chèn trong MQL editor.'
-                        : 'A dedicated page for extracting insight from the current result set without crowding the MQL editor.'}
-                    </p>
+                    <h1 className="text-base font-bold">{text.noSqlTitle}</h1>
+                    <p className="text-sm text-muted-foreground">{text.noSqlDescription}</p>
                   </div>
                 </div>
 
@@ -277,7 +237,7 @@ export function VisualizePage() {
                     {nosqlActiveCollection}
                   </span>
                   <span className="rounded-full border border-border/60 bg-background/70 px-3 py-1">
-                    {nosqlResult.length} {lang === 'vi' ? 'tài liệu' : 'documents'}
+                    {nosqlResult.length} {text.documents}
                   </span>
                 </div>
               </div>
@@ -285,7 +245,7 @@ export function VisualizePage() {
 
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={() => navigate(goBackPath)}>
-                {lang === 'vi' ? 'Về trình soạn NoSQL' : 'Back to NoSQL editor'}
+                {text.backToNoSqlEditor}
               </Button>
             </div>
           </div>
@@ -294,9 +254,7 @@ export function VisualizePage() {
         <div className="flex-1 overflow-auto">
           <div className="mx-auto flex min-h-full w-full max-w-7xl flex-col gap-4 p-4 md:p-6">
             <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/5 px-4 py-3 text-sm text-muted-foreground">
-              {lang === 'vi'
-                ? 'Nếu cần nhóm toàn collection hoặc metric phức tạp hơn, hãy quay về Aggregation Builder, chạy pipeline rồi mở lại trang này.'
-                : 'If you need collection-wide grouping or more advanced metrics, go back to the Aggregation Builder, run the pipeline, then return here.'}
+              {text.chartHint}
             </div>
 
             <div className="flex min-h-[720px] flex-1 flex-col">
@@ -327,7 +285,7 @@ export function VisualizePage() {
               <PieChart className="w-4 h-4 text-emerald-500" />
             </div>
             <span className="text-sm font-bold hidden sm:inline">
-              {lang === 'vi' ? 'Studio trực quan' : 'Chart Studio'}
+              {text.chartStudio}
             </span>
           </div>
           <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />

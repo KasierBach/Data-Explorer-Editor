@@ -10,10 +10,13 @@ import { cn } from '@/lib/utils';
 import { useAppStore } from '@/core/services/store';
 import { LanguageSwitcher } from '@/presentation/components/shared/LanguageSwitcher';
 import { SEO } from '@/presentation/components/shared/Seo';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
+import { getLocalizedDocTitle } from '@/presentation/components/docs/docsI18n';
 
 export function DocumentationPage() {
     const navigate = useNavigate();
     const { lang } = useAppStore();
+    const text = getWorkspaceText(lang).documentationPage;
     const [activeSection, setActiveSection] = useState('introduction');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [headings, setHeadings] = useState<{ id: string, text: string, level: number }[]>([]);
@@ -29,7 +32,7 @@ export function DocumentationPage() {
                 for (const item of section.items) {
                     const itemData = {
                         ...item,
-                        sectionTitle: lang === 'vi' ? section.title : (section.titleEn || section.title)
+                        sectionTitle: getLocalizedDocTitle(lang, section)
                     };
                     flatItems.push(itemData);
                     if (item.id === activeSection) {
@@ -86,15 +89,15 @@ export function DocumentationPage() {
         }
     };
 
+    const currentSectionTitle = navInfo.currentSection ? getLocalizedDocTitle(lang, navInfo.currentSection) : '';
+    const currentItemTitle = navInfo.currentItem ? getLocalizedDocTitle(lang, navInfo.currentItem) : text.defaultTitle;
+
     return (
         <div className="h-dvh min-h-screen bg-background text-foreground flex flex-col overflow-hidden">
             <SEO 
                 lang={lang}
-                title={`${lang === 'vi' ? (navInfo.currentItem?.title || 'Tài liệu') : (navInfo.currentItem?.titleEn || navInfo.currentItem?.title || 'Docs')}`}
-                description={lang === 'vi'
-                    ? `Hướng dẫn chi tiết về ${navInfo.currentItem?.title} trong Data Explorer. Tìm hiểu cách tối ưu hóa quy trình làm việc với dữ liệu.`
-                    : `In-depth guide for ${navInfo.currentItem?.titleEn || navInfo.currentItem?.title} in Data Explorer. Learn how to optimize your data workflow.`
-                }
+                title={text.seoTitle(currentItemTitle)}
+                description={text.seoDescription(currentItemTitle)}
             />
             {/* Minimal Header */}
             <header className="h-14 border-b bg-card/50 backdrop-blur-xl flex items-center justify-between px-4 shrink-0 z-50">
@@ -107,7 +110,7 @@ export function DocumentationPage() {
                             <Database className="w-5 h-5 text-primary" />
                         </div>
                         <h1 className="font-bold text-sm tracking-tight hidden sm:block truncate max-w-[150px] lg:max-w-none">
-                            Data Explorer <span className="text-muted-foreground font-normal ml-1">{lang === 'vi' ? 'Tài liệu' : 'Docs'}</span>
+                            Data Explorer <span className="text-muted-foreground font-normal ml-1">{text.docsLabel}</span>
                         </h1>
                     </div>
 
@@ -121,7 +124,7 @@ export function DocumentationPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" />
                         <input
                             type="text"
-                            placeholder={lang === 'vi' ? "Tìm nhanh tài liệu..." : "Quick search docs..."}
+                            placeholder={text.quickSearch}
                             className="bg-muted/50 border rounded-full pl-9 pr-4 py-1.5 text-xs w-48 lg:w-64 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
                         />
                     </div>
@@ -132,11 +135,11 @@ export function DocumentationPage() {
 
                     <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="hidden sm:flex text-xs h-8 items-center gap-1.5 text-muted-foreground">
                         <ArrowLeft className="w-3.5 h-3.5" />
-                        {lang === 'vi' ? 'Quay lại' : 'Go Back'}
+                        {text.goBack}
                     </Button>
 
                     <Button variant="ghost" size="sm" onClick={() => navigate('/sql-explorer')} className="text-xs h-8">
-                        {lang === 'vi' ? 'Mở Ứng dụng' : 'Launch App'}
+                        {text.launchApp}
                     </Button>
                     <Button
                         variant="ghost"
@@ -188,8 +191,8 @@ export function DocumentationPage() {
                     <div className="relative z-10 flex flex-col min-h-full">
                         <div className="max-w-3xl mx-auto w-full py-12 px-6">
                             <DocBreadcrumbs
-                                sectionTitle={lang === 'vi' ? navInfo.currentSection?.title || '' : (navInfo.currentSection?.titleEn || navInfo.currentSection?.title || '')}
-                                itemTitle={lang === 'vi' ? navInfo.currentItem?.title || '' : (navInfo.currentItem?.titleEn || navInfo.currentItem?.title || '')}
+                                sectionTitle={currentSectionTitle}
+                                itemTitle={navInfo.currentItem ? currentItemTitle : ''}
                                 onHomeClick={() => setActiveSection('introduction')}
                                 lang={lang}
                             />
@@ -215,14 +218,14 @@ export function DocumentationPage() {
                                         onClick={() => window.open('https://github.com/KasierBach/Data-Explorer-Editor.git', '_blank')}
                                     >
                                         <Github className="w-4 h-4 transition-transform group-hover/btn:scale-110" />
-                                        {lang === 'vi' ? 'Chỉnh sửa trang này' : 'Edit this page'}
+                                        {text.editPage}
                                     </button>
                                     <span className="opacity-30 hidden sm:block">|</span>
-                                    <span className="text-xs">v3.6.2 • {lang === 'vi' ? 'Tháng 6 2026' : 'June 2026'}</span>
+                                    <span className="text-xs">v3.6.2 • {text.releaseDate}</span>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <span className="text-xs text-muted-foreground font-medium">
-                                        {lang === 'vi' ? 'Tài liệu này hữu ích chứ?' : 'Was this helpful?'}
+                                        {text.helpful}
                                     </span>
                                     <div className="flex gap-1">
                                         <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors">👍</Button>
@@ -235,19 +238,17 @@ export function DocumentationPage() {
                         {/* Global CTA Strip */}
                         <div className="mt-auto border-t bg-muted/10 p-12 text-center space-y-4">
                             <h3 className="text-xl font-bold">
-                                {lang === 'vi' ? 'Sẵn sàng khám phá dữ liệu?' : 'Ready to explore data?'}
+                                {text.readyTitle}
                             </h3>
                             <p className="text-muted-foreground max-w-md mx-auto text-sm leading-relaxed">
-                                {lang === 'vi'
-                                    ? 'Tham gia cộng đồng trên GitHub để đóng góp cho IDE cơ sở dữ liệu địa phương thông minh nhất.'
-                                    : 'Join the community on GitHub to contribute to the smartest local database IDE.'}
+                                {text.readyDescription}
                             </p>
                             <div className="flex items-center justify-center gap-3">
                                 <Button variant="outline" size="sm" onClick={() => window.open('https://github.com/KasierBach/Data-Explorer-Editor.git', '_blank')}>
                                     <Github className="w-4 h-4 mr-2" /> GitHub
                                 </Button>
                                 <Button variant="default" size="sm" onClick={() => navigate('/sql-explorer')}>
-                                    {lang === 'vi' ? 'Mở Ứng dụng' : 'Launch App'}
+                                    {text.launchApp}
                                 </Button>
                             </div>
                         </div>
@@ -257,7 +258,7 @@ export function DocumentationPage() {
                 {/* Right Sidebar - On Page TOC (Desktop only) */}
                 <aside className="hidden lg:block w-64 border-l bg-card/10 p-6 overflow-y-auto custom-scrollbar">
                     <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mb-6">
-                        {lang === 'vi' ? 'Mục lục' : 'Table of Contents'}
+                        {text.tableOfContents}
                     </h4>
                     <div className="space-y-1">
                         {headings.length > 0 ? (
@@ -275,7 +276,7 @@ export function DocumentationPage() {
                             ))
                         ) : (
                             <p className="text-[10px] text-muted-foreground italic">
-                                {lang === 'vi' ? 'Không có đề mục nào' : 'No headings found'}
+                                {text.noHeadings}
                             </p>
                         )}
                     </div>

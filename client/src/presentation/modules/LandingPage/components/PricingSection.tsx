@@ -4,6 +4,7 @@ import { Button } from '@/presentation/components/ui/button';
 import { Badge } from '@/presentation/components/ui/badge';
 import { billingPlans } from '@/core/billing/billingPlans';
 import { cn } from '@/lib/utils';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface PricingSectionProps {
     lang: string;
@@ -11,7 +12,7 @@ interface PricingSectionProps {
 }
 
 export const PricingSection: React.FC<PricingSectionProps> = ({ lang, addToRevealRefs }) => {
-    const isVi = lang === 'vi';
+    const text = getWorkspaceText(lang).pricingSection;
 
     const handleOpenBilling = () => {
         window.location.href = '/sql-explorer';
@@ -22,12 +23,10 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ lang, addToRevea
             <div className="container mx-auto px-4 sm:px-6">
                 <div ref={addToRevealRefs} className="reveal mx-auto mb-12 max-w-2xl text-center">
                     <h2 className="mb-4 text-3xl font-semibold tracking-normal md:text-5xl">
-                        {isVi ? 'Giá rõ ràng cho database workspace' : 'Clear pricing for a database workspace'}
+                        {text.title}
                     </h2>
                     <p className="text-base font-medium text-muted-foreground md:text-lg">
-                        {isVi
-                            ? 'Thanh toán bằng VND qua MoMo và ZaloPay. Giá USD chỉ dùng để tham khảo.'
-                            : 'Pay in VND through MoMo and ZaloPay. USD prices are reference copy only.'}
+                        {text.description}
                     </p>
                 </div>
 
@@ -52,7 +51,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ lang, addToRevea
                                         <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
                                     </div>
                                     {isPopular && (
-                                        <Badge className="bg-blue-600 text-white">Best value</Badge>
+                                        <Badge className="bg-blue-600 text-white">{text.bestValue}</Badge>
                                     )}
                                 </div>
 
@@ -83,8 +82,8 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ lang, addToRevea
                                 >
                                     <CreditCard className="h-4 w-4" />
                                     {plan.code === 'free'
-                                        ? isVi ? 'Mở workspace' : 'Open workspace'
-                                        : isVi ? 'Nâng cấp trong hồ sơ' : 'Upgrade in profile'}
+                                        ? text.openWorkspace
+                                        : text.upgradeInProfile}
                                 </Button>
                             </div>
                         );
@@ -92,9 +91,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ lang, addToRevea
                 </div>
 
                 <p className="mx-auto mt-6 max-w-3xl text-center text-xs text-muted-foreground">
-                    {isVi
-                        ? 'MoMo và ZaloPay chỉ kích hoạt Pro sau khi webhook từ nhà cung cấp xác nhận thành công.'
-                        : 'MoMo and ZaloPay checkout activates Pro only after a confirmed provider webhook.'}
+                    {text.footerNote}
                 </p>
             </div>
         </section>

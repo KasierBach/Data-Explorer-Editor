@@ -13,6 +13,7 @@ import {
     Terminal,
     Users,
 } from 'lucide-react';
+import { getDocsText, getLocalizedDocTitle } from './docsI18n';
 
 export interface DocItem {
     id: string;
@@ -136,6 +137,8 @@ interface DocSidebarProps {
 }
 
 export function DocSidebar({ activeId, onSelect, lang, className }: DocSidebarProps) {
+    const text = getDocsText(lang);
+
     return (
         <aside className={cn('w-64 border-r bg-card/30 backdrop-blur-md flex flex-col h-full overflow-hidden', className)}>
             <div className="flex-1 flex flex-col min-h-0">
@@ -144,9 +147,7 @@ export function DocSidebar({ activeId, onSelect, lang, className }: DocSidebarPr
                         <div className="bg-primary/10 p-1.5 rounded-lg">
                             <BookOpen className="w-5 h-5 text-primary" />
                         </div>
-                        <span className="font-bold text-lg tracking-tight">
-                            {lang === 'vi' ? 'Tài liệu' : 'Documentation'}
-                        </span>
+                        <span className="font-bold text-lg tracking-tight">{text.documentation}</span>
                     </div>
                 </div>
 
@@ -155,7 +156,7 @@ export function DocSidebar({ activeId, onSelect, lang, className }: DocSidebarPr
                         <div key={section.id} className="space-y-2">
                             <h4 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2">
                                 {section.icon}
-                                {lang === 'vi' ? section.title : (section.titleEn || section.title)}
+                                {getLocalizedDocTitle(lang, section)}
                             </h4>
                             <div className="space-y-1">
                                 {section.items?.map((item) => (
@@ -170,7 +171,7 @@ export function DocSidebar({ activeId, onSelect, lang, className }: DocSidebarPr
                                         )}
                                     >
                                         <span className="truncate">
-                                            {lang === 'vi' ? item.title : (item.titleEn || item.title)}
+                                            {getLocalizedDocTitle(lang, item)}
                                         </span>
                                         <ChevronRight
                                             className={cn(
@@ -189,7 +190,7 @@ export function DocSidebar({ activeId, onSelect, lang, className }: DocSidebarPr
             <div className="mt-auto p-4 border-t border-border/50 bg-muted/20">
                 <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
                     <HelpCircle className="w-4 h-4" />
-                    <span>{lang === 'vi' ? 'Hỗ trợ' : 'Support'}</span>
+                    <span>{text.support}</span>
                 </button>
             </div>
         </aside>

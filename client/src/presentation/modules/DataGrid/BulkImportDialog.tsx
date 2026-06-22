@@ -12,6 +12,7 @@ import { queryService } from '@/core/services/QueryService';
 import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
 import type { RowData } from '@/core/domain/entities';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface BulkImportDialogProps {
     open: boolean;
@@ -33,6 +34,7 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
     readOnly = false,
 }) => {
     const { activeConnectionId, lang } = useAppStore();
+    const text = getWorkspaceText(lang).bulkImportDialog;
     const [file, setFile] = useState<File | null>(null);
     const [data, setData] = useState<RowData[]>([]);
     const [isImporting, setIsImporting] = useState(false);
@@ -42,7 +44,7 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
 
     const processFile = (selectedFile: File) => {
         if (!selectedFile.name.endsWith('.csv')) {
-            toast.error(lang === 'vi' ? 'Vui lòng chọn file CSV' : 'Please select a CSV file');
+            toast.error(text.csvOnly);
             return;
         }
         
@@ -54,7 +56,7 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
             const csv = event.target?.result as string;
             const lines = csv.split('\n').filter(l => l.trim());
             if (lines.length < 2) {
-                setError(lang === 'vi' ? 'File CSV trống hoặc không đúng định dạng' : 'CSV file is empty or invalid');
+                setError(text.invalidCsv);
                 return;
             }
 
@@ -110,14 +112,14 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
                 data: data
             });
 
-            toast.success(lang === 'vi' ? `Đã nhập ${data.length} dòng thành công!` : `Imported ${data.length} rows successfully!`);
+            toast.success(text.importSuccess(data.length));
             onSuccess();
             onOpenChange(false);
             setFile(null);
             setData([]);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Import failed');
-            toast.error(lang === 'vi' ? 'Lỗi khi nhập dữ liệu' : 'Import failed');
+            setError(err instanceof Error ? err.message : text.fallbackImportError);
+            toast.error(text.importFailed);
         } finally {
             setIsImporting(false);
         }
@@ -129,7 +131,7 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Upload className="w-4 h-4" />
-                        {lang === 'vi' ? 'Nhập dữ liệu hàng loạt' : 'Bulk Import Data'}
+                        {text.title}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -159,11 +161,11 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
                             <div className="text-center">
                                 <p className="text-sm font-medium">
                                     {isDragging 
-                                        ? (lang === 'vi' ? 'Thả file vào đây' : 'Drop file here')
-                                        : (lang === 'vi' ? 'Kéo thả file CSV vào đây' : 'Drag & drop CSV file here')}
+                                        ? text.dropHere
+                                        : text.dragHere}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    {lang === 'vi' ? 'Hoặc click để chọn từ máy tính' : 'Or click to browse files'}
+                                    {text.browseHint}
                                 </p>
                             </div>
                             <Button 
@@ -172,7 +174,7 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
                                 onClick={() => fileInputRef.current?.click()}
                                 className="mt-2"
                             >
-                                {lang === 'vi' ? 'Chọn File' : 'Select File'}
+                                {text.selectFile}
                             </Button>
                         </div>
                     ) : (
@@ -182,10 +184,10 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
                                 {file.name}
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                {data.length} {lang === 'vi' ? 'dòng dữ liệu sẵn sàng' : 'rows ready for import'}
+                                {text.rowsReady(data.length)}
                             </p>
                             <Button variant="ghost" size="sm" className="text-xs h-8 mt-2" onClick={() => { setFile(null); setData([]); }}>
-                                {lang === 'vi' ? 'Chọn file khác' : 'Change file'}
+                                {text.changeFile}
                             </Button>
                         </div>
                     )}
@@ -201,21 +203,21 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
                 {(!importAllowed || readOnly) && (
                     <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-md text-amber-500 text-xs mt-2">
                         {readOnly
-                            ? (lang === 'vi' ? 'Kết nối đang ở chế độ chỉ đọc nên không thể import.' : 'This connection is read-only, so import is blocked.')
-                            : (lang === 'vi' ? 'Import/export đã bị tắt cho kết nối này.' : 'Import/export has been disabled for this connection.')}
+                            ? text.readOnlyBlocked
+                            : text.disabledBlocked}
                     </div>
                 )}
 
                 <DialogFooter className="mt-4">
                     <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                        {lang === 'vi' ? 'Hủy' : 'Cancel'}
+                        {text.cancel}
                     </Button>
                     <Button 
                         disabled={!file || isImporting || !importAllowed || readOnly} 
                         onClick={handleImport}
                     >
                         {isImporting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                        {lang === 'vi' ? 'Bắt đầu Nhập' : 'Start Import'}
+                        {text.startImport}
                     </Button>
                 </DialogFooter>
             </DialogContent>

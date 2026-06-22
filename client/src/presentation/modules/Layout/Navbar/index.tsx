@@ -12,6 +12,7 @@ import { NavMainActions } from './components/NavMainActions';
 import { NavMenus } from './components/NavMenus';
 import { NavUserSection } from './components/NavUserSection';
 import { AuthService } from '@/core/services/AuthService';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 export const Navbar: React.FC = () => {
     const {
@@ -29,6 +30,7 @@ export const Navbar: React.FC = () => {
     const useCompactChrome = isCompactMobileLayout;
     const isSqlRoute = location.pathname.startsWith('/sql-explorer');
     const isNoSqlRoute = location.pathname.startsWith('/nosql');
+    const text = getWorkspaceText(lang);
 
     const handleLogout = async () => {
         await AuthService.logoutAndRedirect('/login');
@@ -133,9 +135,9 @@ export const Navbar: React.FC = () => {
                             useCompactChrome ? "w-8" : "px-3 gap-1.5"
                         )}
                         onClick={() => navigate('/teams')}
-                        title={lang === 'vi' ? 'Nhóm' : 'Teams'}
+                        title={text.navbar.teams}
                     >
-                        {!useCompactChrome && <span className="font-semibold">{lang === 'vi' ? 'Nhóm' : 'Teams'}</span>}
+                        {!useCompactChrome && <span className="font-semibold">{text.navbar.teams}</span>}
                         <Users className={cn("w-4 h-4", useCompactChrome && "text-primary")} />
                     </Button>
 

@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAppStore } from '@/core/services/store';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { Button } from '@/presentation/components/ui/button';
 import { useVerticalResizablePanel } from '@/presentation/hooks/useVerticalResizablePanel';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
@@ -52,6 +53,7 @@ export const NoSqlMainContent: React.FC = () => {
     defaultResultHeight,
     setDefaultResultHeight,
   } = useAppStore();
+  const text = getWorkspaceText(lang).noSqlMainContent;
 
   const activeConnection = connections.find((c) => c.id === nosqlActiveConnectionId);
   const nosqlEffectiveDatabase =
@@ -65,16 +67,10 @@ export const NoSqlMainContent: React.FC = () => {
   );
   const guardrailMessage =
     activeConnection?.allowQueryExecution === false
-      ? lang === 'vi'
-        ? 'Kết nối này đang tắt quyền chạy truy vấn.'
-        : 'Query execution is disabled for this connection.'
+      ? text.executionDisabledGuardrail
       : activeConnection?.readOnly
-        ? lang === 'vi'
-          ? 'Chế độ chỉ đọc đang bật. Chỉ cho phép find/aggregate.'
-          : 'Read-only mode is enabled. Only find/aggregate are allowed.'
-        : lang === 'vi'
-          ? 'Kết quả được giới hạn để bảo vệ hiệu năng và tránh quá tải.'
-          : 'Results are guarded with execution limits to protect performance.';
+        ? text.readOnlyGuardrail
+        : text.performanceGuardrail;
 
   const { isCompactMobileLayout } = useResponsiveLayoutMode();
   const resizer = useVerticalResizablePanel({
@@ -108,44 +104,28 @@ export const NoSqlMainContent: React.FC = () => {
   const resultPanelCopy =
     resultViewMode === 'grid'
       ? {
-          title: lang === 'vi' ? 'Kết quả dạng bảng' : 'Flattened Result Grid',
-          description:
-            lang === 'vi'
-              ? 'Xem tài liệu dưới dạng cột để lọc, so sánh và scan nhanh.'
-              : 'Scan documents as columns to compare fields and inspect rows faster.',
+          title: text.gridTitle,
+          description: text.gridDescription,
         }
       : resultViewMode === 'charts'
         ? {
-            title: lang === 'vi' ? 'Insight từ tập kết quả' : 'Result Set Insights',
-            description:
-              lang === 'vi'
-                ? 'Nhóm dữ liệu hiện tại thành metric có ý nghĩa thay vì vẽ từng document rời rạc.'
-                : 'Turn the current result sample into grouped metrics instead of charting raw documents.',
+            title: text.insightsTitle,
+            description: text.insightsDescription,
           }
         : resultViewMode === 'schema'
           ? {
-              title: lang === 'vi' ? 'Phân tích schema' : 'Schema Analysis',
-              description:
-                lang === 'vi'
-                  ? 'Kiểm tra độ phủ field, kiểu dữ liệu và ví dụ giá trị trong collection.'
-                  : 'Inspect field coverage, type distribution, and sample values for the collection.',
+              title: text.schemaTitle,
+              description: text.schemaDescription,
             }
           : {
               title:
                 isAggregationView && result
-                  ? lang === 'vi'
-                    ? 'Kết quả pipeline'
-                    : 'Pipeline Output'
-                  : lang === 'vi'
-                    ? 'Kết quả dạng cây'
-                    : 'Tree Result View',
-              description:
-                lang === 'vi'
-                  ? 'Giữ nguyên cấu trúc BSON/JSON để kiểm tra document thật.'
-                  : 'Preserve BSON/JSON structure so you can inspect the real document shape.',
+                  ? text.pipelineOutputTitle
+                  : text.treeTitle,
+              description: text.treeDescription,
             };
   const resultPillLabel =
-    result?.summaryLabel || (lang === 'vi' ? 'tài liệu' : 'docs');
+    result?.summaryLabel || text.docsLabel;
   const resultPillValue = result?.summaryValue ?? result?.rowCount ?? result?.rows.length;
 
   const handleViewModeChange = (
@@ -171,14 +151,10 @@ export const NoSqlMainContent: React.FC = () => {
       <div className="h-full w-full bg-background flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
         <Leaf className="w-16 h-16 mb-6 opacity-20" />
         <h2 className="text-2xl font-semibold mb-2 text-foreground/80">
-          {lang === 'vi'
-            ? 'NoSQL workspace đang chờ kết nối phù hợp...'
-            : 'Waiting for a NoSQL connection...'}
+          {text.waitingTitle}
         </h2>
         <p className="max-w-md opacity-70">
-          {lang === 'vi'
-            ? 'Bạn đang chọn một kết nối SQL. Hãy chọn MongoDB hoặc Redis ở sidebar để mở NoSQL Studio.'
-            : 'You are currently selecting a relational connection. Choose MongoDB or Redis from the sidebar to open the NoSQL Studio.'}
+          {text.waitingDescription}
         </p>
       </div>
     );
@@ -200,7 +176,7 @@ export const NoSqlMainContent: React.FC = () => {
           )}
         >
           <div className="font-semibold uppercase tracking-wide text-[10px]">
-            {lang === 'vi' ? 'Guardrails NoSQL' : 'NoSQL guardrails'}
+            {text.guardrailsTitle}
           </div>
           <div className="mt-1 text-muted-foreground">{guardrailMessage}</div>
         </div>
@@ -274,7 +250,7 @@ export const NoSqlMainContent: React.FC = () => {
           size="icon"
           className="h-7 w-7 shrink-0 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
           onClick={() => setNosqlCollection(null)}
-          title={lang === 'vi' ? 'Đóng collection' : 'Close collection'}
+          title={text.closeCollection}
         >
           <X className="w-4 h-4" />
         </Button>
@@ -286,16 +262,12 @@ export const NoSqlMainContent: React.FC = () => {
             <div className="flex items-center gap-2 min-w-0 shrink truncate">
               <span className="truncate whitespace-nowrap">
                 {isAggregationView
-                  ? lang === 'vi'
-                    ? 'Trình dựng Aggregation Pipeline'
-                    : 'Aggregation Pipeline Builder'
-                  : lang === 'vi'
-                    ? 'Trình thiết kế truy vấn (MQL)'
-                    : 'Visual MQL Builder'}
+                  ? text.aggregationBuilder
+                  : text.visualBuilder}
               </span>
               {!isAggregationView && (
                 <span className="text-[9px] font-normal lowercase bg-background border border-border/50 px-1.5 py-0.5 rounded text-muted-foreground tracking-normal whitespace-nowrap hidden md:inline">
-                  Shift + Alt + F to format
+                  {text.formatHint}
                 </span>
               )}
             </div>
@@ -307,11 +279,7 @@ export const NoSqlMainContent: React.FC = () => {
                     variant="ghost"
                     size="sm"
                     className="h-7 gap-1.5 px-2 hover:bg-green-500/10 text-green-500/80 hover:text-green-400 transition-all border border-transparent hover:border-green-500/20"
-                    title={
-                      lang === 'vi'
-                        ? 'Hỏi trợ lý AI sinh MQL'
-                        : 'Ask AI to generate MQL'
-                    }
+                    title={text.askAiMql}
                   >
                     <Sparkles className="w-3.5 h-3.5 fill-green-500/10" />
                     <span className="font-semibold text-[10px] uppercase tracking-wider">
@@ -355,7 +323,7 @@ export const NoSqlMainContent: React.FC = () => {
               {result?.truncated && (
                 <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-full shrink-0">
                   <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-amber-500/80">
-                    {lang === 'vi' ? 'Giới hạn' : 'Capped'}
+                    {text.capped}
                   </span>
                   {result.appliedLimit && (
                     <span className="text-[10px] font-medium text-amber-500/70">
@@ -372,15 +340,7 @@ export const NoSqlMainContent: React.FC = () => {
                 size="sm"
                 className="h-7 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
                 onClick={toggleResultPanel}
-                title={
-                  isResultPanelOpen
-                    ? lang === 'vi'
-                      ? 'Ẩn panel kết quả'
-                      : 'Hide results panel'
-                    : lang === 'vi'
-                      ? 'Mở panel kết quả'
-                      : 'Show results panel'
-                }
+                title={isResultPanelOpen ? text.hideResultsPanelTitle : text.showResultsPanelTitle}
               >
                 {isResultPanelOpen ? (
                   <EyeOff className="w-3.5 h-3.5" />
@@ -388,13 +348,7 @@ export const NoSqlMainContent: React.FC = () => {
                   <Eye className="w-3.5 h-3.5" />
                 )}
                 <span className={cn('whitespace-nowrap', isCompactMobileLayout && 'hidden')}>
-                  {isResultPanelOpen
-                    ? lang === 'vi'
-                      ? 'Ẩn kết quả'
-                      : 'Hide results'
-                    : lang === 'vi'
-                      ? 'Mở kết quả'
-                      : 'Show results'}
+                  {isResultPanelOpen ? text.hideResults : text.showResults}
                 </span>
               </Button>
 
@@ -445,7 +399,7 @@ export const NoSqlMainContent: React.FC = () => {
                     ) : (
                       <Play className="w-3.5 h-3.5 fill-current" />
                     )}
-                    {lang === 'vi' ? 'Thực thi' : 'Run'}
+                    {text.run}
                   </Button>
                 </>
               )}
@@ -523,11 +477,7 @@ export const NoSqlMainContent: React.FC = () => {
                 size="icon"
                 className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
                 onClick={toggleResultPanel}
-                title={
-                  lang === 'vi'
-                    ? 'Đóng panel kết quả (Ctrl+J)'
-                    : 'Close results panel (Ctrl+J)'
-                }
+                title={text.closeResultsPanel}
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -539,7 +489,7 @@ export const NoSqlMainContent: React.FC = () => {
               <div className="h-full flex flex-col items-center justify-center gap-3">
                 <div className="w-8 h-8 rounded-full border-2 border-green-500/20 border-t-green-500 animate-spin" />
                 <span className="text-sm font-medium text-green-600 animate-pulse">
-                  {lang === 'vi' ? 'Đang truy vấn BSON...' : 'Querying BSON...'}
+                  {text.queryingBson}
                 </span>
               </div>
             ) : error ? (
@@ -551,13 +501,7 @@ export const NoSqlMainContent: React.FC = () => {
               <div className="h-full flex flex-col items-center justify-center opacity-30 gap-3">
                 <Leaf className="w-8 h-8 text-green-500 animate-pulse" />
                 <span className="text-sm font-medium tracking-wide">
-                  {isAggregationView
-                    ? lang === 'vi'
-                      ? 'Dựng pipeline rồi chạy để xem kết quả'
-                      : 'Build a pipeline, then run it to inspect results'
-                    : lang === 'vi'
-                      ? 'Nhấn Thực thi để nạp dữ liệu'
-                      : 'Click Run to fetch documents'}
+                  {isAggregationView ? text.buildPipelineHint : text.clickRunHint}
                 </span>
               </div>
             ) : (

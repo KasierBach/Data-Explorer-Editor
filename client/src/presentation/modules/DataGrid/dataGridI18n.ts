@@ -53,7 +53,9 @@ export function getDataGridText(lang: AppLang) {
     globalSearch: pickLocalizedText(lang, 'Tìm kiếm toàn cục', 'Global Search'),
     import: pickLocalizedText(lang, 'Nhập', 'Import'),
     importExportDisabled: pickLocalizedText(lang, 'Tắt import/export cho kết nối này.', 'Import/export disabled for this connection.'),
+    inspectValueHint: pickLocalizedText(lang, 'Nhấn đúp để xem đầy đủ giá trị', 'Double-click to inspect full value'),
     insert: pickLocalizedText(lang, 'Thêm', 'Insert'),
+    insertSql: pickLocalizedText(lang, 'SQL (THÊM)', 'SQL (INSERT)'),
     insertRow: pickLocalizedText(lang, 'Thêm dòng', 'Insert Row'),
     jumpToPage: pickLocalizedText(lang, 'Nhập số trang', 'Jump to page'),
     loadingData: pickLocalizedText(lang, 'Đang tải dữ liệu...', 'Loading Data...'),
@@ -101,6 +103,9 @@ export function getDataGridText(lang: AppLang) {
         ? pickLocalizedText(lang, `${count} ô tìm thấy`, `${count} cells found`)
         : pickLocalizedText(lang, `${count} ô sẽ được cập nhật`, `${count} cells will be updated`),
     virtualizedAll: pickLocalizedText(lang, 'Ảo hóa toàn bộ', 'Virtualized (All)'),
+    dragReorderColumn: pickLocalizedText(lang, 'Kéo để đổi thứ tự cột', 'Drag to reorder column'),
+    resizeColumnHint: pickLocalizedText(lang, 'Kéo để đổi độ rộng. Nhấn đúp để vừa nội dung.', 'Drag to resize. Double-click to auto-fit.'),
+    pageUnit: pickLocalizedText(lang, 'TRANG', 'PAGE'),
     wholeWord: pickLocalizedText(lang, 'Trọn từ', 'Whole word'),
   };
 }

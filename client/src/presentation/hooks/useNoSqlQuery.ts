@@ -3,6 +3,7 @@ import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
 import type { RowData } from '@/core/domain/entities';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface NoSqlQueryResult {
     rows: RowData[];
@@ -57,6 +58,7 @@ const buildNoSqlLimitHint = (
     },
     lang: 'vi' | 'en',
 ) => {
+    const text = getWorkspaceText(lang).noSqlQuery;
     if (!queryResult.truncated || !queryResult.appliedLimit) {
         return undefined;
     }
@@ -66,18 +68,14 @@ const buildNoSqlLimitHint = (
     );
     const noun =
         action === 'aggregate'
-            ? (lang === 'vi' ? 'kết quả pipeline' : 'pipeline results')
-            : (lang === 'vi' ? 'tài liệu' : 'documents');
+            ? text.pipelineResults
+            : text.documents;
 
     if (queryResult.limitSource === 'requested') {
-        return lang === 'vi'
-            ? `Đang hiển thị ${formattedLimit} ${noun} đầu tiên theo giới hạn bạn yêu cầu.`
-            : `Showing the first ${formattedLimit} ${noun} requested by this query.`;
+        return text.requestedLimitHint(formattedLimit, noun);
     }
 
-    return lang === 'vi'
-        ? `Đang hiển thị ${formattedLimit} ${noun} đầu tiên vì bộ bảo vệ hiệu năng đã chặn phần còn lại.`
-        : `Showing the first ${formattedLimit} ${noun} because a performance guardrail capped the result set.`;
+    return text.guardrailLimitHint(formattedLimit, noun);
 };
 
 const summarizeNoSqlExecution = (
@@ -86,6 +84,7 @@ const summarizeNoSqlExecution = (
     durationMs: number,
     lang: 'vi' | 'en',
 ) => {
+    const text = getWorkspaceText(lang).noSqlQuery;
     const rows = queryResult.rows || [];
     const baseCount = queryResult.rowCount ?? rows.length;
 
@@ -93,37 +92,29 @@ const summarizeNoSqlExecution = (
         case 'aggregate':
             return {
                 summaryValue: baseCount,
-                summaryLabel: lang === 'vi' ? 'kết quả' : 'results',
-                successMessage: lang === 'vi'
-                    ? `Đã nạp ${baseCount} kết quả pipeline (${durationMs}ms)`
-                    : `Loaded ${baseCount} pipeline results (${durationMs}ms)`,
+                summaryLabel: text.resultsLabel,
+                successMessage: text.loadedPipeline(baseCount, durationMs),
             };
         case 'count': {
             const counted = getNumericField(rows[0], 'count') ?? baseCount;
             return {
                 summaryValue: counted,
-                summaryLabel: 'count',
-                successMessage: lang === 'vi'
-                    ? `Đếm được ${counted} tài liệu (${durationMs}ms)`
-                    : `Counted ${counted} documents (${durationMs}ms)`,
+                summaryLabel: text.countLabel,
+                successMessage: text.countedDocuments(counted, durationMs),
             };
         }
         case 'insertOne':
             return {
                 summaryValue: 1,
-                summaryLabel: lang === 'vi' ? 'đã thêm' : 'inserted',
-                successMessage: lang === 'vi'
-                    ? `Đã thêm 1 tài liệu (${durationMs}ms)`
-                    : `Inserted 1 document (${durationMs}ms)`,
+                summaryLabel: text.insertedLabel,
+                successMessage: text.insertedOne(durationMs),
             };
         case 'insertMany': {
             const insertedCount = getNumericField(rows[0], 'insertedCount') ?? baseCount;
             return {
                 summaryValue: insertedCount,
-                summaryLabel: lang === 'vi' ? 'đã thêm' : 'inserted',
-                successMessage: lang === 'vi'
-                    ? `Đã thêm ${insertedCount} tài liệu (${durationMs}ms)`
-                    : `Inserted ${insertedCount} documents (${durationMs}ms)`,
+                summaryLabel: text.insertedLabel,
+                successMessage: text.insertedMany(insertedCount, durationMs),
             };
         }
         case 'updateOne':
@@ -131,18 +122,14 @@ const summarizeNoSqlExecution = (
             const matchedCount = getNumericField(rows[0], 'matchedCount') ?? 0;
             const modifiedCount = getNumericField(rows[0], 'modifiedCount') ?? baseCount;
             const summaryHint = matchedCount > modifiedCount
-                ? (lang === 'vi'
-                    ? `${matchedCount} tài liệu khớp điều kiện`
-                    : `${matchedCount} documents matched the filter`)
+                ? text.matchedHint(matchedCount)
                 : undefined;
 
             return {
                 summaryValue: modifiedCount,
-                summaryLabel: lang === 'vi' ? 'đã sửa' : 'updated',
+                summaryLabel: text.updatedLabel,
                 summaryHint,
-                successMessage: lang === 'vi'
-                    ? `Đã cập nhật ${modifiedCount} tài liệu (${durationMs}ms)`
-                    : `Updated ${modifiedCount} documents (${durationMs}ms)`,
+                successMessage: text.updatedDocuments(modifiedCount, durationMs),
             };
         }
         case 'deleteOne':
@@ -150,28 +137,22 @@ const summarizeNoSqlExecution = (
             const deletedCount = getNumericField(rows[0], 'deletedCount') ?? baseCount;
             return {
                 summaryValue: deletedCount,
-                summaryLabel: lang === 'vi' ? 'đã xoá' : 'deleted',
-                successMessage: lang === 'vi'
-                    ? `Đã xoá ${deletedCount} tài liệu (${durationMs}ms)`
-                    : `Deleted ${deletedCount} documents (${durationMs}ms)`,
+                summaryLabel: text.deletedLabel,
+                successMessage: text.deletedDocuments(deletedCount, durationMs),
             };
         }
         case 'distinct':
             return {
                 summaryValue: baseCount,
-                summaryLabel: lang === 'vi' ? 'giá trị' : 'values',
-                successMessage: lang === 'vi'
-                    ? `Đã lấy ${baseCount} giá trị distinct (${durationMs}ms)`
-                    : `Loaded ${baseCount} distinct values (${durationMs}ms)`,
+                summaryLabel: text.valuesLabel,
+                successMessage: text.loadedDistinct(baseCount, durationMs),
             };
         case 'find':
         default:
             return {
                 summaryValue: baseCount,
-                summaryLabel: lang === 'vi' ? 'tài liệu' : 'docs',
-                successMessage: lang === 'vi'
-                    ? `Đã nạp ${baseCount} tài liệu (${durationMs}ms)`
-                    : `Loaded ${baseCount} documents (${durationMs}ms)`,
+                summaryLabel: text.docsLabel,
+                successMessage: text.loadedDocuments(baseCount, durationMs),
             };
     }
 };
@@ -206,21 +187,22 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
             connections,
             lang,
         } = state;
+        const text = getWorkspaceText(lang).noSqlQuery;
 
         const activeConnection = connections.find(c => c.id === nosqlActiveConnectionId);
 
         if (!activeConnection) {
-            toast.error('No active connection');
+            toast.error(text.noActiveConnection);
             return;
         }
 
         if (activeConnection.allowQueryExecution === false) {
-            toast.error('Query execution is disabled for this connection');
+            toast.error(text.executionDisabled);
             return;
         }
 
         if (!nosqlActiveCollection) {
-            toast.warning('Please select a Collection first');
+            toast.warning(text.selectCollection);
             return;
         }
 
@@ -229,24 +211,24 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
         try {
             const parsed = JSON.parse(state.nosqlMqlQuery || '{}') as unknown;
             if (!isMqlPayload(parsed)) {
-                throw new Error('MQL payload must be a JSON object');
+                throw new Error(text.payloadObjectRequired);
             }
             payload = parsed;
         } catch {
-            toast.error('Invalid MQL JSON');
+            toast.error(text.invalidJson);
             return;
         }
 
         // Validate basic payload structure
         if (!payload.action || !payload.collection) {
-            toast.error('MQL JSON must contain "action" and "collection" fields');
+            toast.error(text.missingActionCollection);
             return;
         }
 
         const action = String(payload.action || '');
         const isMutatingAction = MUTATING_ACTIONS.has(action as MutationAction);
         if (activeConnection.readOnly && isMutatingAction) {
-            toast.error('This connection is read-only. Only find and aggregate are allowed.');
+            toast.error(text.readOnlyViolation);
             return;
         }
 
@@ -291,7 +273,7 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
         } catch (err) {
             const error = toError(err);
             setError(error);
-            toast.error(error.message || 'MQL Execution Failed');
+            toast.error(error.message || text.executionFailed);
         } finally {
             setIsLoading(false);
             state.setNosqlQueryRunning(false);

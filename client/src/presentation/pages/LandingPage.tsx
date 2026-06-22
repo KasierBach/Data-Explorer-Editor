@@ -5,6 +5,7 @@ import { LandingHeader } from '../modules/LandingPage/components/LandingHeader';
 import { HeroSection } from '../modules/LandingPage/components/HeroSection';
 import { InteractiveBackground } from '../modules/LandingPage/components/InteractiveBackground';
 import { AuthService } from '@/core/services/AuthService';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 // Lazy load sections below the fold
 const FeaturesSection = lazy(() => import('../modules/LandingPage/components/FeaturesSection').then(m => ({ default: m.FeaturesSection })));
@@ -17,6 +18,7 @@ const LandingFooter = lazy(() => import('../modules/LandingPage/components/Landi
 
 export const LandingPage: React.FC = () => {
     const { isAuthenticated, lang } = useAppStore();
+    const text = getWorkspaceText(lang).landingPage;
     const revealRefs = useRef<HTMLDivElement[]>([]);
     const observer = useRef<IntersectionObserver | null>(null);
     const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
@@ -57,11 +59,8 @@ export const LandingPage: React.FC = () => {
         <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-blue-500/30 overflow-x-hidden relative">
             <SEO 
                 lang={lang} 
-                title={lang === 'vi' ? "Data Explorer - IDE Cơ sở dữ liệu Thông minh" : "Data Explorer - Smart Database IDE"}
-                description={lang === 'vi' 
-                    ? "Khám phá và quản lý SQL & NoSQL với sức mạnh của AI. Trình duyệt cơ sở dữ liệu hiện đại, nhanh chóng và bảo mật."
-                    : "Explore and manage SQL & NoSQL with the power of AI. Modern, fast, and secure database explorer."
-                }
+                title={text.seoTitle}
+                description={text.seoDescription}
             />
             <InteractiveBackground />
 

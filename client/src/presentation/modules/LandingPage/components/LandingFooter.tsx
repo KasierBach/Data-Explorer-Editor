@@ -1,15 +1,17 @@
 import React from 'react';
 import { Database, Github, Twitter, Disc } from 'lucide-react';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface LandingFooterProps {
     lang: string;
 }
 
 export const LandingFooter: React.FC<LandingFooterProps> = ({ lang }) => {
+    const text = getWorkspaceText(lang).landingFooter;
     const footerLinks = [
-        { title: lang === 'vi' ? 'Sản phẩm' : 'Product', links: lang === 'vi' ? ['Tính năng', 'Gemini 3.1', 'ERD trực quan', 'Nhật ký thay đổi'] : ['Features', 'Gemini 3.1', 'Visual ERD', 'Changelog'] },
-        { title: lang === 'vi' ? 'Tài nguyên' : 'Resources', links: lang === 'vi' ? ['Tài liệu', 'Clean Code Guide', 'Vitest Suite', 'Trạng thái'] : ['Documentation', 'Clean Code Guide', 'Vitest Suite', 'Status'] },
-        { title: lang === 'vi' ? 'Pháp lý' : 'Legal', links: lang === 'vi' ? ['Quyền riêng tư', 'Điều khoản', 'Bảo mật AES', 'Tuân thủ'] : ['Privacy', 'Terms', 'AES Security', 'Compliance'] }
+        { title: text.product, links: text.productLinks },
+        { title: text.resources, links: text.resourceLinks },
+        { title: text.legal, links: text.legalLinks }
     ];
 
     return (
@@ -24,7 +26,7 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ lang }) => {
                             <span>DataExplorer</span>
                         </div>
                         <p className="text-muted-foreground text-sm font-medium leading-relaxed max-w-xs mb-8 opacity-70">
-                            Precision engineered data tools for the next generation of engineers. Built with speed and security at its core.
+                            {text.brandDescription}
                         </p>
                         <div className="flex gap-5">
                             <a href="#" className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/10 transition-all">
@@ -53,18 +55,18 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ lang }) => {
 
                 <div className="border-t border-white/5 pt-10 flex flex-col md:flex-row items-center justify-between gap-6">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
-                        © 2026 DATA EXPLORER. {lang === 'vi' ? 'XÂY DỰNG CHO NHÓM DỮ LIỆU HIỆN ĐẠI.' : 'BUILT FOR MODERN DATA TEAMS.'}
+                        © 2026 DATA EXPLORER. {text.builtForTeams}
                     </p>
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
                             <span className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em]">
-                                {lang === 'vi' ? 'Trạng thái: Hoạt động' : 'Live Status: Nominal'}
+                                {text.liveStatus}
                             </span>
                         </div>
                         <div className="flex items-center gap-2 group cursor-pointer">
                             <span className="text-[9px] text-muted-foreground font-black uppercase tracking-[0.2em] group-hover:text-white transition-colors">
-                                {lang === 'vi' ? 'Tiếng Việt' : 'English (US)'}
+                                {text.languageLabel}
                             </span>
                         </div>
                     </div>

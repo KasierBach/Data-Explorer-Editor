@@ -90,7 +90,7 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
             });
             onOpenChange(false);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to save query');
+            setError(err instanceof Error ? err.message : text.saveQuery.saveFailed);
         } finally {
             setIsSaving(false);
         }
@@ -121,7 +121,7 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                         <Input
                             value={form.name}
                             onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                            placeholder={lang === 'vi' ? 'VD: Revenue by week' : 'e.g. Revenue by week'}
+                            placeholder={text.saveQuery.namePlaceholder}
                         />
                     </div>
 
@@ -170,7 +170,7 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                                     <Input
                                         value={form.folderId}
                                         onChange={(e) => setForm((prev) => ({ ...prev, folderId: e.target.value }))}
-                                        placeholder={lang === 'vi' ? 'analytics, ops, growth...' : 'analytics, ops, growth...'}
+                                        placeholder={text.saveQuery.folderPlaceholder}
                                     />
                                 </>
                             )}
@@ -183,7 +183,7 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                             <Input
                                 value={form.folderId}
                                 onChange={(e) => setForm((prev) => ({ ...prev, folderId: e.target.value }))}
-                                placeholder={lang === 'vi' ? 'analytics, ops, growth...' : 'analytics, ops, growth...'}
+                                placeholder={text.saveQuery.folderPlaceholder}
                             />
                         </div>
                     )}
@@ -193,7 +193,7 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                         <Input
                             value={form.tags}
                             onChange={(e) => setForm((prev) => ({ ...prev, tags: e.target.value }))}
-                            placeholder={lang === 'vi' ? 'dashboard, churn, monthly' : 'dashboard, churn, monthly'}
+                            placeholder={text.saveQuery.tagsPlaceholder}
                         />
                     </div>
 

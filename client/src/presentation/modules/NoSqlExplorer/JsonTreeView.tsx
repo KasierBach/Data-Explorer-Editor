@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/core/services/store';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 // ─── Type Definitions ───
 
@@ -51,6 +52,7 @@ const getObjectEntries = (value: unknown): [string, unknown][] => (
 const JsonNode: React.FC<JsonNodeProps> = React.memo(({ label, value, depth, isLast, defaultExpanded = false, lang }) => {
     const [isExpanded, setIsExpanded] = useState(defaultExpanded || depth < 1);
     const [copied, setCopied] = useState(false);
+    const text = getWorkspaceText(lang).jsonTreeView;
 
     const expandable = isExpandable(value);
     const isArray = Array.isArray(value);
@@ -77,7 +79,7 @@ const JsonNode: React.FC<JsonNodeProps> = React.memo(({ label, value, depth, isL
                 <button 
                     onClick={handleCopy}
                     className="ml-auto opacity-0 group-hover/node:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted"
-                    title={lang === 'vi' ? 'Sao chép giá trị' : 'Copy value'}
+                    title={text.copyValue}
                 >
                     {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
                 </button>
@@ -101,9 +103,7 @@ const JsonNode: React.FC<JsonNodeProps> = React.memo(({ label, value, depth, isL
                 <span className="text-muted-foreground ml-1">{bracketOpen}</span>
                 {!isExpanded && (
                     <span className="text-muted-foreground/60 text-xs ml-1">
-                        {lang === 'vi'
-                          ? `${childCount} ${isArray ? 'phan tu' : 'khoa'}`
-                          : `${childCount} ${isArray ? (childCount === 1 ? 'item' : 'items') : (childCount === 1 ? 'key' : 'keys')}`}
+                        {isArray ? text.itemCount(childCount) : text.keyCount(childCount)}
                         <span className="ml-1">{bracketClose}</span>
                         {!isLast && ','}
                     </span>
@@ -111,7 +111,7 @@ const JsonNode: React.FC<JsonNodeProps> = React.memo(({ label, value, depth, isL
                 <button 
                     onClick={handleCopy}
                     className="ml-auto opacity-0 group-hover/node:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted"
-                    title={lang === 'vi' ? 'Sao chép đối tượng' : 'Copy object'}
+                    title={text.copyObject}
                 >
                     {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
                 </button>

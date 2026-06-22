@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/presentation
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Label } from '@/presentation/components/ui/label';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 export interface SaveErdWorkspaceFormValues {
     name: string;
@@ -26,6 +27,7 @@ export const SaveErdWorkspaceDialog: React.FC<SaveErdWorkspaceDialogProps> = ({
     currentWorkspaceName,
     onSubmit,
 }) => {
+    const text = getWorkspaceText(lang).erd;
     const [form, setForm] = useState<SaveErdWorkspaceFormValues>(initialValues);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export const SaveErdWorkspaceDialog: React.FC<SaveErdWorkspaceDialogProps> = ({
             });
             onOpenChange(false);
         } catch (err) {
-            setError(err instanceof Error ? err.message : (lang === 'vi' ? 'Không thể lưu workspace ERD' : 'Failed to save ERD workspace'));
+            setError(err instanceof Error ? err.message : text.saveDialogError);
         } finally {
             setIsSaving(false);
         }
@@ -61,8 +63,8 @@ export const SaveErdWorkspaceDialog: React.FC<SaveErdWorkspaceDialogProps> = ({
                 <DialogHeader>
                     <DialogTitle>
                         {currentWorkspaceName
-                            ? (lang === 'vi' ? 'Cập nhật workspace ERD' : 'Update ERD workspace')
-                            : (lang === 'vi' ? 'Lưu workspace ERD' : 'Save ERD workspace')}
+                            ? text.saveDialogUpdateTitle
+                            : text.saveDialogCreateTitle}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -74,33 +76,33 @@ export const SaveErdWorkspaceDialog: React.FC<SaveErdWorkspaceDialogProps> = ({
                     )}
 
                     <div className="space-y-1.5">
-                        <Label>{lang === 'vi' ? 'Tên workspace' : 'Workspace name'}</Label>
+                        <Label>{text.saveDialogName}</Label>
                         <Input
                             value={form.name}
                             onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-                            placeholder={lang === 'vi' ? 'VD: Payments schema map' : 'e.g. Payments schema map'}
+                            placeholder={text.saveDialogNamePlaceholder}
                         />
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label>{lang === 'vi' ? 'Ghi chú' : 'Notes'}</Label>
+                        <Label>{text.saveDialogNotes}</Label>
                         <textarea
                             className="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                             value={form.notes}
                             onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-                            placeholder={lang === 'vi' ? 'Mô tả ngắn để lần sau mở lại dễ hiểu hơn.' : 'Add some context so this layout is easier to revisit later.'}
+                            placeholder={text.saveDialogNotesPlaceholder}
                         />
                     </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">
                     <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isSaving}>
-                        {lang === 'vi' ? 'Hủy' : 'Cancel'}
+                        {text.saveDialogCancel}
                     </Button>
                     <Button onClick={handleSubmit} disabled={isSaving || !form.name.trim()}>
                         {isSaving
-                            ? (lang === 'vi' ? 'Đang lưu...' : 'Saving...')
-                            : (currentWorkspaceName ? (lang === 'vi' ? 'Cập nhật' : 'Update') : (lang === 'vi' ? 'Lưu workspace' : 'Save workspace'))}
+                            ? text.saveDialogSaving
+                            : (currentWorkspaceName ? text.saveDialogUpdate : text.saveDialogSave)}
                     </Button>
                 </div>
             </DialogContent>

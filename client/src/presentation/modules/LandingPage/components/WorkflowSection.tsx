@@ -1,17 +1,18 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Database, Zap, Cpu, Search } from 'lucide-react';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface WorkflowSectionProps {
     lang: string;
 }
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
+    const text = getWorkspaceText(lang).workflowSection;
     const steps = [
         {
             icon: <Search className="w-6 h-6" />,
-            title: lang === 'vi' ? 'Khám phá' : 'Discovery',
-            desc: lang === 'vi' ? 'Tự động quét và lập chỉ mục toàn bộ lược đồ dữ liệu của bạn.' : 'Auto-scans and indexes your entire data schema instantly.',
+            ...text.steps[0],
             color: 'blue',
             bg: 'bg-blue-500/20',
             border: 'border-blue-500/30',
@@ -20,8 +21,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
         },
         {
             icon: <Cpu className="w-6 h-6" />,
-            title: lang === 'vi' ? 'Xử lý AI' : 'AI Augmentation',
-            desc: lang === 'vi' ? 'Gemini 3.1 phân tích ngữ cảnh và tối ưu hóa câu lệnh SQL.' : 'Gemini 3.1 analyzes context and optimizes your SQL constructs.',
+            ...text.steps[1],
             color: 'purple',
             bg: 'bg-purple-500/20',
             border: 'border-purple-500/30',
@@ -30,8 +30,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
         },
         {
             icon: <Zap className="w-6 h-6" />,
-            title: lang === 'vi' ? 'Thực thi' : 'Instant Execution',
-            desc: lang === 'vi' ? 'Phản hồi trong tích tắc với kết quả được trực quan hóa.' : 'Real-time execution with beautifully visualized results.',
+            ...text.steps[2],
             color: 'emerald',
             bg: 'bg-emerald-500/20',
             border: 'border-emerald-500/30',
@@ -40,8 +39,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
         },
         {
             icon: <Database className="w-6 h-6" />,
-            title: lang === 'vi' ? 'Lưu trữ & Đồng bộ' : 'Sync & Save',
-            desc: lang === 'vi' ? 'Mã hóa AES-256 và đồng bộ hóa an toàn trên các thiết bị.' : 'AES-256 encrypted storage and secure multi-device sync.',
+            ...text.steps[3],
             color: 'amber',
             bg: 'bg-amber-500/20',
             border: 'border-amber-500/30',
@@ -55,12 +53,10 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
             <div className="container mx-auto px-4 sm:px-6">
                 <div className="text-center mb-20">
                     <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 uppercase">
-                        {lang === 'vi' ? 'Quy trình Thông minh' : 'Intelligent Workflow'}
+                        {text.title}
                     </h2>
                     <p className="text-muted-foreground font-medium max-w-2xl mx-auto">
-                        {lang === 'vi' 
-                            ? 'Sự kết hợp hoàn hảo giữa con người và trí tuệ nhân tạo.' 
-                            : 'The perfect synergy between human intuition and artificial intelligence.'}
+                        {text.description}
                     </p>
                 </div>
 
@@ -88,7 +84,7 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
                                     </div>
                                 </motion.div>
                                 <h3 className="text-lg font-black mb-3 uppercase tracking-tight">{step.title}</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed px-4">{step.desc}</p>
+                                <p className="text-sm text-muted-foreground leading-relaxed px-4">{step.description}</p>
                             </motion.div>
                         ))}
                     </div>

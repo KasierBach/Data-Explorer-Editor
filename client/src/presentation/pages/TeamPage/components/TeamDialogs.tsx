@@ -66,7 +66,7 @@ export function InviteMemberDialog({
               <SelectContent>
                 <SelectItem value="ADMIN">{text.admin}</SelectItem>
                 <SelectItem value="MEMBER">{text.member}</SelectItem>
-                <SelectItem value="VIEWER">{lang === 'vi' ? 'Người xem' : 'Viewer'}</SelectItem>
+                <SelectItem value="VIEWER">{text.viewer}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -75,7 +75,7 @@ export function InviteMemberDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {text.cancel}
           </Button>
-          <Button onClick={onInvite}>{lang === 'vi' ? 'Gửi lời mời' : 'Send Invite'}</Button>
+          <Button onClick={onInvite}>{text.sendInvite}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -173,7 +173,7 @@ export function CreateTeamspaceDialog({
           <div className="space-y-2">
             <label className="text-sm font-medium">{text.description}</label>
             <Textarea
-              placeholder={lang === 'vi' ? 'Ghi chu tuy chon cho teamspace nay' : 'Optional note about this teamspace'}
+              placeholder={text.teamspaceNotePlaceholder}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               rows={3}

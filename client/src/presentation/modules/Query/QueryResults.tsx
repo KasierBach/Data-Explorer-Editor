@@ -12,6 +12,7 @@ import { QueryPlanVisualizer } from './QueryPlanVisualizer';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/core/services/store';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface QueryResultsProps {
     results: QueryResult | null;
@@ -41,10 +42,11 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
     onSaveToDashboard,
 }) => {
     const { lang } = useAppStore();
+    const text = getWorkspaceText(lang).queryResults;
     const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
     const hasExplainPlan = explainPlan !== null && explainPlan !== undefined;
+    const isError = !!error;
 
-    // Determine content based on state
     const renderDataContent = () => {
         if (isError) {
             return (
@@ -53,7 +55,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                         <Info className="w-6 h-6 text-red-500" />
                     </div>
                     <div className="text-red-500 font-bold text-sm">
-                        {lang === 'vi' ? 'TRUY VẤN THẤT BẠI' : 'QUERY FAILED'}
+                        {text.failed}
                     </div>
                     <p className="text-red-400/80 text-xs max-w-md font-mono whitespace-pre-wrap">{(error as Error).message}</p>
                 </div>
@@ -72,15 +74,13 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
             return (
                 <div className="flex items-center justify-center h-full text-muted-foreground text-sm flex-col gap-2">
                     <Play className="w-10 h-10 opacity-10" />
-                    <span>{lang === 'vi' ? 'Chạy truy vấn để xem kết quả' : 'Run a query to see results'}</span>
+                    <span>{text.empty}</span>
                 </div>
             );
         }
 
         return <ResultTable results={results} />;
     };
-
-    const isError = !!error;
 
     return (
         <Tabs value={activeTab} onValueChange={onTabChange} className="h-full flex flex-col">
@@ -91,14 +91,14 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                         className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-1 text-[10px] md:text-[11px] flex gap-1.5"
                     >
                         <TableIcon className="w-3 h-3" />
-                        {isCompactMobileLayout ? (lang === 'vi' ? "Dữ liệu" : "Data") : (lang === 'vi' ? "Kết quả dữ liệu" : "Data Output")}
+                        {isCompactMobileLayout ? text.dataCompact : text.dataFull}
                     </TabsTrigger>
                     <TabsTrigger
                         value="messages"
                         className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shadow-none px-1 text-[10px] md:text-[11px] flex gap-1.5"
                     >
                         <Info className="w-3 h-3" />
-                        {isCompactMobileLayout ? (lang === 'vi' ? "T.Báo" : "Msgs") : (lang === 'vi' ? "Thông báo" : "Messages")}
+                        {isCompactMobileLayout ? text.messagesCompact : text.messagesFull}
                     </TabsTrigger>
                     {hasExplainPlan && (
                         <TabsTrigger
@@ -106,7 +106,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                             className="h-full rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-transparent shadow-none px-1 text-[10px] md:text-[11px] flex gap-1.5 text-orange-500"
                         >
                             <GitBranch className="w-3 h-3" />
-                            {isCompactMobileLayout ? (lang === 'vi' ? "Sơ đồ" : "Plan") : (lang === 'vi' ? "Sơ đồ truy vấn" : "Query Plan")}
+                            {isCompactMobileLayout ? text.planCompact : text.planFull}
                         </TabsTrigger>
                     )}
                 </TabsList>
@@ -115,7 +115,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                     {!isSmallMobile && (
                         <div className="text-[9px] md:text-[10px] text-muted-foreground font-mono flex gap-2 md:gap-3 items-center">
                             {results?.durationMs !== undefined && (
-                                <span>{isCompactMobileLayout ? "" : (lang === 'vi' ? "Thời gian: " : "Time: ")}{results.durationMs}ms</span>
+                                <span>{isCompactMobileLayout ? "" : text.timePrefix}{results.durationMs}ms</span>
                             )}
                             {dataUpdatedAt > 0 && (
                                 <span className={cn(isCompactMobileLayout && "hidden")}>{new Date(dataUpdatedAt).toLocaleTimeString()}</span>
@@ -126,7 +126,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                         <button
                             onClick={onClearResults}
                             className="p-1 rounded hover:bg-muted text-muted-foreground transition-colors"
-                            title={lang === 'vi' ? 'Xóa kết quả (Clear)' : 'Clear results'}
+                            title={text.clearResults}
                         >
                             <Eraser className="w-3.5 h-3.5" />
                         </button>
@@ -135,7 +135,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                         <button
                             onClick={onSaveToDashboard}
                             className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
-                            title={lang === 'vi' ? 'Lưu vào dashboard' : 'Save to dashboard'}
+                            title={text.saveToDashboard}
                         >
                             <LayoutDashboard className="w-3.5 h-3.5" />
                         </button>
@@ -145,7 +145,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                         <button
                             onClick={onClose}
                             className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-red-500 transition-colors"
-                            title={lang === 'vi' ? 'Đóng bảng (Ctrl+J)' : 'Close Panel (Ctrl+J)'}
+                            title={text.closePanel}
                         >
                             <X className="w-3.5 h-3.5" />
                         </button>
@@ -161,26 +161,26 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                 <TabsContent value="messages" className="m-0 h-full p-4 font-mono text-[13px] overflow-auto select-text uppercase">
                     {error ? (
                         <div className="text-red-500 whitespace-pre-wrap leading-relaxed">
-                            <div className="font-bold mb-2">{lang === 'vi' ? 'LỖI:' : 'ERROR:'}</div>
+                            <div className="font-bold mb-2">{text.error}</div>
                             {(error as Error).message}
                         </div>
                     ) : results ? (
                         <div className="space-y-4">
                             <div className="text-green-600 font-bold flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-green-600" />
-                                {lang === 'vi' ? 'TRUY VẤN THỰC THI THÀNH CÔNG.' : 'QUERY EXECUTED SUCCESSFULLY.'}
+                                {text.success}
                             </div>
 
                             <div className="text-muted-foreground border-l-2 pl-4 space-y-1">
-                                <div>{lang === 'vi' ? 'SỐ DÒNG ẢNH HƯỞNG:' : 'ROWS AFFECTED:'} {results.rowCount ?? 0}</div>
-                                <div>{lang === 'vi' ? 'SỐ CỘT TRẢ VỀ:' : 'COLUMNS RETURNED:'} {results.columns?.length ?? 0}</div>
-                                <div>{lang === 'vi' ? 'THỜI GIAN THỰC THI:' : 'EXECUTION TIME:'} {results.durationMs ?? 0}ms</div>
-                                <div>{lang === 'vi' ? 'HOÀN THÀNH LÚC:' : 'COMPLETED AT:'} {dataUpdatedAt > 0 ? new Date(dataUpdatedAt).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US') : '-'}</div>
+                                <div>{text.rowsAffected} {results.rowCount ?? 0}</div>
+                                <div>{text.columnsReturned} {results.columns?.length ?? 0}</div>
+                                <div>{text.executionTime} {results.durationMs ?? 0}ms</div>
+                                <div>{text.completedAt} {dataUpdatedAt > 0 ? new Date(dataUpdatedAt).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US') : '-'}</div>
                             </div>
 
                             {executedQuery && (
                                 <div className="mt-8 pt-4 border-t">
-                                    <div className="text-[10px] text-muted-foreground mb-2">{lang === 'vi' ? 'CÂU LỆNH SQL:' : 'SQL STATEMENT:'}</div>
+                                    <div className="text-[10px] text-muted-foreground mb-2">{text.sqlStatement}</div>
                                     <pre className="text-xs bg-muted/30 p-3 rounded text-foreground/80 lowercase">
                                         {executedQuery}
                                     </pre>
@@ -188,7 +188,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                             )}
                         </div>
                     ) : (
-                        <div className="text-muted-foreground italic">{lang === 'vi' ? 'Không có thông báo nào.' : 'No messages to display.'}</div>
+                        <div className="text-muted-foreground italic">{text.noMessages}</div>
                     )}
                 </TabsContent>
 

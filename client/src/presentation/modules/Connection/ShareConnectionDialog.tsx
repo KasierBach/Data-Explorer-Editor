@@ -6,6 +6,7 @@ import { ConnectionService } from '@/core/services/ConnectionService';
 import { OrganizationService } from '@/core/services/OrganizationService';
 import { TeamspaceService, type TeamspaceEntity } from '@/core/services/TeamspaceService';
 import { Button } from '@/presentation/components/ui/button';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,7 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
   onSuccess,
 }) => {
   const { lang, updateConnection } = useAppStore();
+  const text = getWorkspaceText(lang).shareConnectionDialog;
   const [shareOrgId, setShareOrgId] = useState<string>('');
   const [shareTeamspaceId, setShareTeamspaceId] = useState<string>(TEAMSPACE_UNASSIGNED);
   const [isSharing, setIsSharing] = useState(false);
@@ -88,17 +90,17 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
 
       onOpenChange(false);
       onSuccess?.();
-      alert(lang === 'vi' ? 'Đã chia sẻ kết nối với team!' : 'Connection shared with team!');
+      alert(text.sharedSuccess);
     } catch (error) {
       console.error('Error sharing connection:', error);
-      alert(getErrorMessage(error, lang === 'vi' ? 'Lỗi khi chia sẻ kết nối' : 'Error sharing connection'));
+      alert(getErrorMessage(error, text.shareFailed));
     } finally {
       setIsSharing(false);
     }
   };
 
   const handleCreateTeam = async () => {
-    const teamName = prompt(lang === 'vi' ? 'Nhập tên team mới:' : 'Enter new team name:');
+    const teamName = prompt(text.createTeamPrompt);
     if (!teamName) return;
 
     try {
@@ -109,7 +111,7 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
       await refetchTeamspaces();
     } catch (error) {
       console.error('Error creating team:', error);
-      alert(getErrorMessage(error, lang === 'vi' ? 'Lỗi khi tạo team' : 'Error creating team'));
+      alert(getErrorMessage(error, text.createTeamFailed));
     }
   };
 
@@ -119,23 +121,21 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5 text-blue-500" />
-            {lang === 'vi' ? 'Chia sẻ kết nối với team' : 'Share Connection with Team'}
+            {text.title}
           </DialogTitle>
           <DialogDescription>
-            {lang === 'vi'
-              ? 'Chọn team và teamspace để đưa connection này vào đúng workspace chung.'
-              : 'Pick a team and teamspace to place this connection in the shared workspace.'}
+            {text.description}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              {lang === 'vi' ? 'Chọn Team' : 'Select Team'}
+              {text.selectTeam}
             </label>
             <Select value={shareOrgId} onValueChange={setShareOrgId}>
               <SelectTrigger className="h-10 text-xs">
-                <SelectValue placeholder={lang === 'vi' ? 'Chọn một team...' : 'Select a team...'} />
+                <SelectValue placeholder={text.selectTeamPlaceholder} />
               </SelectTrigger>
               <SelectContent>
                 {organizations.length > 0 ? (
@@ -146,7 +146,7 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
                   ))
                 ) : (
                   <div className="p-4 text-center text-xs text-muted-foreground">
-                    {lang === 'vi' ? 'Bạn chưa tham gia team nào' : 'You are not in any teams yet'}
+                    {text.noTeams}
                   </div>
                 )}
               </SelectContent>
@@ -155,7 +155,7 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
 
           <div className="space-y-2">
             <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              {lang === 'vi' ? 'Chọn Teamspace' : 'Select Teamspace'}
+              {text.selectTeamspace}
             </label>
             <Select
               value={shareTeamspaceId}
@@ -163,11 +163,11 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
               disabled={!shareOrgId}
             >
               <SelectTrigger className="h-10 text-xs">
-                <SelectValue placeholder={lang === 'vi' ? 'Tuỳ chọn...' : 'Optional...'} />
+                <SelectValue placeholder={text.optional} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={TEAMSPACE_UNASSIGNED} className="text-xs">
-                  {lang === 'vi' ? 'Không chọn teamspace' : 'Unassigned'}
+                  {text.unassigned}
                 </SelectItem>
                 {getTeamspaceItems(teamspaces)}
               </SelectContent>
@@ -181,13 +181,13 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
             className="mt-1 flex h-auto items-center gap-1.5 p-0 text-xs text-blue-500 hover:bg-blue-500/5 hover:text-blue-600"
           >
             <Plus className="h-3 w-3" />
-            {lang === 'vi' ? 'Tạo team mới' : 'Create new team'}
+            {text.createNewTeam}
           </Button>
         </div>
 
         <DialogFooter className="gap-2">
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="text-xs">
-            {lang === 'vi' ? 'Hủy' : 'Cancel'}
+            {text.cancel}
           </Button>
           <Button
             size="sm"
@@ -195,7 +195,7 @@ export const ShareConnectionDialog: React.FC<ShareConnectionDialogProps> = ({
             disabled={!shareOrgId || isSharing}
             className="min-w-[100px] bg-blue-600 text-white hover:bg-blue-700 text-xs"
           >
-            {isSharing ? <Loader2 className="h-4 w-4 animate-spin" /> : lang === 'vi' ? 'Chia sẻ ngay' : 'Share Now'}
+            {isSharing ? <Loader2 className="h-4 w-4 animate-spin" /> : text.shareNow}
           </Button>
         </DialogFooter>
       </DialogContent>

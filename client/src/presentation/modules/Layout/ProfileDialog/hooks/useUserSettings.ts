@@ -4,6 +4,7 @@ import { apiService } from '@/core/services/api.service';
 import { toast } from 'sonner';
 import { useTheme } from '@/presentation/components/theme-provider';
 import type { AuthUser } from '@/core/services/store/slices/authSlice';
+import { getProfileDialogText } from '../profileI18n';
 
 const getErrorMessage = (error: unknown) => (
     error instanceof Error ? error.message : 'Something went wrong'
@@ -12,6 +13,7 @@ const getErrorMessage = (error: unknown) => (
 export const useUserSettings = (isOpen: boolean) => {
     const { user, updateUser, lang, setLang } = useAppStore();
     const { setTheme: setAppTheme } = useTheme();
+    const text = getProfileDialogText(lang);
     const [isLoading, setIsLoading] = useState(false);
 
     // Appearance State
@@ -43,7 +45,7 @@ export const useUserSettings = (isOpen: boolean) => {
             }
             const data = await apiService.patch<AuthUser>('/users/settings', updates);
             updateUser(data);
-            toast.success(lang === 'vi' ? "Cập nhật cài đặt thành công!" : "Settings updated successfully!");
+            toast.success(text.settingsUpdated);
             return true;
         } catch (err) {
             toast.error(getErrorMessage(err));

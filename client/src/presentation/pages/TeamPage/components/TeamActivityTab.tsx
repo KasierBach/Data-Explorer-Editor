@@ -2,6 +2,7 @@ import { Activity, Layers, MessageSquare, Share2, User } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/presentation/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import type { CollaborationActivityLog } from '@/core/services/CollaborationService';
+import { getTeamText } from '../teamI18n';
 
 interface TeamActivityTabProps {
   activities: CollaborationActivityLog[];
@@ -42,10 +43,12 @@ function getDetailString(details: CollaborationActivityLog['details'], key: stri
 }
 
 export function TeamActivityTab({ activities, lang }: TeamActivityTabProps) {
+  const text = getTeamText(lang);
+
   if (activities.length === 0) {
     return (
       <div className="rounded-lg border px-4 py-8 text-center text-sm text-muted-foreground">
-        {lang === 'vi' ? 'Chua co hoat dong nao trong team.' : 'No team activity yet.'}
+        {text.activityEmpty}
       </div>
     );
   }

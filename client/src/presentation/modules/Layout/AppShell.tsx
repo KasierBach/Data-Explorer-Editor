@@ -11,6 +11,7 @@ import { useResizablePanel } from '@/presentation/hooks/useResizablePanel';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { useGlobalShortcuts } from '@/presentation/hooks/useGlobalShortcuts';
 import { MobileWorkspaceBar } from './MobileWorkspaceBar';
+import { getLayoutText } from './layoutI18n';
 
 export function AppShell() {
     useGlobalShortcuts();
@@ -25,6 +26,7 @@ export function AppShell() {
     const isResultPanelOpen = useAppStore(state => state.isResultPanelOpen);
     const toggleResultPanel = useAppStore(state => state.toggleResultPanel);
     const lang = useAppStore(state => state.lang);
+    const text = getLayoutText(lang);
 
     const { isActualMobile, isCompactMobileLayout, isSmallMobile, isLandscapeMobile } = useResponsiveLayoutMode();
 
@@ -251,7 +253,7 @@ export function AppShell() {
             )}
 
             <div className="h-6 border-t bg-muted/40 text-xs flex items-center px-4 text-muted-foreground shrink-0">
-                {lang === 'vi' ? 'Sẵn sàng' : 'Ready'}
+                {text.ready}
             </div>
             <ConnectionDialog />
         </div>

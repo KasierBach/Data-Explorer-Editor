@@ -1,42 +1,38 @@
 import React from 'react';
 import { Terminal, Zap, BarChart3, GitGraph, PieChart, Lock } from 'lucide-react';
 import { motion, type Variants } from 'framer-motion';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface FeaturesSectionProps {
     lang: string;
 }
 
 export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
+    const text = getWorkspaceText(lang).featuresSection;
     const features = [
         {
             icon: <Terminal className="w-6 h-6 text-blue-400" aria-hidden="true" />,
-            title: lang === 'vi' ? "Monaco Editor" : "Monaco Editor",
-            desc: lang === 'vi' ? "Trình soạn thảo mã chuyên nghiệp với Auto-Complete, gợi ý cấu trúc bảng trực tiếp bằng AI và Schema Intellisense." : "Professional grade editor with precise Auto-complete, AI-driven schema suggestions, and Intellisense."
+            ...text.features[0],
         },
         {
             icon: <Zap className="w-6 h-6 text-yellow-400" aria-hidden="true" />,
-            title: lang === 'vi' ? "Hỗ Trợ SQL & NoSQL Toàn Diện" : "Universal SQL & NoSQL Power",
-            desc: lang === 'vi' ? "Trải nghiệm đồng nhất giữa PostgreSQL, MySQL và MongoDB với bộ phím tắt, menu và công cụ Trực quan hóa (Visualize) dùng chung." : "Unified experience across SQL & NoSQL. Share same shortcuts, menus, and Visualize designers between relational and document databases."
+            ...text.features[1],
         },
         {
             icon: <GitGraph className="w-6 h-6 text-purple-400" aria-hidden="true" />,
-            title: lang === 'vi' ? "Live ERD Visualizer" : "Live ERD Visualizer",
-            desc: lang === 'vi' ? "Tự động phân tích và tạo sơ đồ quan hệ (ERD) bằng React Flow. Cung cấp góc nhìn tổng quan 100% rõ ràng về kiến trúc database." : "Automatically generate and explore interactive Entity Relationship Diagrams (ERD) powered by React Flow."
+            ...text.features[2],
         },
         {
             icon: <BarChart3 className="w-6 h-6 text-emerald-400" aria-hidden="true" />,
-            title: lang === 'vi' ? "Gemini 3.1 AI Agent" : "Gemini 3.1 AI Agent",
-            desc: lang === 'vi' ? "Sức mạnh AI Assistant phân tích ngữ cảnh, giúp bạn tạo SQL bằng ngôn ngữ tự nhiên hoặc sửa lỗi tối ưu hóa Query." : "Context-aware AI understands your schema, converts natural language to SQL, and highlights query bugs."
+            ...text.features[3],
         },
         {
             icon: <Lock className="w-6 h-6 text-amber-500" aria-hidden="true" />,
-            title: lang === 'vi' ? "Bảo mật & Phân Quyền" : "Enterprise Security",
-            desc: lang === 'vi' ? "Bảo mật đa lớp: Chặn đứng SQL injection lồng nhau, triệt phá SSRF qua Tunnel, siết chặt riêng tư Team và mã hóa AES-256-GCM toàn diện." : "Multi-layer security: Reinforced SQL Guard, SSRF tunnel protection, strict team privacy, and AES-256-GCM encryption."
+            ...text.features[4],
         },
         {
             icon: <PieChart className="w-6 h-6 text-cyan-400" aria-hidden="true" />,
-            title: lang === 'vi' ? "Lịch Sử & Export" : "History & Data Export",
-            desc: lang === 'vi' ? "Giám sát thời gian thực thi, giữ lại lịch sử câu lệnh, và hỗ trợ xuất dữ liệu ra file CSV, JSON hoặc chèn script SQL." : "Track query timings, retain execution history, and instantly export data grids to CSV, JSON, or SQL format."
+            ...text.features[5],
         }
     ];
 
@@ -69,12 +65,10 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
                     className="text-center mb-16 md:mb-24 max-w-4xl mx-auto"
                 >
                     <h2 className="text-5xl md:text-6xl font-extrabold tracking-tight mb-6 md:mb-8 bg-gradient-to-br from-white via-white to-white/40 bg-clip-text text-transparent">
-                        {lang === 'vi' ? 'Trí tuệ hợp nhất' : 'Unified Intelligence'}
+                        {text.title}
                     </h2>
                     <p className="text-muted-foreground/80 text-lg md:text-xl font-medium leading-relaxed max-w-2xl mx-auto">
-                        {lang === 'vi'
-                            ? 'Không chỉ là một trình chỉnh sửa. Đó là trung tâm chỉ huy cho dữ liệu của bạn, được xây dựng với sự tinh xảo hiện đại.'
-                            : 'Not just an editor. A command center for your data, built with modern craftsmanship.'}
+                        {text.description}
                     </p>
                 </motion.div>
 
@@ -109,7 +103,7 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang }) => {
                                 <div className="mt-2">
                                     <h3 className="font-extrabold text-xl lg:text-2xl tracking-tight mb-3 text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-400 group-hover:to-cyan-300 transition-all">{feature.title}</h3>
                                     <p className="text-muted-foreground/80 leading-relaxed text-sm lg:text-base font-medium group-hover:text-white/90 transition-colors">
-                                        {feature.desc}
+                                        {feature.description}
                                     </p>
                                 </div>
                             </div>

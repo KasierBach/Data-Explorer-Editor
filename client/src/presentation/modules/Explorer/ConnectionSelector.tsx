@@ -14,6 +14,7 @@ import { DiMsqlServer } from "react-icons/di"
 import { ConnectionService } from "@/core/services/ConnectionService"
 import { ShareConnectionDialog } from "../Connection/ShareConnectionDialog"
 import { pickFallbackConnectionId } from "./connectionSelectorUtils"
+import { getWorkspaceText } from "@/core/utils/workspaceText"
 
 /** Returns a database-type-specific icon and accent color. */
 const getDbBranding = (type?: string) => {
@@ -88,6 +89,7 @@ interface ConnectionSelectorProps {
 
 export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
     const { connections, activeConnectionId, setActiveConnectionId, openConnectionDialog, removeConnection, updateConnection, lang } = useAppStore()
+    const text = getWorkspaceText(lang).connectionSelector
     const nosqlActiveConnectionId = useAppStore(state => state.nosqlActiveConnectionId);
     const setNosqlActiveConnectionId = useAppStore(state => state.setNosqlActiveConnectionId);
     const [isDeleting, setIsDeleting] = useState<string | null>(null)
@@ -166,10 +168,7 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.preventDefault();
         e.stopPropagation();
-        const confirmMsg = lang === 'vi' 
-            ? 'Bạn có chắc chắn muốn xóa kết nối này không?' 
-            : 'Are you sure you want to delete this connection?';
-        if (!confirm(confirmMsg)) return;
+        if (!confirm(text.confirmDeleteConnection)) return;
 
         setIsDeleting(id);
         try {
@@ -177,8 +176,7 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
             removeConnection(id);
         } catch (error) {
             console.error('Error deleting connection:', error);
-            const errMsg = lang === 'vi' ? 'Lỗi khi xóa kết nối' : 'Error deleting connection';
-            alert(error instanceof Error ? error.message : errMsg);
+            alert(error instanceof Error ? error.message : text.deleteConnectionFallback);
         } finally {
             setIsDeleting(null);
         }
@@ -211,7 +209,7 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
                             {activeBranding.icon}
                         </div>
                         <span className="truncate">
-                            {activeConn ? activeConn.name : (lang === 'vi' ? "Chọn cơ sở dữ liệu" : "Select Instance")}
+                            {activeConn ? activeConn.name : text.selectInstance}
                         </span>
                     </div>
                 </SelectTrigger>
@@ -219,10 +217,10 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
                     <SelectGroup>
                         <SelectLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/70 px-4 py-2">
                             {filter === 'nosql' 
-                                ? (lang === 'vi' ? 'Cơ sở dữ liệu NoSQL' : 'NoSQL Instances') 
+                                ? text.noSqlInstances
                                 : filter === 'sql' 
-                                    ? (lang === 'vi' ? 'Cơ sở dữ liệu SQL' : 'SQL Instances') 
-                                    : (lang === 'vi' ? 'Cơ sở dữ liệu hiện có' : 'Available Instances')}
+                                    ? text.sqlInstances
+                                    : text.availableInstances}
                         </SelectLabel>
                         {visibleConnections.map((conn) => {
                             const branding = getDbBranding(conn.type);
@@ -297,7 +295,7 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
                             }}
                         >
                             <PlusCircle className="w-4 h-4" />
-                            <span>{lang === 'vi' ? 'Thêm máy chủ mới' : 'Provision New Server'}</span>
+                            <span>{text.provisionServer}</span>
                         </div>
                     </div>
 
@@ -313,11 +311,11 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
                         <div className="flex items-center gap-2 min-w-0">
                             <div className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase ${getHealthTone(activeConn.lastHealthStatus)}`}>
                                 <Activity className="w-3 h-3" />
-                                {activeConn.lastHealthStatus || (lang === 'vi' ? 'không xác định' : 'unknown')}
+                                {activeConn.lastHealthStatus || text.unknownHealth}
                             </div>
                             {activeConn.readOnly && (
                                 <div className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-400">
-                                    {lang === 'vi' ? 'Chỉ đọc' : 'Read-only'}
+                                    {text.readOnly}
                                 </div>
                             )}
                             {activeConn.lastConnectionLatencyMs !== undefined && activeConn.lastConnectionLatencyMs !== null && (
@@ -333,7 +331,7 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
                             disabled={isCheckingHealth === activeConn.id}
                         >
                             {isCheckingHealth === activeConn.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                            {lang === 'vi' ? 'Kiểm tra' : 'Check'}
+                            {text.check}
                         </button>
 
                     </div>

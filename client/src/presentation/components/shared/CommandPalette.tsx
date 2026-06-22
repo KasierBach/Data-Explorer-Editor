@@ -7,6 +7,7 @@ import type { SearchResult } from '@/core/services/SearchService';
 import { useAppStore } from '@/core/services/store';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 export const CommandPalette: React.FC = () => {
     const { 
@@ -16,6 +17,7 @@ export const CommandPalette: React.FC = () => {
         setActiveConnectionId,
         setActiveDatabase
     } = useAppStore();
+    const text = getWorkspaceText(lang).commandPalette;
 
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
@@ -69,10 +71,7 @@ export const CommandPalette: React.FC = () => {
             setActiveDatabase(result.database);
         }
         
-        toast.success(lang === 'vi' 
-            ? `Đã chuyển sang ${result.connectionName}${result.database ? ` (${result.database})` : ''}` 
-            : `Switched to ${result.connectionName}${result.database ? ` (${result.database})` : ''}`
-        );
+        toast.success(text.switchedTo(result.connectionName, result.database));
         
         setCommandPaletteOpen(false);
     };
@@ -98,7 +97,7 @@ export const CommandPalette: React.FC = () => {
                     <Search className="w-5 h-5 text-muted-foreground opacity-50" />
                     <Input
                         autoFocus
-                        placeholder={lang === 'vi' ? "Tìm kiếm bảng, view hoặc thực thi lệnh..." : "Search tables, views or run commands..."}
+                        placeholder={text.searchPlaceholder}
                         className="flex-1 bg-transparent border-none focus-visible:ring-0 text-md h-full placeholder:text-muted-foreground/40"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
@@ -114,7 +113,7 @@ export const CommandPalette: React.FC = () => {
                         <div className="flex items-center justify-center py-10 opacity-50 space-x-3">
                             <Loader2 className="w-4 h-4 animate-spin" />
                             <span className="text-xs font-medium tracking-tight italic">
-                                {lang === 'vi' ? "AI đang suy nghĩ..." : "AI is thinking..."}
+                                {text.loading}
                             </span>
                         </div>
                     )}
@@ -122,7 +121,7 @@ export const CommandPalette: React.FC = () => {
                     {!isLoading && results.length === 0 && query.length >= 2 && (
                         <div className="py-12 text-center">
                             <p className="text-sm text-muted-foreground italic opacity-40">
-                                {lang === 'vi' ? "Không tìm thấy kết quả nào" : "No results found"}
+                                {text.noResults}
                             </p>
                         </div>
                     )}
@@ -131,21 +130,21 @@ export const CommandPalette: React.FC = () => {
                         <div className="p-4 py-8 space-y-6">
                             <div>
                                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/30 px-2 mb-3">
-                                    {lang === 'vi' ? "Lệnh gợi ý" : "Suggested Commands"}
+                                    {text.suggestedCommands}
                                 </h3>
                                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                     <CommandItem 
                                         icon={<Zap className="w-4 h-4 text-amber-400" />} 
-                                        label={lang === 'vi' ? "Đồng bộ Index" : "Sync Index"} 
+                                        label={text.syncIndex} 
                                         shortcut="CTRL+S"
                                         onClick={async () => {
                                             await SearchService.syncIndex();
-                                            toast.success("Sync complete");
+                                            toast.success(text.syncComplete);
                                         }}
                                     />
                                     <CommandItem 
                                         icon={<History className="w-4 h-4 text-blue-400" />} 
-                                        label={lang === 'vi' ? "Thanh lịch sử" : "Query History"} 
+                                        label={text.queryHistory} 
                                         shortcut="G+H"
                                     />
                                 </div>
@@ -154,9 +153,7 @@ export const CommandPalette: React.FC = () => {
                             <div className="flex items-center justify-center space-x-2 py-4 border-t border-white/5">
                                 <Sparkles className="w-3 h-3 text-purple-400 animate-pulse" />
                                 <p className="text-[10px] text-muted-foreground/40 font-medium">
-                                    {lang === 'vi' 
-                                        ? "Dùng ngôn ngữ tự nhiên để tìm kiếm thông minh" 
-                                        : "Use natural language for semantic search"}
+                                    {text.naturalLanguageHint}
                                 </p>
                             </div>
                         </div>
@@ -165,7 +162,7 @@ export const CommandPalette: React.FC = () => {
                     {!isLoading && results.length > 0 && (
                         <div className="space-y-1">
                             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/30 px-3 py-2">
-                                {lang === 'vi' ? "Kết quả tìm kiếm" : "Search Results"}
+                                {text.searchResults}
                             </h3>
                             {results.map((result, index) => (
                                 <div
@@ -217,7 +214,7 @@ export const CommandPalette: React.FC = () => {
                                     <div className="flex items-center space-x-2">
                                         {index === activeIndex && (
                                             <div className="flex items-center space-x-1 px-2 py-1 rounded bg-white/5 border border-white/10 animate-in fade-in slide-in-from-right-2 duration-300">
-                                                <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">ENTER TO OPEN</span>
+                                                <span className="text-[10px] font-bold text-muted-foreground whitespace-nowrap">{text.enterToOpen}</span>
                                             </div>
                                         )}
                                     </div>
@@ -229,8 +226,8 @@ export const CommandPalette: React.FC = () => {
                 
                 <div className="h-10 px-4 border-t border-white/5 flex items-center justify-between gap-3 bg-muted/20">
                     <div className="hidden items-center space-x-4 sm:flex">
-                        <KbdHint keys={["↑", "↓"]} label={lang === 'vi' ? "Di chuyển" : "Navigate"} />
-                        <KbdHint keys={["↵"]} label={lang === 'vi' ? "Mở" : "Open"} />
+                        <KbdHint keys={["↑", "↓"]} label={text.navigate} />
+                        <KbdHint keys={["↵"]} label={text.open} />
                     </div>
                     <div className="flex items-center space-x-1.5">
                         <CommandIcon className="w-3 h-3 text-muted-foreground opacity-40" />

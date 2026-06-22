@@ -34,6 +34,7 @@ import {
 } from '@/presentation/components/ui/select';
 import { cn } from '@/lib/utils';
 import { AiQueryBox } from './AiQueryBox';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface QueryToolbarProps {
     isLoading: boolean;
@@ -85,7 +86,9 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
     onLimitChange,
 }) => {
     const isExecutionDisabled = isLoading || allowQueryExecution === false;
-    const explainLabel = lang === 'vi' ? 'Giải thích AI' : 'AI Explain';
+    const text = getWorkspaceText(lang).queryToolbar;
+    const explainLabel = text.explain;
+    const runLabel = isCompactMobileLayout ? text.runCompact : text.runFull;
 
     return (
         <div className="p-1 px-1.5 border-b flex items-center justify-between gap-2 bg-muted/30 min-h-[40px] overflow-hidden flex-nowrap">
@@ -101,7 +104,7 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                 >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4 fill-current" />}
                     <span className="font-bold">
-                        {isCompactMobileLayout ? (lang === 'vi' ? 'Chạy' : 'Run') : (lang === 'vi' ? 'Thực thi' : 'Execute')}
+                        {runLabel}
                     </span>
                 </Button>
 
@@ -115,7 +118,7 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                             className="h-8 gap-1.5 px-3 shrink-0 border-blue-500/30 bg-blue-500/5 hover:bg-blue-500/10 text-blue-500 transition-all shadow-none"
                         >
                             <Sparkles className="w-3.5 h-3.5 fill-blue-500/20" />
-                            <span className="font-medium">{isSmallMobile ? 'AI' : 'AI SQL'}</span>
+                            <span className="font-medium">{isSmallMobile ? text.aiShort : text.aiSql}</span>
                         </Button>
                     </PopoverTrigger>
                     <PopoverContent
@@ -141,16 +144,16 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                         className="h-8 gap-1.5 px-3 shrink-0 border-border/60 bg-background/80 shadow-none"
                     >
                         <Layers className="w-3.5 h-3.5" />
-                        <span className="font-medium">{isSmallMobile ? 'SQL' : (lang === 'vi' ? 'Chuỗi SQL' : 'SQL Sequence')}</span>
+                        <span className="font-medium">{isSmallMobile ? 'SQL' : text.sqlSequence}</span>
                     </Button>
                 )}
 
                 {!isCompactMobileLayout && (
                     <>
                         <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
-                        <Button variant="ghost" size="sm" onClick={onRefreshSchema} className="h-7 gap-1 px-1.5 text-xs shrink-0" title={lang === 'vi' ? 'Tải lại thanh bên' : 'Refresh Sidebar'}>
+                        <Button variant="ghost" size="sm" onClick={onRefreshSchema} className="h-7 gap-1 px-1.5 text-xs shrink-0" title={text.refreshSidebar}>
                             <RefreshCw className="w-3.5 h-3.5" />
-                            <span className="whitespace-nowrap">{lang === 'vi' ? 'Tải lại' : 'Refresh'}</span>
+                            <span className="whitespace-nowrap">{text.refresh}</span>
                         </Button>
                         <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
                     </>
@@ -160,24 +163,24 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                     <>
                         <Button variant="ghost" size="sm" onClick={onFormat} className="h-7 gap-1 px-1.5 text-xs shrink-0">
                             <AlignLeft className="w-3.5 h-3.5" />
-                            <span className="whitespace-nowrap">{lang === 'vi' ? 'Định dạng' : 'Format'}</span>
+                            <span className="whitespace-nowrap">{text.format}</span>
                         </Button>
                         <Button variant="ghost" size="sm" onClick={onClear} className="h-7 gap-1 px-1.5 text-xs text-muted-foreground hover:text-destructive shrink-0">
                             <Eraser className="w-3.5 h-3.5" />
-                            <span className="whitespace-nowrap">{lang === 'vi' ? 'Xóa' : 'Clear'}</span>
+                            <span className="whitespace-nowrap">{text.clear}</span>
                         </Button>
                         <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
                         <Button variant="ghost" size="sm" onClick={onSave} className="h-7 gap-1 px-1.5 text-xs shrink-0" title="Ctrl+S">
                             <Save className="w-3.5 h-3.5" />
-                            <span className="whitespace-nowrap">{lang === 'vi' ? 'Lưu' : 'Save'}</span>
+                            <span className="whitespace-nowrap">{text.save}</span>
                         </Button>
                         <Button variant="ghost" size="sm" onClick={onOpenSaved} className="h-7 gap-1 px-1.5 text-xs shrink-0" title="Ctrl+O">
                             <FolderOpen className="w-3.5 h-3.5" />
-                            <span className="whitespace-nowrap">{lang === 'vi' ? 'Mở' : 'Open'}</span>
+                            <span className="whitespace-nowrap">{text.open}</span>
                         </Button>
                         <Button variant="ghost" size="sm" onClick={onOpenHistory} className="h-7 gap-1 px-1.5 text-xs shrink-0" title="Ctrl+H">
                             <History className="w-3.5 h-3.5" />
-                            <span className="whitespace-nowrap">{lang === 'vi' ? 'Lịch sử' : 'History'}</span>
+                            <span className="whitespace-nowrap">{text.history}</span>
                         </Button>
                         <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
                         <Button variant="ghost" size="sm" onClick={onExplain} disabled={isExplaining || !activeConnectionId} className="h-7 gap-1 px-1.5 text-xs text-orange-500 hover:text-orange-600 shrink-0" title={explainLabel}>
@@ -190,31 +193,31 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                         <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 text-xs shrink-0">
                                 <History className="w-4 h-4" />
-                                {lang === 'vi' ? 'Hành động' : 'Actions'}
+                                {text.actions}
                                 <ChevronDown className="w-3 h-3 opacity-50" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" className="w-48">
                             <DropdownMenuItem onClick={onFormat}>
                                 <AlignLeft className="mr-2 h-4 w-4" />
-                                <span>{lang === 'vi' ? 'Định dạng SQL' : 'Format SQL'}</span>
+                                <span>{text.formatSql}</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={onSave}>
                                 <Save className="mr-2 h-4 w-4" />
-                                <span>{lang === 'vi' ? 'Lưu truy vấn' : 'Save Query'}</span>
+                                <span>{text.saveQuery}</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={onOpenSaved}>
                                 <FolderOpen className="mr-2 h-4 w-4" />
-                                <span>{lang === 'vi' ? 'Mở đã lưu' : 'Open Saved'}</span>
+                                <span>{text.openSaved}</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={onOpenHistory}>
                                 <History className="mr-2 h-4 w-4" />
-                                <span>{lang === 'vi' ? 'Lịch sử' : 'History'}</span>
+                                <span>{text.history}</span>
                             </DropdownMenuItem>
                             {showSqlSequence && onOpenSqlSequence && (
                                 <DropdownMenuItem onClick={onOpenSqlSequence}>
                                     <Layers className="mr-2 h-4 w-4" />
-                                    <span>{lang === 'vi' ? 'Chuỗi SQL' : 'SQL Sequence'}</span>
+                                    <span>{text.sqlSequence}</span>
                                 </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
@@ -225,24 +228,24 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={onClear} className="text-red-600">
                                 <Eraser className="mr-2 h-4 w-4" />
-                                <span>{lang === 'vi' ? 'Xóa tất cả' : 'Clear All'}</span>
+                                <span>{text.clearAll}</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 )}
 
                 <div className="flex items-center gap-1 px-1 shrink-0">
-                    {!isCompactMobileLayout && <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{lang === 'vi' ? 'Giới hạn' : 'Limit'}</span>}
+                    {!isCompactMobileLayout && <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{text.limit}</span>}
                     <Select value={limit} onValueChange={onLimitChange}>
                         <SelectTrigger className="h-7 w-[80px] text-[10px] py-0 border-none bg-muted hover:bg-muted/80 focus:ring-0 shadow-none shrink-0">
-                            <SelectValue placeholder={lang === 'vi' ? 'Giới hạn' : 'Limit'} />
+                            <SelectValue placeholder={text.limit} />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="100">100</SelectItem>
                             <SelectItem value="500">500</SelectItem>
                             <SelectItem value="1000">1000</SelectItem>
                             <SelectItem value="5000">5000</SelectItem>
-                            <SelectItem value="all">{lang === 'vi' ? 'Tối đa 50k' : 'Max 50k'}</SelectItem>
+                            <SelectItem value="all">{text.max50k}</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>

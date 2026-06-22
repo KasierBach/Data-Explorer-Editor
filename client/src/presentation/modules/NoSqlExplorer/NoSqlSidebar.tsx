@@ -14,9 +14,14 @@ import { CreateDatabaseDialog } from '@/presentation/components/Dialogs/CreateDa
 import { DeleteDatabaseDialog } from '@/presentation/components/Dialogs/DeleteDatabaseDialog';
 import { handleTreeAction as importedHandleTreeAction } from '../Explorer/treeActions';
 import { toast } from 'sonner';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 export const NoSqlSidebar: React.FC = () => {
     const lang = useAppStore(state => state.lang);
+    const workspaceText = getWorkspaceText(lang);
+    const text = workspaceText.noSqlSidebar;
+    const refreshLoadingLabel = workspaceText.explorerSidebar.refreshingHierarchy;
+    const refreshedLabel = workspaceText.explorerSidebar.refreshed;
 
     const [searchTerm, setSearchTerm] = useState('');
     const [isCreateDatabaseDialogOpen, setCreateDatabaseDialogOpen] = useState(false);
@@ -24,11 +29,11 @@ export const NoSqlSidebar: React.FC = () => {
     const [databaseToDelete, setDatabaseToDelete] = useState<string | null>(null);
     const queryClient = useQueryClient();
 
-    const handleRefresh = React.useCallback(async () => {
-        const t = toast.loading(lang === 'vi' ? 'Đang làm mới dữ liệu...' : 'Refreshing hierarchy...');
+    const runRefresh = React.useEffectEvent(async () => {
+        const t = toast.loading(refreshLoadingLabel);
         await queryClient.resetQueries({ queryKey: ['hierarchy'] });
-        toast.success(lang === 'vi' ? 'Đã cập nhật' : 'Refreshed', { id: t });
-    }, [lang, queryClient]);
+        toast.success(refreshedLabel, { id: t });
+    });
 
     const nosqlActiveConnectionId = useAppStore(state => state.nosqlActiveConnectionId);
     const nosqlActiveDatabase = useAppStore(state => state.nosqlActiveDatabase);
@@ -41,16 +46,15 @@ export const NoSqlSidebar: React.FC = () => {
             importedHandleTreeAction(action, nodeId, nodeType, {
                 setDatabaseToDelete,
                 setDeleteDatabaseDialogOpen,
-                handleRefresh,
+                handleRefresh: () => void runRefresh(),
                 overrideConnectionId: nosqlActiveConnectionId
             });
         };
 
         window.addEventListener('tree-node-action', handleTreeAction as EventListener);
         return () => window.removeEventListener('tree-node-action', handleTreeAction as EventListener);
-    }, [handleRefresh, nosqlActiveConnectionId]);
+    }, [nosqlActiveConnectionId]);
 
-    // Sync active connection with backend when nosqlActiveConnectionId changes
     React.useEffect(() => {
         if (activeConnection) {
             connectionService.setActiveConnection(activeConnection).catch(console.error);
@@ -67,8 +71,9 @@ export const NoSqlSidebar: React.FC = () => {
         );
     }, [rootNodes, searchTerm]);
 
-    const triggerRefresh = handleRefresh;
-
+    const triggerRefresh = () => {
+        void runRefresh();
+    };
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
 
     return (
@@ -92,9 +97,9 @@ export const NoSqlSidebar: React.FC = () => {
                         >
                             <RefreshCw className="h-3.5 h-3.5" />
                         </Button>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
+                        <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-7 w-7 rounded-lg hover:bg-green-500/20 hover:text-green-600"
                             onClick={() => setCreateDatabaseDialogOpen(true)}
                         >
@@ -109,7 +114,7 @@ export const NoSqlSidebar: React.FC = () => {
                     <div className="relative group">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70 transition-colors group-focus-within:text-green-500" />
                         <Input
-                            placeholder={lang === 'vi' ? "Tìm Document/Collection..." : "Find Documents..."}
+                            placeholder={text.searchPlaceholder}
                             className="h-9 text-xs pl-9 pr-8 bg-muted/40 border-none ring-1 ring-border/50 focus:ring-green-500/50 transition-all rounded-xl placeholder:text-muted-foreground/50"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -123,10 +128,10 @@ export const NoSqlSidebar: React.FC = () => {
                     <div className="flex flex-col items-center justify-center h-full p-6 text-center text-muted-foreground opacity-60">
                         <Leaf className="w-12 h-12 mb-4 text-muted-foreground/30" />
                         <p className="text-sm font-medium">
-                            {lang === 'vi' ? 'Chế độ Không gian NoSQL chỉ hỗ trợ kết nối MongoDB hoặc Redis.' : 'NoSQL Workspace only supports MongoDB or Redis connections.'}
+                            {text.onlySupports}
                         </p>
                         <p className="text-xs mt-2">
-                            {lang === 'vi' ? `Bạn đang chọn: ${activeConnection.type.toUpperCase()}` : `Current selection: ${activeConnection.type.toUpperCase()}`}
+                            {text.currentSelection(activeConnection.type.toUpperCase())}
                         </p>
                     </div>
                 )}
@@ -135,7 +140,7 @@ export const NoSqlSidebar: React.FC = () => {
                     <div className="flex flex-col items-center justify-center h-20 gap-3 opacity-40">
                         <div className="w-5 h-5 rounded-full border-2 border-green-500/20 border-t-green-500 animate-spin" />
                         <span className="text-[10px] uppercase tracking-widest font-black text-green-600">
-                            {lang === 'vi' ? 'Đang quét BSON' : 'Scanning BSON'}
+                            {text.scanningBson}
                         </span>
                     </div>
                 )}
@@ -170,7 +175,7 @@ export const NoSqlSidebar: React.FC = () => {
                                     <div className="flex flex-col items-center justify-center py-10 opacity-30 gap-2">
                                         <Filter className="h-8 w-8" />
                                         <p className="text-[10px] font-bold uppercase tracking-widest text-center px-4">
-                                            {lang === 'vi' ? 'Không tìm thấy collection' : 'No collections found'}
+                                            {text.noCollectionsFound}
                                         </p>
                                     </div>
                                 )}
@@ -182,12 +187,11 @@ export const NoSqlSidebar: React.FC = () => {
                     </div>
                 )}
             </div>
-            
-            {/* Dynamic NoSQL Footer */}
+
             <div className="p-3 border-t bg-muted/20 flex items-center justify-between text-[9px] font-bold uppercase tracking-widest">
                 <div className="flex items-center gap-1.5 opacity-50 text-green-600 dark:text-green-400">
                     <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                    <span>{lang === 'vi' ? 'Kết nối NoSQL' : 'NoSQL Connected'}</span>
+                    <span>{text.connected}</span>
                 </div>
                 {nosqlEffectiveDatabase && (
                     <div className="flex items-center gap-1 text-green-500/80">

@@ -9,6 +9,7 @@ import { useAppStore } from '@/core/services/store';
 import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AiMarkdownContent } from './AiMarkdownContent';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 type FieldSizingStyle = React.CSSProperties & {
     fieldSizing?: 'content';
@@ -25,9 +26,10 @@ interface AiMessageBubbleProps {
 export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({ 
     msg, onInsertQuery, onRunQuery, onRegenerate, onEditSubmit 
 }) => {
-    const { user, activeConnectionId, connections, deleteAiMessage, activeAiChatId } = useAppStore();
+    const { user, activeConnectionId, connections, deleteAiMessage, activeAiChatId, lang } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';
+    const text = getWorkspaceText(lang).aiMessageBubble;
 
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(msg.content);
@@ -48,7 +50,7 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
     };
 
     const handleDelete = async () => {
-        if (activeAiChatId && window.confirm('Xóa tin nhắn này?')) {
+        if (activeAiChatId && window.confirm(text.confirmDelete)) {
             try {
                 await deleteAiMessage(activeAiChatId, msg.id);
             } catch (e) {
@@ -128,10 +130,10 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                             />
                             <div className="flex justify-end gap-2">
                                 <Button variant="ghost" size="sm" className="h-8 px-3 text-xs font-medium hover:bg-muted/50" onClick={() => setIsEditing(false)}>
-                                    <CloseIcon className="w-3.5 h-3.5 mr-1.5" /> Hủy
+                                    <CloseIcon className="w-3.5 h-3.5 mr-1.5" /> {text.cancelEdit}
                                 </Button>
                                 <Button variant="default" size="sm" className="h-8 px-4 text-xs font-semibold bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-500/20" onClick={handleEditSave}>
-                                    <Check className="w-3.5 h-3.5 mr-1.5" /> Lưu & Gửi
+                                    <Check className="w-3.5 h-3.5 mr-1.5" /> {text.saveAndSend}
                                 </Button>
                             </div>
                         </div>
@@ -157,13 +159,13 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                             <div className="flex items-center justify-between px-2 py-1 bg-muted/20 border-b border-border/30">
                                 <span className="text-[9px] text-muted-foreground font-mono">{isNoSql ? 'MQL' : 'SQL'}</span>
                                 <div className="flex gap-1">
-                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-green-500/20" onClick={() => onInsertQuery(msg.sql!)} title="Insert vào Editor">
+                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-green-500/20" onClick={() => onInsertQuery(msg.sql!)} title={text.insertToEditor}>
                                         <ChevronDown className="w-3 h-3 text-green-400" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-blue-500/20" onClick={() => { onInsertQuery(msg.sql!); onRunQuery(msg.sql!); }} title="Chạy ngay">
+                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-blue-500/20" onClick={() => { onInsertQuery(msg.sql!); onRunQuery(msg.sql!); }} title={text.runNow}>
                                         <Play className="w-3 h-3 text-blue-400" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-muted/50" onClick={() => handleCopy(msg.sql!)} title={isNoSql ? 'Copy MQL' : 'Copy SQL'} aria-label="Copy SQL">
+                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-muted/50" onClick={() => handleCopy(msg.sql!)} title={isNoSql ? text.copyMql : text.copySql} aria-label={isNoSql ? text.copyMql : text.copySql}>
                                         <Copy className="w-3 h-3" />
                                     </Button>
                                 </div>
@@ -201,20 +203,20 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                                                 )}
                                                 {recommendation.chartType && (
                                                     <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-                                                        Suggested chart: {recommendation.chartType}
+                                                        {text.suggestedChart}: {recommendation.chartType}
                                                     </div>
                                                 )}
                                             </div>
 
                                             {recommendation.sql && (
                                                 <div className="flex gap-1 shrink-0">
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-green-500/20" onClick={() => onInsertQuery(recommendation.sql!)} title="Insert into editor">
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-green-500/20" onClick={() => onInsertQuery(recommendation.sql!)} title={text.insertSuggestion}>
                                                         <ChevronDown className="w-3 h-3 text-green-400" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-blue-500/20" onClick={() => { onInsertQuery(recommendation.sql!); onRunQuery(recommendation.sql!); }} title="Run suggestion">
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-blue-500/20" onClick={() => { onInsertQuery(recommendation.sql!); onRunQuery(recommendation.sql!); }} title={text.runSuggestion}>
                                                         <Play className="w-3 h-3 text-blue-400" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted/50" onClick={() => handleCopy(recommendation.sql!)} title="Copy suggestion" aria-label="Copy suggestion SQL">
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted/50" onClick={() => handleCopy(recommendation.sql!)} title={text.copySuggestion} aria-label={text.copySuggestion}>
                                                         <Copy className="w-3 h-3" />
                                                     </Button>
                                                 </div>
@@ -233,11 +235,11 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                     msg.role === 'user' ? "justify-end mr-1" : "justify-start ml-1"
                 )}>
                     {msg.role === 'user' && !isEditing && !!onEditSubmit && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => { setIsEditing(true); setEditContent(msg.content); }} title="Chỉnh sửa" aria-label="Edit message">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => { setIsEditing(true); setEditContent(msg.content); }} title={text.editMessage} aria-label={text.editMessage}>
                             <Pencil className="w-3.5 h-3.5" />
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => handleCopy(msg.content)} title="Sao chép" aria-label="Copy message">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => handleCopy(msg.content)} title={text.copyMessage} aria-label={text.copyMessage}>
                         <Copy className="w-3.5 h-3.5" />
                     </Button>
                     {msg.role === 'ai' && !msg.error && onRegenerate && (

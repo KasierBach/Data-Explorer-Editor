@@ -77,48 +77,51 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
         : isReadOnly
             ? text.noSqlAi.capabilityNoteReadOnly
             : text.noSqlAi.capabilityNoteMutable;
+    const runHotkeyLabel = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+        ? text.noSqlAi.runHotkey.replace('CTRL', 'CMD')
+        : text.noSqlAi.runHotkey;
     const quickPrompts: QuickPrompt[] = isRedis
         ? [
             {
                 label: text.noSqlAi.quickScanSessions,
-                prompt: 'Scan session:* and return the first 20 matching keys.',
+                prompt: text.noSqlAi.quickScanSessionsPrompt,
             },
             {
                 label: text.noSqlAi.quickInspectTtl,
-                prompt: 'Show the TTL for user:123 and explain the command before running it.',
+                prompt: text.noSqlAi.quickInspectTtlPrompt,
             },
             {
                 label: text.noSqlAi.quickDeleteOldKey,
-                prompt: 'Delete the cache key report:daily:stale and explain the impact.',
+                prompt: text.noSqlAi.quickDeleteOldKeyPrompt,
             },
         ]
         : isReadOnly
             ? [
                 {
                     label: text.noSqlAi.quickTopCategories,
-                    prompt: 'Find the top 10 categories by document count in this collection.',
+                    prompt: text.noSqlAi.quickTopCategoriesPrompt,
                 },
                 {
                     label: text.noSqlAi.quickLatestOrders,
-                    prompt: 'Find the latest 20 documents sorted by createdAt descending.',
+                    prompt: text.noSqlAi.quickLatestOrdersPrompt,
                 },
                 {
                     label: text.noSqlAi.quickSamplePipeline,
-                    prompt: 'Build an aggregation pipeline that groups documents by status and counts each group.',
+                    prompt: text.noSqlAi.quickSamplePipelinePrompt,
                 },
             ]
             : [
                 {
                     label: text.noSqlAi.quickTopCategories,
-                    prompt: 'Find the top 10 categories by document count in this collection.',
+                    prompt: text.noSqlAi.quickTopCategoriesPrompt,
                 },
                 {
                     label: text.noSqlAi.quickUpdateStatus,
-                    prompt: 'Update all documents with status "pending" to "archived" using updateMany and explain the filter.',
+                    prompt: text.noSqlAi.quickUpdateStatusPrompt,
                 },
                 {
                     label: text.noSqlAi.quickDeleteOldLogs,
-                    prompt: 'Delete documents older than 30 days using deleteMany and explain the filter before running it.',
+                    prompt: text.noSqlAi.quickDeleteOldLogsPrompt,
                 },
             ];
 
@@ -242,9 +245,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
                                     'text-[9px] font-bold py-0.5 px-1.5 rounded transition-all tracking-tighter',
                                     query.length > 0 ? 'bg-green-500/20 text-green-400 border border-green-500/20' : 'text-muted-foreground/20 italic',
                                 )}>
-                                    {lang === 'vi'
-                                        ? (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? text.noSqlAi.runHotkey.replace('CTRL', 'CMD') : text.noSqlAi.runHotkey)
-                                        : (navigator.platform.toUpperCase().indexOf('MAC') >= 0 ? text.noSqlAi.runHotkey.replace('CTRL', 'CMD') : text.noSqlAi.runHotkey)}
+                                    {runHotkeyLabel}
                                 </span>
                             </div>
                         </div>
@@ -328,7 +329,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
                                     ) : (
                                         <Wand2 className="w-3.5 h-3.5" />
                                     )}
-                                    <span>{lang === 'vi' ? `Sinh ${commandLabel}` : `Generate ${commandLabel}`}</span>
+                                    <span>{text.noSqlAi.generateCommand(commandLabel)}</span>
                                 </Button>
                             </div>
                         </div>

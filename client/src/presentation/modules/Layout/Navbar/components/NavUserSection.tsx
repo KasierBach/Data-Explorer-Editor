@@ -17,6 +17,7 @@ import {
 } from "@/presentation/components/ui/dropdown-menu"
 import { cn } from '@/lib/utils';
 import type { AuthUser } from '@/core/services/store/slices/authSlice';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface NavUserSectionProps {
     user: AuthUser | null;
@@ -37,6 +38,8 @@ export const NavUserSection: React.FC<NavUserSectionProps> = ({
     user, logout, isAiPanelOpen, toggleAiPanel, isMobile, isSmallMobile, 
     isDesktopModeOnMobile, toggleDesktopModeOnMobile, lang, setActiveProfileTab, setIsProfileOpen, navigate
 }) => {
+    const text = getWorkspaceText(lang).navUserSection;
+
     return (
         <div className={cn("flex items-center gap-1 md:gap-2", isMobile && "pl-2")}>
             {!isSmallMobile && <div className="h-4 w-px bg-border mx-1" />}
@@ -51,7 +54,7 @@ export const NavUserSection: React.FC<NavUserSectionProps> = ({
                     isAiPanelOpen ? 'text-violet-500 bg-violet-500/10' : 'text-muted-foreground hover:text-violet-500'
                 )}
                 onClick={toggleAiPanel}
-                title="AI Assistant (Ctrl+I)"
+                title={text.aiAssistantTitle}
             >
                 <Sparkles className="w-4 h-4" />
             </Button>
@@ -140,27 +143,27 @@ export const NavUserSection: React.FC<NavUserSectionProps> = ({
                         {isMobile && (
                             <DropdownMenuItem onClick={toggleDesktopModeOnMobile}>
                                 <MonitorSmartphone className="mr-2 h-4 w-4" />
-                                <span>{isDesktopModeOnMobile ? (lang === 'vi' ? 'Tắt chế độ máy tính' : 'Turn off desktop mode') : (lang === 'vi' ? 'Bật chế độ máy tính' : 'Turn on desktop mode')}</span>
+                                <span>{isDesktopModeOnMobile ? text.turnOffDesktopMode : text.turnOnDesktopMode}</span>
                             </DropdownMenuItem>
                         )}
                         <DropdownMenuItem onClick={() => { setActiveProfileTab('profile'); setIsProfileOpen(true); }}>
                             <UserIcon className="mr-2 h-4 w-4" />
-                            <span>{lang === 'vi' ? 'Hồ sơ' : 'Profile'}</span>
+                            <span>{text.profile}</span>
                             {!isMobile && <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setActiveProfileTab('billing'); setIsProfileOpen(true); }}>
                             <CreditCard className="mr-2 h-4 w-4" />
-                            <span>{lang === 'vi' ? 'Gói cước' : 'Billing'}</span>
+                            <span>{text.billing}</span>
                             {!isMobile && <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => { setActiveProfileTab('advanced'); setIsProfileOpen(true); }}>
                             <Settings className="mr-2 h-4 w-4" />
-                            <span>{lang === 'vi' ? 'Cài đặt' : 'Settings'}</span>
+                            <span>{text.settings}</span>
                             {!isMobile && <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => navigate('/teams')}>
                             <Users className="mr-2 h-4 w-4" />
-                            <span>{lang === 'vi' ? 'Nhóm / Team' : 'Teams'}</span>
+                            <span>{text.teams}</span>
                         </DropdownMenuItem>
                     </DropdownMenuGroup>
 
@@ -169,7 +172,7 @@ export const NavUserSection: React.FC<NavUserSectionProps> = ({
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => navigate('/admin')}>
                                 <Shield className="mr-2 h-4 w-4 text-primary" />
-                                <span className="text-primary font-medium">{lang === 'vi' ? 'Quản trị viên' : 'Admin Panel'}</span>
+                                <span className="text-primary font-medium">{text.adminPanel}</span>
                             </DropdownMenuItem>
                         </>
                     )}
@@ -177,7 +180,7 @@ export const NavUserSection: React.FC<NavUserSectionProps> = ({
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={logout} className="cursor-pointer text-red-600 focus:text-red-600">
                         <LogOut className="mr-2 h-4 w-4" />
-                        <span>{lang === 'vi' ? 'Đăng xuất' : 'Log out'}</span>
+                        <span>{text.logOut}</span>
                         {!isMobile && <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>}
                     </DropdownMenuItem>
                 </DropdownMenuContent>

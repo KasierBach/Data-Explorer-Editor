@@ -32,6 +32,7 @@ import {
 } from '@/presentation/components/ui/select';
 import { useAppStore } from '@/core/services/store';
 import type { RowData } from '@/core/domain/entities';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface NoSqlVisualizeViewProps {
     data: RowData[];
@@ -98,24 +99,21 @@ const truncateTick = (label: string) => (
     label.length > 18 ? `${label.slice(0, 15)}...` : label
 );
 
-const metricLabel = (metricMode: MetricMode, metricField: string, lang: 'vi' | 'en') => {
+const metricLabel = (
+    metricMode: MetricMode,
+    metricField: string,
+    text: ReturnType<typeof getWorkspaceText>['noSqlVisualize'],
+) => {
     if (metricMode === 'count') {
-        return lang === 'vi' ? 'Số lượng tài liệu' : 'Document count';
+        return text.documentCount;
     }
 
-    const prefixMap: Record<Exclude<MetricMode, 'count'>, string> = lang === 'vi'
-        ? {
-            sum: 'Tổng',
-            avg: 'Trung bình',
-            min: 'Nhỏ nhất',
-            max: 'Lớn nhất',
-        }
-        : {
-            sum: 'Sum',
-            avg: 'Average',
-            min: 'Minimum',
-            max: 'Maximum',
-        };
+    const prefixMap: Record<Exclude<MetricMode, 'count'>, string> = {
+        sum: text.sum,
+        avg: text.average,
+        min: text.minimum,
+        max: text.maximum,
+    };
 
     return `${prefixMap[metricMode]} ${metricField}`;
 };
@@ -191,6 +189,7 @@ const buildFieldProfiles = (data: RowData[]) => {
 
 export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) => {
     const { lang, nosqlActiveCollection } = useAppStore();
+    const text = getWorkspaceText(lang).noSqlVisualize;
     const [chartType, setChartType] = useState<ChartType>('bar');
     const [groupField, setGroupField] = useState('');
     const [metricField, setMetricField] = useState('');
@@ -276,11 +275,11 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
     const topBucket = chartData[0];
     const metricTitle = metricLabel(
         resolvedMetricMode,
-        resolvedMetricField || (lang === 'vi' ? 'trường số' : 'numeric field'),
-        lang,
+        resolvedMetricField || text.numericFieldFallback,
+        text,
     );
     const chartLegendLabel = resolvedMetricMode === 'count'
-        ? (lang === 'vi' ? 'Số lượng' : 'Count')
+        ? text.countShort
         : resolvedMetricField;
 
     const renderChart = () => {
@@ -301,7 +300,7 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
                         <YAxis fontSize={10} axisLine={false} tickLine={false} />
                         <Tooltip
                             formatter={(value) => [formatMetricValue(value, lang), metricTitle]}
-                            labelFormatter={(label) => `${lang === 'vi' ? 'Nhóm' : 'Bucket'}: ${label}`}
+                            labelFormatter={(label) => `${text.bucket}: ${label}`}
                             contentStyle={{
                                 backgroundColor: 'hsl(var(--card))',
                                 border: '1px solid hsl(var(--border))',
@@ -367,7 +366,7 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
                     <YAxis fontSize={10} axisLine={false} tickLine={false} />
                     <Tooltip
                         formatter={(value) => [formatMetricValue(value, lang), metricTitle]}
-                        labelFormatter={(label) => `${lang === 'vi' ? 'Nhóm' : 'Bucket'}: ${label}`}
+                        labelFormatter={(label) => `${text.bucket}: ${label}`}
                         contentStyle={{
                             backgroundColor: 'hsl(var(--card))',
                             border: '1px solid hsl(var(--border))',
@@ -390,7 +389,7 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-muted-foreground opacity-50">
                 <BarChart3 className="h-12 w-12" />
                 <p className="text-sm font-medium">
-                    {lang === 'vi' ? 'Chưa có dữ liệu để trực quan hóa.' : 'No query results to visualize yet.'}
+                    {text.empty}
                 </p>
             </div>
         );
@@ -402,12 +401,10 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
                 <Settings2 className="h-12 w-12 opacity-30" />
                 <div>
                     <p className="text-base font-semibold">
-                        {lang === 'vi' ? 'Tập kết quả này chưa phù hợp để nhóm trực quan.' : 'This result set is not chart-ready yet.'}
+                        {text.notChartReadyTitle}
                     </p>
                     <p className="mt-2 max-w-lg text-sm text-muted-foreground/80">
-                        {lang === 'vi'
-                            ? 'Hãy dùng Aggregation Builder để tạo pipeline có field nhóm rõ ràng, hoặc chuyển sang Grid để kiểm tra dữ liệu thô.'
-                            : 'Use the Aggregation Builder to shape grouped fields first, or switch to Grid to inspect the raw result set.'}
+                        {text.notChartReadyDescription}
                     </p>
                 </div>
             </div>
@@ -420,40 +417,36 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
                 <div className="rounded-xl border bg-card/50 p-4">
                     <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         <Database className="h-3.5 w-3.5 text-emerald-500" />
-                        {lang === 'vi' ? 'Mẫu hiện tại' : 'Current sample'}
+                        {text.currentSample}
                     </div>
                     <div className="mt-3 text-2xl font-bold">{data.length}</div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                        {lang === 'vi'
-                            ? `document từ ${nosqlActiveCollection || 'collection'}`
-                            : `documents from ${nosqlActiveCollection || 'the current collection'}`}
+                        {text.documentsFrom(nosqlActiveCollection || text.currentCollectionFallback)}
                     </p>
                 </div>
 
                 <div className="rounded-xl border bg-card/50 p-4">
                     <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         <Filter className="h-3.5 w-3.5 text-blue-500" />
-                        {lang === 'vi' ? 'Nhóm khả dụng' : 'Grouping fields'}
+                        {text.groupingFields}
                     </div>
                     <div className="mt-3 text-2xl font-bold">{groupableFields.length}</div>
                     <p className="mt-1 text-xs text-muted-foreground">
                         {bestGroupingField
-                            ? `${lang === 'vi' ? 'Gợi ý mạnh nhất' : 'Best default'}: ${bestGroupingField}`
-                            : lang === 'vi'
-                                ? 'Chưa có field nhóm phù hợp.'
-                                : 'No strong grouping field yet.'}
+                            ? text.bestDefault(bestGroupingField)
+                            : text.noStrongGrouping}
                     </p>
                 </div>
 
                 <div className="rounded-xl border bg-card/50 p-4">
                     <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         <BarChart3 className="h-3.5 w-3.5 text-orange-500" />
-                        {lang === 'vi' ? 'Metric số' : 'Numeric metrics'}
+                        {text.numericMetrics}
                     </div>
                     <div className="mt-3 text-2xl font-bold">{numericFields.length}</div>
                     <p className="mt-1 text-xs text-muted-foreground">
                         {metricMode === 'count'
-                            ? (lang === 'vi' ? 'Đang dùng đếm tài liệu.' : 'Currently using document count.')
+                            ? text.usingDocumentCount
                             : metricTitle}
                     </p>
                 </div>
@@ -461,13 +454,13 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
                 <div className="rounded-xl border bg-card/50 p-4">
                     <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                         <PieIcon className="h-3.5 w-3.5 text-pink-500" />
-                        {lang === 'vi' ? 'Nhóm nổi bật' : 'Top bucket'}
+                        {text.topBucket}
                     </div>
                     <div className="mt-3 text-lg font-bold">{topBucket?.label || '-'}</div>
                     <p className="mt-1 text-xs text-muted-foreground">
                         {topBucket
                             ? `${topBucket.value.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US')} ${chartLegendLabel}`
-                            : (lang === 'vi' ? 'Chưa có nhóm nổi bật.' : 'No dominant bucket yet.')}
+                            : text.noTopBucket}
                     </p>
                 </div>
             </div>
@@ -504,11 +497,11 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
                     <div className="grid flex-1 gap-3 md:grid-cols-3">
                         <div className="space-y-1">
                             <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                                {lang === 'vi' ? 'Nhóm theo' : 'Group by'}
+                                {text.groupBy}
                             </span>
                             <Select value={resolvedGroupField} onValueChange={setGroupField}>
                                 <SelectTrigger className="h-9 text-xs">
-                                    <SelectValue placeholder={lang === 'vi' ? 'Chọn field nhóm' : 'Choose a grouping field'} />
+                                    <SelectValue placeholder={text.groupFieldPlaceholder} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {groupableFields.map((field) => (
@@ -522,28 +515,28 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
 
                         <div className="space-y-1">
                             <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                                {lang === 'vi' ? 'Metric' : 'Metric'}
+                                {text.metric}
                             </span>
                             <Select
                                 value={resolvedMetricMode}
                                 onValueChange={(value) => setMetricMode(value as MetricMode)}
                             >
                                 <SelectTrigger className="h-9 text-xs">
-                                    <SelectValue placeholder={lang === 'vi' ? 'Chọn metric' : 'Choose a metric'} />
+                                    <SelectValue placeholder={text.metricPlaceholder} />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="count">{lang === 'vi' ? 'Đếm tài liệu' : 'Document count'}</SelectItem>
-                                    <SelectItem value="sum">{lang === 'vi' ? 'Tổng' : 'Sum'}</SelectItem>
-                                    <SelectItem value="avg">{lang === 'vi' ? 'Trung bình' : 'Average'}</SelectItem>
-                                    <SelectItem value="min">{lang === 'vi' ? 'Nhỏ nhất' : 'Minimum'}</SelectItem>
-                                    <SelectItem value="max">{lang === 'vi' ? 'Lớn nhất' : 'Maximum'}</SelectItem>
+                                    <SelectItem value="count">{text.countMetric}</SelectItem>
+                                    <SelectItem value="sum">{text.sum}</SelectItem>
+                                    <SelectItem value="avg">{text.average}</SelectItem>
+                                    <SelectItem value="min">{text.minimum}</SelectItem>
+                                    <SelectItem value="max">{text.maximum}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div className="space-y-1">
                             <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
-                                {lang === 'vi' ? 'Field số' : 'Numeric field'}
+                                {text.numericField}
                             </span>
                             <Select
                                 value={resolvedMetricField}
@@ -554,8 +547,8 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
                                     <SelectValue
                                         placeholder={
                                             resolvedMetricMode === 'count'
-                                                ? (lang === 'vi' ? 'Không cần cho Count' : 'Not needed for Count')
-                                                : (lang === 'vi' ? 'Chọn field số' : 'Choose a numeric field')
+                                                ? text.notNeededForCount
+                                                : text.numericFieldPlaceholder
                                         }
                                     />
                                 </SelectTrigger>
@@ -572,9 +565,7 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
                 </div>
 
                 <div className="mt-3 rounded-lg border border-dashed border-orange-500/20 bg-orange-500/5 px-3 py-2 text-xs text-orange-100/80">
-                    {lang === 'vi'
-                        ? 'Visualize giờ dùng để rút insight nhanh từ tập kết quả hiện tại. Nếu bạn cần số liệu toàn collection hoặc group phức tạp hơn, hãy dùng Aggregation Builder với $group trước rồi quay lại đây.'
-                        : 'Visualize now focuses on quick insight extraction from the current result set. For collection-wide metrics or more advanced grouping, shape the dataset with the Aggregation Builder first and then return here.'}
+                    {text.insightHint}
                 </div>
             </div>
 
@@ -583,9 +574,7 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
                     <>
                         <div className="mb-3">
                             <h3 className="text-sm font-semibold">
-                                {lang === 'vi'
-                                    ? `So sánh theo ${resolvedGroupField}`
-                                    : `Comparing groups by ${resolvedGroupField}`}
+                                {text.compareBy(resolvedGroupField)}
                             </h3>
                             <p className="text-xs text-muted-foreground">
                                 {metricTitle}
@@ -599,9 +588,7 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
                     <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-muted-foreground">
                         <Settings2 className="h-10 w-10 opacity-20" />
                         <p className="text-sm font-medium">
-                            {lang === 'vi'
-                                ? 'Không đủ dữ liệu số cho metric hiện tại. Hãy đổi sang Count hoặc chọn field số khác.'
-                                : 'Not enough numeric data for the current metric. Switch to Count or choose another numeric field.'}
+                            {text.insufficientNumericData}
                         </p>
                     </div>
                 )}

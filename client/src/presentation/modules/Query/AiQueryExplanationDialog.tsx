@@ -10,6 +10,7 @@ import {
 } from '@/presentation/components/ui/dialog';
 import { Button } from '@/presentation/components/ui/button';
 import { AiMarkdownContent } from './AiMarkdownContent';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface AiQueryExplanationDialogProps {
     open: boolean;
@@ -31,25 +32,7 @@ export const AiQueryExplanationDialog: React.FC<AiQueryExplanationDialogProps> =
     error,
 }) => {
     const lines = sql.split('\n');
-    const text = lang === 'vi'
-        ? {
-            title: 'AI Giải Thích Truy Vấn',
-            description: 'AI sẽ diễn giải câu SQL theo từng phần, nêu mục đích và các lưu ý nếu có.',
-            query: 'Truy vấn',
-            explanation: 'Giải thích',
-            loading: 'AI đang phân tích câu SQL này...',
-            fallback: 'AI chưa trả về phần giải thích.',
-            close: 'Đóng',
-        }
-        : {
-            title: 'AI Query Explanation',
-            description: 'AI breaks down the SQL step by step, explains the intent, and calls out important notes.',
-            query: 'Query',
-            explanation: 'Explanation',
-            loading: 'AI is analyzing this SQL...',
-            fallback: 'The AI did not return an explanation yet.',
-            close: 'Close',
-        };
+    const text = getWorkspaceText(lang).aiQueryExplanation;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -77,7 +60,7 @@ export const AiQueryExplanationDialog: React.FC<AiQueryExplanationDialogProps> =
                                                     {index + 1}
                                                 </div>
                                                 <pre className="overflow-x-auto whitespace-pre-wrap break-words px-4 text-foreground">
-                                                    {line || ' '}
+                                                    {line || '\u00A0'}
                                                 </pre>
                                             </React.Fragment>
                                         ))}

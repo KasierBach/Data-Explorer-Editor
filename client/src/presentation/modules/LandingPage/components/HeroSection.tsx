@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Sparkles, ArrowRight, Hexagon } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { motion, type Variants } from 'framer-motion';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface HeroSectionProps {
     lang: string;
@@ -11,6 +12,7 @@ interface HeroSectionProps {
 
 export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated }) => {
     const navigate = useNavigate();
+    const text = getWorkspaceText(lang).heroSection;
 
     const containerVariants = {
         hidden: { opacity: 0 },
@@ -77,34 +79,21 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                     variants={itemVariants}
                     className="text-5xl md:text-7xl font-extrabold tracking-tight mb-4 md:mb-8 bg-gradient-to-br from-white via-white to-white/40 bg-clip-text text-transparent max-w-5xl mx-auto leading-tight md:leading-[1.1] pb-2 cursor-default"
                 >
-                    {lang === 'vi' ? (
-                        <>HỆ QUẢN TRỊ <br /> 
-                        <motion.span 
-                            animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                            transition={{ duration: 5, ease: "linear", repeat: Infinity }}
-                            className="bg-[length:200%_200%] bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 bg-clip-text text-transparent inline-block"
-                        >
-                            CƠ SỞ DỮ LIỆU BẰNG AI
-                        </motion.span></>
-                    ) : (
-                        <>THE AI-POWERED <br /> 
-                        <motion.span 
-                            animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                            transition={{ duration: 5, ease: "linear", repeat: Infinity }}
-                            className="bg-[length:200%_200%] bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 bg-clip-text text-transparent inline-block"
-                        >
-                            DATABASE IDE
-                        </motion.span></>
-                    )}
+                    <>{text.titlePrefix} <br /> 
+                    <motion.span 
+                        animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                        transition={{ duration: 5, ease: "linear", repeat: Infinity }}
+                        className="bg-[length:200%_200%] bg-gradient-to-r from-blue-400 via-indigo-500 to-purple-500 bg-clip-text text-transparent inline-block"
+                    >
+                        {text.titleHighlight}
+                    </motion.span></>
                 </motion.h1>
                 
                 <motion.p 
                     variants={itemVariants}
                     className="text-lg md:text-xl text-muted-foreground/80 max-w-2xl mx-auto mb-8 md:mb-12 leading-relaxed font-medium"
                 >
-                    {lang === 'vi'
-                        ? 'Thay thế các công cụ cũ kĩ. Kết nối SQL & NoSQL, bảo mật đa lớp chuẩn doanh nghiệp (SSRF & SQL Guard), và viết query siêu tốc cùng AI Assistant.'
-                        : 'Ditch the legacy tools. Connect to SQL & NoSQL simultaneously, secure your workflows with Enterprise-grade guardrails, and write queries at lightspeed.'}
+                    {text.description}
                 </motion.p>
                 
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-6">
@@ -116,7 +105,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                             onClick={() => navigate(isAuthenticated ? '/sql-explorer' : '/login')} 
                             className="relative h-12 px-8 text-[11px] font-bold uppercase tracking-[0.15em] bg-background/50 hover:bg-background/80 text-white backdrop-blur-xl border border-blue-400/30 w-full sm:w-auto rounded-xl transition-all hover:scale-[1.02] active:scale-95"
                         >
-                            {isAuthenticated ? (lang === 'vi' ? 'Vào Workspace' : 'Open Workspace') : (lang === 'vi' ? 'Nhận quyền truy cập' : 'Claim Your Access')}
+                            {isAuthenticated ? text.openWorkspace : text.claimAccess}
                             <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1.5 transition-transform text-blue-400" />
                         </Button>
                     </div>
@@ -128,7 +117,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                         className="relative overflow-hidden group h-12 px-8 text-[11px] font-bold uppercase tracking-[0.15em] w-full sm:w-auto glass-panel hover:bg-white/10 hover:text-white text-muted-foreground/90 rounded-xl border-white/[0.08] backdrop-blur-md transition-colors"
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out" />
-                        <span className="relative z-10">{lang === 'vi' ? 'Tài liệu hướng dẫn' : 'Documentation'}</span>
+                        <span className="relative z-10">{text.documentation}</span>
                     </Button>
                 </motion.div>
             </motion.div>

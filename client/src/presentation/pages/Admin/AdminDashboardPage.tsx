@@ -7,9 +7,11 @@ import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayou
 import { cn } from '@/lib/utils';
 import { UsersView } from './UsersView';
 import { AuditLogsView } from './AuditLogsView';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 export function AdminDashboardPage() {
     const { lang } = useAppStore();
+    const text = getWorkspaceText(lang).adminDashboardPage;
     const navigate = useNavigate();
     const { isCompactMobileLayout } = useResponsiveLayoutMode();
     const [activeTab, setActiveTab] = useState<'users' | 'audit'>('users');
@@ -18,12 +20,12 @@ export function AdminDashboardPage() {
         {
             key: 'users' as const,
             icon: Users,
-            label: lang === 'vi' ? 'Quản lý người dùng' : 'User Management',
+            label: text.userManagement,
         },
         {
             key: 'audit' as const,
             icon: Shield,
-            label: lang === 'vi' ? 'Nhật ký hệ thống' : 'Audit Logs',
+            label: text.auditLogs,
         },
     ];
 
@@ -37,12 +39,12 @@ export function AdminDashboardPage() {
                     <div className="flex min-w-0 items-center gap-2">
                         <Shield className="h-5 w-5 shrink-0 text-primary" />
                         <div className="min-w-0">
-                            <div className="truncate font-bold text-base sm:text-lg">{lang === 'vi' ? 'Bang quan tri' : 'Admin Panel'}</div>
+                            <div className="truncate font-bold text-base sm:text-lg">{text.adminPanel}</div>
                             {isCompactMobileLayout && (
                                 <div className="text-[11px] text-muted-foreground">
                                     {activeTab === 'users'
-                                        ? (lang === 'vi' ? 'Người dùng' : 'Users')
-                                        : (lang === 'vi' ? 'Nhật ký' : 'Audit')}
+                                        ? text.usersShort
+                                        : text.auditShort}
                                 </div>
                             )}
                         </div>
@@ -74,8 +76,8 @@ export function AdminDashboardPage() {
                 <header className="hidden h-14 items-center border-b bg-card px-6 md:flex">
                     <h1 className="text-lg font-semibold">
                         {activeTab === 'users'
-                            ? (lang === 'vi' ? 'Quản lý người dùng' : 'User Management')
-                            : (lang === 'vi' ? 'Nhật ký hệ thống' : 'Audit Logs')}
+                            ? text.userManagement
+                            : text.auditLogs}
                     </h1>
                 </header>
                 <main className="flex-1 overflow-auto p-4 sm:p-6">

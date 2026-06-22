@@ -3,6 +3,7 @@ import { useAppStore } from '@/core/services/store';
 import { apiService } from '@/core/services/api.service';
 import { toast } from 'sonner';
 import type { AuthUser } from '@/core/services/store/slices/authSlice';
+import { getProfileDialogText } from '../profileI18n';
 
 const getErrorMessage = (error: unknown) => (
     error instanceof Error ? error.message : 'Something went wrong'
@@ -10,6 +11,7 @@ const getErrorMessage = (error: unknown) => (
 
 export const useUserProfile = (isOpen: boolean) => {
     const { user, updateUser, lang } = useAppStore();
+    const text = getProfileDialogText(lang);
     const [isLoading, setIsLoading] = useState(false);
 
     // Profile State
@@ -42,7 +44,7 @@ export const useUserProfile = (isOpen: boolean) => {
                 firstName, lastName, email, username, jobRole, bio, phoneNumber, address
             });
             updateUser(data);
-            toast.success(lang === 'vi' ? "Cập nhật hồ sơ thành công!" : "Profile updated successfully!");
+            toast.success(text.profileUpdated);
             return true;
         } catch (err) {
             toast.error(getErrorMessage(err));
@@ -57,7 +59,7 @@ export const useUserProfile = (isOpen: boolean) => {
         try {
             const data = await apiService.patch<AuthUser>('/users/profile', { avatarUrl: base64String });
             updateUser(data);
-            toast.success(lang === 'vi' ? "Cập nhật ảnh đại diện thành công!" : "Avatar updated successfully!");
+            toast.success(text.avatarUpdated);
             return true;
         } catch (err) {
             toast.error(getErrorMessage(err));

@@ -10,21 +10,7 @@ import {
 } from "@/presentation/components/ui/dropdown-menu";
 import { Button } from '@/presentation/components/ui/button';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
-
-/** Translates default tab titles to the active language. */
-function getTabDisplayTitle(tab: { type: string; title: string }, lang: string): string {
-    if (tab.type === 'query' && /^Query \d+$/.test(tab.title)) {
-        return lang === 'vi' ? `Truy vấn ${tab.title.split(' ')[1]}` : tab.title;
-    }
-    // Legacy support for old "New Query" tabs
-    if (tab.type === 'query' && tab.title === 'New Query') {
-        return lang === 'vi' ? 'Truy vấn mới' : 'New Query';
-    }
-    if (tab.type === 'visualize' && tab.title === 'Visualizer Hub') {
-        return lang === 'vi' ? 'Trạm trực quan' : 'Visualizer Hub';
-    }
-    return tab.title;
-}
+import { getLayoutTabTitle } from './layoutI18n';
 
 export const TabsBar: React.FC = () => {
     const { tabs, activeTabId, setActiveTab, closeTab, reorderTabs, lang } = useAppStore();
@@ -113,7 +99,7 @@ export const TabsBar: React.FC = () => {
                         <Database className="w-3.5 h-3.5 text-blue-500/80 shrink-0" />
 
                         <span className="truncate flex-1">
-                            {getTabDisplayTitle(tab, lang)}
+                            {getLayoutTabTitle(tab, lang)}
                         </span>
 
                         <button
@@ -147,7 +133,7 @@ export const TabsBar: React.FC = () => {
                         >
                             <Database className="w-4 h-4 mr-3 text-blue-500/80" />
                             <span className="truncate flex-1">
-                                {getTabDisplayTitle(tab, lang)}
+                                {getLayoutTabTitle(tab, lang)}
                             </span>
                         </DropdownMenuItem>
                     ))}

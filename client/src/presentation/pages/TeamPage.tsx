@@ -618,7 +618,7 @@ export function TeamPage() {
                       <TabButton value="members" label={text.members} icon={Users} count={members.length} />
                       <TabButton value="connections" label={text.connections} icon={Database} count={teamConnections.length} />
                       <TabButton value="queries" label={text.queries} icon={FileText} count={teamQueries.length} />
-                      <TabButton value="dashboards" label={lang === 'vi' ? 'Dashboard' : 'Dashboards'} icon={LayoutDashboard} count={teamDashboards.length} />
+                      <TabButton value="dashboards" label={text.dashboards} icon={LayoutDashboard} count={teamDashboards.length} />
                       <TabButton value="backups" label={text.backups} icon={Download} />
                       <TabButton value="activity" label={text.activity} icon={MessageSquare} count={teamActivities.length} />
                     </div>
@@ -849,7 +849,7 @@ export function TeamPage() {
                           <Textarea
                             value={backupJson}
                             onChange={(event) => setBackupJson(event.target.value)}
-                            placeholder={lang === 'vi' ? 'Dan backup JSON vao day...' : 'Paste backup JSON here...'}
+                            placeholder={text.backupJsonPlaceholder}
                             className="min-h-56 font-mono text-xs"
                           />
                           <div className="flex flex-wrap items-center gap-2">
@@ -864,7 +864,7 @@ export function TeamPage() {
                             <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
                               <div className="font-medium text-foreground">{text.restoreComplete}</div>
                               <div className="mt-1">
-                                {text.teamspaces}: {backupSummary.created.teamspaces}, {text.queries}: {backupSummary.created.savedQueries}, {lang === 'vi' ? 'Dashboard' : 'Dashboards'}: {backupSummary.created.dashboards}, ERD: {backupSummary.created.erdWorkspaces}
+                                {text.teamspaces}: {backupSummary.created.teamspaces}, {text.queries}: {backupSummary.created.savedQueries}, {text.dashboards}: {backupSummary.created.dashboards}, ERD: {backupSummary.created.erdWorkspaces}
                               </div>
                               {backupSummary.warnings.length > 0 && (
                                 <div className="mt-2 space-y-1">

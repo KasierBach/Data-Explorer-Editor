@@ -6,6 +6,7 @@ import { Button } from '@/presentation/components/ui/button';
 import { Badge } from '@/presentation/components/ui/badge';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { toast } from 'sonner';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 function getErrorMessage(error: unknown) {
     return error instanceof Error ? error.message : 'Unexpected error';
@@ -13,9 +14,12 @@ function getErrorMessage(error: unknown) {
 
 export function UsersView() {
     const { lang } = useAppStore();
+    const text = getWorkspaceText(lang).usersView;
     const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const roleLabel = (role: AdminUser['role']) => (role === 'admin' ? text.admin : text.user);
 
     const fetchUsers = useCallback(async () => {
         try {
@@ -23,12 +27,12 @@ export function UsersView() {
             const data = await adminService.getUsers();
             setUsers(data);
         } catch (error) {
-            toast.error(lang === 'vi' ? 'Không thể tải danh sách người dùng' : 'Failed to load users');
+            toast.error(text.loadFailed);
             console.error(error);
         } finally {
             setLoading(false);
         }
-    }, [lang]);
+    }, [text]);
 
     useEffect(() => {
         fetchUsers();
@@ -38,7 +42,7 @@ export function UsersView() {
         const newRole = user.role === 'admin' ? 'user' : 'admin';
         try {
             await adminService.updateRole(user.id, newRole);
-            toast.success(lang === 'vi' ? `Đã cập nhật vai trò thành ${newRole}` : `Role updated to ${newRole}`);
+            toast.success(text.roleUpdated(roleLabel(newRole)));
             fetchUsers();
         } catch (error) {
             toast.error(getErrorMessage(error));
@@ -46,36 +50,28 @@ export function UsersView() {
     };
 
     const resetPassword = async (user: AdminUser) => {
-        const newPassword = prompt(
-            lang === 'vi'
-                ? 'Nhập mật khẩu mới (ít nhất 6 ký tự):'
-                : 'Enter new password (min 6 characters):'
-        );
+        const newPassword = prompt(text.passwordPrompt);
         if (!newPassword) return;
         if (newPassword.length < 6) {
-            toast.error(lang === 'vi' ? 'Mật khẩu phải dài ít nhất 6 ký tự' : 'Password must be at least 6 characters');
+            toast.error(text.passwordTooShort);
             return;
         }
 
         try {
             await adminService.resetPassword(user.id, newPassword);
-            toast.success(lang === 'vi' ? 'Đã đặt lại mật khẩu thành công' : 'Password reset successfully');
+            toast.success(text.passwordResetSuccess);
         } catch (error) {
             toast.error(getErrorMessage(error));
         }
     };
 
     const deleteUser = async (user: AdminUser) => {
-        const confirmed = window.confirm(
-            lang === 'vi'
-                ? `Bạn có chắc chắn muốn xóa người dùng ${user.email}?`
-                : `Are you sure you want to delete user ${user.email}?`
-        );
+        const confirmed = window.confirm(text.deleteConfirm(user.email));
         if (!confirmed) return;
 
         try {
             await adminService.deleteUser(user.id);
-            toast.success(lang === 'vi' ? 'Đã xóa người dùng thành công' : 'User deleted successfully');
+            toast.success(text.userDeleted);
             fetchUsers();
         } catch (error) {
             toast.error(getErrorMessage(error));
@@ -93,7 +89,7 @@ export function UsersView() {
     };
 
     if (loading) {
-        return <div className="flex justify-center p-8 text-muted-foreground">{lang === 'vi' ? 'Đang tải...' : 'Loading...'}</div>;
+        return <div className="flex justify-center p-8 text-muted-foreground">{text.loading}</div>;
     }
 
     const ActionButtons = ({ user }: { user: AdminUser }) => (
@@ -102,11 +98,11 @@ export function UsersView() {
                 variant="outline"
                 size="sm"
                 onClick={() => toggleRole(user)}
-                title={user.role === 'admin' ? (lang === 'vi' ? 'Hạ quyền về user' : 'Demote to User') : (lang === 'vi' ? 'Nâng quyền lên admin' : 'Promote to Admin')}
+                title={user.role === 'admin' ? text.demoteTitle : text.promoteTitle}
                 className="gap-2"
             >
                 <Shield className="h-3.5 w-3.5" />
-                {isSmallMobile && <span>{user.role === 'admin' ? (lang === 'vi' ? 'Hạ quyền' : 'Demote') : (lang === 'vi' ? 'Nâng quyền' : 'Promote')}</span>}
+                {isSmallMobile && <span>{user.role === 'admin' ? text.demote : text.promote}</span>}
             </Button>
 
             <Button
@@ -114,34 +110,34 @@ export function UsersView() {
                 size="sm"
                 onClick={() => toggleBan(user)}
                 className={`gap-2 ${user.isBanned ? 'text-green-500 hover:text-green-600' : 'text-orange-500 hover:text-orange-600'}`}
-                title={user.isBanned ? (lang === 'vi' ? 'Mở khóa người dùng' : 'Unban User') : (lang === 'vi' ? 'Khóa người dùng' : 'Ban User')}
+                title={user.isBanned ? text.unbanTitle : text.banTitle}
                 disabled={user.role === 'admin'}
             >
                 {user.isBanned ? <UserCheck className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}
-                {isSmallMobile && <span>{user.isBanned ? (lang === 'vi' ? 'Mở khóa' : 'Unban') : (lang === 'vi' ? 'Khóa' : 'Ban')}</span>}
+                {isSmallMobile && <span>{user.isBanned ? text.unban : text.ban}</span>}
             </Button>
 
             <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => resetPassword(user)}
-                title={lang === 'vi' ? 'Đặt lại mật khẩu' : 'Reset Password'}
+                title={text.resetPassword}
                 className="gap-2"
             >
                 <KeyRound className="h-3.5 w-3.5" />
-                {isSmallMobile && <span>{lang === 'vi' ? 'Đặt lại' : 'Reset'}</span>}
+                {isSmallMobile && <span>{text.reset}</span>}
             </Button>
 
             <Button
                 variant="destructive"
                 size="sm"
                 onClick={() => deleteUser(user)}
-                title={lang === 'vi' ? 'Xóa người dùng' : 'Delete User'}
+                title={text.deleteUser}
                 disabled={user.role === 'admin'}
                 className="gap-2"
             >
                 <Trash2 className="h-3.5 w-3.5" />
-                {isSmallMobile && <span>{lang === 'vi' ? 'Xóa' : 'Delete'}</span>}
+                {isSmallMobile && <span>{text.delete}</span>}
             </Button>
         </div>
     );
@@ -159,10 +155,10 @@ export function UsersView() {
                                 <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <div className="break-words font-medium">
-                                            {[user.firstName, user.lastName].filter(Boolean).join(' ') || (lang === 'vi' ? 'Chưa đặt tên' : 'No name')}
+                                            {[user.firstName, user.lastName].filter(Boolean).join(' ') || text.noName}
                                         </div>
                                         {user.isBanned && (
-                                            <span className="text-[10px] font-bold uppercase tracking-tight text-red-500">{lang === 'vi' ? 'BỊ KHÓA' : 'Banned'}</span>
+                                            <span className="text-[10px] font-bold uppercase tracking-tight text-red-500">{text.banned}</span>
                                         )}
                                     </div>
                                     <div className="break-all text-sm text-muted-foreground">{user.email}</div>
@@ -171,19 +167,19 @@ export function UsersView() {
 
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div>
-                                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{lang === 'vi' ? 'Vai trò' : 'Role'}</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{text.role}</div>
                                     <div className="mt-1">
                                         {user.role === 'admin' ? (
                                             <Badge variant="default" className="w-fit bg-indigo-500 hover:bg-indigo-600">
-                                                <ShieldAlert className="mr-1 h-3 w-3" /> {lang === 'vi' ? 'Quản trị' : 'Admin'}
+                                                <ShieldAlert className="mr-1 h-3 w-3" /> {text.admin}
                                             </Badge>
                                         ) : (
-                                            <Badge variant="secondary" className="w-fit">{lang === 'vi' ? 'Người dùng' : 'User'}</Badge>
+                                            <Badge variant="secondary" className="w-fit">{text.user}</Badge>
                                         )}
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{lang === 'vi' ? 'Ngày tham gia' : 'Joined'}</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{text.joined}</div>
                                     <div className="mt-1 text-sm text-muted-foreground">
                                         {new Date(user.createdAt).toLocaleDateString()}
                                     </div>
@@ -194,7 +190,7 @@ export function UsersView() {
                         </div>
                     ))}
                     {users.length === 0 && (
-                        <div className="p-8 text-center text-sm text-muted-foreground">{lang === 'vi' ? 'Không có người dùng nào.' : 'No users found.'}</div>
+                        <div className="p-8 text-center text-sm text-muted-foreground">{text.noUsers}</div>
                     )}
                 </div>
             ) : (
@@ -202,11 +198,11 @@ export function UsersView() {
                     <table className="w-full text-left text-sm">
                         <thead className="bg-muted/50 text-xs uppercase text-muted-foreground">
                             <tr>
-                                <th className="px-6 py-3">{lang === 'vi' ? 'Tên' : 'Name'}</th>
+                                <th className="px-6 py-3">{text.name}</th>
                                 <th className="px-6 py-3">Email</th>
-                                <th className="px-6 py-3">{lang === 'vi' ? 'Vai trò' : 'Role'}</th>
-                                <th className="px-6 py-3">{lang === 'vi' ? 'Ngày tham gia' : 'Joined Date'}</th>
-                                <th className="px-6 py-3 text-right">{lang === 'vi' ? 'Hành động' : 'Actions'}</th>
+                                <th className="px-6 py-3">{text.role}</th>
+                                <th className="px-6 py-3">{text.joinedDate}</th>
+                                <th className="px-6 py-3 text-right">{text.actions}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -219,10 +215,10 @@ export function UsersView() {
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="font-medium">
-                                                    {[user.firstName, user.lastName].filter(Boolean).join(' ') || (lang === 'vi' ? 'Chưa đặt tên' : 'No name')}
+                                                    {[user.firstName, user.lastName].filter(Boolean).join(' ') || text.noName}
                                                 </span>
                                                 {user.isBanned && (
-                                                    <span className="text-[10px] font-bold uppercase tracking-tighter text-red-500">{lang === 'vi' ? 'BỊ KHÓA' : 'BANNED'}</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-tighter text-red-500">{text.banned}</span>
                                                 )}
                                             </div>
                                         </div>
@@ -231,10 +227,10 @@ export function UsersView() {
                                     <td className="px-6 py-4">
                                         {user.role === 'admin' ? (
                                             <Badge variant="default" className="w-fit bg-indigo-500 hover:bg-indigo-600">
-                                                <ShieldAlert className="mr-1 h-3 w-3" /> {lang === 'vi' ? 'Quản trị' : 'Admin'}
+                                                <ShieldAlert className="mr-1 h-3 w-3" /> {text.admin}
                                             </Badge>
                                         ) : (
-                                            <Badge variant="secondary" className="w-fit">{lang === 'vi' ? 'Người dùng' : 'User'}</Badge>
+                                            <Badge variant="secondary" className="w-fit">{text.user}</Badge>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 text-xs text-muted-foreground">
@@ -246,7 +242,7 @@ export function UsersView() {
                                                 variant="outline"
                                                 size="sm"
                                                 onClick={() => toggleRole(user)}
-                                                title={user.role === 'admin' ? (lang === 'vi' ? 'Hạ quyền về user' : 'Demote to User') : (lang === 'vi' ? 'Nâng quyền lên admin' : 'Promote to Admin')}
+                                                title={user.role === 'admin' ? text.demoteTitle : text.promoteTitle}
                                             >
                                                 <Shield className="h-3.5 w-3.5" />
                                             </Button>
@@ -256,7 +252,7 @@ export function UsersView() {
                                                 size="sm"
                                                 onClick={() => toggleBan(user)}
                                                 className={user.isBanned ? 'text-green-500 hover:text-green-600' : 'text-orange-500 hover:text-orange-600'}
-                                                title={user.isBanned ? (lang === 'vi' ? 'Mở khóa người dùng' : 'Unban User') : (lang === 'vi' ? 'Khóa người dùng' : 'Ban User')}
+                                                title={user.isBanned ? text.unbanTitle : text.banTitle}
                                                 disabled={user.role === 'admin'}
                                             >
                                                 {user.isBanned ? <UserCheck className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}
@@ -266,7 +262,7 @@ export function UsersView() {
                                                 variant="secondary"
                                                 size="sm"
                                                 onClick={() => resetPassword(user)}
-                                                title={lang === 'vi' ? 'Đặt lại mật khẩu' : 'Reset Password'}
+                                                title={text.resetPassword}
                                             >
                                                 <KeyRound className="h-3.5 w-3.5" />
                                             </Button>
@@ -275,7 +271,7 @@ export function UsersView() {
                                                 variant="destructive"
                                                 size="sm"
                                                 onClick={() => deleteUser(user)}
-                                                title={lang === 'vi' ? 'Xóa người dùng' : 'Delete User'}
+                                                title={text.deleteUser}
                                                 disabled={user.role === 'admin'}
                                             >
                                                 <Trash2 className="h-3.5 w-3.5" />

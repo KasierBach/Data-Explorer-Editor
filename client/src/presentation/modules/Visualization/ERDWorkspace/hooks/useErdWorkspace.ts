@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { ErdWorkspaceService, type SaveErdWorkspacePayload } from '@/core/services/ErdWorkspaceService';
 import type { ErdWorkspaceEntity } from '@/core/domain/entities';
 import { ApiError } from '@/core/services/api.service';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface UseErdWorkspaceOptions {
     connectionId: string;
@@ -30,6 +31,7 @@ export function useErdWorkspace({
     handleSetSelectedDatabase,
     lang,
 }: UseErdWorkspaceOptions) {
+    const text = getWorkspaceText(lang).erd;
     const queryClient = useQueryClient();
     const hasShownWorkspaceWarning = useRef(false);
 
@@ -45,21 +47,19 @@ export function useErdWorkspace({
 
         toast.error(
             isStorageUnavailable
-                ? (lang === 'vi' ? 'Kho workspace ERD chưa sẵn sàng' : 'ERD workspace storage is not ready yet')
-                : (lang === 'vi' ? 'Không thể tải danh sách workspace ERD' : 'Failed to load ERD workspaces'),
+                ? text.storageNotReady
+                : text.loadFailed,
             {
                 description: isStorageUnavailable
-                    ? (lang === 'vi'
-                        ? 'Trang ERD vẫn dùng được, nhưng bạn cần sync schema backend để lưu workspace.'
-                        : 'The ERD page still works, but the backend schema must be synced before workspaces can be saved.')
+                    ? text.storageDescription
                     : (error instanceof Error ? error.message : undefined),
             },
         );
-    }, [lang]);
+    }, [text]);
 
     const saveWorkspace = useCallback(async (values: { name: string; notes: string }) => {
         if (!connectionId) {
-            throw new Error(lang === 'vi' ? 'Chưa có connection để lưu workspace.' : 'No connection selected for this workspace.');
+            throw new Error(text.noConnectionToSave);
         }
 
         const payload: Partial<SaveErdWorkspacePayload> = {
@@ -79,17 +79,17 @@ export function useErdWorkspace({
         setCurrentWorkspaceNotes(workspace.notes || '');
 
         await queryClient.invalidateQueries({ queryKey: ['erd-workspaces', connectionId] });
-        toast.success(lang === 'vi' ? 'Đã lưu workspace ERD' : 'ERD workspace saved');
+        toast.success(text.saved);
     }, [
         buildWorkspaceLayout,
         connectionId,
         currentWorkspaceId,
-        lang,
         queryClient,
         selectedDatabase,
         setCurrentWorkspaceId,
         setCurrentWorkspaceName,
         setCurrentWorkspaceNotes,
+        text,
     ]);
 
     const loadWorkspace = useCallback(async (workspace: ErdWorkspaceEntity) => {
@@ -101,15 +101,15 @@ export function useErdWorkspace({
         setCurrentWorkspaceId(workspace.id);
         setCurrentWorkspaceName(workspace.name);
         setCurrentWorkspaceNotes(workspace.notes || '');
-        toast.success(lang === 'vi' ? 'Đã mở workspace ERD' : 'ERD workspace loaded');
+        toast.success(text.loaded);
     }, [
         applyWorkspaceLayout,
         handleSetSelectedDatabase,
-        lang,
         selectedDatabase,
         setCurrentWorkspaceId,
         setCurrentWorkspaceName,
         setCurrentWorkspaceNotes,
+        text,
     ]);
 
     const deleteWorkspace = useCallback(async (workspace: ErdWorkspaceEntity) => {
@@ -120,15 +120,15 @@ export function useErdWorkspace({
             setCurrentWorkspaceNotes('');
         }
         await queryClient.invalidateQueries({ queryKey: ['erd-workspaces', connectionId] });
-        toast.success(lang === 'vi' ? 'Đã xóa workspace ERD' : 'ERD workspace deleted');
+        toast.success(text.deleted);
     }, [
         connectionId,
         currentWorkspaceId,
-        lang,
         queryClient,
         setCurrentWorkspaceId,
         setCurrentWorkspaceName,
         setCurrentWorkspaceNotes,
+        text,
     ]);
 
     return {

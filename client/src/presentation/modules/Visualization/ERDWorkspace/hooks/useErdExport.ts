@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface UseErdExportOptions {
     selectedDatabase?: string;
@@ -14,6 +15,8 @@ export function useErdExport({
     visibleTableNames,
     lang,
 }: UseErdExportOptions) {
+    const text = getWorkspaceText(lang).erd;
+
     const handleExportPNG = useCallback(() => {
         import('html-to-image').then(({ toPng }) => {
             const canvas = document.querySelector('.react-flow') as HTMLElement | null;
@@ -24,10 +27,10 @@ export function useErdExport({
                 link.download = `erd-${selectedDatabase || 'diagram'}-${Date.now()}.png`;
                 link.href = dataUrl;
                 link.click();
-                toast.success(lang === 'vi' ? 'Đã xuất PNG' : 'Exported as PNG');
+                toast.success(text.exportedPng);
             });
         });
-    }, [lang, selectedDatabase]);
+    }, [selectedDatabase, text.exportedPng]);
 
     const handleExportSQL = useCallback(() => {
         if (!tableData || visibleTableNames.size === 0) return;
@@ -50,8 +53,8 @@ export function useErdExport({
         link.download = `erd-${selectedDatabase || 'schema'}-${Date.now()}.sql`;
         link.href = url;
         link.click();
-        toast.success(lang === 'vi' ? 'Đã xuất SQL' : 'Exported as SQL');
-    }, [lang, selectedDatabase, tableData, visibleTableNames]);
+        toast.success(text.exportedSql);
+    }, [selectedDatabase, tableData, text.exportedSql, visibleTableNames]);
 
     return {
         handleExportPNG,

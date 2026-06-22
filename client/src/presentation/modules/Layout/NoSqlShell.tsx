@@ -11,6 +11,7 @@ import { NoSqlSidebar } from '../NoSqlExplorer/NoSqlSidebar';
 import { NoSqlMainContent } from '../NoSqlExplorer/NoSqlMainContent';
 import { AiAssistant } from '@/presentation/modules/Query/AiAssistant';
 import { MobileWorkspaceBar } from './MobileWorkspaceBar';
+import { getLayoutText } from './layoutI18n';
 
 export function NoSqlShell() {
     useGlobalShortcuts();
@@ -25,6 +26,7 @@ export function NoSqlShell() {
     const isDesktopModeOnMobile = useAppStore(state => state.isDesktopModeOnMobile);
     const toggleDesktopModeOnMobile = useAppStore(state => state.toggleDesktopModeOnMobile);
     const lang = useAppStore(state => state.lang);
+    const text = getLayoutText(lang);
 
     const { isActualMobile, isCompactMobileLayout, isSmallMobile, isLandscapeMobile } = useResponsiveLayoutMode();
 
@@ -209,7 +211,7 @@ export function NoSqlShell() {
             )}
 
             <div className="h-6 border-t bg-green-500/10 text-xs flex items-center px-4 text-green-600 dark:text-green-400 shrink-0 font-medium">
-                {lang === 'vi' ? 'Không gian NoSQL Độc lập' : 'Isolated NoSQL Workspace'}
+                {text.isolatedNoSqlWorkspace}
             </div>
             <ConnectionDialog />
         </div>

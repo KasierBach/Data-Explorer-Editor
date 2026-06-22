@@ -120,12 +120,12 @@ export const SavedQueriesDialog: React.FC<SavedQueriesDialogProps> = ({
                                 <FileCode className="w-8 h-8 opacity-40" />
                                 <p className="text-sm">
                                     {savedQueries.length === 0
-                                        ? "No saved queries yet"
-                                        : "No matches found"}
+                                        ? text.savedQueries.empty
+                                        : text.savedQueries.noMatches}
                                 </p>
                                 {savedQueries.length === 0 && (
                                     <p className="text-xs text-center opacity-60">
-                                        Use Ctrl+S in the Query Editor to save your first query
+                                        {text.savedQueries.firstSaveHint}
                                     </p>
                                 )}
                             </div>

@@ -11,6 +11,7 @@ import { Input } from '@/presentation/components/ui/input';
 import { useAppStore } from '@/core/services/store';
 import { adminService, type AuditLogEntry } from '@/core/services/AdminService';
 import { useQuery } from '@tanstack/react-query';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { 
     Trash2, Play, Copy, Search, Clock, 
     CheckCircle, XCircle, RefreshCw, Database
@@ -36,6 +37,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
     onRunQuery,
 }) => {
     const { lang, queryHistory, clearQueryHistory } = useAppStore();
+    const text = getWorkspaceText(lang).queryHistory;
     const [search, setSearch] = useState('');
 
     // Fetch persistent history from server Audit Logs
@@ -53,15 +55,15 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
             
             return {
                 id: log.id,
-                sql: String(details.sqlSnippet || details.sql || 'Unknown Query'),
+                sql: String(details.sqlSnippet || details.sql || text.unknownQuery),
                 database: String(details.database || ''),
-                connectionName: String(details.connectionName || 'Database'),
+                connectionName: String(details.connectionName || text.databaseFallback),
                 executedAt: new Date(log.createdAt).getTime(),
                 status: 'success' as const, // For now assume successful if in logs
                 isServerPersisted: true
             };
         });
-    }, [serverLogs]);
+    }, [serverLogs, text.databaseFallback, text.unknownQuery]);
 
     // Combine local (very recent) and server (permanent) history
     const mergedHistory = useMemo(() => {
@@ -88,7 +90,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
 
     const formatTime = (ts: number) => {
         const d = new Date(ts);
-        return d.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: '2-digit' });
+        return d.toLocaleString(text.timeLocale, { hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: '2-digit' });
     };
 
     return (
@@ -97,9 +99,9 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Clock className="w-4 h-4" />
-                        {lang === 'vi' ? 'Lịch sử Truy vấn' : 'Query History'}
+                        {text.title}
                         <span className="text-xs text-muted-foreground font-normal ml-2">
-                            ({mergedHistory.length} {lang === 'vi' ? 'mục' : 'entries'})
+                            ({text.entryCount(mergedHistory.length)})
                         </span>
                         {isLoading && <RefreshCw className="w-3 h-3 animate-spin ml-auto" />}
                         {!isLoading && (
@@ -108,16 +110,14 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                                 size="icon" 
                                 className="h-6 w-6 ml-auto" 
                                 onClick={() => refetch()}
-                                title={lang === 'vi' ? 'Tải lại' : 'Refresh'}
+                                title={text.refresh}
                             >
                                 <RefreshCw className="w-3 h-3" />
                             </Button>
                         )}
                     </DialogTitle>
                     <DialogDescription className="sr-only">
-                        {lang === 'vi'
-                            ? 'Xem lịch sử truy vấn đã chạy, tìm kiếm lại và mở nhanh vào editor.'
-                            : 'Review executed query history, search past entries, and reopen them in the editor.'}
+                        {text.description}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -125,7 +125,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                         <Input
-                            placeholder={lang === 'vi' ? "Tìm kiếm truy vấn..." : "Search queries..."}
+                            placeholder={text.searchPlaceholder}
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="pl-9 h-8 text-xs"
@@ -139,7 +139,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                             className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-500/10 gap-1"
                         >
                             <Trash2 className="w-3 h-3" />
-                            {lang === 'vi' ? 'Xóa tất cả' : 'Clear All'}
+                            {text.clearAll}
                         </Button>
                     )}
                 </div>
@@ -148,11 +148,11 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                     {isLoading && mergedHistory.length === 0 ? (
                         <div className="text-center py-12 flex flex-col items-center gap-2 text-muted-foreground text-sm">
                             <RefreshCw className="w-6 h-6 animate-spin" />
-                            <span>{lang === 'vi' ? 'Đang tải lịch sử...' : 'Loading history...'}</span>
+                            <span>{text.loading}</span>
                         </div>
                     ) : filtered.length === 0 ? (
                         <div className="text-center py-12 text-muted-foreground text-sm">
-                            {mergedHistory.length === 0 ? (lang === 'vi' ? 'Chưa có truy vấn nào' : 'No queries executed yet') : (lang === 'vi' ? 'Không tìm thấy kết quả' : 'No matching queries')}
+                            {mergedHistory.length === 0 ? text.empty : text.noMatches}
                         </div>
                     ) : (
                         filtered.map((entry) => (
@@ -177,7 +177,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                                             {formatTime(entry.executedAt)}
                                         </span>
                                         {entry.durationMs !== undefined && <span>{entry.durationMs}ms</span>}
-                                        {entry.rowCount !== undefined && <span>{entry.rowCount} rows</span>}
+                                        {entry.rowCount !== undefined && <span>{entry.rowCount} {text.rowsLabel}</span>}
                                         {entry.connectionName && (
                                             <span className="flex items-center gap-1 text-blue-500">
                                                 <Database className="w-2.5 h-2.5" />
@@ -186,7 +186,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                                         )}
                                         {entry.database && <span>({entry.database})</span>}
                                         {(entry as { isServerPersisted?: boolean }).isServerPersisted && (
-                                            <span className="bg-green-500/10 text-green-600 px-1 rounded border border-green-500/20 text-[9px]">Synced</span>
+                                            <span className="bg-green-500/10 text-green-600 px-1 rounded border border-green-500/20 text-[9px]">{text.synced}</span>
                                         )}
                                         {entry.errorMessage && (
                                             <span className="text-red-400 truncate max-w-[200px]">{entry.errorMessage}</span>
@@ -203,7 +203,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                                             onRunQuery(entry.sql);
                                             onOpenChange(false);
                                         }}
-                                        title="Open in Query Editor"
+                                        title={text.openInEditor}
                                     >
                                         <Play className="w-3 h-3" />
                                     </Button>
@@ -212,7 +212,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                                         size="icon"
                                         className="h-6 w-6"
                                         onClick={() => navigator.clipboard.writeText(entry.sql)}
-                                        title="Copy SQL"
+                                        title={text.copySql}
                                     >
                                         <Copy className="w-3 h-3" />
                                     </Button>

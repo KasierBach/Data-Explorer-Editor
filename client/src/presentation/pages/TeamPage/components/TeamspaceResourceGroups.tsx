@@ -88,8 +88,8 @@ export function TeamspaceCard({
         <PresenceBadge
           entries={presence.entries}
           isLoading={presence.isLoading}
-          label={lang === 'vi' ? 'Teamspace dang hoat dong' : 'Teamspace live'}
-          emptyLabel={lang === 'vi' ? 'Chua co ai dang hoat dong' : 'No one active yet'}
+          label={text.teamspaceLive}
+          emptyLabel={text.noOneActiveYet}
           className="w-full justify-between"
         />
       </div>
@@ -103,7 +103,7 @@ export function TeamspaceCard({
             onClick={() => onDelete(teamspace.id)}
           >
             <Trash2 className="mr-1 h-3.5 w-3.5" />
-            {text.delete ?? (lang === 'vi' ? 'Xoa' : 'Delete')}
+            {text.delete}
           </Button>
         </div>
       )}
@@ -148,9 +148,7 @@ export function TeamspaceResourceGroups<T extends { id: string; teamspaceId?: st
                 {section.teamspace?.name ?? text.unassigned}
               </div>
               <div className="text-[11px] text-muted-foreground">
-                {lang === 'vi'
-                  ? `${section.items.length} tai nguyen`
-                  : `${section.items.length} resource${section.items.length === 1 ? '' : 's'}`}
+                {text.resourceCount(section.items.length)}
               </div>
             </div>
           </div>

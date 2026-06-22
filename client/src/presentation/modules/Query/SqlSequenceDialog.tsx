@@ -4,6 +4,7 @@ import { Button } from '@/presentation/components/ui/button';
 import { Textarea } from '@/presentation/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/presentation/components/ui/dialog';
 import { cn } from '@/lib/utils';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface SqlSequenceDialogProps {
     open: boolean;
@@ -142,15 +143,19 @@ export const SqlSequenceDialog: React.FC<SqlSequenceDialogProps> = ({
     onApply,
     onRun,
 }) => {
+    const text = getWorkspaceText(lang).sqlSequence;
     const [blocks, setBlocks] = useState<SqlBlock[]>(() => buildBlocksFromSql(initialSql));
     const [draggingBlockId, setDraggingBlockId] = useState<string | null>(null);
     const [dropTargetBlockId, setDropTargetBlockId] = useState<string | null>(null);
+    const resetDialogState = React.useEffectEvent((nextSql: string) => {
+        setBlocks(buildBlocksFromSql(nextSql));
+        setDraggingBlockId(null);
+        setDropTargetBlockId(null);
+    });
 
     useEffect(() => {
         if (!open) return;
-        setBlocks(buildBlocksFromSql(initialSql));
-        setDraggingBlockId(null);
-        setDropTargetBlockId(null);
+        resetDialogState(initialSql);
     }, [initialSql, open]);
 
     const sequenceSql = useMemo(() => buildSqlFromBlocks(blocks), [blocks]);
@@ -197,24 +202,20 @@ export const SqlSequenceDialog: React.FC<SqlSequenceDialogProps> = ({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Layers className="w-4 h-4" />
-                        {lang === 'vi' ? 'Chuỗi SQL' : 'SQL Sequence'}
+                        {text.title}
                     </DialogTitle>
                     <DialogDescription className="sr-only">
-                        {lang === 'vi'
-                            ? 'Sắp xếp lại từng khối SQL và chạy tuần tự theo thứ tự bạn chọn.'
-                            : 'Reorder SQL blocks and run them sequentially in the order you choose.'}
+                        {text.description}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="text-xs text-muted-foreground">
-                        {lang === 'vi'
-                            ? 'Kéo từng khối để đổi thứ tự, hoặc dùng nút lên xuống.'
-                            : 'Drag blocks to reorder, or use the up/down buttons.'}
+                        {text.reorderHint}
                     </div>
                     <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={addBlock}>
                         <Plus className="w-3.5 h-3.5" />
-                        {lang === 'vi' ? 'Thêm bước' : 'Add step'}
+                        {text.addStep}
                     </Button>
                 </div>
 
@@ -263,13 +264,13 @@ export const SqlSequenceDialog: React.FC<SqlSequenceDialogProps> = ({
                                         setDraggingBlockId(null);
                                         setDropTargetBlockId(null);
                                     }}
-                                    title={lang === 'vi' ? 'Kéo để đổi thứ tự' : 'Drag to reorder'}
+                                    title={text.dragToReorder}
                                 >
                                     <GripVertical className="w-4 h-4" />
                                 </button>
 
                                 <div className="text-xs font-medium text-muted-foreground">
-                                    {(lang === 'vi' ? 'Bước' : 'Step')} {index + 1}
+                                    {text.step} {index + 1}
                                 </div>
 
                                 <div className="ml-auto flex items-center gap-1">
@@ -280,7 +281,7 @@ export const SqlSequenceDialog: React.FC<SqlSequenceDialogProps> = ({
                                         className="h-7 w-7"
                                         onClick={() => nudgeBlock(index, -1)}
                                         disabled={index === 0}
-                                        title={lang === 'vi' ? 'Đưa lên' : 'Move up'}
+                                        title={text.moveUp}
                                     >
                                         <ArrowUp className="w-3.5 h-3.5" />
                                     </Button>
@@ -291,7 +292,7 @@ export const SqlSequenceDialog: React.FC<SqlSequenceDialogProps> = ({
                                         className="h-7 w-7"
                                         onClick={() => nudgeBlock(index, 1)}
                                         disabled={index === blocks.length - 1}
-                                        title={lang === 'vi' ? 'Đưa xuống' : 'Move down'}
+                                        title={text.moveDown}
                                     >
                                         <ArrowDown className="w-3.5 h-3.5" />
                                     </Button>
@@ -301,7 +302,7 @@ export const SqlSequenceDialog: React.FC<SqlSequenceDialogProps> = ({
                                         size="icon"
                                         className="h-7 w-7 text-red-500 hover:text-red-600"
                                         onClick={() => removeBlock(block.id)}
-                                        title={lang === 'vi' ? 'Xóa bước' : 'Delete step'}
+                                        title={text.deleteStep}
                                     >
                                         <Trash2 className="w-3.5 h-3.5" />
                                     </Button>
@@ -311,7 +312,7 @@ export const SqlSequenceDialog: React.FC<SqlSequenceDialogProps> = ({
                             <Textarea
                                 value={block.sql}
                                 onChange={(event) => updateBlock(block.id, event.target.value)}
-                                placeholder={lang === 'vi' ? 'Nhập SQL cho bước này...' : 'Enter SQL for this step...'}
+                                placeholder={text.sqlPlaceholder}
                                 className="min-h-[140px] font-mono text-xs"
                                 rows={6}
                             />
@@ -321,19 +322,19 @@ export const SqlSequenceDialog: React.FC<SqlSequenceDialogProps> = ({
 
                 <div className="flex items-center justify-between gap-2 border-t pt-3 flex-wrap">
                     <div className="text-xs text-muted-foreground">
-                        {blockCount} {lang === 'vi' ? 'bước có nội dung' : 'non-empty steps'}
+                        {text.nonEmptySteps(blockCount)}
                     </div>
 
                     <div className="flex items-center gap-2 ml-auto">
                         <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-                            {lang === 'vi' ? 'Đóng' : 'Close'}
+                            {text.close}
                         </Button>
                         <Button type="button" variant="outline" size="sm" onClick={handleApply} disabled={!sequenceSql.trim()}>
-                            {lang === 'vi' ? 'Áp vào editor' : 'Apply to editor'}
+                            {text.applyToEditor}
                         </Button>
                         <Button type="button" size="sm" className="gap-1.5" onClick={handleRun} disabled={!sequenceSql.trim() || !canRun}>
                             <Play className="w-3.5 h-3.5 fill-current" />
-                            {lang === 'vi' ? 'Chạy tuần tự' : 'Run sequence'}
+                            {text.runSequence}
                         </Button>
                     </div>
                 </div>

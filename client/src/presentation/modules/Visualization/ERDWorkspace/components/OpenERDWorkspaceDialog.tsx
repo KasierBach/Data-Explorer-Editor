@@ -9,6 +9,7 @@ import { VersionHistoryService } from '@/core/services/VersionHistoryService';
 import { cn } from '@/lib/utils';
 import { useResourcePresence } from '@/presentation/hooks/useResourcePresence';
 import { PresenceBadge } from '@/presentation/components/presence/PresenceBadge';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface OpenErdWorkspaceDialogProps {
     open: boolean;
@@ -29,6 +30,7 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
     onDeleteWorkspace,
     onRestoreWorkspace,
 }) => {
+    const text = getWorkspaceText(lang).erd;
     const [search, setSearch] = useState('');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -90,11 +92,7 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
 
     const handleDelete = async (workspace: ErdWorkspaceEntity, event: React.MouseEvent) => {
         event.stopPropagation();
-        const confirmed = window.confirm(
-            lang === 'vi'
-                ? `Xóa workspace "${workspace.name}"?`
-                : `Delete workspace "${workspace.name}"?`,
-        );
+        const confirmed = window.confirm(text.deleteConfirm(workspace.name));
         if (!confirmed) return;
 
         setPendingDeleteId(workspace.id);
@@ -116,7 +114,7 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                 <DialogHeader className="p-4 pb-2 border-b">
                     <DialogTitle className="flex items-center gap-2 text-base">
                         <FolderOpen className="w-4 h-4 text-blue-500" />
-                        ERD Workspaces
+                        {text.dialogTitle}
                     </DialogTitle>
                 </DialogHeader>
 
@@ -124,7 +122,7 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                     <div className="relative">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                         <Input
-                            placeholder={lang === 'vi' ? 'Tìm workspace...' : 'Search workspaces...'}
+                            placeholder={text.searchPlaceholder}
                             value={search}
                             onChange={(event) => setSearch(event.target.value)}
                             className="pl-8 h-8 text-sm"
@@ -139,8 +137,8 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                                 <FolderOpen className="h-8 w-8 opacity-40" />
                                 <p className="text-sm">
                                     {workspaces.length === 0
-                                        ? (lang === 'vi' ? 'Chua co workspace ERD nao' : 'No ERD workspaces yet')
-                                        : (lang === 'vi' ? 'Không tìm thấy workspace nào' : 'No matches found')}
+                                        ? text.noWorkspaces
+                                        : text.noMatches}
                                 </p>
                             </div>
                         ) : (
@@ -194,15 +192,15 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                             <>
                                 <div className="flex items-center justify-between border-b bg-muted/30 px-3 py-2">
                                     <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                        {lang === 'vi' ? 'Chi tiet' : 'Preview'}
+                                        {text.preview}
                                     </span>
                                     <div className="flex items-center gap-2">
                                         {selectedWorkspace.organizationId && (
                                             <PresenceBadge
                                                 entries={workspacePresence.entries}
                                                 isLoading={workspacePresence.isLoading}
-                                                label={lang === 'vi' ? 'ERD live' : 'ERD live'}
-                                                emptyLabel={lang === 'vi' ? 'Chua co ai mo ERD nay' : 'No one on this ERD'}
+                                                label={text.liveLabel}
+                                                emptyLabel={text.emptyPresence}
                                                 className="max-w-[260px]"
                                             />
                                         )}
@@ -214,7 +212,7 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                                                 className="h-6 gap-1 px-3 text-xs"
                                             >
                                                 <Clock className="h-3 w-3" />
-                                                {lang === 'vi' ? 'Lịch sử' : 'History'}
+                                                {text.history}
                                             </Button>
                                         )}
                                         <Button
@@ -223,7 +221,7 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                                             className="h-6 gap-1 px-3 text-xs"
                                         >
                                             <FolderOpen className="h-3 w-3" />
-                                            {lang === 'vi' ? 'Mo' : 'Open'}
+                                            {text.open}
                                         </Button>
                                     </div>
                                 </div>
@@ -243,7 +241,7 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                                         <div className="space-y-1">
                                             <div className="inline-flex items-center gap-1 text-muted-foreground">
                                                 <StickyNote className="h-3 w-3" />
-                                                {lang === 'vi' ? 'Ghi chu' : 'Notes'}
+                                                {text.notes}
                                             </div>
                                             <p className="leading-relaxed text-muted-foreground">{selectedWorkspace.notes}</p>
                                         </div>
@@ -251,24 +249,24 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                                 </div>
                                 <div className="flex-1 space-y-2 overflow-auto bg-muted/10 p-3 text-xs text-muted-foreground">
                                     <div>
-                                        <span className="font-medium text-foreground">{lang === 'vi' ? 'Bang hien thi' : 'Visible tables'}:</span>{' '}
+                                        <span className="font-medium text-foreground">{text.visibleTables}:</span>{' '}
                                         {Array.isArray(selectedWorkspace.layout?.visibleTables)
                                             ? selectedWorkspace.layout.visibleTables.length
                                             : 0}
                                     </div>
                                     <div>
-                                        <span className="font-medium text-foreground">{lang === 'vi' ? 'Node tuy chinh' : 'Saved nodes'}:</span>{' '}
+                                        <span className="font-medium text-foreground">{text.savedNodes}:</span>{' '}
                                         {Array.isArray(selectedWorkspace.layout?.nodes) ? selectedWorkspace.layout.nodes.length : 0}
                                     </div>
                                     <div>
-                                        <span className="font-medium text-foreground">{lang === 'vi' ? 'Lien ket thu cong' : 'Manual edges'}:</span>{' '}
+                                        <span className="font-medium text-foreground">{text.manualEdges}:</span>{' '}
                                         {Array.isArray(selectedWorkspace.layout?.edges) ? selectedWorkspace.layout.edges.length : 0}
                                     </div>
                                 </div>
                             </>
                         ) : (
                             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                                {lang === 'vi' ? 'Chon workspace de xem truoc' : 'Select a workspace to preview'}
+                                {text.selectWorkspace}
                             </div>
                         )}
                     </div>
@@ -288,17 +286,17 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                 open={isVersionHistoryOpen}
                 onOpenChange={setIsVersionHistoryOpen}
                 lang={lang}
-                title={lang === 'vi' ? 'Lịch sử workspace ERD' : 'ERD Workspace History'}
+                title={text.historyTitle}
                 resourceType="ERD"
                 resourceId={selectedWorkspace?.id ?? null}
-                emptyMessage={lang === 'vi' ? 'Chua co phien ban nao' : 'No versions yet'}
+                emptyMessage={text.noVersions}
                 restoreVersion={VersionHistoryService.restoreErdWorkspaceVersion}
                 onRestored={onRestoreWorkspace}
                 renderSnapshot={(snapshot) => (
                     <div className="space-y-3">
                         <div className="space-y-1">
                             <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                                {lang === 'vi' ? 'Ten workspace' : 'Workspace name'}
+                                {text.workspaceName}
                             </div>
                             <div className="font-medium">{snapshot.name}</div>
                         </div>
@@ -310,13 +308,13 @@ export const OpenErdWorkspaceDialog: React.FC<OpenErdWorkspaceDialogProps> = ({
                         )}
                         <div className="space-y-1 text-[11px] text-muted-foreground">
                             <div>
-                                {lang === 'vi' ? 'Visible tables' : 'Visible tables'}: {snapshot.layout?.visibleTables?.length ?? 0}
+                                {text.visibleTables}: {snapshot.layout?.visibleTables?.length ?? 0}
                             </div>
                             <div>
-                                {lang === 'vi' ? 'Saved nodes' : 'Saved nodes'}: {snapshot.layout?.nodes?.length ?? 0}
+                                {text.savedNodes}: {snapshot.layout?.nodes?.length ?? 0}
                             </div>
                             <div>
-                                {lang === 'vi' ? 'Manual edges' : 'Manual edges'}: {snapshot.layout?.edges?.length ?? 0}
+                                {text.manualEdges}: {snapshot.layout?.edges?.length ?? 0}
                             </div>
                         </div>
                     </div>

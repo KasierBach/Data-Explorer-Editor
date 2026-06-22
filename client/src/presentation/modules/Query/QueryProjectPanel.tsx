@@ -150,7 +150,7 @@ export function QueryProjectPanel({
                                     >
                                         <div className="truncate text-sm font-medium">{query.name}</div>
                                         <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                                            {query.folderId || (lang === 'vi' ? 'Không có thư mục' : 'No folder')}
+                                            {query.folderId || text.queryProject.noFolder}
                                         </div>
                                     </button>
                                     <div className="flex items-center gap-1">

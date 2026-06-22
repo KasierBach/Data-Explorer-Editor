@@ -7,10 +7,12 @@ import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
 import { AuthService } from '@/core/services/AuthService';
 import { SEO } from '@/presentation/components/shared/Seo';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 export const ForgotPasswordPage = () => {
     const navigate = useNavigate();
     const { lang } = useAppStore();
+    const text = getWorkspaceText(lang).forgotPassword;
     
     const [step, setStep] = useState<1 | 2>(1);
     const [email, setEmail] = useState('');
@@ -26,10 +28,10 @@ export const ForgotPasswordPage = () => {
 
         try {
             await AuthService.forgotPassword(email);
-            toast.success(lang === 'vi' ? 'Đã gửi mã OTP đến email của bạn!' : 'OTP sent to your email!');
+            toast.success(text.otpSent);
             setStep(2);
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Error sending OTP');
+            setError(err instanceof Error ? err.message : text.sendOtpError);
         } finally {
             setIsLoading(false);
         }
@@ -42,10 +44,10 @@ export const ForgotPasswordPage = () => {
 
         try {
             await AuthService.resetPassword({ email, otp, newPassword });
-            toast.success(lang === 'vi' ? 'Đổi mật khẩu thành công!' : 'Password reset successfully!');
+            toast.success(text.resetSuccess);
             navigate('/login');
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Invalid OTP');
+            setError(err instanceof Error ? err.message : text.invalidOtp);
         } finally {
             setIsLoading(false);
         }
@@ -55,8 +57,8 @@ export const ForgotPasswordPage = () => {
         <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
             <SEO 
                 title={step === 1 
-                    ? (lang === 'vi' ? 'Quên mật khẩu' : 'Forgot Password') 
-                    : (lang === 'vi' ? 'Đặt lại mật khẩu' : 'Reset Password')} 
+                    ? text.forgotTitle
+                    : text.resetTitle} 
             />
             <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
                 <div className="flex flex-col items-center mb-8 space-y-2">
@@ -65,13 +67,13 @@ export const ForgotPasswordPage = () => {
                     </div>
                     <h1 className="text-2xl font-semibold tracking-tight text-center">
                         {step === 1 
-                            ? (lang === 'vi' ? 'Quên mật khẩu' : 'Forgot Password')
-                            : (lang === 'vi' ? 'Đặt lại mật khẩu' : 'Reset Password')}
+                            ? text.forgotTitle
+                            : text.resetTitle}
                     </h1>
                     <p className="text-sm text-muted-foreground text-center">
                         {step === 1 
-                            ? (lang === 'vi' ? 'Nhập email của bạn để nhận mã xác thực' : 'Enter your email to receive an OTP')
-                            : (lang === 'vi' ? 'Nhập mã OTP (6 số) được gửi đến email của bạn' : 'Enter the 6-digit OTP sent to your email')}
+                            ? text.forgotDescription
+                            : text.resetDescription}
                     </p>
                 </div>
 
@@ -97,13 +99,13 @@ export const ForgotPasswordPage = () => {
 
                         <Button className="w-full gap-2" type="submit" disabled={isLoading}>
                             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                            {lang === 'vi' ? 'Gửi mã OTP' : 'Send OTP'}
+                            {text.sendOtp}
                         </Button>
                     </form>
                 ) : (
                     <form onSubmit={handleResetPassword} className="space-y-4">
                          <div className="space-y-2">
-                            <label className="text-sm font-medium" htmlFor="otp">Mã OTP / OTP Code</label>
+                            <label className="text-sm font-medium" htmlFor="otp">{text.otpLabel}</label>
                             <Input
                                 id="otp"
                                 type="text"
@@ -116,7 +118,7 @@ export const ForgotPasswordPage = () => {
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-medium" htmlFor="newPassword">Mật khẩu mới / New Password</label>
+                            <label className="text-sm font-medium" htmlFor="newPassword">{text.newPasswordLabel}</label>
                             <Input
                                 id="newPassword"
                                 type="password"
@@ -136,7 +138,7 @@ export const ForgotPasswordPage = () => {
 
                         <Button className="w-full gap-2" type="submit" disabled={isLoading}>
                             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-                            {lang === 'vi' ? 'Đặt lại mật khẩu' : 'Reset Password'}
+                            {text.resetPassword}
                         </Button>
                     </form>
                 )}
@@ -148,7 +150,7 @@ export const ForgotPasswordPage = () => {
                         className="text-muted-foreground hover:text-foreground flex items-center justify-center mx-auto gap-2 transition-colors"
                     >
                         <ArrowLeft className="w-4 h-4" />
-                        {lang === 'vi' ? 'Quay lại đăng nhập' : 'Back to login'}
+                        {text.backToLogin}
                     </button>
                 </div>
             </div>

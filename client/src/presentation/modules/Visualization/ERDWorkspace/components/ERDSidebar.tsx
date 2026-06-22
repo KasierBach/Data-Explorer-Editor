@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Layers } from 'lucide-react';
 import type { TreeNode } from '@/core/domain/entities';
 import type { SearchResult } from '@/core/services/SearchService';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface ERDHierarchyNode extends TreeNode {
     schema?: string;
@@ -45,6 +46,7 @@ interface ERDSidebarProps {
 export const ERDSidebar: React.FC<ERDSidebarProps> = ({
     isCollapsed, setCollapsed, lang, selectedDatabase, setSelectedDatabase, allDatabases, hierarchy, filteredHierarchy, visibleTableNames, toggleTable, searchTerm, setSearchTerm, schemaFilter, setSchemaFilter, handleSelectAll, handleDeselectAll, isLoadingHierarchy, globalSearchResults = [], isSearchingGlobal = false, onAddGlobalTable, isRefreshing, onRefresh
 }) => {
+    const text = getWorkspaceText(lang).erd;
     const hasMultipleDatabases = allDatabases && allDatabases.length > 1;
 
     const schemas = useMemo(() => {
@@ -75,16 +77,16 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                             <Table className="h-4 w-4" />
                         </div>
                         <div>
-                            <h2 className="font-black text-sm uppercase tracking-widest leading-none mb-1">{lang === 'vi' ? 'Thực thể' : 'Entities'}</h2>
+                            <h2 className="font-black text-sm uppercase tracking-widest leading-none mb-1">{text.entities}</h2>
                             <div className="flex items-center gap-2">
                                 <span className="text-[9px] text-muted-foreground">
-                                    {visibleTableNames.size}/{hierarchy?.length || 0} {lang === 'vi' ? 'đã chọn' : 'selected'}
+                                    {visibleTableNames.size}/{hierarchy?.length || 0} {text.selected}
                                 </span>
                                 <button
                                     onClick={onRefresh}
                                     disabled={isRefreshing}
                                     className="p-1 hover:bg-muted rounded-md transition-colors disabled:opacity-50"
-                                    title={lang === 'vi' ? 'Làm mới metadata' : 'Refresh Metadata'}
+                                    title={text.refreshMetadata}
                                 >
                                     <Loader2 className={cn("h-2.5 w-2.5 text-blue-500", isRefreshing && "animate-spin")} />
                                 </button>
@@ -100,7 +102,7 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                     <div className="mb-3">
                         <Select value={selectedDatabase} onValueChange={setSelectedDatabase}>
                             <SelectTrigger className="h-8 text-xs bg-muted/20 border-border/20">
-                                <SelectValue placeholder={lang === 'vi' ? 'Chọn Cơ sở dữ liệu' : 'Select Database'} />
+                                <SelectValue placeholder={text.selectDatabase} />
                             </SelectTrigger>
                             <SelectContent>
                                 {allDatabases.map((db) => (
@@ -116,10 +118,10 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                         <Select value={schemaFilter} onValueChange={setSchemaFilter}>
                             <SelectTrigger className="h-8 text-xs bg-muted/20 border-border/20">
                                 <Layers className="w-3 h-3 mr-1" />
-                                <SelectValue placeholder={lang === 'vi' ? 'Chọn Schema' : 'Select Schema'} />
+                                <SelectValue placeholder={text.selectSchema} />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all" className="text-xs">{lang === 'vi' ? 'Tất cả Schema' : 'All Schemas'}</SelectItem>
+                                <SelectItem value="all" className="text-xs">{text.allSchemas}</SelectItem>
                                 {schemas.map(s => (
                                     <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
                                 ))}
@@ -137,7 +139,7 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                         )}
                     </div>
                     <Input
-                        placeholder={lang === 'vi' ? "Lọc hoặc tìm nhanh bảng..." : "Filter or quick find tables..."}
+                        placeholder={text.filterPlaceholder}
                         className="pl-9 bg-muted/20 border-border/20 h-9 text-xs rounded-xl focus-visible:ring-blue-500/20 focus-visible:border-blue-500/50 transition-all font-medium"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -147,11 +149,11 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                 <div className="flex gap-2 mt-3">
                     <Button variant="outline" size="sm" className="flex-1 h-7 text-[9px] font-bold uppercase tracking-wider gap-1" onClick={handleSelectAll}>
                         <CheckSquare className="h-3 w-3" />
-                        {lang === 'vi' ? 'Tất cả' : 'All'}
+                        {text.all}
                     </Button>
                     <Button variant="outline" size="sm" className="flex-1 h-7 text-[9px] font-bold uppercase tracking-wider gap-1" onClick={handleDeselectAll}>
                         <Square className="h-3 w-3" />
-                        {lang === 'vi' ? 'Bỏ chọn' : 'None'}
+                        {text.none}
                     </Button>
                 </div>
             </div>
@@ -161,7 +163,7 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                     <div className="p-12 text-center space-y-4">
                         <div className="w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mx-auto shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
                         <p className="text-[11px] font-bold text-muted-foreground animate-pulse tracking-wide uppercase">
-                            {lang === 'vi' ? 'Đang tải thực thể...' : 'Exploring Entities...'}
+                            {text.loadingEntities}
                         </p>
                     </div>
                 ) : (
@@ -169,12 +171,12 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                         {/* Local Results */}
                         <div className="space-y-1.5">
                             <div className="px-3 pb-2 text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.2em] border-b border-border/10 mb-2 flex justify-between items-center">
-                                <span>{lang === 'vi' ? 'Danh sách bảng' : 'Table List'}</span>
+                                <span>{text.tableList}</span>
                                 {filteredHierarchy.length > 0 && <span className="opacity-50">{filteredHierarchy.length}</span>}
                             </div>
                             {filteredHierarchy.length === 0 && !isSearchingGlobal && (
                                 <div className="py-4 text-center text-[10px] text-muted-foreground italic">
-                                    {lang === 'vi' ? 'Không tìm thấy bảng cục bộ' : 'No local tables found'}
+                                    {text.noLocalTables}
                                 </div>
                             )}
                             {filteredHierarchy.map((t) => (
@@ -211,7 +213,7 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                             <div className="space-y-1.5 pt-2 animate-in slide-in-from-bottom-2 duration-500">
                                 <div className="px-3 pb-2 text-[10px] font-black text-emerald-500/60 uppercase tracking-[0.2em] border-b border-emerald-500/10 mb-2 flex items-center gap-2">
                                     <Globe className="w-3 h-3" />
-                                    <span>{lang === 'vi' ? 'Gợi ý thông minh' : 'Smart Suggestions'}</span>
+                                    <span>{text.smartSuggestions}</span>
                                 </div>
                                 {globalSearchResults.map((item) => (
                                     <div
@@ -253,8 +255,8 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
                                 ))}
                                 <div className="px-4 py-2 text-[9px] text-muted-foreground/30 text-center italic">
                                     {globalSearchResults.some(i => i.isAiSuggested)
-                                        ? (lang === 'vi' ? 'Kết quả từ Redis Hybrid Search (AI + Index)' : 'Results from Redis Hybrid Search (AI + Index)')
-                                        : (lang === 'vi' ? 'Kết quả từ Redis Global Index' : 'Results from Redis Global Index')
+                                        ? text.hybridResults
+                                        : text.globalResults
                                     }
                                 </div>
                             </div>
@@ -265,7 +267,7 @@ export const ERDSidebar: React.FC<ERDSidebarProps> = ({
 
             <div className="p-4 border-t bg-muted/10">
                 <Button variant="outline" size="sm" className="w-full text-[10px] font-black uppercase tracking-widest gap-2 rounded-xl" onClick={handleDeselectAll}>
-                    {lang === 'vi' ? 'XÓA SƠ ĐỒ' : 'Clear Canvas'}
+                    {text.clearCanvas}
                 </Button>
             </div>
         </div>
