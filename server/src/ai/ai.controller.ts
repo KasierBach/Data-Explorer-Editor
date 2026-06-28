@@ -16,7 +16,8 @@ import { GenerateSqlDto } from './dto/generate-sql.dto';
 import { AutocompleteDto } from './dto/autocomplete.dto';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
 
-const normalizeProviderBaseUrl = (value: string) => value.trim().replace(/\/+$/, '');
+const normalizeProviderBaseUrl = (value: string) =>
+  value.trim().replace(/\/+$/, '');
 
 const extractProviderErrorMessage = (payload: unknown) => {
   if (!payload || typeof payload !== 'object') {
@@ -173,7 +174,15 @@ export class AiController {
     @Body() body: AutocompleteDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    const { connectionId, database, beforeCursor, afterCursor, context } = body;
+    const {
+      connectionId,
+      database,
+      beforeCursor,
+      afterCursor,
+      context,
+      model,
+      providerOverride,
+    } = body;
 
     const { connection, schemaContext } =
       await this.connectionService.getConnectionContext(
@@ -189,6 +198,8 @@ export class AiController {
       afterCursor,
       schemaContext: context ? `${context}\n\n${schemaContext}` : schemaContext,
       databaseType: connection.type,
+      model,
+      providerOverride,
     });
 
     return { completion };
@@ -202,8 +213,7 @@ export class AiController {
       typeof body?.baseUrl === 'string'
         ? normalizeProviderBaseUrl(body.baseUrl)
         : '';
-    const apiKey =
-      typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
+    const apiKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
 
     if (!baseUrl) {
       throw new BadRequestException('Base URL is required');
@@ -223,7 +233,8 @@ export class AiController {
       headers.Authorization = `Bearer ${apiKey}`;
     }
     if (baseUrl.includes('openrouter.ai')) {
-      headers['HTTP-Referer'] = process.env.FRONTEND_URL || 'http://localhost:5173';
+      headers['HTTP-Referer'] =
+        process.env.FRONTEND_URL || 'http://localhost:5173';
       headers['X-Title'] = 'Data Explorer';
     }
 
@@ -316,7 +327,15 @@ export class AiTestController {
     @Body() body: AutocompleteDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    const { connectionId, database, beforeCursor, afterCursor, context } = body;
+    const {
+      connectionId,
+      database,
+      beforeCursor,
+      afterCursor,
+      context,
+      model,
+      providerOverride,
+    } = body;
 
     try {
       const { connection, schemaContext } =
@@ -335,6 +354,8 @@ export class AiTestController {
           ? `${context}\n\n${schemaContext}`
           : schemaContext,
         databaseType: connection.type,
+        model,
+        providerOverride,
       });
       return { completion, error: null };
     } catch (err) {

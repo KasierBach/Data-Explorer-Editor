@@ -796,9 +796,9 @@ export class AiProviderRunnerService {
         ),
         sources,
         provider: 'gemini',
-      providerLabel: plan.displayName || 'gemini',
-      model: plan.model,
-      routingMode,
+        providerLabel: plan.displayName || 'gemini',
+        model: plan.model,
+        routingMode,
       },
     };
   }
@@ -1030,6 +1030,3 @@ export class AiProviderRunnerService {
     return headers;
   }
 }
-
-
-

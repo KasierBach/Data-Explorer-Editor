@@ -52,7 +52,8 @@ export class MongoDbStrategy implements IDatabaseStrategy {
 
     return {
       appliedLimit,
-      limitSource: requestedLimit !== undefined ? 'requested' : 'protective_default',
+      limitSource:
+        requestedLimit !== undefined ? 'requested' : 'protective_default',
     } as const;
   }
 
@@ -169,10 +170,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
 
     switch (payload.action) {
       case 'find': {
-        const limitMeta = this.resolveResultLimit(
-          payload,
-          options,
-        );
+        const limitMeta = this.resolveResultLimit(payload, options);
         appliedLimit = limitMeta.appliedLimit;
         limitSource = limitMeta.limitSource;
         const skip = options?.offset || 0;
@@ -187,10 +185,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         break;
       }
       case 'aggregate': {
-        const limitMeta = this.resolveResultLimit(
-          payload,
-          options,
-        );
+        const limitMeta = this.resolveResultLimit(payload, options);
         appliedLimit = limitMeta.appliedLimit;
         limitSource = limitMeta.limitSource;
         const aggregateOptions = { ...(payload.options || {}) };

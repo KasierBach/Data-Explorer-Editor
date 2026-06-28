@@ -69,6 +69,109 @@ export function getChangelogPageContent(
     ),
     releases: [
       {
+        version: 'v3.6.4',
+        date: pickLocalizedText(currentLang, '22 tháng 6, 2026', 'June 22, 2026'),
+        title: pickLocalizedText(
+          currentLang,
+          'Cấu hình AI linh hoạt, query guard thông minh & phủ song ngữ rộng hơn',
+          'Flexible AI Configuration, Smarter Query Guards & Broader Localization',
+        ),
+        badge: pickLocalizedText(currentLang, 'Mới nhất', 'Latest'),
+        features: [
+          feature(
+            currentLang,
+            'settings',
+            'Cấu hình AI theo vai trò & provider tùy chỉnh',
+            'Role-based AI configuration & custom providers',
+            'Thêm trung tâm cấu hình AI riêng để chọn model cho Assistant, Explain, SQL và NoSQL, đồng thời lưu provider OpenAI-compatible tùy chỉnh với model mặc định riêng cho từng nguồn.',
+            'Added a dedicated AI configuration hub for Assistant, Explain, SQL, and NoSQL model selection, plus custom OpenAI-compatible providers with their own default models.',
+          ),
+          feature(
+            currentLang,
+            'shieldCheck',
+            'Cảnh báo truy vấn bớt ồn và đúng trọng tâm hơn',
+            'Higher-signal query safety warnings',
+            'Siết lại lớp phân tích truy vấn để chỉ nâng cảnh báo ở các thao tác thật sự rủi ro, giảm cảnh báo giả cho những lệnh tạo dữ liệu thông thường và làm rõ lý do trước khi chạy.',
+            'Tightened query analysis so warnings focus on genuinely risky actions, cut down false alarms on routine creation flows, and explain the reason more clearly before execution.',
+          ),
+          feature(
+            currentLang,
+            'code2',
+            'AI Explain và SQL Steps liền mạch hơn trong editor',
+            'Smoother AI Explain and SQL Steps inside the editor',
+            'Bổ sung luồng giải thích truy vấn bằng AI, dialog SQL Steps để sắp xếp và chạy tuần tự nhiều đoạn SQL, cùng các tinh chỉnh toolbar giúp workflow trong editor mạch lạc hơn.',
+            'Added AI-powered query explanation, an SQL Steps dialog for reordering and running multi-step SQL sequences, and toolbar refinements that make the editor workflow feel more cohesive.',
+          ),
+          feature(
+            currentLang,
+            'zap',
+            'Tối ưu hot-path thật và có benchmark đi kèm',
+            'Hot-path performance backed by real benchmarks',
+            'Tăng tốc table-window browsing, adaptive migration batching, search indexing và các đường đọc dữ liệu quan trọng, đồng thời công bố baseline hiệu năng để theo dõi các đợt tối ưu sau.',
+            'Accelerated table-window browsing, adaptive migration batching, search indexing, and other critical data-access paths while publishing a real performance baseline for future tuning passes.',
+          ),
+          feature(
+            currentLang,
+            'globe',
+            'Phủ song ngữ sâu hơn cho workspace, docs và landing',
+            'Deeper bilingual coverage for workspace, docs, and landing',
+            'Mở rộng shared content map và i18n cho nhiều màn hình hơn, giúp các khu vực workspace, tài liệu và landing giữ ngữ nghĩa nhất quán hơn giữa tiếng Việt và tiếng Anh.',
+            'Expanded the shared content map and i18n coverage so more workspace, documentation, and landing surfaces stay semantically consistent in Vietnamese and English.',
+          ),
+        ],
+      },
+      {
+        version: 'v3.6.3',
+        date: pickLocalizedText(currentLang, '13 tháng 6, 2026', 'June 13, 2026'),
+        title: pickLocalizedText(
+          currentLang,
+          'AI đầu ra thống nhất, NoSQL hành động được & runtime gọn hơn',
+          'Unified AI Outputs, Actionable NoSQL & Leaner Runtime',
+        ),
+        features: [
+          feature(
+            currentLang,
+            'sparkles',
+            'Structured outputs dùng chung cho chat, SQL và NoSQL',
+            'Shared structured outputs across chat, SQL, and NoSQL',
+            'Hợp nhất cơ chế đầu ra có cấu trúc để AI trả lời ổn định hơn giữa chat tự do, sinh SQL và luồng hỗ trợ NoSQL, giảm nhánh xử lý riêng và giúp kết quả dễ tái sử dụng hơn.',
+            'Unified structured outputs so freeform chat, SQL generation, and NoSQL assistance behave more consistently while reducing one-off parsing paths and making results easier to reuse.',
+          ),
+          feature(
+            currentLang,
+            'database',
+            'NoSQL có summary, mutation và phân tích sâu hơn',
+            'NoSQL summaries, mutations, and deeper analysis',
+            'Mở rộng NoSQL workspace với summary trực tiếp trên kết quả, hỗ trợ mutation rõ ràng hơn và các màn hình schema/visualize được làm lại để đọc hành vi dữ liệu tốt hơn.',
+            'Expanded the NoSQL workspace with inline summaries, clearer mutation support, and reworked schema and visualize surfaces that make data behavior easier to inspect.',
+          ),
+          feature(
+            currentLang,
+            'globe',
+            'Routing provider gọn hơn và dễ mở rộng hơn',
+            'Leaner provider routing with broader extensibility',
+            'Đơn giản hóa provider runner, gom lại logic tương thích OpenAI-style và mở rộng lane model để việc thêm provider hoặc đổi model bớt phụ thuộc vào các nhánh đặc biệt.',
+            'Simplified the provider runner, consolidated OpenAI-style compatibility logic, and widened model lanes so adding providers or swapping models depends less on special-case branches.',
+          ),
+          feature(
+            currentLang,
+            'code2',
+            'Replay hội thoại và prompt context ổn định hơn',
+            'More stable conversation replay and prompt context',
+            'Củng cố luồng replay hội thoại, ghép context và prompt builder để Assistant giữ mạch tốt hơn giữa các lượt trao đổi dài hoặc khi chuyển qua lại giữa SQL và NoSQL.',
+            'Strengthened conversation replay, context assembly, and prompt building so the Assistant keeps its flow more reliably during longer exchanges or when switching between SQL and NoSQL.',
+          ),
+          feature(
+            currentLang,
+            'testTube',
+            'Tái cấu trúc lớn cho màn hình NoSQL và visualize',
+            'Major refactors across NoSQL and visualize screens',
+            'Dọn lại kiến trúc của các màn hình tổng hợp, schema analysis và visualize để giảm logic rải rác, tăng độ tách bạch và tạo nền cho các vòng cải tiến UX về sau.',
+            'Reworked the aggregation, schema analysis, and visualize screens to reduce scattered logic, improve separation of concerns, and prepare the ground for later UX iterations.',
+          ),
+        ],
+      },
+      {
         version: 'v3.6.2',
         date: pickLocalizedText(currentLang, '28 tháng 5, 2026', 'May 28, 2026'),
         title: pickLocalizedText(
@@ -76,7 +179,6 @@ export function getChangelogPageContent(
           'AI Vision mở rộng & catalog model mới',
           'Expanded AI Vision & New Model Catalog',
         ),
-        badge: pickLocalizedText(currentLang, 'Mới nhất', 'Latest'),
         features: [
           feature(
             currentLang,

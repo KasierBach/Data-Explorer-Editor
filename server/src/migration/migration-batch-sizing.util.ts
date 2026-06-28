@@ -39,10 +39,7 @@ function estimateRowBytes(
   }
 
   try {
-    return Math.max(
-      64,
-      Buffer.byteLength(JSON.stringify(sampleRow), 'utf8'),
-    );
+    return Math.max(64, Buffer.byteLength(JSON.stringify(sampleRow), 'utf8'));
   } catch {
     return Math.max(128, columnCount * 48);
   }
@@ -114,7 +111,11 @@ export function reduceMigrationBatchSize(
 
 export function isRetryableMigrationBatchError(error: unknown) {
   const message =
-    error instanceof Error ? error.message : String(error ?? 'Unknown error');
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : 'Unknown error';
 
   return /(timeout|timed out|packet|payload|too many|too large|memory|exhausted|parameter|2100|socket hang up|econnreset|request)/i.test(
     message,

@@ -24,6 +24,8 @@ export default defineConfig({
     },
   },
   build: {
+    // ponytail: monaco workers are already split; warn only when we exceed the current heavy-worker ceiling.
+    chunkSizeWarningLimit: 7500,
     rollupOptions: {
       output: {
         manualChunks: {

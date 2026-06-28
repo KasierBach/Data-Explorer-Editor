@@ -1,4 +1,4 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { AiService } from '../../ai/ai.service';
 import { AiChatCompletionService } from '../../ai/ai.chat-completion.service';
 import { AiSchemaService } from '../../ai/ai.schema-service';
@@ -114,6 +114,35 @@ describe('AiService', () => {
         pipeline: [{ $match: { status: 'active' } }],
       });
       expect(result.explanation).toBe('Filters active orders.');
+    });
+  });
+
+  describe('autocomplete', () => {
+    it('passes model overrides through to the shared autocomplete service', async () => {
+      autocompleteService.autocomplete.mockResolvedValue('FROM users');
+
+      await service.autocomplete({
+        beforeCursor: 'SELECT * ',
+        databaseType: 'postgres',
+        model: 'anthropic/claude-sonnet-4.5',
+        providerOverride: {
+          type: 'openai-compatible',
+          name: 'gido',
+          baseUrl: 'https://provider.example.com/v1',
+          apiKey: 'sk-test',
+          model: 'anthropic/claude-sonnet-4.5',
+        },
+      });
+
+      expect(autocompleteService.autocomplete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          beforeCursor: 'SELECT * ',
+          model: 'anthropic/claude-sonnet-4.5',
+          providerOverride: expect.objectContaining({
+            name: 'gido',
+          }),
+        }),
+      );
     });
   });
 });

@@ -16,17 +16,20 @@
 
 **Data Explorer** is a high-fidelity, high-performance database management and visualization IDE. It provides a unified, intelligent interface for developers and data engineers to explore, query, and visualize multi-engine databases, all supercharged by a context-aware AI.
 
-Current release focus: **v3.6.2** adds image-aware AI workflows, explicit Beeknoee and TokenRouter model lanes, richer NoSQL tooling, dedicated model catalog management, billing and access-control hardening, and broader UX polish across SQL, NoSQL, docs, and the landing experience.
+Current release focus: **v3.6.2** adds image-aware AI workflows, explicit Beeknoee model lanes, per-role AI configuration, custom OpenAI-compatible providers with model loading, SQL Steps sequencing, richer NoSQL tooling, billing and access-control hardening, and broader UX polish across SQL, NoSQL, docs, and the landing experience.
 
 ---
 
 ## Key Features
 
 ### AI Assistant and Routing
+
 - **Context-Aware SQL Generation**: Describe complex data needs in natural language and the AI generates SQL based on your live schema and foreign key relationships.
 - **Vision Integration**: Upload screenshots of DB diagrams or whiteboards for AI-assisted schema reconstruction and query help.
 - **Global Assistant Panel**: A resizable, toggleable sidebar available across major modules with SSE-based streaming responses.
-- **Provider-Aware Routing**: Gemini remains the premium lane, Cerebras/OpenRouter/Groq can be configured as lower-cost, fast, or fallback lanes, and Beeknoee or TokenRouter can be chosen explicitly when you want tighter model control.
+- **Configure AI by Role**: Choose separate models for **AI Assistant**, **Explain**, **AI SQL**, **AI NoSQL**, and **Autocomplete**, or let those roles inherit the main assistant model when you want a simpler setup.
+- **Custom OpenAI-Compatible Providers**: Add your own provider from the UI with a name, Base URL, API key, default model, and on-demand model catalog loading.
+- **Provider-Aware Routing**: Gemini remains the premium lane, Cerebras/OpenRouter/Groq can be configured as lower-cost, fast, or fallback lanes, and Beeknoee can be chosen explicitly when you want tighter model control.
 - **Dedicated AI Services**: Prompt building, schema context assembly, provider execution, connection context, and routing are separated into focused services for easier testing and safer future changes.
 - **Intelligent Model Fallback**: The AI layer can iterate through providers and models when a requested lane fails, helping keep generation more resilient without hanging the backend.
 - **Surgical Precision Autocomplete**: Inline AI suggestions prioritize exact SQL syntax completion without unnecessary explanations.
@@ -34,6 +37,7 @@ Current release focus: **v3.6.2** adds image-aware AI workflows, explicit Beekno
 - **Chat Persistence**: Conversation history is stored in app state for continuity across sessions.
 
 ### Multi-Database Strategy
+
 - **Unified Engine Architecture**: Connect to multiple engines through a strategy-based backend:
   - **PostgreSQL** (Neon, Supabase, RDS, Local)
   - **MySQL** (PlanetScale, Local, TiDB)
@@ -49,6 +53,7 @@ Current release focus: **v3.6.2** adds image-aware AI workflows, explicit Beekno
 - **Cross-DB Browsing**: Jump between databases and schemas in a single workspace.
 
 ### Redis Infrastructure
+
 - **Caching Layer**: Redis backs repeated metadata reads and query results so the app stays responsive under load.
 - **Notification Bus**: SSE notifications are broadcast through Redis Pub/Sub for progress updates and system messages.
 - **Presence and Collaboration**: Team presence and shared workspace signals are coordinated through Redis-backed flows.
@@ -58,6 +63,7 @@ Current release focus: **v3.6.2** adds image-aware AI workflows, explicit Beekno
 - **Organization Safety**: Redis powers the Organization Backup and Migration Preview engines to handle bulk exports without downtime.
 
 ### Team Collaboration
+
 - **Team Workspace**: Create teams, invite members, and manage roles from the Team page.
 - **Shared Resources**: Teams can share connections, queries, and dashboards.
 - **Role-Based Membership**: Invite users as viewers, members, or admins depending on how much control they need.
@@ -67,26 +73,32 @@ Current release focus: **v3.6.2** adds image-aware AI workflows, explicit Beekno
 - **Org Backup System**: Admins can export and migrate entire organization configurations safely.
 
 ### Entity Relationship Diagrams (ERD)
+
 - **Intelligent Auto-Layout**: Dynamic graph generation using React Flow with automatic node positioning.
 - **Schema Exploration**: Visualize table structures and relationships in an ERD-style workspace.
 - **Visual Intelligence**: Primary and foreign keys are highlighted for fast structural understanding.
 
 ### Analytics and Insights
+
 - **Heuristic Dashboard**: Surface connection health, storage distribution, and table usage metrics.
 - **Visual Intelligence**: Interactive charts powered by Recharts for operational visibility.
 - **Table Distribution**: Heatmaps and row-count style analytics to spot bottlenecks quickly.
 
 ### Pro SQL Workspace
+
 - **Monaco Engine**: VS Code-grade editing experience with advanced syntax highlighting and multi-cursor support.
 - **Schema-Aware IntelliSense**: Deep autocompletion that understands your tables, columns, and custom types.
 - **Smart Safeguards and Optimization**: Automatic limit injection, pagination support, and per-engine query guards help prevent accidental OOM scenarios.
 - **Backend-Enforced Guardrails**: Read-only and restricted connections are enforced server-side, so blocked updates, deletes, DDL, and imports cannot be bypassed by skipping the UI.
+- **SQL Steps Sequencing**: Split a multi-statement SQL script into draggable steps, reorder them, edit each block, apply the sequence back to the editor, or run it sequentially.
+- **AI Query Explanation Dialog**: Open a dedicated explanation surface with a line-numbered SQL preview and markdown-based AI breakdown of the script.
 - **Keyboard Shortcuts**: Use `Ctrl+Enter` to run, `Ctrl+S` to save, and `Ctrl+H` to open history.
 - **Execution Analytics**: Query plans and execution timing are surfaced in the workspace.
 - **Tabbed Results**: Separate panes for data, messages, and explain output.
 - **Export Capabilities**: Export result data as **CSV**, **JSON**, or **SQL** from the grid tooling.
 
 ### Premium UI and Responsive Experience
+
 - **Fully Responsive Architecture**: Works across mobile and desktop layouts.
 - **Mobile-Adaptive Interface**:
   - Animated menu and drawer patterns
@@ -106,31 +118,32 @@ Current release focus: **v3.6.2** adds image-aware AI workflows, explicit Beekno
 
 ### Frontend (Client-Side)
 
-| Layer | Technologies |
-|---|---|
-| **Core Framework** | React 19, Vite, TypeScript |
-| **State Management** | Zustand, TanStack Query v5 |
-| **UI Components** | Radix UI, Shadcn UI, Tailwind CSS |
-| **Visualizations** | React Flow, Recharts, Lucide Icons |
-| **Editor** | Monaco Editor |
-| **Animations** | Framer Motion, CSS Keyframes, Intersection Observer |
+| Layer                | Technologies                                        |
+| -------------------- | --------------------------------------------------- |
+| **Core Framework**   | React 19, Vite, TypeScript                          |
+| **State Management** | Zustand, TanStack Query v5                          |
+| **UI Components**    | Radix UI, Shadcn UI, Tailwind CSS                   |
+| **Visualizations**   | React Flow, Recharts, Lucide Icons                  |
+| **Editor**           | Monaco Editor                                       |
+| **Animations**       | Framer Motion, CSS Keyframes, Intersection Observer |
 
 ### Backend (Server-Side)
 
-| Layer | Technologies |
-|---|---|
-| **Architecture** | NestJS |
-| **ORM / Persistence** | Prisma |
-| **AI Engine** | Gemini plus OpenAI-compatible provider routing (Cerebras, OpenRouter, Groq, Beeknoee, TokenRouter), SSE streaming, attachment-aware orchestration |
-| **Engines Support** | `pg`, `mysql2`, `mssql`, `mongodb`, `@clickhouse/client` |
-| **Security** | JWT, Passport.js, AES-256-GCM encryption |
-| **Infrastructure** | Redis, BullMQ, SSE notifications, presence coordination, search indexing |
+| Layer                 | Technologies                                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **Architecture**      | NestJS                                                                                                                               |
+| **ORM / Persistence** | Prisma                                                                                                                               |
+| **AI Engine**         | Gemini plus OpenAI-compatible provider routing (Cerebras, OpenRouter, Groq, Beeknoee), SSE streaming, attachment-aware orchestration |
+| **Engines Support**   | `pg`, `mysql2`, `mssql`, `mongodb`, `@clickhouse/client`                                                                             |
+| **Security**          | JWT, Passport.js, AES-256-GCM encryption                                                                                             |
+| **Infrastructure**    | Redis, BullMQ, SSE notifications, presence coordination, search indexing                                                             |
 
 ---
 
 ## Project Architecture and Structure
 
 ### Current Architecture Notes
+
 - **Frontend layering**: `core` keeps shared app/domain state, `infrastructure` keeps bootstrapping/plumbing, and `presentation` owns UI composition by feature module.
 - **Backend layering**: NestJS modules separate auth, permissions, connection persistence, query execution, AI, metadata, migrations, teamspaces, notifications, and Redis-backed infrastructure.
 - **AI layering**: Prompt building, schema context, routing, provider execution, and connection context are split so provider changes do not leak into UI or query services.
@@ -138,6 +151,7 @@ Current release focus: **v3.6.2** adds image-aware AI workflows, explicit Beekno
 - **Responsive shell**: `Layout` owns AppShell, NoSQL shell, navbar, profile dialog, compact mobile chrome, and desktop-mode-on-mobile behavior.
 
 ### Code Intelligence and Review Workflow
+
 - **GitNexus indexed workspace**: The repository is indexed as `Data-Explorer-Workspace` with symbol, relationship, and execution-flow awareness for safer navigation and refactoring.
 - **Impact-first changes**: Before changing an important function, class, or method, run GitNexus impact analysis to understand direct callers, affected flows, and blast radius.
 - **Pre-commit scope check**: Use GitNexus change detection before committing so the changed symbols and execution flows match the intended patch.
@@ -211,41 +225,50 @@ Data Explorer/
 ## Comprehensive User Guide
 
 ### 1. Connection Management
+
 - **Universal Drivers**: Click the `+` in the Explorer sidebar to add a new connection. The main UI currently exposes **PostgreSQL**, **MySQL**, **SQL Server**, **ClickHouse**, **MongoDB**, and **MongoDB Atlas (SRV)**.
 - **Metadata Sync**: After connecting, the app crawls your schema and builds the tree view.
 - **Switching Context**: Move between saved connections and databases from the same workspace.
 
 ### 2. Pro SQL Workspace
+
 - **Multi-Tab Editing**: Open multiple SQL tabs and execute with **Ctrl/Cmd + Enter**.
 - **Smart IntelliSense**: Schema-aware suggestions are available inside the editor.
-- **Explain and Analyze**: Use the explain action to inspect query plans directly in the results panel.
+- **Explain and Analyze**: Use the plan/analyze tooling for engine execution plans, and use the dedicated AI explanation dialog when you want a natural-language breakdown of the current SQL script.
+- **SQL Steps**: Break a long script into ordered steps, rearrange them visually, then apply the sequence back to the editor or run it one step at a time in order.
 - **Saved Queries and History**: Save reusable queries and reopen recent executions quickly.
 - **Query Guardrails**: Read-only and restricted connections are enforced at both UI and server levels.
 - **Balanced IDE Chrome**: The desktop navbar centers the SQL/NoSQL workspace switcher while preserving enough space for teams, theme controls, AI, timer, settings, and profile actions.
 - **Mobile/Desktop Toggle**: On mobile browsers, users can stay in compact mode or enable desktop-style mode when they need the full query/editor surface.
 
 ### 3. Team Collaboration
+
 - **Invite and Manage Members**: Create teams, invite members by email, and assign roles.
 - **Share Work**: Connections, queries, and dashboards can be shared to a team from the Team page.
 - **Track Team Activity**: Team dashboards and activity feeds help you see what the group has been using recently.
 - **Open on Mobile**: Teams is available from the avatar menu on mobile, even when the desktop navigation is collapsed.
 
 ### 4. Using the AI Assistant
+
 - **Contextual Knowledge**: The assistant is aware of your active connection, schema context, and current workspace state.
 - **Vision Features**: Drop in screenshots or reference material for AI-assisted schema and SQL help.
-- **Routing Modes**: Use premium Gemini for harder work, optional Cerebras/OpenRouter/Groq lanes for cheaper, faster, or fallback chat flows, and explicit Beeknoee or TokenRouter picks when you want to lock the provider/model.
+- **Configure AI**: Open `Profile > Configure AI` to set separate models for Assistant, Explain, AI SQL, AI NoSQL, and Autocomplete, or let those roles inherit the Assistant model.
+- **Custom Providers**: Add your own OpenAI-compatible provider with a Base URL and API key, load the available models from that endpoint, and use them in role-based configuration.
+- **Routing Modes**: Use premium Gemini for harder work, optional Cerebras/OpenRouter/Groq lanes for cheaper, faster, or fallback chat flows, and explicit Beeknoee picks when you want to lock the provider/model.
 - **Operational Safety**: Provider requests include timeout and stream-idle limits so failed or slow model lanes do not block the app indefinitely.
 - **Prompt Engineering**: Ask practical questions like:
   - `"Summarize the relationship between orders and customers"`
   - `"Find the top 5 customers with high churn risk based on transaction volume"`
 
 ### 5. Interactive Visualizations
+
 - **ERD Exploration**: Open the ERD module to inspect table relationships visually.
 - **Insights Dashboard**: Review health signals, charts, and high-level usage indicators.
 - **NoSQL Workspace**: MongoDB-oriented flows now include Tree JSON browsing, Auto-Flatten Grid, schema analysis, aggregation building, and result-driven insights in a dedicated workspace.
 - **Metadata Analytics**: Inspect schema version history and metadata freshness signals from the sidebar.
 
 ### 6. Redis Infrastructure
+
 - **Redis-backed Search**: The backend keeps a fast metadata index in Redis so global search and workspace lookups stay responsive.
 - **Notification Streaming**: Long-running operations publish progress through Redis Pub/Sub and SSE.
 - **Presence Coordination**: Team presence and collaborative status indicators rely on Redis-backed runtime state.
@@ -257,11 +280,12 @@ Data Explorer/
 ## Installation and Local Development
 
 ### Requirements
+
 - **Node.js 20+**
 - **npm**
 - **PostgreSQL** for the app metadata database
 - **Redis** for caching, notifications, presence, search, and background jobs
-- **At least one AI provider key** (optional, only needed for AI features such as Gemini, OpenRouter, Groq, Cerebras, Beeknoee, or TokenRouter)
+- **At least one built-in AI provider key, or a custom OpenAI-compatible provider you will add from the Configure AI screen** (optional, only needed for AI features)
 - **Docker and Docker Compose** (optional, for the containerized path)
 
 ---
@@ -286,6 +310,7 @@ This is the fastest way to run **Data Explorer** locally with PostgreSQL, Redis,
    ```
 
 ### Access Points
+
 - **Web Interface**: [http://localhost](http://localhost)
 - **Backend API**: [http://localhost:3001/api/health](http://localhost:3001/api/health)
 - **Primary Database**: `localhost:5435`
@@ -295,6 +320,7 @@ This is the fastest way to run **Data Explorer** locally with PostgreSQL, Redis,
 - **Redis**: `localhost:6379` (for caching, notifications, queues, presence, and search indexing)
 
 Note:
+
 - `docker-compose.yml` reads backend env vars from `server/.env`, not from the root `.env.example`.
 - The backend container listens on port `3001`.
 - The frontend build arg defaults to `VITE_API_URL=http://localhost:3001/api`.
@@ -303,7 +329,9 @@ Note:
 ---
 
 ### Initial Setup
+
 1. **Clone and Install**
+
    ```bash
    git clone https://github.com/KasierBach/Data-Explorer-Editor.git
    cd Data-Explorer-Editor
@@ -311,6 +339,7 @@ Note:
    ```
 
 2. **Backend Configuration**
+
    ```bash
    cd server
    npm install
@@ -321,6 +350,7 @@ Note:
    ```
 
    Recommended local values in `server/.env`:
+
    ```env
    DATABASE_URL=postgresql://postgres:postgres@localhost:5435/data_explorer
    REDIS_URL=redis://localhost:6379
@@ -331,6 +361,7 @@ Note:
    ```
 
 3. **Frontend Configuration**
+
    ```bash
    cd ../client
    npm install
@@ -338,6 +369,7 @@ Note:
    ```
 
    Optional `client/.env`:
+
    ```env
    VITE_API_URL=http://localhost:3001/api
    ```
@@ -375,44 +407,43 @@ cd server && npm run lint && npm run build
 
 The backend reads configuration from `server/.env`. The frontend reads `VITE_API_URL` from `client/.env` or from the Docker build arg.
 
-| Variable | Required | Description |
-|---|---|---|
-| `DATABASE_URL` | Yes | Connection string for the app's central PostgreSQL database. Docker default: `postgresql://postgres:postgres@db:5432/data_explorer`. |
-| `REDIS_URL` | No | Redis connection string for caching, notifications, queues, presence, search indexing, and throttling. Docker default: `redis://redis:6379`. |
-| `GEMINI_API_KEY` | No | Gemini API key used for the premium AI lane, vision-capable prompts, and current-info capable flows. |
-| `AI_PROVIDER_TIMEOUT_MS` | No | Timeout in milliseconds for AI provider requests. Default: `15000`. |
-| `AI_STREAM_IDLE_TIMEOUT_MS` | No | Idle timeout in milliseconds for streaming AI responses. Default: `15000`. |
-| `CEREBRAS_API_KEY` | No | Optional lower-cost AI provider key used by AI routing in `Auto` / `Fast` mode. |
-| `CEREBRAS_BASE_URL` | No | Base URL for Cerebras' OpenAI-compatible API. Default: `https://api.cerebras.ai/v1`. |
-| `CEREBRAS_CHAT_MODEL` | No | Preferred Cerebras chat model for cheaper AI routing. |
-| `OPENROUTER_API_KEY` | No | Optional fallback AI provider key used when you want more free/cheap routing options. |
-| `OPENROUTER_BASE_URL` | No | Base URL for OpenRouter. Default: `https://openrouter.ai/api/v1`. |
-| `OPENROUTER_CHAT_MODEL` | No | OpenRouter model slug to use in `Auto` / `Fast` mode. |
-| `GROQ_API_KEY` | No | Optional Groq key for low-latency OpenAI-compatible AI routing. |
-| `GROQ_BASE_URL` | No | Base URL for Groq. Default: `https://api.groq.com/openai/v1`. |
-| `GROQ_CHAT_MODEL` | No | Groq model slug used in `Auto` / `Fast` mode. Default: `meta-llama/llama-4-scout-17b-16e-instruct`. |
-| `BEEKNOEE_API_KEY` | No | Optional Beeknoee key used when a user explicitly selects a Beeknoee model in AI Assistant. |
-| `BEEKNOEE_BASE_URL` | No | Base URL for Beeknoee's OpenAI-compatible API. Default: `https://platform.beeknoee.com/api/v1`. |
-| `BEEKNOEE_CHAT_MODEL` | No | Default Beeknoee chat model slug. Current recommended value: `glm-4.7-flash`. |
-| `TOKENROUTER_API_KEY` | No | Optional TokenRouter key used when a user explicitly selects a TokenRouter model in AI Assistant. |
-| `TOKENROUTER_BASE_URL` | No | Base URL for TokenRouter's OpenAI-compatible API. Default: `https://api.tokenrouter.com/v1`. |
-| `TOKENROUTER_CHAT_MODEL` | No | Default TokenRouter chat model slug. Current recommended value: `MiniMax-M3`. |
-| `JWT_SECRET` | Yes | Strong secret used to sign access tokens. Placeholder values are rejected. |
-| `REFRESH_TOKEN_SECRET` | No | Recommended separate secret for refresh-token cookies. If omitted, the app falls back to `JWT_SECRET`. |
-| `ENCRYPTION_KEY` | Yes | Exactly **32 characters**, used to encrypt saved database connection passwords. |
-| `LEGACY_ENCRYPTION_KEYS` | No | Comma-separated list of older keys used to decrypt connections saved before the hardening update. |
-| `PORT` | No | Server port. Local default: `3001`. |
-| `FRONTEND_URL` | Yes | Frontend URL used for CORS and OAuth redirects. Use `http://localhost:5173` for Vite local dev, or `http://localhost` when serving the frontend through Docker on port `80`. |
-| `ALLOW_INTERNAL_IPS` | No | Recommended default is `false`. Local development still allows `localhost`, `127.0.0.1`, and `::1`. |
-| `GOOGLE_CLIENT_ID` | No | Google login client ID. |
-| `GOOGLE_CLIENT_SECRET` | No | Google login client secret. |
-| `GOOGLE_CALLBACK_URL` | No | Google OAuth callback URL. Local default: `http://localhost:3001/api/auth/google/callback`. |
-| `GITHUB_CLIENT_ID` | No | GitHub login client ID. |
-| `GITHUB_CLIENT_SECRET` | No | GitHub login client secret. |
-| `GITHUB_CALLBACK_URL` | No | GitHub OAuth callback URL. Local default: `http://localhost:3001/api/auth/github/callback`. |
-| `MAIL_USER` | No | Email address or sender used for system mail. |
-| `MAIL_PASS` | No | App password or provider API key. |
-| `VITE_API_URL` | No | Frontend backend API URL. Default: `http://localhost:3001/api`. |
+Built-in AI lanes such as Gemini, OpenRouter, Groq, Cerebras, and Beeknoee are backend env-driven. User-added OpenAI-compatible providers, loaded model catalogs, and per-role model choices for Assistant / Explain / AI SQL / AI NoSQL / Autocomplete are configured from `Profile > Configure AI` and stored locally on that client machine/browser.
+
+| Variable                    | Required | Description                                                                                                                                                                  |
+| --------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`              | Yes      | Connection string for the app's central PostgreSQL database. Docker default: `postgresql://postgres:postgres@db:5432/data_explorer`.                                         |
+| `REDIS_URL`                 | No       | Redis connection string for caching, notifications, queues, presence, search indexing, and throttling. Docker default: `redis://redis:6379`.                                 |
+| `GEMINI_API_KEY`            | No       | Gemini API key used for the premium AI lane, vision-capable prompts, and current-info capable flows.                                                                         |
+| `AI_PROVIDER_TIMEOUT_MS`    | No       | Timeout in milliseconds for AI provider requests. Default: `15000`.                                                                                                          |
+| `AI_STREAM_IDLE_TIMEOUT_MS` | No       | Idle timeout in milliseconds for streaming AI responses. Default: `15000`.                                                                                                   |
+| `CEREBRAS_API_KEY`          | No       | Optional lower-cost AI provider key used by AI routing in `Auto` / `Fast` mode.                                                                                              |
+| `CEREBRAS_BASE_URL`         | No       | Base URL for Cerebras' OpenAI-compatible API. Default: `https://api.cerebras.ai/v1`.                                                                                         |
+| `CEREBRAS_CHAT_MODEL`       | No       | Preferred Cerebras chat model for cheaper AI routing.                                                                                                                        |
+| `OPENROUTER_API_KEY`        | No       | Optional fallback AI provider key used when you want more free/cheap routing options.                                                                                        |
+| `OPENROUTER_BASE_URL`       | No       | Base URL for OpenRouter. Default: `https://openrouter.ai/api/v1`.                                                                                                            |
+| `OPENROUTER_CHAT_MODEL`     | No       | OpenRouter model slug to use in `Auto` / `Fast` mode.                                                                                                                        |
+| `GROQ_API_KEY`              | No       | Optional Groq key for low-latency OpenAI-compatible AI routing.                                                                                                              |
+| `GROQ_BASE_URL`             | No       | Base URL for Groq. Default: `https://api.groq.com/openai/v1`.                                                                                                                |
+| `GROQ_CHAT_MODEL`           | No       | Groq model slug used in `Auto` / `Fast` mode. Default: `meta-llama/llama-4-scout-17b-16e-instruct`.                                                                          |
+| `BEEKNOEE_API_KEY`          | No       | Optional Beeknoee key used when a user explicitly selects a Beeknoee model in AI Assistant.                                                                                  |
+| `BEEKNOEE_BASE_URL`         | No       | Base URL for Beeknoee's OpenAI-compatible API. Default: `https://platform.beeknoee.com/api/v1`.                                                                              |
+| `BEEKNOEE_CHAT_MODEL`       | No       | Default Beeknoee chat model slug. Current recommended value: `glm-4.7-flash`.                                                                                                |
+| `JWT_SECRET`                | Yes      | Strong secret used to sign access tokens. Placeholder values are rejected.                                                                                                   |
+| `REFRESH_TOKEN_SECRET`      | No       | Recommended separate secret for refresh-token cookies. If omitted, the app falls back to `JWT_SECRET`.                                                                       |
+| `ENCRYPTION_KEY`            | Yes      | Exactly **32 characters**, used to encrypt saved database connection passwords.                                                                                              |
+| `LEGACY_ENCRYPTION_KEYS`    | No       | Comma-separated list of older keys used to decrypt connections saved before the hardening update.                                                                            |
+| `PORT`                      | No       | Server port. Local default: `3001`.                                                                                                                                          |
+| `FRONTEND_URL`              | Yes      | Frontend URL used for CORS and OAuth redirects. Use `http://localhost:5173` for Vite local dev, or `http://localhost` when serving the frontend through Docker on port `80`. |
+| `ALLOW_INTERNAL_IPS`        | No       | Recommended default is `false`. Local development still allows `localhost`, `127.0.0.1`, and `::1`.                                                                          |
+| `GOOGLE_CLIENT_ID`          | No       | Google login client ID.                                                                                                                                                      |
+| `GOOGLE_CLIENT_SECRET`      | No       | Google login client secret.                                                                                                                                                  |
+| `GOOGLE_CALLBACK_URL`       | No       | Google OAuth callback URL. Local default: `http://localhost:3001/api/auth/google/callback`.                                                                                  |
+| `GITHUB_CLIENT_ID`          | No       | GitHub login client ID.                                                                                                                                                      |
+| `GITHUB_CLIENT_SECRET`      | No       | GitHub login client secret.                                                                                                                                                  |
+| `GITHUB_CALLBACK_URL`       | No       | GitHub OAuth callback URL. Local default: `http://localhost:3001/api/auth/github/callback`.                                                                                  |
+| `MAIL_USER`                 | No       | Email address or sender used for system mail.                                                                                                                                |
+| `MAIL_PASS`                 | No       | App password or provider API key.                                                                                                                                            |
+| `VITE_API_URL`              | No       | Frontend backend API URL. Default: `http://localhost:3001/api`.                                                                                                              |
 
 ---
 

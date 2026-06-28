@@ -16,18 +16,14 @@ describe('analyzeDestructiveSql', () => {
   });
 
   it('does not require confirmation for insert or targeted delete', () => {
-    expect(
-      analyzeDestructiveSql('INSERT INTO users (id) VALUES (1)'),
-    ).toEqual(
+    expect(analyzeDestructiveSql('INSERT INTO users (id) VALUES (1)')).toEqual(
       expect.objectContaining({
         requiresConfirmation: false,
         isMutating: true,
       }),
     );
 
-    expect(
-      analyzeDestructiveSql('DELETE FROM users WHERE id = 42'),
-    ).toEqual(
+    expect(analyzeDestructiveSql('DELETE FROM users WHERE id = 42')).toEqual(
       expect.objectContaining({
         requiresConfirmation: false,
         isMutating: true,
@@ -56,9 +52,7 @@ describe('analyzeDestructiveSql', () => {
   });
 
   it('treats tautological where clauses as unbounded', () => {
-    expect(
-      analyzeDestructiveSql('DELETE FROM users WHERE 1 = 1'),
-    ).toEqual(
+    expect(analyzeDestructiveSql('DELETE FROM users WHERE 1 = 1')).toEqual(
       expect.objectContaining({
         requiresConfirmation: true,
         severity: 'high',
@@ -69,7 +63,9 @@ describe('analyzeDestructiveSql', () => {
 
   it('flags create or replace and rename as contract changes', () => {
     expect(
-      analyzeDestructiveSql('CREATE OR REPLACE VIEW active_users AS SELECT * FROM users'),
+      analyzeDestructiveSql(
+        'CREATE OR REPLACE VIEW active_users AS SELECT * FROM users',
+      ),
     ).toEqual(
       expect.objectContaining({
         requiresConfirmation: true,
@@ -80,7 +76,9 @@ describe('analyzeDestructiveSql', () => {
       }),
     );
 
-    expect(analyzeDestructiveSql('RENAME TABLE users TO users_archive')).toEqual(
+    expect(
+      analyzeDestructiveSql('RENAME TABLE users TO users_archive'),
+    ).toEqual(
       expect.objectContaining({
         requiresConfirmation: true,
         severity: 'medium',
@@ -101,9 +99,7 @@ describe('analyzeDestructiveSql', () => {
       }),
     );
 
-    expect(
-      analyzeDestructiveSql('ALTER TABLE users DROP COLUMN note'),
-    ).toEqual(
+    expect(analyzeDestructiveSql('ALTER TABLE users DROP COLUMN note')).toEqual(
       expect.objectContaining({
         requiresConfirmation: true,
         severity: 'high',

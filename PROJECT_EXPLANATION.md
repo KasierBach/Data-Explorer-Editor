@@ -21,7 +21,7 @@
 
 - **Frontend:** React 19, Vite, TypeScript, Zustand, TanStack Query, Tailwind CSS, Radix UI
 - **Backend:** NestJS, Prisma, Redis, BullMQ
-- **AI layer:** Gemini + các lane OpenAI-compatible như OpenRouter, Groq, Cerebras, Beeknoee, TokenRouter
+- **AI layer:** Gemini + các lane OpenAI-compatible như OpenRouter, Groq, Cerebras, Beeknoee
 - **Visualization:** React Flow, Recharts, Monaco Editor
 - **Hạ tầng local/dev:** PostgreSQL cho metadata app, Redis cho cache/queue/presence/search index
 
@@ -38,7 +38,7 @@ Khi có một request “nhờ AI viết SQL” hoặc “phân tích dữ liệ
 4. **Backend định tuyến và chuẩn hóa task**
    - Xác định đây là chat thường, SQL generation, vision, current-info request, hay tác vụ có explicit provider/model.
 5. **AI provider được chọn**
-   - Có thể là Gemini, OpenRouter, Groq, Cerebras, Beeknoee, hoặc TokenRouter tùy routing mode và explicit selection.
+   - Có thể là Gemini, OpenRouter, Groq, Cerebras, Beeknoee.
 6. **Backend trả kết quả hoặc chạy tiếp workflow**
    - Với SQL: có thể sinh query, validate, rồi đưa sang query execution path.
    - Với NoSQL: có thể hỗ trợ MQL, aggregation, schema reasoning, hoặc insight từ result set.

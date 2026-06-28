@@ -45,10 +45,7 @@ export class QueryController {
     @Body() fetchTableWindowDto: FetchTableWindowDto,
     @Req() req: RequestWithUser,
   ) {
-    return this.queryService.fetchTableWindow(
-      fetchTableWindowDto,
-      req.user.id,
-    );
+    return this.queryService.fetchTableWindow(fetchTableWindowDto, req.user.id);
   }
 
   @Patch('row')

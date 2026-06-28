@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 import { AiService } from '../ai/ai.service';
@@ -30,8 +27,8 @@ export class SearchService {
     const semanticPromise: Promise<string[]> =
       this.aiService.suggestTablesBySemantic(query, names);
     const timeoutPromise = new Promise<string[]>((resolve) => {
-        setTimeout(() => resolve([]), timeoutMs);
-      });
+      setTimeout(() => resolve([]), timeoutMs);
+    });
     return Promise.race([semanticPromise, timeoutPromise]);
   }
 

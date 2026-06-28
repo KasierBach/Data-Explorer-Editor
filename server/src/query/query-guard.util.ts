@@ -61,7 +61,9 @@ export function isSqlAllowedOnReadOnly(sql: string): boolean {
   if (!normalized) return true;
 
   if (
-    SQL_WRITE_KEYWORDS.some((kw) => new RegExp(`\\b${kw}\\b`, 'i').test(normalized))
+    SQL_WRITE_KEYWORDS.some((kw) =>
+      new RegExp(`\\b${kw}\\b`, 'i').test(normalized),
+    )
   ) {
     return false;
   }
@@ -171,7 +173,12 @@ function startsWithKeyword(normalized: string, keyword: string) {
 
 function cleanIdentifier(value: string | undefined): string | null {
   if (!value) return null;
-  return value.replace(/["`\[\]]/g, '').replace(/[;,]+$/g, '').trim() || null;
+  return (
+    value
+      .replace(/["`[\]]/g, '')
+      .replace(/[;,]+$/g, '')
+      .trim() || null
+  );
 }
 
 function getImpactScopeForObjectType(objectType: string | null): ImpactScope {
@@ -249,7 +256,8 @@ function extractObjectInfo(normalized: string): SqlObjectInfo {
     if (!match) continue;
 
     const rawObjectType =
-      pattern.objectType || cleanIdentifier(match[pattern.objectTypeGroup || 0]);
+      pattern.objectType ||
+      cleanIdentifier(match[pattern.objectTypeGroup || 0]);
     const objectType = rawObjectType ? rawObjectType.toUpperCase() : null;
     return {
       affectedObject: cleanIdentifier(match[pattern.objectGroup]),
@@ -532,7 +540,10 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
       sql,
       operation,
       severity: 'high',
-      reason: operation === 'ATTACH' ? 'schema_contract_change' : 'destructive_schema_change',
+      reason:
+        operation === 'ATTACH'
+          ? 'schema_contract_change'
+          : 'destructive_schema_change',
       info: extractObjectInfo(normalized),
     });
   }
@@ -552,7 +563,9 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
   }
 
   if (
-    SQL_WRITE_KEYWORDS.some((kw) => new RegExp(`\\b${kw}\\b`, 'i').test(normalized))
+    SQL_WRITE_KEYWORDS.some((kw) =>
+      new RegExp(`\\b${kw}\\b`, 'i').test(normalized),
+    )
   ) {
     return createSafeAnalysis(true);
   }
@@ -563,7 +576,9 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
 export function analyzeSqlConfirmation(sql: string): DestructiveAnalysis {
   const statements = splitSqlStatements(sql);
   const executableStatements = statements.length > 0 ? statements : [sql];
-  const analyses = executableStatements.map((statement) => analyzeDestructiveSql(statement));
+  const analyses = executableStatements.map((statement) =>
+    analyzeDestructiveSql(statement),
+  );
   const flaggedAnalyses: DestructiveAnalysis[] = [];
 
   analyses.forEach((analysis, index) => {
@@ -571,7 +586,8 @@ export function analyzeSqlConfirmation(sql: string): DestructiveAnalysis {
 
     flaggedAnalyses.push({
       ...analysis,
-      statement: analysis.statement || executableStatements[index].trim().slice(0, 4000),
+      statement:
+        analysis.statement || executableStatements[index].trim().slice(0, 4000),
       statementIndex: index + 1,
       statementCount: executableStatements.length,
     });
@@ -606,4 +622,3 @@ export function isMongoActionAllowedOnReadOnly(action: string | null): boolean {
   if (!action) return false;
   return MONGO_READ_ONLY_ACTIONS.has(action);
 }
-

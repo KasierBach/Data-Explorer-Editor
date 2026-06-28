@@ -79,6 +79,8 @@ export class AiService {
     afterCursor?: string;
     schemaContext?: string;
     databaseType?: string;
+    model?: string;
+    providerOverride?: ChatParams['providerOverride'];
   }): Promise<string> {
     return this.autocompleteService.autocomplete(params);
   }
@@ -335,4 +337,3 @@ export class AiService {
     return trimmed;
   }
 }
-

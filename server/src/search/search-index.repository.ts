@@ -41,13 +41,7 @@ export class SearchIndexRepository {
 
   private buildSearchText(item: SearchIndexItem) {
     return this.tokenize(
-      [
-        item.name,
-        item.schema,
-        item.database,
-        item.connectionName,
-        item.type,
-      ]
+      [item.name, item.schema, item.database, item.connectionName, item.type]
         .filter(Boolean)
         .join(' '),
     ).join(' ');
@@ -76,13 +70,7 @@ export class SearchIndexRepository {
     };
 
     for (const token of this.tokenize(
-      [
-        item.name,
-        item.schema,
-        item.database,
-        item.connectionName,
-        item.type,
-      ]
+      [item.name, item.schema, item.database, item.connectionName, item.type]
         .filter(Boolean)
         .join(' '),
     )) {
@@ -217,7 +205,10 @@ export class SearchIndexRepository {
       }
     }
 
-    const storedItems = await client.hmget(this.itemsKey(userId), ...candidateIds);
+    const storedItems = await client.hmget(
+      this.itemsKey(userId),
+      ...candidateIds,
+    );
     const matchedItems = storedItems
       .map((value) => this.parseStoredItem(value))
       .filter((item): item is StoredSearchIndexItem => Boolean(item))
@@ -226,7 +217,9 @@ export class SearchIndexRepository {
         const exactLeft = this.normalize(left.name).startsWith(normalizedQuery)
           ? 0
           : 1;
-        const exactRight = this.normalize(right.name).startsWith(normalizedQuery)
+        const exactRight = this.normalize(right.name).startsWith(
+          normalizedQuery,
+        )
           ? 0
           : 1;
 

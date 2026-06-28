@@ -1,5 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { aiService } from '@/core/services/AiService';
+import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
 import { useAppStore } from '@/core/services/store';
 import type { Monaco } from '@monaco-editor/react';
 import type { CancellationToken, editor, languages, Position } from 'monaco-editor';
@@ -35,8 +36,19 @@ export function useAiGhostText(
     activeDatabase: string | undefined,
     language: string = 'sql'
 ) {
+    const aiModel = useAppStore((state) => state.aiModel);
     const nosqlActiveCollection = useAppStore((state) => state.nosqlActiveCollection);
     const nosqlSchemaStats = useAppStore((state) => state.nosqlSchemaStats);
+    const preferences = useAiPreferences();
+    const assistantSelection = preferences.assistantModel || aiModel;
+    const resolvedAutocomplete = useMemo(
+        () => resolveAiSelection(
+            preferences.autocompleteModel,
+            assistantSelection,
+            preferences.customProviders,
+        ),
+        [preferences.autocompleteModel, assistantSelection, preferences.customProviders],
+    );
     
     useEffect(() => {
         if (!monaco || !activeConnectionId) return;
@@ -106,6 +118,8 @@ export function useAiGhostText(
                         beforeCursor,
                         afterCursor,
                         context: contextStr,
+                        model: resolvedAutocomplete.model,
+                        providerOverride: resolvedAutocomplete.providerOverride,
                     });
 
                     if (!completion || token.isCancellationRequested) return;
@@ -165,5 +179,14 @@ export function useAiGhostText(
         const disposable = monaco.languages.registerInlineCompletionsProvider(language, provider);
 
         return () => disposable.dispose();
-    }, [monaco, activeConnectionId, activeDatabase, language, nosqlActiveCollection, nosqlSchemaStats]);
+    }, [
+        monaco,
+        activeConnectionId,
+        activeDatabase,
+        language,
+        nosqlActiveCollection,
+        nosqlSchemaStats,
+        resolvedAutocomplete.model,
+        resolvedAutocomplete.providerOverride,
+    ]);
 }

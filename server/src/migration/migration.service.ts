@@ -412,7 +412,9 @@ export class MigrationService {
                   context!.targetConn!.type,
                   dto.targetSchema,
                 ),
-                table: this.comparisonService.normalizeTableName(dto.targetTable),
+                table: this.comparisonService.normalizeTableName(
+                  dto.targetTable,
+                ),
                 data: batch,
               });
 

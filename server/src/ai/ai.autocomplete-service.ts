@@ -3,7 +3,9 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import * as crypto from 'crypto';
 import { AiProviderRunnerService } from './ai.provider-runner.service';
+import { AiRoutingService } from './ai.routing.service';
 import { AI_CONSTANTS } from './ai.constants';
+import type { ChatParams } from './ai.types';
 
 type GeneratedCommandResponse = {
   explanation?: string;
@@ -265,6 +267,7 @@ export class AiAutocompleteService {
   constructor(
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly providerRunner: AiProviderRunnerService,
+    private readonly routingService: AiRoutingService,
   ) {}
 
   async autocomplete(params: {
@@ -272,17 +275,17 @@ export class AiAutocompleteService {
     afterCursor?: string;
     schemaContext?: string;
     databaseType?: string;
+    model?: string;
+    providerOverride?: ChatParams['providerOverride'];
   }): Promise<string> {
     const {
       beforeCursor,
       afterCursor = '',
       schemaContext,
       databaseType = 'postgres',
+      model,
+      providerOverride,
     } = params;
-
-    if (!this.providerRunner.isGeminiAvailable()) {
-      return '';
-    }
 
     const isNoSql =
       databaseType === 'mongodb' ||
@@ -294,7 +297,10 @@ export class AiAutocompleteService {
         : 'Redis Command'
       : `${databaseType} SQL`;
 
-    const cacheContent = `${databaseType}:${schemaContext || ''}:${beforeCursor}`;
+    const cacheScope = providerOverride
+      ? `${providerOverride.baseUrl}:${providerOverride.model}`
+      : model || 'assistant-default';
+    const cacheContent = `${databaseType}:${cacheScope}:${schemaContext || ''}:${beforeCursor}`;
     const cacheKey = `ai:autocomplete:${crypto.createHash('sha256').update(cacheContent).digest('hex')}`;
 
     try {
@@ -322,26 +328,59 @@ ${afterCursor.length > 300 ? afterCursor.slice(0, 300) : afterCursor}
 
 NEXT CHARACTERS (START IMMEDIATELY):`;
 
-      const responseText = await this.providerRunner.completeGeminiText({
-        model: 'gemini-3.1-flash-lite-preview',
-        prompt: systemPrompt,
-        temperature: AI_CONSTANTS.TEMPERATURE_PRECISE,
-        maxOutputTokens: AI_CONSTANTS.AUTOCOMPLETE_MAX_OUTPUT_TOKENS,
-      });
+      const { plans } = this.routingService.buildPlanChain(
+        {
+          prompt: beforeCursor,
+          schemaContext,
+          databaseType,
+          model,
+          mode: 'fast',
+          providerOverride,
+        },
+        this.providerRunner.isGeminiAvailable(),
+      );
 
-      const suggestion = responseText
-        .replace(/^```(sql|json|bash)?\n?|```$/g, '')
-        .trim();
+      for (const plan of plans) {
+        try {
+          const responseText =
+            plan.provider === 'gemini'
+              ? await this.providerRunner.completeGeminiText({
+                  model: plan.model,
+                  prompt: systemPrompt,
+                  temperature: AI_CONSTANTS.TEMPERATURE_PRECISE,
+                  maxOutputTokens: AI_CONSTANTS.AUTOCOMPLETE_MAX_OUTPUT_TOKENS,
+                })
+              : await this.providerRunner.completeOpenAiCompatibleText(plan, {
+                  systemPrompt,
+                  prompt: beforeCursor,
+                  temperature: AI_CONSTANTS.TEMPERATURE_PRECISE,
+                  maxOutputTokens: AI_CONSTANTS.AUTOCOMPLETE_MAX_OUTPUT_TOKENS,
+                });
 
-      if (suggestion) {
-        await this.cacheManager.set(
-          cacheKey,
-          suggestion,
-          AI_CONSTANTS.AUTOCOMPLETE_CACHE_TTL_MS,
-        );
+          const suggestion = responseText
+            .replace(/^```(sql|json|bash)?\n?|```$/g, '')
+            .trim();
+
+          if (!suggestion) {
+            continue;
+          }
+
+          await this.cacheManager.set(
+            cacheKey,
+            suggestion,
+            AI_CONSTANTS.AUTOCOMPLETE_CACHE_TTL_MS,
+          );
+          return suggestion;
+        } catch (planError) {
+          this.logger.warn(
+            `[AiAutocompleteService] Autocomplete plan ${plan.provider}:${plan.model} failed: ${
+              planError instanceof Error ? planError.message : 'Unknown error'
+            }`,
+          );
+        }
       }
 
-      return suggestion;
+      return '';
     } catch (error) {
       this.logger.warn(
         '[AiAutocompleteService] Autocomplete failed:',

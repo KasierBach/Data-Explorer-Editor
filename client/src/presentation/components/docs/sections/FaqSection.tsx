@@ -1,116 +1,155 @@
-import { DocPageLayout } from '../primitives';
+import { DocPageLayout } from "../primitives";
 
-interface Props { lang: 'vi' | 'en'; }
+interface Props {
+  lang: "vi" | "en";
+}
 
 export function FaqSection({ lang }: Props) {
-    const t = lang === 'vi';
+  const t = lang === "vi";
 
-    const faqs = [
-        {
-            q: t ? 'Tôi có cần cài database trước khi dùng Data Explorer không?' : 'Do I need a database before using Data Explorer?',
-            a: t
-                ? 'Có. Data Explorer là công cụ quản lý và khám phá dữ liệu, không phải database server. Bạn cần ít nhất một database đang chạy để kết nối vào. App metadata của Data Explorer cũng cần một PostgreSQL riêng cho users, connections, saved queries, dashboards và các dữ liệu nội bộ khác.'
-                : 'Yes. Data Explorer is a management and exploration tool, not a database server. You need at least one running database to connect to. The app itself also needs a separate PostgreSQL database for users, connections, saved queries, dashboards, and other internal metadata.',
-        },
-        {
-            q: t ? 'App hiện hỗ trợ những engine nào?' : 'Which engines are supported right now?',
-            a: t
-                ? 'Hiện tại app hỗ trợ PostgreSQL, MySQL, SQL Server, MongoDB và MongoDB Atlas (SRV). SQL workspace và NoSQL workspace là hai bề mặt riêng, nhưng cùng dùng chung hệ thống auth, connections, AI, dashboards và audit.'
-                : 'The app currently supports PostgreSQL, MySQL, SQL Server, MongoDB, and MongoDB Atlas (SRV). The SQL workspace and NoSQL workspace are separate surfaces, but they share the same auth, connections, AI, dashboards, and audit foundations.',
-        },
-        {
-            q: t ? 'Dữ liệu của tôi có bị gửi lên cloud không?' : 'Is my data sent to the cloud?',
-            a: t
-                ? 'Không theo kiểu dump toàn bộ data lên cloud. Khi dùng AI, app có thể gửi prompt, schema context hoặc ngữ cảnh bạn chủ động yêu cầu sang provider AI đang cấu hình. App không render raw HTML từ AI và không tự gửi toàn bộ result set trừ khi flow đó thật sự cần.'
-                : 'Not in the sense of dumping your whole database to the cloud. When you use AI, the app can send prompts, schema context, or the context you explicitly request to the configured AI provider. The app does not render raw HTML from AI and does not automatically send full result sets unless that flow really needs them.',
-        },
-        {
-            q: t ? 'AI hiện dùng Gemini hay gì khác?' : 'Does the AI only use Gemini?',
-            a: t
-                ? 'Không còn chỉ là Gemini. App hiện có AI routing với Gemini, OpenRouter, Groq, Cerebras, và các lane explicit như Beeknoee hoặc TokenRouter. Routing mode trong UI quyết định hướng ưu tiên chung, nhưng explicit model/provider vẫn là nút điều khiển mạnh nhất. Mỗi response cũng hiển thị provider/model thực tế để bạn không bị nhầm lane.'
-                : 'No longer Gemini-only. The app now supports AI routing across Gemini, OpenRouter, Groq, Cerebras, and explicit lanes such as Beeknoee or TokenRouter. The routing mode in the UI sets the broad preference, but explicit model/provider selection remains the strongest control. Each response also shows the actual provider/model so the lane stays transparent.',
-        },
-        {
-            q: t ? 'Tại sao AI trả lời khác nhau giữa các mode như Auto, Fast / Cheap và Gemini Only?' : 'Why do answers differ across Auto, Fast / Cheap, and Gemini Only?',
-            a: t
-                ? 'Vì mode chỉ là một phần của router. Auto cân bằng chung, Fast / Cheap thiên về lane nhẹ hơn, Best Quality nghiêng về lane mạnh hơn, còn Gemini Only khóa hẳn vào Gemini. Nhưng kết quả cuối còn phụ thuộc explicit model/provider, việc prompt có ảnh hay không, và việc request có bị nhận diện là current-info hay không.'
-                : 'Because the mode is only one part of the router. Auto balances broadly, Fast / Cheap leans toward lighter lanes, Best Quality leans toward stronger lanes, and Gemini Only locks into Gemini. But the final result also depends on any explicit model/provider selection, whether the prompt contains an image, and whether the request is detected as current-information work.',
-        },
-        {
-            q: t ? 'Tại sao tôi vẫn bị mất đăng nhập sau refresh hay restart?' : 'Why do I still lose my login after refresh or restart?',
-            a: t
-                ? 'Phiên hiện tại dùng refresh token trong httpOnly cookie và access token trong memory. Nếu bạn vẫn bị out, hãy kiểm tra FRONTEND_URL, HTTPS hoặc cookie policy ở production, và JWT_SECRET hoặc REFRESH_TOKEN_SECRET có bị đổi giữa các lần deploy không. Một secret đổi giữa các lần deploy sẽ làm phiên cũ mất hiệu lực.'
-                : 'The current session model uses a refresh token in an httpOnly cookie and an access token in memory. If you still get logged out, check FRONTEND_URL, HTTPS or cookie policy in production, and whether JWT_SECRET or REFRESH_TOKEN_SECRET changed between deploys. Rotating those secrets will invalidate older sessions.',
-        },
-        {
-            q: t ? 'Saved queries hiện lưu ở đâu?' : 'Where are saved queries stored now?',
-            a: t
-                ? 'Saved queries không còn chỉ là local-only nữa. Chúng được lưu ở backend metadata database và hỗ trợ private, team và workspace visibility. Tab content vẫn có state phía client để phục hồi UX, nhưng luồng saved queries đã là server-backed.'
-                : 'Saved queries are no longer local-only. They are stored in the backend metadata database and support private, team, and workspace visibility. Tab content still has client-side state for UX recovery, but the saved-query flow itself is now server-backed.',
-        },
-        {
-            q: t ? 'Vì sao prisma migrate deploy lỗi còn prisma db push lại chạy được?' : 'Why does prisma migrate deploy fail while prisma db push works?',
-            a: t
-                ? 'Vì migration history hiện tại của repo chưa khớp với một PostgreSQL deploy flow sạch. Trong trạng thái hiện nay, bạn nên dùng npx prisma db push cho local và production build. Đó là lý do docs deployment hiện nhấn mạnh db push thay vì migrate deploy.'
-                : 'Because the current migration history in the repo is not aligned with a clean PostgreSQL deploy flow. In the current state, you should use npx prisma db push for local and production builds. That is why the deployment docs emphasize db push instead of migrate deploy.',
-        },
-        {
-            q: t ? 'Tại sao kết nối database ở trường hoặc mạng công cộng lại hay bị lỗi?' : 'Why do database connections often fail on school or public networks?',
-            a: t
-                ? 'Nhiều mạng chặn trực tiếp các cổng database như 5432, 3306 hoặc 27017. Khi đó cả local dev lẫn app web đều có thể mất reachability tới DB cloud hoặc private. Cách thực tế nhất là dùng DB local cho dev, hoặc tunnel, VPN hay agent trên các mạng bị chặn mạnh.'
-                : 'Many networks block database ports such as 5432, 3306, or 27017 directly. In that case, both local development and the deployed app can lose reachability to cloud or private databases. The most practical workaround is to use a local database for development, or tunnels, VPNs, or agents on heavily restricted networks.',
-        },
-        {
-            q: t ? 'AI-generated SQL có chạy ngay lập tức không?' : 'Does AI-generated SQL run immediately?',
-            a: t
-                ? 'Không mặc định. Insert into editor chỉ chèn SQL vào editor. Run suggestion mới là hành động chạy, và app hiện có bước xác nhận trước khi execute SQL do AI đề xuất để giảm rủi ro chạy nhầm.'
-                : 'Not by default. Insert into editor only inserts SQL into the editor. Run suggestion is the action that executes it, and the app now shows a confirmation step before running AI-generated SQL to reduce the risk of accidental execution.',
-        },
-        {
-            q: t ? 'Tại sao connection của tôi bị chặn bởi guardrails?' : 'Why is my connection blocked by guardrails?',
-            a: t
-                ? 'Connection hiện có policy flags như readOnly, allowSchemaChanges, allowImportExport và allowQueryExecution. Backend sẽ enforce các guardrails này kể cả khi frontend bị bypass. Nếu một câu lệnh bị chặn, UI sẽ hiển thị lý do thay vì chỉ thất bại mơ hồ.'
-                : 'Connections now carry policy flags such as readOnly, allowSchemaChanges, allowImportExport, and allowQueryExecution. The backend enforces these guardrails even if the frontend is bypassed. When a statement is blocked, the UI shows a clear reason instead of failing vaguely.',
-        },
-        {
-            q: t ? 'Tại sao tôi không thấy query của đồng nghiệp mặc dù cả hai đều dùng @gmail.com?' : 'Why can\'t I see my colleague\'s queries if we both use @gmail.com?',
-            a: t
-                ? 'Bảo mật quyền riêng tư của bạn là ưu tiên hàng đầu. Data Explorer đã loại bỏ việc tự động chia sẻ query dựa trên domain email công cộng (như @gmail.com, @outlook.com) để tránh rò rỉ dữ liệu giữa những người dùng không liên quan. Để chia sẻ, hãy tạo một Organization và mời đồng nghiệp vào.'
-                : 'Your privacy is our priority. Data Explorer has removed automatic query sharing based on public email domains (like @gmail.com, @outlook.com) to prevent data leaks between unrelated users. To share, create an Organization and invite your colleagues.',
-        },
-        {
-            q: t ? 'Tại sao đích đến (host) của SSH tunnel của tôi bị chặn?' : 'Why is my SSH tunnel destination host blocked?',
-            a: t
-                ? 'SshTunnelService hiện áp dụng SSRF validation nghiêm ngặt. Hệ thống chặn các kết nối tới localhost, 127.0.0.1 và các dải IP nội bộ RFC1918 thông qua tunnel để bảo vệ mạng nội bộ của bạn khỏi các hành vi thám thính hoặc tấn công SSRF.'
-                : 'SshTunnelService now applies strict SSRF validation. The system blocks connections to localhost, 127.0.0.1, and RFC1918 internal IP ranges through tunnels to protect your internal network from reconnaissance or SSRF attacks.',
-        },
-    ];
+  const faqs = [
+    {
+      q: t
+        ? "Tôi có cần cài database trước khi dùng Data Explorer không?"
+        : "Do I need a database before using Data Explorer?",
+      a: t
+        ? "Có. Data Explorer là công cụ quản lý và khám phá dữ liệu, không phải database server. Bạn cần ít nhất một database đang chạy để kết nối vào. App metadata của Data Explorer cũng cần một PostgreSQL riêng cho users, connections, saved queries, dashboards và các dữ liệu nội bộ khác."
+        : "Yes. Data Explorer is a management and exploration tool, not a database server. You need at least one running database to connect to. The app itself also needs a separate PostgreSQL database for users, connections, saved queries, dashboards, and other internal metadata.",
+    },
+    {
+      q: t
+        ? "App hiện hỗ trợ những engine nào?"
+        : "Which engines are supported right now?",
+      a: t
+        ? "Hiện tại app hỗ trợ PostgreSQL, MySQL, SQL Server, MongoDB và MongoDB Atlas (SRV). SQL workspace và NoSQL workspace là hai bề mặt riêng, nhưng cùng dùng chung hệ thống auth, connections, AI, dashboards và audit."
+        : "The app currently supports PostgreSQL, MySQL, SQL Server, MongoDB, and MongoDB Atlas (SRV). The SQL workspace and NoSQL workspace are separate surfaces, but they share the same auth, connections, AI, dashboards, and audit foundations.",
+    },
+    {
+      q: t
+        ? "Dữ liệu của tôi có bị gửi lên cloud không?"
+        : "Is my data sent to the cloud?",
+      a: t
+        ? "Không theo kiểu dump toàn bộ data lên cloud. Khi dùng AI, app có thể gửi prompt, schema context hoặc ngữ cảnh bạn chủ động yêu cầu sang provider AI đang cấu hình. App không render raw HTML từ AI và không tự gửi toàn bộ result set trừ khi flow đó thật sự cần."
+        : "Not in the sense of dumping your whole database to the cloud. When you use AI, the app can send prompts, schema context, or the context you explicitly request to the configured AI provider. The app does not render raw HTML from AI and does not automatically send full result sets unless that flow really needs them.",
+    },
+    {
+      q: t
+        ? "AI hiện dùng Gemini hay gì khác?"
+        : "Does the AI only use Gemini?",
+      a: t
+        ? "Không còn chỉ là Gemini. App hiện có AI routing với Gemini, OpenRouter, Groq, Cerebras, và lane explicit của Beeknoee. Routing mode trong UI quyết định hướng ưu tiên chung, nhưng explicit model/provider vẫn là nút điều khiển mạnh nhất. Mỗi response cũng hiển thị provider/model thực tế để bạn không bị nhầm lane."
+        : "No longer Gemini-only. The app now supports AI routing across Gemini, OpenRouter, Groq, Cerebras, and the Beeknoee explicit lane. The routing mode in the UI sets the broad preference, but explicit model/provider selection remains the strongest control. Each response also shows the actual provider/model so the lane stays transparent.",
+    },
+    {
+      q: t
+        ? "Tại sao AI trả lời khác nhau giữa các mode như Auto, Fast / Cheap và Gemini Only?"
+        : "Why do answers differ across Auto, Fast / Cheap, and Gemini Only?",
+      a: t
+        ? "Vì mode chỉ là một phần của router. Auto cân bằng chung, Fast / Cheap thiên về lane nhẹ hơn, Best Quality nghiêng về lane mạnh hơn, còn Gemini Only khóa hẳn vào Gemini. Nhưng kết quả cuối còn phụ thuộc explicit model/provider, việc prompt có ảnh hay không, và việc request có bị nhận diện là current-info hay không."
+        : "Because the mode is only one part of the router. Auto balances broadly, Fast / Cheap leans toward lighter lanes, Best Quality leans toward stronger lanes, and Gemini Only locks into Gemini. But the final result also depends on any explicit model/provider selection, whether the prompt contains an image, and whether the request is detected as current-information work.",
+    },
+    {
+      q: t
+        ? "Tại sao tôi vẫn bị mất đăng nhập sau refresh hay restart?"
+        : "Why do I still lose my login after refresh or restart?",
+      a: t
+        ? "Phiên hiện tại dùng refresh token trong httpOnly cookie và access token trong memory. Nếu bạn vẫn bị out, hãy kiểm tra FRONTEND_URL, HTTPS hoặc cookie policy ở production, và JWT_SECRET hoặc REFRESH_TOKEN_SECRET có bị đổi giữa các lần deploy không. Một secret đổi giữa các lần deploy sẽ làm phiên cũ mất hiệu lực."
+        : "The current session model uses a refresh token in an httpOnly cookie and an access token in memory. If you still get logged out, check FRONTEND_URL, HTTPS or cookie policy in production, and whether JWT_SECRET or REFRESH_TOKEN_SECRET changed between deploys. Rotating those secrets will invalidate older sessions.",
+    },
+    {
+      q: t
+        ? "Saved queries hiện lưu ở đâu?"
+        : "Where are saved queries stored now?",
+      a: t
+        ? "Saved queries không còn chỉ là local-only nữa. Chúng được lưu ở backend metadata database và hỗ trợ private, team và workspace visibility. Tab content vẫn có state phía client để phục hồi UX, nhưng luồng saved queries đã là server-backed."
+        : "Saved queries are no longer local-only. They are stored in the backend metadata database and support private, team, and workspace visibility. Tab content still has client-side state for UX recovery, but the saved-query flow itself is now server-backed.",
+    },
+    {
+      q: t
+        ? "Vì sao prisma migrate deploy lỗi còn prisma db push lại chạy được?"
+        : "Why does prisma migrate deploy fail while prisma db push works?",
+      a: t
+        ? "Vì migration history hiện tại của repo chưa khớp với một PostgreSQL deploy flow sạch. Trong trạng thái hiện nay, bạn nên dùng npx prisma db push cho local và production build. Đó là lý do docs deployment hiện nhấn mạnh db push thay vì migrate deploy."
+        : "Because the current migration history in the repo is not aligned with a clean PostgreSQL deploy flow. In the current state, you should use npx prisma db push for local and production builds. That is why the deployment docs emphasize db push instead of migrate deploy.",
+    },
+    {
+      q: t
+        ? "Tại sao kết nối database ở trường hoặc mạng công cộng lại hay bị lỗi?"
+        : "Why do database connections often fail on school or public networks?",
+      a: t
+        ? "Nhiều mạng chặn trực tiếp các cổng database như 5432, 3306 hoặc 27017. Khi đó cả local dev lẫn app web đều có thể mất reachability tới DB cloud hoặc private. Cách thực tế nhất là dùng DB local cho dev, hoặc tunnel, VPN hay agent trên các mạng bị chặn mạnh."
+        : "Many networks block database ports such as 5432, 3306, or 27017 directly. In that case, both local development and the deployed app can lose reachability to cloud or private databases. The most practical workaround is to use a local database for development, or tunnels, VPNs, or agents on heavily restricted networks.",
+    },
+    {
+      q: t
+        ? "AI-generated SQL có chạy ngay lập tức không?"
+        : "Does AI-generated SQL run immediately?",
+      a: t
+        ? "Không mặc định. Insert into editor chỉ chèn SQL vào editor. Run suggestion mới là hành động chạy, và app hiện có bước xác nhận trước khi execute SQL do AI đề xuất để giảm rủi ro chạy nhầm."
+        : "Not by default. Insert into editor only inserts SQL into the editor. Run suggestion is the action that executes it, and the app now shows a confirmation step before running AI-generated SQL to reduce the risk of accidental execution.",
+    },
+    {
+      q: t
+        ? "Tại sao connection của tôi bị chặn bởi guardrails?"
+        : "Why is my connection blocked by guardrails?",
+      a: t
+        ? "Connection hiện có policy flags như readOnly, allowSchemaChanges, allowImportExport và allowQueryExecution. Backend sẽ enforce các guardrails này kể cả khi frontend bị bypass. Nếu một câu lệnh bị chặn, UI sẽ hiển thị lý do thay vì chỉ thất bại mơ hồ."
+        : "Connections now carry policy flags such as readOnly, allowSchemaChanges, allowImportExport, and allowQueryExecution. The backend enforces these guardrails even if the frontend is bypassed. When a statement is blocked, the UI shows a clear reason instead of failing vaguely.",
+    },
+    {
+      q: t
+        ? "Tại sao tôi không thấy query của đồng nghiệp mặc dù cả hai đều dùng @gmail.com?"
+        : "Why can't I see my colleague's queries if we both use @gmail.com?",
+      a: t
+        ? "Bảo mật quyền riêng tư của bạn là ưu tiên hàng đầu. Data Explorer đã loại bỏ việc tự động chia sẻ query dựa trên domain email công cộng (như @gmail.com, @outlook.com) để tránh rò rỉ dữ liệu giữa những người dùng không liên quan. Để chia sẻ, hãy tạo một Organization và mời đồng nghiệp vào."
+        : "Your privacy is our priority. Data Explorer has removed automatic query sharing based on public email domains (like @gmail.com, @outlook.com) to prevent data leaks between unrelated users. To share, create an Organization and invite your colleagues.",
+    },
+    {
+      q: t
+        ? "Tại sao đích đến (host) của SSH tunnel của tôi bị chặn?"
+        : "Why is my SSH tunnel destination host blocked?",
+      a: t
+        ? "SshTunnelService hiện áp dụng SSRF validation nghiêm ngặt. Hệ thống chặn các kết nối tới localhost, 127.0.0.1 và các dải IP nội bộ RFC1918 thông qua tunnel để bảo vệ mạng nội bộ của bạn khỏi các hành vi thám thính hoặc tấn công SSRF."
+        : "SshTunnelService now applies strict SSRF validation. The system blocks connections to localhost, 127.0.0.1, and RFC1918 internal IP ranges through tunnels to protect your internal network from reconnaissance or SSRF attacks.",
+    },
+  ];
 
-    return (
-        <DocPageLayout
-            title={t ? 'Câu hỏi thường gặp & khắc phục sự cố' : 'FAQ & troubleshooting'}
-            subtitle={t
-                ? 'Những câu hỏi và lỗi phổ biến nhất, được cập nhật đúng với Data Explorer hiện tại.'
-                : 'The most common questions and failure modes, updated to match the current Data Explorer codebase.'}
-        >
-            <div className="space-y-4">
-                {faqs.map((faq, i) => (
-                    <details key={i} className="group border rounded-2xl bg-card overflow-hidden">
-                        <summary className="flex items-center gap-4 p-5 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-sm shrink-0 group-open:bg-primary group-open:text-primary-foreground transition-colors">
-                                {i + 1}
-                            </div>
-                            <span className="font-bold text-sm">{faq.q}</span>
-                            <span className="ml-auto text-muted-foreground group-open:rotate-180 transition-transform">▼</span>
-                        </summary>
-                        <div className="px-5 pb-5 pt-0">
-                            <div className="pl-12 border-l-2 border-primary/20 ml-4">
-                                <p className="text-sm text-muted-foreground leading-relaxed">{faq.a}</p>
-                            </div>
-                        </div>
-                    </details>
-                ))}
+  return (
+    <DocPageLayout
+      title={
+        t ? "Câu hỏi thường gặp & khắc phục sự cố" : "FAQ & troubleshooting"
+      }
+      subtitle={
+        t
+          ? "Những câu hỏi và lỗi phổ biến nhất, được cập nhật đúng với Data Explorer hiện tại."
+          : "The most common questions and failure modes, updated to match the current Data Explorer codebase."
+      }
+    >
+      <div className="space-y-4">
+        {faqs.map((faq, i) => (
+          <details
+            key={i}
+            className="group border rounded-2xl bg-card overflow-hidden"
+          >
+            <summary className="flex items-center gap-4 p-5 cursor-pointer hover:bg-muted/30 transition-colors list-none">
+              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-sm shrink-0 group-open:bg-primary group-open:text-primary-foreground transition-colors">
+                {i + 1}
+              </div>
+              <span className="font-bold text-sm">{faq.q}</span>
+              <span className="ml-auto text-muted-foreground group-open:rotate-180 transition-transform">
+                ▼
+              </span>
+            </summary>
+            <div className="px-5 pb-5 pt-0">
+              <div className="pl-12 border-l-2 border-primary/20 ml-4">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {faq.a}
+                </p>
+              </div>
             </div>
-        </DocPageLayout>
-    );
+          </details>
+        ))}
+      </div>
+    </DocPageLayout>
+  );
 }

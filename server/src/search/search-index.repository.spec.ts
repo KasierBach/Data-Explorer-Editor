@@ -43,7 +43,12 @@ class FakeRedisClient {
     return fields.map((field) => target.get(field) ?? null);
   }
 
-  async hscan(key: string, _cursor: string, _countLabel: string, _count: number) {
+  async hscan(
+    key: string,
+    _cursor: string,
+    _countLabel: string,
+    _count: number,
+  ) {
     this.hscanCalls += 1;
     const target = this.hashes.get(key) ?? new Map<string, string>();
     const chunk: string[] = [];

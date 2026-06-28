@@ -1,4 +1,4 @@
-import { Test, TestingModule } from '@nestjs/testing';
+﻿import { Test, TestingModule } from '@nestjs/testing';
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 import { AiConnectionService } from './ai.connection-service';
@@ -147,6 +147,41 @@ describe('AiController', () => {
         method: 'GET',
         headers: expect.objectContaining({
           Authorization: 'Bearer sk-test',
+        }),
+      }),
+    );
+  });
+
+  it('passes autocomplete model overrides through to the ai service', async () => {
+    connectionServiceMock.getConnectionContext.mockResolvedValue({
+      connection: { type: 'postgresql' },
+      schemaContext: 'schema context',
+    });
+    aiServiceMock.autocomplete.mockResolvedValue('FROM users');
+
+    await controller.autocomplete(
+      {
+        connectionId: 'conn-1',
+        beforeCursor: 'SELECT * ',
+        model: 'anthropic/claude-sonnet-4.5',
+        providerOverride: {
+          type: 'openai-compatible',
+          name: 'gido',
+          baseUrl: 'https://provider.example.com/v1',
+          apiKey: 'sk-test',
+          model: 'anthropic/claude-sonnet-4.5',
+        },
+      } as any,
+      { user: { id: 'user-1' } } as any,
+    );
+
+    expect(aiServiceMock.autocomplete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        beforeCursor: 'SELECT * ',
+        model: 'anthropic/claude-sonnet-4.5',
+        providerOverride: expect.objectContaining({
+          name: 'gido',
+          model: 'anthropic/claude-sonnet-4.5',
         }),
       }),
     );

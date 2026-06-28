@@ -3,7 +3,6 @@ export type AiProvider =
   | 'cerebras'
   | 'openrouter'
   | 'beeknoee'
-  | 'tokenrouter'
   | 'zhipu'
   | 'groq'
   | 'custom';

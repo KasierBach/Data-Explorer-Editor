@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+﻿import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AI_CONSTANTS } from './ai.constants';
 import {
@@ -39,25 +39,10 @@ export class AiRoutingService {
     };
   }
 
-  private getTokenRouterPlan(requestedModel?: string): ProviderPlan | null {
-    const apiKey = this.configService.get<string>('TOKENROUTER_API_KEY');
-    if (!apiKey) return null;
-
-    const fallbackModel =
-      this.configService.get<string>('TOKENROUTER_CHAT_MODEL') || 'MiniMax-M3';
-    const normalizedModel =
-      requestedModel && requestedModel !== 'default'
-        ? requestedModel
-        : fallbackModel;
-
-    return {
-      provider: 'tokenrouter',
-      apiKey,
-      baseUrl:
-        this.configService.get<string>('TOKENROUTER_BASE_URL') ||
-        'https://api.tokenrouter.com/v1',
-      model: normalizedModel,
-    };
+  private isTokenRouterBaseUrl(baseUrl?: string): boolean {
+    return (
+      typeof baseUrl === 'string' && /tokenrouter\.com/i.test(baseUrl.trim())
+    );
   }
 
   getGeminiModelList(requestedModel?: string): string[] {
@@ -94,8 +79,8 @@ export class AiRoutingService {
     return value
       .normalize('NFD')
       .replace(/\p{Diacritic}/gu, '')
-      .replace(/đ/g, 'd')
-      .replace(/Đ/g, 'D');
+      .replace(/Ä‘/g, 'd')
+      .replace(/Ä/g, 'D');
   }
 
   detectPromptNeeds(
@@ -252,6 +237,12 @@ export class AiRoutingService {
 
     let requestedPlan: ProviderPlan | null = null;
     if (params.providerOverride?.type === 'openai-compatible') {
+      if (this.isTokenRouterBaseUrl(params.providerOverride.baseUrl)) {
+        throw new Error(
+          'TokenRouter support has been removed. Update this provider to a different OpenAI-compatible endpoint.',
+        );
+      }
+
       requestedPlan = {
         provider: 'custom',
         model: params.providerOverride.model,
@@ -270,14 +261,9 @@ export class AiRoutingService {
         }
         requestedPlan = beeknoeePlan;
       } else if (params.model.startsWith('tokenrouter:')) {
-        const modelName = params.model.slice('tokenrouter:'.length);
-        const tokenRouterPlan = this.getTokenRouterPlan(modelName);
-        if (!tokenRouterPlan) {
-          throw new Error(
-            'TokenRouter provider is not configured. Set TOKENROUTER_API_KEY to use TokenRouter models.',
-          );
-        }
-        requestedPlan = tokenRouterPlan;
+        throw new Error(
+          'TokenRouter support has been removed. Pick another built-in model or update your saved AI preferences.',
+        );
       } else if (params.model.startsWith('groq:')) {
         const modelName = params.model.slice('groq:'.length);
         const groqConfig = lowCostPlans.find((p) => p.provider === 'groq');
@@ -399,4 +385,3 @@ export class AiRoutingService {
     return { routingMode, plans: capabilityFilteredPlans, routeDecision };
   }
 }
-

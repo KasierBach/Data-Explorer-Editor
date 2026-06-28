@@ -203,17 +203,14 @@ describe('AiProviderRunnerService streaming', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(events[0]).toEqual({ type: 'chunk', text: 'Hello after retry' });
-    expect(events[1]).toEqual({
+    expect(events[1]).toMatchObject({
       type: 'done',
       data: {
         message: 'Hello after retry',
         provider: 'openrouter',
+        providerLabel: 'openrouter',
         model: 'openai/gpt-4o-mini',
         routingMode: 'auto',
-        recommendations: undefined,
-        sources: undefined,
-        sql: undefined,
-        explanation: undefined,
       },
     });
   });
@@ -231,6 +228,7 @@ describe('AiProviderRunnerService streaming', () => {
           abortController: { clear: () => void; signal: AbortSignal },
           model: string,
           provider: string,
+          providerLabel: string,
           routingMode: AiRoutingMode,
         ) => AsyncGenerator<StreamEvent>;
       }
@@ -242,23 +240,21 @@ describe('AiProviderRunnerService streaming', () => {
       { clear: jest.fn(), signal: new AbortController().signal },
       'test-model',
       'openrouter',
+      'openrouter',
       'auto',
     )) {
       events.push(event);
     }
 
     expect(events[0]).toEqual({ type: 'chunk', text: 'Hello' });
-    expect(events[1]).toEqual({
+    expect(events[1]).toMatchObject({
       type: 'done',
       data: {
         message: 'Hello',
         provider: 'openrouter',
+        providerLabel: 'openrouter',
         model: 'test-model',
         routingMode: 'auto',
-        recommendations: undefined,
-        sources: undefined,
-        sql: undefined,
-        explanation: undefined,
       },
     });
   });

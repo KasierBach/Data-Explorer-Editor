@@ -151,7 +151,9 @@ export class QueryService {
   }
 
   private async resolveTableCount(
-    strategy: { executeQuery: (pool: unknown, sql: string) => Promise<QueryResult> },
+    strategy: {
+      executeQuery: (pool: unknown, sql: string) => Promise<QueryResult>;
+    },
     pool: unknown,
     quotedTable: string,
   ): Promise<number | undefined> {
@@ -291,7 +293,9 @@ export class QueryService {
     if (!connection.readOnly) {
       const analysis = analyzeSqlConfirmation(sql);
       const statementLabel =
-        analysis.statementCount && analysis.statementCount > 1 && analysis.statementIndex
+        analysis.statementCount &&
+        analysis.statementCount > 1 &&
+        analysis.statementIndex
           ? `Statement ${analysis.statementIndex} of ${analysis.statementCount}`
           : 'Statement';
       const confirmationMessage =
@@ -395,13 +399,11 @@ export class QueryService {
         connection.type === 'mongodb' || connection.type === 'mongodb+srv'
           ? [sql]
           : splitSqlStatements(sql);
-      const executableStatements =
-        statements.length > 0 ? statements : [sql];
+      const executableStatements = statements.length > 0 ? statements : [sql];
       const finalSql = executableStatements[executableStatements.length - 1];
       const isMultiStatement = executableStatements.length > 1;
 
-      const isCacheable =
-        !isMultiStatement && this.isCacheableQuery(finalSql);
+      const isCacheable = !isMultiStatement && this.isCacheableQuery(finalSql);
       const cacheKey = isCacheable
         ? await this.getQueryCacheKey(
             connectionId,
@@ -454,7 +456,7 @@ export class QueryService {
               connection.type === 'mongodb'
                 ? JSON.stringify({
                     action: 'count',
-                    collection: tableRef.replace(/[\'"`]/g, ''),
+                    collection: tableRef.replace(/['"`]/g, ''),
                   })
                 : `SELECT COUNT(*) as total FROM ${tableRef}`;
 
@@ -612,11 +614,7 @@ export class QueryService {
         response.countStatus = 'skipped';
       }
 
-      await this.cacheManager.set(
-        cacheKey,
-        response,
-        this.QUERY_CACHE_TTL_MS,
-      );
+      await this.cacheManager.set(cacheKey, response, this.QUERY_CACHE_TTL_MS);
 
       await this.auditService.log({
         action: AuditAction.DB_QUERY_EXECUTE,
@@ -636,10 +634,7 @@ export class QueryService {
     } catch (error) {
       if (isForbiddenException(error)) throw error;
 
-      this.logger.error(
-        'Table Window Error Details:',
-        getErrorMessage(error),
-      );
+      this.logger.error('Table Window Error Details:', getErrorMessage(error));
       throw new InternalServerErrorException(
         'Table browsing failed. Please verify the selected table and connection permissions.',
       );
@@ -1037,7 +1032,3 @@ export class QueryService {
     }
   }
 }
-
-
-
-

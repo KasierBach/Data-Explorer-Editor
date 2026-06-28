@@ -1,4 +1,4 @@
-import { ConfigService } from '@nestjs/config';
+﻿import { ConfigService } from '@nestjs/config';
 import { AiRoutingService } from './ai.routing.service';
 
 function createConfig(
@@ -7,9 +7,6 @@ function createConfig(
   const defaults: Record<string, string | undefined> = {
     BEEKNOEE_API_KEY: 'sk-bee-test',
     BEEKNOEE_BASE_URL: 'https://platform.beeknoee.com/api/v1',
-    TOKENROUTER_API_KEY: 'sk-tr-test',
-    TOKENROUTER_BASE_URL: 'https://api.tokenrouter.com/v1',
-    TOKENROUTER_CHAT_MODEL: 'MiniMax-M3',
     OPENROUTER_API_KEY: 'sk-or-test',
     OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1',
     OPENROUTER_CHAT_MODEL: 'openai/gpt-3.5-turbo',
@@ -65,42 +62,45 @@ describe('AiRoutingService', () => {
     expect(result.routeDecision.responseFormat).toBe('structured');
   });
 
-  it('routes an explicitly selected TokenRouter model to the TokenRouter provider plan first', () => {
+  it('rejects removed TokenRouter model selections', () => {
     const service = new AiRoutingService(createConfig());
 
-    const result = service.buildPlanChain(
-      {
-        prompt: 'Explain this query',
-        model: 'tokenrouter:MiniMax-M3',
-        routingMode: 'auto',
-      },
-      true,
+    expect(() =>
+      service.buildPlanChain(
+        {
+          prompt: 'Explain this query',
+          model: 'tokenrouter:MiniMax-M3',
+          routingMode: 'auto',
+        },
+        true,
+      ),
+    ).toThrow(
+      'TokenRouter support has been removed. Pick another built-in model or update your saved AI preferences.',
     );
-
-    expect(result.plans[0]).toMatchObject({
-      provider: 'tokenrouter',
-      apiKey: 'sk-tr-test',
-      baseUrl: 'https://api.tokenrouter.com/v1',
-      model: 'MiniMax-M3',
-    });
-    expect(result.routeDecision.responseFormat).toBe('structured');
   });
 
-  it('does not add TokenRouter to the default auto provider chain', () => {
+  it('rejects custom providers that still point at TokenRouter', () => {
     const service = new AiRoutingService(createConfig());
 
-    const result = service.buildPlanChain(
-      {
-        prompt: 'List slow queries in this schema',
-        routingMode: 'auto',
-      },
-      true,
+    expect(() =>
+      service.buildPlanChain(
+        {
+          prompt: 'Explain this query',
+          model: 'MiniMax-M3',
+          routingMode: 'auto',
+          providerOverride: {
+            type: 'openai-compatible',
+            name: 'legacy-tokenrouter',
+            baseUrl: 'https://api.tokenrouter.com/v1',
+            apiKey: 'sk-test',
+            model: 'MiniMax-M3',
+          },
+        },
+        true,
+      ),
+    ).toThrow(
+      'TokenRouter support has been removed. Update this provider to a different OpenAI-compatible endpoint.',
     );
-
-    expect(result.plans.some((plan) => plan.provider === 'tokenrouter')).toBe(
-      false,
-    );
-    expect(result.routeDecision.responseFormat).toBe('structured');
   });
 
   it('puts an explicitly selected Gemini model first in the provider chain', () => {
@@ -157,26 +157,6 @@ describe('AiRoutingService', () => {
     expect(result.plans.some((plan) => plan.provider === 'gemini')).toBe(true);
   });
 
-  it('keeps an explicitly selected TokenRouter model first for image prompts when that model is vision-capable', () => {
-    const service = new AiRoutingService(createConfig());
-
-    const result = service.buildPlanChain(
-      {
-        prompt: 'Describe this screenshot',
-        image: 'data:image/png;base64,abc',
-        model: 'tokenrouter:MiniMax-M3',
-        routingMode: 'auto',
-      },
-      true,
-    );
-
-    expect(result.plans[0]).toMatchObject({
-      provider: 'tokenrouter',
-      model: 'MiniMax-M3',
-    });
-    expect(result.plans.some((plan) => plan.provider === 'gemini')).toBe(true);
-  });
-
   it('flags live-search prompts and keeps them in chat mode by default', () => {
     const service = new AiRoutingService(createConfig());
 
@@ -193,8 +173,8 @@ describe('AiRoutingService', () => {
     const service = new AiRoutingService(createConfig());
 
     const result = service.detectPromptNeeds(
-      'Tin tức mới nhất hôm nay là gì?',
-      'Cho mình cập nhật thị trường và giá vàng',
+      'Tin tá»©c má»›i nháº¥t hÃ´m nay lÃ  gÃ¬?',
+      'Cho mÃ¬nh cáº­p nháº­t thá»‹ trÆ°á»ng vÃ  giÃ¡ vÃ ng',
     );
 
     expect(result.needsLiveSearch).toBe(true);

@@ -14,6 +14,7 @@ import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/presentation/components/ui/popover';
 import { getAssistantModelCatalog } from '@/presentation/modules/Query/assistantModelCatalog';
+import { filterSearchableGroups, type SearchableGroup } from './AiConfigTab.utils';
 
 interface AiConfigTabProps {
     t: (key: string) => string;
@@ -24,16 +25,6 @@ type ProviderFormState = {
     baseUrl: string;
     apiKey: string;
     model: string;
-};
-
-type SearchableOption = {
-    value: string;
-    label: string;
-};
-
-type SearchableGroup = {
-    label?: string;
-    options: SearchableOption[];
 };
 
 interface SearchableModelSelectProps {
@@ -72,23 +63,6 @@ const getProviderModelsErrorMessage = (
 
     const message = getErrorMessage(error, fallback);
     return /failed to fetch/i.test(message) ? backendUnavailable : message;
-};
-
-export const filterSearchableGroups = (groups: SearchableGroup[], query: string) => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) {
-        return groups;
-    }
-
-    return groups
-        .map((group) => ({
-            ...group,
-            options: group.options.filter((option) => (
-                option.label.toLowerCase().includes(normalizedQuery)
-                || option.value.toLowerCase().includes(normalizedQuery)
-            )),
-        }))
-        .filter((group) => group.options.length > 0);
 };
 
 const findSearchableOption = (groups: SearchableGroup[], value: string) => (
@@ -131,7 +105,6 @@ const SearchableModelSelect: React.FC<SearchableModelSelectProps> = ({
             return;
         }
 
-        setQuery('');
         const trigger = triggerRef.current;
         const firstRect = trigger?.getBoundingClientRect();
 
@@ -196,6 +169,9 @@ const SearchableModelSelect: React.FC<SearchableModelSelectProps> = ({
     };
 
     const handleOpenChange = (nextOpen: boolean) => {
+        if (nextOpen) {
+            setQuery('');
+        }
         if (open === undefined) {
             setInternalIsOpen(nextOpen);
         }
@@ -336,6 +312,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
             explainRole: 'Explain',
             sqlRole: 'AI SQL',
             nosqlRole: 'AI NoSQL',
+            autocompleteRole: 'Autocomplete',
             roleModelPlaceholder: 'Chọn model',
             searchRoleModels: 'Search models...',
             noRoleModelMatch: 'Không tìm thấy model phù hợp.',
@@ -374,6 +351,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
             explainRole: 'Explain',
             sqlRole: 'AI SQL',
             nosqlRole: 'AI NoSQL',
+            autocompleteRole: 'Autocomplete',
             roleModelPlaceholder: 'Choose a model',
             searchRoleModels: 'Search models...',
             noRoleModelMatch: 'No models found.',
@@ -439,7 +417,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
     };
 
     const updateRoleSelection = (
-        key: 'assistantModel' | 'explainModel' | 'sqlModel' | 'nosqlModel',
+        key: 'assistantModel' | 'explainModel' | 'sqlModel' | 'nosqlModel' | 'autocompleteModel',
         value: string,
     ) => {
         updateAiPreferences((current) => ({
@@ -556,6 +534,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
             explainModel: current.explainModel === customSelection ? INHERIT_ASSISTANT_MODEL : current.explainModel,
             sqlModel: current.sqlModel === customSelection ? INHERIT_ASSISTANT_MODEL : current.sqlModel,
             nosqlModel: current.nosqlModel === customSelection ? INHERIT_ASSISTANT_MODEL : current.nosqlModel,
+            autocompleteModel: current.autocompleteModel === customSelection ? INHERIT_ASSISTANT_MODEL : current.autocompleteModel,
         }));
 
         if (editingProviderId === providerId) {
@@ -574,6 +553,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
             value={value}
             onChange={onChange}
             groups={getRoleModelGroups(includeInherit)}
+            minContentWidth={360}
             placeholder={labels.roleModelPlaceholder}
             searchPlaceholder={labels.searchRoleModels}
             emptyLabel={labels.noRoleModelMatch}
@@ -589,7 +569,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
             <div className="h-px w-full bg-border/50" />
 
             <div className="space-y-5 rounded-2xl border border-border/60 bg-card/40 p-5">
-                <div className="grid gap-4 lg:grid-cols-2">
+                <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
                     <div className="space-y-2">
                         <label className="flex items-center gap-2 text-sm font-medium">
                             <Bot className="h-4 w-4 text-violet-400" />
@@ -617,6 +597,13 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                             {labels.nosqlRole}
                         </label>
                         {renderModelSelect(preferences.nosqlModel, (nextValue) => updateRoleSelection('nosqlModel', nextValue), true)}
+                    </div>
+                    <div className="space-y-2">
+                        <label className="flex items-center gap-2 text-sm font-medium">
+                            <Search className="h-4 w-4 text-cyan-400" />
+                            {labels.autocompleteRole}
+                        </label>
+                        {renderModelSelect(preferences.autocompleteModel, (nextValue) => updateRoleSelection('autocompleteModel', nextValue), true)}
                     </div>
                 </div>
             </div>

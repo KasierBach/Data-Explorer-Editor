@@ -23,7 +23,7 @@ class ChatHistoryMessageDto implements ChatHistoryMessage {
   content: string;
 }
 
-class AiProviderOverrideDto {
+export class AiProviderOverrideDto {
   @IsString()
   @IsIn(['openai-compatible'])
   type: 'openai-compatible';

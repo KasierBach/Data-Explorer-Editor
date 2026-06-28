@@ -1,273 +1,444 @@
-import { Zap, Database, BookOpen } from 'lucide-react';
-import { Badge } from '@/presentation/components/ui/badge';
-import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, Callout, CodeBlock, CodeComment, CodeLine } from '../primitives';
+import { Zap, Database, BookOpen } from "lucide-react";
+import { Badge } from "@/presentation/components/ui/badge";
+import {
+  DocPageLayout,
+  DocSection,
+  Prose,
+  InfoCard,
+  FeatureGrid,
+  Callout,
+  CodeBlock,
+  CodeComment,
+  CodeLine,
+} from "../primitives";
 
-interface Props { lang: 'vi' | 'en'; }
+interface Props {
+  lang: "vi" | "en";
+}
 
 export function IntroductionSection({ lang }: Props) {
-    const t = lang === 'vi';
-    return (
-        <DocPageLayout
-            title={t ? 'Chào mừng tới Data Explorer' : 'Welcome to Data Explorer'}
-            subtitle={t
-                ? 'Nền tảng quản trị cơ sở dữ liệu hiện đại, được thiết kế theo triết lý "AI-First" cho các Data Engineer và AI Developers.'
-                : 'A modern database management platform, designed with an "AI-First" philosophy for Data Engineers and AI Developers.'}
-            gradient
+  const t = lang === "vi";
+  return (
+    <DocPageLayout
+      title={t ? "Chào mừng tới Data Explorer" : "Welcome to Data Explorer"}
+      subtitle={
+        t
+          ? 'Nền tảng quản trị cơ sở dữ liệu hiện đại, được thiết kế theo triết lý "AI-First" cho các Data Engineer và AI Developers.'
+          : 'A modern database management platform, designed with an "AI-First" philosophy for Data Engineers and AI Developers.'
+      }
+      gradient
+    >
+      <Prose className="mb-12">
+        {t
+          ? "Data Explorer không chỉ là một SQL Client thông thường. Đây là một hệ sinh thái được tối ưu hóa để rút ngắn khoảng cách giữa ý tưởng và dữ liệu, sử dụng sức mạnh của các Large Language Models (LLMs) thế hệ mới nhất để biến ngôn ngữ tự nhiên thành những truy vấn phức tạp."
+          : "Data Explorer is more than just a regular SQL Client. It is an ecosystem optimized to bridge the gap between idea and data, using the power of the latest Large Language Models (LLMs) to turn natural language into complex queries."}
+      </Prose>
+      <Callout type="info">
+        <p className="text-sm">
+          {t
+            ? "Điểm nhấn của v3.6.2+: ảnh đính kèm đi thẳng vào AI chat, catalog model explicit có thêm Beeknoee/Groq/OpenRouter, billing checkout thật, phân quyền resource chặt hơn, và i18n vi/en chạy xuyên client lẫn server. Đợt perf pass mới cũng làm rõ search index, table-window browsing, cap NoSQL aggregate, batch migration thích ứng và Redis guardrails."
+            : "v3.6.2+ highlights: image attachments now flow directly into AI chat, the explicit model catalog includes Beeknoee/Groq/OpenRouter, billing is now real, resource permissions are tighter, and vi/en localization runs across both client and server. The latest performance pass also clarified search indexing, table-window browsing, capped NoSQL aggregate execution, adaptive migration batching, and Redis guardrails."}
+        </p>
+      </Callout>
+      {/* Overview Cards */}
+      <FeatureGrid>
+        <InfoCard
+          icon={<Database className="w-6 h-6 text-blue-500" />}
+          title={t ? "Hỗ trợ Đa Engine" : "Multi-Engine Support"}
+          color="blue"
         >
-            <Prose className="mb-12">
+          <p>
+            {t
+              ? "Kết nối bản địa tới PostgreSQL, MySQL, SQL Server và MongoDB/Atlas thông qua một giao diện thống nhất. Mỗi engine sử dụng driver riêng biệt được tối ưu hóa cho hiệu suất tốt nhất — không chỉ là một wrapper chung chung."
+              : "Native connections to PostgreSQL, MySQL, SQL Server, and MongoDB/Atlas through a unified interface. Each engine uses its own optimized driver for maximum performance — not just a generic wrapper."}
+          </p>
+        </InfoCard>
+        <InfoCard
+          icon={<BookOpen className="w-6 h-6 text-purple-500" />}
+          title={t ? "AI Assistant đa lane" : "Multi-lane AI Assistant"}
+          color="purple"
+        >
+          <p>
+            {t
+              ? "Kết hợp AI routing, Gemini, OpenRouter, Groq, Cerebras, và lane explicit của Beeknoee để hỗ trợ general chat, SQL generation, schema analysis, typed recommendations, attachment context, và vision flows."
+              : "Combines AI routing, Gemini, OpenRouter, Groq, Cerebras, and the Beeknoee explicit lane to support general chat, SQL generation, schema analysis, typed recommendations, attachment context, and vision flows."}
+          </p>
+        </InfoCard>
+      </FeatureGrid>
+
+      {/* Why Data Explorer */}
+      <DocSection
+        title={t ? "Tại sao chọn Data Explorer?" : "Why Data Explorer?"}
+      >
+        <Prose>
+          {t
+            ? 'Hầu hết các công cụ quản trị database hiện nay đều quá đơn sơ hoặc bị sa lầy trong các thiết kế cũ kỹ từ những thập kỷ trước. Data Explorer tập trung vào ba trụ cột cốt lõi: Mật độ thông tin, Tốc độ thực thi, và Trí tuệ nhân tạo. Chúng tôi mang đến trải nghiệm "Monaco-first" — biến việc quản trị dữ liệu trở nên thoải mái như đang lập trình trên VS Code.'
+            : 'Most database management tools today are either too simplistic or bogged down in legacy designs from decades ago. Data Explorer focuses on three core pillars: Information Density, Execution Speed, and Artificial Intelligence. We bring a "Monaco-first" experience — making data management as comfortable as coding in VS Code.'}
+        </Prose>
+        <Prose>
+          {t
+            ? "Khác với các GUI database truyền thống như pgAdmin hay DBeaver, Data Explorer được xây dựng hoàn toàn trên nền web hiện đại (React + Vite) với kiến trúc Hexagonal (Clean Architecture). Điều này cho phép bạn truy cập từ bất kỳ trình duyệt nào, trên bất kỳ thiết bị nào, mà vẫn giữ được hiệu năng ngang ngửa ứng dụng desktop."
+            : "Unlike traditional database GUIs like pgAdmin or DBeaver, Data Explorer is built entirely on modern web technologies (React + Vite) with Hexagonal (Clean) Architecture. This allows access from any browser, on any device, while maintaining desktop-class performance."}
+        </Prose>
+        <Callout type="info">
+          <p className="italic text-lg text-foreground">
+            {t
+              ? '"Sứ mệnh của chúng tôi là biến việc khám phá dữ liệu trở nên trực quan và liền mạch như cách bạn viết mã nguồn hàng ngày."'
+              : '"Our mission is to make data exploration as intuitive and seamless as the way you write source code every day."'}
+          </p>
+        </Callout>
+      </DocSection>
+
+      {/* Quick Start Example */}
+      <DocSection
+        title={t ? "Bắt đầu nhanh trong 60 giây" : "Quick Start in 60 Seconds"}
+      >
+        <Prose>
+          {t
+            ? "Dưới đây là đường chạy nhanh nhất sau khi bạn đã chuẩn bị `server/.env` theo trang Installation. Mục tiêu của đoạn này là boot app thật bằng các lệnh đang tồn tại trong repo hiện tại, không phải pseudo-script cũ."
+            : "Here is the fastest path once you have prepared `server/.env` as described on the Installation page. The goal is to boot the real app using commands that actually exist in the current repo, not older pseudo-scripts."}
+        </Prose>
+        <CodeBlock title={t ? "Khởi động nhanh" : "Quick Start"}>
+          <CodeComment>
+            {t
+              ? "Clone và cài đủ dependency cho root + hai workspace"
+              : "Clone and install root + workspace dependencies"}
+          </CodeComment>
+          <CodeLine>
+            git clone https://github.com/KasierBach/Data-Explorer-Editor.git
+          </CodeLine>
+          <CodeLine>cd Data-Explorer-Editor</CodeLine>
+          <CodeLine>npm install</CodeLine>
+          <CodeLine>npm install --prefix server</CodeLine>
+          <CodeLine>npm install --prefix client</CodeLine>
+          <p className="mt-3" />
+          <CodeComment>
+            {t ? "Đồng bộ schema metadata app" : "Sync the app metadata schema"}
+          </CodeComment>
+          <CodeLine>cd server && npx prisma db push && cd ..</CodeLine>
+          <p className="mt-3" />
+          <CodeComment>
+            {t
+              ? "Khởi động toàn bộ dự án (server + client)"
+              : "Start the full project (server + client)"}
+          </CodeComment>
+          <CodeLine>npm run dev</CodeLine>
+          <p className="mt-3" />
+          <CodeComment>
+            {t
+              ? "Mở trình duyệt tại http://localhost:5173"
+              : "Open browser at http://localhost:5173"}
+          </CodeComment>
+        </CodeBlock>
+      </DocSection>
+
+      {/* Core Values */}
+      <DocSection title={t ? "Giá trị cốt lõi" : "Core Values"}>
+        <Prose>
+          {t
+            ? "Data Explorer được xây dựng dựa trên bốn giá trị cốt lõi. Mỗi tính năng, mỗi dòng code đều phản ánh cam kết của chúng tôi với những nguyên tắc này:"
+            : "Data Explorer is built on four core values. Every feature, every line of code reflects our commitment to these principles:"}
+        </Prose>
+        <ul className="grid sm:grid-cols-2 gap-4">
+          {[
+            {
+              title: t ? "Hiệu năng cực đỉnh" : "Extreme Performance",
+              desc: t
+                ? "Tối ưu các đường nóng thực tế: global search dùng candidate index, duyệt bảng dùng server-side window rõ ràng, raw SQL có guardrail 50,000 rows, NoSQL aggregate cap trước khi materialize, và migration dùng batch sizing thích ứng."
+                : "Optimizes practical hot paths: global search uses candidate indexes, table browsing uses explicit server-side windows, raw SQL has a 50,000-row guardrail, NoSQL aggregate caps before materialization, and migration uses adaptive batch sizing.",
+            },
+            {
+              title: t ? "Bảo mật tuyệt đối" : "Absolute Security",
+              desc: t
+                ? "Kiến trúc nhiều lớp giúp tách dữ liệu kết nối, metadata app, và UI. Mật khẩu connection được mã hóa AES-256-GCM trước khi lưu; backend ép buộc secret mạnh, guardrails cho query, và SSRF validation cho host đích."
+                : "A layered architecture keeps connection data, app metadata, and UI concerns separated. Connection passwords are AES-256-GCM encrypted before storage; the backend enforces strong secrets, query guardrails, and SSRF validation for target hosts.",
+            },
+            {
+              title: t ? "Trải nghiệm lập trình viên" : "Developer Experience",
+              desc: t
+                ? "Hỗ trợ đầy đủ phím tắt (Ctrl+Enter để thực thi, Shift+Alt+F để format), linting SQL theo từng dialect, đa con trỏ, tìm kiếm và thay thế regex, và auto-complete thông minh."
+                : "Full shortcut support (Ctrl+Enter to execute, Shift+Alt+F to format), SQL linting per dialect, multi-cursor editing, regex find & replace, and intelligent auto-complete.",
+            },
+            {
+              title: t ? "Trực quan hóa tức thời" : "Instant Visualization",
+              desc: t
+                ? "Chuyển đổi kết quả truy vấn sang biểu đồ chuyên nghiệp chỉ với một cú click. Hỗ trợ 15+ loại biểu đồ. Sơ đồ ERD tương tác với auto-layout dựa trên thuật toán Dagre."
+                : "Convert query results into professional charts with a single click. 15+ chart types supported. Interactive ERD diagrams with Dagre-based auto-layout.",
+            },
+          ].map((item, id) => (
+            <li
+              key={id}
+              className="flex gap-4 p-5 rounded-xl hover:bg-muted/30 transition-colors border"
+            >
+              <div className="h-2 w-2 rounded-full bg-primary mt-2 shrink-0" />
+              <div>
+                <span className="font-bold block text-base">{item.title}</span>
+                <span className="text-sm text-muted-foreground leading-relaxed">
+                  {item.desc}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </DocSection>
+
+      {/* Design Philosophy */}
+      <DocSection
+        title={t ? "Triết lý Thiết kế: AI-First" : "AI-First Design Philosophy"}
+      >
+        <div className="grid md:grid-cols-2 gap-12 items-center">
+          <Prose>
+            {t
+              ? "Chúng tôi tin rằng trong kỷ nguyên AI, việc gõ từng dòng mã SQL lặp đi lặp lại là một sự lãng phí. Triết lý AI-First của chúng tôi xoay quanh 3 trụ cột:"
+              : "We believe that in the AI era, typing repetitive SQL lines is a waste. Our AI-First philosophy revolves around 3 pillars:"}
+            <ul className="mt-6 space-y-4">
+              <li>
+                <strong>1. Proactive Assistance:</strong>{" "}
                 {t
-                    ? 'Data Explorer không chỉ là một SQL Client thông thường. Đây là một hệ sinh thái được tối ưu hóa để rút ngắn khoảng cách giữa ý tưởng và dữ liệu, sử dụng sức mạnh của các Large Language Models (LLMs) thế hệ mới nhất để biến ngôn ngữ tự nhiên thành những truy vấn phức tạp.'
-                    : 'Data Explorer is more than just a regular SQL Client. It is an ecosystem optimized to bridge the gap between idea and data, using the power of the latest Large Language Models (LLMs) to turn natural language into complex queries.'}
+                  ? "AI không chỉ trả lời khi được hỏi, nó chủ động gợi ý (Ghost Text) dựa trên ngữ cảnh hiện tại."
+                  : "AI doesn't just answer when asked; it proactively suggests (Ghost Text) based on code context."}
+              </li>
+              <li>
+                <strong>2. Schema-Awareness:</strong>{" "}
+                {t
+                  ? 'AI của chúng tôi "thấu hiểu" lược đồ của bạn sâu sắc hơn bất kỳ công cụ IntelliSense truyền thống nào.'
+                  : 'Our AI "understands" your schema deeper than any traditional IntelliSense tool.'}
+              </li>
+              <li>
+                <strong>3. Privacy-First AI:</strong>{" "}
+                {t
+                  ? "Sử dụng AI nhưng không bao giờ đánh đổi dữ liệu khách hàng."
+                  : "Leveraging AI without ever compromising customer data."}
+              </li>
+            </ul>
+          </Prose>
+          <div className="p-8 rounded-3xl bg-primary/5 border border-primary/10 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-3xl -mr-16 -mt-16 group-hover:bg-primary/20 transition-all" />
+            <h4 className="font-bold text-sm mb-4 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-primary" />
+              {t ? "Lộ trình phát triển" : "Strategic Roadmap"}
+            </h4>
+            <div className="space-y-4">
+              {[
+                {
+                  v: "Now",
+                  t: t
+                    ? "Connection guardrails + shared queries"
+                    : "Connection guardrails + shared queries",
+                  d: "✅ Live",
+                },
+                {
+                  v: "Next",
+                  t: t
+                    ? "ERD save/load + migration dry-run"
+                    : "ERD save/load + migration dry-run",
+                  d: "🚀 In progress",
+                },
+                {
+                  v: "Later",
+                  t: t
+                    ? "Scheduled reports + richer dashboards"
+                    : "Scheduled reports + richer dashboards",
+                  d: "🎯 Roadmap",
+                },
+              ].map((item, i) => (
+                <div
+                  key={i}
+                  className="flex justify-between items-center text-[10px]"
+                >
+                  <span className="font-mono text-muted-foreground">
+                    {item.v}
+                  </span>
+                  <span className="font-bold">{item.t}</span>
+                  <span className="text-primary">{item.d}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </DocSection>
+
+      {/* Feature Overview Table */}
+      <DocSection title={t ? "Tổng quan tính năng" : "Feature Overview"}>
+        <div className="border rounded-2xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="text-left p-4 font-bold">
+                  {t ? "Tính năng" : "Feature"}
+                </th>
+                <th className="text-left p-4 font-bold">
+                  {t ? "Mô tả" : "Description"}
+                </th>
+                <th className="text-center p-4 font-bold">
+                  {t ? "Trạng thái" : "Status"}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {[
+                {
+                  feature: "Monaco SQL Editor",
+                  desc: t
+                    ? "Trình soạn thảo VS Code-grade với IntelliSense"
+                    : "VS Code-grade editor with IntelliSense",
+                  status: "✅",
+                },
+                {
+                  feature: t ? "Đa kết nối DB" : "Multi-DB Connections",
+                  desc: t
+                    ? "PostgreSQL, MySQL, MSSQL, MongoDB, MongoDB Atlas"
+                    : "PostgreSQL, MySQL, MSSQL, MongoDB, MongoDB Atlas",
+                  status: "✅",
+                },
+                {
+                  feature: t ? "AI SQL Generation" : "AI SQL Generation",
+                  desc: t
+                    ? "AI routing + Gemini + typed recommendations"
+                    : "AI routing + Gemini + typed recommendations",
+                  status: "✅",
+                },
+                {
+                  feature: t ? "Saved Queries chia sẻ" : "Shared Saved Queries",
+                  desc: t
+                    ? "Private, team, và workspace visibility"
+                    : "Private, team, and workspace visibility",
+                  status: "✅",
+                },
+                {
+                  feature: t ? "Dashboard từ query" : "Query to Dashboard",
+                  desc: t
+                    ? "Lưu query result thành dashboard widget"
+                    : "Save query results as dashboard widgets",
+                  status: "✅",
+                },
+                {
+                  feature: t ? "Hệ thống Phím tắt" : "Global Shortcuts",
+                  desc: t
+                    ? "Bộ phím tắt toàn cục (Ctrl+N, Ctrl+J, Ctrl+I...)"
+                    : "Global keyboard shortcuts palette",
+                  status: "✅",
+                },
+                {
+                  feature: t ? "Hiệu ứng Mượt mà" : "Smooth UI Transitions",
+                  desc: t
+                    ? "Đóng mở bảng và tab với chuyển động 300ms"
+                    : "300ms smooth panel and tab animations",
+                  status: "✅",
+                },
+                {
+                  feature: t ? "Đa ngôn ngữ" : "Internationalization",
+                  desc: t
+                    ? "Tiếng Việt và Tiếng Anh"
+                    : "Vietnamese and English",
+                  status: "✅",
+                },
+              ].map((row, i) => (
+                <tr key={i} className="hover:bg-muted/10 transition-colors">
+                  <td className="py-3 px-2 font-medium text-xs text-foreground/80">
+                    {row.feature}
+                  </td>
+                  <td className="py-3 px-2 text-xs text-muted-foreground">
+                    {row.desc}
+                  </td>
+                  <td className="py-3 px-2 text-center">{row.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </DocSection>
+
+      {/* Mission & Vision */}
+      <DocSection title={t ? "Sứ mệnh & Tầm nhìn" : "Mission & Vision"}>
+        <div className="grid md:grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <h4 className="font-bold text-sm flex items-center gap-2">
+              <Zap className="w-4 h-4 text-blue-500" />
+              {t ? "Sứ mệnh" : "Mission"}
+            </h4>
+            <Prose>
+              {t
+                ? 'Chúng tôi tin rằng việc tương tác với dữ liệu không nên là một cực hình kỹ thuật. Sứ mệnh của Data Explorer là dân chủ hóa quyền truy cập dữ liệu thông qua AI, giúp các kỹ sư và nhà phân tích tập trung vào "Tại sao" thay vì "Làm thế nào" khi viết SQL.'
+                : 'We believe that interacting with data should not be a technical ordeal. Data Explorer\'s mission is to democratize data access through AI, helping engineers and analysts focus on the "Why" rather than the "How" when writing SQL.'}
             </Prose>
-            <Callout type="info">
-                <p className="text-sm">
-                    {t
-                        ? 'Điểm nhấn của v3.6.2+: ảnh đính kèm đi thẳng vào AI chat, catalog model explicit có thêm Beeknoee/Groq/OpenRouter/TokenRouter, billing checkout thật, phân quyền resource chặt hơn, và i18n vi/en chạy xuyên client lẫn server. Đợt perf pass mới cũng làm rõ search index, table-window browsing, cap NoSQL aggregate, batch migration thích ứng và Redis guardrails.'
-                        : 'v3.6.2+ highlights: image attachments now flow directly into AI chat, the explicit model catalog includes Beeknoee/Groq/OpenRouter/TokenRouter, billing is now real, resource permissions are tighter, and vi/en localization runs across both client and server. The latest performance pass also clarified search indexing, table-window browsing, capped NoSQL aggregate execution, adaptive migration batching, and Redis guardrails.'}
-                </p>
-            </Callout>
-            {/* Overview Cards */}
-            <FeatureGrid>
-                <InfoCard icon={<Database className="w-6 h-6 text-blue-500" />} title={t ? 'Hỗ trợ Đa Engine' : 'Multi-Engine Support'} color="blue">
-                    <p>{t
-                        ? 'Kết nối bản địa tới PostgreSQL, MySQL, SQL Server và MongoDB/Atlas thông qua một giao diện thống nhất. Mỗi engine sử dụng driver riêng biệt được tối ưu hóa cho hiệu suất tốt nhất — không chỉ là một wrapper chung chung.'
-                        : 'Native connections to PostgreSQL, MySQL, SQL Server, and MongoDB/Atlas through a unified interface. Each engine uses its own optimized driver for maximum performance — not just a generic wrapper.'}</p>
-                </InfoCard>
-                <InfoCard icon={<BookOpen className="w-6 h-6 text-purple-500" />} title={t ? 'AI Assistant đa lane' : 'Multi-lane AI Assistant'} color="purple">
-                    <p>{t
-                        ? 'Kết hợp AI routing, Gemini, OpenRouter, Groq, Cerebras, và các lane explicit như Beeknoee hoặc TokenRouter để hỗ trợ general chat, SQL generation, schema analysis, typed recommendations, attachment context, và vision flows.'
-                        : 'Combines AI routing, Gemini, OpenRouter, Groq, Cerebras, and explicit lanes such as Beeknoee or TokenRouter to support general chat, SQL generation, schema analysis, typed recommendations, attachment context, and vision flows.'}</p>
-                </InfoCard>
-            </FeatureGrid>
+          </div>
+          <div className="space-y-4">
+            <h4 className="font-bold text-sm flex items-center gap-2">
+              <Database className="w-4 h-4 text-purple-500" />
+              {t ? "Tầm nhìn" : "Vision"}
+            </h4>
+            <Prose>
+              {t
+                ? "Trở thành trung tâm chỉ huy dữ liệu (Data Command Center) mã nguồn mở hàng đầu, nơi AI không chỉ tạo query mà còn hiểu được bối cảnh kinh doanh, dự báo xu hướng và tự động hóa các tác vụ bảo trì database phức tạp."
+                : "To become the leading open-source Data Command Center, where AI not only generates queries but also understands business context, predicts trends, and automates complex database maintenance tasks."}
+            </Prose>
+          </div>
+        </div>
+      </DocSection>
 
-            {/* Why Data Explorer */}
-            <DocSection title={t ? 'Tại sao chọn Data Explorer?' : 'Why Data Explorer?'}>
-                <Prose>
-                    {t
-                        ? 'Hầu hết các công cụ quản trị database hiện nay đều quá đơn sơ hoặc bị sa lầy trong các thiết kế cũ kỹ từ những thập kỷ trước. Data Explorer tập trung vào ba trụ cột cốt lõi: Mật độ thông tin, Tốc độ thực thi, và Trí tuệ nhân tạo. Chúng tôi mang đến trải nghiệm "Monaco-first" — biến việc quản trị dữ liệu trở nên thoải mái như đang lập trình trên VS Code.'
-                        : 'Most database management tools today are either too simplistic or bogged down in legacy designs from decades ago. Data Explorer focuses on three core pillars: Information Density, Execution Speed, and Artificial Intelligence. We bring a "Monaco-first" experience — making data management as comfortable as coding in VS Code.'}
-                </Prose>
-                <Prose>
-                    {t
-                        ? 'Khác với các GUI database truyền thống như pgAdmin hay DBeaver, Data Explorer được xây dựng hoàn toàn trên nền web hiện đại (React + Vite) với kiến trúc Hexagonal (Clean Architecture). Điều này cho phép bạn truy cập từ bất kỳ trình duyệt nào, trên bất kỳ thiết bị nào, mà vẫn giữ được hiệu năng ngang ngửa ứng dụng desktop.'
-                        : 'Unlike traditional database GUIs like pgAdmin or DBeaver, Data Explorer is built entirely on modern web technologies (React + Vite) with Hexagonal (Clean) Architecture. This allows access from any browser, on any device, while maintaining desktop-class performance.'}
-                </Prose>
-                <Callout type="info">
-                    <p className="italic text-lg text-foreground">
-                        {t
-                            ? '"Sứ mệnh của chúng tôi là biến việc khám phá dữ liệu trở nên trực quan và liền mạch như cách bạn viết mã nguồn hàng ngày."'
-                            : '"Our mission is to make data exploration as intuitive and seamless as the way you write source code every day."'}
-                    </p>
-                </Callout>
-            </DocSection>
+      {/* Product Roadmap */}
+      <DocSection
+        title={t ? "Lộ trình Phát triển (Roadmap)" : "Product Roadmap"}
+      >
+        <div className="space-y-6">
+          <Prose>
+            {t
+              ? "Chúng tôi không ngừng cải tiến Data Explorer. Dưới đây là những gì chúng tôi đang phát triển cho các phiên bản tiếp theo:"
+              : "We are constantly improving Data Explorer. Here is what we are building for the upcoming versions:"}
+          </Prose>
 
-            {/* Quick Start Example */}
-            <DocSection title={t ? 'Bắt đầu nhanh trong 60 giây' : 'Quick Start in 60 Seconds'}>
-                <Prose>
-                    {t
-                        ? 'Dưới đây là đường chạy nhanh nhất sau khi bạn đã chuẩn bị `server/.env` theo trang Installation. Mục tiêu của đoạn này là boot app thật bằng các lệnh đang tồn tại trong repo hiện tại, không phải pseudo-script cũ.'
-                        : 'Here is the fastest path once you have prepared `server/.env` as described on the Installation page. The goal is to boot the real app using commands that actually exist in the current repo, not older pseudo-scripts.'}
-                </Prose>
-                <CodeBlock title={t ? 'Khởi động nhanh' : 'Quick Start'}>
-                    <CodeComment>{t ? 'Clone và cài đủ dependency cho root + hai workspace' : 'Clone and install root + workspace dependencies'}</CodeComment>
-                    <CodeLine>git clone https://github.com/KasierBach/Data-Explorer-Editor.git</CodeLine>
-                    <CodeLine>cd Data-Explorer-Editor</CodeLine>
-                    <CodeLine>npm install</CodeLine>
-                    <CodeLine>npm install --prefix server</CodeLine>
-                    <CodeLine>npm install --prefix client</CodeLine>
-                    <p className="mt-3" />
-                    <CodeComment>{t ? 'Đồng bộ schema metadata app' : 'Sync the app metadata schema'}</CodeComment>
-                    <CodeLine>cd server && npx prisma db push && cd ..</CodeLine>
-                    <p className="mt-3" />
-                    <CodeComment>{t ? 'Khởi động toàn bộ dự án (server + client)' : 'Start the full project (server + client)'}</CodeComment>
-                    <CodeLine>npm run dev</CodeLine>
-                    <p className="mt-3" />
-                    <CodeComment>{t ? 'Mở trình duyệt tại http://localhost:5173' : 'Open browser at http://localhost:5173'}</CodeComment>
-                </CodeBlock>
-            </DocSection>
-
-            {/* Core Values */}
-            <DocSection title={t ? 'Giá trị cốt lõi' : 'Core Values'}>
-                <Prose>
-                    {t
-                        ? 'Data Explorer được xây dựng dựa trên bốn giá trị cốt lõi. Mỗi tính năng, mỗi dòng code đều phản ánh cam kết của chúng tôi với những nguyên tắc này:'
-                        : 'Data Explorer is built on four core values. Every feature, every line of code reflects our commitment to these principles:'}
-                </Prose>
-                <ul className="grid sm:grid-cols-2 gap-4">
-                    {[
-                        {
-                            title: t ? "Hiệu năng cực đỉnh" : "Extreme Performance",
-                            desc: t
-                                ? "Tối ưu các đường nóng thực tế: global search dùng candidate index, duyệt bảng dùng server-side window rõ ràng, raw SQL có guardrail 50,000 rows, NoSQL aggregate cap trước khi materialize, và migration dùng batch sizing thích ứng."
-                                : "Optimizes practical hot paths: global search uses candidate indexes, table browsing uses explicit server-side windows, raw SQL has a 50,000-row guardrail, NoSQL aggregate caps before materialization, and migration uses adaptive batch sizing."
-                        },
-                        {
-                            title: t ? "Bảo mật tuyệt đối" : "Absolute Security",
-                            desc: t
-                                ? "Kiến trúc nhiều lớp giúp tách dữ liệu kết nối, metadata app, và UI. Mật khẩu connection được mã hóa AES-256-GCM trước khi lưu; backend ép buộc secret mạnh, guardrails cho query, và SSRF validation cho host đích."
-                                : "A layered architecture keeps connection data, app metadata, and UI concerns separated. Connection passwords are AES-256-GCM encrypted before storage; the backend enforces strong secrets, query guardrails, and SSRF validation for target hosts."
-                        },
-                        {
-                            title: t ? "Trải nghiệm lập trình viên" : "Developer Experience",
-                            desc: t
-                                ? "Hỗ trợ đầy đủ phím tắt (Ctrl+Enter để thực thi, Shift+Alt+F để format), linting SQL theo từng dialect, đa con trỏ, tìm kiếm và thay thế regex, và auto-complete thông minh."
-                                : "Full shortcut support (Ctrl+Enter to execute, Shift+Alt+F to format), SQL linting per dialect, multi-cursor editing, regex find & replace, and intelligent auto-complete."
-                        },
-                        {
-                            title: t ? "Trực quan hóa tức thời" : "Instant Visualization",
-                            desc: t
-                                ? "Chuyển đổi kết quả truy vấn sang biểu đồ chuyên nghiệp chỉ với một cú click. Hỗ trợ 15+ loại biểu đồ. Sơ đồ ERD tương tác với auto-layout dựa trên thuật toán Dagre."
-                                : "Convert query results into professional charts with a single click. 15+ chart types supported. Interactive ERD diagrams with Dagre-based auto-layout."
-                        }
-                    ].map((item, id) => (
-                        <li key={id} className="flex gap-4 p-5 rounded-xl hover:bg-muted/30 transition-colors border">
-                            <div className="h-2 w-2 rounded-full bg-primary mt-2 shrink-0" />
-                            <div>
-                                <span className="font-bold block text-base">{item.title}</span>
-                                <span className="text-sm text-muted-foreground leading-relaxed">{item.desc}</span>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            </DocSection>
-
-            {/* Design Philosophy */}
-            <DocSection title={t ? 'Triết lý Thiết kế: AI-First' : 'AI-First Design Philosophy'}>
-                <div className="grid md:grid-cols-2 gap-12 items-center">
-                    <Prose>
-                        {t
-                            ? 'Chúng tôi tin rằng trong kỷ nguyên AI, việc gõ từng dòng mã SQL lặp đi lặp lại là một sự lãng phí. Triết lý AI-First của chúng tôi xoay quanh 3 trụ cột:'
-                            : 'We believe that in the AI era, typing repetitive SQL lines is a waste. Our AI-First philosophy revolves around 3 pillars:'}
-                        <ul className="mt-6 space-y-4">
-                            <li><strong>1. Proactive Assistance:</strong> {t ? 'AI không chỉ trả lời khi được hỏi, nó chủ động gợi ý (Ghost Text) dựa trên ngữ cảnh hiện tại.' : 'AI doesn\'t just answer when asked; it proactively suggests (Ghost Text) based on code context.'}</li>
-                            <li><strong>2. Schema-Awareness:</strong> {t ? 'AI của chúng tôi "thấu hiểu" lược đồ của bạn sâu sắc hơn bất kỳ công cụ IntelliSense truyền thống nào.' : 'Our AI "understands" your schema deeper than any traditional IntelliSense tool.'}</li>
-                            <li><strong>3. Privacy-First AI:</strong> {t ? 'Sử dụng AI nhưng không bao giờ đánh đổi dữ liệu khách hàng.' : 'Leveraging AI without ever compromising customer data.'}</li>
-                        </ul>
-                    </Prose>
-                    <div className="p-8 rounded-3xl bg-primary/5 border border-primary/10 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-3xl -mr-16 -mt-16 group-hover:bg-primary/20 transition-all" />
-                        <h4 className="font-bold text-sm mb-4 flex items-center gap-2">
-                             <BookOpen className="w-4 h-4 text-primary" />
-                             {t ? 'Lộ trình phát triển' : 'Strategic Roadmap'}
-                        </h4>
-                        <div className="space-y-4">
-                            {[
-                                { v: 'Now', t: t ? 'Connection guardrails + shared queries' : 'Connection guardrails + shared queries', d: '✅ Live' },
-                                { v: 'Next', t: t ? 'ERD save/load + migration dry-run' : 'ERD save/load + migration dry-run', d: '🚀 In progress' },
-                                { v: 'Later', t: t ? 'Scheduled reports + richer dashboards' : 'Scheduled reports + richer dashboards', d: '🎯 Roadmap' }
-                            ].map((item, i) => (
-                                <div key={i} className="flex justify-between items-center text-[10px]">
-                                    <span className="font-mono text-muted-foreground">{item.v}</span>
-                                    <span className="font-bold">{item.t}</span>
-                                    <span className="text-primary">{item.d}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+          <div className="grid gap-4">
+            {[
+              {
+                quarter: "Q2 2026",
+                title: t
+                  ? "Tìm kiếm Toàn cục (Global Search)"
+                  : "Global Search (Ctrl+P)",
+                desc: t
+                  ? "Truy cập nhanh vào bảng, file, lịch sử và câu lệnh AI từ một thanh bar duy nhất."
+                  : "Instant access to tables, files, history, and AI commands from a single command palette.",
+              },
+              {
+                quarter: "Q3 2026",
+                title: t
+                  ? "Thống kê Hiệu năng (Performance Profiler)"
+                  : "Performance Profiler",
+                desc: t
+                  ? "Phân tích trực quan EXPLAIN ANALYZE và gợi ý index tự động dựa trên tần suất truy vấn."
+                  : "Visual breakdown of EXPLAIN ANALYZE and automated index suggestions based on query frequency.",
+              },
+              {
+                quarter: "Q4 2026",
+                title: t
+                  ? "Cộng tác Nhóm (Team Collaboration)"
+                  : "Team Collaboration",
+                desc: t
+                  ? "Chia sẻ query, dashboard và sơ đồ ERD trực tiếp trong không gian làm việc chung."
+                  : "Share queries, dashboards, and ERD diagrams directly within a shared workspace.",
+              },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className="flex gap-4 p-4 rounded-xl border bg-muted/20 border-border/50"
+              >
+                <Badge
+                  variant="outline"
+                  className="h-fit py-1 px-3 bg-blue-500/5 text-blue-500 border-blue-500/20 font-black text-[10px] shrink-0"
+                >
+                  {item.quarter}
+                </Badge>
+                <div className="space-y-1">
+                  <h5 className="font-bold text-sm">{item.title}</h5>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {item.desc}
+                  </p>
                 </div>
-            </DocSection>
-
-            {/* Feature Overview Table */}
-            <DocSection title={t ? 'Tổng quan tính năng' : 'Feature Overview'}>
-                <div className="border rounded-2xl overflow-hidden">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="bg-muted/50">
-                                <th className="text-left p-4 font-bold">{t ? 'Tính năng' : 'Feature'}</th>
-                                <th className="text-left p-4 font-bold">{t ? 'Mô tả' : 'Description'}</th>
-                                <th className="text-center p-4 font-bold">{t ? 'Trạng thái' : 'Status'}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                            {[
-                                { feature: 'Monaco SQL Editor', desc: t ? 'Trình soạn thảo VS Code-grade với IntelliSense' : 'VS Code-grade editor with IntelliSense', status: '✅' },
-                                { feature: t ? 'Đa kết nối DB' : 'Multi-DB Connections', desc: t ? 'PostgreSQL, MySQL, MSSQL, MongoDB, MongoDB Atlas' : 'PostgreSQL, MySQL, MSSQL, MongoDB, MongoDB Atlas', status: '✅' },
-                                { feature: t ? 'AI SQL Generation' : 'AI SQL Generation', desc: t ? 'AI routing + Gemini + typed recommendations' : 'AI routing + Gemini + typed recommendations', status: '✅' },
-                                { feature: t ? 'Saved Queries chia sẻ' : 'Shared Saved Queries', desc: t ? 'Private, team, và workspace visibility' : 'Private, team, and workspace visibility', status: '✅' },
-                                { feature: t ? 'Dashboard từ query' : 'Query to Dashboard', desc: t ? 'Lưu query result thành dashboard widget' : 'Save query results as dashboard widgets', status: '✅' },
-                                { feature: t ? 'Hệ thống Phím tắt' : 'Global Shortcuts', desc: t ? 'Bộ phím tắt toàn cục (Ctrl+N, Ctrl+J, Ctrl+I...)' : 'Global keyboard shortcuts palette', status: '✅' },
-                                { feature: t ? 'Hiệu ứng Mượt mà' : 'Smooth UI Transitions', desc: t ? 'Đóng mở bảng và tab với chuyển động 300ms' : '300ms smooth panel and tab animations', status: '✅' },
-                                { feature: t ? 'Đa ngôn ngữ' : 'Internationalization', desc: t ? 'Tiếng Việt và Tiếng Anh' : 'Vietnamese and English', status: '✅' },
-                            ].map((row, i) => (
-                                <tr key={i} className="hover:bg-muted/10 transition-colors">
-                                    <td className="py-3 px-2 font-medium text-xs text-foreground/80">{row.feature}</td>
-                                    <td className="py-3 px-2 text-xs text-muted-foreground">{row.desc}</td>
-                                    <td className="py-3 px-2 text-center">{row.status}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </DocSection>
-
-            {/* Mission & Vision */}
-            <DocSection title={t ? 'Sứ mệnh & Tầm nhìn' : 'Mission & Vision'}>
-                <div className="grid md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                        <h4 className="font-bold text-sm flex items-center gap-2">
-                            <Zap className="w-4 h-4 text-blue-500" />
-                            {t ? 'Sứ mệnh' : 'Mission'}
-                        </h4>
-                        <Prose>
-                            {t
-                                ? 'Chúng tôi tin rằng việc tương tác với dữ liệu không nên là một cực hình kỹ thuật. Sứ mệnh của Data Explorer là dân chủ hóa quyền truy cập dữ liệu thông qua AI, giúp các kỹ sư và nhà phân tích tập trung vào "Tại sao" thay vì "Làm thế nào" khi viết SQL.'
-                                : 'We believe that interacting with data should not be a technical ordeal. Data Explorer\'s mission is to democratize data access through AI, helping engineers and analysts focus on the "Why" rather than the "How" when writing SQL.'}
-                        </Prose>
-                    </div>
-                    <div className="space-y-4">
-                        <h4 className="font-bold text-sm flex items-center gap-2">
-                            <Database className="w-4 h-4 text-purple-500" />
-                            {t ? 'Tầm nhìn' : 'Vision'}
-                        </h4>
-                        <Prose>
-                            {t
-                                ? 'Trở thành trung tâm chỉ huy dữ liệu (Data Command Center) mã nguồn mở hàng đầu, nơi AI không chỉ tạo query mà còn hiểu được bối cảnh kinh doanh, dự báo xu hướng và tự động hóa các tác vụ bảo trì database phức tạp.'
-                                : 'To become the leading open-source Data Command Center, where AI not only generates queries but also understands business context, predicts trends, and automates complex database maintenance tasks.'}
-                        </Prose>
-                    </div>
-                </div>
-            </DocSection>
-
-            {/* Product Roadmap */}
-            <DocSection title={t ? 'Lộ trình Phát triển (Roadmap)' : 'Product Roadmap'}>
-                <div className="space-y-6">
-                    <Prose>
-                        {t
-                            ? 'Chúng tôi không ngừng cải tiến Data Explorer. Dưới đây là những gì chúng tôi đang phát triển cho các phiên bản tiếp theo:'
-                            : 'We are constantly improving Data Explorer. Here is what we are building for the upcoming versions:'}
-                    </Prose>
-
-                    <div className="grid gap-4">
-                        {[
-                            {
-                                quarter: 'Q2 2026',
-                                title: t ? 'Tìm kiếm Toàn cục (Global Search)' : 'Global Search (Ctrl+P)',
-                                desc: t ? 'Truy cập nhanh vào bảng, file, lịch sử và câu lệnh AI từ một thanh bar duy nhất.' : 'Instant access to tables, files, history, and AI commands from a single command palette.'
-                            },
-                            {
-                                quarter: 'Q3 2026',
-                                title: t ? 'Thống kê Hiệu năng (Performance Profiler)' : 'Performance Profiler',
-                                desc: t ? 'Phân tích trực quan EXPLAIN ANALYZE và gợi ý index tự động dựa trên tần suất truy vấn.' : 'Visual breakdown of EXPLAIN ANALYZE and automated index suggestions based on query frequency.'
-                            },
-                            {
-                                quarter: 'Q4 2026',
-                                title: t ? 'Cộng tác Nhóm (Team Collaboration)' : 'Team Collaboration',
-                                desc: t ? 'Chia sẻ query, dashboard và sơ đồ ERD trực tiếp trong không gian làm việc chung.' : 'Share queries, dashboards, and ERD diagrams directly within a shared workspace.'
-                            }
-                        ].map((item, i) => (
-                            <div key={i} className="flex gap-4 p-4 rounded-xl border bg-muted/20 border-border/50">
-                                <Badge variant="outline" className="h-fit py-1 px-3 bg-blue-500/5 text-blue-500 border-blue-500/20 font-black text-[10px] shrink-0">
-                                    {item.quarter}
-                                </Badge>
-                                <div className="space-y-1">
-                                    <h5 className="font-bold text-sm">{item.title}</h5>
-                                    <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </DocSection>
-        </DocPageLayout>
-    );
+              </div>
+            ))}
+          </div>
+        </div>
+      </DocSection>
+    </DocPageLayout>
+  );
 }

@@ -1,4 +1,4 @@
-import { AiAutocompleteService } from '../../ai/ai.autocomplete-service';
+﻿import { AiAutocompleteService } from '../../ai/ai.autocomplete-service';
 
 describe('AiAutocompleteService', () => {
   let service: AiAutocompleteService;
@@ -11,15 +11,73 @@ describe('AiAutocompleteService', () => {
   const providerRunner = {
     isGeminiAvailable: jest.fn(),
     completeGeminiText: jest.fn(),
+    completeOpenAiCompatibleText: jest.fn(),
+  };
+
+  const routingService = {
+    buildPlanChain: jest.fn(),
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
     providerRunner.isGeminiAvailable.mockReturnValue(true);
+    routingService.buildPlanChain.mockReturnValue({
+      plans: [{ provider: 'gemini', model: 'gemini-3.1-flash-lite-preview' }],
+    });
     service = new AiAutocompleteService(
       cacheManager as never,
       providerRunner as never,
+      routingService as never,
     );
+  });
+
+  it('routes autocomplete through the selected openai-compatible provider', async () => {
+    cacheManager.get.mockResolvedValue(undefined);
+    routingService.buildPlanChain.mockReturnValue({
+      plans: [
+        {
+          provider: 'custom',
+          model: 'gpt-oss-120b',
+          baseUrl: 'https://provider.example.com/v1',
+          apiKey: 'no-key',
+        },
+      ],
+    });
+    providerRunner.completeOpenAiCompatibleText.mockResolvedValue(
+      'FROM orders',
+    );
+
+    const result = await service.autocomplete({
+      beforeCursor: 'SELECT * ',
+      schemaContext: 'TABLE orders(id int)',
+      databaseType: 'postgres',
+      model: 'gpt-oss-120b',
+      providerOverride: {
+        type: 'openai-compatible',
+        name: 'custom',
+        baseUrl: 'https://provider.example.com/v1',
+        apiKey: '',
+        model: 'gpt-oss-120b',
+      },
+    });
+
+    expect(routingService.buildPlanChain).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'SELECT * ',
+        model: 'gpt-oss-120b',
+      }),
+      true,
+    );
+    expect(providerRunner.completeOpenAiCompatibleText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'custom',
+        model: 'gpt-oss-120b',
+      }),
+      expect.objectContaining({
+        prompt: 'SELECT * ',
+      }),
+    );
+    expect(result).toBe('FROM orders');
   });
 
   it('normalizes MongoDB payload objects into executable JSON', async () => {

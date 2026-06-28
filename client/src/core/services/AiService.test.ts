@@ -27,7 +27,15 @@ describe('AiService (Frontend)', () => {
 
     const params = {
       connectionId: 'conn-1',
-      beforeCursor: 'SEL'
+      beforeCursor: 'SEL',
+      model: 'openai/gpt-oss-120b:free',
+      providerOverride: {
+        type: 'openai-compatible' as const,
+        name: 'custom',
+        baseUrl: 'https://provider.example.com/v1',
+        apiKey: 'sk-test',
+        model: 'custom-model',
+      },
     };
 
     const result = await aiService.getAutocomplete(params);

@@ -1,4 +1,5 @@
 import { apiService } from './api.service';
+import type { AiProviderOverrideConfig } from '@/core/domain/database-adapter.interface';
 
 export interface AutocompleteResponse {
     completion: string;
@@ -15,6 +16,8 @@ class AiService {
         beforeCursor: string;
         afterCursor?: string;
         context?: string;
+        model?: string;
+        providerOverride?: AiProviderOverrideConfig;
     }, signal?: AbortSignal): Promise<string> {
         try {
             const data = await apiService.request<AutocompleteResponse>('/ai/autocomplete', {

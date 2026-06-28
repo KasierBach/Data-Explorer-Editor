@@ -436,7 +436,9 @@ describe('QueryService', () => {
     expect(strategy.executeQuery).not.toHaveBeenCalled();
 
     const response = thrown?.getResponse() as any;
-    expect(response.message).toContain('Statement 2 of 2 requires confirmation.');
+    expect(response.message).toContain(
+      'Statement 2 of 2 requires confirmation.',
+    );
     expect(response.details.analysis).toEqual(
       expect.objectContaining({
         severity: 'high',

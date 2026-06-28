@@ -65,10 +65,20 @@ describe('SearchService', () => {
     it('returns indexed keyword matches without triggering semantic fallback when the hit set is already strong', async () => {
       searchIndexRepository.search.mockResolvedValue([
         { id: '1', name: 'users', type: 'table', connectionName: 'DB1' },
-        { id: '2', name: 'users_archive', type: 'table', connectionName: 'DB1' },
+        {
+          id: '2',
+          name: 'users_archive',
+          type: 'table',
+          connectionName: 'DB1',
+        },
         { id: '3', name: 'users_shadow', type: 'table', connectionName: 'DB1' },
         { id: '4', name: 'users_beta', type: 'table', connectionName: 'DB1' },
-        { id: '5', name: 'users_staging', type: 'table', connectionName: 'DB1' },
+        {
+          id: '5',
+          name: 'users_staging',
+          type: 'table',
+          connectionName: 'DB1',
+        },
       ]);
 
       const results = await service.search('user-1', 'user');
@@ -93,7 +103,12 @@ describe('SearchService', () => {
       ]);
       searchIndexRepository.getItemsByNames.mockResolvedValue([
         { id: '2', name: 'users', type: 'table', connectionName: 'DB1' },
-        { id: '3', name: 'user_sessions', type: 'table', connectionName: 'DB1' },
+        {
+          id: '3',
+          name: 'user_sessions',
+          type: 'table',
+          connectionName: 'DB1',
+        },
       ]);
 
       const results = await service.search('user-1', 'login history');
