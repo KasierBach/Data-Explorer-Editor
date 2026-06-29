@@ -48,6 +48,7 @@ export class TokenService {
       role: user.role,
       username: user.username,
       jobRole: user.jobRole,
+      legalAcceptedAt: user.legalAcceptedAt,
     };
   }
 

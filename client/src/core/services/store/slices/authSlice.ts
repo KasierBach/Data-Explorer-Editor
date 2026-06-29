@@ -35,6 +35,7 @@ export interface AuthUser {
     planExpiresAt?: string;
     subscriptionStatus?: string;
     paymentProvider?: string;
+    legalAcceptedAt?: string | null;
 }
 
 interface AuthResetState {

@@ -4,7 +4,7 @@
   "description": "",
   "author": "",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "scripts": {
     "build": "node scripts/prisma-generate-safe.mjs && nest build",
     "bench:search": "node --expose-gc scripts/benchmarks/search-benchmark.mjs",

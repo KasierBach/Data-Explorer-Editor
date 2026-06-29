@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -39,6 +40,7 @@ interface SessionUser {
   lastLoginIp?: string | null;
   securityAlerts?: boolean;
   language?: string | null;
+  legalAcceptedAt?: Date | null;
 }
 
 @Injectable()
@@ -241,6 +243,16 @@ export class AuthService implements OnModuleInit {
 
   async register(registerDto: RegisterDto, lang: AppLanguage = 'vi') {
     const preferredLang = this.resolveLanguage(lang);
+
+    if (!registerDto.acceptedLegal) {
+      throw new BadRequestException(
+        this.t(
+          preferredLang,
+          'Bạn cần đồng ý với điều khoản và chính sách trước khi đăng ký.',
+          'You must accept the terms and privacy policy before registering.',
+        ),
+      );
+    }
     const existingUser = await this.prisma.user.findUnique({
       where: { email: registerDto.email },
     });
@@ -273,6 +285,7 @@ export class AuthService implements OnModuleInit {
           firstName,
           lastName,
           language: preferredLang,
+          legalAcceptedAt: new Date(),
           verifyOtp: hashedOtp,
           verifyOtpExpiry: expiry,
         },
@@ -289,6 +302,7 @@ export class AuthService implements OnModuleInit {
           isOnboarded: false,
           isEmailVerified: false,
           language: preferredLang,
+          legalAcceptedAt: new Date(),
           verifyOtp: hashedOtp,
           verifyOtpExpiry: expiry,
         },

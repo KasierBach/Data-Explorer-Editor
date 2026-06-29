@@ -6,17 +6,17 @@
 [![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![MySQL](https://img.shields.io/badge/MySQL-9-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-8-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
-[![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supported-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-Supported-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Supported-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Redis](https://img.shields.io/badge/Redis-Infrastructure-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![Framer_Motion](https://img.shields.io/badge/Framer_Motion-12-0055FF?logo=framer&logoColor=white)](https://www.framer.com/motion/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](#license)
-[![Version](https://img.shields.io/badge/Version-3.6.2-blue.svg)](https://github.com/KasierBach/Data-Explorer-Editor/releases)
+[![Version](https://img.shields.io/badge/Version-3.6.4-blue.svg)](https://github.com/KasierBach/Data-Explorer-Editor/releases)
 
 **Data Explorer** is a high-fidelity, high-performance database management and visualization IDE. It provides a unified, intelligent interface for developers and data engineers to explore, query, and visualize multi-engine databases, all supercharged by a context-aware AI.
 
-Current release focus: **v3.6.2** adds image-aware AI workflows, explicit Beeknoee model lanes, per-role AI configuration, custom OpenAI-compatible providers with model loading, SQL Steps sequencing, richer NoSQL tooling, billing and access-control hardening, and broader UX polish across SQL, NoSQL, docs, and the landing experience.
+Current documentation focus reflects the **v3.6.4** workspace: configurable AI roles with custom OpenAI-compatible providers, higher-signal query safety warnings, SQL Steps plus AI Explain inside the editor, broader bilingual coverage, and a legal center with signup consent flow.
 
 ---
 
@@ -71,6 +71,12 @@ Current release focus: **v3.6.2** adds image-aware AI workflows, explicit Beekno
 - **Activity Visibility**: Shared dashboard activity and team-level usage signals help collaborators see what changed.
 - **Presence Tracking**: Real-time indicators show active members within shared teamspaces.
 - **Org Backup System**: Admins can export and migrate entire organization configurations safely.
+
+### Access and Legal Surface
+
+- **Public Legal Center**: The landing surface now links to dedicated /legal, /privacy, and /terms pages.
+- **Signup Consent Gate**: Local signups must accept the Terms of Service and Privacy Policy before account creation succeeds.
+- **Workspace Consent Enforcement**: Accounts without recorded legal acceptance are redirected to a dedicated consent screen before entering the SQL or NoSQL workspace.
 
 ### Entity Relationship Diagrams (ERD)
 
@@ -297,16 +303,13 @@ This is the fastest way to run **Data Explorer** locally with PostgreSQL, Redis,
 1. **Environment Setup**
    - Copy `server/.env.example` to `server/.env`.
    - Fill in at least `JWT_SECRET`, `ENCRYPTION_KEY`, and any optional AI or OAuth variables you want to use.
-   - Sync the Prisma schema before first boot:
-     ```bash
-     npx prisma db push
-     ```
+   - No manual Prisma sync is required before first boot. The Docker stack runs the dedicated `migrate` service and applies the committed baseline automatically.
    - If you are serving the frontend through Docker on port `80`, set:
      - `FRONTEND_URL=http://localhost`
 
 2. **Launch**
    ```bash
-   docker-compose up --build -d
+   docker compose up --build -d
    ```
 
 ### Access Points
@@ -325,6 +328,7 @@ Note:
 - The backend container listens on port `3001`.
 - The frontend build arg defaults to `VITE_API_URL=http://localhost:3001/api`.
 - The Docker stack starts Redis automatically, so no separate Redis install is needed in that path.
+- The `migrate` service uses Prisma Migrate with the committed `0_init` Postgres baseline, so you do not need a pre-run `db push`.
 
 ---
 
@@ -345,7 +349,7 @@ Note:
    npm install
    cp .env.example .env
    npx prisma generate
-   npx prisma db push
+   npx prisma migrate deploy
    npm run start:dev
    ```
 
@@ -462,6 +466,7 @@ Recent hardening introduced a few important changes:
 - **Safer session handling**: Refresh tokens now live in `httpOnly` cookies, while access tokens stay in memory and are re-bootstrapped through `/auth/refresh`.
 - **Sanitized DB Errors**: Database error messages are sanitized before being sent to the client to prevent infrastructure information leakage.
 - **AI request guardrails**: Provider calls now use request timeouts and streaming idle timeouts so a slow lane cannot hang the backend indefinitely.
+- **Legal access flow**: New local registrations require Terms + Privacy consent, and users who have not accepted the legal flow are redirected to `/legal-consent` before entering the main workspace.
 
 ---
 
@@ -539,6 +544,10 @@ npm test
   - This usually happens because the backend dev server is still locking the Prisma engine file
   - Stop the running backend process and build again
 
+- **You already have data in Postgres and want Prisma tracking**
+  - Use the committed baseline plus `prisma migrate resolve` if you need to attach Prisma history to an existing database
+  - Do not run `prisma migrate reset` against a live database
+
 ---
 
 ## Contributing and Support
@@ -548,4 +557,4 @@ npm test
 
 ## License
 
-This project is licensed under the **MIT License**.
+This project is licensed under the **MIT License**. See [LICENSE](./LICENSE).

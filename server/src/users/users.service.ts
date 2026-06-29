@@ -1,4 +1,4 @@
-import {
+﻿import {
   Injectable,
   NotFoundException,
   ConflictException,
@@ -40,6 +40,7 @@ export class UsersService {
         provider: true,
         theme: true,
         language: true,
+        legalAcceptedAt: true,
         emailNotifications: true,
         failedQueryAlerts: true,
         productUpdates: true,
@@ -56,8 +57,28 @@ export class UsersService {
     return user;
   }
 
+  async acceptLegalConsent(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, legalAcceptedAt: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.legalAcceptedAt) {
+      return user;
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { legalAcceptedAt: new Date() },
+      select: { id: true, legalAcceptedAt: true },
+    });
+  }
+
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    // Check for username uniqueness if provided
     if (dto.username) {
       const existing = await this.prisma.user.findUnique({
         where: { username: dto.username },
@@ -140,12 +161,10 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    // Only allow onboarding once for security
     if (user.isOnboarded && user.role !== 'admin') {
       throw new ConflictException('User is already onboarded');
     }
 
-    // Check if username is already taken by someone else
     const existingUsername = await this.prisma.user.findUnique({
       where: { username: dto.username },
     });

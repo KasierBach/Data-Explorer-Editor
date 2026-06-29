@@ -33,6 +33,10 @@ const AdminDashboardPage = lazy(() => import('@/presentation/pages/Admin/AdminDa
 const ChangelogPage = lazy(() => import('@/presentation/pages/ChangelogPage').then((m) => ({ default: m.ChangelogPage })))
 const TeamPage = lazy(() => import('@/presentation/pages/TeamPage').then((m) => ({ default: m.TeamPage })))
 const BillingReturnPage = lazy(() => import('@/presentation/pages/BillingReturnPage').then((m) => ({ default: m.BillingReturnPage })))
+const LegalCenterPage = lazy(() => import('@/presentation/pages/LegalPages').then((m) => ({ default: m.LegalCenterPage })))
+const PrivacyPage = lazy(() => import('@/presentation/pages/LegalPages').then((m) => ({ default: m.PrivacyPage })))
+const TermsPage = lazy(() => import('@/presentation/pages/LegalPages').then((m) => ({ default: m.TermsPage })))
+const LegalConsentPage = lazy(() => import('@/presentation/pages/LegalPages').then((m) => ({ default: m.LegalConsentPage })))
 
 function RouteFallback() {
   const { lang } = useAppStore()
@@ -48,12 +52,11 @@ export function App() {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 1000 * 60 * 5, // 5 minutes
+        staleTime: 1000 * 60 * 5,
       },
     },
   }))
 
-  // Auto-fetch connections from backend whenever user is authenticated
   useSyncConnections();
   useSyncSavedQueries();
   useNotifications();
@@ -61,7 +64,6 @@ export function App() {
   const { theme: appTheme, setTheme: setAppTheme } = useTheme();
   const { user, restoreSession, setAuthBootstrapped } = useAppStore();
 
-  // Sync profile theme with App Theme
   useEffect(() => {
     if (isAppTheme(user?.theme) && user.theme !== appTheme) {
         setAppTheme(user.theme);
@@ -77,8 +79,8 @@ export function App() {
         if (!cancelled && data.access_token && data.user) {
           restoreSession(data.access_token, data.user, data.accessTokenExpiresAt ?? null);
         }
-      } catch {
-        // Anonymous sessions are allowed.
+      } catch (error) {
+        void error;
       } finally {
         if (!cancelled) {
           setAuthBootstrapped(true);
@@ -101,9 +103,13 @@ export function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
               <Route path="/forgot-password" element={<RedirectIfAuth><ForgotPasswordPage /></RedirectIfAuth>} />
+              <Route path="/legal-consent" element={<RequireAuth><LegalConsentPage /></RequireAuth>} />
               <Route path="/onboarding" element={<RequireAuth><OnboardingPage /></RequireAuth>} />
               <Route path="/docs" element={<DocumentationPage />} />
               <Route path="/changelog" element={<ChangelogPage />} />
+              <Route path="/legal" element={<LegalCenterPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/terms" element={<TermsPage />} />
               <Route path="/teams" element={<RequireAuth><TeamPage /></RequireAuth>} />
               <Route path="/billing/return" element={<RequireAuth><BillingReturnPage /></RequireAuth>} />
 
@@ -143,7 +149,6 @@ export function App() {
   )
 }
 
-// Helper to redirect authenticated users to app
 function RedirectIfAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isAuthBootstrapped, accessToken } = useAppStore();
   if (!isAuthBootstrapped) {

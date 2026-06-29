@@ -16,5 +16,6 @@
     "dotenv": "^17.4.2",
     "ssh2": "^1.17.0",
     "typescript": "^6.0.3"
-  }
+  },
+  "license": "MIT"
 }

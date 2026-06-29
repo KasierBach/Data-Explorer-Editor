@@ -72,7 +72,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                 >
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/20 to-blue-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out" />
                     <Sparkles className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-300 transition-colors" aria-hidden="true" />
-                    <span className="text-white/90 group-hover:text-white transition-colors relative z-10">v3.6.2: VISION, BEEKNOEE & AI UX POLISH</span>
+                    <span className="text-white/90 group-hover:text-white transition-colors relative z-10">{text.badge}</span>
                 </motion.div>
                 
                 <motion.h1 
@@ -98,7 +98,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                 
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center justify-center gap-6">
                     <div className="relative group w-full sm:w-auto">
-                        {/* Glow effect behind the button */}
                         <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-xl blur-lg opacity-40 group-hover:opacity-100 transition duration-500 group-hover:duration-200 animate-pulse"></div>
                         <Button 
                             size="lg" 
@@ -113,7 +112,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ lang, isAuthenticated 
                     <Button 
                         size="lg" 
                         variant="outline" 
-                        onClick={() => window.open('/docs', '_blank')} 
+                        onClick={() => navigate('/docs')}
                         className="relative overflow-hidden group h-12 px-8 text-[11px] font-bold uppercase tracking-[0.15em] w-full sm:w-auto glass-panel hover:bg-white/10 hover:text-white text-muted-foreground/90 rounded-xl border-white/[0.08] backdrop-blur-md transition-colors"
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/5 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-in-out" />

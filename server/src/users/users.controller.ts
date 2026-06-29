@@ -1,4 +1,4 @@
-import {
+﻿import {
   Controller,
   Get,
   Post,
@@ -54,6 +54,11 @@ export class UsersController {
     @Body() dto: UpdateSettingsDto,
   ) {
     return this.usersService.updateSettings(req.user.id, dto);
+  }
+
+  @Patch('legal-consent')
+  async acceptLegalConsent(@Request() req: AuthenticatedRequest) {
+    return this.usersService.acceptLegalConsent(req.user.id);
   }
 
   @Patch('billing')

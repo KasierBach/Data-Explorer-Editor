@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '@/core/services/store';
 
@@ -14,7 +14,10 @@ export const RequireAuth = ({ children, requireAdmin = false }: { children: Reac
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    // Force onboarding if not completed (unless they are already on the onboarding page)
+    if (user && !user.legalAcceptedAt && location.pathname !== '/legal-consent') {
+        return <Navigate to="/legal-consent" replace />;
+    }
+
     if (user && !user.isOnboarded && location.pathname !== '/onboarding') {
          return <Navigate to="/onboarding" replace />;
     }

@@ -11,7 +11,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Enums ───
+// â”€â”€â”€ Enums â”€â”€â”€
 
 enum OrganizationRole {
   OWNER
@@ -27,7 +27,7 @@ enum ResourceType {
   ERD
 }
 
-// ─── Core Models ───
+// â”€â”€â”€ Core Models â”€â”€â”€
 
 model Connection {
   id               String   @id @default(uuid())
@@ -87,6 +87,7 @@ model User {
   // Preferences
   theme       String   @default("dark") // "light", "dark", "system"
   language    String   @default("vi")   // "vi", "en"
+  legalAcceptedAt DateTime?
 
   // Notifications
   emailNotifications Boolean @default(true)
@@ -312,7 +313,7 @@ model ErdWorkspace {
   @@index([organizationId])
 }
 
-// ─── Organization / Team Collaboration ───
+// â”€â”€â”€ Organization / Team Collaboration â”€â”€â”€
 
 model VersionHistory {
   id            String       @id @default(uuid())

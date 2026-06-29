@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
@@ -28,6 +28,7 @@ export const LoginPage = () => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [acceptedLegal, setAcceptedLegal] = useState(false);
     const [verifyEmailStep, setVerifyEmailStep] = useState(false);
     const [registeredEmail, setRegisteredEmail] = useState('');
     const [otp, setOtp] = useState('');
@@ -35,8 +36,8 @@ export const LoginPage = () => {
     const [error, setError] = useState('');
 
     const title = isRegister
-        ? t('Đăng ký tài khoản', 'Create Account')
-        : t('Đăng nhập', 'Login');
+        ? t('Đăng ký tài khoản', 'Create account')
+        : t('Đăng nhập', 'Sign in');
 
     const copy = {
         home: t('Quay lại trang chủ', 'Back to home'),
@@ -48,25 +49,35 @@ export const LoginPage = () => {
         otpLabel: t('Mã OTP', 'OTP code'),
         verifyButton: t('Xác minh tài khoản', 'Verify account'),
         resendCode: t('Gửi lại mã', 'Resend code'),
-        backToLogin: t('Quay lại đăng nhập', 'Back to login'),
+        backToLogin: t('Quay lại đăng nhập', 'Back to sign in'),
         createAccount: t('Tạo tài khoản', 'Create account'),
         welcomeBack: t('Chào mừng trở lại', 'Welcome back'),
-        registerIntro: t('Đăng ký tài khoản mới để bắt đầu', 'Register a new account to get started'),
-        loginIntro: t('Đăng nhập vào tài khoản để tiếp tục', 'Sign in to your account to continue'),
-        continueWith: t('Tiếp tục với', 'Or continue with'),
+        registerIntro: t('Đăng ký tài khoản mới để bắt đầu làm việc với workspace của bạn.', 'Create a new account to start working in your workspace.'),
+        loginIntro: t('Đăng nhập để tiếp tục với workspace và lịch sử của bạn.', 'Sign in to continue with your workspace and history.'),
+        continueWith: t('Hoặc tiếp tục với', 'Or continue with'),
+        socialRegisterHint: t('Đăng ký bằng Google hoặc GitHub cũng cần bạn đồng ý với tài liệu pháp lý bên dưới.', 'Google and GitHub sign-up also requires accepting the legal documents below.'),
         name: t('Tên', 'Name'),
         yourName: t('Tên của bạn', 'Your name'),
         email: 'Email',
         password: t('Mật khẩu', 'Password'),
         forgotPassword: t('Quên mật khẩu?', 'Forgot password?'),
-        minChars: t('Tối thiểu 6 ký tự', 'Min 6 characters'),
+        minChars: t('Tối thiểu 6 ký tự', 'Minimum 6 characters'),
         createWithEmail: t('Tạo tài khoản bằng Email', 'Create account with email'),
         signInWithEmail: t('Đăng nhập bằng Email', 'Sign in with email'),
         alreadyHaveAccount: t('Đã có tài khoản?', 'Already have an account?'),
         signIn: t('Đăng nhập', 'Sign in'),
         dontHaveAccount: t('Chưa có tài khoản?', "Don't have an account?"),
         register: t('Đăng ký', 'Register'),
+        acceptLegalPrefix: t('Tôi đã đọc và đồng ý với', 'I have read and agree to the'),
+        terms: t('Điều khoản dịch vụ', 'Terms of Service'),
+        privacy: t('Chính sách riêng tư', 'Privacy Policy'),
+        acceptLegalSuffix: t('cho tài khoản này.', 'for this account.'),
+        acceptLegalError: t('Bạn cần đồng ý với Điều khoản dịch vụ và Chính sách riêng tư trước khi tạo tài khoản.', 'You must accept the Terms of Service and Privacy Policy before creating an account.'),
     };
+
+    const navigateAfterAuth = React.useCallback(() => {
+        navigate('/sql-explorer');
+    }, [navigate]);
 
     const handleOAuthCode = React.useCallback(async (code: string) => {
         setIsLoading(true);
@@ -85,17 +96,13 @@ export const LoginPage = () => {
                 console.warn('Failed to fetch connections upon login');
             }
 
-            if (data.user.isOnboarded) {
-                navigate('/sql-explorer');
-            } else {
-                navigate('/onboarding');
-            }
+            navigateAfterAuth();
         } catch {
             setError(t('Đăng nhập mạng xã hội thất bại. Vui lòng thử lại.', 'Social login failed. Please try again.'));
         } finally {
             setIsLoading(false);
         }
-    }, [login, navigate, t]);
+    }, [login, navigateAfterAuth, t]);
 
     useEffect(() => {
         const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
@@ -107,17 +114,28 @@ export const LoginPage = () => {
     }, [handleOAuthCode]);
 
     const handleSocialLogin = (provider: 'google' | 'github') => {
+        if (isRegister && !acceptedLegal) {
+            setError(copy.acceptLegalError);
+            toast.error(copy.acceptLegalError);
+            return;
+        }
         window.location.href = `${API_BASE_URL}/auth/${provider}`;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoading(true);
         setError('');
+
+        if (isRegister && !acceptedLegal) {
+            setError(copy.acceptLegalError);
+            return;
+        }
+
+        setIsLoading(true);
 
         try {
             const data = isRegister
-                ? await AuthService.register(name, email, password)
+                ? await AuthService.register(name, email, password, true)
                 : await AuthService.login(email, password);
 
             if (data.unverified) {
@@ -126,7 +144,6 @@ export const LoginPage = () => {
                 toast.success(data.message || (lang === 'vi'
                     ? 'Mã xác minh đã được gửi đến email của bạn.'
                     : 'A verification code has been sent to your email.'));
-                setIsLoading(false);
                 return;
             }
 
@@ -140,11 +157,7 @@ export const LoginPage = () => {
                     console.warn('Failed to fetch connections upon login');
                 }
 
-                if (data.user?.isOnboarded === false) {
-                    navigate('/onboarding');
-                } else {
-                    navigate('/');
-                }
+                navigateAfterAuth();
             }
         } catch (err) {
             const data = getApiErrorData(err);
@@ -167,16 +180,11 @@ export const LoginPage = () => {
 
         try {
             const data = await AuthService.verifyEmail(registeredEmail, otp);
-            toast.success(t('Xác minh thành công!', 'Verification successful!'));
+            toast.success(t('Xác minh thành công.', 'Verification successful.'));
 
             if (data.access_token && data.user) {
                 login(data.access_token, data.user, data.accessTokenExpiresAt ?? null);
-
-                if (data.user?.isOnboarded === false) {
-                    navigate('/onboarding');
-                } else {
-                    navigate('/');
-                }
+                navigateAfterAuth();
             }
         } catch (err) {
             setError(getErrorMessage(err, t('Mã OTP không hợp lệ', 'Invalid OTP')));
@@ -190,9 +198,9 @@ export const LoginPage = () => {
         setError('');
         try {
             const data = await AuthService.resendVerification(registeredEmail);
-            toast.success(data.message || t('Đã gửi lại mã xác minh!', 'Verification code resent!'));
+            toast.success(data.message || t('Đã gửi lại mã xác minh.', 'Verification code resent.'));
         } catch (err) {
-            setError(getErrorMessage(err, t('Không thể gửi lại mã', 'Error resending OTP')));
+            setError(getErrorMessage(err, t('Không thể gửi lại mã', 'Could not resend the code')));
         } finally {
             setIsLoading(false);
         }
@@ -201,7 +209,7 @@ export const LoginPage = () => {
     if (verifyEmailStep) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
-                <SEO title={`${title} - ${t('Xác minh Email', 'Verify Email')}`} />
+                <SEO title={`${title} - ${t('Xác minh email', 'Verify email')}`} lang={lang} />
                 <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
                     <div className="mb-6">
                         <Button
@@ -284,7 +292,7 @@ export const LoginPage = () => {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
-            <SEO title={title} />
+            <SEO title={title} lang={lang} />
             <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
                 <div className="mb-6">
                     <Button
@@ -310,9 +318,9 @@ export const LoginPage = () => {
                     </p>
                 </div>
 
-                <div className="grid gap-3 mb-6">
+                <div className="grid gap-3 mb-3">
                     <Button variant="outline" type="button" onClick={() => handleSocialLogin('google')} disabled={isLoading}>
-                        <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path></svg>
+                        <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"></path></svg>
                         Google
                     </Button>
                     <Button variant="outline" type="button" onClick={() => handleSocialLogin('github')} disabled={isLoading}>
@@ -320,6 +328,11 @@ export const LoginPage = () => {
                         GitHub
                     </Button>
                 </div>
+                {isRegister && (
+                    <p className="mb-6 text-xs leading-5 text-muted-foreground">
+                        {copy.socialRegisterHint}
+                    </p>
+                )}
 
                 <div className="relative mb-6">
                     <div className="absolute inset-0 flex items-center">
@@ -380,6 +393,28 @@ export const LoginPage = () => {
                         />
                     </div>
 
+                    {isRegister && (
+                        <label className="flex items-start gap-3 rounded-xl border border-white/10 bg-muted/30 p-3 text-sm leading-6">
+                            <input
+                                type="checkbox"
+                                className="mt-1 h-4 w-4 rounded border-border"
+                                checked={acceptedLegal}
+                                onChange={(e) => setAcceptedLegal(e.target.checked)}
+                            />
+                            <span>
+                                {copy.acceptLegalPrefix}{' '}
+                                <a href="/terms" target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+                                    {copy.terms}
+                                </a>{' '}
+                                {lang === 'vi' ? 'và' : 'and'}{' '}
+                                <a href="/privacy" target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+                                    {copy.privacy}
+                                </a>{' '}
+                                {copy.acceptLegalSuffix}
+                            </span>
+                        </label>
+                    )}
+
                     {error && (
                         <div className="text-sm text-red-500 font-medium text-center bg-red-500/10 p-2 rounded">
                             {error}
@@ -405,6 +440,7 @@ export const LoginPage = () => {
                                 type="button"
                                 onClick={() => {
                                     setIsRegister(false);
+                                    setAcceptedLegal(false);
                                     setError('');
                                 }}
                                 className="text-primary hover:underline font-medium"
@@ -418,6 +454,7 @@ export const LoginPage = () => {
                                 type="button"
                                 onClick={() => {
                                     setIsRegister(true);
+                                    setAcceptedLegal(false);
                                     setError('');
                                 }}
                                 className="text-primary hover:underline font-medium"

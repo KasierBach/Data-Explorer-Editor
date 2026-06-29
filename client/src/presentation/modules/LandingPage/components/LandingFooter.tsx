@@ -1,17 +1,98 @@
-import React from 'react';
-import { Database, Github, Twitter, Disc } from 'lucide-react';
-import { getWorkspaceText } from '@/core/utils/workspaceText';
+﻿import React from 'react';
+import { BookOpen, Database, Github, History } from 'lucide-react';
 
 interface LandingFooterProps {
     lang: string;
 }
 
 export const LandingFooter: React.FC<LandingFooterProps> = ({ lang }) => {
-    const text = getWorkspaceText(lang).landingFooter;
-    const footerLinks = [
-        { title: text.product, links: text.productLinks },
-        { title: text.resources, links: text.resourceLinks },
-        { title: text.legal, links: text.legalLinks }
+    const text = lang === 'vi'
+        ? {
+            brandDescription: 'Workspace cho SQL, NoSQL, ERD và các luồng AI có thể cấu hình theo từng vai trò, đủ gọn để dùng hằng ngày nhưng vẫn có guardrail khi cần.',
+            builtForTeams: 'DÀNH CHO NHÓM DỮ LIỆU LÀM VIỆC NHANH.',
+            liveStatus: 'Trạng thái: Sẵn sàng',
+            languageLabel: 'Tiếng Việt',
+            footerLinks: [
+                {
+                    title: 'Sản phẩm',
+                    links: [
+                        { label: 'Tính năng', href: '/#features' },
+                        { label: 'SQL Workspace', href: '/sql-explorer' },
+                        { label: 'NoSQL Studio', href: '/nosql-explorer' },
+                        { label: 'ERD Workspace', href: '/sql-explorer/erd' },
+                    ],
+                },
+                {
+                    title: 'Khám phá',
+                    links: [
+                        { label: 'Tài liệu', href: '/docs' },
+                        { label: 'Cập nhật', href: '/changelog' },
+                        { label: 'GitHub', href: 'https://github.com/KasierBach/Data-Explorer-Editor' },
+                    ],
+                },
+                {
+                    title: 'Pháp lý',
+                    links: [
+                        { label: 'Trung tâm pháp lý', href: '/legal' },
+                        { label: 'Chính sách riêng tư', href: '/privacy' },
+                        { label: 'Điều khoản dịch vụ', href: '/terms' },
+                    ],
+                },
+            ],
+        }
+        : {
+            brandDescription: 'A workspace for SQL, NoSQL, ERD, and role-based AI flows that stays compact for daily work and adds guardrails when they matter.',
+            builtForTeams: 'BUILT FOR DATA TEAMS THAT MOVE FAST.',
+            liveStatus: 'Status: Ready',
+            languageLabel: 'English (US)',
+            footerLinks: [
+                {
+                    title: 'Product',
+                    links: [
+                        { label: 'Features', href: '/#features' },
+                        { label: 'SQL Workspace', href: '/sql-explorer' },
+                        { label: 'NoSQL Studio', href: '/nosql-explorer' },
+                        { label: 'ERD Workspace', href: '/sql-explorer/erd' },
+                    ],
+                },
+                {
+                    title: 'Explore',
+                    links: [
+                        { label: 'Documentation', href: '/docs' },
+                        { label: 'Changelog', href: '/changelog' },
+                        { label: 'GitHub', href: 'https://github.com/KasierBach/Data-Explorer-Editor' },
+                    ],
+                },
+                {
+                    title: 'Legal',
+                    links: [
+                        { label: 'Legal center', href: '/legal' },
+                        { label: 'Privacy policy', href: '/privacy' },
+                        { label: 'Terms of service', href: '/terms' },
+                    ],
+                },
+            ],
+        };
+
+    const shortcuts = [
+        {
+            href: 'https://github.com/KasierBach/Data-Explorer-Editor',
+            label: 'GitHub',
+            icon: <Github className="w-5 h-5" />,
+            external: true,
+        },
+        {
+            href: '/docs',
+            label: 'Documentation',
+            icon: <BookOpen className="w-5 h-5" />,
+            external: false,
+        },
+        {
+            href: '/changelog',
+            label: 'Changelog',
+            icon: <History className="w-5 h-5" />,
+            external: false,
+        },
     ];
 
     return (
@@ -19,35 +100,50 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ lang }) => {
             <div className="container mx-auto px-4 sm:px-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 md:gap-12 mb-12 md:mb-20">
                     <div className="col-span-2 lg:col-span-2">
-                        <div className="flex items-center gap-3 font-black text-2xl mb-6 tracking-tighter uppercase cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                        <a href="/" className="flex items-center gap-3 font-black text-2xl mb-6 tracking-tighter uppercase w-fit">
                             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
                                 <Database className="w-4 h-4 text-white" />
                             </div>
                             <span>DataExplorer</span>
-                        </div>
+                        </a>
                         <p className="text-muted-foreground text-sm font-medium leading-relaxed max-w-xs mb-8 opacity-70">
                             {text.brandDescription}
                         </p>
                         <div className="flex gap-5">
-                            <a href="#" className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/10 transition-all">
-                                <Github className="w-5 h-5" />
-                            </a>
-                            <a href="#" className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/10 transition-all">
-                                <Twitter className="w-5 h-5" />
-                            </a>
-                            <a href="#" className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/10 transition-all">
-                                <Disc className="w-5 h-5" />
-                            </a>
+                            {shortcuts.map((item) => (
+                                <a
+                                    key={item.label}
+                                    href={item.href}
+                                    aria-label={item.label}
+                                    target={item.external ? '_blank' : undefined}
+                                    rel={item.external ? 'noreferrer noopener' : undefined}
+                                    className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground hover:text-white hover:bg-white/10 transition-all"
+                                >
+                                    {item.icon}
+                                </a>
+                            ))}
                         </div>
                     </div>
 
-                    {footerLinks.map((col, i) => (
-                        <div key={i}>
+                    {text.footerLinks.map((col) => (
+                        <div key={col.title}>
                             <h4 className="font-black mb-6 text-xs tracking-[0.2em] uppercase text-foreground/80">{col.title}</h4>
                             <ul className="space-y-4 text-sm font-medium text-muted-foreground/60">
-                                {col.links.map(link => (
-                                    <li key={link}><a href="#" className="hover:text-blue-500 transition-colors">{link}</a></li>
-                                ))}
+                                {col.links.map((link) => {
+                                    const external = link.href.startsWith('http');
+                                    return (
+                                        <li key={link.label}>
+                                            <a
+                                                href={link.href}
+                                                target={external ? '_blank' : undefined}
+                                                rel={external ? 'noreferrer noopener' : undefined}
+                                                className="hover:text-blue-500 transition-colors"
+                                            >
+                                                {link.label}
+                                            </a>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         </div>
                     ))}

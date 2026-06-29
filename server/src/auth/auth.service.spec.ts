@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 
@@ -55,5 +55,17 @@ describe('AuthService - login', () => {
         'en',
       ),
     ).rejects.toThrow('Invalid credentials');
+  });
+  it('rejects registration when legal terms are not accepted', async () => {
+    await expect(
+      authService.register({
+        name: 'No Consent',
+        email: 'noconsent@example.com',
+        password: 'secret123',
+        acceptedLegal: false,
+      } as any),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
   });
 });

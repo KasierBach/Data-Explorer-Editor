@@ -1,4 +1,4 @@
-import { apiService } from './api.service';
+﻿import { apiService } from './api.service';
 import { useAppStore } from './store';
 import type { AuthUser } from './store/slices/authSlice';
 
@@ -50,8 +50,8 @@ export class AuthService {
         }
     }
 
-    static async register(name: string, email: string, password: string): Promise<AuthResponse> {
-        return await apiService.post<AuthResponse>('/auth/register', { name, email, password }, {}, false);
+    static async register(name: string, email: string, password: string, acceptedLegal: boolean): Promise<AuthResponse> {
+        return await apiService.post<AuthResponse>('/auth/register', { name, email, password, acceptedLegal }, {}, false);
     }
 
     static async verifyEmail(email: string, otp: string): Promise<AuthResponse> {

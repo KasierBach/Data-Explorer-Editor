@@ -1,19 +1,62 @@
-import React from 'react';
+﻿import React from 'react';
 import { motion } from 'framer-motion';
 import { Database, Zap, Cpu, Search } from 'lucide-react';
-import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface WorkflowSectionProps {
     lang: string;
 }
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
-    const text = getWorkspaceText(lang).workflowSection;
+    const text = lang === 'vi'
+        ? {
+            title: 'Quy trình làm việc rõ ràng',
+            description: 'Từ đọc schema tới chạy query, mỗi bước đều có trợ giúp đúng vai trò thay vì một model ôm hết.',
+            steps: [
+                {
+                    title: 'Đọc schema',
+                    description: 'Quét cấu trúc bảng, collection và quan hệ để có đúng ngữ cảnh trước khi gõ.',
+                },
+                {
+                    title: 'Chọn AI phù hợp',
+                    description: 'Assistant, Explain, AI SQL, AI NoSQL và Autocomplete có thể dùng model khác nhau.',
+                },
+                {
+                    title: 'Chạy có guardrail',
+                    description: 'Thực thi, explain hoặc chạy tuần tự với cảnh báo mức nghiêm trọng rõ ràng hơn.',
+                },
+                {
+                    title: 'Lưu và quay lại',
+                    description: 'Lịch sử, workspace và draft được giữ lại để không mất luồng làm việc giữa các phiên.',
+                },
+            ],
+        }
+        : {
+            title: 'A clearer working loop',
+            description: 'From reading schema to running queries, each step gets the right helper instead of one model doing everything.',
+            steps: [
+                {
+                    title: 'Read the schema',
+                    description: 'Scan tables, collections, and relationships so the editor starts with real context.',
+                },
+                {
+                    title: 'Pick the right AI',
+                    description: 'Assistant, Explain, AI SQL, AI NoSQL, and Autocomplete can each use different models.',
+                },
+                {
+                    title: 'Run with guardrails',
+                    description: 'Execute, explain, or run sequences with clearer severity-based warnings.',
+                },
+                {
+                    title: 'Save and return',
+                    description: 'History, workspace state, and drafts stay around so the flow survives across sessions.',
+                },
+            ],
+        };
+
     const steps = [
         {
             icon: <Search className="w-6 h-6" />,
             ...text.steps[0],
-            color: 'blue',
             bg: 'bg-blue-500/20',
             border: 'border-blue-500/30',
             text: 'text-blue-400',
@@ -22,7 +65,6 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
         {
             icon: <Cpu className="w-6 h-6" />,
             ...text.steps[1],
-            color: 'purple',
             bg: 'bg-purple-500/20',
             border: 'border-purple-500/30',
             text: 'text-purple-400',
@@ -31,7 +73,6 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
         {
             icon: <Zap className="w-6 h-6" />,
             ...text.steps[2],
-            color: 'emerald',
             bg: 'bg-emerald-500/20',
             border: 'border-emerald-500/30',
             text: 'text-emerald-400',
@@ -40,7 +81,6 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
         {
             icon: <Database className="w-6 h-6" />,
             ...text.steps[3],
-            color: 'amber',
             bg: 'bg-amber-500/20',
             border: 'border-amber-500/30',
             text: 'text-amber-400',
@@ -61,12 +101,11 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
                 </div>
 
                 <div className="relative">
-                    {/* Connection Line */}
                     <div className="hidden lg:block absolute top-1/2 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-y-1/2 z-0" />
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 relative z-10">
                         {steps.map((step, i) => (
-                            <motion.div 
+                            <motion.div
                                 key={i}
                                 initial={{ opacity: 0, y: 20 }}
                                 whileInView={{ opacity: 1, y: 0 }}
@@ -74,12 +113,12 @@ export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
                                 transition={{ delay: i * 0.2 }}
                                 className="flex flex-col items-center text-center"
                             >
-                                <motion.div 
+                                <motion.div
                                     whileHover={{ scale: 1.1, rotate: 360 }}
                                     transition={{ duration: 0.5 }}
                                     className={`w-16 h-16 rounded-3xl ${step.bg} border ${step.border} flex items-center justify-center mb-6 shadow-2xl ${step.shadow}`}
                                 >
-                                    <div className={`${step.text}`}>
+                                    <div className={step.text}>
                                         {step.icon}
                                     </div>
                                 </motion.div>
