@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { getAssistantModelCatalog } from "./assistantModelCatalog";
 
 describe("assistantModelCatalog", () => {
@@ -14,12 +14,20 @@ describe("assistantModelCatalog", () => {
           label: "GLM 4.7 Flash",
         }),
         expect.objectContaining({
-          id: "beeknoee:qwen-3-235b-a22b-instruct-2507",
-          label: "Qwen 3 235B A22B Instruct 2507",
-        }),
-        expect.objectContaining({
           id: "beeknoee:minimax/minimax-m2.7",
           label: "MiniMax M2.7",
+        }),
+        expect.objectContaining({
+          id: "beeknoee:gemini-3.1-pro-preview",
+          label: "Gemini 3.1 Pro (Reasoning)",
+        }),
+        expect.objectContaining({
+          id: "beeknoee:claude-opus-4-6-thinking",
+          label: "Claude Opus 4.6 Thinking",
+        }),
+        expect.objectContaining({
+          id: "beeknoee:claude-sonnet-4-6",
+          label: "Claude Sonnet 4.6",
         }),
       ]),
     );
