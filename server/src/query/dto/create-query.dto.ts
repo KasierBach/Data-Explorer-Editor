@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsInt,
   Min,
+  Max,
   MaxLength,
   IsBoolean,
 } from 'class-validator';
@@ -27,6 +28,7 @@ export class CreateQueryDto {
 
   @IsInt()
   @Min(1)
+  @Max(50_000)
   @IsOptional()
   limit?: number;
 

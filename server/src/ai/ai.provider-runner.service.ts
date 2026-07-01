@@ -22,6 +22,7 @@ import type {
   RouteDecision,
   StreamEvent,
 } from './ai.types';
+import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
 
 @Injectable()
 export class AiProviderRunnerService {
@@ -39,6 +40,14 @@ export class AiProviderRunnerService {
     } else {
       this.genAI = new GoogleGenerativeAI(apiKey);
     }
+  }
+
+  private async getSafeOpenAiCompatibleUrl(baseUrl: string): Promise<string> {
+    const requestUrl = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+    if (!(await validateExternalUrl(requestUrl))) {
+      throw new Error('Unsafe provider URL');
+    }
+    return requestUrl;
   }
 
   isGeminiAvailable(): boolean {
@@ -406,6 +415,7 @@ export class AiProviderRunnerService {
   ): Promise<string> {
     if (!plan.apiKey || !plan.baseUrl)
       throw new Error(`${plan.provider} provider is not configured`);
+    const requestUrl = await this.getSafeOpenAiCompatibleUrl(plan.baseUrl);
 
     const requestTimeout = this.createAbortController(
       `${plan.provider} completion`,
@@ -413,7 +423,7 @@ export class AiProviderRunnerService {
     );
 
     try {
-      const response = await fetch(`${plan.baseUrl}/chat/completions`, {
+      const response = await fetch(requestUrl, {
         method: 'POST',
         headers: this.getOpenAiCompatibleHeaders(plan),
         body: JSON.stringify({
@@ -429,6 +439,7 @@ export class AiProviderRunnerService {
             params.maxOutputTokens ?? AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
         }),
         signal: requestTimeout.signal,
+        redirect: 'manual',
       });
 
       if (!response.ok) {
@@ -555,6 +566,7 @@ export class AiProviderRunnerService {
   ): Promise<ChatResult> {
     if (!plan.apiKey || !plan.baseUrl)
       throw new Error(`${plan.provider} provider is not configured`);
+    const requestUrl = await this.getSafeOpenAiCompatibleUrl(plan.baseUrl);
 
     const searchAttempt = this.getOpenAiSearchAttempt(
       plan,
@@ -580,7 +592,7 @@ export class AiProviderRunnerService {
         requestTimeout = this.createAbortController(
           `${plan.provider} request (${modelToUse}) attempt ${attempt + 1}`,
         );
-        return fetch(`${plan.baseUrl}/chat/completions`, {
+        return fetch(requestUrl, {
           method: 'POST',
           headers: this.getOpenAiCompatibleHeaders(plan),
           body: JSON.stringify({
@@ -599,6 +611,7 @@ export class AiProviderRunnerService {
               : {}),
           }),
           signal: requestTimeout.signal,
+          redirect: 'manual',
         });
       };
 
@@ -809,6 +822,9 @@ export class AiProviderRunnerService {
     routingMode: AiRoutingMode,
     routeDecision: RouteDecision,
   ): AsyncGenerator<StreamEvent> {
+    if (!plan.apiKey || !plan.baseUrl)
+      throw new Error(`${plan.provider} provider is not configured`);
+    const requestUrl = await this.getSafeOpenAiCompatibleUrl(plan.baseUrl);
     const searchAttempt = this.getOpenAiSearchAttempt(
       plan,
       params,
@@ -833,7 +849,7 @@ export class AiProviderRunnerService {
         requestTimeout = this.createAbortController(
           `${plan.provider} stream request (${modelToUse}) attempt ${attempt + 1}`,
         );
-        return fetch(`${plan.baseUrl}/chat/completions`, {
+        return fetch(requestUrl, {
           method: 'POST',
           headers: this.getOpenAiCompatibleHeaders(plan),
           body: JSON.stringify({
@@ -853,6 +869,7 @@ export class AiProviderRunnerService {
               : {}),
           }),
           signal: requestTimeout.signal,
+          redirect: 'manual',
         });
       };
 

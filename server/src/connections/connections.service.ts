@@ -15,6 +15,8 @@ import { AuditService, AuditAction } from '../audit/audit.service';
 import { SshTunnelService } from './ssh-tunnel.service';
 import { OrganizationsService } from '../organizations/services/organizations.service';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
+import { Permission } from '../permissions/enums/permission.enum';
+import { PermissionsService } from '../permissions/services/permissions.service';
 import { getErrorMessage } from '../common/utils/error.util';
 
 @Injectable()
@@ -30,6 +32,7 @@ export class ConnectionsService implements OnModuleDestroy {
       database: string | null;
     }
   >();
+  private readonly poolCreations = new Map<string, Promise<any>>();
   private readonly POOL_TTL = 15 * 60 * 1000; // 15 mins
   private readonly POOL_PRESSURE_IDLE_MS = 60 * 1000;
   private readonly MAX_ACTIVE_POOLS = 30;
@@ -42,6 +45,7 @@ export class ConnectionsService implements OnModuleDestroy {
     private auditService: AuditService,
     private sshTunnelService: SshTunnelService,
     private organizationsService: OrganizationsService,
+    private permissionsService: PermissionsService,
   ) {
     // Run cleanup every minute
     this.cleanupInterval = setInterval(() => void this.cleanupPools(), 60000);
@@ -367,7 +371,11 @@ export class ConnectionsService implements OnModuleDestroy {
     ) as unknown as Connection[];
   }
 
-  private async findRawOne(id: string, userId: string) {
+  private async findRawOne(
+    id: string,
+    userId: string,
+    permission: Permission = Permission.READ,
+  ) {
     const connection = await this.prisma.connection.findFirst({
       where: {
         id,
@@ -379,6 +387,12 @@ export class ConnectionsService implements OnModuleDestroy {
         `Connection with ID ${id} not found or you don't have permission`,
       );
     }
+    await this.permissionsService.ensurePermission(
+      userId,
+      ResourceType.CONNECTION,
+      id,
+      permission,
+    );
     return connection;
   }
 
@@ -392,12 +406,89 @@ export class ConnectionsService implements OnModuleDestroy {
    * Retrieves a connection with the password decrypted.
    * Internal use only (e.g. MigrationService).
    */
-  async getDecryptedConnection(id: string, userId: string) {
-    const connection = await this.findRawOne(id, userId);
+  async getDecryptedConnection(
+    id: string,
+    userId: string,
+    permission: Permission = Permission.READ,
+  ) {
+    const connection = await this.findRawOne(id, userId, permission);
     const decryptedPassword = connection.password
       ? decryptAttribute(connection.password)
       : undefined;
     return { ...connection, password: decryptedPassword };
+  }
+
+  private async createAndCachePool(
+    id: string,
+    databaseOverride: string | undefined,
+    connection: any,
+    poolKey: string,
+  ) {
+    const poolMetrics = this.getPoolMetrics();
+    const connectionPoolCount = poolMetrics.perConnection.get(id) ?? 0;
+    if (
+      poolMetrics.totalPools >= this.MAX_ACTIVE_POOLS ||
+      connectionPoolCount >= this.MAX_POOLS_PER_CONNECTION
+    ) {
+      await this.cleanupPools();
+    }
+
+    const decryptedPassword = connection.password
+      ? decryptAttribute(connection.password)
+      : undefined;
+    let connectionWithDecryptedPassword = {
+      ...connection,
+      password: decryptedPassword,
+    };
+
+    if (connection.sshHost && connection.sshUsername) {
+      const dbHost = this.normalizeHost(connection.host);
+      if (!dbHost) {
+        throw new BadRequestException(
+          'Host is required for SSH tunnel connections.',
+        );
+      }
+
+      const localPort = await this.sshTunnelService.openTunnel(poolKey, {
+        sshHost: connection.sshHost,
+        sshPort: connection.sshPort || 22,
+        sshUsername: connection.sshUsername,
+        sshPrivateKey: connection.sshPrivateKey || undefined,
+        sshPassphrase: connection.sshPassphrase || undefined,
+        dbHost,
+        dbPort: connection.port || 5432,
+      });
+      connectionWithDecryptedPassword = {
+        ...connectionWithDecryptedPassword,
+        host: '127.0.0.1',
+        port: localPort,
+      };
+    }
+
+    const strategy = this.strategyFactory.getStrategy(connection.type);
+    try {
+      const pool = await strategy.createPool(
+        connectionWithDecryptedPassword,
+        databaseOverride,
+      );
+      const timestamp = Date.now();
+      this.pools.set(poolKey, {
+        pool,
+        lastAccessed: timestamp,
+        createdAt: timestamp,
+        connectionId: id,
+        database: databaseOverride || connection.database || null,
+      });
+      this.logPoolPressure(id);
+      await this.updateHealthState(id, { status: 'healthy', connected: true });
+      return pool;
+    } catch (error) {
+      await this.updateHealthState(id, {
+        status: 'error',
+        error: getErrorMessage(error) || 'Connection failed',
+      });
+      throw error;
+    }
   }
 
   async getPool(id: string, databaseOverride?: string, userId?: string) {
@@ -423,72 +514,22 @@ export class ConnectionsService implements OnModuleDestroy {
       }
     }
 
-    const poolMetrics = this.getPoolMetrics();
-    const connectionPoolCount = poolMetrics.perConnection.get(id) ?? 0;
-    if (
-      poolMetrics.totalPools >= this.MAX_ACTIVE_POOLS ||
-      connectionPoolCount >= this.MAX_POOLS_PER_CONNECTION
-    ) {
-      await this.cleanupPools();
-    }
+    const pendingCreation = this.poolCreations.get(poolKey);
+    if (pendingCreation) return pendingCreation;
 
-    const decryptedPassword = connection.password
-      ? decryptAttribute(connection.password)
-      : undefined;
-    let connectionWithDecryptedPassword = {
-      ...connection,
-      password: decryptedPassword,
-    };
-
-    const connAny = connection;
-    if (connAny.sshHost && connAny.sshUsername) {
-      const dbHost = this.normalizeHost(connection.host);
-      if (!dbHost) {
-        throw new BadRequestException(
-          'Host is required for SSH tunnel connections.',
-        );
-      }
-
-      const localPort = await this.sshTunnelService.openTunnel(poolKey, {
-        sshHost: connAny.sshHost,
-        sshPort: connAny.sshPort || 22,
-        sshUsername: connAny.sshUsername,
-        sshPrivateKey: connAny.sshPrivateKey || undefined,
-        sshPassphrase: connAny.sshPassphrase || undefined,
-        dbHost,
-        dbPort: connection.port || 5432,
-      });
-      connectionWithDecryptedPassword = {
-        ...connectionWithDecryptedPassword,
-        host: '127.0.0.1',
-        port: localPort,
-      };
-    }
-
-    const strategy = this.strategyFactory.getStrategy(connection.type);
+    const creation = this.createAndCachePool(
+      id,
+      databaseOverride,
+      connection,
+      poolKey,
+    );
+    this.poolCreations.set(poolKey, creation);
     try {
-      const pool = await strategy.createPool(
-        connectionWithDecryptedPassword,
-        databaseOverride,
-      );
-
-      const timestamp = Date.now();
-      this.pools.set(poolKey, {
-        pool,
-        lastAccessed: timestamp,
-        createdAt: timestamp,
-        connectionId: id,
-        database: databaseOverride || connection.database || null,
-      });
-      this.logPoolPressure(id);
-      await this.updateHealthState(id, { status: 'healthy', connected: true });
-      return pool;
-    } catch (error) {
-      await this.updateHealthState(id, {
-        status: 'error',
-        error: getErrorMessage(error) || 'Connection failed',
-      });
-      throw error;
+      return await creation;
+    } finally {
+      if (this.poolCreations.get(poolKey) === creation) {
+        this.poolCreations.delete(poolKey);
+      }
     }
   }
 
@@ -497,7 +538,7 @@ export class ConnectionsService implements OnModuleDestroy {
     updateConnectionDto: UpdateConnectionDto,
     userId: string,
   ): Promise<Connection> {
-    const connection = await this.findRawOne(id, userId);
+    const connection = await this.findRawOne(id, userId, Permission.MANAGE);
 
     // Close existing pools for this connection if config changed
     await this.closePoolsByConnectionId(id);
@@ -606,7 +647,7 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   async remove(id: string, userId: string): Promise<void> {
-    const connection = await this.findRawOne(id, userId);
+    const connection = await this.findRawOne(id, userId, Permission.DELETE);
 
     // Close pools
     await this.closePoolsByConnectionId(id);

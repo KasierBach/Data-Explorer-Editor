@@ -16,6 +16,10 @@ import { SchemaOperation } from '../query/dto/schema-operations.types';
 import { Injectable, Logger } from '@nestjs/common';
 import { Pool } from 'pg';
 import { SqlUtil } from '../utils/sql.util';
+import {
+  allowInsecureDatabaseTls,
+  isLocalDatabaseHost,
+} from '../common/utils/database-network.util';
 
 @Injectable()
 export class PostgresStrategy implements IDatabaseStrategy {
@@ -30,7 +34,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
       throw new Error('Host is required for Postgres connections.');
     }
 
-    const isLocalhost = host === 'localhost' || host === '127.0.0.1';
+    const isLocalhost = isLocalDatabaseHost(host);
 
     const stmtTimeout = connectionConfig.statementTimeout ?? 30000;
     const qryTimeout = connectionConfig.queryTimeout ?? 30000;
@@ -41,7 +45,9 @@ export class PostgresStrategy implements IDatabaseStrategy {
       user: connectionConfig.username,
       password: connectionConfig.password || undefined,
       database: databaseOverride || connectionConfig.database,
-      ssl: isLocalhost ? false : { rejectUnauthorized: false },
+      ssl: isLocalhost
+        ? false
+        : { rejectUnauthorized: !allowInsecureDatabaseTls() },
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
@@ -63,11 +69,13 @@ export class PostgresStrategy implements IDatabaseStrategy {
   }
 
   quoteIdentifier(name: string): string {
-    return `"${name}"`;
+    return `"${name.replace(/"/g, '""')}"`;
   }
 
   quoteTable(schema: string | undefined, table: string): string {
-    return schema ? `"${schema}"."${table}"` : `"${table}"`;
+    return schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(table)}`
+      : this.quoteIdentifier(table);
   }
 
   // ─── Query Operations ───
@@ -115,9 +123,9 @@ export class PostgresStrategy implements IDatabaseStrategy {
     const updateCols = Object.keys(updates);
     const quotedTable = this.quoteTable(schema, table);
     const setClause = updateCols
-      .map((col, i) => `"${col}" = $${i + 1}`)
+      .map((col, i) => `${this.quoteIdentifier(col)} = $${i + 1}`)
       .join(', ');
-    const sql = `UPDATE ${quotedTable} SET ${setClause} WHERE "${pkColumn}" = $${updateCols.length + 1}`;
+    const sql = `UPDATE ${quotedTable} SET ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = $${updateCols.length + 1}`;
     const values = [...updateCols.map((c) => updates[c]), pkValue];
 
     const res = await pool.query(sql, values);
@@ -133,7 +141,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
     if (columns.length === 0) return { success: false, rowCount: 0 };
 
     const quotedTable = this.quoteTable(schema, table);
-    const colNames = columns.map((c) => `"${c}"`).join(', ');
+    const colNames = columns.map((c) => this.quoteIdentifier(c)).join(', ');
     const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
     const sql = `INSERT INTO ${quotedTable} (${colNames}) VALUES (${placeholders})`;
     const values = columns.map((c) => data[c]);
@@ -151,7 +159,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
 
     const quotedTable = this.quoteTable(schema, table);
     const placeholders = pkValues.map((_, i) => `$${i + 1}`).join(', ');
-    const sql = `DELETE FROM ${quotedTable} WHERE "${pkColumn}" IN (${placeholders})`;
+    const sql = `DELETE FROM ${quotedTable} WHERE ${this.quoteIdentifier(pkColumn)} IN (${placeholders})`;
 
     const res = await pool.query(sql, pkValues);
     return { success: true, rowCount: res.rowCount };
@@ -166,7 +174,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
 
     const columns = Object.keys(data[0]);
     const quotedTable = this.quoteTable(schema, table);
-    const colNames = columns.map((c) => `"${c}"`).join(', ');
+    const colNames = columns.map((c) => this.quoteIdentifier(c)).join(', ');
 
     const valuePlaceholders: string[] = [];
     const flatValues: unknown[] = [];

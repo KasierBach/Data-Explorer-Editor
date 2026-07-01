@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { IOrganizationsRepository } from '../interfaces/organizations.repository.interface';
 import { OrganizationRole } from '../entities/organization-role.enum';
 import { ResourceType } from '../../permissions/enums/resource-type.enum';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
-export class OrganizationsRepository implements IOrganizationsRepository {
+export class OrganizationsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async findById(id: string) {

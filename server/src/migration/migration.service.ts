@@ -16,6 +16,7 @@ import {
 import { StartMigrationDto } from './dto/start-migration.dto';
 import { getErrorMessage } from '../common/utils/error.util';
 import { MigrationComparisonService } from './migration-comparison.service';
+import { Permission } from '../permissions/enums/permission.enum';
 import {
   isRetryableMigrationBatchError,
   planMigrationBatchSizing,
@@ -204,10 +205,12 @@ export class MigrationService {
     const rawSourceConn = await this.connectionsService.getDecryptedConnection(
       dto.sourceConnectionId,
       userId,
+      Permission.READ,
     );
     const rawTargetConn = await this.connectionsService.getDecryptedConnection(
       dto.targetConnectionId,
       userId,
+      Permission.WRITE,
     );
 
     if (!rawSourceConn || !rawTargetConn) {

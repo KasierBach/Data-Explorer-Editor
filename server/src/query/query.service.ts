@@ -32,6 +32,9 @@ import {
 } from '../common/utils/error.util';
 import { SqlUtil } from '../utils/sql.util';
 import type { QueryResult } from '../database-strategies';
+import { PermissionsService } from '../permissions/services/permissions.service';
+import { Permission } from '../permissions/enums/permission.enum';
+import { ResourceType } from '../permissions/enums/resource-type.enum';
 
 @Injectable()
 export class QueryService {
@@ -47,6 +50,7 @@ export class QueryService {
     private readonly auditService: AuditService,
     private readonly freshnessService: FreshnessService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   private async getQueryCacheKey(
@@ -156,13 +160,21 @@ export class QueryService {
     },
     pool: unknown,
     quotedTable: string,
+    cacheKey: string,
   ): Promise<number | undefined> {
+    const cachedCount = await this.cacheManager.get<number>(cacheKey);
+    if (typeof cachedCount === 'number') return cachedCount;
+
     const countResult = await strategy.executeQuery(
       pool,
       `SELECT COUNT(*) AS total FROM ${quotedTable}`,
     );
 
-    return this.extractCountValue(countResult);
+    const count = this.extractCountValue(countResult);
+    if (count !== undefined) {
+      await this.cacheManager.set(cacheKey, count, this.QUERY_CACHE_TTL_MS);
+    }
+    return count;
   }
 
   private async blockOperation(
@@ -205,6 +217,13 @@ export class QueryService {
       | 'allowImportExport',
     extra?: Record<string, unknown>,
   ): Promise<void> {
+    await this.permissionsService.ensurePermission(
+      userId,
+      ResourceType.CONNECTION,
+      connection.id,
+      Permission.WRITE,
+    );
+
     const reasonMap = {
       allowQueryExecution: 'QUERY_EXECUTION_DISABLED',
       allowSchemaChanges: 'SCHEMA_CHANGES_DISABLED',
@@ -263,6 +282,14 @@ export class QueryService {
     // 2. MongoDB read-only check
     if (connection.type === 'mongodb' || connection.type === 'mongodb+srv') {
       const action = getMongoActionFromPayload(sql);
+      if (!isMongoActionAllowedOnReadOnly(action)) {
+        await this.permissionsService.ensurePermission(
+          userId,
+          ResourceType.CONNECTION,
+          connection.id,
+          Permission.WRITE,
+        );
+      }
       if (connection.readOnly && !isMongoActionAllowedOnReadOnly(action)) {
         await this.blockOperation(userId, {
           connectionId: connection.id,
@@ -278,6 +305,14 @@ export class QueryService {
     }
 
     // 3. Read-only connection: block all non-read queries
+    if (!isSqlAllowedOnReadOnly(sql)) {
+      await this.permissionsService.ensurePermission(
+        userId,
+        ResourceType.CONNECTION,
+        connection.id,
+        Permission.WRITE,
+      );
+    }
     if (connection.readOnly && !isSqlAllowedOnReadOnly(sql)) {
       await this.blockOperation(userId, {
         connectionId: connection.id,
@@ -590,10 +625,16 @@ export class QueryService {
 
       if (includeTotalCount !== false) {
         try {
+          const countCacheKey = await this.getQueryCacheKey(
+            connectionId,
+            `table-count:${quotedTable}`,
+            database || connection.database,
+          );
           const totalCount = await this.resolveTableCount(
             strategy,
             pool,
             quotedTable,
+            countCacheKey,
           );
           if (totalCount !== undefined) {
             response.totalCount = totalCount;

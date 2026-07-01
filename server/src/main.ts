@@ -5,15 +5,12 @@ import * as bodyParser from 'body-parser';
 import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { getAllowedOrigins } from './common/utils/cors.util';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const isProduction = process.env.NODE_ENV === 'production';
-  const allowedOrigins = [
-    'http://localhost:5173',
-    'http://localhost:4173',
-    process.env.FRONTEND_URL,
-  ].filter(Boolean) as string[];
+  const allowedOrigins = getAllowedOrigins();
   const websocketOrigins = allowedOrigins.flatMap((origin) => {
     if (origin.startsWith('https://'))
       return [origin.replace('https://', 'wss://')];

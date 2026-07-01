@@ -148,3 +148,18 @@ export async function validateHost(host: string): Promise<boolean> {
     }
   }
 }
+
+export async function validateExternalUrl(value: string): Promise<boolean> {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+
+  if (!['http:', 'https:'].includes(url.protocol)) return false;
+  if (!isDevelopment() && url.protocol !== 'https:') return false;
+  if (url.username || url.password) return false;
+
+  return validateHost(url.hostname);
+}

@@ -15,6 +15,10 @@ import { SchemaOperation } from '../query/dto/schema-operations.types';
 import { Injectable, Logger } from '@nestjs/common';
 import * as mssql from 'mssql';
 import { SqlUtil } from '../utils/sql.util';
+import {
+  allowInsecureDatabaseTls,
+  isLocalDatabaseHost,
+} from '../common/utils/database-network.util';
 
 @Injectable()
 export class MssqlStrategy implements IDatabaseStrategy {
@@ -31,6 +35,8 @@ export class MssqlStrategy implements IDatabaseStrategy {
 
     // Migration override: connectionConfig.statementTimeout/queryTimeout will be 0
     const reqTimeout = connectionConfig.statementTimeout ?? 30000;
+    const allowInsecureTls =
+      isLocalDatabaseHost(host) || allowInsecureDatabaseTls();
 
     const config: mssql.config = {
       server: host,
@@ -40,8 +46,8 @@ export class MssqlStrategy implements IDatabaseStrategy {
       database: databaseOverride || connectionConfig.database,
       requestTimeout: reqTimeout, // Overridable timeout
       options: {
-        encrypt: false,
-        trustServerCertificate: true,
+        encrypt: !allowInsecureTls,
+        trustServerCertificate: allowInsecureTls,
       },
       pool: {
         max: 20,
@@ -59,11 +65,13 @@ export class MssqlStrategy implements IDatabaseStrategy {
   // ─── Identifier Quoting ───
 
   quoteIdentifier(name: string): string {
-    return `[${name}]`;
+    return `[${name.replace(/]/g, ']]')}]`;
   }
 
   quoteTable(schema: string | undefined, table: string): string {
-    return schema ? `[${schema}].[${table}]` : `[${table}]`;
+    return schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(table)}`
+      : this.quoteIdentifier(table);
   }
 
   // ─── Query Operations ───
@@ -103,9 +111,9 @@ export class MssqlStrategy implements IDatabaseStrategy {
     const updateCols = Object.keys(updates);
     const quotedTable = this.quoteTable(schema, table);
     const setClause = updateCols
-      .map((col, i) => `[${col}] = @p${i}`)
+      .map((col, i) => `${this.quoteIdentifier(col)} = @p${i}`)
       .join(', ');
-    const sql = `UPDATE ${quotedTable} SET ${setClause} WHERE [${pkColumn}] = @pk`;
+    const sql = `UPDATE ${quotedTable} SET ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = @pk`;
 
     const request = pool.request();
     updateCols.forEach((col, i) => request.input(`p${i}`, updates[col]));
@@ -124,7 +132,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
     if (columns.length === 0) return { success: false, rowCount: 0 };
 
     const quotedTable = this.quoteTable(schema, table);
-    const colNames = columns.map((c) => `[${c}]`).join(', ');
+    const colNames = columns.map((c) => this.quoteIdentifier(c)).join(', ');
     const placeholders = columns.map((_, i) => `@p${i}`).join(', ');
     const sql = `INSERT INTO ${quotedTable} (${colNames}) VALUES (${placeholders})`;
 
@@ -144,7 +152,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
 
     const quotedTable = this.quoteTable(schema, table);
     const placeholders = pkValues.map((_, i) => `@pk${i}`).join(', ');
-    const sql = `DELETE FROM ${quotedTable} WHERE [${pkColumn}] IN (${placeholders})`;
+    const sql = `DELETE FROM ${quotedTable} WHERE ${this.quoteIdentifier(pkColumn)} IN (${placeholders})`;
 
     const request = pool.request();
     pkValues.forEach((v, i) => request.input(`pk${i}`, v));
@@ -163,7 +171,9 @@ export class MssqlStrategy implements IDatabaseStrategy {
     if (columns.length === 0) return { success: false, rowCount: 0 };
 
     const quotedTable = this.quoteTable(schema, table);
-    const columnList = columns.map((column) => `[${column}]`).join(', ');
+    const columnList = columns
+      .map((column) => this.quoteIdentifier(column))
+      .join(', ');
     const valueGroups: string[] = [];
     const request = pool.request();
 

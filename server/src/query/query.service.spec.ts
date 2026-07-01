@@ -6,6 +6,9 @@ import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 import { AuditAction, AuditService } from '../audit/audit.service';
 import { FreshnessService } from '../common/freshness/freshness.service';
+import { PermissionsService } from '../permissions/services/permissions.service';
+import { Permission } from '../permissions/enums/permission.enum';
+import { ResourceType } from '../permissions/enums/resource-type.enum';
 
 describe('QueryService', () => {
   let service: QueryService;
@@ -42,6 +45,9 @@ describe('QueryService', () => {
     get: jest.fn(),
     set: jest.fn(),
   };
+  const permissionsService = {
+    ensurePermission: jest.fn(),
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -54,10 +60,45 @@ describe('QueryService', () => {
         { provide: AuditService, useValue: auditService },
         { provide: FreshnessService, useValue: freshnessService },
         { provide: CACHE_MANAGER, useValue: cacheManager },
+        { provide: PermissionsService, useValue: permissionsService },
       ],
     }).compile();
 
     service = module.get(QueryService);
+  });
+
+  it('requires write permission before executing mutating SQL', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    permissionsService.ensurePermission.mockRejectedValueOnce(
+      new ForbiddenException('viewer cannot write'),
+    );
+
+    await expect(
+      service.executeQuery(
+        {
+          connectionId: 'conn-1',
+          sql: 'UPDATE users SET active = false',
+          confirmed: true,
+        } as any,
+        'viewer-1',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(permissionsService.ensurePermission).toHaveBeenCalledWith(
+      'viewer-1',
+      ResourceType.CONNECTION,
+      'conn-1',
+      Permission.WRITE,
+    );
+    expect(strategy.executeQuery).not.toHaveBeenCalled();
   });
 
   it('builds versioned cache keys for query reads including pagination options', async () => {
@@ -291,6 +332,57 @@ describe('QueryService', () => {
       }),
       60_000,
     );
+  });
+
+  it('reuses a table count across different page windows', async () => {
+    const cache = new Map<string, unknown>();
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+    freshnessService.buildKey.mockImplementation((...parts: unknown[]) =>
+      JSON.stringify(parts),
+    );
+    cacheManager.get.mockImplementation((key: string) => cache.get(key));
+    cacheManager.set.mockImplementation(
+      (key: string, value: unknown) => void cache.set(key, value),
+    );
+    strategy.executeQuery
+      .mockResolvedValueOnce({ rows: [{ id: 1 }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ total: 42 }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: 2 }], rowCount: 1 });
+
+    await service.fetchTableWindow(
+      {
+        connectionId: 'conn-1',
+        database: 'main',
+        schema: 'public',
+        table: 'users',
+        limit: 25,
+        offset: 0,
+      } as any,
+      'user-1',
+    );
+    const secondPage = await service.fetchTableWindow(
+      {
+        connectionId: 'conn-1',
+        database: 'main',
+        schema: 'public',
+        table: 'users',
+        limit: 25,
+        offset: 25,
+      } as any,
+      'user-1',
+    );
+
+    expect(strategy.executeQuery).toHaveBeenCalledTimes(3);
+    expect(secondPage.totalCount).toBe(42);
   });
 
   it('skips confirmation for create and insert statements', async () => {

@@ -59,6 +59,43 @@ describe('MssqlStrategy', () => {
     });
   });
 
+  describe('identifier quoting', () => {
+    it('escapes delimiter characters in table and column identifiers', async () => {
+      mockRequest.query.mockResolvedValue({ rowsAffected: [1] });
+
+      await strategy.updateRow(mockPool, {
+        schema: 'dbo',
+        table: 'users]; DROP TABLE audit; --',
+        pkColumn: 'id] OR 1=1 --',
+        pkValue: 1,
+        updates: { 'display]name': 'Ada' },
+      });
+
+      expect(mockRequest.query).toHaveBeenCalledWith(
+        'UPDATE [dbo].[users]]; DROP TABLE audit; --] SET [display]]name] = @p0 WHERE [id]] OR 1=1 --] = @pk',
+      );
+    });
+
+    it('enables encrypted verified transport for remote SQL Server hosts', async () => {
+      await strategy.createPool({
+        host: 'db.example.com',
+        port: 1433,
+        username: 'sa',
+        password: 'password',
+        database: 'test_db',
+      });
+
+      expect(mssql.ConnectionPool).toHaveBeenCalledWith(
+        expect.objectContaining({
+          options: {
+            encrypt: true,
+            trustServerCertificate: false,
+          },
+        }),
+      );
+    });
+  });
+
   describe('executeQuery (OOM Protections)', () => {
     it('should automatically inject TOP 50000 into a bare SELECT query to prevent OOM', async () => {
       mockRequest.query.mockResolvedValue({ recordset: [], rowsAffected: [0] });
@@ -124,14 +161,14 @@ describe('MssqlStrategy', () => {
         schema: 'dbo',
         table: 'users',
         data: [
-          { id: 1, email: 'ada@example.com' },
-          { id: 2, email: 'grace@example.com' },
+          { id: 1, 'email]address': 'ada@example.com' },
+          { id: 2, 'email]address': 'grace@example.com' },
         ],
       });
 
       expect(mockRequest.input).toHaveBeenCalledTimes(4);
       expect(mockRequest.query).toHaveBeenCalledWith(
-        'INSERT INTO [dbo].[users] ([id], [email]) VALUES (@r0_0, @r0_1), (@r1_0, @r1_1)',
+        'INSERT INTO [dbo].[users] ([id], [email]]address]) VALUES (@r0_0, @r0_1), (@r1_0, @r1_1)',
       );
       expect(result).toEqual({ success: true, rowCount: 2 });
     });

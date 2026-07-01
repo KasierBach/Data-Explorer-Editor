@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GenerateSqlDto } from './dto/generate-sql.dto';
 import { AutocompleteDto } from './dto/autocomplete.dto';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
+import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
 
 const normalizeProviderBaseUrl = (value: string) =>
   value.trim().replace(/\/+$/, '');
@@ -225,6 +226,9 @@ export class AiController {
     } catch {
       throw new BadRequestException('Invalid Base URL');
     }
+    if (!(await validateExternalUrl(requestUrl))) {
+      throw new BadRequestException('Unsafe provider URL');
+    }
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -243,6 +247,7 @@ export class AiController {
       response = await fetch(requestUrl, {
         method: 'GET',
         headers,
+        redirect: 'manual',
       });
     } catch (error) {
       const message =

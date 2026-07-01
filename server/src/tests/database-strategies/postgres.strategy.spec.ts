@@ -53,6 +53,82 @@ describe('PostgresStrategy', () => {
         }),
       );
     });
+
+    it('verifies TLS certificates for remote PostgreSQL hosts', () => {
+      strategy.createPool({
+        host: 'db.example.com',
+        port: 5432,
+        username: 'postgres',
+        password: 'password',
+        database: 'test_db',
+      });
+
+      expect(Pool).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ssl: { rejectUnauthorized: true },
+        }),
+      );
+    });
+  });
+
+  describe('identifier quoting', () => {
+    it('escapes delimiter characters in table and column identifiers', async () => {
+      const quote = String.fromCharCode(34);
+      mockPool.query.mockResolvedValue({ rowCount: 1 });
+
+      await strategy.updateRow(mockPool, {
+        schema: 'public',
+        table: 'users' + quote + '; DROP TABLE audit; --',
+        pkColumn: 'id' + quote + ' OR 1=1 --',
+        pkValue: 1,
+        updates: { ['display' + quote + 'name']: 'Ada' },
+      });
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        'UPDATE ' +
+          quote +
+          'public' +
+          quote +
+          '.' +
+          quote +
+          'users' +
+          quote +
+          quote +
+          '; DROP TABLE audit; --' +
+          quote +
+          ' SET ' +
+          quote +
+          'display' +
+          quote +
+          quote +
+          'name' +
+          quote +
+          ' = $1 WHERE ' +
+          quote +
+          'id' +
+          quote +
+          quote +
+          ' OR 1=1 --' +
+          quote +
+          ' = $2',
+        ['Ada', 1],
+      );
+    });
+
+    it('escapes imported column names', async () => {
+      const quote = String.fromCharCode(34);
+      mockPool.query.mockResolvedValue({ rowCount: 1 });
+
+      await strategy.importData(mockPool, {
+        schema: 'public',
+        table: 'users',
+        data: [{ ['display' + quote + 'name']: 'Ada' }],
+      });
+
+      expect(mockPool.query.mock.calls[0][0]).toContain(
+        '(' + quote + 'display' + quote + quote + 'name' + quote + ')',
+      );
+    });
   });
 
   describe('executeQuery (OOM & Timeout Protections)', () => {

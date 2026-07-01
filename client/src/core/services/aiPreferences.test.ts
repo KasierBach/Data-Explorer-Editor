@@ -79,5 +79,36 @@ describe("aiPreferences", () => {
       apiKey: "sk-test",
       model: "gpt-oss-120b",
     });
+
+    const stored = JSON.parse(
+      localStorage.getItem(AI_PREFERENCES_STORAGE_KEY) || "{}",
+    );
+    expect(stored.customProviders[0].apiKey).toBe("");
+  });
+
+  it("scrubs legacy persisted API keys while keeping them for the current tab", () => {
+    localStorage.setItem(
+      AI_PREFERENCES_STORAGE_KEY,
+      JSON.stringify({
+        customProviders: [
+          {
+            id: "provider-1",
+            name: "Custom Provider",
+            type: "openai-compatible",
+            baseUrl: "https://provider.example.com/v1",
+            apiKey: "sk-legacy-secret",
+            model: "gpt-oss-120b",
+          },
+        ],
+      }),
+    );
+
+    const preferences = readAiPreferences();
+    const stored = JSON.parse(
+      localStorage.getItem(AI_PREFERENCES_STORAGE_KEY) || "{}",
+    );
+
+    expect(preferences.customProviders[0].apiKey).toBe("sk-legacy-secret");
+    expect(stored.customProviders[0].apiKey).toBe("");
   });
 });

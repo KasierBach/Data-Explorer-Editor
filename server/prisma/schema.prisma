@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider   = "prisma-client-js"
   engineType = "client"
 }
 
@@ -30,150 +30,151 @@ enum ResourceType {
 // â”€â”€â”€ Core Models â”€â”€â”€
 
 model Connection {
-  id               String   @id @default(uuid())
-  name             String
-  type             String // 'postgres', 'mysql', 'mssql', 'mongodb', 'mongodb+srv'
-  host             String?
-  port             Int?
-  username         String?
-  password         String?
-  database         String?
-  showAllDatabases Boolean  @default(false)
-  readOnly         Boolean  @default(false)
-  allowSchemaChanges Boolean @default(true)
-  allowImportExport Boolean @default(true)
-  allowQueryExecution Boolean @default(true)
-  lastHealthCheckAt DateTime?
-  lastHealthStatus  String?
-  lastHealthError   String?
-  lastConnectedAt   DateTime?
+  id                      String    @id @default(uuid())
+  name                    String
+  type                    String // 'postgres', 'mysql', 'mssql', 'mongodb', 'mongodb+srv'
+  host                    String?
+  port                    Int?
+  username                String?
+  password                String?
+  database                String?
+  showAllDatabases        Boolean   @default(false)
+  readOnly                Boolean   @default(false)
+  allowSchemaChanges      Boolean   @default(true)
+  allowImportExport       Boolean   @default(true)
+  allowQueryExecution     Boolean   @default(true)
+  lastHealthCheckAt       DateTime?
+  lastHealthStatus        String?
+  lastHealthError         String?
+  lastConnectedAt         DateTime?
   lastConnectionLatencyMs Int?
-  createdAt        DateTime @default(now())
+  createdAt               DateTime  @default(now())
 
-  sshHost          String?
-  sshPort          Int     @default(22)
-  sshUsername      String?
-  sshPrivateKey    String?
-  sshPassphrase    String?
+  sshHost       String?
+  sshPort       Int     @default(22)
+  sshUsername   String?
+  sshPrivateKey String?
+  sshPassphrase String?
 
-  userId           String
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  organizationId   String?
-  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   @@unique([name, userId])
+  @@index([userId, createdAt])
   @@index([organizationId])
 }
 
 model User {
-  id          String   @id @default(uuid())
-  email       String   @unique
-  password    String?  // Optional for social logins
+  id       String  @id @default(uuid())
+  email    String  @unique
+  password String? // Optional for social logins
 
   // Auth Providers
-  provider    String   @default("local") // "local", "google", "github"
-  providerId  String?  // ID from OAuth provider
+  provider   String  @default("local") // "local", "google", "github"
+  providerId String? // ID from OAuth provider
 
   // Basic Profile
-  firstName   String?
-  lastName    String?
-  avatarUrl   String?
-  bio         String?
+  firstName String?
+  lastName  String?
+  avatarUrl String?
+  bio       String?
 
   // Application Data
-  role        String   @default("user")
+  role String @default("user")
 
   // Preferences
-  theme       String   @default("dark") // "light", "dark", "system"
-  language    String   @default("vi")   // "vi", "en"
+  theme           String    @default("dark") // "light", "dark", "system"
+  language        String    @default("vi") // "vi", "en"
   legalAcceptedAt DateTime?
 
   // Notifications
   emailNotifications Boolean @default(true)
   failedQueryAlerts  Boolean @default(true)
   productUpdates     Boolean @default(false)
-  securityAlerts      Boolean @default(true)
+  securityAlerts     Boolean @default(true)
 
   // Billing
-  plan               String   @default("free") // "free", "pro"
+  plan               String    @default("free") // "free", "pro"
   billingDate        DateTime?
   paymentMethod      String?
   planExpiresAt      DateTime?
-  subscriptionStatus String   @default("inactive")
+  subscriptionStatus String    @default("inactive")
   paymentProvider    String?
 
   // Onboarding Data (Progressive Profiling)
-  isOnboarded Boolean  @default(false)
-  username    String?  @unique
-  jobRole     String?  // e.g., "Data Engineer", "Analyst"
+  isOnboarded Boolean @default(false)
+  username    String? @unique
+  jobRole     String? // e.g., "Data Engineer", "Analyst"
   phoneNumber String?
   address     String?
 
   // Password Reset
-  resetOtp       String?
-  resetOtpExpiry DateTime?
-  lastLoginIp    String?
+  resetOtp           String?
+  resetOtpExpiry     DateTime?
+  lastLoginIp        String?
   refreshTokenHash   String?
   refreshTokenExpiry DateTime?
 
   // Email Verification
-  isEmailVerified Boolean @default(false)
+  isEmailVerified Boolean   @default(false)
   verifyOtp       String?
   verifyOtpExpiry DateTime?
 
   // Admin Management
-  isBanned        Boolean @default(false)
+  isBanned Boolean @default(false)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  auditLogs   AuditLog[]
-  connections Connection[]
-  aiChats     AiChat[]
-  savedQueries SavedQuery[]
-  dashboards  Dashboard[]
-  erdWorkspaces ErdWorkspace[]
-  versionHistories VersionHistory[]
+  auditLogs           AuditLog[]
+  connections         Connection[]
+  aiChats             AiChat[]
+  savedQueries        SavedQuery[]
+  dashboards          Dashboard[]
+  erdWorkspaces       ErdWorkspace[]
+  versionHistories    VersionHistory[]
   organizationMembers OrganizationMember[]
-  createdTeamspaces Teamspace[]
-  payments Payment[]
+  createdTeamspaces   Teamspace[]
+  payments            Payment[]
   billingSubscription BillingSubscription?
 }
 
 model BillingSubscription {
-  id            String   @id @default(uuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   planCode      String
-  status        String   @default("inactive")
+  status        String    @default("inactive")
   provider      String?
   startsAt      DateTime?
   expiresAt     DateTime?
   lastPaymentId String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([status, expiresAt])
 }
 
 model Payment {
-  id                    String   @id @default(uuid())
+  id                    String    @id @default(uuid())
   userId                String
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   provider              String
   planCode              String
   amountVnd             Int
   displayAmountUsd      String
-  status                String   @default("pending")
-  providerOrderId       String   @unique
+  status                String    @default("pending")
+  providerOrderId       String    @unique
   providerRequestId     String?
   providerTransactionId String?
   checkoutUrl           String?
   rawPayload            Json?
   paidAt                DateTime?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
@@ -181,33 +182,37 @@ model Payment {
 }
 
 model AiChat {
-  id               String      @id @default(uuid())
-  title            String
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  id        String   @id @default(uuid())
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  userId           String
-  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  connectionId     String?
-  database         String?
+  connectionId String?
+  database     String?
 
-  messages         AiMessage[]
+  messages AiMessage[]
+
+  @@index([userId, updatedAt])
 }
 
 model AiMessage {
-  id               String   @id @default(uuid())
-  chatId           String
-  chat             AiChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  chatId String
+  chat   AiChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
-  role             String   // "user" or "ai"
-  content          String
-  sql              String?
-  explanation      String?
-  error            Boolean  @default(false)
-  attachments      Json?
+  role        String // "user" or "ai"
+  content     String
+  sql         String?
+  explanation String?
+  error       Boolean @default(false)
+  attachments Json?
 
-  createdAt        DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([chatId, createdAt])
 }
 
 model AuditLog {
@@ -217,31 +222,35 @@ model AuditLog {
   details   String? // JSON stringified details
   ipAddress String?
   createdAt DateTime @default(now())
-  
+
   organizationId String?
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId, action, createdAt])
+  @@index([organizationId, createdAt])
 }
 
 model SavedQuery {
-  id          String   @id @default(uuid())
-  name        String
-  sql         String
-  database    String?
+  id           String   @id @default(uuid())
+  name         String
+  sql          String
+  database     String?
   connectionId String?
-  visibility  String   @default("private")
-  folderId    String?
-  tags        String[] @default([])
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  visibility   String   @default("private")
+  folderId     String?
+  tags         String[] @default([])
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  organizationId   String?
-  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   @@index([userId, updatedAt])
   @@index([visibility, updatedAt])
@@ -258,12 +267,12 @@ model Dashboard {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  widgets      DashboardWidget[]
+  userId  String
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  widgets DashboardWidget[]
 
-  organizationId   String?
-  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   @@index([userId, updatedAt])
   @@index([visibility, updatedAt])
@@ -286,8 +295,8 @@ model DashboardWidget {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  dashboardId  String
-  dashboard    Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  dashboardId String
+  dashboard   Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
 
   @@index([dashboardId, orderIndex])
 }
@@ -302,11 +311,11 @@ model ErdWorkspace {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  organizationId   String?
-  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
 
   @@index([userId, updatedAt])
   @@index([connectionId, updatedAt])
@@ -323,8 +332,8 @@ model VersionHistory {
   snapshot      Json
   createdAt     DateTime     @default(now())
 
-  userId        String
-  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([resourceType, resourceId, versionNumber])
   @@index([resourceType, resourceId, createdAt])
@@ -340,31 +349,31 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members   OrganizationMember[]
-  invitations OrganizationInvitation[]
-  resources OrganizationResource[]
-  teamspaces Teamspace[]
-  auditLogs AuditLog[]
-  connections Connection[]
-  savedQueries SavedQuery[]
-  dashboards Dashboard[]
+  members       OrganizationMember[]
+  invitations   OrganizationInvitation[]
+  resources     OrganizationResource[]
+  teamspaces    Teamspace[]
+  auditLogs     AuditLog[]
+  connections   Connection[]
+  savedQueries  SavedQuery[]
+  dashboards    Dashboard[]
   erdWorkspaces ErdWorkspace[]
 }
 
 model Teamspace {
-  id             String        @id @default(uuid())
-  name           String
-  slug           String
-  description    String?
-  createdBy      String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id          String   @id @default(uuid())
+  name        String
+  slug        String
+  description String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   organizationId String
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  creator        User?         @relation(fields: [createdBy], references: [id], onDelete: SetNull)
-  resources      OrganizationResource[]
+  creator   User?                  @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+  resources OrganizationResource[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -372,17 +381,17 @@ model Teamspace {
 }
 
 model OrganizationMember {
-  id             String           @id @default(uuid())
-  role           OrganizationRole @default(MEMBER)
-  invitedBy      String?
-  invitedAt      DateTime         @default(now())
-  joinedAt       DateTime?
+  id        String           @id @default(uuid())
+  role      OrganizationRole @default(MEMBER)
+  invitedBy String?
+  invitedAt DateTime         @default(now())
+  joinedAt  DateTime?
 
   organizationId String
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  userId         String
-  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, userId])
   @@index([organizationId])
@@ -398,8 +407,8 @@ model OrganizationInvitation {
   acceptedAt       DateTime?
   acceptedByUserId String?
 
-  organizationId   String
-  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, email])
   @@index([organizationId])
@@ -408,12 +417,12 @@ model OrganizationInvitation {
 }
 
 model OrganizationResource {
-  id             String       @id @default(uuid())
-  resourceType   ResourceType
-  resourceId     String
-  permissions    Json         @default("{}")
-  teamspaceId    String?
-  createdAt      DateTime     @default(now())
+  id           String       @id @default(uuid())
+  resourceType ResourceType
+  resourceId   String
+  permissions  Json         @default("{}")
+  teamspaceId  String?
+  createdAt    DateTime     @default(now())
 
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

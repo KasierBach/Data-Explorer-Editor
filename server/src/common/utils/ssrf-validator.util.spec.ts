@@ -1,5 +1,5 @@
 import * as dns from 'dns';
-import { validateHost } from './ssrf-validator.util';
+import { validateExternalUrl, validateHost } from './ssrf-validator.util';
 
 jest.mock('dns', () => ({
   lookup: jest.fn(),
@@ -70,5 +70,22 @@ describe('validateHost', () => {
     ]);
 
     await expect(validateHost('db.example.com')).resolves.toBe(true);
+  });
+
+  it('rejects provider URLs that resolve to private addresses', async () => {
+    mockLookupAddresses([{ address: '10.0.0.5', family: 4 }]);
+
+    await expect(
+      validateExternalUrl('https://provider.example.com/v1'),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects non-https provider URLs in production', async () => {
+    mockLookupAddresses([{ address: '93.184.216.34', family: 4 }]);
+
+    await expect(
+      validateExternalUrl('http://provider.example.com/v1'),
+    ).resolves.toBe(false);
+    expect(lookupMock).not.toHaveBeenCalled();
   });
 });

@@ -154,6 +154,16 @@ function sanitizePreferences(value: unknown): AiPreferences {
   };
 }
 
+function serializePreferences(preferences: AiPreferences) {
+  return JSON.stringify({
+    ...preferences,
+    customProviders: preferences.customProviders.map((provider) => ({
+      ...provider,
+      apiKey: "",
+    })),
+  });
+}
+
 function emitPreferencesChanged() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(AI_PREFERENCES_EVENT));
@@ -187,12 +197,17 @@ export function readAiPreferences(): AiPreferences {
     const snapshot = raw
       ? sanitizePreferences(JSON.parse(raw))
       : DEFAULT_AI_PREFERENCES;
+    const persistedRaw = serializePreferences(snapshot);
+    if (raw !== persistedRaw) {
+      window.localStorage.setItem(AI_PREFERENCES_STORAGE_KEY, persistedRaw);
+    }
 
-    cachedPreferencesRaw = raw;
+    cachedPreferencesRaw = persistedRaw;
     cachedPreferencesSnapshot = snapshot;
     return snapshot;
   } catch {
-    cachedPreferencesRaw = raw;
+    window.localStorage.removeItem(AI_PREFERENCES_STORAGE_KEY);
+    cachedPreferencesRaw = null;
     cachedPreferencesSnapshot = DEFAULT_AI_PREFERENCES;
     return DEFAULT_AI_PREFERENCES;
   }
@@ -202,7 +217,7 @@ export function writeAiPreferences(next: AiPreferences) {
   if (typeof window === "undefined") return;
 
   const sanitized = sanitizePreferences(next);
-  const raw = JSON.stringify(sanitized);
+  const raw = serializePreferences(sanitized);
   cachedPreferencesRaw = raw;
   cachedPreferencesSnapshot = sanitized;
   window.localStorage.setItem(AI_PREFERENCES_STORAGE_KEY, raw);

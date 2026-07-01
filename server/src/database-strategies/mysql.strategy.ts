@@ -16,6 +16,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as mysql from 'mysql2/promise';
 import { Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { SqlUtil } from '../utils/sql.util';
+import {
+  allowInsecureDatabaseTls,
+  isLocalDatabaseHost,
+} from '../common/utils/database-network.util';
 
 @Injectable()
 export class MysqlStrategy implements IDatabaseStrategy {
@@ -34,6 +38,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
       connectionConfig.statementTimeout !== undefined
         ? connectionConfig.statementTimeout
         : 10000;
+    const isLocalhost = isLocalDatabaseHost(host);
 
     return mysql.createPool({
       host,
@@ -46,6 +51,9 @@ export class MysqlStrategy implements IDatabaseStrategy {
       queueLimit: 0,
       multipleStatements: false,
       connectTimeout: timeoutMs,
+      ssl: isLocalhost
+        ? undefined
+        : { rejectUnauthorized: !allowInsecureDatabaseTls() },
     });
   }
 
@@ -54,11 +62,11 @@ export class MysqlStrategy implements IDatabaseStrategy {
   }
 
   quoteIdentifier(name: string): string {
-    return `\`${name}\``;
+    return `\`${name.replace(/`/g, '``')}\``;
   }
 
   quoteTable(schema: string | undefined, table: string): string {
-    return `\`${table}\``;
+    return this.quoteIdentifier(table);
   }
 
   async executeQuery(
@@ -105,8 +113,10 @@ export class MysqlStrategy implements IDatabaseStrategy {
   ): Promise<{ success: boolean; rowCount: number }> {
     const { table, pkColumn, pkValue, updates } = params;
     const updateCols = Object.keys(updates);
-    const setClause = updateCols.map((col) => `\`${col}\` = ?`).join(', ');
-    const sql = `UPDATE \`${table}\` SET ${setClause} WHERE \`${pkColumn}\` = ?`;
+    const setClause = updateCols
+      .map((col) => `${this.quoteIdentifier(col)} = ?`)
+      .join(', ');
+    const sql = `UPDATE ${this.quoteIdentifier(table)} SET ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = ?`;
     const values = [...updateCols.map((c) => updates[c]), pkValue];
 
     const [result] = await pool.execute<ResultSetHeader>(sql, values);
@@ -122,7 +132,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
     if (columns.length === 0) return { success: false, rowCount: 0 };
 
     const quotedTable = this.quoteTable(schema, table);
-    const colNames = columns.map((c) => `\`${c}\``).join(', ');
+    const colNames = columns.map((c) => this.quoteIdentifier(c)).join(', ');
     const placeholders = columns.map(() => `?`).join(', ');
     const sql = `INSERT INTO ${quotedTable} (${colNames}) VALUES (${placeholders})`;
     const values = columns.map((c) => data[c]);
@@ -140,7 +150,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
 
     const quotedTable = this.quoteTable(schema, table);
     const placeholders = pkValues.map(() => `?`).join(', ');
-    const sql = `DELETE FROM ${quotedTable} WHERE \`${pkColumn}\` IN (${placeholders})`;
+    const sql = `DELETE FROM ${quotedTable} WHERE ${this.quoteIdentifier(pkColumn)} IN (${placeholders})`;
 
     const [result] = await pool.execute<ResultSetHeader>(sql, pkValues);
     return { success: true, rowCount: result.affectedRows };
@@ -155,7 +165,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
 
     const columns = Object.keys(data[0]);
     const quotedTable = this.quoteTable(schema, table);
-    const colNames = columns.map((c) => `\`${c}\``).join(', ');
+    const colNames = columns.map((c) => this.quoteIdentifier(c)).join(', ');
 
     const valuePlaceholders: string[] = [];
     const flatValues: unknown[] = [];

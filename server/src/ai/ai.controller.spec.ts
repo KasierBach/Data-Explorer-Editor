@@ -2,6 +2,15 @@
 import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 import { AiConnectionService } from './ai.connection-service';
+import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
+
+jest.mock('../common/utils/ssrf-validator.util', () => ({
+  validateExternalUrl: jest.fn(),
+}));
+
+const validateExternalUrlMock = validateExternalUrl as jest.MockedFunction<
+  typeof validateExternalUrl
+>;
 
 describe('AiController', () => {
   let controller: AiController;
@@ -22,6 +31,7 @@ describe('AiController', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    validateExternalUrlMock.mockResolvedValue(true);
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AiController],
@@ -150,6 +160,20 @@ describe('AiController', () => {
         }),
       }),
     );
+  });
+
+  it('blocks unsafe provider model URLs before sending credentials', async () => {
+    global.fetch = jest.fn() as any;
+    validateExternalUrlMock.mockResolvedValueOnce(false);
+
+    await expect(
+      controller.listProviderModels({
+        baseUrl: 'http://127.0.0.1:3000/v1',
+        apiKey: 'sk-sensitive',
+      }),
+    ).rejects.toThrow('Unsafe provider URL');
+
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
   it('passes autocomplete model overrides through to the ai service', async () => {

@@ -6,9 +6,10 @@ import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory
 import { AuditModule } from '../audit/audit.module';
 import { SshTunnelService } from './ssh-tunnel.service';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, OrganizationsModule],
+  imports: [PrismaModule, AuditModule, OrganizationsModule, PermissionsModule],
   controllers: [ConnectionsController],
   providers: [ConnectionsService, DatabaseStrategyFactory, SshTunnelService],
   exports: [ConnectionsService, SshTunnelService],

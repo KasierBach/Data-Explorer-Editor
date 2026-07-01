@@ -1,5 +1,7 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ConnectionsService } from './connections.service';
+import { Permission } from '../permissions/enums/permission.enum';
+import { ResourceType } from '../permissions/enums/resource-type.enum';
 
 describe('ConnectionsService security', () => {
   let service: ConnectionsService;
@@ -28,15 +30,17 @@ describe('ConnectionsService security', () => {
     ensureResourcePolicy: jest.fn(),
     removeResourcePolicy: jest.fn(),
   };
+  const permissionsMock = { ensurePermission: jest.fn() };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new ConnectionsService(
+    service = new (ConnectionsService as any)(
       prismaMock,
       strategyFactoryMock as any,
       auditMock as any,
       sshTunnelMock as any,
       organizationsMock as any,
+      permissionsMock,
     );
   });
 
@@ -56,6 +60,85 @@ describe('ConnectionsService security', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(prismaMock.connection.create).not.toHaveBeenCalled();
+  });
+
+  it('requires manage permission before updating a shared connection', async () => {
+    prismaMock.connection.findFirst.mockResolvedValue({
+      id: 'conn-1',
+      userId: 'owner-1',
+      organizationId: 'org-1',
+      name: 'Shared DB',
+      type: 'postgres',
+      host: 'db.example.com',
+      readOnly: false,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+      allowQueryExecution: true,
+    });
+    permissionsMock.ensurePermission.mockRejectedValueOnce(
+      new ForbiddenException('viewer cannot manage'),
+    );
+
+    await expect(
+      service.update('conn-1', { name: 'Renamed DB' } as any, 'viewer-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(permissionsMock.ensurePermission).toHaveBeenCalledWith(
+      'viewer-1',
+      ResourceType.CONNECTION,
+      'conn-1',
+      Permission.MANAGE,
+    );
+    expect(prismaMock.connection.update).not.toHaveBeenCalled();
+  });
+
+  it('requires delete permission before deleting a shared connection', async () => {
+    prismaMock.connection.findFirst.mockResolvedValue({
+      id: 'conn-1',
+      userId: 'owner-1',
+      organizationId: 'org-1',
+      name: 'Shared DB',
+      type: 'postgres',
+    });
+    permissionsMock.ensurePermission.mockRejectedValueOnce(
+      new ForbiddenException('member cannot delete'),
+    );
+
+    await expect(service.remove('conn-1', 'member-1')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+
+    expect(permissionsMock.ensurePermission).toHaveBeenCalledWith(
+      'member-1',
+      ResourceType.CONNECTION,
+      'conn-1',
+      Permission.DELETE,
+    );
+    expect(prismaMock.connection.delete).not.toHaveBeenCalled();
+  });
+
+  it('creates one shared pool for concurrent requests with the same key', async () => {
+    const connection = {
+      id: 'conn-1',
+      userId: 'user-1',
+      type: 'postgres',
+      host: 'db.example.com',
+      database: 'main',
+      password: null,
+    };
+    const pool = { id: 'shared-pool' };
+    prismaMock.connection.findFirst.mockResolvedValue(connection);
+    prismaMock.connection.update.mockResolvedValue(connection);
+    strategyMock.createPool.mockResolvedValue(pool);
+
+    const [first, second] = await Promise.all([
+      service.getPool('conn-1', 'main', 'user-1'),
+      service.getPool('conn-1', 'main', 'user-1'),
+    ]);
+
+    expect(first).toBe(pool);
+    expect(second).toBe(pool);
+    expect(strategyMock.createPool).toHaveBeenCalledTimes(1);
   });
 
   it('rejects attaching a connection to a team the caller does not belong to', async () => {

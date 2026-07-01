@@ -2,6 +2,15 @@ import { ConfigService } from '@nestjs/config';
 import { AiPromptBuilderService } from './ai.prompt-builder.service';
 import { AiProviderRunnerService } from './ai.provider-runner.service';
 import type { AiRoutingMode, RouteDecision, StreamEvent } from './ai.types';
+import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
+
+jest.mock('../common/utils/ssrf-validator.util', () => ({
+  validateExternalUrl: jest.fn(),
+}));
+
+const validateExternalUrlMock = validateExternalUrl as jest.MockedFunction<
+  typeof validateExternalUrl
+>;
 
 function createSseResponse(chunks: string[]): Response {
   const encoder = new TextEncoder();
@@ -30,6 +39,7 @@ describe('AiProviderRunnerService streaming', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    validateExternalUrlMock.mockResolvedValue(true);
     mockFetch.mockReset();
     (globalThis as { fetch?: typeof fetch }).fetch =
       mockFetch as unknown as typeof fetch;
@@ -37,6 +47,26 @@ describe('AiProviderRunnerService streaming', () => {
       { get: jest.fn(() => undefined) } as unknown as ConfigService,
       new AiPromptBuilderService(),
     );
+  });
+
+  it('blocks unsafe openai-compatible URLs before sending credentials', async () => {
+    validateExternalUrlMock.mockResolvedValueOnce(false);
+
+    await expect(
+      service.runOpenAiCompatible(
+        {
+          provider: 'custom',
+          model: 'test-model',
+          apiKey: 'sk-sensitive',
+          baseUrl: 'http://127.0.0.1:3000/v1',
+        },
+        { prompt: 'hello' },
+        'auto',
+        structuredDbDecision,
+      ),
+    ).rejects.toThrow('Unsafe provider URL');
+
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('retries transient completion failures from openai-compatible providers before falling through', async () => {

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MigrationService, MigrationJob } from './migration.service';
 import { ConnectionsService } from '../connections/connections.service';
+import { Permission } from '../permissions/enums/permission.enum';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
 import { getQueueToken } from '@nestjs/bullmq';
 import { PassThrough } from 'stream';
@@ -186,6 +187,16 @@ describe('MigrationService', () => {
 
     // 5000 rows / 2000 batch = 2 full batches + 1 partial = 3 calls
     expect(targetStrategy.importData).toHaveBeenCalledTimes(3);
+    expect(mockConnectionsService.getDecryptedConnection).toHaveBeenCalledWith(
+      'src-1',
+      'user-1',
+      Permission.READ,
+    );
+    expect(mockConnectionsService.getDecryptedConnection).toHaveBeenCalledWith(
+      'tgt-1',
+      'user-1',
+      Permission.WRITE,
+    );
 
     // First call should have 2000 rows
     expect(targetStrategy.importData.mock.calls[0][1].data.length).toBe(2000);

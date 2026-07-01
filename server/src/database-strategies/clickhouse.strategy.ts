@@ -15,6 +15,10 @@ import { SchemaOperation } from '../query/dto/schema-operations.types';
 import { Injectable } from '@nestjs/common';
 import { createClient, ClickHouseClient } from '@clickhouse/client';
 import { SqlUtil } from '../utils/sql.util';
+import {
+  allowInsecureDatabaseTls,
+  isLocalDatabaseHost,
+} from '../common/utils/database-network.util';
 
 @Injectable()
 export class ClickHouseStrategy implements IDatabaseStrategy {
@@ -29,9 +33,13 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
     if (!host) {
       throw new Error('Host is required for ClickHouse connections.');
     }
+    const useSecureTransport =
+      !isLocalDatabaseHost(host) && !allowInsecureDatabaseTls();
+    const protocol = useSecureTransport ? 'https' : 'http';
+    const port = connectionConfig.port || (useSecureTransport ? 8443 : 8123);
 
     return createClient({
-      host: `http://${host}:${connectionConfig.port || 8123}`,
+      host: `${protocol}://${host}:${port}`,
       username: connectionConfig.username || 'default',
       password: connectionConfig.password || '',
       database: connectionConfig.database || 'default',
@@ -88,11 +96,15 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
     const cols = Object.keys(updates);
     if (cols.length === 0) return { success: false, rowCount: 0 };
 
+    const values: Record<string, unknown> = { pk: pkValue };
     const setClause = cols
-      .map((c) => `${this.quoteIdentifier(c)} = {${c}:String}`)
+      .map((column, index) => {
+        const parameter = `p${index}`;
+        values[parameter] = updates[column];
+        return `${this.quoteIdentifier(column)} = {${parameter}:String}`;
+      })
       .join(', ');
     const sql = `ALTER TABLE ${this.quoteTable(schema, table)} UPDATE ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = {pk:String}`;
-    const values: Record<string, unknown> = { ...updates, pk: pkValue };
 
     await pool.exec({ query: sql, query_params: values });
     return { success: true, rowCount: 1 };
@@ -106,8 +118,12 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
     const cols = Object.keys(data);
     if (cols.length === 0) return { success: false, rowCount: 0 };
 
-    const sql = `INSERT INTO ${this.quoteTable(schema, table)} (${cols.map((c) => this.quoteIdentifier(c)).join(', ')}) VALUES (${cols.map((c) => `{${c}:String}`).join(', ')})`;
-    await pool.exec({ query: sql, query_params: data });
+    const values = Object.fromEntries(
+      cols.map((column, index) => [`p${index}`, data[column]]),
+    );
+    const placeholders = cols.map((_, index) => `{p${index}:String}`);
+    const sql = `INSERT INTO ${this.quoteTable(schema, table)} (${cols.map((c) => this.quoteIdentifier(c)).join(', ')}) VALUES (${placeholders.join(', ')})`;
+    await pool.exec({ query: sql, query_params: values });
     return { success: true, rowCount: 1 };
   }
 
