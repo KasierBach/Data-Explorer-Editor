@@ -54,7 +54,15 @@ export class ConnectionsService implements OnModuleDestroy {
   private sanitizeConnection<T extends { password?: string | null }>(
     connection: T,
   ) {
-    const { password: _, ...safe } = connection;
+    const {
+      password: _,
+      sshPrivateKey: __,
+      sshPassphrase: ___,
+      ...safe
+    } = connection as T & {
+      sshPrivateKey?: string | null;
+      sshPassphrase?: string | null;
+    };
     return safe;
   }
 

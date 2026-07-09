@@ -68,6 +68,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/data_explorer
       - REDIS_URL=redis://redis:6379
       - FRONTEND_URL=http://localhost
+      - API_PUBLIC_URL=http://localhost:3001/api
     depends_on:
       migrate:
         condition: service_completed_successfully

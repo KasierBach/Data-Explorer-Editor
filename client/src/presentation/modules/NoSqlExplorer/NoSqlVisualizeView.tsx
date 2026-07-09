@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     Bar,
     BarChart,
@@ -188,12 +188,57 @@ const buildFieldProfiles = (data: RowData[]) => {
 };
 
 export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) => {
-    const { lang, nosqlActiveCollection } = useAppStore();
+    const {
+        lang,
+        nosqlActiveCollection,
+        nosqlActiveConnectionId,
+        pageStates,
+        setPageState,
+    } = useAppStore();
     const text = getWorkspaceText(lang).noSqlVisualize;
-    const [chartType, setChartType] = useState<ChartType>('bar');
-    const [groupField, setGroupField] = useState('');
-    const [metricField, setMetricField] = useState('');
-    const [metricMode, setMetricMode] = useState<MetricMode>('count');
+    const pageId = `nosql-visualize-${nosqlActiveConnectionId || 'default'}-${nosqlActiveCollection || 'default'}`;
+    const savedState = pageStates[pageId];
+    const savedChartType: ChartType =
+        savedState?.chartType === 'line' || savedState?.chartType === 'pie'
+            ? savedState.chartType
+            : 'bar';
+    const savedGroupField = savedState && typeof savedState.groupField === 'string'
+        ? savedState.groupField
+        : '';
+    const savedMetricField = savedState && typeof savedState.metricField === 'string'
+        ? savedState.metricField
+        : '';
+    const savedMetricMode: MetricMode =
+        savedState?.metricMode === 'sum'
+        || savedState?.metricMode === 'avg'
+        || savedState?.metricMode === 'min'
+        || savedState?.metricMode === 'max'
+            ? savedState.metricMode
+            : 'count';
+    const [chartType, setChartType] = useState<ChartType>(savedChartType);
+    const [groupField, setGroupField] = useState(savedGroupField);
+    const [metricField, setMetricField] = useState(savedMetricField);
+    const [metricMode, setMetricMode] = useState<MetricMode>(savedMetricMode);
+
+    useEffect(() => {
+        setChartType(savedChartType);
+        setGroupField(savedGroupField);
+        setMetricField(savedMetricField);
+        setMetricMode(savedMetricMode);
+    }, [savedChartType, savedGroupField, savedMetricField, savedMetricMode]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setPageState(pageId, {
+                chartType,
+                groupField,
+                metricField,
+                metricMode,
+            });
+        }, 250);
+
+        return () => clearTimeout(timer);
+    }, [chartType, groupField, metricField, metricMode, pageId, setPageState]);
 
     const fieldProfiles = useMemo(() => buildFieldProfiles(data), [data]);
     const numericFields = useMemo(

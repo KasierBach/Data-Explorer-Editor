@@ -90,7 +90,6 @@ export const useAppStore = create<AppState>()(
                 isAiPanelOpen: state.isAiPanelOpen,
                 expandedNodes: state.expandedNodes,
                 pageStates: state.pageStates,
-                lang: state.lang,
                 isResultPanelOpen: state.isResultPanelOpen,
                 nosqlActiveConnectionId: state.nosqlActiveConnectionId,
                 nosqlActiveDatabase: state.nosqlActiveDatabase,
@@ -98,7 +97,11 @@ export const useAppStore = create<AppState>()(
                 nosqlViewMode: state.nosqlViewMode,
                 nosqlFilter: state.nosqlFilter,
                 nosqlMqlQuery: state.nosqlMqlQuery,
+                nosqlResult: Array.isArray(state.nosqlResult)
+                    ? state.nosqlResult.slice(0, 10)
+                    : state.nosqlResult,
                 nosqlPipelineStages: state.nosqlPipelineStages,
+                nosqlSchemaStats: state.nosqlSchemaStats,
                 explorerSearchMode: state.explorerSearchMode,
                 defaultResultHeight: state.defaultResultHeight,
             }),

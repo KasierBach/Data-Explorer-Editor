@@ -1,8 +1,11 @@
-﻿import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAppStore, type AiMessage } from '@/core/services/store';
+import type { TableMetadata } from '@/core/domain/entities';
 import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
 import { connectionService } from '@/core/services/ConnectionService';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
+import { parseNodeId } from '@/core/utils/id-parser';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { findReplaySourceUserMessage } from './aiChatReplay';
 
@@ -47,6 +50,7 @@ const TEXT_EXTENSIONS = new Set([
 ]);
 
 const EXCEL_EXTENSIONS = new Set(['xlsx', 'xls', 'ods']);
+const MAX_PERSISTED_DRAFT_ATTACHMENT_CHARS = 20000;
 
 function getFileExtension(name: string): string {
     const baseName = name.split('/').pop() || name;
@@ -96,6 +100,31 @@ function parseAiStreamEvent(data: string): AiStreamEvent | null {
 
 function getErrorMessage(error: unknown) {
     return error instanceof Error ? error.message : 'Unknown error';
+}
+
+function isPersistedDraftAttachment(value: unknown): value is Attachment {
+    if (!value || typeof value !== 'object') return false;
+    const candidate = value as Partial<Attachment>;
+    return (
+        (candidate.type === 'sql' || candidate.type === 'table' || candidate.type === 'file')
+        && typeof candidate.label === 'string'
+        && typeof candidate.data === 'string'
+        && (candidate.preview === undefined || typeof candidate.preview === 'string')
+    );
+}
+
+function toPersistedDraftAttachments(attachments: Attachment[]): Attachment[] {
+    return attachments
+        .filter((attachment) => (
+            attachment.type !== 'image'
+            && attachment.data.length <= MAX_PERSISTED_DRAFT_ATTACHMENT_CHARS
+        ))
+        .map((attachment) => ({
+            type: attachment.type,
+            label: attachment.label,
+            data: attachment.data,
+            preview: attachment.preview,
+        }));
 }
 
 function toTriggerAttachments(messageAttachments: AiMessage['attachments']): Attachment[] {
@@ -162,15 +191,25 @@ function parsePartialAiResponse(raw: string): { message: string } {
 }
 
 export function useAiChat() {
-    const [input, setInput] = useState('');
+    const store = useAppStore();
+    const draftKey = `ai-chat-draft-${store.activeAiChatId || 'global'}`;
+    const draftState = store.pageStates[draftKey];
+    const draftInput = draftState && typeof draftState.input === 'string'
+        ? draftState.input
+        : '';
+    const draftAttachments = useMemo(
+        () => (Array.isArray(draftState?.attachments)
+            ? draftState.attachments.filter(isPersistedDraftAttachment)
+            : []),
+        [draftState],
+    );
+    const [input, setInput] = useState(draftInput);
     const [isLoading, setIsLoading] = useState(false);
-    const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [attachments, setAttachments] = useState<Attachment[]>(draftAttachments);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
-
-    const store = useAppStore();
     const text = getWorkspaceText(store.lang);
     const {
         activeConnectionId, connections, activeDatabase,
@@ -178,6 +217,11 @@ export function useAiChat() {
         aiModel, aiMode, aiRoutingMode,
     } = store;
 
+    const setPageState = store.setPageState;
+    const persistedDraftAttachments = useMemo(
+        () => toPersistedDraftAttachments(attachments),
+        [attachments],
+    );
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const activeTab = tabs.find(t => t.id === activeTabId);
     const preferences = useAiPreferences();
@@ -186,6 +230,30 @@ export function useAiChat() {
         () => resolveAiSelection(assistantSelection, aiModel, preferences.customProviders),
         [assistantSelection, aiModel, preferences.customProviders],
     );
+    const queryClient = useQueryClient();
+
+    const previousDraftKeyRef = useRef(draftKey);
+
+    useEffect(() => {
+        if (previousDraftKeyRef.current === draftKey) {
+            return;
+        }
+
+        previousDraftKeyRef.current = draftKey;
+        setInput(draftInput);
+        setAttachments(draftAttachments);
+    }, [draftAttachments, draftInput, draftKey]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setPageState(draftKey, {
+                input,
+                attachments: persistedDraftAttachments,
+            });
+        }, 250);
+
+        return () => clearTimeout(timer);
+    }, [draftKey, input, persistedDraftAttachments, setPageState]);
 
     const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -287,28 +355,93 @@ export function useAiChat() {
         }
     };
 
-    const handleMentionTable = () => {
-        if (activeConnection && activeDatabase) {
-            const isNoSql = activeConnection.type === 'mongodb' || activeConnection.type === 'mongodb+srv';
-            
-            if (isNoSql && store.nosqlActiveCollection) {
-                const schemaStr = store.nosqlSchemaStats ? 
+    const handleMentionTable = async () => {
+        if (!activeConnection) return;
+
+        const isNoSql = activeConnection.type === 'mongodb' || activeConnection.type === 'mongodb+srv';
+
+        if (isNoSql) {
+            if (!activeDatabase) return;
+
+            if (store.nosqlActiveCollection) {
+                const schemaStr = store.nosqlSchemaStats ?
                     `${text.aiChat.schemaPrefix(store.nosqlActiveCollection)}\n` +
                     formatNoSqlSchemaFields(store.nosqlSchemaStats, true)
                     : text.aiChat.collectionWithoutSchema(store.nosqlActiveCollection);
 
                 setAttachments(prev => [...prev, {
                     type: 'table',
-                    label: `Schema: ${store.nosqlActiveCollection}`,
+                    label: `Schema: ${store.nosqlActiveCollection}` ,
                     data: schemaStr,
                 }]);
-            } else {
+            }
+
+            return;
+        }
+
+        const tableId = activeTab?.metadata?.tableId;
+
+        if (tableId) {
+            const { dbName, schema, table } = parseNodeId(tableId);
+            const resolvedDatabase = dbName || activeDatabase || activeConnection.database || activeConnection.name;
+            const resolvedTable = table || activeTab?.title || tableId;
+            const cachedMetadata = queryClient.getQueryData(["metadata", activeConnectionId, tableId]) as TableMetadata | undefined;
+
+            try {
+                const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
+                await adapter.connect(activeConnection);
+                const metadata = cachedMetadata || await adapter.getMetadata(tableId);
+                const visibleColumns = metadata.columns.slice(0, 40);
+                const columnLines = visibleColumns.length > 0
+                    ? visibleColumns.map((column) => {
+                        const flags = [
+                            column.isPrimaryKey ? 'PK' : '',
+                            column.isForeignKey ? 'FK' : '',
+                            column.isNullable ? '' : 'NOT NULL',
+                        ].filter(Boolean).join(", ");
+                        return `- ${column.name}: ${column.type}${flags ? ` [${flags}]` : ""}`;
+                    }).join("\n")
+                    : "- No columns found";
+                const extraColumnsNote = metadata.columns.length > visibleColumns.length
+                    ? `\n- ... ${metadata.columns.length - visibleColumns.length} more columns`
+                    : "";
+                const indexLines = metadata.indices?.length
+                    ? metadata.indices.slice(0, 10).map((index) =>
+                        `- ${index.name}: ${index.columns.join(", ")}${index.isPrimary ? " [PRIMARY]" : index.isUnique ? " [UNIQUE]" : ""}`
+                    ).join("\n")
+                    : "";
+                const schemaContext = [
+                    `[SQL SCHEMA] Database: ${resolvedDatabase}` ,
+                    `Schema: ${schema}` ,
+                    `Table: ${resolvedTable}` ,
+                    metadata.comment ? `Comment: ${metadata.comment}` : "" ,
+                    "Columns:",
+                    `${columnLines}${extraColumnsNote}` ,
+                    indexLines ? `Indexes:\n${indexLines}` : "" ,
+                ].filter(Boolean).join("\n");
+
                 setAttachments(prev => [...prev, {
                     type: 'table',
-                    label: `DB: ${activeDatabase}`,
-                    data: text.aiChat.databaseContext(activeConnection.name, activeDatabase, activeConnection.type),
+                    label: `Schema: ${schema}.${resolvedTable}` ,
+                    data: schemaContext,
                 }]);
+                return;
+            } catch {
+                setAttachments(prev => [...prev, {
+                    type: 'table',
+                    label: `Table: ${schema}.${resolvedTable}` ,
+                    data: `[SQL CONTEXT] Database: ${resolvedDatabase}\nSchema: ${schema}\nTable: ${resolvedTable}\nDetailed metadata could not be loaded for this table.`,
+                }]);
+                return;
             }
+        }
+
+        if (activeDatabase) {
+            setAttachments(prev => [...prev, {
+                type: 'table',
+                label: `Database: ${activeDatabase}` ,
+                data: text.aiChat.databaseContext(activeConnection.name, activeDatabase, activeConnection.type),
+            }]);
         }
     };
 
@@ -410,8 +543,17 @@ export function useAiChat() {
             let imageData = customImageData;
 
             for (const att of customAttachments) {
-                if (att.type === 'image' && !imageData) imageData = att.data;
-                else contextParts.push(`[${att.type.toUpperCase()}] ${att.label}:\n${att.data}`);
+                if (att.type === 'image') {
+                    if (!imageData) {
+                        imageData = att.data;
+                    } else {
+                        contextParts.push(`[IMAGE] ${att.label}:` +
+                            ' Additional image attached. Only the first image is sent to the vision lane in the current chat flow.');
+                    }
+                    continue;
+                }
+
+                contextParts.push(`[${att.type.toUpperCase()}] ${att.label}:\n${att.data}`);
             }
 
             const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';

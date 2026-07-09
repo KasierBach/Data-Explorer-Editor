@@ -149,6 +149,36 @@ export class AiProviderRunnerService {
   }
 
   private isRetryableTransportError(error: unknown): boolean {
+    if (typeof error === 'object' && error !== null) {
+      const candidate = error as {
+        status?: number;
+        code?: number | string;
+        response?: { status?: number };
+        message?: string;
+      };
+      const status = candidate.status ?? candidate.response?.status;
+      const code =
+        typeof candidate.code === 'string'
+          ? candidate.code.toLowerCase()
+          : undefined;
+
+      if (
+        typeof status === 'number' &&
+        this.isTransientOpenAiStatus(status)
+      ) {
+        return true;
+      }
+
+      if (
+        code &&
+        ['aborted', 'deadline_exceeded', 'resource_exhausted', 'unavailable'].includes(
+          code,
+        )
+      ) {
+        return true;
+      }
+    }
+
     if (!(error instanceof Error)) return false;
 
     const message = error.message.toLowerCase();
@@ -172,6 +202,35 @@ export class AiProviderRunnerService {
 
   private async sleep(ms: number) {
     await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async executeRetriableOperation<T>(
+    label: string,
+    execute: (attempt: number) => Promise<T>,
+  ): Promise<T> {
+    const maxAttempts = AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_ATTEMPTS;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        return await execute(attempt);
+      } catch (error) {
+        if (
+          !this.isRetryableTransportError(error) ||
+          attempt >= maxAttempts - 1
+        ) {
+          throw error;
+        }
+
+        const message =
+          error instanceof Error ? error.message : 'Unknown transient error';
+        this.logger.warn(
+          `${label} failed with transient error: ${message}. Retrying (${attempt + 2}/${maxAttempts})...`,
+        );
+        await this.sleep(this.getRetryDelayMs(attempt));
+      }
+    }
+
+    throw new Error(`${label} failed before a result was returned`);
   }
 
   private async executeOpenAiRequestWithRetry(
@@ -380,10 +439,14 @@ export class AiProviderRunnerService {
         },
       });
       const timeout = params.timeoutMs ?? this.getProviderTimeoutMs();
-      const result = await this.withTimeout(
-        model.generateContent(params.prompt),
+      const result = await this.executeRetriableOperation(
         `Gemini completion (${mId})`,
-        timeout,
+        () =>
+          this.withTimeout(
+            model.generateContent(params.prompt),
+            `Gemini completion (${mId})`,
+            timeout,
+          ),
       );
       return result.response.text().trim();
     };
@@ -417,30 +480,43 @@ export class AiProviderRunnerService {
       throw new Error(`${plan.provider} provider is not configured`);
     const requestUrl = await this.getSafeOpenAiCompatibleUrl(plan.baseUrl);
 
-    const requestTimeout = this.createAbortController(
+    let requestTimeout = this.createAbortController(
       `${plan.provider} completion`,
       params.timeoutMs ?? this.getProviderTimeoutMs(),
     );
 
     try {
-      const response = await fetch(requestUrl, {
-        method: 'POST',
-        headers: this.getOpenAiCompatibleHeaders(plan),
-        body: JSON.stringify({
-          model: plan.model,
-          messages: this.promptBuilder.buildOpenAiMessages(
-            params.prompt,
-            params.systemPrompt,
-            params.context,
-            params.history,
-          ),
-          temperature: params.temperature ?? AI_CONSTANTS.TEMPERATURE_PRECISE,
-          max_tokens:
-            params.maxOutputTokens ?? AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
-        }),
-        signal: requestTimeout.signal,
-        redirect: 'manual',
-      });
+      const sendRequest = (attempt: number) => {
+        requestTimeout.clear();
+        requestTimeout = this.createAbortController(
+          `${plan.provider} completion attempt ${attempt + 1}`,
+          params.timeoutMs ?? this.getProviderTimeoutMs(),
+        );
+        return fetch(requestUrl, {
+          method: 'POST',
+          headers: this.getOpenAiCompatibleHeaders(plan),
+          body: JSON.stringify({
+            model: plan.model,
+            messages: this.promptBuilder.buildOpenAiMessages(
+              params.prompt,
+              params.systemPrompt,
+              params.context,
+              params.history,
+            ),
+            temperature: params.temperature ?? AI_CONSTANTS.TEMPERATURE_PRECISE,
+            max_tokens:
+              params.maxOutputTokens ??
+              AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
+          }),
+          signal: requestTimeout.signal,
+          redirect: 'manual',
+        });
+      };
+
+      const response = await this.executeOpenAiRequestWithRetry(
+        `${plan.provider} completion`,
+        sendRequest,
+      );
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
@@ -505,12 +581,16 @@ export class AiProviderRunnerService {
       ? { ...baseGenerationConfig, ...structuredGenerationConfig }
       : baseGenerationConfig;
     const generate = () =>
-      this.withTimeout(
-        model.generateContent({
-          contents: [{ role: 'user', parts }],
-          generationConfig,
-        }),
+      this.executeRetriableOperation(
         `Gemini request (${plan.model})`,
+        () =>
+          this.withTimeout(
+            model.generateContent({
+              contents: [{ role: 'user', parts }],
+              generationConfig,
+            }),
+            `Gemini request (${plan.model})`,
+          ),
       );
     let result;
     try {
@@ -737,12 +817,16 @@ export class AiProviderRunnerService {
       params.image,
     );
     const generateStream = (): Promise<GenerateContentStreamResult> =>
-      this.withTimeout(
-        model.generateContentStream({
-          contents,
-          generationConfig,
-        }),
+      this.executeRetriableOperation(
         `Gemini stream bootstrap (${plan.model})`,
+        () =>
+          this.withTimeout(
+            model.generateContentStream({
+              contents,
+              generationConfig,
+            }),
+            `Gemini stream bootstrap (${plan.model})`,
+          ),
       );
     let result: GenerateContentStreamResult;
     try {

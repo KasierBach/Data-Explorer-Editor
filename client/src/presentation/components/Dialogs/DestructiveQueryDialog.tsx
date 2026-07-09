@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
     Dialog,
     DialogContent,
@@ -8,9 +9,17 @@ import {
     DialogTitle,
 } from '@/presentation/components/ui/dialog';
 import { Button } from '@/presentation/components/ui/button';
+import type { DatabaseRelationship } from '@/core/domain/database-adapter.interface';
 import { apiService } from '@/core/services/api.service';
-import { useAppStore } from '@/core/services/store';
 import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
+import { connectionService } from '@/core/services/ConnectionService';
+import { useAppStore } from '@/core/services/store';
+import {
+    buildReviewContextLines,
+    countObjectDependencies,
+    isMetadataBackedObjectType,
+    type WarningObjectContext,
+} from './DestructiveQueryDialog.utils';
 import { AlertCircle, FileWarning, Loader2, Sparkles } from 'lucide-react';
 
 type ImpactScope = 'rows' | 'object' | 'database' | 'instance' | 'unknown';
@@ -47,6 +56,7 @@ export function DestructiveQueryDialog() {
         lang,
         activeConnectionId,
         activeDatabase,
+        connections,
         aiModel,
         aiRoutingMode,
     } = useAppStore();
@@ -56,9 +66,50 @@ export function DestructiveQueryDialog() {
     const preferences = useAiPreferences();
     const assistantSelection = preferences.assistantModel || aiModel;
     const resolvedExplain = resolveAiSelection(preferences.explainModel, assistantSelection, preferences.customProviders);
+    const activeConnection = connections.find((connection) => connection.id === activeConnectionId) || null;
+    const resolvedDatabase = activeDatabase || activeConnection?.database || null;
 
     const analysis = (destructiveConfirm?.analysis || {}) as DialogAnalysis;
     const isOpen = destructiveConfirm?.isOpen ?? false;
+    const warningObjectContextQuery = useQuery({
+        queryKey: [
+            'destructive-query-context',
+            activeConnection?.id,
+            resolvedDatabase,
+            analysis.affectedObject,
+            analysis.objectType,
+        ],
+        enabled: (
+            isOpen
+            && !!activeConnection
+            && !!analysis.affectedObject
+            && isMetadataBackedObjectType(analysis.objectType)
+        ),
+        staleTime: 60_000,
+        queryFn: async (): Promise<WarningObjectContext | null> => {
+            if (!activeConnection || !analysis.affectedObject) return null;
+
+            try {
+                const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
+                await adapter.connect(activeConnection);
+                const [metadata, relationships] = await Promise.all([
+                    adapter.getMetadata(analysis.affectedObject),
+                    resolvedDatabase
+                        ? adapter.getRelationships(resolvedDatabase).catch(() => [] as DatabaseRelationship[])
+                        : Promise.resolve([] as DatabaseRelationship[]),
+                ]);
+
+                return {
+                    rowCount: metadata.rowCount,
+                    columnCount: metadata.columns.length,
+                    indexCount: metadata.indices?.length ?? 0,
+                    dependencyCount: countObjectDependencies(relationships, analysis.affectedObject),
+                };
+            } catch {
+                return null;
+            }
+        },
+    });
 
     useEffect(() => {
         if (!isOpen) return;
@@ -82,6 +133,17 @@ export function DestructiveQueryDialog() {
             scopeLabel: 'Phạm vi',
             reasonLabel: 'Lý do',
             checklistTitle: 'Checklist nên review',
+            contextTitle: 'Context runtime để review',
+            contextLoading: 'Đang nạp metadata và quan hệ liên quan...',
+            contextConnection: 'Kết nối',
+            contextDatabase: 'Database',
+            contextRows: (count: number) => `Ước lượng số dòng: ${count.toLocaleString('vi-VN')}`,
+            contextColumns: (count: number) => `Số cột: ${count}`,
+            contextIndexes: (count: number) => `Số index: ${count}`,
+            contextDependencies: (count: number) => `Quan hệ/phụ thuộc liên quan: ${count}`,
+            contextReadOnly: 'Connection đang ở chế độ chỉ đọc.',
+            contextSchemaChangesDisabled: 'Schema changes đang bị khóa ở connection này.',
+            contextQueryExecutionDisabled: 'Query execution đang bị khóa ở connection này.',
             sqlPreview: 'SQL sắp chạy',
             aiExplain: 'AI phân tích thêm',
             aiLoading: 'AI đang phân tích...',
@@ -141,6 +203,17 @@ export function DestructiveQueryDialog() {
             scopeLabel: 'Scope',
             reasonLabel: 'Why flagged',
             checklistTitle: 'Review checklist',
+            contextTitle: 'Runtime context for review',
+            contextLoading: 'Loading related metadata and dependency context...',
+            contextConnection: 'Connection',
+            contextDatabase: 'Database',
+            contextRows: (count: number) => `Estimated rows: ${count.toLocaleString('en-US')}`,
+            contextColumns: (count: number) => `Columns: ${count}`,
+            contextIndexes: (count: number) => `Indexes: ${count}`,
+            contextDependencies: (count: number) => `Related dependencies: ${count}`,
+            contextReadOnly: 'This connection is currently read-only.',
+            contextSchemaChangesDisabled: 'Schema changes are disabled on this connection.',
+            contextQueryExecutionDisabled: 'Query execution is disabled on this connection.',
             sqlPreview: 'SQL preview',
             aiExplain: 'Ask AI for a deeper review',
             aiLoading: 'AI is reviewing...',
@@ -191,6 +264,12 @@ export function DestructiveQueryDialog() {
     if (!destructiveConfirm) return null;
 
     const t = content[lang] || content.en;
+    const warningContextLines = buildReviewContextLines({
+        connection: activeConnection,
+        context: warningObjectContextQuery.data,
+        database: resolvedDatabase,
+        text: t,
+    });
     const isHighSeverity = analysis.severity === 'high';
     const operation = analysis.keywords?.join(', ') || 'SQL';
     const target = analysis.affectedObject || t.objectUnknown;
@@ -249,7 +328,7 @@ export function DestructiveQueryDialog() {
         try {
             const result = await apiService.post<AiWarningResponse>('/ai/generate-sql', {
                 connectionId: activeConnectionId,
-                database: activeDatabase || undefined,
+                database: resolvedDatabase || undefined,
                 prompt: t.aiPrompt,
                 context: [
                     `SQL:\n${analysis.statement}`,
@@ -265,6 +344,9 @@ export function DestructiveQueryDialog() {
                         ? `Flagged steps: ${flaggedStatementCount}`
                         : null,
                     `Why flagged: ${detail}`,
+                    warningContextLines.length > 0
+                        ? `${t.contextTitle}:\n${warningContextLines.join('\n')}`
+                        : null,
                 ].filter(Boolean).join('\n\n'),
                 model: resolvedExplain.model,
                 mode: isHighSeverity ? 'planning' : 'fast',
@@ -338,6 +420,21 @@ export function DestructiveQueryDialog() {
                             ))}
                         </ul>
                     </div>
+
+                    {(warningContextLines.length > 0 || warningObjectContextQuery.isLoading) && (
+                        <div className="rounded-md border border-border/70 bg-muted/20 p-4">
+                            <p className="mb-3 text-sm font-semibold text-foreground">{t.contextTitle}</p>
+                            {warningObjectContextQuery.isLoading ? (
+                                <p className="text-sm leading-6 text-muted-foreground">{t.contextLoading}</p>
+                            ) : (
+                                <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+                                    {warningContextLines.map((line) => (
+                                        <li key={line}>{line}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    )}
 
                     {analysis.statement && (
                         <div className="rounded-md border border-border/70 bg-background/60 p-4">

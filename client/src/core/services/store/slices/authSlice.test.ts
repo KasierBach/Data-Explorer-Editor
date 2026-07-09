@@ -91,7 +91,7 @@ describe('authSlice workspace recovery', () => {
         window.localStorage.clear();
     });
 
-    it('restores query tabs after a session-expiry logout for the same user', () => {
+    it('restores workspace tabs after a session-expiry logout for the same user', () => {
         const { store, getState, setState } = createTestStore();
 
         setState({
@@ -108,10 +108,63 @@ describe('authSlice workspace recovery', () => {
 
         store.login('token', userA, 123);
 
-        expect(getState().tabs).toEqual([queryTab]);
+        expect(getState().tabs).toEqual([queryTab, tableTab]);
         expect(getState().activeTabId).toBe(queryTab.id);
         expect(getState().activeConnectionId).toBe('conn-1');
         expect(getState().activeDatabase).toBe('app');
+    });
+
+    it('restores page state and NoSQL workspace context after a session-expiry logout for the same user', () => {
+        const { store, getState, setState } = createTestStore();
+        const recoveredPageStates = {
+            'nosql-visualize-conn-1-users': { chartType: 'bar', groupField: 'status' },
+        };
+        const recoveredFilter = {
+            action: 'aggregate',
+            filter: '{\n  "status": "active"\n}',
+            options: '{\n  "limit": 25\n}',
+        };
+        const recoveredResult = [{ _id: '1', status: 'active' }];
+        const recoveredPipeline = [{ id: 'stage-1', type: '$match', value: '{\n  "status": "active"\n}', enabled: true }];
+        const recoveredSchema = [{
+            name: 'status',
+            types: { string: 1 },
+            count: 1,
+            probability: 100,
+            sampleValues: ['active'],
+        }];
+
+        setState({
+            isAuthenticated: true,
+            user: userA,
+            pageStates: recoveredPageStates,
+            nosqlActiveConnectionId: 'conn-1',
+            nosqlActiveDatabase: 'analytics',
+            nosqlActiveCollection: 'users',
+            nosqlViewMode: 'schema',
+            nosqlFilter: recoveredFilter,
+            nosqlMqlQuery: '{ "aggregate": "users" }',
+            nosqlResult: recoveredResult,
+            nosqlPipelineStages: recoveredPipeline,
+            nosqlSchemaStats: recoveredSchema,
+        });
+
+        store.logout({ preserveWorkspace: true });
+        expect(getState().pageStates).toEqual({});
+        expect(getState().nosqlActiveCollection).toBeNull();
+
+        store.login('token', userA, 123);
+
+        expect(getState().pageStates).toEqual(recoveredPageStates);
+        expect(getState().nosqlActiveConnectionId).toBe('conn-1');
+        expect(getState().nosqlActiveDatabase).toBe('analytics');
+        expect(getState().nosqlActiveCollection).toBe('users');
+        expect(getState().nosqlViewMode).toBe('schema');
+        expect(getState().nosqlFilter).toEqual(recoveredFilter);
+        expect(getState().nosqlMqlQuery).toBe('{ "aggregate": "users" }');
+        expect(getState().nosqlResult).toEqual(recoveredResult);
+        expect(getState().nosqlPipelineStages).toEqual(recoveredPipeline);
+        expect(getState().nosqlSchemaStats).toEqual(recoveredSchema);
     });
 
     it('does not restore another user workspace after a session-expiry logout', () => {

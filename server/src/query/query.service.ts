@@ -1,4 +1,4 @@
-﻿import {
+import {
   Injectable,
   BadRequestException,
   ForbiddenException,
@@ -529,6 +529,7 @@ export class QueryService {
           category: 'query',
           connectionId,
           database: database || connection.database,
+          sql,
           sqlSnippet: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
         },
       });
@@ -537,10 +538,22 @@ export class QueryService {
     } catch (error) {
       if (isForbiddenException(error)) throw error;
 
-      this.logger.error('Query Service Error Details:', getErrorMessage(error));
-      throw new InternalServerErrorException(
-        'Query execution failed. Please check your syntax or connection permissions.',
-      );
+      const resolvedDatabase = database || connection.database || null;
+      const rootCause = getErrorMessage(error);
+
+      this.logger.error('Query Service Error Details:', rootCause);
+      throw new InternalServerErrorException({
+        message: resolvedDatabase
+          ? `Query execution failed on database "${resolvedDatabase}": ${rootCause}`
+          : `Query execution failed: ${rootCause}`,
+        reason: 'QUERY_EXECUTION_FAILED',
+        details: {
+          connectionId,
+          connectionType: connection.type,
+          database: resolvedDatabase,
+          rootCause,
+        },
+      });
     }
   }
 

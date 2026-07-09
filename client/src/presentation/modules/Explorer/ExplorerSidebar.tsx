@@ -33,9 +33,22 @@ export const ExplorerSidebar: React.FC = memo(() => {
     const text = getWorkspaceText(lang).explorerSidebar;
     const explorerSearchMode = useAppStore(state => state.explorerSearchMode);
     const setExplorerSearchMode = useAppStore(state => state.setExplorerSearchMode);
+    const pageStates = useAppStore(state => state.pageStates);
+    const setPageState = useAppStore(state => state.setPageState);
+
+    const pageId = useMemo(
+        () => `explorer-sidebar-${activeConnectionId || 'default'}`,
+        [activeConnectionId],
+    );
+    const savedSearchTerm = useMemo(() => {
+        const savedState = pageStates[pageId];
+        return savedState && typeof savedState.searchTerm === 'string'
+            ? savedState.searchTerm
+            : '';
+    }, [pageId, pageStates]);
     
     // UI Local State
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(savedSearchTerm);
     const [globalResults, setGlobalResults] = useState<SearchResult[]>([]);
     const [isSearchingGlobal, setIsSearchingGlobal] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -50,6 +63,18 @@ export const ExplorerSidebar: React.FC = memo(() => {
     const effectiveDatabase = activeConnection?.database || (!isNoSql ? activeDatabase : null);
 
     const queryClient = useQueryClient();
+
+    useEffect(() => {
+        setSearchTerm(savedSearchTerm);
+    }, [savedSearchTerm]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setPageState(pageId, { searchTerm });
+        }, 250);
+
+        return () => clearTimeout(timer);
+    }, [pageId, searchTerm, setPageState]);
 
     const handleRefresh = useCallback(async () => {
         const t = toast.loading(text.refreshingHierarchy);

@@ -3,6 +3,7 @@ import { Strategy } from 'passport-github2';
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SocialAuthService } from '../social-auth.service';
+import { OAuthStateCookieStore } from '../oauth-state.store';
 
 @Injectable()
 export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
@@ -26,7 +27,8 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
         configService.get<string>('GITHUB_CALLBACK_URL') ||
         'http://localhost:3001/api/auth/github/callback',
       scope: ['user:email'],
-    });
+      store: new OAuthStateCookieStore('de_oauth_github_state'),
+    } as any);
 
     if (!clientID || !clientSecret) {
       this.logger.warn(

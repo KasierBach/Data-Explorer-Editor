@@ -161,11 +161,30 @@ const DataGridRow = React.memo(({
 });
 
 export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
-    const [sorting, setSorting] = useState<SortingState>([]);
+    const {
+        tabs,
+        activeTabId,
+        setTabPagination,
+        updateTabMetadata,
+        connections,
+        activeConnectionId,
+        lang,
+    } = useAppStore();
+    const activeTab = tabs.find((t: Tab) => t.id === activeTabId);
+    const activeConnection = connections.find((connection) => connection.id === activeConnectionId);
+    const initialSorting = Array.isArray(activeTab?.metadata?.sorting)
+        ? activeTab.metadata.sorting as SortingState
+        : [];
+    const initialGlobalFilter = typeof activeTab?.metadata?.globalFilter === 'string'
+        ? activeTab.metadata.globalFilter
+        : '';
+    const initialViewMode = activeTab?.metadata?.viewMode === 'design' ? 'design' : 'grid';
+    const tabStateId = activeTab?.id ?? tableId;
+    const [sorting, setSorting] = useState<SortingState>(initialSorting);
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
     const [columnOrder, setColumnOrder] = useState<string[]>([]);
-    const [globalFilter, setGlobalFilter] = useState('');
-    const [viewMode, setViewMode] = useState<'grid' | 'design'>('grid');
+    const [globalFilter, setGlobalFilter] = useState(initialGlobalFilter);
+    const [viewMode, setViewMode] = useState<'grid' | 'design'>(initialViewMode);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [isBulkReplaceOpen, setIsBulkReplaceOpen] = useState(false);
     const [isMigrationDialogOpen, setIsMigrationDialogOpen] = useState(false);
@@ -178,10 +197,6 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const wheelMomentumFrameRef = useRef<number | null>(null);
     const wheelMomentumVelocityRef = useRef(0);
     const wheelMomentumLastTsRef = useRef<number | null>(null);
-
-    const { tabs, activeTabId, setTabPagination, connections, activeConnectionId, lang } = useAppStore();
-    const activeTab = tabs.find((t: Tab) => t.id === activeTabId);
-    const activeConnection = connections.find((connection) => connection.id === activeConnectionId);
     const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
     const readOnlyConnection = activeConnection?.readOnly === true;
     const queryExecutionDisabled = activeConnection?.allowQueryExecution === false;
@@ -290,6 +305,18 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     }, [columnSizing, columnSizingStorageKey]);
 
     useEffect(() => {
+        const timer = window.setTimeout(() => {
+            updateTabMetadata(tabStateId, {
+                sorting,
+                globalFilter,
+                viewMode,
+            });
+        }, 200);
+
+        return () => window.clearTimeout(timer);
+    }, [globalFilter, sorting, tabStateId, updateTabMetadata, viewMode]);
+
+    useEffect(() => {
         setPageJumpValue(String(pagination.pageIndex + 1));
     }, [pagination.pageIndex]);
 
@@ -337,7 +364,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
             totalPages ? Math.min(parsedPage, totalPages) : parsedPage,
         );
 
-        setTabPagination(tableId, normalizedPage, pagination.pageSize);
+        setTabPagination(tabStateId, normalizedPage, pagination.pageSize);
         setPageJumpValue(String(normalizedPage));
     };
 
@@ -518,7 +545,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         onPaginationChange: (updater) => {
             if (typeof updater === 'function') {
                 const next = updater(pagination);
-                setTabPagination(tableId, next.pageIndex + 1, next.pageSize);
+                setTabPagination(tabStateId, next.pageIndex + 1, next.pageSize);
             }
         },
         manualPagination: true, // Always manual now because we paginate server-side
@@ -1160,7 +1187,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                 size="sm"
                                 className="h-5 w-5 p-0 hover:bg-muted"
                                 disabled={pagination.pageIndex === 0}
-                                onClick={() => setTabPagination(tableId, pagination.pageIndex, pagination.pageSize)}
+                                onClick={() => setTabPagination(tabStateId, pagination.pageIndex, pagination.pageSize)}
                             >
                                 ◀
                             </Button>
@@ -1202,7 +1229,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                                 size="sm"
                                 className="h-5 w-5 p-0 hover:bg-muted"
                                 disabled={effectiveTotalCount ? (pagination.pageIndex + 1) * pagination.pageSize >= effectiveTotalCount : rows.length < pagination.pageSize}
-                                onClick={() => setTabPagination(tableId, pagination.pageIndex + 2, pagination.pageSize)}
+                                onClick={() => setTabPagination(tabStateId, pagination.pageIndex + 2, pagination.pageSize)}
                             >
                                 ▶
                             </Button>
@@ -1212,7 +1239,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                         <select
                             className="bg-transparent border-none outline-none cursor-pointer hover:text-foreground text-[9px] font-bold py-0 h-4"
                             value={pagination.pageSize}
-                            onChange={(e) => setTabPagination(tableId, 1, Number(e.target.value))}
+                            onChange={(e) => setTabPagination(tabStateId, 1, Number(e.target.value))}
                         >
                             <option value="50">50 / {text.pageUnit}</option>
                             <option value="100">100 / {text.pageUnit}</option>

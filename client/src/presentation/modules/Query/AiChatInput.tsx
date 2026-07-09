@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
 import {
     DropdownMenu,
@@ -59,7 +60,7 @@ interface AiChatInputProps {
 
     contextMenuRef: React.RefObject<HTMLDivElement | null>;
     isNoSql: boolean;
-    activeTab: { type: string; metadata?: { sql?: string } } | undefined;
+    activeTab: { type: string; metadata?: { sql?: string; tableId?: string } } | undefined;
     activeConnection: { type: string } | undefined;
     activeDatabase: string | null | undefined;
 }
@@ -76,6 +77,13 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
     isNoSql, activeTab, activeConnection, activeDatabase
 }) => {
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const nosqlMqlQuery = useAppStore((state) => state.nosqlMqlQuery);
+    const hasEditorQuery = isNoSql
+        ? Boolean(nosqlMqlQuery?.trim())
+        : Boolean(activeTab?.type === 'query' && activeTab.metadata?.sql?.trim());
+    const hasSqlTableContext = Boolean(!isNoSql && activeTab?.metadata?.tableId);
+    const contextLabel = isNoSql ? 'Schema Context' : hasSqlTableContext ? 'Table Schema' : 'Database Context';
+    const contextDescription = isNoSql ? 'Cấu trúc collection đang chọn' : hasSqlTableContext ? 'Schema của bảng đang mở' : 'Kết nối DB đang dùng';
 
     const getModelIcon = (modelId: string) => {
         if (modelId.includes('gemini')) return <Sparkles className="w-3 h-3 text-violet-400" />;
@@ -90,7 +98,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
             <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*,.pdf,.csv,.tsv,.xlsx,.ls,.ods,.json,.xml,.yaml,.yml,.txt,.md,.log,.sql,.py,.js,.ts,.tsx,.jsx,.html,.css,.go,.rs,.java,.cpp,.c,.h,.php,.rb,.sh,.toml,.ini,.env"
+                accept="image/*,.pdf,.csv,.tsv,.xlsx,.xls,.ods,.json,.xml,.yaml,.yml,.txt,.md,.log,.sql,.py,.js,.ts,.tsx,.jsx,.html,.css,.go,.rs,.java,.cpp,.c,.h,.php,.rb,.sh,.toml,.ini,.env"
                 className="hidden"
                 onChange={handleFileSelected}
             />
@@ -189,7 +197,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                     </div>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 
-                                    className={cn("flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer group", (!isNoSql && (!activeTab || activeTab.type !== 'query' || !activeTab.metadata?.sql)) && "opacity-40 grayscale pointer-events-none")} 
+                                    className={cn("flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer group", !hasEditorQuery && "opacity-40 grayscale pointer-events-none")}
                                     onClick={handlePasteQuery}
                                 >
                                     <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
@@ -201,15 +209,15 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                     </div>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 
-                                    className={cn("flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer group", (!activeConnection || !activeDatabase) && "opacity-40 grayscale pointer-events-none")} 
+                                    className={cn("flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer group", (!activeConnection || (!activeDatabase && !hasSqlTableContext)) && "opacity-40 grayscale pointer-events-none")}
                                     onClick={handleMentionTable}
                                 >
                                     <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
                                         <Table2 className="w-4 h-4 text-emerald-400" />
                                     </div>
                                     <div>
-                                        <div className="text-[11px] font-bold">Schema Context</div>
-                                        <div className="text-[9px] text-muted-foreground">Cấu trúc DB đang chọn</div>
+                                        <div className="text-[11px] font-bold">{contextLabel}</div>
+                                        <div className="text-[9px] text-muted-foreground">{contextDescription}</div>
                                     </div>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>

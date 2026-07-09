@@ -55,7 +55,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
             
             return {
                 id: log.id,
-                sql: String(details.sqlSnippet || details.sql || text.unknownQuery),
+                sql: String(details.sql || details.sqlSnippet || text.unknownQuery),
                 database: String(details.database || ''),
                 connectionName: String(details.connectionName || text.databaseFallback),
                 executedAt: new Date(log.createdAt).getTime(),

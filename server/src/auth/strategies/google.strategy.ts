@@ -3,6 +3,7 @@ import { Strategy, VerifyCallback } from 'passport-google-oauth20';
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SocialAuthService } from '../social-auth.service';
+import { OAuthStateCookieStore } from '../oauth-state.store';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
@@ -26,7 +27,8 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         configService.get<string>('GOOGLE_CALLBACK_URL') ||
         'http://localhost:3001/api/auth/google/callback',
       scope: ['email', 'profile'],
-    });
+      store: new OAuthStateCookieStore('de_oauth_google_state'),
+    } as any);
 
     if (!clientID || !clientSecret) {
       this.logger.warn(

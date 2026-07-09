@@ -1,4 +1,4 @@
-﻿import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { QueryService } from './query.service';
@@ -553,6 +553,52 @@ describe('QueryService', () => {
     );
   });
 
+  it('surfaces the root cause and database context when raw query execution fails', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'analytics',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+    strategy.executeQuery.mockRejectedValue(
+      new Error('permission denied for relation users'),
+    );
+
+    let thrown: any;
+    try {
+      await service.executeQuery(
+        {
+          connectionId: 'conn-1',
+          sql: 'SELECT * FROM users',
+          includeTotalCount: false,
+        } as any,
+        'user-1',
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeDefined();
+    const response = thrown.getResponse();
+    expect(response).toEqual(
+      expect.objectContaining({
+        reason: 'QUERY_EXECUTION_FAILED',
+        message:
+          'Query execution failed on database "analytics": permission denied for relation users',
+        details: expect.objectContaining({
+          connectionId: 'conn-1',
+          connectionType: 'postgres',
+          database: 'analytics',
+          rootCause: 'permission denied for relation users',
+        }),
+      }),
+    );
+  });
+
   it('marks raw select queries with the protective default limit when no explicit limit is requested', async () => {
     connectionsService.findOne.mockResolvedValue({
       id: 'conn-1',
@@ -586,6 +632,48 @@ describe('QueryService', () => {
         appliedLimit: 50_000,
         limitSource: 'protective_default',
         countStatus: 'skipped',
+      }),
+    );
+  });
+
+  it('stores full SQL in audit logs while keeping a truncated snippet for long queries', async () => {
+    const longSql =
+      "SELECT id, email, created_at FROM users WHERE status = 'active' ORDER BY created_at DESC LIMIT 500 OFFSET 250";
+
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+    freshnessService.buildKey.mockResolvedValue('freshness:query:key');
+    cacheManager.get.mockResolvedValue(undefined);
+    strategy.executeQuery.mockResolvedValue({
+      rows: [{ id: 1 }],
+      columns: ['id'],
+      rowCount: 1,
+    });
+
+    await service.executeQuery(
+      {
+        connectionId: 'conn-1',
+        sql: longSql,
+        includeTotalCount: false,
+      } as any,
+      'user-1',
+    );
+
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.DB_QUERY_EXECUTE,
+        details: expect.objectContaining({
+          sql: longSql,
+          sqlSnippet: `${longSql.substring(0, 100)}...`,
+        }),
       }),
     );
   });

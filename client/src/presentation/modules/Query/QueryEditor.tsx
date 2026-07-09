@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
 import type { editor } from 'monaco-editor';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -49,6 +49,8 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const activeOrganizationId = activeConnection?.organizationId || undefined;
+    const selectedDatabase = activeDatabase || activeConnection?.database || null;
+    const showDatabaseHint = Boolean(activeConnection?.showAllDatabases && !activeConnection?.database);
     const schemaInfo = useSchemaInfo();
     const preferences = useAiPreferences();
     const text = getWorkspaceText(lang).queryEditor;
@@ -74,7 +76,9 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const [executedQuery, setExecutedQuery] = useState<string | null>(null);
     const [limit, setLimit] = useState(initialMetadata.limit || '1000');
     const [runNonce, setRunNonce] = useState(0);
-    const [activeResultTab, setActiveResultTab] = useState('data');
+    const [activeResultTab, setActiveResultTab] = useState(
+        typeof initialMetadata.resultTab === 'string' ? initialMetadata.resultTab : 'data',
+    );
     const [isSavedDialogOpen, setIsSavedDialogOpen] = useState(false);
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
     const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
@@ -140,11 +144,18 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             updateTabMetadata(tabId, {
                 sql: query,
                 limit,
+                resultTab: activeResultTab,
             });
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [query, limit, tabId, updateTabMetadata]);
+    }, [query, limit, activeResultTab, tabId, updateTabMetadata]);
+
+    useEffect(() => {
+        if (activeResultTab === 'plan' && !explainPlan) {
+            setActiveResultTab('data');
+        }
+    }, [activeResultTab, explainPlan]);
 
     useEffect(() => {
         if (typeof externalSql !== 'string' || lastExternalSqlRef.current === externalSql) {
@@ -186,6 +197,9 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         },
         enabled: !!executedQuery && !!activeConnectionId && runNonce > 0,
         retry: false,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false,
     });
 
     const blockedReason = (error as ApiError | null)?.reason;
@@ -584,6 +598,8 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             error={(error as Error) || null}
                             executedQuery={executedQuery}
                             dataUpdatedAt={dataUpdatedAt}
+                            selectedDatabase={selectedDatabase}
+                            showDatabaseHint={showDatabaseHint}
                             activeTab={activeResultTab}
                             onTabChange={setActiveResultTab}
                             explainPlan={explainPlan}

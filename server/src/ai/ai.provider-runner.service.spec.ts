@@ -110,6 +110,44 @@ describe('AiProviderRunnerService streaming', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
+  it('retries transient openai-compatible text completion failures before returning plain text', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        json: async () => ({ error: { message: 'upstream busy' } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: '  Ready after completion retry  ',
+              },
+            },
+          ],
+        }),
+      });
+
+    const result = await service.completeOpenAiCompatibleText(
+      {
+        provider: 'openrouter',
+        model: 'openai/gpt-4o-mini',
+        apiKey: 'sk-test',
+        baseUrl: 'https://openrouter.ai/api/v1',
+      },
+      {
+        systemPrompt: 'You are concise.',
+        prompt: 'Return a short answer',
+      },
+    );
+
+    expect(result).toBe('Ready after completion retry');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
   it('sends json_schema response_format for structured openai-compatible completion requests', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
@@ -146,6 +184,34 @@ describe('AiProviderRunnerService streaming', () => {
       'data_explorer_ai_response',
     );
     expect(body.response_format?.json_schema?.strict).toBe(true);
+  });
+
+  it('retries transient Gemini completion failures before returning text', async () => {
+    const generateContent = jest
+      .fn()
+      .mockRejectedValueOnce(
+        new Error('Gemini completion (gemini-test) timed out after 100ms'),
+      )
+      .mockResolvedValueOnce({
+        response: {
+          text: () => 'Gemini retry succeeded',
+        },
+      });
+    (service as unknown as { genAI: { getGenerativeModel: jest.Mock } }).genAI =
+      {
+        getGenerativeModel: jest.fn(() => ({
+          generateContent,
+        })),
+      };
+
+    const result = await service.completeGeminiText({
+      model: 'gemini-test',
+      prompt: 'hello',
+      timeoutMs: 100,
+    });
+
+    expect(result).toBe('Gemini retry succeeded');
+    expect(generateContent).toHaveBeenCalledTimes(2);
   });
 
   it('falls back when openai-compatible providers reject json_schema response_format', async () => {

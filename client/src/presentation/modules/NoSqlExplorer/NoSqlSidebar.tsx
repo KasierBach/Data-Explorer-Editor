@@ -22,12 +22,37 @@ export const NoSqlSidebar: React.FC = () => {
     const text = workspaceText.noSqlSidebar;
     const refreshLoadingLabel = workspaceText.explorerSidebar.refreshingHierarchy;
     const refreshedLabel = workspaceText.explorerSidebar.refreshed;
+    const pageStates = useAppStore(state => state.pageStates);
+    const setPageState = useAppStore(state => state.setPageState);
+    const nosqlActiveConnectionId = useAppStore(state => state.nosqlActiveConnectionId);
+    const pageId = React.useMemo(
+        () => `nosql-sidebar-${nosqlActiveConnectionId || 'default'}`,
+        [nosqlActiveConnectionId],
+    );
+    const savedSearchTerm = React.useMemo(() => {
+        const savedState = pageStates[pageId];
+        return savedState && typeof savedState.searchTerm === 'string'
+            ? savedState.searchTerm
+            : '';
+    }, [pageId, pageStates]);
 
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(savedSearchTerm);
     const [isCreateDatabaseDialogOpen, setCreateDatabaseDialogOpen] = useState(false);
     const [isDeleteDatabaseDialogOpen, setDeleteDatabaseDialogOpen] = useState(false);
     const [databaseToDelete, setDatabaseToDelete] = useState<string | null>(null);
     const queryClient = useQueryClient();
+
+    React.useEffect(() => {
+        setSearchTerm(savedSearchTerm);
+    }, [savedSearchTerm]);
+
+    React.useEffect(() => {
+        const timer = setTimeout(() => {
+            setPageState(pageId, { searchTerm });
+        }, 250);
+
+        return () => clearTimeout(timer);
+    }, [pageId, searchTerm, setPageState]);
 
     const runRefresh = React.useEffectEvent(async () => {
         const t = toast.loading(refreshLoadingLabel);
@@ -35,7 +60,6 @@ export const NoSqlSidebar: React.FC = () => {
         toast.success(refreshedLabel, { id: t });
     });
 
-    const nosqlActiveConnectionId = useAppStore(state => state.nosqlActiveConnectionId);
     const nosqlActiveDatabase = useAppStore(state => state.nosqlActiveDatabase);
     const activeConnection = useAppStore(state => state.connections.find((c) => c.id === nosqlActiveConnectionId));
     const nosqlEffectiveDatabase = activeConnection?.database || nosqlActiveDatabase;

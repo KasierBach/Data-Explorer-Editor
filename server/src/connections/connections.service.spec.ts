@@ -117,6 +117,35 @@ describe('ConnectionsService security', () => {
     expect(prismaMock.connection.delete).not.toHaveBeenCalled();
   });
 
+  it('strips SSH secrets from returned connections', async () => {
+    prismaMock.connection.findFirst.mockResolvedValue({
+      id: 'conn-1',
+      userId: 'user-1',
+      organizationId: null,
+      name: 'SSH DB',
+      type: 'postgres',
+      host: 'db.example.com',
+      password: 'encrypted-password',
+      sshPrivateKey: 'base64-private-key',
+      sshPassphrase: 'super-secret-passphrase',
+    });
+    permissionsMock.ensurePermission.mockResolvedValue(undefined);
+
+    const result = await service.findOne('conn-1', 'user-1');
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'conn-1',
+        name: 'SSH DB',
+        type: 'postgres',
+        host: 'db.example.com',
+      }),
+    );
+    expect(result).not.toHaveProperty('password');
+    expect(result).not.toHaveProperty('sshPrivateKey');
+    expect(result).not.toHaveProperty('sshPassphrase');
+  });
+
   it('creates one shared pool for concurrent requests with the same key', async () => {
     const connection = {
       id: 'conn-1',

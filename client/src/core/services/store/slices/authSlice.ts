@@ -68,12 +68,28 @@ interface LogoutOptions {
     preserveWorkspace?: boolean;
 }
 
-interface WorkspaceRecoverySnapshot {
-    activeConnectionId: string | null;
-    activeDatabase: string | null;
-    tabs: Tab[];
-    activeTabId: string | null;
-}
+type WorkspaceRecoverySnapshot = Pick<
+    AuthResetState,
+    | 'activeConnectionId'
+    | 'activeDatabase'
+    | 'tabs'
+    | 'activeTabId'
+    | 'activeAiChatId'
+    | 'savedQueries'
+    | 'pinnedQueryIds'
+    | 'queryHistory'
+    | 'expandedNodes'
+    | 'pageStates'
+    | 'nosqlActiveConnectionId'
+    | 'nosqlActiveDatabase'
+    | 'nosqlActiveCollection'
+    | 'nosqlViewMode'
+    | 'nosqlFilter'
+    | 'nosqlMqlQuery'
+    | 'nosqlResult'
+    | 'nosqlPipelineStages'
+    | 'nosqlSchemaStats'
+>;
 
 interface WorkspaceRecoveryPayload {
     userKey: string;
@@ -161,18 +177,30 @@ function clearWorkspaceRecovery() {
 }
 
 function buildWorkspaceRecovery(state: AuthSlice & AuthResetState) {
-    const queryTabs = state.tabs.filter((tab) => tab.type === 'query');
-    if (queryTabs.length === 0) return null;
-
-    const activeTabId = queryTabs.some((tab) => tab.id === state.activeTabId)
+    const activeTabId = state.tabs.some((tab) => tab.id === state.activeTabId)
         ? state.activeTabId
-        : queryTabs[0].id;
+        : state.tabs[0]?.id ?? null;
 
     return {
         activeConnectionId: state.activeConnectionId,
         activeDatabase: state.activeDatabase,
-        tabs: queryTabs,
+        tabs: state.tabs,
         activeTabId,
+        activeAiChatId: state.activeAiChatId,
+        savedQueries: state.savedQueries,
+        pinnedQueryIds: state.pinnedQueryIds,
+        queryHistory: state.queryHistory,
+        expandedNodes: state.expandedNodes,
+        pageStates: state.pageStates,
+        nosqlActiveConnectionId: state.nosqlActiveConnectionId,
+        nosqlActiveDatabase: state.nosqlActiveDatabase,
+        nosqlActiveCollection: state.nosqlActiveCollection,
+        nosqlViewMode: state.nosqlViewMode,
+        nosqlFilter: state.nosqlFilter,
+        nosqlMqlQuery: state.nosqlMqlQuery,
+        nosqlResult: state.nosqlResult,
+        nosqlPipelineStages: state.nosqlPipelineStages,
+        nosqlSchemaStats: state.nosqlSchemaStats,
     } satisfies WorkspaceRecoverySnapshot;
 }
 
