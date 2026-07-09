@@ -13,6 +13,12 @@ import { SEO } from '@/presentation/components/shared/Seo';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { getLocalizedDocTitle } from '@/presentation/components/docs/docsI18n';
 
+type DocSearchEntry = {
+    id: string;
+    title: string;
+    sectionTitle: string;
+};
+
 export function DocumentationPage() {
     const navigate = useNavigate();
     const { lang } = useAppStore();
@@ -20,6 +26,7 @@ export function DocumentationPage() {
     const [activeSection, setActiveSection] = useState('introduction');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [headings, setHeadings] = useState<{ id: string, text: string, level: number }[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Compute navigation metadata
     const navInfo = useMemo(() => {
@@ -49,6 +56,28 @@ export function DocumentationPage() {
 
         return { currentItem, currentSection, prev, next };
     }, [activeSection, lang]);
+
+    const docSearchEntries = useMemo<DocSearchEntry[]>(
+        () => DOCS_STRUCTURE.flatMap((section) => (
+            section.items?.map((item) => ({
+                id: item.id,
+                title: getLocalizedDocTitle(lang, item),
+                sectionTitle: getLocalizedDocTitle(lang, section),
+            })) ?? []
+        )),
+        [lang],
+    );
+
+    const docSearchResults = useMemo(() => {
+        const normalizedSearch = searchTerm.trim().toLowerCase();
+        if (!normalizedSearch) {
+            return [];
+        }
+
+        return docSearchEntries
+            .filter((entry) => `${entry.sectionTitle} ${entry.title}`.toLowerCase().includes(normalizedSearch))
+            .slice(0, 8);
+    }, [docSearchEntries, searchTerm]);
 
     useEffect(() => {
         let cancelled = false;
@@ -89,6 +118,13 @@ export function DocumentationPage() {
         }
     };
 
+    const handleSelectSection = (id: string) => {
+        setActiveSection(id);
+        setIsMobileMenuOpen(false);
+        setSearchTerm('');
+        document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     const currentSectionTitle = navInfo.currentSection ? getLocalizedDocTitle(lang, navInfo.currentSection) : '';
     const currentItemTitle = navInfo.currentItem ? getLocalizedDocTitle(lang, navInfo.currentItem) : text.defaultTitle;
 
@@ -125,8 +161,36 @@ export function DocumentationPage() {
                         <input
                             type="text"
                             placeholder={text.quickSearch}
+                            value={searchTerm}
+                            onChange={(event) => setSearchTerm(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter' && docSearchResults[0]) {
+                                    handleSelectSection(docSearchResults[0].id);
+                                }
+                            }}
                             className="bg-muted/50 border rounded-full pl-9 pr-4 py-1.5 text-xs w-48 lg:w-64 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
                         />
+                        {searchTerm.trim() && docSearchResults.length > 0 ? (
+                            <div className="absolute left-0 right-0 top-full mt-2 overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-xl">
+                                {docSearchResults.map((result) => (
+                                    <button
+                                        key={result.id}
+                                        type="button"
+                                        onMouseDown={(event) => {
+                                            event.preventDefault();
+                                            handleSelectSection(result.id);
+                                        }}
+                                        className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/60"
+                                    >
+                                        <span className="min-w-0">
+                                            <span className="block truncate text-sm text-foreground">{result.title}</span>
+                                            <span className="block truncate text-[11px] text-muted-foreground">{result.sectionTitle}</span>
+                                        </span>
+                                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Enter</span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : null}
                     </div>
 
                     <div className="sm:hidden">
@@ -156,7 +220,7 @@ export function DocumentationPage() {
                 {/* Desktop Sidebar */}
                 <DocSidebar
                     activeId={activeSection}
-                    onSelect={(id) => setActiveSection(id)}
+                    onSelect={handleSelectSection}
                     lang={lang}
                     className="hidden md:flex"
                 />
@@ -172,10 +236,7 @@ export function DocumentationPage() {
                 {/* Mobile Sidebar */}
                 <DocSidebar
                     activeId={activeSection}
-                    onSelect={(id) => {
-                        setActiveSection(id);
-                        setIsMobileMenuOpen(false);
-                    }}
+                    onSelect={handleSelectSection}
                     lang={lang}
                     className={cn(
                         "fixed inset-y-0 left-0 w-72 z-50 md:hidden transition-transform duration-300 ease-in-out border-r pt-14",
@@ -193,7 +254,7 @@ export function DocumentationPage() {
                             <DocBreadcrumbs
                                 sectionTitle={currentSectionTitle}
                                 itemTitle={navInfo.currentItem ? currentItemTitle : ''}
-                                onHomeClick={() => setActiveSection('introduction')}
+                                onHomeClick={() => handleSelectSection('introduction')}
                                 lang={lang}
                             />
 
@@ -204,10 +265,7 @@ export function DocumentationPage() {
                             <DocNavigation
                                 prev={navInfo.prev}
                                 next={navInfo.next}
-                                onNavigate={(id) => {
-                                    setActiveSection(id);
-                                    document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' });
-                                }}
+                                onNavigate={handleSelectSection}
                                 lang={lang}
                             />
 
@@ -222,15 +280,6 @@ export function DocumentationPage() {
                                     </button>
                                     <span className="opacity-30 hidden sm:block">|</span>
                                     <span className="text-xs">v3.6.2 • {text.releaseDate}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-xs text-muted-foreground font-medium">
-                                        {text.helpful}
-                                    </span>
-                                    <div className="flex gap-1">
-                                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-emerald-500/10 hover:text-emerald-500 transition-colors">👍</Button>
-                                        <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-rose-500/10 hover:text-rose-500 transition-colors">👎</Button>
-                                    </div>
                                 </div>
                             </footer>
                         </div>

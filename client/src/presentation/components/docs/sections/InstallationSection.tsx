@@ -109,8 +109,8 @@ export function InstallationSection({ lang }: Props) {
               {t ? "Tùy chọn cho AI routing" : "Optional for AI routing"}
             </CodeComment>
             <CodeLine>GEMINI_API_KEY=...</CodeLine>
-            <CodeLine>AI_PROVIDER_TIMEOUT_MS=15000</CodeLine>
-            <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=15000</CodeLine>
+            <CodeLine>AI_PROVIDER_TIMEOUT_MS=90000</CodeLine>
+            <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=90000</CodeLine>
             <CodeLine>CEREBRAS_API_KEY=...</CodeLine>
             <CodeLine>CEREBRAS_BASE_URL=https://api.cerebras.ai/v1</CodeLine>
             <CodeLine>CEREBRAS_CHAT_MODEL=llama3.1-8b</CodeLine>
@@ -266,8 +266,8 @@ export function InstallationSection({ lang }: Props) {
       <Callout type="tip">
         <p className="text-sm">
           {t
-            ? "Lưu ý về timeout AI: example file trong repo hiện dùng `15000ms` cho local/dev để fail nhanh hơn khi debug. Ở production, bạn có thể tăng giá trị này nếu workflow của bạn thường xuyên có prompt dài hoặc attachment nặng."
-            : "AI timeout note: the example files in the repo currently use `15000ms` for local/dev so failures surface faster while debugging. In production, you can raise that value if your workflows often involve long prompts or heavy attachments."}
+            ? "Lưu ý về timeout AI: code fallback và example file trong repo hiện đều dùng `90000ms`. Nếu local/dev của bạn cần fail nhanh hơn để debug, hãy chủ động hạ riêng giá trị này."
+            : "AI timeout note: the code fallback and the example files in the repo now both use `90000ms`. If you want local/dev to fail faster while debugging, lower that value explicitly for your environment."}
         </p>
       </Callout>
     </DocPageLayout>

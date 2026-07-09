@@ -136,16 +136,16 @@ export function EnvVarsSection({ lang }: Props) {
         {
           name: "AI_PROVIDER_TIMEOUT_MS",
           desc: t
-            ? "Timeout tổng cho provider requests. Code fallback hiện tại là 60000ms, còn file example trong repo đang đặt 15000ms để fail nhanh hơn khi local/dev"
-            : "Overall timeout for provider requests. The code fallback is currently 60000ms, while the repo example files use 15000ms to fail faster in local/dev",
-          example: "15000",
+            ? "Timeout tổng cho provider requests. Hiện code fallback và file example trong repo đều đang dùng 90000ms"
+            : "Overall timeout for provider requests. The code fallback and the repo example files are both set to 90000ms right now",
+          example: "90000",
         },
         {
           name: "AI_STREAM_IDLE_TIMEOUT_MS",
           desc: t
-            ? "Timeout khi stream bị stall. Nếu không đặt riêng, service sẽ fallback về AI_PROVIDER_TIMEOUT_MS; code mặc định hiện tại là 60000ms"
-            : "Timeout for stalled streams. If omitted, the service falls back to AI_PROVIDER_TIMEOUT_MS; the code default is currently 60000ms",
-          example: "15000",
+            ? "Timeout khi stream bị stall. Nếu không đặt riêng, service sẽ fallback về AI_PROVIDER_TIMEOUT_MS; mặc định hiện tại cũng là 90000ms"
+            : "Timeout for stalled streams. If omitted, the service falls back to AI_PROVIDER_TIMEOUT_MS; the current default is also 90000ms",
+          example: "90000",
         },
         {
           name: "CEREBRAS_API_KEY",
@@ -373,8 +373,8 @@ export function EnvVarsSection({ lang }: Props) {
           <Callout type="info">
             <p className="text-sm">
               {t
-                ? "Lưu ý thực tế: một số giá trị trong example file được chọn để thuận tiện cho local/dev, còn code fallback trong service có thể khác. Ví dụ, timeout AI trong code mặc định là 60000ms nhưng example file hiện đang để 15000ms để fail sớm và dễ debug hơn."
-                : "Practical note: some example values are tuned for local/dev convenience, while code-level fallbacks can differ. For example, the AI service defaults to 60000ms in code, but the example env files currently use 15000ms to fail sooner and stay easier to debug."}
+                ? "Lưu ý thực tế: hiện code fallback và example env trong repo đều đang dùng 90000ms. Nếu local/dev của bạn muốn fail sớm hơn để debug, bạn có thể tự hạ riêng giá trị này."
+                : "Practical note: the code fallback and the example env files currently both use 90000ms. If you want local/dev to fail faster while debugging, lower the value explicitly for your setup."}
             </p>
           </Callout>
 

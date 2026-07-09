@@ -218,8 +218,8 @@ export function DeploymentSection({ lang }: Props) {
         <CodeBlock title={t ? "Optional AI lanes" : "Optional AI lanes"}>
           <CodeComment>{t ? "Premium lane" : "Premium lane"}</CodeComment>
           <CodeLine>GEMINI_API_KEY=...</CodeLine>
-          <CodeLine>AI_PROVIDER_TIMEOUT_MS=15000</CodeLine>
-          <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=15000</CodeLine>
+          <CodeLine>AI_PROVIDER_TIMEOUT_MS=90000</CodeLine>
+          <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=90000</CodeLine>
           <p className="mt-3" />
           <CodeComment>{t ? "Lower-cost lane" : "Lower-cost lane"}</CodeComment>
           <CodeLine>CEREBRAS_API_KEY=...</CodeLine>
