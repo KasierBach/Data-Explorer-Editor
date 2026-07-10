@@ -1,4 +1,4 @@
-import { NoSqlService } from './nosql.service';
+﻿import { NoSqlService } from './nosql.service';
 
 describe('NoSqlService security', () => {
   let service: NoSqlService;
@@ -64,6 +64,34 @@ describe('NoSqlService security', () => {
         action: 'find',
         collection: 'events',
         limit: 5,
+      }),
+    );
+  });
+
+  it('caps schema sampling to the configured maximum to avoid oversized scans', async () => {
+    const strategy = {
+      executeQuery: jest.fn().mockResolvedValue({
+        rows: [{ status: 'ok' }],
+      }),
+    };
+    redisMock.get.mockResolvedValueOnce(null);
+    connectionsMock.getPool.mockResolvedValueOnce({});
+    strategyFactoryMock.getStrategy.mockReturnValue(strategy);
+
+    await service.analyzeSchema({
+      connectionId: 'conn-1',
+      database: 'analytics',
+      collection: 'events',
+      sampleSize: 50000,
+      userId: 'user-1',
+    });
+
+    expect(strategy.executeQuery).toHaveBeenCalledWith(
+      {},
+      JSON.stringify({
+        action: 'find',
+        collection: 'events',
+        limit: 1000,
       }),
     );
   });

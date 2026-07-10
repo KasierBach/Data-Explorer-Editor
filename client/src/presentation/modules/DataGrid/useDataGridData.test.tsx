@@ -59,8 +59,7 @@ describe('useDataGridData', () => {
       columns: ['id'],
       rows: [{ id: 101 }],
       rowCount: 1,
-      totalCount: 999,
-      countStatus: 'available',
+      countStatus: 'skipped',
     });
     mockGetAdapter.mockReturnValue(adapter as never);
 
@@ -102,14 +101,14 @@ describe('useDataGridData', () => {
       database: 'analytics',
       schema: 'public',
       table: 'users',
-      includeTotalCount: true,
+      includeTotalCount: false,
       limit: 50,
       offset: 100,
     });
     expect(result.current.queryResult).toEqual(
       expect.objectContaining({
-        totalCount: 999,
-        countStatus: 'available',
+        rows: [{ id: 101 }],
+        countStatus: 'skipped',
       }),
     );
     expect(result.current.pkField).toBe('id');
@@ -129,7 +128,7 @@ describe('useDataGridData', () => {
       database: undefined,
       schema: 'public',
       table: 'large_dataset',
-      includeTotalCount: true,
+      includeTotalCount: false,
       limit: 50,
       offset: 100,
     });

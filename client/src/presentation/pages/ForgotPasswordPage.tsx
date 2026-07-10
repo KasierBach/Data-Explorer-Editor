@@ -58,7 +58,9 @@ export const ForgotPasswordPage = () => {
             <SEO 
                 title={step === 1 
                     ? text.forgotTitle
-                    : text.resetTitle} 
+                    : text.resetTitle}
+                lang={lang}
+                robots="noindex, nofollow"
             />
             <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
                 <div className="flex flex-col items-center mb-8 space-y-2">

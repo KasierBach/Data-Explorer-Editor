@@ -70,7 +70,7 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
                 database: dbName,
                 schema,
                 table: resolvedTableName,
-                includeTotalCount: true,
+                includeTotalCount: false,
                 limit: pageSize,
                 offset,
             });

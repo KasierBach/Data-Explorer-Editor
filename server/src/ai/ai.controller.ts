@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   Controller,
   Post,
@@ -8,12 +8,14 @@ import {
   Res,
   Req,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { AiService } from './ai.service';
 import { AiConnectionService } from './ai.connection-service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { GenerateSqlDto } from './dto/generate-sql.dto';
 import { AutocompleteDto } from './dto/autocomplete.dto';
+import { ProviderModelsDto } from './dto/provider-models.dto';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
 import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
 
@@ -53,6 +55,7 @@ export class AiController {
   ) {}
 
   @Post('generate-sql')
+  @Throttle({ default: { limit: 12, ttl: 60000 } })
   async generateSql(
     @Body() body: GenerateSqlDto,
     @Req() req: AuthenticatedRequest,
@@ -101,6 +104,7 @@ export class AiController {
   }
 
   @Post('generate-sql-stream')
+  @Throttle({ default: { limit: 8, ttl: 60000 } })
   async generateSqlStream(
     @Body() body: GenerateSqlDto,
     @Res() res: Response,
@@ -171,6 +175,7 @@ export class AiController {
   }
 
   @Post('autocomplete')
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   async autocomplete(
     @Body() body: AutocompleteDto,
     @Req() req: AuthenticatedRequest,
@@ -207,8 +212,9 @@ export class AiController {
   }
 
   @Post('provider-models')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async listProviderModels(
-    @Body() body: { baseUrl?: string; apiKey?: string },
+    @Body() body: ProviderModelsDto,
   ) {
     const baseUrl =
       typeof body?.baseUrl === 'string'
@@ -279,6 +285,7 @@ export class AiController {
   }
 
   @Post('nlp-to-sql')
+  @Throttle({ default: { limit: 12, ttl: 60000 } })
   async nlpToSql(
     @Body() body: GenerateSqlDto,
     @Req() req: AuthenticatedRequest,
@@ -328,6 +335,7 @@ export class AiTestController {
   ) {}
 
   @Post('autocomplete')
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   async autocomplete(
     @Body() body: AutocompleteDto,
     @Req() req: AuthenticatedRequest,

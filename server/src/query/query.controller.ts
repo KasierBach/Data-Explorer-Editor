@@ -8,6 +8,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { QueryService } from './query.service';
 import { CreateQueryDto } from './dto/create-query.dto';
 import { FetchTableWindowDto } from './dto/fetch-table-window.dto';
@@ -15,6 +16,9 @@ import { UpdateRowDto } from './dto/update-row.dto';
 import { InsertRowDto } from './dto/insert-row.dto';
 import { DeleteRowsDto } from './dto/delete-rows.dto';
 import { UpdateSchemaDto } from './dto/update-schema.dto';
+import { SeedDataDto } from './dto/seed-data.dto';
+import { ManageDatabaseDto } from './dto/manage-database.dto';
+import { ImportDataDto } from './dto/import-data.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 interface JwtUser {
@@ -33,6 +37,7 @@ export class QueryController {
   constructor(private readonly queryService: QueryService) {}
 
   @Post()
+  @Throttle({ default: { limit: 45, ttl: 60000 } })
   executeQuery(
     @Body() createQueryDto: CreateQueryDto,
     @Req() req: RequestWithUser,
@@ -41,6 +46,7 @@ export class QueryController {
   }
 
   @Post('table-window')
+  @Throttle({ default: { limit: 180, ttl: 60000 } })
   fetchTableWindow(
     @Body() fetchTableWindowDto: FetchTableWindowDto,
     @Req() req: RequestWithUser,
@@ -49,16 +55,19 @@ export class QueryController {
   }
 
   @Patch('row')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   updateRow(@Body() updateRowDto: UpdateRowDto, @Req() req: RequestWithUser) {
     return this.queryService.updateRow(updateRowDto, req.user.id);
   }
 
   @Post('row')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   insertRow(@Body() insertRowDto: InsertRowDto, @Req() req: RequestWithUser) {
     return this.queryService.insertRow(insertRowDto, req.user.id);
   }
 
   @Post('delete-rows')
+  @Throttle({ default: { limit: 45, ttl: 60000 } })
   deleteRows(
     @Body() deleteRowsDto: DeleteRowsDto,
     @Req() req: RequestWithUser,
@@ -67,6 +76,7 @@ export class QueryController {
   }
 
   @Post('schema')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   updateSchema(
     @Body() updateSchemaDto: UpdateSchemaDto,
     @Req() req: RequestWithUser,
@@ -75,16 +85,18 @@ export class QueryController {
   }
 
   @Post('seed')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async seedFailed(
-    @Body() body: { connectionId: string },
+    @Body() body: SeedDataDto,
     @Req() req: RequestWithUser,
   ) {
     return this.queryService.seedData(body.connectionId, req.user.id);
   }
 
   @Post('database')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async createDatabase(
-    @Body() body: { connectionId: string; name: string },
+    @Body() body: ManageDatabaseDto,
     @Req() req: RequestWithUser,
   ) {
     return this.queryService.createDatabase(
@@ -95,8 +107,9 @@ export class QueryController {
   }
 
   @Delete('database')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async dropDatabase(
-    @Body() body: { connectionId: string; name: string },
+    @Body() body: ManageDatabaseDto,
     @Req() req: RequestWithUser,
   ) {
     return this.queryService.dropDatabase(
@@ -107,14 +120,9 @@ export class QueryController {
   }
 
   @Post('import')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async importData(
-    @Body()
-    body: {
-      connectionId: string;
-      schema: string;
-      table: string;
-      data: Record<string, unknown>[];
-    },
+    @Body() body: ImportDataDto,
     @Req() req: RequestWithUser,
   ) {
     return this.queryService.importData(body, req.user.id);

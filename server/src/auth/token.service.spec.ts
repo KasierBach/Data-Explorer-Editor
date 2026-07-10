@@ -26,4 +26,18 @@ describe('TokenService notifications stream tickets', () => {
       UnauthorizedException,
     );
   });
+
+  it('strips inline avatar payloads from the session profile', () => {
+    expect(
+      tokenService.buildUserProfile({
+        id: 'user-1',
+        email: 'user@example.com',
+        avatarUrl: 'data:image/png;base64,abc123',
+      }),
+    ).toMatchObject({
+      id: 'user-1',
+      email: 'user@example.com',
+      avatarUrl: null,
+    });
+  });
 });

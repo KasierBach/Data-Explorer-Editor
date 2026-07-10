@@ -75,9 +75,7 @@ type WorkspaceRecoverySnapshot = Pick<
     | 'tabs'
     | 'activeTabId'
     | 'activeAiChatId'
-    | 'savedQueries'
     | 'pinnedQueryIds'
-    | 'queryHistory'
     | 'expandedNodes'
     | 'pageStates'
     | 'nosqlActiveConnectionId'
@@ -86,9 +84,7 @@ type WorkspaceRecoverySnapshot = Pick<
     | 'nosqlViewMode'
     | 'nosqlFilter'
     | 'nosqlMqlQuery'
-    | 'nosqlResult'
     | 'nosqlPipelineStages'
-    | 'nosqlSchemaStats'
 >;
 
 interface WorkspaceRecoveryPayload {
@@ -187,9 +183,7 @@ function buildWorkspaceRecovery(state: AuthSlice & AuthResetState) {
         tabs: state.tabs,
         activeTabId,
         activeAiChatId: state.activeAiChatId,
-        savedQueries: state.savedQueries,
         pinnedQueryIds: state.pinnedQueryIds,
-        queryHistory: state.queryHistory,
         expandedNodes: state.expandedNodes,
         pageStates: state.pageStates,
         nosqlActiveConnectionId: state.nosqlActiveConnectionId,
@@ -198,9 +192,7 @@ function buildWorkspaceRecovery(state: AuthSlice & AuthResetState) {
         nosqlViewMode: state.nosqlViewMode,
         nosqlFilter: state.nosqlFilter,
         nosqlMqlQuery: state.nosqlMqlQuery,
-        nosqlResult: state.nosqlResult,
         nosqlPipelineStages: state.nosqlPipelineStages,
-        nosqlSchemaStats: state.nosqlSchemaStats,
     } satisfies WorkspaceRecoverySnapshot;
 }
 
@@ -228,7 +220,41 @@ function takeWorkspaceRecovery(user: AuthUser) {
     }
 
     clearWorkspaceRecovery();
-    return payload.snapshot;
+    const {
+        activeConnectionId,
+        activeDatabase,
+        tabs,
+        activeTabId,
+        activeAiChatId,
+        pinnedQueryIds,
+        expandedNodes,
+        pageStates,
+        nosqlActiveConnectionId,
+        nosqlActiveDatabase,
+        nosqlActiveCollection,
+        nosqlViewMode,
+        nosqlFilter,
+        nosqlMqlQuery,
+        nosqlPipelineStages,
+    } = payload.snapshot;
+
+    return {
+        activeConnectionId,
+        activeDatabase,
+        tabs,
+        activeTabId,
+        activeAiChatId,
+        pinnedQueryIds,
+        expandedNodes,
+        pageStates,
+        nosqlActiveConnectionId,
+        nosqlActiveDatabase,
+        nosqlActiveCollection,
+        nosqlViewMode,
+        nosqlFilter,
+        nosqlMqlQuery,
+        nosqlPipelineStages,
+    } satisfies WorkspaceRecoverySnapshot;
 }
 
 const defaultNoSqlFilter: NoSqlFilterState = {

@@ -9,6 +9,7 @@ import {
   UseGuards,
   Req,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ConnectionsService } from './connections.service';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
@@ -44,6 +45,7 @@ export class ConnectionsController {
   }
 
   @Post(':id/health-check')
+  @Throttle({ default: { limit: 180, ttl: 60000 } })
   checkHealth(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     return this.connectionsService.checkHealth(id, req.user.id);
   }

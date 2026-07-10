@@ -393,7 +393,7 @@ export const LegalConsentPage: React.FC = () => {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
-            <SEO title={t('Chấp thuận pháp lý', 'Legal consent')} lang={lang} />
+            <SEO title={t('Chấp thuận pháp lý', 'Legal consent')} lang={lang} robots="noindex, nofollow" />
             <div className="w-full max-w-xl rounded-3xl border bg-background p-8 shadow-sm">
                 <div className="mb-6 flex items-center gap-3">
                     <div className="rounded-2xl bg-primary/10 p-3">

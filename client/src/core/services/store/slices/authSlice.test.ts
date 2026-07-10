@@ -114,7 +114,7 @@ describe('authSlice workspace recovery', () => {
         expect(getState().activeDatabase).toBe('app');
     });
 
-    it('restores page state and NoSQL workspace context after a session-expiry logout for the same user', () => {
+    it('restores workspace context without reviving cached results or history after a session-expiry logout for the same user', () => {
         const { store, getState, setState } = createTestStore();
         const recoveredPageStates = {
             'nosql-visualize-conn-1-users': { chartType: 'bar', groupField: 'status' },
@@ -137,6 +137,8 @@ describe('authSlice workspace recovery', () => {
         setState({
             isAuthenticated: true,
             user: userA,
+            savedQueries: [{ id: 'saved-1', name: 'Pinned', sql: 'select 1', visibility: 'private', tags: [], createdAt: '2026-01-01', updatedAt: '2026-01-01' }],
+            queryHistory: [{ id: 'history-1', sql: 'select 1', executedAt: Date.now(), status: 'success' }],
             pageStates: recoveredPageStates,
             nosqlActiveConnectionId: 'conn-1',
             nosqlActiveDatabase: 'analytics',
@@ -162,9 +164,11 @@ describe('authSlice workspace recovery', () => {
         expect(getState().nosqlViewMode).toBe('schema');
         expect(getState().nosqlFilter).toEqual(recoveredFilter);
         expect(getState().nosqlMqlQuery).toBe('{ "aggregate": "users" }');
-        expect(getState().nosqlResult).toEqual(recoveredResult);
         expect(getState().nosqlPipelineStages).toEqual(recoveredPipeline);
-        expect(getState().nosqlSchemaStats).toEqual(recoveredSchema);
+        expect(getState().savedQueries).toEqual([]);
+        expect(getState().queryHistory).toEqual([]);
+        expect(getState().nosqlResult).toBeNull();
+        expect(getState().nosqlSchemaStats).toBeNull();
     });
 
     it('does not restore another user workspace after a session-expiry logout', () => {

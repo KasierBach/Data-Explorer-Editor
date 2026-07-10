@@ -1,7 +1,11 @@
-User-agent: *
+﻿User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /onboarding/
-Disallow: /forgot-password/
+Disallow: /legal-consent/
+Disallow: /sql-explorer/
+Disallow: /nosql-explorer/
+Disallow: /teams/
+Disallow: /billing/
 
 Sitemap: https://data-explorer-editor.vercel.app/sitemap.xml

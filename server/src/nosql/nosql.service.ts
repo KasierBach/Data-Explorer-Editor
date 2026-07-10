@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
@@ -6,6 +6,8 @@ import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory
 @Injectable()
 export class NoSqlService {
   private readonly logger = new Logger(NoSqlService.name);
+  private readonly DEFAULT_SCHEMA_SAMPLE_SIZE = 100;
+  private readonly MAX_SCHEMA_SAMPLE_SIZE = 1000;
 
   constructor(
     private readonly redisService: RedisService,
@@ -33,18 +35,20 @@ export class NoSqlService {
       connectionId,
       database,
       collection,
-      sampleSize = 100,
+      sampleSize = this.DEFAULT_SCHEMA_SAMPLE_SIZE,
       userId,
       refresh = false,
     } = params;
+    const normalizedSampleSize = Math.min(
+      Math.max(sampleSize, 1),
+      this.MAX_SCHEMA_SAMPLE_SIZE,
+    );
     const cacheKey = this.getSchemaCacheKey(connectionId, database, collection);
 
-    // 1. Clear cache if refresh is requested
     if (refresh) {
       await this.redisService.del(cacheKey);
       this.logger.log(`Forced refresh: cleared cache for ${collection}`);
     } else {
-      // Try to get from cache
       const cached = await this.redisService.get(cacheKey);
       if (cached) {
         this.logger.log(`Serving cached schema for ${collection}`);
@@ -52,29 +56,26 @@ export class NoSqlService {
       }
     }
 
-    // 2. Sample and analyze
     this.logger.log(
-      `Analyzing schema for ${collection} (sampling ${sampleSize} docs)`,
+      `Analyzing schema for ${collection} (sampling ${normalizedSampleSize} docs)`,
     );
     const pool = await this.connectionsService.getPool(
       connectionId,
       database,
       userId,
     );
-    const strategy = this.strategyFactory.getStrategy('mongodb'); // Explicitly use mongodb for now
+    const strategy = this.strategyFactory.getStrategy('mongodb');
 
-    // Get sample data
     const query = JSON.stringify({
       action: 'find',
       collection,
-      limit: sampleSize,
+      limit: normalizedSampleSize,
     });
     const result = await strategy.executeQuery(pool, query);
     const data = result.rows || [];
 
     if (data.length === 0) return [];
 
-    // Inference Logic
     const fieldMeta: Record<string, any> = {};
     data.forEach((doc: any) => {
       Object.keys(doc).forEach((key) => {
@@ -119,7 +120,6 @@ export class NoSqlService {
       }))
       .sort((a, b) => b.count - a.count);
 
-    // 3. Save to cache (TTL: 1 hour)
     await this.redisService.set(cacheKey, stats, 3600);
 
     return stats;

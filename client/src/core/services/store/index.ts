@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 import { createUISlice, type UISlice } from './slices/uiSlice';
@@ -9,10 +9,8 @@ import { createTabSlice, type TabSlice, type Tab } from './slices/tabSlice';
 import { createQuerySlice, type QuerySlice, type SavedQuery, type QueryHistoryEntry } from './slices/querySlice';
 import { createNoSqlSlice, type NoSqlSlice } from './slices/nosqlSlice';
 
-// Re-export types that are used across the app
 export type { AiChat, AiMessage, Connection, Tab, SavedQuery, QueryHistoryEntry };
 
-// Combine all slice interfaces
 export type AppState = UISlice &
     AiChatSlice &
     ConnectionSlice &
@@ -39,10 +37,8 @@ export const useAppStore = create<AppState>()(
         {
             name: 'data-explorer-storage',
             storage: createJSONStorage(() => localStorage),
-            // Sanitize persisted state on rehydration to fix corrupt data
             merge: (persistedState, currentState) => {
                 const persisted = (persistedState as PersistedStoreState) || {};
-                // Fix: expandedNodes may have been saved as {} instead of []
                 if (persisted.expandedNodes && !Array.isArray(persisted.expandedNodes)) {
                     persisted.expandedNodes = [];
                 }
@@ -51,6 +47,10 @@ export const useAppStore = create<AppState>()(
                 delete persisted.accessToken;
                 delete persisted.tokenExp;
                 delete persisted.user;
+                delete persisted.savedQueries;
+                delete persisted.queryHistory;
+                delete persisted.nosqlResult;
+                delete persisted.nosqlSchemaStats;
                 if (Array.isArray(persisted.aiChats)) {
                     persisted.aiChats = persisted.aiChats.map((chat) => ({
                         ...chat,
@@ -62,7 +62,6 @@ export const useAppStore = create<AppState>()(
                 }
                 return { ...currentState, ...persisted } as AppState;
             },
-            // Only persist essential state AND sanitize passwords
             partialize: (state) => ({
                 connections: state.connections.map(c => {
                     const safeConnection = { ...c };
@@ -76,9 +75,7 @@ export const useAppStore = create<AppState>()(
                 isSidebarOpen: state.isSidebarOpen,
                 sidebarWidth: state.sidebarWidth,
                 isDesktopModeOnMobile: state.isDesktopModeOnMobile,
-                savedQueries: state.savedQueries,
                 pinnedQueryIds: state.pinnedQueryIds,
-                queryHistory: state.queryHistory,
                 aiChats: state.aiChats.map(chat => ({
                     ...chat,
                     messages: [],
@@ -97,11 +94,7 @@ export const useAppStore = create<AppState>()(
                 nosqlViewMode: state.nosqlViewMode,
                 nosqlFilter: state.nosqlFilter,
                 nosqlMqlQuery: state.nosqlMqlQuery,
-                nosqlResult: Array.isArray(state.nosqlResult)
-                    ? state.nosqlResult.slice(0, 10)
-                    : state.nosqlResult,
                 nosqlPipelineStages: state.nosqlPipelineStages,
-                nosqlSchemaStats: state.nosqlSchemaStats,
                 explorerSearchMode: state.explorerSearchMode,
                 defaultResultHeight: state.defaultResultHeight,
             }),

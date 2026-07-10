@@ -1,18 +1,16 @@
-# ──────────────────────────────────────────────
-# Data Explorer – Docker Compose (production-like)
-# ──────────────────────────────────────────────
+﻿# Local-by-default Docker Compose baseline.
+# All published ports bind to localhost unless overridden via env vars.
 
 services:
-  # ── PostgreSQL ──────────────────────────────
   db:
     image: postgres:15-alpine
     container_name: data-explorer-db
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local}
       POSTGRES_DB: data_explorer
     ports:
-      - "5435:5432"
+      - "${POSTGRES_BIND:-127.0.0.1:5435}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -23,12 +21,11 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  # ── Redis ───────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: data-explorer-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_BIND:-127.0.0.1:6379}:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -39,7 +36,6 @@ services:
       start_period: 5s
     restart: unless-stopped
 
-  # ── Database Migrations (runs once then exits) ──
   migrate:
     build:
       context: ./server
@@ -47,25 +43,24 @@ services:
     container_name: data-explorer-migrate
     entrypoint: ["npx", "prisma", "migrate", "deploy"]
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/data_explorer
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-change-me-local}@db:5432/data_explorer
     depends_on:
       db:
         condition: service_healthy
     restart: "no"
 
-  # ── Backend API ─────────────────────────────
   backend:
     build:
       context: ./server
       dockerfile: Dockerfile
     container_name: data-explorer-backend
     ports:
-      - "3001:3001"
+      - "${BACKEND_BIND:-127.0.0.1:3001}:3001"
     env_file:
       - ./server/.env
     environment:
       - PORT=3001
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/data_explorer
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-change-me-local}@db:5432/data_explorer
       - REDIS_URL=redis://redis:6379
       - FRONTEND_URL=http://localhost
       - API_PUBLIC_URL=http://localhost:3001/api
@@ -82,7 +77,6 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  # ── Frontend (Nginx) ───────────────────────
   frontend:
     build:
       context: ./client
@@ -91,7 +85,7 @@ services:
         - VITE_API_URL=http://localhost:3001/api
     container_name: data-explorer-frontend
     ports:
-      - "80:80"
+      - "${FRONTEND_BIND:-127.0.0.1:80}:80"
     depends_on:
       backend:
         condition: service_healthy

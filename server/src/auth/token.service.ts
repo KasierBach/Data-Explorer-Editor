@@ -43,7 +43,11 @@ export class TokenService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      avatarUrl: user.avatarUrl,
+      avatarUrl:
+        typeof user.avatarUrl === 'string' &&
+        user.avatarUrl.startsWith('data:')
+          ? null
+          : user.avatarUrl,
       isOnboarded: user.isOnboarded,
       role: user.role,
       username: user.username,

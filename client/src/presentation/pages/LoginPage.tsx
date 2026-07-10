@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
@@ -209,7 +209,7 @@ export const LoginPage = () => {
     if (verifyEmailStep) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
-                <SEO title={`${title} - ${t('Xác minh email', 'Verify email')}`} lang={lang} />
+                <SEO title={`${title} - ${t('Xác minh email', 'Verify email')}`} lang={lang} robots="noindex, nofollow" />
                 <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
                     <div className="mb-6">
                         <Button
@@ -292,7 +292,7 @@ export const LoginPage = () => {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
-            <SEO title={title} lang={lang} />
+            <SEO title={title} lang={lang} robots="noindex, nofollow" />
             <div className="w-full max-w-sm bg-background border rounded-lg shadow-sm p-8 animate-in fade-in zoom-in-95 duration-300">
                 <div className="mb-6">
                     <Button

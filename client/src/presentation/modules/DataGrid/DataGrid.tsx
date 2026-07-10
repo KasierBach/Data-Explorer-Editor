@@ -210,13 +210,13 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
 
     const pagination = useMemo(() => ({ pageIndex, pageSize }), [pageIndex, pageSize]);
 
-    // Custom hooks — data & editing logic
+    // Custom hooks - data & editing logic
     const {
         metadata, queryResult, isLoadingMeta, isLoadingData, isFetchingData,
         refetch, dbName, schema, cleanTableName, dialect, pkField,
     } = useDataGridData({ tableId });
     const tableName = cleanTableName || tableId;
-    const effectiveTotalCount = queryResult?.totalCount;
+    const effectiveTotalCount = queryResult?.totalCount ?? metadata?.rowCount;
     const totalPages = effectiveTotalCount
         ? Math.max(1, Math.ceil(effectiveTotalCount / pagination.pageSize))
         : null;
