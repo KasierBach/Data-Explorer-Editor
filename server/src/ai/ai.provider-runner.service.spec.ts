@@ -148,6 +148,34 @@ describe('AiProviderRunnerService streaming', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
+  it('does not include provider error payloads in thrown errors', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      json: async () => ({ error: { message: 'Bearer sk-sensitive-token' } }),
+    });
+
+    let thrown: unknown;
+    try {
+      await service.runOpenAiCompatible(
+        {
+          provider: 'custom',
+          model: 'test-model',
+          apiKey: 'sk-sensitive-token',
+          baseUrl: 'https://provider.example/v1',
+        },
+        { prompt: 'hello' },
+        'auto',
+        structuredDbDecision,
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toHaveProperty('message', 'custom error (401)');
+  });
+
   it('sends json_schema response_format for structured openai-compatible completion requests', async () => {
     mockFetch.mockResolvedValue({
       ok: true,

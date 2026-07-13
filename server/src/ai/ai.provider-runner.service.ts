@@ -519,9 +519,8 @@ export class AiProviderRunnerService {
       );
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
         throw new Error(
-          `${plan.provider} completion error (${response.status}): ${error.error?.message || response.statusText}`,
+          `${plan.provider} completion error (${response.status})`,
         );
       }
 
@@ -741,9 +740,7 @@ export class AiProviderRunnerService {
           continue;
         }
 
-        throw new Error(
-          `${plan.provider} error (${response.status}): ${this.extractProviderErrorMessage(errorPayload) || response.statusText}`,
-        );
+        throw new Error(`${plan.provider} error (${response.status})`);
       }
 
       const result = await response.json();
@@ -1003,9 +1000,7 @@ export class AiProviderRunnerService {
           continue;
         }
 
-        throw new Error(
-          `${plan.provider} Stream API error [${response.status}]: ${JSON.stringify(errorPayload)}`,
-        );
+        throw new Error(`${plan.provider} Stream API error [${response.status}]`);
       }
 
       yield* this.streamFetch(

@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ConnectionsService } from './connections.service';
 import { Permission } from '../permissions/enums/permission.enum';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
+import * as cryptoUtil from '../utils/crypto.util';
 
 describe('ConnectionsService security', () => {
   let service: ConnectionsService;
@@ -146,6 +147,55 @@ describe('ConnectionsService security', () => {
     expect(result).not.toHaveProperty('sshPassphrase');
   });
 
+  it('upgrades legacy SSH credentials after they are used', async () => {
+    const encryptAttribute = jest
+      .spyOn(cryptoUtil, 'encryptAttribute')
+      .mockImplementation((value) => `v1:encrypted-${value}`);
+    const connection = {
+      id: 'conn-ssh-1',
+      userId: 'user-1',
+      type: 'postgres',
+      host: 'db.example.com',
+      port: 5432,
+      database: 'main',
+      password: null,
+      sshHost: 'ssh.example.com',
+      sshPort: 22,
+      sshUsername: 'deploy',
+      sshPrivateKey: 'bGVnYWN5LXByaXZhdGUta2V5',
+      sshPassphrase: 'legacy-passphrase',
+    };
+    const pool = { id: 'ssh-pool' };
+    prismaMock.connection.findFirst.mockResolvedValue(connection);
+    prismaMock.connection.update.mockResolvedValue(connection);
+    sshTunnelMock.openTunnel.mockResolvedValue(15432);
+    strategyMock.createPool.mockResolvedValue(pool);
+
+    await expect(
+      service.getPool('conn-ssh-1', 'main', 'user-1'),
+    ).resolves.toBe(pool);
+
+    expect(sshTunnelMock.openTunnel).toHaveBeenCalledWith('conn-ssh-1:main', {
+      sshHost: 'ssh.example.com',
+      sshPort: 22,
+      sshUsername: 'deploy',
+      sshPrivateKey: 'bGVnYWN5LXByaXZhdGUta2V5',
+      sshPassphrase: 'legacy-passphrase',
+      dbHost: 'db.example.com',
+      dbPort: 5432,
+    });
+    expect(encryptAttribute).toHaveBeenCalledWith('bGVnYWN5LXByaXZhdGUta2V5');
+    expect(encryptAttribute).toHaveBeenCalledWith('legacy-passphrase');
+    expect(prismaMock.connection.update).toHaveBeenCalledWith({
+      where: { id: 'conn-ssh-1' },
+      data: {
+        sshPrivateKey: 'v1:encrypted-bGVnYWN5LXByaXZhdGUta2V5',
+        sshPassphrase: 'v1:encrypted-legacy-passphrase',
+      },
+    });
+
+    encryptAttribute.mockRestore();
+  });
   it('creates one shared pool for concurrent requests with the same key', async () => {
     const connection = {
       id: 'conn-1',

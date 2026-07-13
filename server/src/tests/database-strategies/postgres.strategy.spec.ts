@@ -69,6 +69,25 @@ describe('PostgresStrategy', () => {
         }),
       );
     });
+
+    it('trusts the official Supabase CA while keeping TLS verification enabled', () => {
+      strategy.createPool({
+        host: 'aws-1-ap-south-1.pooler.supabase.com',
+        port: 6543,
+        username: 'postgres',
+        password: 'password',
+        database: 'postgres',
+      });
+
+      expect(Pool).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ssl: expect.objectContaining({
+            ca: expect.stringContaining('BEGIN CERTIFICATE'),
+            rejectUnauthorized: true,
+          }),
+        }),
+      );
+    });
   });
 
   describe('identifier quoting', () => {

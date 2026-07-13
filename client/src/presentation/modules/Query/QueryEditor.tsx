@@ -3,7 +3,7 @@ import { SqlEditor } from '@/presentation/components/code-editor/SqlEditor';
 import type { editor } from 'monaco-editor';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { connectionService } from '@/core/services/ConnectionService';
-import { apiService, ApiError } from '@/core/services/api.service';
+import { apiService } from '@/core/services/api.service';
 import { useAppStore, type SavedQuery } from '@/core/services/store';
 import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
 import { SavedQueriesDialog } from './SavedQueriesDialog';
@@ -49,8 +49,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const activeOrganizationId = activeConnection?.organizationId || undefined;
-    const selectedDatabase = activeDatabase || activeConnection?.database || null;
-    const showDatabaseHint = Boolean(activeConnection?.showAllDatabases && !activeConnection?.database);
     const schemaInfo = useSchemaInfo();
     const preferences = useAiPreferences();
     const text = getWorkspaceText(lang).queryEditor;
@@ -201,30 +199,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         refetchOnReconnect: false,
         refetchOnMount: false,
     });
-
-    const blockedReason = (error as ApiError | null)?.reason;
-    const hasPersistentGuardrail = Boolean(
-        activeConnection?.readOnly || activeConnection?.allowQueryExecution === false,
-    );
-    const protectiveLimit = results?.appliedLimit ?? 50000;
-    const guardrailMessage = React.useMemo(() => {
-        if (!activeConnection) return null;
-        const parts: string[] = [];
-        if (activeConnection.readOnly) {
-            parts.push(text.readOnlyGuardrail);
-        }
-        if (activeConnection.allowQueryExecution === false) {
-            parts.push(text.executionDisabledGuardrail);
-        } else {
-            parts.push(
-                limit === 'all'
-                    ? text.serverGuardrail(protectiveLimit.toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US'))
-                    : text.requestedLimit(limit),
-            );
-            parts.push(text.timeoutGuardrail);
-        }
-        return parts.join(' • ');
-    }, [activeConnection, lang, limit, protectiveLimit, text]);
 
     const resultColumns = React.useMemo(() => {
         if (results?.columns?.length) return results.columns;
@@ -534,30 +508,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                     ) : null}
                 />
 
-                {activeConnection && (blockedReason || hasPersistentGuardrail) && (
-                    <div className={cn(
-                        'mx-2 mt-2 rounded-lg border px-3 py-2 text-xs',
-                        activeConnection.allowQueryExecution === false
-                            ? 'border-red-500/20 bg-red-500/10 text-red-400'
-                            : activeConnection.readOnly
-                                ? 'border-amber-500/20 bg-amber-500/10 text-amber-400'
-                                : 'border-blue-500/20 bg-blue-500/10 text-blue-400',
-                    )}>
-                        <div className="font-semibold uppercase tracking-wide text-[10px]">
-                            {blockedReason === 'READ_ONLY_CONNECTION'
-                                ? text.blockedReadOnly
-                                : blockedReason === 'QUERY_EXECUTION_DISABLED'
-                                    ? text.blockedPolicy
-                                    : text.connectionGuardrails}
-                        </div>
-                        <div className="mt-1 text-muted-foreground">
-                            {blockedReason
-                                ? (error as Error)?.message
-                                : guardrailMessage}
-                        </div>
-                    </div>
-                )}
-
                 <div className="flex-1 flex flex-col min-h-0 relative">
                     <div className="flex-1 min-h-0 relative">
                         <SqlEditor
@@ -598,8 +548,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             error={(error as Error) || null}
                             executedQuery={executedQuery}
                             dataUpdatedAt={dataUpdatedAt}
-                            selectedDatabase={selectedDatabase}
-                            showDatabaseHint={showDatabaseHint}
                             activeTab={activeResultTab}
                             onTabChange={setActiveResultTab}
                             explainPlan={explainPlan}

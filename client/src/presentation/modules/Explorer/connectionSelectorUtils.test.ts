@@ -39,4 +39,17 @@ describe('pickFallbackConnectionId', () => {
       ),
     ).toBeNull();
   });
+
+  it('keeps an explicitly selected failing connection active', () => {
+    expect(
+      pickFallbackConnectionId(
+        [
+          { id: 'conn-error', lastHealthStatus: 'error' },
+          { id: 'conn-healthy', lastHealthStatus: 'healthy' },
+        ],
+        'conn-error',
+        true,
+      ),
+    ).toBeNull();
+  });
 });

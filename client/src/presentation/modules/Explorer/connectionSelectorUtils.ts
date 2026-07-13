@@ -8,7 +8,10 @@ type FallbackCandidate = Pick<Connection, 'id' | 'lastHealthStatus'>;
 export function pickFallbackConnectionId(
   connections: FallbackCandidate[],
   failedConnectionId: string,
+  isManualSelection = false,
 ): string | null {
+  if (isManualSelection) return null;
+
   const fallbackCandidates = connections.filter(
     (connection) => connection.id !== failedConnectionId,
   );

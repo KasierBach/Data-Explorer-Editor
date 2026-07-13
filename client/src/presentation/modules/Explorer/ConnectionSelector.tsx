@@ -97,6 +97,7 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
     const [shareConnectionId, setShareConnectionId] = useState<string | null>(null)
 
     const checkedConnectionIds = React.useRef<Set<string>>(new Set())
+    const manuallySelectedConnectionId = React.useRef<string | null>(null)
 
     // Determine which connectionId to use based on workspace filter
     const currentConnectionId = filter === 'nosql' ? nosqlActiveConnectionId : activeConnectionId;
@@ -126,8 +127,17 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
             return null;
         }
 
-        return pickFallbackConnectionId(visibleConnections, currentConnectionId);
+        return pickFallbackConnectionId(
+            visibleConnections,
+            currentConnectionId,
+            manuallySelectedConnectionId.current === currentConnectionId,
+        );
     }, [activeConn?.lastHealthStatus, currentConnectionId, visibleConnections]);
+
+    const handleConnectionChange = (connectionId: string) => {
+        manuallySelectedConnectionId.current = connectionId;
+        setCurrentConnectionId(connectionId);
+    };
 
     const runHealthCheck = React.useCallback(async (connectionId: string) => {
         setIsCheckingHealth(connectionId);
@@ -202,7 +212,7 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
     return (
         <div className="px-0">
             <div className="space-y-2">
-            <Select value={currentConnectionId || ''} onValueChange={setCurrentConnectionId}>
+            <Select value={currentConnectionId || ''} onValueChange={handleConnectionChange}>
                 <SelectTrigger className="w-full h-10 bg-muted/30 border-none ring-1 ring-border/50 hover:ring-blue-500/30 transition-all rounded-xl shadow-inner group">
                     <div className="flex items-center gap-2.5 truncate">
                         <div className={`w-6 h-6 rounded-lg ${activeBranding.bg} flex items-center justify-center shrink-0 ${activeBranding.bgHover} transition-colors ${activeBranding.color}`}>

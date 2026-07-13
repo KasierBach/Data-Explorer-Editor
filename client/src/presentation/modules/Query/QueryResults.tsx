@@ -20,8 +20,6 @@ interface QueryResultsProps {
     error: Error | null;
     executedQuery: string | null;
     dataUpdatedAt: number;
-    selectedDatabase?: string | null;
-    showDatabaseHint?: boolean;
     activeTab: string;
     onTabChange: (tab: string) => void;
     explainPlan?: unknown;
@@ -36,8 +34,6 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
     error,
     executedQuery,
     dataUpdatedAt,
-    selectedDatabase,
-    showDatabaseHint = false,
     activeTab,
     onTabChange,
     explainPlan,
@@ -50,38 +46,6 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
     const { isCompactMobileLayout, isSmallMobile } = useResponsiveLayoutMode();
     const hasExplainPlan = explainPlan !== null && explainPlan !== undefined;
     const isError = !!error;
-    const selectedDatabaseLabel = lang === 'vi' ? 'DB dang dung' : 'Selected DB';
-    const noDatabaseSelectedLabel = lang === 'vi' ? 'Chua chon DB' : 'No DB selected';
-    const databaseHint = lang === 'vi'
-        ? 'Neu connection co nhieu DB, hay click 1 DB o sidebar truoc khi chay, hoac dung ten day du trong SQL.'
-        : 'If this connection exposes multiple databases, select one in the sidebar first or use fully qualified names in SQL.';
-
-    const renderDatabaseContext = () => {
-        if (!selectedDatabase && !showDatabaseHint) {
-            return null;
-        }
-
-        const hasSelectedDatabase = Boolean(selectedDatabase);
-
-        return (
-            <div
-                className={cn(
-                    'rounded-lg border px-3 py-2 text-left text-[11px] normal-case',
-                    hasSelectedDatabase
-                        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-100'
-                        : 'border-amber-500/20 bg-amber-500/10 text-amber-100'
-                )}
-            >
-                <div className="font-semibold uppercase tracking-wide text-[10px]">
-                    {hasSelectedDatabase ? selectedDatabaseLabel : noDatabaseSelectedLabel}
-                </div>
-                <div className="mt-1 text-muted-foreground whitespace-pre-wrap break-words">
-                    {hasSelectedDatabase ? selectedDatabase : databaseHint}
-                </div>
-            </div>
-        );
-    };
-
     const renderDataContent = () => {
         if (isError) {
             return (
@@ -92,10 +56,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                     <div className="text-red-500 font-bold text-sm">
                         {text.failed}
                     </div>
-                    <div className="w-full max-w-md space-y-3">
-                        {renderDatabaseContext()}
-                        <p className="text-red-400/80 text-xs max-w-md font-mono whitespace-pre-wrap break-words">{(error as Error).message}</p>
-                    </div>
+                    <p className="max-w-md text-red-400/80 text-xs font-mono whitespace-pre-wrap break-words">{(error as Error).message}</p>
                 </div>
             );
         }
@@ -199,7 +160,6 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                 <TabsContent value="messages" className="m-0 h-full p-4 font-mono text-[13px] overflow-auto select-text uppercase">
                     {error ? (
                         <div className="space-y-3 text-red-500 whitespace-pre-wrap leading-relaxed">
-                            {renderDatabaseContext()}
                             <div>
                                 <div className="font-bold mb-2">{text.error}</div>
                                 {(error as Error).message}

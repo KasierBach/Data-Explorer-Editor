@@ -111,6 +111,46 @@ export class ConnectionsService implements OnModuleDestroy {
     });
   }
 
+  private async upgradeLegacySshCredentials(connection: {
+    id: string;
+    sshPrivateKey?: string | null;
+    sshPassphrase?: string | null;
+  }) {
+    const data: {
+      sshPrivateKey?: string;
+      sshPassphrase?: string;
+    } = {};
+
+    if (
+      connection.sshPrivateKey &&
+      !connection.sshPrivateKey.startsWith('v1:')
+    ) {
+      data.sshPrivateKey = encryptAttribute(connection.sshPrivateKey);
+    }
+    if (
+      connection.sshPassphrase &&
+      !connection.sshPassphrase.startsWith('v1:')
+    ) {
+      data.sshPassphrase = encryptAttribute(connection.sshPassphrase);
+    }
+
+    if (Object.keys(data).length === 0) {
+      return;
+    }
+
+    try {
+      await this.prisma.connection.update({
+        where: { id: connection.id },
+        data,
+      });
+    } catch {
+      // Availability of a legacy tunnel must not depend on its opportunistic upgrade.
+      this.logger.warn(
+        `Could not upgrade legacy SSH credential encryption for connection ${connection.id}.`,
+      );
+    }
+  }
+
   private async pingPool(pool: any, type: string) {
     switch (type) {
       case 'postgres':
@@ -444,6 +484,12 @@ export class ConnectionsService implements OnModuleDestroy {
     const decryptedPassword = connection.password
       ? decryptAttribute(connection.password)
       : undefined;
+    const decryptedSshPrivateKey = connection.sshPrivateKey
+      ? decryptAttribute(connection.sshPrivateKey)
+      : undefined;
+    const decryptedSshPassphrase = connection.sshPassphrase
+      ? decryptAttribute(connection.sshPassphrase)
+      : undefined;
     let connectionWithDecryptedPassword = {
       ...connection,
       password: decryptedPassword,
@@ -457,12 +503,14 @@ export class ConnectionsService implements OnModuleDestroy {
         );
       }
 
+      await this.upgradeLegacySshCredentials(connection);
+
       const localPort = await this.sshTunnelService.openTunnel(poolKey, {
         sshHost: connection.sshHost,
         sshPort: connection.sshPort || 22,
         sshUsername: connection.sshUsername,
-        sshPrivateKey: connection.sshPrivateKey || undefined,
-        sshPassphrase: connection.sshPassphrase || undefined,
+        sshPrivateKey: decryptedSshPrivateKey,
+        sshPassphrase: decryptedSshPassphrase,
         dbHost,
         dbPort: connection.port || 5432,
       });

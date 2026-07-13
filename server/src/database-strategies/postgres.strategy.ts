@@ -20,6 +20,9 @@ import {
   allowInsecureDatabaseTls,
   isLocalDatabaseHost,
 } from '../common/utils/database-network.util';
+import { SUPABASE_ROOT_2021_CA } from '../common/constants/supabase-ca.constant';
+
+const SUPABASE_POOLER_HOST_SUFFIX = '.pooler.supabase.com';
 
 @Injectable()
 export class PostgresStrategy implements IDatabaseStrategy {
@@ -47,7 +50,12 @@ export class PostgresStrategy implements IDatabaseStrategy {
       database: databaseOverride || connectionConfig.database,
       ssl: isLocalhost
         ? false
-        : { rejectUnauthorized: !allowInsecureDatabaseTls() },
+        : {
+            rejectUnauthorized: !allowInsecureDatabaseTls(),
+            ...(host.toLowerCase().endsWith(SUPABASE_POOLER_HOST_SUFFIX)
+              ? { ca: SUPABASE_ROOT_2021_CA }
+              : {}),
+          },
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
