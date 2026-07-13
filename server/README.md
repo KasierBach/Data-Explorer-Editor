@@ -24,7 +24,7 @@ npm install
 3. Sync the metadata schema:
 
 ```bash
-npx prisma db push
+npx prisma migrate deploy
 ```
 
 4. Start the backend in watch mode:
@@ -37,24 +37,23 @@ The local API default is `http://localhost:3001/api`.
 
 ## Scripts
 
-| Command | Purpose |
-| --- | --- |
-| `npm run start:dev` | Start the NestJS server in watch mode |
-| `npm run start:prod` | Run the compiled production server |
-| `npm run build` | Run Prisma generate safely, then build NestJS |
-| `npm run lint` | Lint server TypeScript files |
-| `npm run test` | Run Jest unit tests |
-| `npm run test:e2e` | Run end-to-end tests |
+| Command              | Purpose                                       |
+| -------------------- | --------------------------------------------- |
+| `npm run start:dev`  | Start the NestJS server in watch mode         |
+| `npm run start:prod` | Run the compiled production server            |
+| `npm run build`      | Run Prisma generate safely, then build NestJS |
+| `npm run lint`       | Lint server TypeScript files                  |
+| `npm run test`       | Run Jest unit tests                           |
 
 ## Production note
 
-For the current repo state, production builds should use:
+Production deployments must apply the committed PostgreSQL migrations before starting the backend:
 
 ```bash
-npx prisma db push && npm run build
+npx prisma migrate deploy && npm run build
 ```
 
-`prisma migrate deploy` is not the recommended path for this codebase right now because the migration history is not yet aligned with a clean PostgreSQL deploy flow in every environment.
+`prisma db push` is only for disposable local prototypes; it must not be used to deploy production schema changes.
 
 ## Related files
 

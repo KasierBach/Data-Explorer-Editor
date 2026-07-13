@@ -44,8 +44,7 @@ export class TokenService {
       firstName: user.firstName,
       lastName: user.lastName,
       avatarUrl:
-        typeof user.avatarUrl === 'string' &&
-        user.avatarUrl.startsWith('data:')
+        typeof user.avatarUrl === 'string' && user.avatarUrl.startsWith('data:')
           ? null
           : user.avatarUrl,
       isOnboarded: user.isOnboarded,

@@ -63,8 +63,8 @@ export function PrerequisitesSection({ lang }: Props) {
         <div className="space-y-6">
           <Prose>
             {t
-              ? "Repo hiện chạy tốt nhất với full-stack TypeScript, npm, một PostgreSQL metadata database mà Prisma có thể đồng bộ bằng `db push`, và một Redis endpoint ổn định cho cache, background jobs, search index, notifications, cùng rate limiting."
-              : "The repo currently runs best with full-stack TypeScript, npm, a PostgreSQL metadata database that Prisma can sync through `db push`, and a stable Redis endpoint for cache, background jobs, search indexing, notifications, and rate limiting."}
+              ? "Repo production chạy với full-stack TypeScript, npm, PostgreSQL metadata database, migration Prisma đã commit và Redis endpoint ổn định cho cache, background jobs, search index, notifications, cùng rate limiting."
+              : "The production stack uses TypeScript, npm, a PostgreSQL metadata database with committed Prisma migrations, and a stable Redis endpoint for cache, background jobs, search indexing, notifications, and rate limiting."}
           </Prose>
           <FeatureGrid>
             <InfoCard
@@ -96,8 +96,8 @@ export function PrerequisitesSection({ lang }: Props) {
             >
               <p className="text-xs">
                 {t
-                  ? "Schema app hiện được đồng bộ bằng `npx prisma db push` thay vì flow migrate deploy chuẩn."
-                  : "The app schema is currently synced with `npx prisma db push` instead of a clean migrate-deploy flow."}
+                  ? "Production áp dụng migration PostgreSQL đã commit bằng `npx prisma migrate deploy`; chỉ dùng `db push` cho prototype local có thể bỏ đi."
+                  : "Production schema updates use committed PostgreSQL migrations via `npx prisma migrate deploy`; use `db push` only for disposable local prototypes."}
               </p>
             </InfoCard>
           </FeatureGrid>

@@ -12,10 +12,7 @@ export class NoSqlController {
 
   @Post('analyze-schema')
   @Throttle({ default: { limit: 12, ttl: 60000 } })
-  async analyzeSchema(
-    @Body() body: AnalyzeSchemaDto,
-    @Req() req: any,
-  ) {
+  async analyzeSchema(@Body() body: AnalyzeSchemaDto, @Req() req: any) {
     return this.nosqlService.analyzeSchema({
       ...body,
       userId: req.user.id,
@@ -24,10 +21,7 @@ export class NoSqlController {
 
   @Delete('cache')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  async clearCache(
-    @Body() body: ClearSchemaCacheDto,
-    @Req() req: any,
-  ) {
+  async clearCache(@Body() body: ClearSchemaCacheDto, @Req() req: any) {
     await this.nosqlService.clearSchemaCache(
       body.connectionId,
       body.database,

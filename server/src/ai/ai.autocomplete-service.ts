@@ -483,7 +483,7 @@ JSON RESPONSE:`;
                 query,
               )
           : typeof result.sql === 'string'
-                        ? stripCodeFences(result.sql)
+            ? stripCodeFences(result.sql)
             : '',
         explanation,
       };

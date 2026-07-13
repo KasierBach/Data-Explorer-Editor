@@ -162,18 +162,18 @@ export class AiProviderRunnerService {
           ? candidate.code.toLowerCase()
           : undefined;
 
-      if (
-        typeof status === 'number' &&
-        this.isTransientOpenAiStatus(status)
-      ) {
+      if (typeof status === 'number' && this.isTransientOpenAiStatus(status)) {
         return true;
       }
 
       if (
         code &&
-        ['aborted', 'deadline_exceeded', 'resource_exhausted', 'unavailable'].includes(
-          code,
-        )
+        [
+          'aborted',
+          'deadline_exceeded',
+          'resource_exhausted',
+          'unavailable',
+        ].includes(code)
       ) {
         return true;
       }
@@ -580,16 +580,14 @@ export class AiProviderRunnerService {
       ? { ...baseGenerationConfig, ...structuredGenerationConfig }
       : baseGenerationConfig;
     const generate = () =>
-      this.executeRetriableOperation(
-        `Gemini request (${plan.model})`,
-        () =>
-          this.withTimeout(
-            model.generateContent({
-              contents: [{ role: 'user', parts }],
-              generationConfig,
-            }),
-            `Gemini request (${plan.model})`,
-          ),
+      this.executeRetriableOperation(`Gemini request (${plan.model})`, () =>
+        this.withTimeout(
+          model.generateContent({
+            contents: [{ role: 'user', parts }],
+            generationConfig,
+          }),
+          `Gemini request (${plan.model})`,
+        ),
       );
     let result;
     try {
@@ -1000,7 +998,9 @@ export class AiProviderRunnerService {
           continue;
         }
 
-        throw new Error(`${plan.provider} Stream API error [${response.status}]`);
+        throw new Error(
+          `${plan.provider} Stream API error [${response.status}]`,
+        );
       }
 
       yield* this.streamFetch(

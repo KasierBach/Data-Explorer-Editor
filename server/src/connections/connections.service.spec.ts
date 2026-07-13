@@ -171,9 +171,9 @@ describe('ConnectionsService security', () => {
     sshTunnelMock.openTunnel.mockResolvedValue(15432);
     strategyMock.createPool.mockResolvedValue(pool);
 
-    await expect(
-      service.getPool('conn-ssh-1', 'main', 'user-1'),
-    ).resolves.toBe(pool);
+    await expect(service.getPool('conn-ssh-1', 'main', 'user-1')).resolves.toBe(
+      pool,
+    );
 
     expect(sshTunnelMock.openTunnel).toHaveBeenCalledWith('conn-ssh-1:main', {
       sshHost: 'ssh.example.com',

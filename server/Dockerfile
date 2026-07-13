@@ -3,7 +3,7 @@
 # ──────────────────────────────────────────────
 
 # ── Stage 1: Build ───────────────────────────
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 # Install openssl for Prisma + native deps
 RUN apk add --no-cache openssl
@@ -28,7 +28,7 @@ RUN npm run build
 RUN npm prune --omit=dev
 
 # ── Stage 2: Runtime ─────────────────────────
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 
 # Install openssl for Prisma + wget for healthcheck
 RUN apk add --no-cache openssl wget

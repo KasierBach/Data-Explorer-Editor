@@ -213,9 +213,7 @@ export class AiController {
 
   @Post('provider-models')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async listProviderModels(
-    @Body() body: ProviderModelsDto,
-  ) {
+  async listProviderModels(@Body() body: ProviderModelsDto) {
     const baseUrl =
       typeof body?.baseUrl === 'string'
         ? normalizeProviderBaseUrl(body.baseUrl)

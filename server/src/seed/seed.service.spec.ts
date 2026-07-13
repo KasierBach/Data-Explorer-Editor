@@ -18,7 +18,9 @@ describe('SeedService', () => {
     delete process.env.ADMIN_PASSWORD;
 
     const create = jest.fn();
-    const prisma = { user: { count: jest.fn().mockResolvedValue(0), create } } as any;
+    const prisma = {
+      user: { count: jest.fn().mockResolvedValue(0), create },
+    } as any;
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     const service = new SeedService(prisma);
 

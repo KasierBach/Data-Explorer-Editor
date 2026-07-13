@@ -65,7 +65,11 @@ export class OAuthStateCookieStore {
   verify(
     req: Request & { res?: Response },
     providedState: string,
-    callback: (error: Error | null, ok?: boolean, info?: { message: string }) => void,
+    callback: (
+      error: Error | null,
+      ok?: boolean,
+      info?: { message: string },
+    ) => void,
   ) {
     const storedState = extractCookie(req, this.cookieName);
     const res = req.res;

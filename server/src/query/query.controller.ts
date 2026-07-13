@@ -86,10 +86,7 @@ export class QueryController {
 
   @Post('seed')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async seedFailed(
-    @Body() body: SeedDataDto,
-    @Req() req: RequestWithUser,
-  ) {
+  async seedFailed(@Body() body: SeedDataDto, @Req() req: RequestWithUser) {
     return this.queryService.seedData(body.connectionId, req.user.id);
   }
 
@@ -121,10 +118,7 @@ export class QueryController {
 
   @Post('import')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
-  async importData(
-    @Body() body: ImportDataDto,
-    @Req() req: RequestWithUser,
-  ) {
+  async importData(@Body() body: ImportDataDto, @Req() req: RequestWithUser) {
     return this.queryService.importData(body, req.user.id);
   }
 }
