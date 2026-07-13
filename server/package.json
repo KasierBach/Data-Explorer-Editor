@@ -37,7 +37,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/mapped-types": "*",
     "@nestjs/passport": "^11.0.5",
-    "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/platform-express": "^11.1.28",
     "@nestjs/throttler": "^6.5.0",
     "@nest-lab/throttler-storage-redis": "^1.2.0",
     "@prisma/adapter-pg": "^6.19.2",
