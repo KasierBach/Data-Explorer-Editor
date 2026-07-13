@@ -56,6 +56,20 @@ describe('AuthService - login', () => {
       ),
     ).rejects.toThrow('Invalid credentials');
   });
+  it('rejects a local account without a password hash', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      provider: 'local',
+      password: null,
+      language: 'vi',
+    });
+
+    await expect(
+      authService.login({
+        email: 'local@example.com',
+        password: 'pw',
+      } as LoginDto),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
   it('rejects registration when legal terms are not accepted', async () => {
     await expect(
       authService.register({

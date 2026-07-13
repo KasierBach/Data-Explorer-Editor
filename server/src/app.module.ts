@@ -4,7 +4,7 @@ import { CsrfMiddleware } from './common/middlewares/csrf.middleware';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bullmq';
-import { ThrottlerStorageRedisService } from 'nestjs-throttler-storage-redis';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { redisStore } from 'cache-manager-redis-yet';
 
 import { AppController } from './app.controller';

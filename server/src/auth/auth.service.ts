@@ -142,15 +142,25 @@ export class AuthService implements OnModuleInit {
 
     const userLang = this.resolveLanguage(user.language, lang);
 
-    if (!user.password && user.provider !== 'local') {
+    if (!user.password) {
+      if (user.provider !== 'local') {
+        throw new UnauthorizedException(
+          this.providerLoginMessage(user.provider, userLang),
+        );
+      }
+
       throw new UnauthorizedException(
-        this.providerLoginMessage(user.provider, userLang),
+        this.t(
+          userLang,
+          'Thông tin đăng nhập không hợp lệ',
+          'Invalid credentials',
+        ),
       );
     }
 
     const isPasswordValid = await bcrypt.compare(
       loginDto.password,
-      user.password!,
+      user.password,
     );
 
     if (!isPasswordValid) {
