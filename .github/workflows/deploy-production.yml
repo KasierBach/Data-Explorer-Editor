@@ -33,6 +33,6 @@ jobs:
       - name: Deploy exact commit and verify readiness
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-          PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL }}
+          PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL || 'https://data-explorer-editor-9v55.onrender.com' }}
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
         run: node .github/scripts/deploy-render.mjs
