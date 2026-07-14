@@ -1,0 +1,80 @@
+services:
+  - type: web
+    name: data-explorer-api
+    runtime: docker
+    plan: free
+    region: singapore
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerCommand: npx prisma migrate deploy && node dist/src/main.js
+    autoDeployTrigger: "off"
+    healthCheckPath: /api/health/ready
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: 1
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: REFRESH_TOKEN_SECRET
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: LEGACY_ENCRYPTION_KEYS
+        sync: false
+      - key: FRONTEND_URL
+        value: https://data-explorer-editor.vercel.app
+      - key: API_PUBLIC_URL
+        sync: false
+      - key: ALLOW_INTERNAL_IPS
+        value: false
+      - key: ALLOW_INSECURE_DATABASE_TLS
+        value: false
+      - key: AI_PROVIDER_TIMEOUT_MS
+        value: 90000
+      - key: AI_STREAM_IDLE_TIMEOUT_MS
+        value: 90000
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CEREBRAS_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: BEEKNOEE_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CALLBACK_URL
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CALLBACK_URL
+        sync: false
+      - key: MAIL_USER
+        sync: false
+      - key: MAIL_PASS
+        sync: false
+      - key: MOMO_PARTNER_CODE
+        sync: false
+      - key: MOMO_ACCESS_KEY
+        sync: false
+      - key: MOMO_SECRET_KEY
+        sync: false
+      - key: ZALOPAY_APP_ID
+        sync: false
+      - key: ZALOPAY_KEY1
+        sync: false
+      - key: ZALOPAY_KEY2
+        sync: false

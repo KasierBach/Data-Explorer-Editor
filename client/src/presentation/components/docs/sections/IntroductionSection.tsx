@@ -115,7 +115,7 @@ export function IntroductionSection({ lang }: Props) {
           <CodeComment>
             {t ? "Đồng bộ schema metadata app" : "Sync the app metadata schema"}
           </CodeComment>
-          <CodeLine>cd server && npx prisma db push && cd ..</CodeLine>
+          <CodeLine>cd server && npx prisma migrate deploy && cd ..</CodeLine>
           <p className="mt-3" />
           <CodeComment>
             {t

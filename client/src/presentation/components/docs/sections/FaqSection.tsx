@@ -66,11 +66,11 @@ export function FaqSection({ lang }: Props) {
     },
     {
       q: t
-        ? "Vì sao prisma migrate deploy lỗi còn prisma db push lại chạy được?"
-        : "Why does prisma migrate deploy fail while prisma db push works?",
+        ? "Khi nào nên dùng Prisma Migrate thay vì db push?"
+        : "When should I use Prisma Migrate instead of db push?",
       a: t
-        ? "Vì migration history hiện tại của repo chưa khớp với một PostgreSQL deploy flow sạch. Trong trạng thái hiện nay, bạn nên dùng npx prisma db push cho local và production build. Đó là lý do docs deployment hiện nhấn mạnh db push thay vì migrate deploy."
-        : "Because the current migration history in the repo is not aligned with a clean PostgreSQL deploy flow. In the current state, you should use npx prisma db push for local and production builds. That is why the deployment docs emphasize db push instead of migrate deploy.",
+        ? "Dùng `npx prisma migrate deploy` cho staging và production để giữ lịch sử schema có thể kiểm toán. Chỉ dùng `db push` cho prototype local có thể xóa bỏ, không dùng cho dữ liệu production."
+        : "Use `npx prisma migrate deploy` in staging and production so schema history remains auditable. Reserve `db push` for disposable local prototypes, never production data.",
     },
     {
       q: t

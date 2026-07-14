@@ -134,6 +134,7 @@ export function DocumentationPage() {
                 lang={lang}
                 title={text.seoTitle(currentItemTitle)}
                 description={text.seoDescription(currentItemTitle)}
+                ogUrl="https://data-explorer-editor.vercel.app/docs"
             />
             {/* Minimal Header */}
             <header className="h-14 border-b bg-card/50 backdrop-blur-xl flex items-center justify-between px-4 shrink-0 z-50">
@@ -168,7 +169,7 @@ export function DocumentationPage() {
                                     handleSelectSection(docSearchResults[0].id);
                                 }
                             }}
-                            className="bg-muted/50 border rounded-full pl-9 pr-4 py-1.5 text-xs w-48 lg:w-64 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+                            className="bg-muted/50 border rounded-full pl-9 pr-4 py-1.5 text-xs text-foreground placeholder:text-muted-foreground w-48 lg:w-64 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
                         />
                         {searchTerm.trim() && docSearchResults.length > 0 ? (
                             <div className="absolute left-0 right-0 top-full mt-2 overflow-hidden rounded-2xl border border-border/60 bg-card/95 shadow-2xl backdrop-blur-xl">
@@ -317,7 +318,7 @@ export function DocumentationPage() {
                                     onClick={() => scrollToHeading(heading.id)}
                                     className={cn(
                                         "w-full text-left text-xs transition-all py-1.5 block hover:text-primary",
-                                        heading.level === 2 ? "font-semibold text-muted-foreground" : "pl-4 text-muted-foreground/70"
+                                        heading.level === 2 ? "font-semibold text-muted-foreground" : "pl-4 text-muted-foreground"
                                     )}
                                 >
                                     {heading.text}

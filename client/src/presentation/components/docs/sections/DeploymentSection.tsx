@@ -29,8 +29,8 @@ export function DeploymentSection({ lang }: Props) {
       title={t ? "Triển khai Production" : "Production Deployment"}
       subtitle={
         t
-          ? "Checklist thực dụng để đưa Data Explorer lên web thật, gồm Render/Vercel, env bắt buộc, db push, OAuth callback, và những lỗi deploy hay gặp nhất."
-          : "A practical checklist for shipping Data Explorer to production, including Render/Vercel, required envs, db push, OAuth callbacks, and the most common deployment pitfalls."
+          ? "Checklist thực dụng để đưa Data Explorer lên web thật, gồm Render/Vercel, env bắt buộc, migration, OAuth callback, và những lỗi deploy hay gặp nhất."
+          : "A practical checklist for shipping Data Explorer to production, including Render/Vercel, required envs, migrations, OAuth callbacks, and the most common deployment pitfalls."
       }
       gradient
     >
@@ -68,7 +68,7 @@ export function DeploymentSection({ lang }: Props) {
           title={t ? "Backend service (Render)" : "Backend service (Render)"}
         >
           <CodeBlock title={t ? "Build command" : "Build command"}>
-            <CodeLine>npx prisma db push && npm run build</CodeLine>
+            <CodeLine>npm run build</CodeLine>
           </CodeBlock>
           <CodeBlock title={t ? "Start command" : "Start command"}>
             <CodeLine>npm run start:prod</CodeLine>
@@ -76,8 +76,8 @@ export function DeploymentSection({ lang }: Props) {
           <Callout type="warning">
             <p className="text-sm">
               {t
-                ? "Repo hiện tại chưa sẵn sàng cho prisma migrate deploy xuyên suốt mọi môi trường. Nếu bạn đang deploy bản app này, hãy dùng db push để đồng bộ schema production."
-                : "The current repo is not yet fully aligned for prisma migrate deploy across every environment. For this app version, use db push to sync production schema."}
+                ? "Chạy `npx prisma migrate deploy` trước khi khởi động app. Render Blueprint trong repo đã thực hiện bước này và chỉ đưa phiên bản mới vào phục vụ khi readiness check thành công."
+                : "Run `npx prisma migrate deploy` before starting the app. The repository's Render Blueprint performs this step and only serves a release after its readiness check passes."}
             </p>
           </Callout>
         </DocSubSection>
@@ -273,8 +273,8 @@ export function DeploymentSection({ lang }: Props) {
           >
             <p className="text-[10px]">
               {t
-                ? "Backend lên code mới nhưng DB chưa db push, gây lỗi 500 ở login hoặc dashboard APIs."
-                : "The backend ships new code but the database has not been db pushed yet, causing 500 errors in login or dashboard APIs."}
+                ? "Backend lên code mới nhưng migration chưa được áp dụng, gây lỗi 500 ở login hoặc dashboard APIs."
+                : "The backend ships new code before its migration is applied, causing 500 errors in login or dashboard APIs."}
             </p>
           </InfoCard>
           <InfoCard
@@ -305,8 +305,8 @@ export function DeploymentSection({ lang }: Props) {
       <Callout type="tip">
         <p className="text-sm">
           {t
-            ? "Nếu bạn chỉ muốn ship nhanh: Vercel cho client, Render cho backend, set env chuẩn, chạy db push trong build command, rồi test login + health check + 1 query thật trước khi public."
-            : "If you just want to ship quickly: use Vercel for the client, Render for the backend, set the envs correctly, run db push in the build command, then test login + health check + one real query before going public."}
+            ? "Nếu bạn muốn ship an toàn: dùng Vercel cho client, Render Blueprint cho backend, set env chuẩn, chạy migration trước khi start, rồi test login + readiness + 1 query thật trước khi public."
+            : "For a safe release: use Vercel for the client, the Render Blueprint for the backend, set envs correctly, migrate before startup, then test login, readiness, and one real query before going public."}
         </p>
       </Callout>
     </DocPageLayout>

@@ -39,11 +39,14 @@ import { PresenceModule } from './presence/presence.module';
 import { RedisModule } from './redis/redis.module';
 import { NoSqlModule } from './nosql/nosql.module';
 import { BillingModule } from './billing/billing.module';
+import { validateEnvironment } from './config/environment.validation';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      cache: true,
+      validate: validateEnvironment,
     }),
     BullModule.forRootAsync({
       imports: [ConfigModule],

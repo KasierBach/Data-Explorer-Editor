@@ -15,7 +15,6 @@ export class PrismaService
         ? {
             adapter: new PrismaPg({
               connectionString,
-              ssl: { rejectUnauthorized: false },
             }),
           }
         : undefined,

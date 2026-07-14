@@ -13,7 +13,7 @@ export const LanguageSwitcher: React.FC = () => {
                     "px-2.5 py-1 text-[10px] font-black rounded-lg transition-all duration-300 uppercase tracking-[0.2em] relative overflow-hidden",
                     lang === 'vi'
                         ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20 active:scale-95"
-                        : "text-muted-foreground/60 hover:text-foreground hover:bg-white/5"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                 )}
             >
                 VN
@@ -25,7 +25,7 @@ export const LanguageSwitcher: React.FC = () => {
                     "px-2.5 py-1 text-[10px] font-black rounded-lg transition-all duration-300 uppercase tracking-[0.2em] relative overflow-hidden",
                     lang === 'en'
                         ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20 active:scale-95"
-                        : "text-muted-foreground/60 hover:text-foreground hover:bg-white/5"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                 )}
             >
                 EN

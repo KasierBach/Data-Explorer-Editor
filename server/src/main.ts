@@ -10,6 +10,11 @@ import { getAllowedOrigins } from './common/utils/cors.util';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const isProduction = process.env.NODE_ENV === 'production';
+  const trustProxy = Number(process.env.TRUST_PROXY || 0);
+  if (trustProxy > 0) {
+    app.getHttpAdapter().getInstance().set('trust proxy', trustProxy);
+  }
+  app.enableShutdownHooks();
   const allowedOrigins = getAllowedOrigins();
   const websocketOrigins = allowedOrigins.flatMap((origin) => {
     if (origin.startsWith('https://'))

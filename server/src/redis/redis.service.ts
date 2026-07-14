@@ -29,8 +29,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  onModuleDestroy() {
-    this.client.quit();
+  async onModuleDestroy() {
+    if (this.client) await this.client.quit();
   }
 
   /**
@@ -106,5 +106,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
    */
   getClient(): Redis {
     return this.client;
+  }
+
+  async ping(): Promise<string> {
+    return this.client.ping();
   }
 }

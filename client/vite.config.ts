@@ -31,7 +31,7 @@ export default defineConfig({
         manualChunks: {
           'vendor-core': ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'zustand'],
           'vendor-ui': ['framer-motion', 'lucide-react', 'sonner', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
-          'vendor-editor': ['@monaco-editor/react', 'monaco-editor'],
+          'vendor-editor': ['@monaco-editor/react'],
           'vendor-xlsx': ['xlsx'],
           'vendor-pdf': ['pdfjs-dist'],
           'vendor-sql-format': ['sql-formatter'],
@@ -46,6 +46,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: './src/test/setup.ts',
   },
 })

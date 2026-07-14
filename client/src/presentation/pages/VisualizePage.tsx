@@ -258,7 +258,10 @@ export function VisualizePage() {
             </div>
 
             <div className="flex min-h-[720px] flex-1 flex-col">
-              <NoSqlVisualizeView data={nosqlResult} />
+              <NoSqlVisualizeView
+                key={`${nosqlActiveConnectionId || 'default'}-${nosqlActiveCollection || 'default'}`}
+                data={nosqlResult}
+              />
             </div>
           </div>
         </div>

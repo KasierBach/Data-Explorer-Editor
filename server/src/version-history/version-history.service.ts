@@ -95,7 +95,7 @@ export class VersionHistoryService {
         'Version history is temporarily unavailable until the database schema is synced.',
       reason: 'VERSION_HISTORY_STORAGE_UNAVAILABLE',
       action:
-        'Run prisma db push on the server database and restart the backend.',
+        'Run prisma migrate deploy on the server database and restart the backend.',
     });
   }
 

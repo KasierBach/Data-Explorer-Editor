@@ -6,7 +6,12 @@ on:
     types: [completed]
     branches: [main]
 
-permissions: {}
+permissions:
+  contents: read
+
+concurrency:
+  group: production-backend
+  cancel-in-progress: false
 
 jobs:
   deploy-render:
@@ -17,14 +22,17 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Trigger Render deploy
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Validate deploy automation
+        run: node --test .github/scripts/deploy-render.test.mjs
+      - name: Deploy exact commit and verify readiness
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: |
-          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
-            echo "RENDER_DEPLOY_HOOK_URL is required for production deployment."
-            exit 1
-          fi
-
-          curl --fail --silent --show-error --retry 3 --retry-all-errors \
-            --connect-timeout 10 --max-time 120 --request POST "$RENDER_DEPLOY_HOOK_URL"
+          PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL }}
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node .github/scripts/deploy-render.mjs

@@ -22,8 +22,8 @@ export function InstallationSection({ lang }: Props) {
       title={t ? "Cài đặt & chạy local" : "Installation & local setup"}
       subtitle={
         t
-          ? "Thiết lập Data Explorer đúng với repo hiện tại: Prisma sync bằng `db push`, backend NestJS, frontend Vite, và các biến môi trường cần thiết."
-          : "Set up Data Explorer the way the current repo actually works: Prisma sync via `db push`, a NestJS backend, a Vite frontend, and the required environment variables."
+          ? "Thiết lập Data Explorer đúng với repo hiện tại: Prisma Migrate, backend NestJS, frontend Vite, và các biến môi trường cần thiết."
+          : "Set up Data Explorer the way the current repo works: Prisma Migrate, a NestJS backend, a Vite frontend, and the required environment variables."
       }
     >
       <div className="mb-12 grid gap-4 md:grid-cols-2">
@@ -146,13 +146,13 @@ export function InstallationSection({ lang }: Props) {
         >
           <Prose>
             {t
-              ? "Repo hiện tại dùng Prisma `db push` cho metadata schema. Đây cũng là lệnh nên dùng trong production build flow hiện nay."
-              : "The current repo uses Prisma `db push` for the metadata schema. This is also the command you should use in the current production build flow."}
+              ? "Repo có migration PostgreSQL baseline đã commit. Dùng `migrate deploy` để áp dụng đúng lịch sử schema ở mọi môi trường."
+              : "The repository includes a committed PostgreSQL migration baseline. Use `migrate deploy` to apply the same schema history in every environment."}
           </Prose>
 
           <CodeBlock title="Terminal">
             <CodeLine>cd server</CodeLine>
-            <CodeLine>npx prisma db push</CodeLine>
+            <CodeLine>npx prisma migrate deploy</CodeLine>
           </CodeBlock>
         </StepBlock>
 
@@ -204,8 +204,8 @@ export function InstallationSection({ lang }: Props) {
       <DocSection title={t ? "Docker notes" : "Docker notes"}>
         <Prose>
           {t
-            ? "Docker phù hợp khi bạn muốn metadata database cục bộ ổn định hoặc không muốn cài PostgreSQL trực tiếp trên máy. Với code hiện tại, đường manual setup + `prisma db push` vẫn là lối dev đơn giản nhất; còn dependency của `server` và `client` vẫn nên được cài riêng nếu bạn chạy dev ngoài container."
-            : "Docker is a good fit if you want a stable local metadata database or do not want to install PostgreSQL directly on your machine. With the current codebase, manual setup + `prisma db push` is still the easiest development path, and `server` / `client` dependencies should still be installed separately when you run dev outside containers."}
+            ? "Docker phù hợp khi bạn muốn metadata database cục bộ ổn định hoặc không muốn cài PostgreSQL trực tiếp trên máy. Compose tự chạy `prisma migrate deploy`; dependency của `server` và `client` vẫn nên được cài riêng nếu bạn chạy dev ngoài container."
+            : "Docker is a good fit if you want a stable local metadata database or do not want to install PostgreSQL directly. Compose runs `prisma migrate deploy` automatically; install `server` and `client` dependencies separately when developing outside containers."}
         </Prose>
 
         <CodeBlock title="Docker">
@@ -258,8 +258,8 @@ export function InstallationSection({ lang }: Props) {
       <Callout type="info">
         <p className="text-sm">
           {t
-            ? "Production hiện nên build backend bằng `npx prisma db push && npm run build` thay vì `prisma migrate deploy`, vì migration history hiện tại của repo chưa sẵn sàng cho PostgreSQL deploy flow chuẩn."
-            : "Production should currently build the backend with `npx prisma db push && npm run build` instead of `prisma migrate deploy`, because the repo migration history is not yet aligned with a clean PostgreSQL deploy flow."}
+            ? "Production build image một lần, chạy `npx prisma migrate deploy` trước khi start, và chỉ nhận traffic sau khi `/api/health/ready` xác nhận database cùng Redis đều sẵn sàng."
+            : "Build the production image once, run `npx prisma migrate deploy` before startup, and accept traffic only after `/api/health/ready` confirms both the database and Redis are ready."}
         </p>
       </Callout>
 

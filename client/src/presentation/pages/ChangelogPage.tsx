@@ -44,7 +44,12 @@ export const ChangelogPage: React.FC = () => {
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-x-hidden bg-background font-sans text-foreground selection:bg-blue-500/30">
-      <SEO lang={lang} title={content.seoTitle} description={content.seoDescription} />
+      <SEO
+        lang={lang}
+        title={content.seoTitle}
+        description={content.seoDescription}
+        ogUrl="https://data-explorer-editor.vercel.app/changelog"
+      />
       <InteractiveBackground />
 
       <LandingHeader

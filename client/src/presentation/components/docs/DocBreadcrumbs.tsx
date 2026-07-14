@@ -21,7 +21,7 @@ export function DocBreadcrumbs({ sectionTitle, itemTitle, onHomeClick, lang }: D
                 {text.documentation}
             </button>
             <ChevronRight className="w-3 h-3 shrink-0" />
-            <span className="font-medium text-muted-foreground/60">{sectionTitle}</span>
+            <span className="font-medium text-muted-foreground">{sectionTitle}</span>
             <ChevronRight className="w-3 h-3 shrink-0" />
             <span className="font-bold text-foreground">{itemTitle}</span>
         </nav>

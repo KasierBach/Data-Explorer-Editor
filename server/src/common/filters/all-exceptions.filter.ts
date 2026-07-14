@@ -53,6 +53,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const responseBody = {
       success: false,
+      requestId:
+        (typeof request.headers?.['x-request-id'] === 'string'
+          ? request.headers['x-request-id']
+          : undefined) || undefined,
       statusCode: httpStatus,
       timestamp: new Date().toISOString(),
       path: request.url,

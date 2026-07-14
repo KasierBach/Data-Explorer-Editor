@@ -332,6 +332,21 @@ Note:
 
 ---
 
+## Production Delivery (Render + GitHub Actions)
+
+The repository includes a production Blueprint at `render.yaml` and a gated delivery workflow at `.github/workflows/deploy-production.yml`.
+
+1. Create or sync the backend service from the Render Blueprint and set every `sync: false` environment variable in the Render Dashboard. Keep `ALLOW_INSECURE_DATABASE_TLS=false`.
+2. Create a Render Deploy Hook for the backend service and store it as the GitHub Actions secret `RENDER_DEPLOY_HOOK_URL`.
+3. Set the GitHub Actions repository variable `PRODUCTION_API_URL` to the public backend origin, for example `https://your-backend.onrender.com`.
+4. Protect the GitHub `production` environment if deployment approval is required.
+
+Every push to `main` must pass lint, unit tests, production dependency audit, client build, browser E2E/accessibility checks, server build, and container builds. The delivery workflow then deploys the exact tested commit and waits for `/api/health/ready` to confirm PostgreSQL, Redis, and `RENDER_GIT_COMMIT` before succeeding. `/api/health/live` is the process-only liveness endpoint.
+
+Render keeps the previous healthy instance serving traffic when a new deploy fails. Database changes must therefore remain backward-compatible during rolling releases.
+
+---
+
 ### Initial Setup
 
 1. **Clone and Install**

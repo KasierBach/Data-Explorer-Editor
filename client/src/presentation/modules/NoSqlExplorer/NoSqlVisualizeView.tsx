@@ -221,13 +221,6 @@ export const NoSqlVisualizeView: React.FC<NoSqlVisualizeViewProps> = ({ data }) 
     const [metricMode, setMetricMode] = useState<MetricMode>(savedMetricMode);
 
     useEffect(() => {
-        setChartType(savedChartType);
-        setGroupField(savedGroupField);
-        setMetricField(savedMetricField);
-        setMetricMode(savedMetricMode);
-    }, [savedChartType, savedGroupField, savedMetricField, savedMetricMode]);
-
-    useEffect(() => {
         const timer = setTimeout(() => {
             setPageState(pageId, {
                 chartType,

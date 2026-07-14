@@ -31,7 +31,7 @@ export function LifecycleSection({ lang }: Props) {
                                 { script: 'npm run build', dir: 'server/', desc: t ? 'Biên dịch TypeScript sang JavaScript (output: dist/)' : 'Compile TypeScript to JavaScript (output: dist/)' },
                                 { script: 'npm run start:prod', dir: 'server/', desc: t ? 'Chạy bản build production' : 'Run production build' },
                                 { script: 'npx prisma studio', dir: 'server/', desc: t ? 'Mở GUI để duyệt database PostgreSQL hệ thống' : 'Open GUI to browse internal PostgreSQL database' },
-                                { script: 'npx prisma db push', dir: 'server/', desc: t ? 'Đồng bộ schema Prisma với database' : 'Sync Prisma schema with database' },
+                                { script: 'npx prisma migrate deploy', dir: 'server/', desc: t ? 'Áp dụng migration Prisma đang chờ' : 'Apply pending Prisma migrations' },
                             ].map((row, i) => (
                                 <tr key={i} className="hover:bg-muted/20 transition-colors">
                                     <td className="p-4"><code className="bg-primary/10 text-primary px-2 py-0.5 rounded font-mono text-xs font-bold">{row.script}</code></td>

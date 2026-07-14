@@ -73,7 +73,7 @@ export class ErdWorkspacesService {
         'ERD workspaces are temporarily unavailable until the database schema is synced.',
       reason: 'ERD_WORKSPACE_STORAGE_UNAVAILABLE',
       action:
-        'Run prisma db push on the server database and restart the backend.',
+        'Run prisma migrate deploy on the server database and restart the backend.',
     });
   }
 
