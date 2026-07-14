@@ -50,7 +50,7 @@
     "sonner": "^2.0.7",
     "sql-formatter": "^15.7.0",
     "tailwind-merge": "^3.4.0",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "xlsx": "file:vendor/xlsx-0.20.3.tgz",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

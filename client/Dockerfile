@@ -13,6 +13,7 @@ ENV VITE_API_URL=$VITE_API_URL
 
 # Copy package files first for better cache
 COPY package*.json ./
+COPY vendor ./vendor
 
 # Install dependencies
 RUN npm ci
