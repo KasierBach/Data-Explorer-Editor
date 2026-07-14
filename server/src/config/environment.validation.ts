@@ -66,6 +66,10 @@ export function validateEnvironment(config: Record<string, unknown>) {
     throw new Error('TRUST_PROXY must be an integer between 0 and 10.');
   }
   if (nodeEnv !== 'production') return config;
+  const renderExternalUrl = readString(config, 'RENDER_EXTERNAL_URL');
+  if (!readString(config, 'API_PUBLIC_URL') && renderExternalUrl) {
+    config.API_PUBLIC_URL = `${renderExternalUrl.replace(/\/+$/, '')}/api`;
+  }
   for (const key of CORE_PRODUCTION_VARS) requireValue(config, key);
   validateUrl(requireValue(config, 'DATABASE_URL'), 'DATABASE_URL', [
     'postgres:',

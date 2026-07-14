@@ -336,9 +336,9 @@ Note:
 
 The repository includes a production Blueprint at `render.yaml` and a gated delivery workflow at `.github/workflows/deploy-production.yml`.
 
-1. Create or sync the backend service from the Render Blueprint and set every `sync: false` environment variable in the Render Dashboard. Keep `ALLOW_INSECURE_DATABASE_TLS=false`.
+1. Create or sync the backend service from the Render Blueprint and set its required `sync: false` secrets (`DATABASE_URL`, `REDIS_URL`, JWT secrets, and encryption key). Add AI, OAuth, mail, or billing secrets only when those features are enabled. Keep `ALLOW_INSECURE_DATABASE_TLS=false`.
 2. Create a Render Deploy Hook for the backend service and store it as the GitHub Actions secret `RENDER_DEPLOY_HOOK_URL`.
-3. Set the GitHub Actions repository variable `PRODUCTION_API_URL` to the public backend origin, for example `https://your-backend.onrender.com`.
+3. For another deployment or a custom domain, set the GitHub Actions repository variable `PRODUCTION_API_URL` to the public backend origin. This repository defaults to its verified Render origin, and the backend derives `API_PUBLIC_URL` from Render's built-in `RENDER_EXTERNAL_URL` unless explicitly overridden.
 4. Protect the GitHub `production` environment if deployment approval is required.
 
 Every push to `main` must pass lint, unit tests, production dependency audit, client build, browser E2E/accessibility checks, server build, and container builds. The delivery workflow then deploys the exact tested commit and waits for `/api/health/ready` to confirm PostgreSQL, Redis, and `RENDER_GIT_COMMIT` before succeeding. `/api/health/live` is the process-only liveness endpoint.
@@ -453,7 +453,7 @@ Built-in AI lanes such as Gemini, OpenRouter, Groq, Cerebras, and Beeknoee are b
 | `LEGACY_ENCRYPTION_KEYS`    | No       | Comma-separated list of older keys used to decrypt connections saved before the hardening update.                                                                            |
 | `PORT`                      | No       | Server port. Local default: `3001`.                                                                                                                                          |
 | `FRONTEND_URL`              | Yes      | Frontend URL used for CORS and OAuth redirects. Use `http://localhost:5173` for Vite local dev, or `http://localhost` when serving the frontend through Docker on port `80`. |
-| `API_PUBLIC_URL`            | No       | Public backend base URL used by billing providers when they need to build callback or webhook-facing API links. Docker local default: `http://localhost:3001/api`.         |
+| `API_PUBLIC_URL`            | Yes\*    | Public backend API base used for billing callbacks. Render derives it from `RENDER_EXTERNAL_URL`; set it explicitly on other production hosts or to use a custom domain.     |
 | `ALLOW_INTERNAL_IPS`        | No       | Recommended default is `false`. Local development still allows `localhost`, `127.0.0.1`, and `::1`.                                                                          |
 | `GOOGLE_CLIENT_ID`          | No       | Google login client ID.                                                                                                                                                      |
 | `GOOGLE_CLIENT_SECRET`      | No       | Google login client secret.                                                                                                                                                  |

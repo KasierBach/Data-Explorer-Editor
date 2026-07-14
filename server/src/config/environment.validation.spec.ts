@@ -17,6 +17,17 @@ describe('validateEnvironment', () => {
       productionConfig,
     );
   });
+  it('derives the public API URL from Render when no override is set', () => {
+    const config: Record<string, unknown> = {
+      ...productionConfig,
+      RENDER_EXTERNAL_URL: 'https://data-explorer.onrender.com/',
+    };
+    delete config.API_PUBLIC_URL;
+
+    expect(validateEnvironment(config).API_PUBLIC_URL).toBe(
+      'https://data-explorer.onrender.com/api',
+    );
+  });
   it('fails fast when production infrastructure is missing', () => {
     expect(() =>
       validateEnvironment({ ...productionConfig, REDIS_URL: '' }),

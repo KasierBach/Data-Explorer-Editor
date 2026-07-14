@@ -7,5 +7,10 @@
 # ──────────────────────────────────────────────
 set -e
 
+if [ "$#" -gt 0 ]; then
+  echo "Running configured container command..."
+  exec "$@"
+fi
+
 echo "🚀 Starting Data Explorer server..."
 exec node dist/src/main.js
