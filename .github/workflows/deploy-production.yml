@@ -20,6 +20,7 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
+    timeout-minutes: 50
     environment: production
     steps:
       - uses: actions/checkout@v7
@@ -34,5 +35,6 @@ jobs:
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
           PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL || 'https://data-explorer-editor-9v55.onrender.com' }}
+          RENDER_DEPLOY_TIMEOUT_MS: ${{ vars.RENDER_DEPLOY_TIMEOUT_MS || '2700000' }}
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
         run: node .github/scripts/deploy-render.mjs
