@@ -5,6 +5,7 @@ import { useAppStore } from '@/core/services/store';
 import type { QueryResult } from '@/core/domain/entities';
 import { ApiError } from '@/core/services/api.service';
 import { SearchService } from '@/core/services/SearchService';
+import { MetadataService } from '@/core/services/MetadataService';
 
 interface UseQueryExecutionOptions {
     tabId: string;
@@ -65,6 +66,14 @@ export function useQueryExecution({
                 });
 
                 if (shouldSyncSearchIndex(query)) {
+                    void MetadataService.refresh(activeConnectionId, activeDatabase || undefined)
+                        .then(() => Promise.all([
+                            queryClient.invalidateQueries({ queryKey: ['hierarchy'] }),
+                            queryClient.invalidateQueries({ queryKey: ['metadata'] }),
+                        ]))
+                        .catch((error) => {
+                            console.warn('useQueryExecution: metadata refresh failed', error);
+                        });
                     void SearchService.syncIndex().catch((error) => {
                         console.warn('useQueryExecution: search sync failed', error);
                     });

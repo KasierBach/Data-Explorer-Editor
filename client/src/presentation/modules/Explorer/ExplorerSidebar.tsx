@@ -4,7 +4,7 @@ import { TreeNodeItem } from './TreeNodeItem';
 import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
 import { Plus, RefreshCw, Layers, Database, Globe, Loader2, Search } from 'lucide-react';
-import { connectionService } from '@/core/services/ConnectionService';
+import { connectionService, ConnectionService } from '@/core/services/ConnectionService';
 import { MetadataService } from '@/core/services/MetadataService';
 import { SearchService } from '@/core/services/SearchService';
 import { useQueryClient } from '@tanstack/react-query';
@@ -28,6 +28,7 @@ export const ExplorerSidebar: React.FC = memo(() => {
     const connections = useAppStore(state => state.connections);
     const activeConnectionId = useAppStore(state => state.activeConnectionId);
     const setActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
+    const updateConnection = useAppStore(state => state.updateConnection);
     const activeDatabase = useAppStore(state => state.activeDatabase);
     const lang = useAppStore(state => state.lang);
     const text = getWorkspaceText(lang).explorerSidebar;
@@ -90,6 +91,19 @@ export const ExplorerSidebar: React.FC = memo(() => {
         });
         toast.success(text.refreshed, { id: t });
     }, [activeConnectionId, effectiveDatabase, queryClient, text.refreshed, text.refreshingHierarchy]);
+
+    const handleToggleShowAllDatabases = useCallback(async () => {
+        if (!activeConnection) return;
+
+        const showAllDatabases = !activeConnection.showAllDatabases;
+        try {
+            await ConnectionService.updateConnection(activeConnection.id, { showAllDatabases });
+            updateConnection(activeConnection.id, { showAllDatabases });
+            await handleRefresh();
+        } catch (error) {
+            toast.error(getErrorMessage(error, 'Failed to update database visibility'));
+        }
+    }, [activeConnection, handleRefresh, updateConnection]);
 
     const handleSyncIndex = async () => {
         setIsSyncing(true);
@@ -238,7 +252,14 @@ export const ExplorerSidebar: React.FC = memo(() => {
                     </div>
                 ) : (
                     <div className="px-2">
-                        <SidebarContextMenu type="connection" onAction={(action) => action === 'refresh' && handleRefresh()}>
+                        <SidebarContextMenu
+                            type="connection"
+                            onAction={(action) => {
+                                if (action === 'refresh') void handleRefresh();
+                                if (action === 'toggleShowAll') void handleToggleShowAllDatabases();
+                                if (action === 'createDatabase') setCreateDatabaseDialogOpen(true);
+                            }}
+                        >
                             <div className="flex items-center py-2 px-3 rounded-xl mb-1 bg-blue-500/5 border border-blue-500/10 text-blue-600/90 shadow-sm">
                                 <Database className="w-4 h-4 mr-2.5 text-blue-500" />
                                 <span className="truncate flex-1 font-bold">{activeConnection?.name || text.localInstance}</span>

@@ -19,7 +19,7 @@ export class MetadataController {
   @Post('hierarchy')
   getHierarchy(
     @Body('connectionId') connectionId: string,
-    @Body('parentId') parentId: string | null,
+    @Body('parentId') parentId: unknown,
     @Req() req: AuthenticatedRequest,
   ) {
     return this.metadataService.getHierarchy(

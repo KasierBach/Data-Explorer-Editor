@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { ConnectionsService } from '../connections/connections.service';
@@ -68,19 +68,24 @@ export class MetadataService {
     };
   }
 
-  async getHierarchy(
-    connectionId: string,
-    parentId: string | null,
-    userId: string,
-  ) {
+  async getHierarchy(connectionId: string, parentId: unknown, userId: string) {
+    if (
+      parentId !== null &&
+      parentId !== undefined &&
+      typeof parentId !== 'string'
+    ) {
+      throw new BadRequestException('parentId must be a string or null');
+    }
+    const normalizedParentId = typeof parentId === 'string' ? parentId : null;
     const cacheKey = await this.getCacheKey(
       'hierarchy',
       connectionId,
-      parentId || 'root',
+      normalizedParentId || 'root',
     );
     return this.withCache(
       cacheKey,
-      () => this._getHierarchyUncached(connectionId, parentId, userId),
+      () =>
+        this._getHierarchyUncached(connectionId, normalizedParentId, userId),
       3600000,
     );
   }

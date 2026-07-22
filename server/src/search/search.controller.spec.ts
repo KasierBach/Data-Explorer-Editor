@@ -1,28 +1,12 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { SearchController } from './search.controller';
-import { SearchService } from './search.service';
 
 describe('SearchController', () => {
-  let controller: SearchController;
+  it('rejects repeated q parameters', async () => {
+    const controller = new SearchController({} as never);
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [SearchController],
-      providers: [
-        {
-          provide: SearchService,
-          useValue: {
-            search: jest.fn(),
-            syncIndex: jest.fn(),
-          },
-        },
-      ],
-    }).compile();
-
-    controller = module.get<SearchController>(SearchController);
-  });
-
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
+    await expect(controller.search({} as never, ['users'])).rejects.toThrow(
+      BadRequestException,
+    );
   });
 });
