@@ -25,6 +25,7 @@ import {
   isMongoActionAllowedOnReadOnly,
   isSqlAllowedOnReadOnly,
   splitSqlStatements,
+  MAX_SQL_STATEMENTS,
 } from './query-guard.util';
 import {
   getErrorMessage,
@@ -326,7 +327,15 @@ export class QueryService {
 
     // 4. Non-readOnly connection: confirm only truly high-impact SQL
     if (!connection.readOnly) {
-      const analysis = analyzeSqlConfirmation(sql);
+      let analysis;
+      try {
+        analysis = analyzeSqlConfirmation(sql);
+      } catch (error) {
+        if (error instanceof RangeError) {
+          throw new BadRequestException(error.message);
+        }
+        throw error;
+      }
       const statementLabel =
         analysis.statementCount &&
         analysis.statementCount > 1 &&
@@ -435,7 +444,13 @@ export class QueryService {
           ? [sql]
           : splitSqlStatements(sql);
       const executableStatements = statements.length > 0 ? statements : [sql];
-      const finalSql = executableStatements[executableStatements.length - 1];
+      if (executableStatements.length > MAX_SQL_STATEMENTS) {
+        throw new BadRequestException(
+          `SQL query exceeds the maximum of ${MAX_SQL_STATEMENTS} statements.`,
+        );
+      }
+      const statementCount = executableStatements.length;
+      const finalSql = executableStatements[statementCount - 1];
       const isMultiStatement = executableStatements.length > 1;
 
       const isCacheable = !isMultiStatement && this.isCacheableQuery(finalSql);
@@ -462,9 +477,10 @@ export class QueryService {
       let result: QueryResult;
       if (isMultiStatement) {
         result = { rows: [], columns: [], countStatus: 'skipped' };
-        for (let index = 0; index < executableStatements.length; index++) {
+        for (let index = 0; index < MAX_SQL_STATEMENTS; index++) {
+          if (index >= statementCount) break;
           const statement = executableStatements[index];
-          const isLastStatement = index === executableStatements.length - 1;
+          const isLastStatement = index === statementCount - 1;
           result = await strategy.executeQuery(
             pool,
             statement,

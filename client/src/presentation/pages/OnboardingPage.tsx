@@ -22,7 +22,7 @@ export const OnboardingPage = () => {
 
     // Initial state based on Google/GitHub data if available
     const [formData, setFormData] = useState({
-        username: user?.email?.split('@')[0] || `user_${Math.floor(Math.random() * 10000)}`,
+        username: user?.email?.split('@')[0] || `user_${crypto.randomUUID().slice(0, 8)}`,
         jobRole: '',
         phoneNumber: '',
         address: ''

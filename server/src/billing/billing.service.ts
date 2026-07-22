@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { getBillingPlan } from './billing-plans';
 import type { CreateCheckoutDto } from './dto/create-checkout.dto';
@@ -236,7 +237,7 @@ export class BillingService {
   }
 
   private createProviderOrderId(provider: PaymentProviderName) {
-    const suffix = Math.random().toString(36).slice(2, 10);
+    const suffix = randomBytes(8).toString('hex');
     return `de_${provider}_${Date.now()}_${suffix}`;
   }
 

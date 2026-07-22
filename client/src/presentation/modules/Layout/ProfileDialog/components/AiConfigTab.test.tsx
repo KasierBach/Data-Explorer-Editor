@@ -3,7 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AiPreferences } from "@/core/services/aiPreferences";
 import { INHERIT_ASSISTANT_MODEL } from "@/core/services/aiPreferences";
 import { AiConfigTab } from "./AiConfigTab";
-import { filterSearchableGroups } from "./AiConfigTab.utils";
+import {
+  filterSearchableGroups,
+  normalizeProviderBaseUrl,
+} from "./AiConfigTab.utils";
 
 const aiConfigTabMocks = vi.hoisted(() => ({
   post: vi.fn(),
@@ -63,6 +66,12 @@ describe("filterSearchableGroups", () => {
         ],
       },
     ]);
+  });
+
+  it("normalizes provider URLs without a trailing-slash regex", () => {
+    expect(
+      normalizeProviderBaseUrl("  https://provider.example.com/v1///  "),
+    ).toBe("https://provider.example.com/v1");
   });
 });
 

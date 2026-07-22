@@ -144,7 +144,7 @@ describe('AiController', () => {
 
     await expect(
       controller.listProviderModels({
-        baseUrl: 'https://provider.example.com/v1',
+        baseUrl: 'https://provider.example.com/v1///',
         apiKey: 'sk-test',
       }),
     ).resolves.toEqual({

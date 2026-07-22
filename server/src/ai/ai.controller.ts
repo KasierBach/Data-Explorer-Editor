@@ -18,9 +18,7 @@ import { AutocompleteDto } from './dto/autocomplete.dto';
 import { ProviderModelsDto } from './dto/provider-models.dto';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
 import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
-
-const normalizeProviderBaseUrl = (value: string) =>
-  value.trim().replace(/\/+$/, '');
+import { normalizeProviderBaseUrl } from './ai-url.util';
 
 const extractProviderErrorMessage = (payload: unknown) => {
   if (!payload || typeof payload !== 'object') {

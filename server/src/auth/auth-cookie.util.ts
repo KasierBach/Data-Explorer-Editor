@@ -1,4 +1,5 @@
-import type { CookieOptions, Request } from 'express';
+import type { CookieOptions, Request, Response } from 'express';
+import { decryptAttribute, encryptAttribute } from '../utils/crypto.util';
 
 export const REFRESH_TOKEN_COOKIE = 'de_refresh';
 
@@ -47,4 +48,27 @@ export function extractCookie(req: Request, name: string): string | undefined {
   }
 
   return undefined;
+}
+
+export function setRefreshTokenCookie(
+  res: Response,
+  refreshToken: string,
+  expiresAt: Date,
+) {
+  res.cookie(
+    REFRESH_TOKEN_COOKIE,
+    encryptAttribute(refreshToken),
+    getRefreshTokenCookieOptions(expiresAt.getTime() - Date.now()),
+  );
+}
+
+export function extractRefreshTokenCookie(req: Request): string | undefined {
+  const value = extractCookie(req, REFRESH_TOKEN_COOKIE);
+  if (!value) return undefined;
+
+  try {
+    return decryptAttribute(value);
+  } catch {
+    return undefined;
+  }
 }

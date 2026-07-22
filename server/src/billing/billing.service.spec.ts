@@ -97,6 +97,7 @@ describe('BillingService', () => {
     expect(provider.createCheckout).toHaveBeenCalledWith(
       expect.objectContaining({
         amountVnd: 149000,
+        providerOrderId: expect.stringMatching(/^de_momo_\d+_[a-f0-9]{16}$/),
         planCode: 'pro_monthly',
         userId: 'user_1',
       }),

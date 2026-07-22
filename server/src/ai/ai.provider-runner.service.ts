@@ -23,6 +23,7 @@ import type {
   StreamEvent,
 } from './ai.types';
 import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
+import { normalizeProviderBaseUrl } from './ai-url.util';
 
 @Injectable()
 export class AiProviderRunnerService {
@@ -43,7 +44,7 @@ export class AiProviderRunnerService {
   }
 
   private async getSafeOpenAiCompatibleUrl(baseUrl: string): Promise<string> {
-    const requestUrl = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+    const requestUrl = `${normalizeProviderBaseUrl(baseUrl)}/chat/completions`;
     if (!(await validateExternalUrl(requestUrl))) {
       throw new Error('Unsafe provider URL');
     }

@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { QueryService } from './query.service';
@@ -264,6 +264,34 @@ describe('QueryService', () => {
         countStatus: 'skipped',
       }),
     );
+  });
+
+  it('returns a bad request for SQL batches above the statement limit', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+
+    const sql = Array.from({ length: 101 }, () => 'SELECT 1').join(';');
+
+    await expect(
+      service.executeQuery(
+        {
+          connectionId: 'conn-1',
+          sql,
+          includeTotalCount: false,
+        } as any,
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(connectionsService.getPool).not.toHaveBeenCalled();
+    expect(strategy.executeQuery).not.toHaveBeenCalled();
   });
 
   it('returns explicit table windows with limit, offset, and a trusted total count', async () => {

@@ -105,6 +105,24 @@ describe('AiAutocompleteService', () => {
     expect(result.explanation).toBe('Only active orders.');
   });
 
+  it('rejects quoted MongoDB collection names across line boundaries', async () => {
+    providerRunner.completeGeminiText.mockResolvedValue(
+      JSON.stringify({
+        payload: { action: 'find', filter: {} },
+        explanation: 'Fallback collection.',
+      }),
+    );
+
+    const result = await service.generateSql({
+      query: 'For collection "orders\nadmin": show all orders',
+      databaseType: 'mongodb',
+    });
+
+    expect(JSON.parse(result.sql)).toEqual(
+      expect.objectContaining({ collection: 'yourCollection' }),
+    );
+  });
+
   it('wraps legacy MongoDB pipeline strings with the selected collection', async () => {
     providerRunner.completeGeminiText.mockResolvedValue(
       JSON.stringify({

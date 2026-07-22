@@ -195,11 +195,18 @@ export class AiPromptBuilderService {
     > = [{ text: userText }];
 
     if (image) {
-      const match = image.match(/^data:(.*?);base64,(.*)$/);
-      if (match) {
-        parts.push({
-          inlineData: { mimeType: match[1], data: match[2] },
-        });
+      const prefix = 'data:';
+      const marker = ';base64,';
+      const markerIndex = image.startsWith(prefix)
+        ? image.indexOf(marker, prefix.length)
+        : -1;
+
+      if (markerIndex > prefix.length) {
+        const mimeType = image.slice(prefix.length, markerIndex);
+        const data = image.slice(markerIndex + marker.length);
+        if (data) {
+          parts.push({ inlineData: { mimeType, data } });
+        }
       }
     }
 

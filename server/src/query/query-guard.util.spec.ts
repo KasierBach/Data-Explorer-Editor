@@ -1,6 +1,10 @@
 ﻿import {
   analyzeDestructiveSql,
   analyzeSqlConfirmation,
+  MAX_SQL_LENGTH,
+  MAX_SQL_STATEMENTS,
+  normalizeSql,
+  splitSqlStatements,
   isLikelyDestructiveSql,
 } from './query-guard.util';
 
@@ -166,5 +170,30 @@ describe('analyzeSqlConfirmation', () => {
         'INSERT INTO audit_log (id) VALUES (1); DELETE FROM audit_log',
       ),
     ).toBe(true);
+  });
+});
+
+describe('SQL input bounds', () => {
+  it('removes block and line comments without changing executable SQL', () => {
+    expect(
+      normalizeSql('SELECT /* comment **/ * -- line comment\r\nFROM users'),
+    ).toBe('SELECT * FROM users');
+  });
+
+  it('rejects SQL that exceeds the request length limit', () => {
+    expect(() => splitSqlStatements('S'.repeat(MAX_SQL_LENGTH + 1))).toThrow(
+      `SQL query exceeds the maximum length of ${MAX_SQL_LENGTH} characters.`,
+    );
+  });
+
+  it('rejects SQL batches that exceed the statement limit', () => {
+    const sql = Array.from(
+      { length: MAX_SQL_STATEMENTS + 1 },
+      () => 'SELECT 1',
+    ).join(';');
+
+    expect(() => splitSqlStatements(sql)).toThrow(
+      `SQL query exceeds the maximum of ${MAX_SQL_STATEMENTS} statements.`,
+    );
   });
 });

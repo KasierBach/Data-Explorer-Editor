@@ -89,7 +89,9 @@ function extractJsonObject(responseText: string): string {
 }
 
 function extractPreferredCollection(query: string): string | null {
-  const quotedMatch = query.match(/for collection\s+["'`](.+?)["'`]\s*:/i);
+  const quotedMatch = query.match(
+    /for collection\s+["'`]([^"'`\r\n]+)["'`]\s*:/i,
+  );
   if (quotedMatch?.[1]) {
     return quotedMatch[1].trim();
   }

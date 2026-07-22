@@ -14,7 +14,11 @@ import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/presentation/components/ui/popover';
 import { getAssistantModelCatalog } from '@/presentation/modules/Query/assistantModelCatalog';
-import { filterSearchableGroups, type SearchableGroup } from './AiConfigTab.utils';
+import {
+    filterSearchableGroups,
+    normalizeProviderBaseUrl,
+    type SearchableGroup,
+} from './AiConfigTab.utils';
 
 interface AiConfigTabProps {
     t: (key: string) => string;
@@ -432,7 +436,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
 
     const handleSaveProvider = () => {
         const name = providerForm.name.trim();
-        const baseUrl = providerForm.baseUrl.trim().replace(/\/+$/, '');
+        const baseUrl = normalizeProviderBaseUrl(providerForm.baseUrl);
         const apiKey = providerForm.apiKey.trim();
         const model = providerForm.model.trim();
 
@@ -473,7 +477,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
     };
 
     const handleLoadProviderModels = async () => {
-        const baseUrl = providerForm.baseUrl.trim().replace(/\/+$/, '');
+        const baseUrl = normalizeProviderBaseUrl(providerForm.baseUrl);
         if (!baseUrl) {
             window.alert(labels.providerBaseUrlRequired);
             return;

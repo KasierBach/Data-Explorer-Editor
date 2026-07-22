@@ -24,10 +24,10 @@ import { Throttle } from '@nestjs/throttler';
 import { ExchangeOauthCodeDto } from './dto/exchange-oauth-code.dto';
 import { TokenService } from './token.service';
 import {
-  extractCookie,
+  extractRefreshTokenCookie,
   getClearedRefreshTokenCookieOptions,
-  getRefreshTokenCookieOptions,
   REFRESH_TOKEN_COOKIE,
+  setRefreshTokenCookie,
 } from './auth-cookie.util';
 import { resolveRequestLanguage } from '../common/utils/i18n.util';
 
@@ -52,12 +52,10 @@ export class AuthController {
       ip,
       resolveRequestLanguage(req.headers['accept-language']),
     );
-    res.cookie(
-      REFRESH_TOKEN_COOKIE,
+    setRefreshTokenCookie(
+      res,
       session.refreshToken,
-      getRefreshTokenCookieOptions(
-        session.refreshTokenExpiresAt.getTime() - Date.now(),
-      ),
+      session.refreshTokenExpiresAt,
     );
 
     return {
@@ -87,12 +85,10 @@ export class AuthController {
       dto,
       resolveRequestLanguage(req.headers['accept-language']),
     );
-    res.cookie(
-      REFRESH_TOKEN_COOKIE,
+    setRefreshTokenCookie(
+      res,
       session.refreshToken,
-      getRefreshTokenCookieOptions(
-        session.refreshTokenExpiresAt.getTime() - Date.now(),
-      ),
+      session.refreshTokenExpiresAt,
     );
 
     return {
@@ -150,12 +146,10 @@ export class AuthController {
       dto.code,
       resolveRequestLanguage(req.headers['accept-language']),
     );
-    res.cookie(
-      REFRESH_TOKEN_COOKIE,
+    setRefreshTokenCookie(
+      res,
       session.refreshToken,
-      getRefreshTokenCookieOptions(
-        session.refreshTokenExpiresAt.getTime() - Date.now(),
-      ),
+      session.refreshTokenExpiresAt,
     );
 
     return {
@@ -171,17 +165,15 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = extractCookie(req, REFRESH_TOKEN_COOKIE);
+    const refreshToken = extractRefreshTokenCookie(req);
     const session = await this.authService.refreshSession(
       refreshToken,
       resolveRequestLanguage(req.headers['accept-language']),
     );
-    res.cookie(
-      REFRESH_TOKEN_COOKIE,
+    setRefreshTokenCookie(
+      res,
       session.refreshToken,
-      getRefreshTokenCookieOptions(
-        session.refreshTokenExpiresAt.getTime() - Date.now(),
-      ),
+      session.refreshTokenExpiresAt,
     );
 
     return {
@@ -194,7 +186,7 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = extractCookie(req, REFRESH_TOKEN_COOKIE);
+    const refreshToken = extractRefreshTokenCookie(req);
     const result = await this.authService.logout(
       refreshToken,
       resolveRequestLanguage(req.headers['accept-language']),

@@ -34,6 +34,8 @@ const SQL_WRITE_KEYWORDS = [
 ];
 
 const MONGO_READ_ONLY_ACTIONS = new Set(['find', 'aggregate', 'count']);
+export const MAX_SQL_LENGTH = 500_000;
+export const MAX_SQL_STATEMENTS = 100;
 
 type ImpactScope = 'rows' | 'object' | 'database' | 'instance' | 'unknown';
 type DestructiveReason =
@@ -50,8 +52,8 @@ interface SqlObjectInfo {
 
 export function normalizeSql(sql: string): string {
   return sql
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/--.*$/gm, ' ')
+    .replace(/\/\*(?:[^*]|\*(?!\/))*\*\//g, ' ')
+    .replace(/--[^\r\n]*/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -79,7 +81,24 @@ export function containsMultipleStatements(sql: string): boolean {
   return splitSqlStatements(sql).length > 1;
 }
 
+function appendSqlStatement(statements: string[], sql: string) {
+  if (!normalizeSql(sql)) return;
+  if (statements.length >= MAX_SQL_STATEMENTS) {
+    throw new RangeError(
+      `SQL query exceeds the maximum of ${MAX_SQL_STATEMENTS} statements.`,
+    );
+  }
+
+  statements.push(sql.trim());
+}
+
 export function splitSqlStatements(sql: string): string[] {
+  if (sql.length > MAX_SQL_LENGTH) {
+    throw new RangeError(
+      `SQL query exceeds the maximum length of ${MAX_SQL_LENGTH} characters.`,
+    );
+  }
+
   const statements: string[] = [];
   let current = '';
   let insideSingle = false;
@@ -87,7 +106,8 @@ export function splitSqlStatements(sql: string): string[] {
   let insideLineComment = false;
   let insideBlockComment = false;
 
-  for (let i = 0; i < sql.length; i++) {
+  for (let i = 0; i < MAX_SQL_LENGTH; i++) {
+    if (i >= sql.length) break;
     const ch = sql[i];
     const next = i < sql.length - 1 ? sql[i + 1] : '';
     const prev = i > 0 ? sql[i - 1] : '';
@@ -133,18 +153,14 @@ export function splitSqlStatements(sql: string): string[] {
       insideDouble = !insideDouble;
       current += ch;
     } else if (ch === ';' && !insideSingle && !insideDouble) {
-      if (normalizeSql(current)) {
-        statements.push(current.trim());
-      }
+      appendSqlStatement(statements, current);
       current = '';
     } else {
       current += ch;
     }
   }
 
-  if (normalizeSql(current)) {
-    statements.push(current.trim());
-  }
+  appendSqlStatement(statements, current);
 
   return statements;
 }

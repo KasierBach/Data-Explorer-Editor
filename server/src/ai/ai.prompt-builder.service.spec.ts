@@ -76,4 +76,32 @@ describe('AiPromptBuilderService', () => {
     expect(prompt).toContain('place citation URLs in the "sources" array');
     expect(prompt).toContain('An image is attached to this request');
   });
+
+  it('parses valid base64 image data without a regular expression', () => {
+    expect(
+      service.prepareGeminiParts(
+        'Describe this image',
+        undefined,
+        'data:image/png;base64,aGVsbG8=',
+      ),
+    ).toEqual([
+      { text: 'Describe this image' },
+      {
+        inlineData: {
+          mimeType: 'image/png',
+          data: 'aGVsbG8=',
+        },
+      },
+    ]);
+  });
+
+  it('ignores malformed image data URLs', () => {
+    expect(
+      service.prepareGeminiParts(
+        'Describe this image',
+        undefined,
+        'https://example.com/image.png',
+      ),
+    ).toEqual([{ text: 'Describe this image' }]);
+  });
 });
