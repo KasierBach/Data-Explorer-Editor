@@ -457,9 +457,9 @@ export class AiProviderRunnerService {
     } catch (error: unknown) {
       if (this.isModelNotFoundError(error)) {
         this.logger.warn(
-          `Model ${params.model} not found. Falling back to gemini-1.5-flash-latest...`,
+          `Model ${params.model} not found. Falling back to gemini-3.5-flash-lite...`,
         );
-        return await tryCompletion('gemini-1.5-flash-latest');
+        return await tryCompletion('gemini-3.5-flash-lite');
       }
       throw error;
     }

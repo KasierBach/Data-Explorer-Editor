@@ -60,7 +60,7 @@ export class AiRoutingService {
       : null;
     return actualModel
       ? [actualModel]
-      : ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-3-flash'];
+      : ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash'];
   }
 
   normalizeRoutingMode(routingMode?: string): AiRoutingMode {
@@ -191,7 +191,7 @@ export class AiRoutingService {
           'https://openrouter.ai/api/v1',
         model:
           this.configService.get<string>('OPENROUTER_CHAT_MODEL') ||
-          'openai/gpt-3.5-turbo',
+          'google/gemma-4-31b-it:free',
       });
     }
 
@@ -217,7 +217,7 @@ export class AiRoutingService {
           'https://api.groq.com/openai/v1',
         model:
           this.configService.get<string>('GROQ_CHAT_MODEL') ||
-          'meta-llama/llama-4-scout-17b-16e-instruct',
+          'openai/gpt-oss-120b',
       });
     }
 

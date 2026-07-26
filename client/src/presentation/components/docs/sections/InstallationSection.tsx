@@ -122,7 +122,7 @@ export function InstallationSection({ lang }: Props) {
             <CodeLine>GROQ_API_KEY=...</CodeLine>
             <CodeLine>GROQ_BASE_URL=https://api.groq.com/openai/v1</CodeLine>
             <CodeLine>
-              GROQ_CHAT_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
+              GROQ_CHAT_MODEL=openai/gpt-oss-120b
             </CodeLine>
             <CodeLine>BEEKNOEE_API_KEY=...</CodeLine>
             <CodeLine>

@@ -57,8 +57,15 @@ export const useAppStore = create<AppState>()(
                         messages: [],
                     }));
                 }
-                if (!persisted.aiModel || persisted.aiModel === 'gemini-3-flash-preview') {
-                    persisted.aiModel = 'groq:meta-llama/llama-4-scout-17b-16e-instruct';
+                const retiredAiModels = new Set([
+                    'groq:meta-llama/llama-4-scout-17b-16e-instruct',
+                    'groq:mixtral-8x7b-32768',
+                    'groq:gemma2-9b-it',
+                    'openai/gpt-oss-120b:free',
+                    'openrouter/owl-alpha',
+                ]);
+                if (!persisted.aiModel || retiredAiModels.has(persisted.aiModel)) {
+                    persisted.aiModel = 'groq:openai/gpt-oss-120b';
                 }
                 return { ...currentState, ...persisted } as AppState;
             },

@@ -63,7 +63,7 @@ export interface AiChatSlice {
 export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
     aiChats: [],
     activeAiChatId: null,
-    aiModel: 'groq:meta-llama/llama-4-scout-17b-16e-instruct',
+    aiModel: 'groq:openai/gpt-oss-120b',
     aiMode: 'planning',
     aiRoutingMode: 'auto',
     isFetchingAiChats: false,

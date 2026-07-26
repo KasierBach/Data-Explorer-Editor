@@ -23,6 +23,14 @@ describe('aiChatSlice.editAiMessage', () => {
     vi.clearAllMocks();
   });
 
+  it('uses a currently available default model', () => {
+    const store = createStore<AiChatSlice>()((set, get, api) =>
+      createAiChatSlice(set, get, api),
+    );
+
+    expect(store.getState().aiModel).toBe('groq:openai/gpt-oss-120b');
+  });
+
   it('updates the existing persisted message instead of appending a new one', async () => {
     const store = createStore<AiChatSlice>()((set, get, api) =>
       createAiChatSlice(set, get, api),

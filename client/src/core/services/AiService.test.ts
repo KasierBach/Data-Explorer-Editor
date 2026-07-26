@@ -28,7 +28,7 @@ describe('AiService (Frontend)', () => {
     const params = {
       connectionId: 'conn-1',
       beforeCursor: 'SEL',
-      model: 'openai/gpt-oss-120b:free',
+      model: 'google/gemma-4-31b-it:free',
       providerOverride: {
         type: 'openai-compatible' as const,
         name: 'custom',

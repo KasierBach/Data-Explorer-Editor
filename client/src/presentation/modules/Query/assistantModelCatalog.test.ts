@@ -43,4 +43,20 @@ describe("assistantModelCatalog", () => {
         .some((item) => item.id.startsWith("tokenrouter:")),
     ).toBe(false);
   });
+
+  it("does not expose retired built-in models", () => {
+    const ids = getAssistantModelCatalog().flatMap((group) =>
+      group.items.map((item) => item.id),
+    );
+
+    expect(ids).toContain("gemini-3.6-flash");
+    expect(ids).toContain("groq:openai/gpt-oss-120b");
+    expect(ids).toContain("groq:qwen/qwen3.6-27b");
+    expect(ids).toContain("groq:groq/compound");
+    expect(ids).not.toContain("groq:meta-llama/llama-4-scout-17b-16e-instruct");
+    expect(ids).not.toContain("groq:mixtral-8x7b-32768");
+    expect(ids).not.toContain("groq:gemma2-9b-it");
+    expect(ids).not.toContain("openai/gpt-oss-120b:free");
+    expect(ids).not.toContain("openrouter/owl-alpha");
+  });
 });

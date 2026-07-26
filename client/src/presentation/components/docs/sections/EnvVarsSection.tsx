@@ -206,7 +206,7 @@ export function EnvVarsSection({ lang }: Props) {
           desc: t
             ? "Model mặc định của lane Groq"
             : "Default model for the Groq lane",
-          example: "meta-llama/llama-4-scout-17b-16e-instruct",
+          example: "openai/gpt-oss-120b",
         },
         {
           name: "BEEKNOEE_API_KEY",
