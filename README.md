@@ -25,6 +25,7 @@ Current documentation focus reflects the **v3.6.4** workspace: configurable AI r
 ### AI Assistant and Routing
 
 - **Context-Aware SQL Generation**: Describe complex data needs in natural language and the AI generates SQL based on your live schema and foreign key relationships.
+- **Schema-Only AI Context by Default**: AI receives table, column, and relationship metadata without reading or sending row values.
 - **Vision Integration**: Upload screenshots of DB diagrams or whiteboards for AI-assisted schema reconstruction and query help.
 - **Global Assistant Panel**: A resizable, toggleable sidebar available across major modules with SSE-based streaming responses.
 - **Configure AI by Role**: Choose separate models for **AI Assistant**, **Explain**, **AI SQL**, **AI NoSQL**, and **Autocomplete**, or let those roles inherit the main assistant model when you want a simpler setup.

@@ -19,6 +19,9 @@ import { ProviderModelsDto } from './dto/provider-models.dto';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
 import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
 import { normalizeProviderBaseUrl } from './ai-url.util';
+import { randomUUID } from 'crypto';
+import { AuditAction, AuditService } from '../audit/audit.service';
+import { AiSqlFeedbackDto } from './dto/ai-sql-feedback.dto';
 
 const extractProviderErrorMessage = (payload: unknown) => {
   if (!payload || typeof payload !== 'object') {
@@ -50,6 +53,7 @@ export class AiController {
   constructor(
     private readonly aiService: AiService,
     private readonly connectionService: AiConnectionService,
+    private readonly auditService: AuditService,
   ) {}
 
   @Post('generate-sql')
@@ -286,6 +290,8 @@ export class AiController {
     @Body() body: GenerateSqlDto,
     @Req() req: AuthenticatedRequest,
   ) {
+    const generationId = randomUUID();
+    const startedAt = Date.now();
     const {
       connectionId,
       database,
@@ -306,7 +312,7 @@ export class AiController {
       );
 
     try {
-      return await this.aiService.generateSql({
+      const result = await this.aiService.generateSql({
         query: prompt,
         databaseType: connection.type,
         schemaContext,
@@ -315,10 +321,56 @@ export class AiController {
         routingMode,
         providerOverride,
       });
+
+      await this.auditService.log({
+        action: AuditAction.AI_SQL_GENERATED,
+        userId: req.user.id,
+        details: {
+          generationId,
+          connectionId,
+          databaseType: connection.type,
+          model: model || null,
+          mode: mode || 'fast',
+          routingMode: routingMode || null,
+          customProvider: Boolean(providerOverride),
+          latencyMs: Date.now() - startedAt,
+        },
+      });
+
+      return { ...result, generationId };
     } catch (error) {
+      await this.auditService.log({
+        action: AuditAction.AI_SQL_GENERATION_FAILED,
+        userId: req.user.id,
+        details: {
+          generationId,
+          connectionId,
+          databaseType: connection.type,
+          model: model || null,
+          mode: mode || 'fast',
+          routingMode: routingMode || null,
+          customProvider: Boolean(providerOverride),
+          latencyMs: Date.now() - startedAt,
+        },
+      });
       const message = error instanceof Error ? error.message : 'Unknown error';
       throw new InternalServerErrorException(message);
     }
+  }
+
+  @Post('sql-feedback')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async recordSqlFeedback(
+    @Body() body: AiSqlFeedbackDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    await this.auditService.log({
+      action: AuditAction.AI_SQL_FEEDBACK,
+      userId: req.user.id,
+      details: body,
+    });
+
+    return { success: true };
   }
 }
 

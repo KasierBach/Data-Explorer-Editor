@@ -40,6 +40,8 @@ import { RedisModule } from './redis/redis.module';
 import { NoSqlModule } from './nosql/nosql.module';
 import { BillingModule } from './billing/billing.module';
 import { validateEnvironment } from './config/environment.validation';
+import { MaintenanceModule } from './maintenance/maintenance.module';
+import { AiQualityModule } from './ai-quality/ai-quality.module';
 
 @Module({
   imports: [
@@ -114,6 +116,8 @@ import { validateEnvironment } from './config/environment.validation';
     RedisModule,
     NoSqlModule,
     BillingModule,
+    MaintenanceModule,
+    AiQualityModule,
   ],
   controllers: [AppController],
   providers: [

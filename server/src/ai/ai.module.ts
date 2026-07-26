@@ -13,11 +13,12 @@ import { AiProviderRunnerService } from './ai.provider-runner.service';
 import { AiSchemaService } from './ai.schema-service';
 import { AiAutocompleteService } from './ai.autocomplete-service';
 import { AiConnectionService } from './ai.connection-service';
+import { AuditModule } from '../audit/audit.module';
 
 const isProd = process.env.NODE_ENV === 'production';
 
 @Module({
-  imports: [ConnectionsModule, PrismaModule],
+  imports: [ConnectionsModule, PrismaModule, AuditModule],
   controllers: [
     AiController,
     AiChatController,

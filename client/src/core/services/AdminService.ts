@@ -31,6 +31,18 @@ export interface AuditLogEntry {
     user?: AdminUserIdentity | null;
 }
 
+export interface AiQualityMetrics {
+    days: number;
+    generations: number;
+    success: number;
+    failed: number;
+    successRate: number;
+    averageLatencyMs: number;
+    p95LatencyMs: number;
+    feedback: { up: number; down: number; total: number };
+    models: Array<{ model: string; success: number; failed: number; total: number }>;
+}
+
 interface MessageResponse {
     message: string;
 }
@@ -70,6 +82,10 @@ class AdminService {
 
     async getMyAuditLogs(limit: number = 200): Promise<AuditLogEntry[]> {
         return await apiService.get<AuditLogEntry[]>(`/audit/me?limit=${limit}`);
+    }
+
+    async getAiQualityMetrics(days: number = 30): Promise<AiQualityMetrics> {
+        return await apiService.get<AiQualityMetrics>(`/admin/ai-quality?days=${days}`);
     }
 }
 

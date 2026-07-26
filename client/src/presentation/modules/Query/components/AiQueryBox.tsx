@@ -1,5 +1,5 @@
 ﻿import React, { useState, useRef } from 'react';
-import { Sparkles, Loader2, Wand2, Calculator, Info, X } from 'lucide-react';
+import { Sparkles, Loader2, Wand2, Calculator, Info, X, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Textarea } from '@/presentation/components/ui/textarea';
 import { apiService } from '@/core/services/api.service';
@@ -24,6 +24,9 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
     const [query, setQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [explanation, setExplanation] = useState<string | null>(null);
+    const [pendingSql, setPendingSql] = useState<string | null>(null);
+    const [generationId, setGenerationId] = useState<string | null>(null);
+    const [feedbackRating, setFeedbackRating] = useState<'up' | 'down' | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -32,8 +35,11 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
 
         setIsLoading(true);
         setExplanation(null);
+        setPendingSql(null);
+        setGenerationId(null);
+        setFeedbackRating(null);
         try {
-            const result = await apiService.post<{ sql: string, explanation: string }>('/ai/nlp-to-sql', {
+            const result = await apiService.post<{ sql: string, explanation: string, generationId?: string }>('/ai/nlp-to-sql', {
                 connectionId: currentConnectionId,
                 database: currentDatabase,
                 prompt: query,
@@ -44,11 +50,13 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
             });
 
             const generatedSql = result.sql?.trim() || '';
+            setGenerationId(result.generationId || null);
             const explicitSchemaIntent = /\b(create|alter|drop|truncate|migrate|migration|schema|table|column|ddl)\b/i.test(query);
             const isSchemaChangingSql = /^\s*(create|alter|drop|truncate|insert|update|delete|replace|rename)\s+/i.test(generatedSql);
             const isTooLong = generatedSql.length > 500 || generatedSql.split('\n').length > 6;
 
             if (generatedSql && !explicitSchemaIntent && (isSchemaChangingSql || isTooLong)) {
+                setPendingSql(generatedSql);
                 setExplanation(result.explanation || text.aiQuery.autoInsertSkipped);
                 toast.warning(text.aiQuery.autoInsertWarning);
             } else if (generatedSql) {
@@ -65,6 +73,18 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
             toast.error(text.aiQuery.requestFailed);
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleFeedback = async (rating: 'up' | 'down') => {
+        if (!generationId || feedbackRating) return;
+
+        try {
+            await apiService.post('/ai/sql-feedback', { generationId, rating });
+            setFeedbackRating(rating);
+            toast.success(text.aiQuery.feedbackThanks);
+        } catch {
+            toast.error(text.aiQuery.feedbackFailed);
         }
     };
 
@@ -143,13 +163,53 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                         </div>
 
                         {explanation && (
-                            <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/10 flex space-x-3 animate-in slide-in-from-top-2">
+                            <div className="p-3 rounded-xl bg-blue-500/5 border border-blue-500/10 space-y-3 animate-in slide-in-from-top-2">
+                                <div className="flex space-x-3">
                                 <div className="mt-0.5">
                                     <Info className="w-3.5 h-3.5 text-blue-400" />
                                 </div>
                                 <p className="text-[11px] leading-relaxed text-blue-200/70 italic">
                                     {explanation}
                                 </p>
+                                </div>
+                                {generationId && (
+                                    <div className="flex items-center justify-between border-t border-blue-500/10 pt-2">
+                                        <span className="text-[10px] text-muted-foreground">{text.aiQuery.feedbackQuestion}</span>
+                                        <div className="flex gap-1">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" disabled={Boolean(feedbackRating)} aria-label={text.aiQuery.feedbackUp} onClick={() => handleFeedback('up')}>
+                                                <ThumbsUp className={cn('h-3.5 w-3.5', feedbackRating === 'up' && 'text-emerald-400')} />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" disabled={Boolean(feedbackRating)} aria-label={text.aiQuery.feedbackDown} onClick={() => handleFeedback('down')}>
+                                                <ThumbsDown className={cn('h-3.5 w-3.5', feedbackRating === 'down' && 'text-red-400')} />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {pendingSql && (
+                            <div className="space-y-3 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                                <div>
+                                    <p className="text-xs font-semibold text-amber-300">{text.aiQuery.previewTitle}</p>
+                                    <p className="mt-1 text-[11px] text-muted-foreground">{text.aiQuery.previewHint}</p>
+                                </div>
+                                <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-black/30 p-3 font-mono text-xs text-foreground">{pendingSql}</pre>
+                                <div className="flex justify-end gap-2">
+                                    <Button variant="ghost" size="sm" onClick={() => setPendingSql(null)}>
+                                        {text.aiQuery.discardPreview}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            onGenerate(pendingSql);
+                                            setPendingSql(null);
+                                            toast.success(text.aiQuery.generatedSuccess);
+                                        }}
+                                    >
+                                        {text.aiQuery.applyPreview}
+                                    </Button>
+                                </div>
                             </div>
                         )}
 

@@ -18,7 +18,6 @@ import type {
 interface SchemaTable {
   name: string;
   schema: string;
-  sampleData?: Record<string, unknown>[];
 }
 
 @Injectable()

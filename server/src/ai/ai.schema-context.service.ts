@@ -12,7 +12,6 @@ import { FreshnessService } from '../common/freshness/freshness.service';
 interface SchemaTable {
   name: string;
   schema: string;
-  sampleData?: Record<string, unknown>[];
 }
 
 function formatSchemaDefaultValue(value: unknown): string {
@@ -41,7 +40,7 @@ export class AiSchemaContextService {
       ? await this.freshnessService.buildKey(
           'ai-schema',
           [connectionId, database || 'default'],
-          ['schema-context-v2'], // Versioned key for new format
+          ['schema-context-v3-schema-only'],
         )
       : null;
 
@@ -101,16 +100,6 @@ export class AiSchemaContextService {
                 database,
               );
               columnMap.set(`${schemaName}.${tableName}`, cols);
-
-              // Gather sample data to provide real data type context to AI
-              if (tableCount < 30) {
-                const sample = await strategy
-                  .getSampleRows(pool, schemaName, tableName, 2)
-                  .catch(() => []);
-                if (sample && sample.length > 0) {
-                  tableObj.sampleData = sample;
-                }
-              }
             } catch {
               // Continue building partial schema context.
             }
@@ -147,7 +136,7 @@ export class AiSchemaContextService {
       }
 
       this.logger.log(
-        `[AiSchemaContextService] Schema context built: ${allTables.length} tables with sample data`,
+        `[AiSchemaContextService] Schema-only context built: ${allTables.length} tables`,
       );
     } catch (error) {
       this.logger.error(
@@ -190,13 +179,6 @@ export class AiSchemaContextService {
             ? ` DEFAULT ${formatSchemaDefaultValue(col.defaultValue)}`
             : '';
         context += `    - ${col.name} ${col.type} ${nullable}${pk}${def}\n`;
-      }
-
-      if (table.sampleData && table.sampleData.length > 0) {
-        context += '  SAMPLE DATA:\n';
-        table.sampleData.forEach((row) => {
-          context += `    - ${JSON.stringify(row)}\n`;
-        });
       }
     }
 

@@ -73,15 +73,6 @@ export class QueryService {
     );
   }
 
-  private isCacheableQuery(sql: string): boolean {
-    const trimmed = sql.trim().toUpperCase();
-    return (
-      trimmed.startsWith('SELECT') &&
-      !trimmed.includes('NOW()') &&
-      !trimmed.includes('RAND()')
-    );
-  }
-
   private async invalidateQueryCache(
     connectionId: string,
     database?: string,
@@ -453,27 +444,6 @@ export class QueryService {
       const finalSql = executableStatements[statementCount - 1];
       const isMultiStatement = executableStatements.length > 1;
 
-      const isCacheable = !isMultiStatement && this.isCacheableQuery(finalSql);
-      const cacheKey = isCacheable
-        ? await this.getQueryCacheKey(
-            connectionId,
-            finalSql,
-            database || connection.database,
-            {
-              limit,
-              offset,
-              includeTotalCount,
-            },
-          )
-        : null;
-
-      if (cacheKey) {
-        const cachedResult = await this.cacheManager.get(cacheKey);
-        if (cachedResult) {
-          return { ...cachedResult, cached: true };
-        }
-      }
-
       let result: QueryResult;
       if (isMultiStatement) {
         result = { rows: [], columns: [], countStatus: 'skipped' };
@@ -532,10 +502,6 @@ export class QueryService {
         }
       } else if (includeTotalCount === false || isMultiStatement) {
         result.countStatus = 'skipped';
-      }
-
-      if (cacheKey && result.rows) {
-        await this.cacheManager.set(cacheKey, result, this.QUERY_CACHE_TTL_MS);
       }
 
       await this.auditService.log({
@@ -624,22 +590,6 @@ export class QueryService {
       const strategy = this.strategyFactory.getStrategy(connection.type);
       const quotedTable = strategy.quoteTable(schema, table);
       const baseSql = `SELECT * FROM ${quotedTable}`;
-      const cacheKey = await this.getQueryCacheKey(
-        connectionId,
-        `table-window:${baseSql}`,
-        database || connection.database,
-        {
-          limit: normalizedLimit,
-          offset: normalizedOffset,
-          includeTotalCount,
-        },
-      );
-
-      const cachedResult = await this.cacheManager.get<QueryResult>(cacheKey);
-      if (cachedResult) {
-        return { ...cachedResult, cached: true };
-      }
-
       const result = await strategy.executeQuery(pool, baseSql, {
         limit: normalizedLimit,
         offset: normalizedOffset,
@@ -683,8 +633,6 @@ export class QueryService {
       } else {
         response.countStatus = 'skipped';
       }
-
-      await this.cacheManager.set(cacheKey, response, this.QUERY_CACHE_TTL_MS);
 
       await this.auditService.log({
         action: AuditAction.DB_QUERY_EXECUTE,

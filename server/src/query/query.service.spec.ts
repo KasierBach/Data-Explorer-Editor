@@ -101,7 +101,7 @@ describe('QueryService', () => {
     expect(strategy.executeQuery).not.toHaveBeenCalled();
   });
 
-  it('builds versioned cache keys for query reads including pagination options', async () => {
+  it('does not cache raw query execution and still records audit history', async () => {
     connectionsService.findOne.mockResolvedValue({
       id: 'conn-1',
       type: 'postgres',
@@ -112,8 +112,6 @@ describe('QueryService', () => {
       allowImportExport: true,
     });
     connectionsService.getPool.mockResolvedValue({});
-    freshnessService.buildKey.mockResolvedValue('freshness:query:key');
-    cacheManager.get.mockResolvedValue(undefined);
     strategy.executeQuery.mockResolvedValue({ rows: [{ id: 1 }] });
 
     await service.executeQuery(
@@ -126,10 +124,13 @@ describe('QueryService', () => {
       'user-1',
     );
 
-    expect(freshnessService.buildKey).toHaveBeenCalledWith(
-      'query',
-      ['conn-1', 'main'],
-      ['select * from users', 'limit:25', 'offset:50'],
+    expect(freshnessService.buildKey).not.toHaveBeenCalled();
+    expect(cacheManager.get).not.toHaveBeenCalled();
+    expect(cacheManager.set).not.toHaveBeenCalled();
+    expect(auditService.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: AuditAction.DB_QUERY_EXECUTE,
+      }),
     );
   });
 
@@ -181,8 +182,6 @@ describe('QueryService', () => {
       allowImportExport: true,
     });
     connectionsService.getPool.mockResolvedValue({});
-    freshnessService.buildKey.mockResolvedValue('freshness:query:key');
-    cacheManager.get.mockResolvedValue(undefined);
     strategy.executeQuery.mockResolvedValue({ rows: [{ id: 1 }] });
 
     const result = (await service.executeQuery(
@@ -198,11 +197,8 @@ describe('QueryService', () => {
 
     expect(strategy.executeQuery).toHaveBeenCalledTimes(1);
     expect(result.totalCount).toBeUndefined();
-    expect(freshnessService.buildKey).toHaveBeenCalledWith(
-      'query',
-      ['conn-1', 'main'],
-      ['select * from users', 'limit:1000', 'offset:0', 'total:0'],
-    );
+    expect(freshnessService.buildKey).not.toHaveBeenCalled();
+    expect(cacheManager.get).not.toHaveBeenCalled();
   });
 
   it('runs multi-statement SQL sequentially and returns the final statement result', async () => {
@@ -352,12 +348,10 @@ describe('QueryService', () => {
         limitSource: 'table_window',
       }),
     );
+    expect(cacheManager.set).toHaveBeenCalledTimes(1);
     expect(cacheManager.set).toHaveBeenCalledWith(
       'freshness:table-window:key',
-      expect.objectContaining({
-        totalCount: 42,
-        countStatus: 'available',
-      }),
+      42,
       60_000,
     );
   });

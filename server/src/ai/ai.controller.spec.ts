@@ -3,6 +3,7 @@ import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 import { AiConnectionService } from './ai.connection-service';
 import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
+import { AuditAction, AuditService } from '../audit/audit.service';
 
 jest.mock('../common/utils/ssrf-validator.util', () => ({
   validateExternalUrl: jest.fn(),
@@ -29,6 +30,10 @@ describe('AiController', () => {
     getConnectionContextForStream: jest.fn(),
   };
 
+  const auditServiceMock = {
+    log: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
     validateExternalUrlMock.mockResolvedValue(true);
@@ -41,6 +46,7 @@ describe('AiController', () => {
           provide: AiConnectionService,
           useValue: connectionServiceMock,
         },
+        { provide: AuditService, useValue: auditServiceMock },
       ],
     }).compile();
 
@@ -112,7 +118,7 @@ describe('AiController', () => {
       explanation: 'Reads orders.',
     });
 
-    await controller.nlpToSql(
+    const result = await controller.nlpToSql(
       {
         connectionId: 'conn-1',
         database: 'app',
@@ -131,6 +137,43 @@ describe('AiController', () => {
       model: 'gemini:gemini-2.5-flash',
       mode: 'fast',
       routingMode: 'auto',
+    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        sql: '{"action":"find","collection":"orders","filter":{}}',
+        generationId: expect.any(String),
+      }),
+    );
+    expect(auditServiceMock.log).toHaveBeenCalledWith({
+      action: AuditAction.AI_SQL_GENERATED,
+      userId: 'user-1',
+      details: expect.objectContaining({
+        generationId: result.generationId,
+        databaseType: 'mongodb',
+        model: 'gemini:gemini-2.5-flash',
+        latencyMs: expect.any(Number),
+      }),
+    });
+  });
+
+  it('records SQL feedback without storing prompt or generated SQL', async () => {
+    await expect(
+      controller.recordSqlFeedback(
+        {
+          generationId: '2c1cc849-e91f-4d54-9a40-9ac7c3f5d37f',
+          rating: 'down',
+        },
+        { user: { id: 'user-1' } } as any,
+      ),
+    ).resolves.toEqual({ success: true });
+
+    expect(auditServiceMock.log).toHaveBeenCalledWith({
+      action: AuditAction.AI_SQL_FEEDBACK,
+      userId: 'user-1',
+      details: {
+        generationId: '2c1cc849-e91f-4d54-9a40-9ac7c3f5d37f',
+        rating: 'down',
+      },
     });
   });
 

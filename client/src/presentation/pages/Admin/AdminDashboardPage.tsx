@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Users } from 'lucide-react';
+import { ArrowLeft, Shield, Sparkles, Users } from 'lucide-react';
 import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
 import { UsersView } from './UsersView';
 import { AuditLogsView } from './AuditLogsView';
+import { AiQualityView } from './AiQualityView';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 export function AdminDashboardPage() {
@@ -14,7 +15,7 @@ export function AdminDashboardPage() {
     const text = getWorkspaceText(lang).adminDashboardPage;
     const navigate = useNavigate();
     const { isCompactMobileLayout } = useResponsiveLayoutMode();
-    const [activeTab, setActiveTab] = useState<'users' | 'audit'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'audit' | 'ai'>('users');
 
     const tabs = [
         {
@@ -26,6 +27,11 @@ export function AdminDashboardPage() {
             key: 'audit' as const,
             icon: Shield,
             label: text.auditLogs,
+        },
+        {
+            key: 'ai' as const,
+            icon: Sparkles,
+            label: lang === 'vi' ? 'Chất lượng AI' : 'AI quality',
         },
     ];
 
@@ -44,7 +50,9 @@ export function AdminDashboardPage() {
                                 <div className="text-[11px] text-muted-foreground">
                                     {activeTab === 'users'
                                         ? text.usersShort
-                                        : text.auditShort}
+                                        : activeTab === 'audit'
+                                            ? text.auditShort
+                                            : (lang === 'vi' ? 'Chất lượng AI' : 'AI quality')}
                                 </div>
                             )}
                         </div>
@@ -77,12 +85,15 @@ export function AdminDashboardPage() {
                     <h1 className="text-lg font-semibold">
                         {activeTab === 'users'
                             ? text.userManagement
-                            : text.auditLogs}
+                            : activeTab === 'audit'
+                                ? text.auditLogs
+                                : (lang === 'vi' ? 'Chất lượng AI' : 'AI quality')}
                     </h1>
                 </header>
                 <main className="flex-1 overflow-auto p-4 sm:p-6">
                     {activeTab === 'users' && <UsersView />}
                     {activeTab === 'audit' && <AuditLogsView />}
+                    {activeTab === 'ai' && <AiQualityView />}
                 </main>
             </div>
         </div>
