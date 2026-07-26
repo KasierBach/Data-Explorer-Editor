@@ -93,12 +93,14 @@ export class ZaloPayProvider implements PaymentProvider {
     const data = this.parseData(dataString);
     const providerOrderId = this.stringValue(data, 'app_trans_id');
     const providerTransactionId = this.stringValue(data, 'zp_trans_id');
+    const amount = Number(this.stringValue(data, 'amount'));
     const serverTime = this.stringValue(data, 'server_time');
 
     return {
       isValid,
       status: isValid ? 'paid' : 'failed',
       providerOrderId,
+      amountVnd: Number.isSafeInteger(amount) ? amount : undefined,
       providerTransactionId: providerTransactionId || undefined,
       paidAt: serverTime ? new Date(Number(serverTime)) : new Date(),
       rawPayload: payload,

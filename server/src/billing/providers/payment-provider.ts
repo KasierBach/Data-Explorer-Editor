@@ -27,6 +27,7 @@ export interface VerifiedPayment {
   isValid: boolean;
   status: VerifiedPaymentStatus;
   providerOrderId: string;
+  amountVnd?: number;
   providerTransactionId?: string;
   paidAt?: Date;
   rawPayload: unknown;

@@ -23,6 +23,7 @@ describe('BillingService', () => {
         isValid: true,
         status: 'paid',
         providerOrderId: 'momo_order_1',
+        amountVnd: 149000,
         providerTransactionId: 'txn_1',
         paidAt: new Date('2026-05-18T10:00:00.000Z'),
         rawPayload: { resultCode: 0 },
@@ -49,6 +50,7 @@ describe('BillingService', () => {
           ...payment,
           checkoutUrl: providerResult.checkoutUrl,
         }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         findUnique: jest.fn().mockResolvedValue(payment),
         findMany: jest.fn().mockResolvedValue([payment]),
       },
@@ -138,6 +140,7 @@ describe('BillingService', () => {
       isValid: false,
       status: 'failed',
       providerOrderId: 'momo_order_1',
+      amountVnd: 149000,
       rawPayload: {},
     });
     const service = new BillingService(prisma, [provider]);
@@ -145,5 +148,36 @@ describe('BillingService', () => {
     await expect(service.handleProviderWebhook('momo', {})).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  it('rejects a signed webhook when its amount differs from checkout', async () => {
+    const prisma = createPrisma();
+    const provider = createProvider({
+      isValid: true,
+      status: 'paid',
+      providerOrderId: 'momo_order_1',
+      amountVnd: 1000,
+      rawPayload: {},
+    });
+    const service = new BillingService(prisma, [provider]);
+
+    await expect(service.handleProviderWebhook('momo', {})).rejects.toThrow(
+      'Payment amount does not match checkout',
+    );
+    expect(prisma.billingSubscription.upsert).not.toHaveBeenCalled();
+  });
+
+  it('does not extend a subscription twice when another webhook won the race', async () => {
+    const prisma = createPrisma();
+    prisma.payment.updateMany.mockResolvedValueOnce({ count: 0 });
+    const service = new BillingService(prisma, [createProvider()]);
+
+    await expect(service.handleProviderWebhook('momo', {})).resolves.toEqual({
+      paymentId: 'payment_1',
+      status: 'paid',
+      idempotent: true,
+    });
+    expect(prisma.billingSubscription.upsert).not.toHaveBeenCalled();
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });

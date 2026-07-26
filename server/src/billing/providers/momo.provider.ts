@@ -109,6 +109,9 @@ export class MomoProvider implements PaymentProvider {
       isValid,
       status: resultCode === 0 ? 'paid' : 'failed',
       providerOrderId: orderId,
+      amountVnd: Number.isSafeInteger(Number(amount))
+        ? Number(amount)
+        : undefined,
       providerTransactionId: transId || undefined,
       paidAt: resultCode === 0 ? new Date() : undefined,
       rawPayload: payload,

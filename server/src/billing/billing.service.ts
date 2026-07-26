@@ -128,6 +128,10 @@ export class BillingService {
       throw new NotFoundException('Payment not found');
     }
 
+    if (verified.amountVnd !== payment.amountVnd) {
+      throw new BadRequestException('Payment amount does not match checkout');
+    }
+
     if (payment.status === 'paid') {
       return { paymentId: payment.id, status: 'paid', idempotent: true };
     }
@@ -141,8 +145,8 @@ export class BillingService {
     const failedStatus = verified.status === 'failed' ? 'failed' : 'pending';
 
     if (verified.status !== 'paid') {
-      await this.prisma.payment.update({
-        where: { id: payment.id },
+      await this.prisma.payment.updateMany({
+        where: { id: payment.id, status: { not: 'paid' } },
         data: {
           status: failedStatus,
           providerTransactionId: verified.providerTransactionId,
@@ -153,7 +157,21 @@ export class BillingService {
     }
 
     const now = verified.paidAt ?? new Date();
-    const expiresAt = await this.prisma.$transaction(async (tx) => {
+    const activation = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.payment.updateMany({
+        where: { id: payment.id, status: { not: 'paid' } },
+        data: {
+          status: 'paid',
+          providerTransactionId: verified.providerTransactionId,
+          paidAt: now,
+          rawPayload: this.toJson(verified.rawPayload),
+        },
+      });
+
+      if (claimed.count === 0) {
+        return { idempotent: true as const };
+      }
+
       const currentSubscription = await tx.billingSubscription.findUnique({
         where: { userId: payment.userId },
       });
@@ -164,16 +182,6 @@ export class BillingService {
       const nextExpiresAt = new Date(
         startsAt.getTime() + plan.durationDays * DAY_MS,
       );
-
-      await tx.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: 'paid',
-          providerTransactionId: verified.providerTransactionId,
-          paidAt: now,
-          rawPayload: this.toJson(verified.rawPayload),
-        },
-      });
 
       await tx.billingSubscription.upsert({
         where: { userId: payment.userId },
@@ -217,14 +225,18 @@ export class BillingService {
         },
       });
 
-      return nextExpiresAt;
+      return { idempotent: false as const, expiresAt: nextExpiresAt };
     });
+
+    if (activation.idempotent) {
+      return { paymentId: payment.id, status: 'paid', idempotent: true };
+    }
 
     return {
       paymentId: payment.id,
       status: 'paid',
       planCode: plan.code,
-      expiresAt,
+      expiresAt: activation.expiresAt,
     };
   }
 

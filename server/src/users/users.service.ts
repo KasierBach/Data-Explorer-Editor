@@ -15,6 +15,35 @@ import { UpdateBillingDto } from './dto/update-billing.dto';
 import * as bcrypt from 'bcryptjs';
 import { UnauthorizedException } from '@nestjs/common';
 
+const USER_PROFILE_SELECT = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  avatarUrl: true,
+  bio: true,
+  isOnboarded: true,
+  role: true,
+  jobRole: true,
+  username: true,
+  phoneNumber: true,
+  address: true,
+  provider: true,
+  theme: true,
+  language: true,
+  legalAcceptedAt: true,
+  emailNotifications: true,
+  failedQueryAlerts: true,
+  productUpdates: true,
+  securityAlerts: true,
+  plan: true,
+  billingDate: true,
+  paymentMethod: true,
+  planExpiresAt: true,
+  subscriptionStatus: true,
+  paymentProvider: true,
+} as const;
+
 @Injectable()
 export class UsersService {
   private readonly SALT_ROUNDS = 10;
@@ -24,36 +53,37 @@ export class UsersService {
   async findById(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        avatarUrl: true,
-        bio: true,
-        isOnboarded: true,
-        role: true,
-        jobRole: true,
-        username: true,
-        phoneNumber: true,
-        address: true,
-        provider: true,
-        theme: true,
-        language: true,
-        legalAcceptedAt: true,
-        emailNotifications: true,
-        failedQueryAlerts: true,
-        productUpdates: true,
-        securityAlerts: true,
-        plan: true,
-        billingDate: true,
-        paymentMethod: true,
-        planExpiresAt: true,
-        subscriptionStatus: true,
-        paymentProvider: true,
-      },
+      select: USER_PROFILE_SELECT,
     });
     if (!user) throw new NotFoundException('User not found');
+
+    if (
+      user.plan === 'pro' &&
+      user.planExpiresAt &&
+      user.planExpiresAt <= new Date()
+    ) {
+      const [expiredUser] = await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id },
+          data: {
+            plan: 'free',
+            billingDate: null,
+            subscriptionStatus: 'expired',
+          },
+          select: USER_PROFILE_SELECT,
+        }),
+        this.prisma.billingSubscription.updateMany({
+          where: {
+            userId: id,
+            status: 'active',
+            expiresAt: { lte: new Date() },
+          },
+          data: { status: 'expired' },
+        }),
+      ]);
+      return expiredUser;
+    }
+
     return user;
   }
 
