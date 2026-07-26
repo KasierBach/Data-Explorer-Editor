@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -13,6 +14,7 @@ import { DashboardsService } from './dashboards.service';
 import { CreateDashboardDto } from './dto/create-dashboard.dto';
 import { AddDashboardWidgetDto } from './dto/add-dashboard-widget.dto';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
+import { UpdateDashboardDto } from './dto/update-dashboard.dto';
 
 @Controller('dashboards')
 @UseGuards(JwtAuthGuard)
@@ -41,6 +43,20 @@ export class DashboardsController {
     @Req() req: AuthenticatedRequest,
   ) {
     return this.dashboardsService.addWidget(id, dto, req.user.id);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateDashboardDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return this.dashboardsService.update(id, dto, req.user.id);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+    return this.dashboardsService.remove(id, req.user.id);
   }
 
   @Delete(':dashboardId/widgets/:widgetId')

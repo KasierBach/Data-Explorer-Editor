@@ -4,9 +4,15 @@ import { ErdWorkspacesService } from './erd-workspaces.service';
 import { AuditModule } from '../audit/audit.module';
 import { ConnectionsModule } from '../connections/connections.module';
 import { VersionHistoryModule } from '../version-history/version-history.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [AuditModule, ConnectionsModule, VersionHistoryModule],
+  imports: [
+    AuditModule,
+    ConnectionsModule,
+    VersionHistoryModule,
+    PermissionsModule,
+  ],
   controllers: [ErdWorkspacesController],
   providers: [ErdWorkspacesService],
   exports: [ErdWorkspacesService],

@@ -1,5 +1,5 @@
 import {
-  ForbiddenException,
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -10,8 +10,11 @@ import { ConnectionsService } from '../connections/connections.service';
 import { CreateDashboardDto } from './dto/create-dashboard.dto';
 import { AddDashboardWidgetDto } from './dto/add-dashboard-widget.dto';
 import { DashboardEntity } from './entities/dashboard.entity';
+import { UpdateDashboardDto } from './dto/update-dashboard.dto';
 import { OrganizationsService } from '../organizations/services/organizations.service';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
+import { Permission } from '../permissions/enums/permission.enum';
+import { PermissionsService } from '../permissions/services/permissions.service';
 
 interface RawDashboardUser {
   id: string;
@@ -19,6 +22,8 @@ interface RawDashboardUser {
   firstName: string | null;
   lastName: string | null;
 }
+
+const MAX_DASHBOARD_SNAPSHOT_BYTES = 512 * 1024;
 
 interface RawDashboardWidget {
   id: string;
@@ -60,6 +65,7 @@ export class DashboardsService {
     private readonly auditService: AuditService,
     private readonly connectionsService: ConnectionsService,
     private readonly organizationsService: OrganizationsService,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   private get dashboards() {
@@ -169,18 +175,46 @@ export class DashboardsService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return dashboards.map((dashboard) =>
-      this.toEntity(dashboard as unknown as RawDashboard, userId),
-    );
+    const accessibleIds =
+      await this.permissionsService.filterAccessibleResourceIds(
+        userId,
+        ResourceType.DASHBOARD,
+        dashboards,
+        Permission.READ,
+      );
+
+    return dashboards
+      .filter((dashboard) => accessibleIds.has(dashboard.id))
+      .map((dashboard) =>
+        this.toEntity(dashboard as unknown as RawDashboard, userId),
+      );
   }
 
   async findOne(id: string, userId: string): Promise<DashboardEntity> {
-    const dashboards = await this.findAllAvailable(userId);
-    const dashboard = dashboards.find((entry) => entry.id === id);
+    const dashboard = await this.dashboards.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        widgets: { orderBy: { orderIndex: 'asc' } },
+      },
+    });
     if (!dashboard) {
-      throw new NotFoundException('Dashboard not found or not accessible.');
+      throw new NotFoundException('Dashboard not found.');
     }
-    return dashboard;
+    await this.permissionsService.ensurePermission(
+      userId,
+      ResourceType.DASHBOARD,
+      id,
+      Permission.READ,
+    );
+    return this.toEntity(dashboard as unknown as RawDashboard, userId);
   }
 
   async create(
@@ -251,8 +285,8 @@ export class DashboardsService {
     dto: AddDashboardWidgetDto,
     userId: string,
   ): Promise<DashboardEntity> {
-    const dashboard = await this.dashboards.findFirst({
-      where: { id: dashboardId, userId },
+    const dashboard = await this.dashboards.findUnique({
+      where: { id: dashboardId },
       include: {
         user: {
           select: {
@@ -267,13 +301,28 @@ export class DashboardsService {
     });
 
     if (!dashboard) {
-      throw new ForbiddenException('Only the dashboard owner can add widgets.');
+      throw new NotFoundException('Dashboard not found.');
     }
+    await this.permissionsService.ensurePermission(
+      userId,
+      ResourceType.DASHBOARD,
+      dashboardId,
+      Permission.WRITE,
+    );
 
     await this.validateConnectionOwnership(
       dto.connectionId ?? dashboard.connectionId,
       userId,
     );
+
+    if (
+      Buffer.byteLength(JSON.stringify(dto.dataSnapshot), 'utf8') >
+      MAX_DASHBOARD_SNAPSHOT_BYTES
+    ) {
+      throw new BadRequestException(
+        'Dashboard snapshot must not exceed 512 KB.',
+      );
+    }
 
     const widgetCount = dashboard.widgets?.length ?? 0;
     await this.dashboardWidgets.create({
@@ -304,8 +353,8 @@ export class DashboardsService {
       },
     });
 
-    const updated = await this.dashboards.findFirst({
-      where: { id: dashboardId, userId },
+    const updated = await this.dashboards.findUnique({
+      where: { id: dashboardId },
       include: {
         user: {
           select: {
@@ -328,17 +377,157 @@ export class DashboardsService {
     return this.toEntity(updated, userId);
   }
 
+  async update(
+    id: string,
+    dto: UpdateDashboardDto,
+    userId: string,
+  ): Promise<DashboardEntity> {
+    const existing = await this.dashboards.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        widgets: true,
+      },
+    });
+    if (!existing) throw new NotFoundException('Dashboard not found.');
+
+    const changesScope =
+      dto.visibility !== undefined || dto.organizationId !== undefined;
+    await this.permissionsService.ensurePermission(
+      userId,
+      ResourceType.DASHBOARD,
+      id,
+      changesScope ? Permission.MANAGE : Permission.WRITE,
+    );
+    await this.validateConnectionOwnership(
+      dto.connectionId ?? existing.connectionId,
+      userId,
+    );
+
+    const requestedOrganizationId =
+      dto.organizationId !== undefined
+        ? dto.organizationId || null
+        : existing.organizationId;
+    const visibility = this.normalizeVisibility(
+      dto.visibility ?? existing.visibility,
+      requestedOrganizationId,
+    );
+    const organizationId =
+      visibility === 'workspace' ? requestedOrganizationId : null;
+    if (organizationId) {
+      await this.organizationsService.ensureMemberAccess(
+        organizationId,
+        userId,
+      );
+    }
+
+    const updated = await this.dashboards.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+        ...(dto.description !== undefined
+          ? { description: dto.description.trim() || null }
+          : {}),
+        ...(dto.connectionId !== undefined
+          ? { connectionId: dto.connectionId || null }
+          : {}),
+        ...(dto.database !== undefined
+          ? { database: dto.database.trim() || null }
+          : {}),
+        visibility,
+        organizationId,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        widgets: { orderBy: { orderIndex: 'asc' } },
+      },
+    });
+
+    if (
+      existing.organizationId &&
+      existing.organizationId !== updated.organizationId
+    ) {
+      await this.organizationsService.removeResourcePolicy(
+        ResourceType.DASHBOARD,
+        id,
+        existing.organizationId,
+      );
+    }
+    if (
+      updated.organizationId &&
+      existing.organizationId !== updated.organizationId
+    ) {
+      await this.organizationsService.ensureResourcePolicy(
+        ResourceType.DASHBOARD,
+        id,
+        updated.organizationId,
+      );
+    }
+    await this.auditService.log({
+      action: AuditAction.DASHBOARD_UPDATE,
+      userId,
+      details: { category: 'dashboard', dashboardId: id },
+    });
+
+    return this.toEntity(updated as unknown as RawDashboard, userId);
+  }
+
+  async remove(id: string, userId: string) {
+    const dashboard = await this.dashboards.findUnique({
+      where: { id },
+      select: { id: true, organizationId: true },
+    });
+    if (!dashboard) throw new NotFoundException('Dashboard not found.');
+
+    await this.permissionsService.ensurePermission(
+      userId,
+      ResourceType.DASHBOARD,
+      id,
+      Permission.DELETE,
+    );
+    await this.prisma.$transaction([
+      this.prisma.organizationResource.deleteMany({
+        where: { resourceType: ResourceType.DASHBOARD, resourceId: id },
+      }),
+      this.dashboards.delete({ where: { id } }),
+    ]);
+    await this.auditService.log({
+      action: AuditAction.DASHBOARD_DELETE,
+      userId,
+      details: { category: 'dashboard', dashboardId: id },
+    });
+    return { success: true };
+  }
+
   async removeWidget(dashboardId: string, widgetId: string, userId: string) {
-    const dashboard = await this.dashboards.findFirst({
-      where: { id: dashboardId, userId },
+    const dashboard = await this.dashboards.findUnique({
+      where: { id: dashboardId },
       select: { id: true },
     });
 
     if (!dashboard) {
-      throw new ForbiddenException(
-        'Only the dashboard owner can delete widgets.',
-      );
+      throw new NotFoundException('Dashboard not found.');
     }
+    await this.permissionsService.ensurePermission(
+      userId,
+      ResourceType.DASHBOARD,
+      dashboardId,
+      Permission.DELETE,
+    );
 
     const widget = await this.dashboardWidgets.findFirst({
       where: { id: widgetId, dashboardId },

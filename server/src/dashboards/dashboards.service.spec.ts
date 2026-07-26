@@ -7,15 +7,27 @@ describe('DashboardsService', () => {
     },
     dashboard: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
       create: jest.fn(),
+      delete: jest.fn().mockResolvedValue({ id: 'dashboard-1' }),
     },
-    dashboardWidget: {},
+    dashboardWidget: { create: jest.fn() },
+    organizationResource: {
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
+    $transaction: jest.fn(async (operations: Promise<unknown>[]) =>
+      Promise.all(operations),
+    ),
   };
   const auditServiceMock = { log: jest.fn() };
   const connectionsServiceMock = { findOne: jest.fn() };
   const organizationsServiceMock = {
     ensureMemberAccess: jest.fn(),
     ensureResourcePolicy: jest.fn(),
+  };
+  const permissionsServiceMock = {
+    filterAccessibleResourceIds: jest.fn().mockResolvedValue(new Set()),
+    ensurePermission: jest.fn(),
   };
 
   beforeEach(() => {
@@ -24,6 +36,9 @@ describe('DashboardsService', () => {
       email: 'analyst@example.com',
     });
     prismaMock.dashboard.findMany.mockResolvedValue([]);
+    permissionsServiceMock.filterAccessibleResourceIds.mockResolvedValue(
+      new Set(),
+    );
   });
 
   it('does not grant dashboard access by matching email domain', async () => {
@@ -32,6 +47,7 @@ describe('DashboardsService', () => {
       auditServiceMock as any,
       connectionsServiceMock as any,
       organizationsServiceMock as any,
+      permissionsServiceMock as any,
     );
 
     await service.findAllAvailable('viewer-1');
@@ -46,6 +62,7 @@ describe('DashboardsService', () => {
       auditServiceMock as any,
       connectionsServiceMock as any,
       organizationsServiceMock as any,
+      permissionsServiceMock as any,
     );
 
     await service.findAllAvailable('viewer-1');
@@ -86,6 +103,7 @@ describe('DashboardsService', () => {
       auditServiceMock as any,
       connectionsServiceMock as any,
       organizationsServiceMock as any,
+      permissionsServiceMock as any,
     );
 
     await service.create(
@@ -140,6 +158,7 @@ describe('DashboardsService', () => {
       auditServiceMock as any,
       connectionsServiceMock as any,
       organizationsServiceMock as any,
+      permissionsServiceMock as any,
     );
 
     await service.create(
@@ -163,5 +182,65 @@ describe('DashboardsService', () => {
     expect(
       organizationsServiceMock.ensureResourcePolicy,
     ).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized dashboard snapshots before storing a widget', async () => {
+    prismaMock.dashboard.findUnique.mockResolvedValue({
+      id: 'dashboard-1',
+      connectionId: null,
+      database: null,
+      widgets: [],
+      user: {},
+    });
+    const service = new DashboardsService(
+      prismaMock as any,
+      auditServiceMock as any,
+      connectionsServiceMock as any,
+      organizationsServiceMock as any,
+      permissionsServiceMock as any,
+    );
+
+    await expect(
+      service.addWidget(
+        'dashboard-1',
+        {
+          title: 'Too large',
+          chartType: 'table',
+          columns: ['value'],
+          yAxis: [],
+          dataSnapshot: [{ value: 'x'.repeat(512 * 1024) }],
+        },
+        'member-1',
+      ),
+    ).rejects.toThrow('Dashboard snapshot must not exceed 512 KB.');
+    expect(prismaMock.dashboardWidget.create).not.toHaveBeenCalled();
+  });
+
+  it('deletes a dashboard and its detached resource policy together', async () => {
+    prismaMock.dashboard.findUnique.mockResolvedValue({
+      id: 'dashboard-1',
+      organizationId: 'org-1',
+    });
+    const service = new DashboardsService(
+      prismaMock as any,
+      auditServiceMock as any,
+      connectionsServiceMock as any,
+      organizationsServiceMock as any,
+      permissionsServiceMock as any,
+    );
+
+    await expect(service.remove('dashboard-1', 'owner-1')).resolves.toEqual({
+      success: true,
+    });
+    expect(permissionsServiceMock.ensurePermission).toHaveBeenCalledWith(
+      'owner-1',
+      'DASHBOARD',
+      'dashboard-1',
+      'delete',
+    );
+    expect(prismaMock.organizationResource.deleteMany).toHaveBeenCalledWith({
+      where: { resourceType: 'DASHBOARD', resourceId: 'dashboard-1' },
+    });
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
   });
 });

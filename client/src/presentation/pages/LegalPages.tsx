@@ -74,7 +74,7 @@ const getLegalDocument = (lang: 'vi' | 'en', key: LegalDocKey): LegalDocument =>
                         title: 'Dữ liệu chúng tôi thu thập',
                         paragraphs: [
                             'Chúng tôi thu thập các trường cần để vận hành tài khoản như email, tên hiển thị, thông tin hồ sơ, cấu hình giao diện và các cài đặt thông báo bạn tự chọn.',
-                            'Trong workspace, hệ thống có thể lưu metadata như connections, truy vấn đã lưu, lịch sử thao tác, dashboard, ERD workspace và các thiết lập AI mà bạn chủ động tạo.',
+                            'Trong workspace, hệ thống có thể lưu metadata như connections, truy vấn đã lưu, lịch sử thao tác, dashboard, ERD workspace và các thiết lập AI mà bạn chủ động tạo. Khi bạn lưu query result thành dashboard widget, tối đa 200 dòng dữ liệu hiển thị cũng được lưu làm snapshot cho đến khi widget hoặc dashboard bị xóa.',
                         ],
                     },
                     {
@@ -86,6 +86,7 @@ const getLegalDocument = (lang: 'vi' | 'en', key: LegalDocKey): LegalDocument =>
                             'Bảo vệ phiên đăng nhập và phát hiện đăng nhập bất thường.',
                             'Khôi phục workspace, draft và lịch sử sử dụng khi bạn quay lại.',
                             'Cung cấp trải nghiệm AI theo provider hoặc model mà bạn đã cấu hình.',
+                            'Theo mặc định, ngữ cảnh AI chỉ gồm metadata về schema, bảng, cột và quan hệ; hệ thống không đọc hoặc gửi giá trị trong các dòng dữ liệu.',
                         ],
                     },
                     {
@@ -186,7 +187,7 @@ const getLegalDocument = (lang: 'vi' | 'en', key: LegalDocKey): LegalDocument =>
                         title: 'What we collect',
                         paragraphs: [
                             'We collect the fields needed to operate your account, such as email, display identity, profile details, interface preferences, and the notification settings you choose.',
-                            'Inside the workspace, the system may store metadata such as connections, saved queries, activity history, dashboards, ERD workspaces, and AI settings that you explicitly create.',
+                            'Inside the workspace, the system may store metadata such as connections, saved queries, activity history, dashboards, ERD workspaces, and AI settings that you explicitly create. When you save query results as a dashboard widget, up to 200 displayed rows are also retained as a snapshot until the widget or dashboard is deleted.',
                         ],
                     },
                     {
@@ -198,6 +199,7 @@ const getLegalDocument = (lang: 'vi' | 'en', key: LegalDocKey): LegalDocument =>
                             'Protect account sessions and detect unusual sign-ins.',
                             'Restore workspace state, drafts, and usage history when you return.',
                             'Deliver AI experiences through the provider or model choices you configured.',
+                            'By default, AI context contains only schema, table, column, and relationship metadata; the system does not read or send row values.',
                         ],
                     },
                     {

@@ -5,7 +5,8 @@ import type { DashboardEntity, DashboardWidget } from '@/core/domain/entities';
 import { Button } from '@/presentation/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/presentation/components/ui/card';
 import { toast } from 'sonner';
-import { Loader2, LayoutDashboard, Trash2, Share2 } from 'lucide-react';
+import { Loader2, LayoutDashboard, Pencil, Trash2, Share2 } from 'lucide-react';
+import { useAppStore } from '@/core/services/store';
 import {
     ResponsiveContainer,
     BarChart,
@@ -196,6 +197,8 @@ function DashboardWidgetCard({
 
 export const SavedDashboardView: React.FC<{ dashboardId: string }> = ({ dashboardId }) => {
     const queryClient = useQueryClient();
+    const closeTab = useAppStore((state) => state.closeTab);
+    const [isMutating, setIsMutating] = React.useState(false);
     const { data, isLoading, error, refetch, isFetching } = useQuery({
         queryKey: ['dashboard', dashboardId],
         queryFn: () => DashboardService.getDashboard(dashboardId),
@@ -223,6 +226,37 @@ export const SavedDashboardView: React.FC<{ dashboardId: string }> = ({ dashboar
             </div>
         );
     }
+
+    const handleRename = async () => {
+        const name = prompt('Dashboard name', data.name)?.trim();
+        if (!name || name === data.name) return;
+        setIsMutating(true);
+        try {
+            const updated = await DashboardService.updateDashboard(data.id, { name });
+            queryClient.setQueryData(['dashboard', dashboardId], updated);
+            await queryClient.invalidateQueries({ queryKey: ['dashboards'] });
+            toast.success('Dashboard renamed');
+        } catch (renameError) {
+            toast.error(renameError instanceof Error ? renameError.message : 'Failed to rename dashboard');
+        } finally {
+            setIsMutating(false);
+        }
+    };
+
+    const handleDeleteDashboard = async () => {
+        if (!confirm(`Delete dashboard "${data.name}" and all of its widgets?`)) return;
+        setIsMutating(true);
+        try {
+            await DashboardService.deleteDashboard(data.id);
+            await queryClient.invalidateQueries({ queryKey: ['dashboards'] });
+            queryClient.removeQueries({ queryKey: ['dashboard', dashboardId] });
+            closeTab(`dashboard-${dashboardId}`);
+            toast.success('Dashboard deleted');
+        } catch (deleteError) {
+            toast.error(deleteError instanceof Error ? deleteError.message : 'Failed to delete dashboard');
+            setIsMutating(false);
+        }
+    };
 
     return (
         <div className="h-full overflow-auto bg-background">
@@ -254,6 +288,18 @@ export const SavedDashboardView: React.FC<{ dashboardId: string }> = ({ dashboar
                         <div className="rounded-lg border bg-card px-3 py-2 text-xs text-muted-foreground">
                             {data.widgets.length} widget{data.widgets.length === 1 ? '' : 's'}
                         </div>
+                        {data.isOwner && (
+                            <>
+                                <Button variant="outline" size="sm" onClick={handleRename} disabled={isMutating}>
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Rename
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={handleDeleteDashboard} disabled={isMutating}>
+                                    <Trash2 className="mr-2 h-4 w-4 text-red-500" />
+                                    Delete
+                                </Button>
+                            </>
+                        )}
                         <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
                             {isFetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}
                             Refresh

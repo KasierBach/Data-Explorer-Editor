@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditAction, AuditService } from '../audit/audit.service';
 import { CreateSavedQueryDto } from './dto/create-saved-query.dto';
@@ -12,6 +8,8 @@ import { SavedQueryEntity } from './entities/saved-query.entity';
 import { VersionHistoryService } from '../version-history/version-history.service';
 import { OrganizationsService } from '../organizations/services/organizations.service';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
+import { Permission } from '../permissions/enums/permission.enum';
+import { PermissionsService } from '../permissions/services/permissions.service';
 
 @Injectable()
 export class SavedQueriesService {
@@ -21,6 +19,7 @@ export class SavedQueriesService {
     private readonly connectionsService: ConnectionsService,
     private readonly versionHistoryService: VersionHistoryService,
     private readonly organizationsService: OrganizationsService,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   private get savedQueries() {
@@ -110,7 +109,16 @@ export class SavedQueriesService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return availableQueries.map((query) => this.toEntity(query, userId));
+    const accessibleIds =
+      await this.permissionsService.filterAccessibleResourceIds(
+        userId,
+        ResourceType.QUERY,
+        availableQueries,
+        Permission.READ,
+      );
+    return availableQueries
+      .filter((query) => accessibleIds.has(query.id))
+      .map((query) => this.toEntity(query, userId));
   }
 
   async create(
@@ -188,8 +196,8 @@ export class SavedQueriesService {
     dto: UpdateSavedQueryDto,
     userId: string,
   ): Promise<SavedQueryEntity> {
-    const existing = await this.savedQueries.findFirst({
-      where: { id, userId },
+    const existing = await this.savedQueries.findUnique({
+      where: { id },
       include: {
         user: {
           select: {
@@ -203,10 +211,17 @@ export class SavedQueriesService {
     });
 
     if (!existing) {
-      throw new NotFoundException(
-        'Saved query not found or you do not have permission.',
-      );
+      throw new NotFoundException('Saved query not found.');
     }
+
+    const changesScope =
+      dto.visibility !== undefined || dto.organizationId !== undefined;
+    await this.permissionsService.ensurePermission(
+      userId,
+      ResourceType.QUERY,
+      id,
+      changesScope ? Permission.MANAGE : Permission.WRITE,
+    );
 
     await this.validateConnectionOwnership(
       dto.connectionId ?? existing.connectionId ?? undefined,
@@ -301,15 +316,19 @@ export class SavedQueriesService {
   }
 
   async remove(id: string, userId: string) {
-    const existing = await this.savedQueries.findFirst({
-      where: { id, userId },
+    const existing = await this.savedQueries.findUnique({
+      where: { id },
     });
 
     if (!existing) {
-      throw new ForbiddenException(
-        'Only the owner can delete this saved query.',
-      );
+      throw new NotFoundException('Saved query not found.');
     }
+    await this.permissionsService.ensurePermission(
+      userId,
+      ResourceType.QUERY,
+      id,
+      Permission.DELETE,
+    );
 
     await this.savedQueries.delete({
       where: { id },

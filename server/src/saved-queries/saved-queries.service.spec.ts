@@ -6,6 +6,7 @@ describe('SavedQueriesService', () => {
       findMany: jest.fn(),
       create: jest.fn(),
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       update: jest.fn(),
     },
   };
@@ -17,11 +18,19 @@ describe('SavedQueriesService', () => {
     ensureResourcePolicy: jest.fn(),
     removeResourcePolicy: jest.fn(),
   };
+  const permissionsServiceMock = {
+    filterAccessibleResourceIds: jest.fn().mockResolvedValue(new Set()),
+    ensurePermission: jest.fn(),
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     prismaMock.savedQuery.findMany.mockResolvedValue([]);
     prismaMock.savedQuery.findFirst.mockResolvedValue(null);
+    prismaMock.savedQuery.findUnique.mockResolvedValue(null);
+    permissionsServiceMock.filterAccessibleResourceIds.mockResolvedValue(
+      new Set(),
+    );
   });
 
   it('does not expose workspace saved queries globally outside organizations', async () => {
@@ -31,6 +40,7 @@ describe('SavedQueriesService', () => {
       connectionsServiceMock as any,
       versionHistoryServiceMock as any,
       organizationsServiceMock as any,
+      permissionsServiceMock as any,
     );
 
     await service.findAllAvailable('viewer-1');
@@ -74,6 +84,7 @@ describe('SavedQueriesService', () => {
       connectionsServiceMock as any,
       versionHistoryServiceMock as any,
       organizationsServiceMock as any,
+      permissionsServiceMock as any,
     );
 
     await service.create(
@@ -132,6 +143,7 @@ describe('SavedQueriesService', () => {
       connectionsServiceMock as any,
       versionHistoryServiceMock as any,
       organizationsServiceMock as any,
+      permissionsServiceMock as any,
     );
 
     await service.create(
@@ -186,7 +198,7 @@ describe('SavedQueriesService', () => {
       organizationId: 'org-1',
       updatedAt: new Date('2026-01-02T00:00:00Z'),
     };
-    prismaMock.savedQuery.findFirst.mockResolvedValue(existing);
+    prismaMock.savedQuery.findUnique.mockResolvedValue(existing);
     prismaMock.savedQuery.update.mockResolvedValue(updated);
 
     const service = new SavedQueriesService(
@@ -195,6 +207,7 @@ describe('SavedQueriesService', () => {
       connectionsServiceMock as any,
       versionHistoryServiceMock as any,
       organizationsServiceMock as any,
+      permissionsServiceMock as any,
     );
 
     await service.update(
@@ -253,7 +266,7 @@ describe('SavedQueriesService', () => {
       organizationId: null,
       updatedAt: new Date('2026-01-02T00:00:00Z'),
     };
-    prismaMock.savedQuery.findFirst.mockResolvedValue(existing);
+    prismaMock.savedQuery.findUnique.mockResolvedValue(existing);
     prismaMock.savedQuery.update.mockResolvedValue(updated);
 
     const service = new SavedQueriesService(
@@ -262,6 +275,7 @@ describe('SavedQueriesService', () => {
       connectionsServiceMock as any,
       versionHistoryServiceMock as any,
       organizationsServiceMock as any,
+      permissionsServiceMock as any,
     );
 
     await service.update(

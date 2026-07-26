@@ -1,5 +1,4 @@
 import {
-  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -35,6 +34,9 @@ import { CreateErdWorkspaceDto } from './dto/create-erd-workspace.dto';
 import { UpdateErdWorkspaceDto } from './dto/update-erd-workspace.dto';
 import { ErdWorkspaceEntity } from './entities/erd-workspace.entity';
 import { VersionHistoryService } from '../version-history/version-history.service';
+import { Permission } from '../permissions/enums/permission.enum';
+import { ResourceType } from '../permissions/enums/resource-type.enum';
+import { PermissionsService } from '../permissions/services/permissions.service';
 
 @Injectable()
 export class ErdWorkspacesService {
@@ -45,6 +47,7 @@ export class ErdWorkspacesService {
     private readonly auditService: AuditService,
     private readonly connectionsService: ConnectionsService,
     private readonly versionHistoryService: VersionHistoryService,
+    private readonly permissionsService: PermissionsService,
   ) {}
 
   private get erdWorkspaces() {
@@ -165,9 +168,18 @@ export class ErdWorkspacesService {
         orderBy: { updatedAt: 'desc' },
       });
 
-      return workspaces.map((workspace) =>
-        this.toEntity(workspace as unknown as RawErdWorkspace, userId),
-      );
+      const accessibleIds =
+        await this.permissionsService.filterAccessibleResourceIds(
+          userId,
+          ResourceType.ERD,
+          workspaces,
+          Permission.READ,
+        );
+      return workspaces
+        .filter((workspace) => accessibleIds.has(workspace.id))
+        .map((workspace) =>
+          this.toEntity(workspace as unknown as RawErdWorkspace, userId),
+        );
     } catch (error) {
       if (this.isWorkspaceStoreUnavailable(error)) {
         this.logger.warn(
@@ -200,6 +212,13 @@ export class ErdWorkspacesService {
     if (!workspace) {
       throw new NotFoundException('ERD workspace not found.');
     }
+
+    await this.permissionsService.ensurePermission(
+      userId,
+      ResourceType.ERD,
+      id,
+      Permission.READ,
+    );
 
     return this.toEntity(workspace, userId);
   }
@@ -265,8 +284,8 @@ export class ErdWorkspacesService {
   ): Promise<ErdWorkspaceEntity> {
     let existing: RawErdWorkspace | null;
     try {
-      existing = await this.erdWorkspaces.findFirst({
-        where: { id, userId },
+      existing = await this.erdWorkspaces.findUnique({
+        where: { id },
         include: {
           user: {
             select: {
@@ -288,6 +307,13 @@ export class ErdWorkspacesService {
     if (!existing) {
       throw new NotFoundException('ERD workspace not found.');
     }
+
+    await this.permissionsService.ensurePermission(
+      userId,
+      ResourceType.ERD,
+      id,
+      Permission.WRITE,
+    );
 
     await this.validateConnectionOwnership(
       dto.connectionId ?? existing.connectionId ?? undefined,
@@ -352,8 +378,8 @@ export class ErdWorkspacesService {
   async remove(id: string, userId: string) {
     let workspace: { id: string } | null = null;
     try {
-      workspace = await this.erdWorkspaces.findFirst({
-        where: { id, userId },
+      workspace = await this.erdWorkspaces.findUnique({
+        where: { id },
         select: { id: true },
       });
     } catch (error) {
@@ -364,8 +390,15 @@ export class ErdWorkspacesService {
     }
 
     if (!workspace) {
-      throw new ForbiddenException('Only the workspace owner can delete it.');
+      throw new NotFoundException('ERD workspace not found.');
     }
+
+    await this.permissionsService.ensurePermission(
+      userId,
+      ResourceType.ERD,
+      id,
+      Permission.DELETE,
+    );
 
     try {
       await this.erdWorkspaces.delete({

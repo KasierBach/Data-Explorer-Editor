@@ -1,5 +1,6 @@
 import {
   IsArray,
+  ArrayMaxSize,
   IsInt,
   IsObject,
   IsOptional,
@@ -18,6 +19,7 @@ export class AddDashboardWidgetDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100_000)
   queryText?: string;
 
   @IsOptional()
@@ -29,7 +31,9 @@ export class AddDashboardWidgetDto {
   database?: string;
 
   @IsArray()
+  @ArrayMaxSize(200)
   @IsString({ each: true })
+  @MaxLength(200, { each: true })
   columns!: string[];
 
   @IsOptional()
@@ -37,7 +41,9 @@ export class AddDashboardWidgetDto {
   xAxis?: string;
 
   @IsArray()
+  @ArrayMaxSize(20)
   @IsString({ each: true })
+  @MaxLength(200, { each: true })
   yAxis!: string[];
 
   @IsOptional()
@@ -50,5 +56,6 @@ export class AddDashboardWidgetDto {
   config?: Record<string, any>;
 
   @IsArray()
+  @ArrayMaxSize(200)
   dataSnapshot!: Record<string, any>[];
 }

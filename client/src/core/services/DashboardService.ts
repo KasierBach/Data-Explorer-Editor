@@ -23,6 +23,8 @@ export interface AddDashboardWidgetPayload {
     dataSnapshot: Record<string, unknown>[];
 }
 
+export type UpdateDashboardPayload = Partial<CreateDashboardPayload>;
+
 export class DashboardService {
     static async getDashboards(): Promise<DashboardEntity[]> {
         return apiService.get<DashboardEntity[]>('/dashboards');
@@ -38,6 +40,14 @@ export class DashboardService {
 
     static async addWidget(dashboardId: string, payload: AddDashboardWidgetPayload): Promise<DashboardEntity> {
         return apiService.post<DashboardEntity>(`/dashboards/${dashboardId}/widgets`, payload);
+    }
+
+    static async updateDashboard(id: string, payload: UpdateDashboardPayload): Promise<DashboardEntity> {
+        return apiService.patch<DashboardEntity>(`/dashboards/${id}`, payload);
+    }
+
+    static async deleteDashboard(id: string): Promise<{ success: true }> {
+        return apiService.delete<{ success: true }>(`/dashboards/${id}`);
     }
 
     static async deleteWidget(dashboardId: string, widgetId: string): Promise<{ success: true }> {

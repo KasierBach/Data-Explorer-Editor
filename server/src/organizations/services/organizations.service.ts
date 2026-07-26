@@ -504,6 +504,15 @@ export class OrganizationsService {
     organizationId: string,
     permissions?: ResourcePermissionPolicy,
   ) {
+    if (!permissions) {
+      const existing = await this.repository.findResource(
+        resourceType,
+        resourceId,
+        organizationId,
+      );
+      if (existing) return existing;
+    }
+
     return this.repository.upsertResource({
       organizationId,
       resourceType: resourceType as any,

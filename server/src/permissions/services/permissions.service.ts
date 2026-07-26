@@ -56,6 +56,81 @@ export class PermissionsService {
     return record?.userId === userId;
   }
 
+  async filterAccessibleResourceIds(
+    userId: string,
+    resourceType: ResourceType,
+    records: Array<{
+      id: string;
+      userId: string;
+      organizationId?: string | null;
+    }>,
+    permission: Permission,
+  ): Promise<Set<string>> {
+    const organizationIds = Array.from(
+      new Set(
+        records
+          .map((record) => record.organizationId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    if (organizationIds.length === 0) {
+      return new Set(
+        records
+          .filter((record) => record.userId === userId)
+          .map((record) => record.id),
+      );
+    }
+
+    const resourceIds = records.map((record) => record.id);
+    const [memberships, policies] = await Promise.all([
+      this.prisma.organizationMember.findMany({
+        where: { userId, organizationId: { in: organizationIds } },
+        select: { organizationId: true, role: true },
+      }),
+      this.prisma.organizationResource.findMany({
+        where: {
+          resourceType,
+          resourceId: { in: resourceIds },
+          organizationId: { in: organizationIds },
+        },
+        select: {
+          resourceId: true,
+          organizationId: true,
+          permissions: true,
+        },
+      }),
+    ]);
+    const roleByOrganization = new Map(
+      memberships.map((membership) => [
+        membership.organizationId,
+        membership.role as OrganizationRole,
+      ]),
+    );
+    const policyByResource = new Map(
+      policies.map((policy) => [
+        `${policy.organizationId}:${policy.resourceId}`,
+        isResourcePermissionPolicy(policy.permissions)
+          ? policy.permissions
+          : null,
+      ]),
+    );
+
+    return new Set(
+      records
+        .filter((record) => {
+          if (!record.organizationId) return record.userId === userId;
+          const role = roleByOrganization.get(record.organizationId);
+          if (!role) return false;
+          const policy =
+            policyByResource.get(`${record.organizationId}:${record.id}`) ??
+            null;
+          return this.getPermissionsForRole(role, policy).includes(permission);
+        })
+        .map((record) => record.id),
+    );
+  }
+
   private async checkOrgPermission(
     userId: string,
     orgId: string,

@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
 import { OrganizationRole } from '../entities/organization-role.enum';
 import { Permission } from '../../permissions/enums/permission.enum';
+import { ResourceType } from '../../permissions/enums/resource-type.enum';
 
 describe('OrganizationsService security', () => {
   let service: OrganizationsService;
@@ -16,7 +17,11 @@ describe('OrganizationsService security', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
-    organizationResource: { findMany: jest.fn() },
+    organizationResource: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
+    },
     savedQuery: { findMany: jest.fn() },
     dashboard: { findMany: jest.fn() },
   };
@@ -55,6 +60,20 @@ describe('OrganizationsService security', () => {
       permissionsMock as any,
       mailMock as any,
     );
+  });
+
+  it('preserves an existing custom resource policy when ensuring it', async () => {
+    const existing = { id: 'resource-1', permissions: denyMemberReadPolicy };
+    prismaMock.organizationResource.findUnique.mockResolvedValueOnce(existing);
+
+    await expect(
+      service.ensureResourcePolicy(
+        ResourceType.DASHBOARD,
+        'dashboard-1',
+        'org-1',
+      ),
+    ).resolves.toBe(existing);
+    expect(prismaMock.organizationResource.upsert).not.toHaveBeenCalled();
   });
 
   it('rejects invitations that try to grant OWNER', async () => {

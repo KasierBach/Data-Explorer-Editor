@@ -6,6 +6,7 @@ import { AuditModule } from '../audit/audit.module';
 import { ConnectionsModule } from '../connections/connections.module';
 import { VersionHistoryModule } from '../version-history/version-history.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { OrganizationsModule } from '../organizations/organizations.module';
     ConnectionsModule,
     VersionHistoryModule,
     OrganizationsModule,
+    PermissionsModule,
   ],
   controllers: [SavedQueriesController],
   providers: [SavedQueriesService],

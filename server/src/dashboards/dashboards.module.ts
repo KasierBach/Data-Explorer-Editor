@@ -5,9 +5,16 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { ConnectionsModule } from '../connections/connections.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, ConnectionsModule, OrganizationsModule],
+  imports: [
+    PrismaModule,
+    AuditModule,
+    ConnectionsModule,
+    OrganizationsModule,
+    PermissionsModule,
+  ],
   controllers: [DashboardsController],
   providers: [DashboardsService],
   exports: [DashboardsService],
