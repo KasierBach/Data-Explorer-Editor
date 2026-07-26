@@ -121,7 +121,7 @@ describe('AiRoutingService', () => {
     });
   });
 
-  it('routes image prompts through vision-capable lanes only when the default low-cost models are text-only', () => {
+  it('routes default image prompts through the current vision-capable OpenRouter model', () => {
     const service = new AiRoutingService(createConfig());
 
     const result = service.buildPlanChain(
@@ -133,8 +133,10 @@ describe('AiRoutingService', () => {
       true,
     );
 
-    expect(result.plans.length).toBeGreaterThan(0);
-    expect(result.plans.every((plan) => plan.provider === 'gemini')).toBe(true);
+    expect(result.plans[0]).toMatchObject({
+      provider: 'openrouter',
+      model: 'google/gemma-4-31b-it:free',
+    });
   });
 
   it('keeps an explicitly selected vision-capable OpenRouter model first for image prompts', () => {
@@ -155,6 +157,39 @@ describe('AiRoutingService', () => {
       model: 'openai/gpt-4o-mini',
     });
     expect(result.plans.some((plan) => plan.provider === 'gemini')).toBe(true);
+  });
+  it.each([
+    ['beeknoee:minimax/minimax-m2.7', 'beeknoee', 'minimax/minimax-m2.7'],
+    ['groq:qwen/qwen3.6-27b', 'groq', 'qwen/qwen3.6-27b'],
+  ])('keeps selected vision model %s first', (selected, provider, model) => {
+    const service = new AiRoutingService(createConfig());
+    const result = service.buildPlanChain(
+      {
+        prompt: 'Describe this screenshot',
+        image: 'data:image/png;base64,abc',
+        model: selected,
+      },
+      true,
+    );
+
+    expect(result.plans[0]).toMatchObject({ provider, model });
+  });
+
+  it.each([
+    ['google/gemma-4-31b-it:free', 'openrouter', 'google/gemma-4-31b-it:free'],
+    ['groq:groq/compound', 'groq', 'groq/compound'],
+  ])('keeps selected search model %s first', (selected, provider, model) => {
+    const service = new AiRoutingService(createConfig());
+    const result = service.buildPlanChain(
+      {
+        prompt: 'What is the latest PostgreSQL news today?',
+        model: selected,
+      },
+      true,
+    );
+
+    expect(result.plans[0]).toMatchObject({ provider, model });
+    expect(result.routeDecision.needsLiveSearch).toBe(true);
   });
 
   it('flags live-search prompts and keeps them in chat mode by default', () => {

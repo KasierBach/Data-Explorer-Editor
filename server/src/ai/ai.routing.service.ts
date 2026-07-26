@@ -324,13 +324,14 @@ export class AiRoutingService {
     if (routingMode === 'gemini-only') {
       pushAll(geminiPlans);
       if (orderedPlans.length === 0) pushAll(lowCostPlans);
-    } else if (routeDecision.needsLiveSearch) {
-      pushAll(geminiPlans);
-      if (orderedPlans.length === 0) pushAll(lowCostPlans);
     } else if (requestedPlan) {
       push(requestedPlan);
 
-      if (routeDecision.preferGemini || routingMode === 'best') {
+      if (
+        routeDecision.needsLiveSearch ||
+        routeDecision.preferGemini ||
+        routingMode === 'best'
+      ) {
         pushAll(geminiPlans);
       }
 
@@ -366,13 +367,13 @@ export class AiRoutingService {
 
     if (params.image && capabilityFilteredPlans.length === 0) {
       throw new Error(
-        'Image analysis requires a configured vision-capable lane. Use Gemini or choose a vision-capable OpenRouter model.',
+        'Image analysis requires a configured vision-capable Gemini, Beeknoee, Groq, or OpenRouter model.',
       );
     }
 
     if (routeDecision.needsLiveSearch && capabilityFilteredPlans.length === 0) {
       throw new Error(
-        'Live search requires a configured search-capable lane. Use Gemini or configure an OpenRouter lane for web-backed requests.',
+        'Live search requires Gemini, OpenRouter, or a Groq Compound model.',
       );
     }
 

@@ -36,6 +36,13 @@ describe('AiProviderRunnerService streaming', () => {
     needsLiveSearch: false,
     responseFormat: 'structured',
   };
+  const liveSearchDecision: RouteDecision = {
+    preferGemini: false,
+    complexityScore: 0,
+    reasons: ['current-info'],
+    needsLiveSearch: true,
+    responseFormat: 'chat',
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -67,6 +74,61 @@ describe('AiProviderRunnerService streaming', () => {
     ).rejects.toThrow('Unsafe provider URL');
 
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+  it('uses the OpenRouter web-search tool without silently retrying offline', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      json: async () => ({ error: { message: 'search rejected' } }),
+    });
+
+    await expect(
+      service.runOpenAiCompatible(
+        {
+          provider: 'openrouter',
+          model: 'google/gemma-4-31b-it:free',
+          apiKey: 'sk-test',
+          baseUrl: 'https://openrouter.ai/api/v1',
+        },
+        { prompt: 'What is the latest PostgreSQL news?' },
+        'auto',
+        liveSearchDecision,
+      ),
+    ).rejects.toThrow('openrouter error (400)');
+
+    const body = JSON.parse(String(mockFetch.mock.calls[0]?.[1]?.body));
+    expect(body.model).toBe('google/gemma-4-31b-it:free');
+    expect(body.tools).toEqual([{ type: 'openrouter:web_search' }]);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('enables Groq Compound web search for streaming requests', async () => {
+    mockFetch.mockResolvedValue(
+      createSseResponse([
+        'data: {"choices":[{"delta":{"content":"Current result"}}]}\n',
+        'data: [DONE]\n',
+      ]),
+    );
+
+    for await (const _event of service.streamOpenAiCompatible(
+      {
+        provider: 'groq',
+        model: 'groq/compound',
+        apiKey: 'gsk-test',
+        baseUrl: 'https://api.groq.com/openai/v1',
+      },
+      { prompt: 'What is the latest PostgreSQL news?' },
+      'auto',
+      liveSearchDecision,
+    )) {
+      // drain stream
+    }
+
+    const body = JSON.parse(String(mockFetch.mock.calls[0]?.[1]?.body));
+    expect(body.compound_custom).toEqual({
+      tools: { enabled_tools: ['web_search'] },
+    });
   });
 
   it('retries transient completion failures from openai-compatible providers before falling through', async () => {

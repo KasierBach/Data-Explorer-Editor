@@ -24,6 +24,7 @@ import type {
 } from './ai.types';
 import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
 import { normalizeProviderBaseUrl } from './ai-url.util';
+import { supportsLiveWebSearch } from './ai.provider-capabilities';
 
 @Injectable()
 export class AiProviderRunnerService {
@@ -384,19 +385,25 @@ export class AiProviderRunnerService {
     routeDecision: RouteDecision,
   ) {
     const searchEnabled =
-      routeDecision.needsLiveSearch && plan.provider === 'openrouter';
-    const model =
-      searchEnabled && !plan.model.endsWith(':online')
-        ? `${plan.model}:online`
-        : plan.model;
+      routeDecision.needsLiveSearch && supportsLiveWebSearch(plan);
+    const requestOptions = !searchEnabled
+      ? {}
+      : plan.provider === 'openrouter'
+        ? { tools: [{ type: 'openrouter:web_search' }] }
+        : {
+            compound_custom: {
+              tools: { enabled_tools: ['web_search'] },
+            },
+          };
 
     return {
       searchEnabled,
-      model,
+      model: plan.model,
       prompt: searchEnabled
         ? `[SEARCH ONLINE] ${params.prompt}`
         : params.prompt,
       capabilities: this.buildCapabilities(searchEnabled),
+      requestOptions,
     };
   }
 
@@ -651,15 +658,19 @@ export class AiProviderRunnerService {
       params,
       routeDecision,
     );
-    let modelToUse = searchAttempt.model;
-    let finalPrompt = searchAttempt.prompt;
+    const modelToUse = searchAttempt.model;
+    const finalPrompt = searchAttempt.prompt;
     let structuredResponseFormat = buildOpenAiStructuredResponseFormat(
       routeDecision.responseFormat,
     );
-    let systemPrompt = this.buildSystemPromptForRequest(params, routeDecision, {
-      ...searchAttempt.capabilities,
-      visionInput: !!params.image,
-    });
+    const systemPrompt = this.buildSystemPromptForRequest(
+      params,
+      routeDecision,
+      {
+        ...searchAttempt.capabilities,
+        visionInput: !!params.image,
+      },
+    );
     let requestTimeout = this.createAbortController(
       `${plan.provider} request (${modelToUse})`,
     );
@@ -684,6 +695,7 @@ export class AiProviderRunnerService {
             ),
             temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
             max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+            ...searchAttempt.requestOptions,
             ...(structuredResponseFormat
               ? { response_format: structuredResponseFormat }
               : {}),
@@ -700,29 +712,6 @@ export class AiProviderRunnerService {
 
       while (!response.ok) {
         const errorPayload = await this.readProviderErrorPayload(response);
-
-        if (
-          modelToUse.endsWith(':online') &&
-          (response.status === 402 ||
-            response.status === 400 ||
-            response.status === 404)
-        ) {
-          this.logger.warn(
-            `Model ${modelToUse} failed. Retrying without search...`,
-          );
-          modelToUse = modelToUse.replace(':online', '');
-          finalPrompt = params.prompt;
-          systemPrompt = this.buildSystemPromptForRequest(
-            params,
-            routeDecision,
-            this.buildCapabilities(false, !!params.image),
-          );
-          response = await this.executeOpenAiRequestWithRetry(
-            `${plan.provider} request (${modelToUse}) search fallback`,
-            sendRequest,
-          );
-          continue;
-        }
 
         if (
           structuredResponseFormat &&
@@ -910,15 +899,19 @@ export class AiProviderRunnerService {
       params,
       routeDecision,
     );
-    let modelToUse = searchAttempt.model;
-    let finalPrompt = searchAttempt.prompt;
+    const modelToUse = searchAttempt.model;
+    const finalPrompt = searchAttempt.prompt;
     let structuredResponseFormat = buildOpenAiStructuredResponseFormat(
       routeDecision.responseFormat,
     );
-    let systemPrompt = this.buildSystemPromptForRequest(params, routeDecision, {
-      ...searchAttempt.capabilities,
-      visionInput: !!params.image,
-    });
+    const systemPrompt = this.buildSystemPromptForRequest(
+      params,
+      routeDecision,
+      {
+        ...searchAttempt.capabilities,
+        visionInput: !!params.image,
+      },
+    );
     let requestTimeout = this.createAbortController(
       `${plan.provider} stream request (${modelToUse})`,
     );
@@ -944,6 +937,7 @@ export class AiProviderRunnerService {
             temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
             max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
             stream: true,
+            ...searchAttempt.requestOptions,
             ...(structuredResponseFormat
               ? { response_format: structuredResponseFormat }
               : {}),
@@ -960,29 +954,6 @@ export class AiProviderRunnerService {
 
       while (!response.ok) {
         const errorPayload = await this.readProviderErrorPayload(response);
-
-        if (
-          modelToUse.endsWith(':online') &&
-          (response.status === 402 ||
-            response.status === 400 ||
-            response.status === 404)
-        ) {
-          this.logger.warn(
-            `Model ${modelToUse} failed. Retrying without search...`,
-          );
-          modelToUse = modelToUse.replace(':online', '');
-          finalPrompt = params.prompt;
-          systemPrompt = this.buildSystemPromptForRequest(
-            params,
-            routeDecision,
-            this.buildCapabilities(false, !!params.image),
-          );
-          response = await this.executeOpenAiRequestWithRetry(
-            `${plan.provider} stream request (${modelToUse}) search fallback`,
-            sendRequest,
-          );
-          continue;
-        }
 
         if (
           structuredResponseFormat &&
