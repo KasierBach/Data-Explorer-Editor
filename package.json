@@ -8,7 +8,7 @@
     "client": "npm run dev --prefix client -- --host"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^10.0.4"
   },
   "license": "MIT"
 }
