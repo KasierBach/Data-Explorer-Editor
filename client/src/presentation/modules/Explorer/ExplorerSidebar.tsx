@@ -275,12 +275,11 @@ export const ExplorerSidebar: React.FC = memo(() => {
             </div>
 
             {/* Footer */}
-            <div className="p-3 border-t bg-muted/20 flex items-center justify-between text-[9px] font-bold uppercase">
-                <div className="flex items-center gap-1.5 opacity-70">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="p-3 border-t bg-muted/20 flex items-center justify-between text-[9px] font-bold uppercase tracking-widest">
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     <span>{text.connected}</span>
                 </div>
-                <span className="opacity-50 text-[8px]">DATA EXPLORER V3.6</span>
             </div>
 
             <CreateDatabaseDialog isOpen={isCreateDatabaseDialogOpen} onClose={() => setCreateDatabaseDialogOpen(false)} connectionId={activeConnectionId} onSuccess={handleRefresh} />

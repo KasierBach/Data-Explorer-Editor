@@ -213,8 +213,8 @@ export const NoSqlSidebar: React.FC = () => {
             </div>
 
             <div className="p-3 border-t bg-muted/20 flex items-center justify-between text-[9px] font-bold uppercase tracking-widest">
-                <div className="flex items-center gap-1.5 opacity-50 text-green-600 dark:text-green-400">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     <span>{text.connected}</span>
                 </div>
                 {nosqlEffectiveDatabase && (
@@ -223,7 +223,6 @@ export const NoSqlSidebar: React.FC = () => {
                         <span className="truncate max-w-[100px]">{nosqlEffectiveDatabase}</span>
                     </div>
                 )}
-                <span className="opacity-50">V3.6.2</span>
             </div>
 
             <CreateDatabaseDialog

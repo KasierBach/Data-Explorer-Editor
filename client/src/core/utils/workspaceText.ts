@@ -356,7 +356,7 @@ const workspaceText = {
             localSearchPlaceholder: 'Tìm đối tượng...',
             globalSearchPlaceholder: 'Tìm kiếm toàn cục...',
             localInstance: 'Máy cục bộ',
-            connected: 'Đang kết nối',
+            connected: 'Đã kết nối',
         },
         connectionSelector: {
             confirmDeleteConnection: 'Bạn có chắc chắn muốn xóa kết nối này không?',
@@ -376,7 +376,7 @@ const workspaceText = {
             currentSelection: (type: string) => `Bạn đang chọn: ${type}`,
             scanningBson: 'Đang quét BSON',
             noCollectionsFound: 'Không tìm thấy collection',
-            connected: 'Kết nối NoSQL',
+            connected: 'Đã kết nối',
         },
         noSqlMainContent: {
             executionDisabledGuardrail: 'Kết nối này đang tắt quyền chạy truy vấn.',
@@ -1239,7 +1239,7 @@ const workspaceText = {
             currentSelection: (type: string) => `Current selection: ${type}`,
             scanningBson: 'Scanning BSON',
             noCollectionsFound: 'No collections found',
-            connected: 'NoSQL Connected',
+            connected: 'Connected',
         },
         noSqlMainContent: {
             executionDisabledGuardrail: 'Query execution is disabled for this connection.',
