@@ -72,8 +72,8 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
-    "@nestjs/cli": "^11.0.0",
-    "@nestjs/schematics": "^11.0.0",
+    "@nestjs/cli": "^11.0.24",
+    "@nestjs/schematics": "^11.1.0",
     "@nestjs/testing": "^11.0.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cache-manager": "^4.0.6",
@@ -100,6 +100,11 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
+  },
+  "overrides": {
+    "flatted": "3.4.3",
+    "form-data": "4.0.6",
+    "handlebars": "4.7.9"
   },
   "jest": {
     "moduleFileExtensions": [

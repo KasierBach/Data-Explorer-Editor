@@ -30,13 +30,16 @@ export function useResizablePanel({
     const directionRef = useRef(direction);
     const minWidthRef = useRef(minWidth);
     const maxWidthRef = useRef(maxWidth);
+    const onWidthChangeRef = useRef(onWidthChange);
+    const lastNotifiedWidthRef = useRef(initialWidth);
 
     // Keep refs in sync with props outside render for React Compiler.
     useEffect(() => {
         directionRef.current = direction;
         minWidthRef.current = minWidth;
         maxWidthRef.current = maxWidth;
-    }, [direction, minWidth, maxWidth]);
+        onWidthChangeRef.current = onWidthChange;
+    }, [direction, minWidth, maxWidth, onWidthChange]);
 
     const startResizing = useCallback((e: React.MouseEvent | React.PointerEvent | React.TouchEvent) => {
         e.preventDefault();
@@ -118,10 +121,11 @@ export function useResizablePanel({
 
     // Notify parent of width changes when drag completes
     useEffect(() => {
-        if (!isDragging && onWidthChange) {
-            onWidthChange(width);
-        }
-    }, [isDragging, width, onWidthChange]);
+        if (isDragging || width === lastNotifiedWidthRef.current) return;
+
+        lastNotifiedWidthRef.current = width;
+        onWidthChangeRef.current?.(width);
+    }, [isDragging, width]);
 
     // Memoize return value to provide stable reference for consumers
     return useMemo(() => ({

@@ -28,11 +28,14 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
-      - run: npm audit --omit=dev --audit-level=high
+      - run: node ../.github/scripts/npm-audit.mjs
+        env:
+          # SPA-only usage; allow the React Router RSC advisory while keeping all other high/critical findings blocking.
+          NPM_AUDIT_ALLOW_GHSA: GHSA-QWWW-VCR4-C8H2
       - run: npm run lint
       - run: npm run test:ci
       - run: npm run test:prerender
-      - run: node --test ../.github/scripts/deploy-render.test.mjs
+      - run: node --test ../.github/scripts/deploy-render.test.mjs ../.github/scripts/npm-audit.test.mjs
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
@@ -51,7 +54,7 @@ jobs:
           cache: npm
           cache-dependency-path: server/package-lock.json
       - run: npm ci
-      - run: npm audit --omit=dev --audit-level=high
+      - run: node ../.github/scripts/npm-audit.mjs
       - run: npm run prisma:generate
       - run: npm run lint
       - run: npm run test:ci

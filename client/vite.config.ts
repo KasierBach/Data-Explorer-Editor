@@ -7,6 +7,18 @@ import tailwindcss from '@tailwindcss/vite'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
+const manualChunkPackages: Record<string, string[]> = {
+  'vendor-core': ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'zustand'],
+  'vendor-ui': ['framer-motion', 'lucide-react', 'sonner', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
+  'vendor-editor': ['@monaco-editor/react'],
+  'vendor-monaco': ['monaco-editor'],
+  'vendor-xlsx': ['xlsx'],
+  'vendor-pdf': ['pdfjs-dist'],
+  'vendor-sql-format': ['sql-formatter'],
+  'vendor-diagram': ['@xyflow/react', 'dagre'],
+  'vendor-markdown': ['react-markdown', 'remark-gfm'],
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -28,17 +40,14 @@ export default defineConfig({
     chunkSizeWarningLimit: 7500,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-core': ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'zustand'],
-          'vendor-ui': ['framer-motion', 'lucide-react', 'sonner', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tabs'],
-          'vendor-editor': ['@monaco-editor/react'],
-          'vendor-xlsx': ['xlsx'],
-          'vendor-pdf': ['pdfjs-dist'],
-          'vendor-sql-format': ['sql-formatter'],
-          'vendor-diagram': ['@xyflow/react', 'dagre'],
-          'vendor-charts': ['recharts'],
-          'vendor-markdown': ['react-markdown', 'remark-gfm'],
-        }
+        manualChunks(id) {
+          const normalizedId = id.replaceAll('\\', '/')
+          for (const [chunkName, packageNames] of Object.entries(manualChunkPackages)) {
+            if (packageNames.some((packageName) => normalizedId.includes(`/node_modules/${packageName}/`))) {
+              return chunkName
+            }
+          }
+        },
       }
     }
   },

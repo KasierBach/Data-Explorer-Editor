@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import '@/lib/monaco';
 import Editor, { useMonaco, type Monaco, type OnMount } from '@monaco-editor/react';
 import { createSqlCompletionProvider, type SchemaInfo } from './sqlAutocomplete';
 import { useAppStore } from '@/core/services/store';

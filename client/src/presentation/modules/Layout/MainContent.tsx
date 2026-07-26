@@ -1,13 +1,13 @@
 import React from 'react';
 import { useAppStore } from '@/core/services/store';
 import { DataGrid } from '@/presentation/modules/DataGrid/DataGrid';
-import { QueryEditor } from '@/presentation/modules/Query/QueryEditor';
 import { TabsBar } from './TabsBar';
 import { Dashboard } from '@/presentation/pages/Dashboard';
 import { InsightsDashboard } from '@/presentation/modules/Dashboard/InsightsDashboard';
 import { SavedDashboardView } from '@/presentation/modules/Dashboard/SavedDashboardView';
 import { VisualizeWorkplace } from '@/presentation/modules/Visualization/VisualizeWorkplace';
 const ERDWorkspace = React.lazy(() => import('@/presentation/modules/Visualization/ERDWorkspace').then(m => ({ default: m.ERDWorkspace })));
+const QueryEditor = React.lazy(() => import('@/presentation/modules/Query/QueryEditor').then(m => ({ default: m.QueryEditor })));
 
 export const MainContent: React.FC = () => {
     const { tabs, activeTabId } = useAppStore();
@@ -27,7 +27,9 @@ export const MainContent: React.FC = () => {
                                 <DataGrid key={activeTab.id} tableId={activeTab.metadata?.tableId || activeTab.id} />
                             )}
                             {activeTab.type === 'query' && (
-                                <QueryEditor key={activeTab.id} tabId={activeTab.id} />
+                                <React.Suspense fallback={<div className="h-full flex items-center justify-center text-sm text-muted-foreground">Loading query editor...</div>}>
+                                    <QueryEditor key={activeTab.id} tabId={activeTab.id} />
+                                </React.Suspense>
                             )}
                             {activeTab.type === 'insights' && (
                                 <InsightsDashboard
