@@ -37,4 +37,29 @@ describe('GenerateSqlDto', () => {
 
     expect(errors).toHaveLength(0);
   });
+  it('accepts PDF data URLs and rejects other document payloads', async () => {
+    const valid = plainToInstance(GenerateSqlDto, {
+      connectionId: 'conn-1',
+      prompt: 'Read this PDF',
+      document: {
+        name: 'schema.pdf',
+        mimeType: 'application/pdf',
+        data: 'data:application/pdf;base64,aGVsbG8=',
+      },
+    });
+    const invalid = plainToInstance(GenerateSqlDto, {
+      connectionId: 'conn-1',
+      prompt: 'Read this file',
+      document: {
+        name: 'schema.html',
+        mimeType: 'text/html',
+        data: 'data:text/html;base64,aGVsbG8=',
+      },
+    });
+
+    expect(await validate(valid)).toHaveLength(0);
+    expect(
+      (await validate(invalid)).some((error) => error.property === 'document'),
+    ).toBe(true);
+  });
 });

@@ -407,6 +407,14 @@ export class AiProviderRunnerService {
     };
   }
 
+  private getOpenAiDocumentOptions(plan: ProviderPlan, params: ChatParams) {
+    return plan.provider === 'openrouter' && params.document
+      ? {
+          plugins: [{ id: 'file-parser', pdf: { engine: 'native' } }],
+        }
+      : {};
+  }
+
   private async readWithTimeout<T>(
     reader: ReadableStreamDefaultReader<T>,
     label: string,
@@ -562,6 +570,7 @@ export class AiProviderRunnerService {
       params.prompt,
       params.context,
       params.image,
+      params.document,
     );
 
     const modelConfig: {
@@ -692,9 +701,11 @@ export class AiProviderRunnerService {
               params.context,
               params.history,
               params.image,
+              plan.provider === 'openrouter' ? params.document : undefined,
             ),
             temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
             max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+            ...this.getOpenAiDocumentOptions(plan, params),
             ...searchAttempt.requestOptions,
             ...(structuredResponseFormat
               ? { response_format: structuredResponseFormat }
@@ -800,6 +811,7 @@ export class AiProviderRunnerService {
       params.context,
       params.history,
       params.image,
+      params.document,
     );
     const generateStream = (): Promise<GenerateContentStreamResult> =>
       this.executeRetriableOperation(
@@ -933,10 +945,12 @@ export class AiProviderRunnerService {
               params.context,
               params.history,
               params.image,
+              plan.provider === 'openrouter' ? params.document : undefined,
             ),
             temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
             max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
             stream: true,
+            ...this.getOpenAiDocumentOptions(plan, params),
             ...searchAttempt.requestOptions,
             ...(structuredResponseFormat
               ? { response_format: structuredResponseFormat }

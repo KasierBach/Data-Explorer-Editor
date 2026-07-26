@@ -15,6 +15,8 @@ export interface Attachment {
     label: string;
     data: string;
     preview?: string;
+    rawData?: string;
+    mimeType?: 'application/pdf';
 }
 
 interface NoSqlSchemaField {
@@ -51,6 +53,7 @@ const TEXT_EXTENSIONS = new Set([
 
 const EXCEL_EXTENSIONS = new Set(['xlsx', 'xls', 'ods']);
 const MAX_PERSISTED_DRAFT_ATTACHMENT_CHARS = 20000;
+const MAX_NATIVE_PDF_BYTES = 5 * 1024 * 1024;
 
 function getFileExtension(name: string): string {
     const baseName = name.split('/').pop() || name;
@@ -279,11 +282,25 @@ export function useAiChat() {
         if (ext === 'pdf' || file.type === 'application/pdf') {
             const buffer = await file.arrayBuffer();
             const text = await readPdfText(buffer);
+            const truncated = text.length > 50000
+                ? text.slice(0, 50000) + '\n\n[... locally extracted PDF text truncated at 50,000 chars]'
+                : text;
+            let rawData: string | undefined;
+            if (file.size <= MAX_NATIVE_PDF_BYTES) {
+                rawData = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = () => reject(reader.error);
+                    reader.readAsDataURL(file);
+                }).catch(() => undefined);
+            }
             setAttachments(prev => [...prev, {
                 type: 'file',
                 label: `PDF: ${file.name}`,
-                data: `[PDF File: ${file.name}]\n\n${text}`,
+                data: `[PDF File: ${file.name}]\n[Locally extracted text fallback]\n\n${truncated}`,
                 preview: `PDF - ${(file.size / 1024).toFixed(0)} KB`,
+                rawData,
+                mimeType: 'application/pdf',
             }]);
             return;
         }
@@ -534,14 +551,15 @@ export function useAiChat() {
         const controller = new AbortController();
         abortControllerRef.current = controller;
         let rawText = '';
-
         try {
+
             const adapter = connectionService.getActiveAdapter();
             if (!adapter?.generateSqlStream) throw new Error("API Adapter does not support AI streaming.");
 
             const contextParts: string[] = [];
             let imageData = customImageData;
 
+            let document: { name: string; mimeType: 'application/pdf'; data: string } | undefined;
             for (const att of customAttachments) {
                 if (att.type === 'image') {
                     if (!imageData) {
@@ -551,6 +569,13 @@ export function useAiChat() {
                             ' Additional image attached. Only the first image is sent to the vision lane in the current chat flow.');
                     }
                     continue;
+                }
+                if (!document && att.mimeType === 'application/pdf' && att.rawData) {
+                    document = {
+                        name: att.label.replace(/^PDF:\s*/, ''),
+                        mimeType: att.mimeType,
+                        data: att.rawData,
+                    };
                 }
 
                 contextParts.push(`[${att.type.toUpperCase()}] ${att.label}:\n${att.data}`);
@@ -575,6 +600,7 @@ export function useAiChat() {
                 image: imageData,
                 context: contextParts.length > 0 ? contextParts.join('\n\n') : undefined,
                 model: resolvedAssistant.model,
+                document,
                 mode: aiMode,
                 routingMode: aiRoutingMode,
                 providerOverride: resolvedAssistant.providerOverride,

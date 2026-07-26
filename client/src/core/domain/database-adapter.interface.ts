@@ -67,6 +67,11 @@ export interface GenerateSqlParams {
     database?: string;
     prompt: string;
     image?: string;
+    document?: {
+        name: string;
+        mimeType: 'application/pdf';
+        data: string;
+    };
     context?: string;
     model: string;
     mode: string;

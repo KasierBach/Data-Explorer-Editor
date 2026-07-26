@@ -75,7 +75,7 @@ describe('AiProviderRunnerService streaming', () => {
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
-  it('uses the OpenRouter web-search tool without silently retrying offline', async () => {
+  it('uses OpenRouter native web and PDF tools without silently retrying offline', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 400,
@@ -91,7 +91,14 @@ describe('AiProviderRunnerService streaming', () => {
           apiKey: 'sk-test',
           baseUrl: 'https://openrouter.ai/api/v1',
         },
-        { prompt: 'What is the latest PostgreSQL news?' },
+        {
+          prompt: 'What is the latest PostgreSQL news?',
+          document: {
+            name: 'schema.pdf',
+            mimeType: 'application/pdf',
+            data: 'data:application/pdf;base64,aGVsbG8=',
+          },
+        },
         'auto',
         liveSearchDecision,
       ),
@@ -100,6 +107,20 @@ describe('AiProviderRunnerService streaming', () => {
     const body = JSON.parse(String(mockFetch.mock.calls[0]?.[1]?.body));
     expect(body.model).toBe('google/gemma-4-31b-it:free');
     expect(body.tools).toEqual([{ type: 'openrouter:web_search' }]);
+    expect(body.plugins).toEqual([
+      { id: 'file-parser', pdf: { engine: 'native' } },
+    ]);
+    expect(body.messages.at(-1)?.content).toEqual(
+      expect.arrayContaining([
+        {
+          type: 'file',
+          file: {
+            filename: 'schema.pdf',
+            file_data: 'data:application/pdf;base64,aGVsbG8=',
+          },
+        },
+      ]),
+    );
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 

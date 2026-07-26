@@ -104,4 +104,43 @@ describe('AiPromptBuilderService', () => {
       ),
     ).toEqual([{ text: 'Describe this image' }]);
   });
+  it('passes PDF data natively to Gemini and OpenRouter message formats', () => {
+    const document = {
+      name: 'schema.pdf',
+      mimeType: 'application/pdf' as const,
+      data: 'data:application/pdf;base64,aGVsbG8=',
+    };
+
+    expect(
+      service.prepareGeminiParts(
+        'Read this PDF',
+        undefined,
+        undefined,
+        document,
+      ),
+    ).toContainEqual({
+      inlineData: { mimeType: 'application/pdf', data: 'aGVsbG8=' },
+    });
+
+    const messages = service.buildOpenAiMessages(
+      'Read this PDF',
+      'System',
+      undefined,
+      [],
+      undefined,
+      document,
+    );
+    expect(messages.at(-1)).toMatchObject({
+      role: 'user',
+      content: expect.arrayContaining([
+        {
+          type: 'file',
+          file: {
+            filename: 'schema.pdf',
+            file_data: document.data,
+          },
+        },
+      ]),
+    });
+  });
 });

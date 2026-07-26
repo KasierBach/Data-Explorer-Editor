@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as Prompts from './ai.prompts';
 import type {
+  AiDocument,
   AiChatMode,
   AiPromptCapabilities,
   AiRecommendation,
@@ -86,6 +87,7 @@ export class AiPromptBuilderService {
     context?: string,
     history: ChatHistoryMessage[] = [],
     image?: string,
+    document?: AiDocument,
   ) {
     const userText = context
       ? `${prompt}\n\nAdditional context:\n${context}`
@@ -99,6 +101,7 @@ export class AiPromptBuilderService {
           content: Array<
             | { type: 'text'; text: string }
             | { type: 'image_url'; image_url: { url: string } }
+            | { type: 'file'; file: { filename: string; file_data: string } }
           >;
         }
     > = [{ role: 'system', content: systemPrompt }];
@@ -120,17 +123,25 @@ export class AiPromptBuilderService {
       }
     }
 
-    if (image) {
+    if (image || document) {
       messages.push({
         role: 'user',
         content: [
           { type: 'text', text: userText },
-          {
-            type: 'image_url',
-            image_url: {
-              url: image,
-            },
-          },
+          ...(image
+            ? [{ type: 'image_url' as const, image_url: { url: image } }]
+            : []),
+          ...(document
+            ? [
+                {
+                  type: 'file' as const,
+                  file: {
+                    filename: document.name,
+                    file_data: document.data,
+                  },
+                },
+              ]
+            : []),
         ],
       });
     } else {
@@ -145,6 +156,7 @@ export class AiPromptBuilderService {
     context?: string,
     history: ChatHistoryMessage[] = [],
     image?: string,
+    document?: AiDocument,
   ) {
     const contents: Array<{
       role: 'model' | 'user';
@@ -170,7 +182,12 @@ export class AiPromptBuilderService {
       }
     }
 
-    const currentParts = this.prepareGeminiParts(prompt, context, image);
+    const currentParts = this.prepareGeminiParts(
+      prompt,
+      context,
+      image,
+      document,
+    );
     contents.push({
       role: 'user',
       parts: currentParts,
@@ -183,6 +200,7 @@ export class AiPromptBuilderService {
     prompt: string,
     context?: string,
     image?: string,
+    document?: AiDocument,
   ): Array<
     { text: string } | { inlineData: { mimeType: string; data: string } }
   > {
@@ -210,14 +228,23 @@ export class AiPromptBuilderService {
       }
     }
 
+    if (document) {
+      const prefix = `data:${document.mimeType};base64,`;
+      if (document.data.startsWith(prefix)) {
+        const data = document.data.slice(prefix.length);
+        if (data) {
+          parts.push({ inlineData: { mimeType: document.mimeType, data } });
+        }
+      }
+    }
     return parts;
   }
-
   parseAiResponse(fullText: string): {
     message: string;
     sql?: string;
     explanation?: string;
     recommendations?: AiRecommendation[];
+
     sources?: string[];
   } {
     try {

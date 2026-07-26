@@ -68,6 +68,12 @@ export interface AiProviderOverride {
   model: string;
 }
 
+export interface AiDocument {
+  name: string;
+  mimeType: 'application/pdf';
+  data: string;
+}
+
 export interface ChatParams {
   model?: string;
   mode?: AiChatMode;
@@ -75,6 +81,7 @@ export interface ChatParams {
   schemaContext?: string;
   databaseType?: string;
   image?: string;
+  document?: AiDocument;
   context?: string;
   routingMode?: AiRoutingMode;
   history?: ChatHistoryMessage[];

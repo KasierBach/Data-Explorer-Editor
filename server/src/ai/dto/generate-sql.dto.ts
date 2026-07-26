@@ -3,6 +3,8 @@ import {
   IsArray,
   IsIn,
   IsNotEmpty,
+  Matches,
+  MaxLength,
   IsOptional,
   IsString,
   ValidateNested,
@@ -21,6 +23,21 @@ class ChatHistoryMessageDto implements ChatHistoryMessage {
   @IsString()
   @IsNotEmpty()
   content: string;
+}
+class AiDocumentDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name: string;
+
+  @IsString()
+  @IsIn(['application/pdf'])
+  mimeType: 'application/pdf';
+
+  @IsString()
+  @MaxLength(7_000_000)
+  @Matches(/^data:application\/pdf;base64,[A-Za-z0-9+/=]+$/)
+  data: string;
 }
 
 export class AiProviderOverrideDto {
@@ -61,6 +78,11 @@ export class GenerateSqlDto {
   @IsOptional()
   @IsString()
   image?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AiDocumentDto)
+  document?: AiDocumentDto;
 
   @IsOptional()
   @IsString()
