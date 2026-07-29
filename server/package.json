@@ -27,7 +27,7 @@
     "test:stress": "node scripts/load/http-load.mjs stress"
   },
   "dependencies": {
-    "@clickhouse/client": "^1.18.3",
+    "@clickhouse/client": "^1.23.1",
     "@google/genai": "^2.13.0",
     "@nest-lab/throttler-storage-redis": "^1.2.0",
     "@nestjs/bullmq": "^11.0.4",
