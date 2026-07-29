@@ -210,8 +210,8 @@ export function NoSqlShell() {
                 />
             )}
 
-            <div className="h-6 border-t bg-green-500/10 text-xs flex items-center px-4 text-green-600 dark:text-green-400 shrink-0 font-medium">
-                {text.isolatedNoSqlWorkspace}
+            <div className="h-6 border-t bg-muted/40 text-xs flex items-center px-4 text-muted-foreground shrink-0">
+                {text.ready}
             </div>
             <ConnectionDialog />
         </div>
