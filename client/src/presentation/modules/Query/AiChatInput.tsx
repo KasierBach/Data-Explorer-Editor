@@ -164,7 +164,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                     onKeyDown={handleKeyDown}
                     placeholder={activeConnection ? "Hỏi bất cứ điều gì..." : "Kết nối database trước..."}
                     disabled={isLoading || !activeConnection}
-                    className="w-full bg-transparent border-none px-4 pt-4 pb-2 text-sm resize-none focus:outline-none min-h-[58px] max-h-[250px] placeholder:text-muted-foreground/50 leading-relaxed scrollbar-none"
+                    className="w-full bg-transparent border-none px-4 pt-4 pb-2 text-base md:text-sm resize-none focus:outline-none min-h-[58px] max-h-[250px] placeholder:text-muted-foreground/50 leading-relaxed scrollbar-none"
                     rows={1}
                     style={{ fieldSizing: "content" } satisfies FieldSizingStyle}
                 />

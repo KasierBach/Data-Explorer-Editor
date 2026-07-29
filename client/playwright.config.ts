@@ -27,6 +27,17 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: /mobile-workspace\.spec\.ts/,
+    },
+    {
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 7'] },
+      testMatch: /(?:mobile-workspace|public-pages)\.spec\.ts/,
+    },
+    {
+      name: 'mobile-webkit',
+      use: { ...devices['iPhone 13'] },
+      testMatch: /(?:mobile-workspace|public-pages)\.spec\.ts/,
     },
   ],
 });

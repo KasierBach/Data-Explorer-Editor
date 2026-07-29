@@ -209,8 +209,10 @@ export function DocumentationPage() {
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="md:hidden h-8 w-8"
+                        className="md:hidden h-11 w-11"
                         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                        aria-label={isMobileMenuOpen ? 'Close documentation menu' : 'Open documentation menu'}
+                        aria-expanded={isMobileMenuOpen}
                     >
                         {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
                     </Button>

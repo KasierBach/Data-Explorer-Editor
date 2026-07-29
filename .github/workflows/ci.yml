@@ -37,7 +37,7 @@ jobs:
       - run: npm run test:prerender
       - run: node --test ../.github/scripts/deploy-render.test.mjs ../.github/scripts/npm-audit.test.mjs
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
 
   server:

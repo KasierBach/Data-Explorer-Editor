@@ -25,11 +25,11 @@ export const MobileWorkspaceBar: React.FC<MobileWorkspaceBarProps> = ({
     resultsOpen,
 }) => {
     return (
-        <div className="h-12 border-t bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85 px-2 flex items-center justify-between gap-2 shrink-0">
+        <div className="h-14 border-t bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85 px-2 flex items-center justify-between gap-2 shrink-0">
             <Button
                 variant={sidebarOpen ? 'secondary' : 'ghost'}
                 size="sm"
-                className="flex-1 h-9 gap-1.5 text-xs"
+                className="flex-1 h-11 gap-1.5 text-xs"
                 onClick={onToggleSidebar}
             >
                 {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
@@ -40,7 +40,7 @@ export const MobileWorkspaceBar: React.FC<MobileWorkspaceBarProps> = ({
                 <Button
                     variant={resultsOpen ? 'secondary' : 'ghost'}
                     size="sm"
-                    className="flex-1 h-9 gap-1.5 text-xs"
+                    className="flex-1 h-11 gap-1.5 text-xs"
                     onClick={onToggleResults}
                 >
                     <Rows3 className="w-4 h-4" />
@@ -51,8 +51,10 @@ export const MobileWorkspaceBar: React.FC<MobileWorkspaceBarProps> = ({
             <Button
                 variant={desktopModeOnMobile ? 'secondary' : 'ghost'}
                 size="sm"
-                className={cn("h-9 gap-1.5 text-xs", onToggleResults ? "px-2" : "flex-1")}
+                className={cn("h-11 min-w-11 gap-1.5 text-xs", onToggleResults ? "px-2" : "flex-1")}
                 onClick={onToggleDesktopMode}
+                aria-label={desktopModeOnMobile ? 'Turn off desktop mode' : 'Turn on desktop mode'}
+                aria-pressed={desktopModeOnMobile}
             >
                 <MonitorSmartphone className="w-4 h-4" />
                 {!onToggleResults && 'Desktop'}
@@ -61,7 +63,7 @@ export const MobileWorkspaceBar: React.FC<MobileWorkspaceBarProps> = ({
             <Button
                 variant={aiOpen ? 'secondary' : 'ghost'}
                 size="sm"
-                className="flex-1 h-9 gap-1.5 text-xs"
+                className="flex-1 h-11 gap-1.5 text-xs"
                 onClick={onToggleAi}
             >
                 <Sparkles className="w-4 h-4" />
