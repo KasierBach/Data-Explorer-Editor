@@ -1,4 +1,3 @@
-import { SchemaType, type ResponseSchema } from '@google/generative-ai';
 import type { AiResponseFormat } from './ai.types';
 
 const OPENAI_RECOMMENDATION_SCHEMA = {
@@ -88,85 +87,6 @@ const OPENAI_STRUCTURED_RESPONSE_SCHEMA = {
   required: ['message'],
 } as const;
 
-const GEMINI_RECOMMENDATION_SCHEMA: ResponseSchema = {
-  type: SchemaType.OBJECT,
-  description:
-    'A grounded follow-up suggestion that the UI can display separately.',
-  properties: {
-    type: {
-      type: SchemaType.STRING,
-      description:
-        'Recommendation type. Use query_fix, index_suggestion, schema_suggestion, or chart_suggestion.',
-    },
-    title: {
-      type: SchemaType.STRING,
-      description: 'Short action-oriented label for the suggestion.',
-    },
-    summary: {
-      type: SchemaType.STRING,
-      description: 'Concise explanation of why this suggestion matters.',
-    },
-    sql: {
-      type: SchemaType.STRING,
-      description:
-        'Optional executable SQL, MongoDB payload JSON, or Redis command.',
-    },
-    chartType: {
-      type: SchemaType.STRING,
-      description:
-        'Optional chart type if this suggestion is about visualization.',
-    },
-    fields: {
-      type: SchemaType.ARRAY,
-      description: 'Optional field names relevant to the suggestion.',
-      items: {
-        type: SchemaType.STRING,
-      },
-      maxItems: 6,
-    },
-  },
-  required: ['type', 'title', 'summary'],
-};
-
-const GEMINI_STRUCTURED_RESPONSE_SCHEMA: ResponseSchema = {
-  type: SchemaType.OBJECT,
-  description:
-    'Structured Data Explorer AI response for chat, SQL, MongoDB, or Redis generation.',
-  properties: {
-    message: {
-      type: SchemaType.STRING,
-      description:
-        'Primary user-facing answer in markdown. Keep it concise and truthful.',
-    },
-    sql: {
-      type: SchemaType.STRING,
-      description:
-        'Executable SQL query, MongoDB payload JSON string, or Redis command string.',
-    },
-    explanation: {
-      type: SchemaType.STRING,
-      description:
-        'Short explanation of the generated command, assumptions, or safety notes.',
-    },
-    sources: {
-      type: SchemaType.ARRAY,
-      description:
-        'Optional http or https URLs used for live external research. Omit when no live sources were used.',
-      items: {
-        type: SchemaType.STRING,
-      },
-    },
-    recommendations: {
-      type: SchemaType.ARRAY,
-      description:
-        'Optional grounded follow-up suggestions. Include at most three specific items.',
-      items: GEMINI_RECOMMENDATION_SCHEMA,
-      maxItems: 3,
-    },
-  },
-  required: ['message'],
-};
-
 export function buildOpenAiStructuredResponseFormat(
   responseFormat: AiResponseFormat,
 ) {
@@ -193,6 +113,6 @@ export function buildGeminiStructuredGenerationConfig(
 
   return {
     responseMimeType: 'application/json',
-    responseSchema: GEMINI_STRUCTURED_RESPONSE_SCHEMA,
+    responseJsonSchema: OPENAI_STRUCTURED_RESPONSE_SCHEMA,
   } as const;
 }

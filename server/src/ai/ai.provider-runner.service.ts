@@ -1,10 +1,6 @@
 ﻿import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import type {
-  EnhancedGenerateContentResponse,
-  GenerateContentStreamResult,
-} from '@google/generative-ai';
+import { GoogleGenAI, type GenerateContentResponse } from '@google/genai';
 import { AiPromptBuilderService } from './ai.prompt-builder.service';
 import {
   buildGeminiStructuredGenerationConfig,
@@ -28,7 +24,7 @@ import { supportsLiveWebSearch } from './ai.provider-capabilities';
 
 @Injectable()
 export class AiProviderRunnerService {
-  private readonly genAI: GoogleGenerativeAI | null;
+  private readonly genAI: GoogleGenAI | null;
   private readonly logger = new Logger(AiProviderRunnerService.name);
 
   constructor(
@@ -40,7 +36,7 @@ export class AiProviderRunnerService {
       this.logger.warn('GEMINI_API_KEY not set - Gemini lane disabled');
       this.genAI = null;
     } else {
-      this.genAI = new GoogleGenerativeAI(apiKey);
+      this.genAI = new GoogleGenAI({ apiKey });
     }
   }
 
@@ -446,25 +442,27 @@ export class AiProviderRunnerService {
     if (!this.genAI) throw new Error('Gemini provider is not configured');
 
     const tryCompletion = async (mId: string) => {
-      const model = this.genAI!.getGenerativeModel({
-        model: mId,
-        generationConfig: {
-          temperature: params.temperature ?? AI_CONSTANTS.TEMPERATURE_PRECISE,
-          maxOutputTokens:
-            params.maxOutputTokens ?? AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
-        },
-      });
       const timeout = params.timeoutMs ?? this.getProviderTimeoutMs();
-      const result = await this.executeRetriableOperation(
+      const response = await this.executeRetriableOperation(
         `Gemini completion (${mId})`,
         () =>
           this.withTimeout(
-            model.generateContent(params.prompt),
+            this.genAI!.models.generateContent({
+              model: mId,
+              contents: params.prompt,
+              config: {
+                temperature:
+                  params.temperature ?? AI_CONSTANTS.TEMPERATURE_PRECISE,
+                maxOutputTokens:
+                  params.maxOutputTokens ??
+                  AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
+              },
+            }),
             `Gemini completion (${mId})`,
             timeout,
           ),
       );
-      return result.response.text().trim();
+      return (response.text || '').trim();
     };
 
     try {
@@ -573,35 +571,25 @@ export class AiProviderRunnerService {
       params.document,
     );
 
-    const modelConfig: {
-      model: string;
-      systemInstruction: string;
-      tools?: Array<Record<string, unknown>>;
-    } = {
-      model: plan.model,
+    const baseConfig = {
       systemInstruction: systemPrompt,
-    };
-    if (searchEnabled) {
-      modelConfig.tools = [{ googleSearch: {} } as Record<string, unknown>];
-    }
-
-    const model = this.genAI.getGenerativeModel(modelConfig);
-    const baseGenerationConfig = {
       temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
       maxOutputTokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+      ...(searchEnabled ? { tools: [{ googleSearch: {} }] } : {}),
     };
     const structuredGenerationConfig = buildGeminiStructuredGenerationConfig(
       routeDecision.responseFormat,
     );
-    let generationConfig = structuredGenerationConfig
-      ? { ...baseGenerationConfig, ...structuredGenerationConfig }
-      : baseGenerationConfig;
+    let config = structuredGenerationConfig
+      ? { ...baseConfig, ...structuredGenerationConfig }
+      : baseConfig;
     const generate = () =>
       this.executeRetriableOperation(`Gemini request (${plan.model})`, () =>
         this.withTimeout(
-          model.generateContent({
+          this.genAI!.models.generateContent({
+            model: plan.model,
             contents: [{ role: 'user', parts }],
-            generationConfig,
+            config,
           }),
           `Gemini request (${plan.model})`,
         ),
@@ -617,14 +605,14 @@ export class AiProviderRunnerService {
         this.logger.warn(
           `Gemini model ${plan.model} rejected structured output config. Retrying without provider-level schema enforcement...`,
         );
-        generationConfig = baseGenerationConfig;
+        config = baseConfig;
         result = await generate();
       } else {
         throw error;
       }
     }
 
-    const responseText = result.response.text();
+    const responseText = result.text || '';
     const parsed = this.promptBuilder.parseAiResponse(responseText);
     this.promptBuilder.assertUsableStructuredResponse(
       parsed,
@@ -634,9 +622,7 @@ export class AiProviderRunnerService {
 
     const sources = this.promptBuilder.mergeSources(
       parsed.sources,
-      searchEnabled
-        ? this.promptBuilder.extractSources(result.response)
-        : undefined,
+      searchEnabled ? this.promptBuilder.extractSources(result) : undefined,
     );
     return {
       ...parsed,
@@ -783,29 +769,18 @@ export class AiProviderRunnerService {
       this.buildCapabilities(searchEnabled, !!params.image),
     );
 
-    const modelConfig: {
-      model: string;
-      systemInstruction: string;
-      tools?: Array<Record<string, unknown>>;
-    } = {
-      model: plan.model,
+    const baseConfig = {
       systemInstruction: systemPrompt,
-    };
-    if (searchEnabled) {
-      modelConfig.tools = [{ googleSearch: {} } as Record<string, unknown>];
-    }
-
-    const model = this.genAI.getGenerativeModel(modelConfig);
-    const baseGenerationConfig = {
       temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
       maxOutputTokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+      ...(searchEnabled ? { tools: [{ googleSearch: {} }] } : {}),
     };
     const structuredGenerationConfig = buildGeminiStructuredGenerationConfig(
       routeDecision.responseFormat,
     );
-    let generationConfig = structuredGenerationConfig
-      ? { ...baseGenerationConfig, ...structuredGenerationConfig }
-      : baseGenerationConfig;
+    let config = structuredGenerationConfig
+      ? { ...baseConfig, ...structuredGenerationConfig }
+      : baseConfig;
     const contents = this.promptBuilder.buildGeminiContents(
       params.prompt,
       params.context,
@@ -813,19 +788,22 @@ export class AiProviderRunnerService {
       params.image,
       params.document,
     );
-    const generateStream = (): Promise<GenerateContentStreamResult> =>
+    const generateStream = (): Promise<
+      AsyncGenerator<GenerateContentResponse>
+    > =>
       this.executeRetriableOperation(
         `Gemini stream bootstrap (${plan.model})`,
         () =>
           this.withTimeout(
-            model.generateContentStream({
+            this.genAI!.models.generateContentStream({
+              model: plan.model,
               contents,
-              generationConfig,
+              config,
             }),
             `Gemini stream bootstrap (${plan.model})`,
           ),
       );
-    let result: GenerateContentStreamResult;
+    let result: AsyncGenerator<GenerateContentResponse>;
     try {
       result = await generateStream();
     } catch (error) {
@@ -836,7 +814,7 @@ export class AiProviderRunnerService {
         this.logger.warn(
           `Gemini model ${plan.model} rejected structured output config for streaming. Retrying without provider-level schema enforcement...`,
         );
-        generationConfig = baseGenerationConfig;
+        config = baseConfig;
         result = await generateStream();
       } else {
         throw error;
@@ -844,29 +822,28 @@ export class AiProviderRunnerService {
     }
 
     let fullText = '';
-    const iterator: AsyncGenerator<EnhancedGenerateContentResponse> =
-      result.stream;
+    const providerSources: string[] = [];
+    const iterator = result;
     while (true) {
       const nextChunk = await this.withTimeout<
-        IteratorResult<EnhancedGenerateContentResponse, unknown>
+        IteratorResult<GenerateContentResponse, unknown>
       >(
         iterator.next(),
         `Gemini stream (${plan.model})`,
         this.getStreamIdleTimeoutMs(),
       );
       if (nextChunk.done) break;
-      const chunkText = nextChunk.value.text();
+      const chunkText = nextChunk.value.text || '';
+      if (searchEnabled) {
+        providerSources.push(
+          ...this.promptBuilder.extractSources(nextChunk.value),
+        );
+      }
       if (chunkText) {
         fullText += chunkText;
         yield { type: 'chunk', text: chunkText };
       }
     }
-
-    const aggregatedResponse =
-      await this.withTimeout<EnhancedGenerateContentResponse>(
-        result.response,
-        `Gemini stream finalize (${plan.model})`,
-      );
     const parsed = this.promptBuilder.parseAiResponse(fullText);
     this.promptBuilder.assertUsableStructuredResponse(
       parsed,
@@ -876,9 +853,7 @@ export class AiProviderRunnerService {
 
     const sources = this.promptBuilder.mergeSources(
       parsed.sources,
-      searchEnabled
-        ? this.promptBuilder.extractSources(aggregatedResponse)
-        : undefined,
+      searchEnabled ? providerSources : undefined,
     );
     yield {
       type: 'done',

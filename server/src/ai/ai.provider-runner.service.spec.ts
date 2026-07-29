@@ -304,16 +304,15 @@ describe('AiProviderRunnerService streaming', () => {
         new Error('Gemini completion (gemini-test) timed out after 100ms'),
       )
       .mockResolvedValueOnce({
-        response: {
-          text: () => 'Gemini retry succeeded',
-        },
+        text: 'Gemini retry succeeded',
       });
-    (service as unknown as { genAI: { getGenerativeModel: jest.Mock } }).genAI =
-      {
-        getGenerativeModel: jest.fn(() => ({
-          generateContent,
-        })),
-      };
+    (
+      service as unknown as {
+        genAI: { models: { generateContent: jest.Mock } };
+      }
+    ).genAI = {
+      models: { generateContent },
+    };
 
     const result = await service.completeGeminiText({
       model: 'gemini-test',
@@ -582,21 +581,74 @@ describe('AiProviderRunnerService streaming', () => {
     ).rejects.toThrow('empty structured response');
   });
 
-  it('passes provider-level structured output config to Gemini for structured requests', async () => {
-    const generateContent = jest.fn().mockResolvedValue({
-      response: {
-        text: () => '{"message":"Gemini ready"}',
-      },
-    });
-    const getGenerativeModel = jest.fn(() => ({
-      generateContent,
-    }));
+  it('streams Gemini through the new SDK and preserves grounded sources', async () => {
+    const generateContentStream = jest.fn().mockResolvedValue(
+      (async function* () {
+        yield {
+          text: 'Gemini ',
+          candidates: [
+            {
+              groundingMetadata: {
+                groundingChunks: [
+                  {
+                    web: {
+                      title: 'Gemini docs',
+                      uri: 'https://ai.google.dev/gemini-api/docs',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        };
+        yield { text: 'ready' };
+      })(),
+    );
     (
       service as unknown as {
-        genAI: { getGenerativeModel: typeof getGenerativeModel };
+        genAI: { models: { generateContentStream: jest.Mock } };
       }
     ).genAI = {
-      getGenerativeModel,
+      models: { generateContentStream },
+    };
+
+    const events: StreamEvent[] = [];
+    for await (const event of service.streamGemini(
+      {
+        provider: 'gemini',
+        model: 'gemini-3.5-flash',
+      },
+      { prompt: 'Latest Gemini docs?' },
+      'auto',
+      liveSearchDecision,
+    )) {
+      events.push(event);
+    }
+
+    const call = generateContentStream.mock.calls[0]?.[0];
+    expect(call?.config?.tools).toEqual([{ googleSearch: {} }]);
+    expect(events.filter((event) => event.type === 'chunk')).toEqual([
+      { type: 'chunk', text: 'Gemini ' },
+      { type: 'chunk', text: 'ready' },
+    ]);
+    expect(events.at(-1)).toMatchObject({
+      type: 'done',
+      data: {
+        sources: ['https://ai.google.dev/gemini-api/docs'],
+      },
+    });
+  });
+
+  it('passes provider-level structured output config to Gemini for structured requests', async () => {
+    const generateContent = jest.fn().mockResolvedValue({
+      text: '{"message":"Gemini ready"}',
+    });
+    (
+      service as unknown as {
+        genAI: { models: { generateContent: typeof generateContent } };
+      }
+    ).genAI = {
+      models: { generateContent },
     };
 
     const result = await service.runGemini(
@@ -614,11 +666,11 @@ describe('AiProviderRunnerService streaming', () => {
     );
 
     const call = generateContent.mock.calls[0]?.[0];
-    expect(call?.generationConfig?.responseMimeType).toBe('application/json');
-    expect(call?.generationConfig?.responseSchema?.type).toBe('object');
-    expect(
-      call?.generationConfig?.responseSchema?.properties?.message?.type,
-    ).toBe('string');
+    expect(call?.config?.responseMimeType).toBe('application/json');
+    expect(call?.config?.responseJsonSchema?.type).toBe('object');
+    expect(call?.config?.responseJsonSchema?.properties?.message?.type).toBe(
+      'string',
+    );
     expect(result.message).toBe('Gemini ready');
   });
 });
