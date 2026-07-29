@@ -130,6 +130,6 @@ import { AiQualityModule } from './ai-quality/ai-quality.module';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(LoggerMiddleware, CsrfMiddleware).forRoutes('*');
+    consumer.apply(LoggerMiddleware, CsrfMiddleware).forRoutes('{*path}');
   }
 }
