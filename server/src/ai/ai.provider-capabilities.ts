@@ -38,6 +38,12 @@ export function supportsVision(
   }
 }
 
+export function supportsDocument(
+  plan: Pick<ProviderPlan, 'provider' | 'model'>,
+): boolean {
+  return plan.provider === 'gemini' || plan.provider === 'openrouter';
+}
+
 export function supportsLiveWebSearch(
   plan: Pick<ProviderPlan, 'provider' | 'model'>,
 ): boolean {

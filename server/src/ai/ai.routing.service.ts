@@ -2,6 +2,7 @@
 import { ConfigService } from '@nestjs/config';
 import { AI_CONSTANTS } from './ai.constants';
 import {
+  supportsDocument,
   supportsLiveWebSearch,
   supportsVision,
 } from './ai.provider-capabilities';
@@ -358,6 +359,10 @@ export class AiRoutingService {
         return false;
       }
 
+      if (params.document && !supportsDocument(plan)) {
+        return false;
+      }
+
       if (routeDecision.needsLiveSearch && !supportsLiveWebSearch(plan)) {
         return false;
       }
@@ -368,6 +373,12 @@ export class AiRoutingService {
     if (params.image && capabilityFilteredPlans.length === 0) {
       throw new Error(
         'Image analysis requires a configured vision-capable Gemini, Beeknoee, Groq, or OpenRouter model.',
+      );
+    }
+
+    if (params.document && capabilityFilteredPlans.length === 0) {
+      throw new Error(
+        'PDF analysis requires a configured Gemini or OpenRouter provider.',
       );
     }
 

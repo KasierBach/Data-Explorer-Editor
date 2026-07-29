@@ -228,4 +228,47 @@ describe('AiRoutingService', () => {
     expect(result.responseFormat).toBe('structured');
     expect(result.reasons).toContain('structured-db-response');
   });
+
+  it('routes PDF requests only through providers that receive the document', () => {
+    const service = new AiRoutingService(createConfig());
+
+    const result = service.buildPlanChain(
+      {
+        prompt: 'Summarize this database document',
+        model: 'groq:openai/gpt-oss-120b',
+        document: {
+          name: 'schema.pdf',
+          mimeType: 'application/pdf',
+          data: 'data:application/pdf;base64,aGVsbG8=',
+        },
+      },
+      false,
+    );
+
+    expect(result.plans).toEqual([
+      expect.objectContaining({ provider: 'openrouter' }),
+    ]);
+  });
+
+  it('rejects PDF requests when no native document provider is configured', () => {
+    const service = new AiRoutingService(
+      createConfig({ OPENROUTER_API_KEY: undefined }),
+    );
+
+    expect(() =>
+      service.buildPlanChain(
+        {
+          prompt: 'Summarize this database document',
+          document: {
+            name: 'schema.pdf',
+            mimeType: 'application/pdf',
+            data: 'data:application/pdf;base64,aGVsbG8=',
+          },
+        },
+        false,
+      ),
+    ).toThrow(
+      'PDF analysis requires a configured Gemini or OpenRouter provider.',
+    );
+  });
 });
