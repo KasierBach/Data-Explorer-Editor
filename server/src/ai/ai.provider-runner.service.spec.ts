@@ -753,4 +753,35 @@ describe('AiProviderRunnerService streaming', () => {
     );
     expect(result.message).toBe('Gemini ready');
   });
+  it.each([
+    [429, 'temporarily rate limited'],
+    [402, 'requires provider credits'],
+    [404, 'is unavailable'],
+  ])(
+    'returns a safe actionable message for provider status %s',
+    async (status, expected) => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status,
+        statusText: 'Provider failure',
+        json: async () => ({
+          error: { message: 'sk-sensitive-provider-payload' },
+        }),
+      });
+
+      await expect(
+        service.runOpenAiCompatible(
+          {
+            provider: 'openrouter',
+            model: 'test-model',
+            apiKey: 'sk-sensitive',
+            baseUrl: 'https://openrouter.ai/api/v1',
+          },
+          { prompt: 'hello' },
+          'auto',
+          structuredDbDecision,
+        ),
+      ).rejects.toThrow(expected);
+    },
+  );
 });

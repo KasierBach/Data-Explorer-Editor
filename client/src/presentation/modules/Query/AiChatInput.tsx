@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Attachment } from '@/presentation/hooks/useAiChat';
+import type { AssistantModelGroup } from './assistantModelCatalog';
+import type { AiModelRuntimeStatus } from './aiProviderStatus';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type FieldSizingStyle = React.CSSProperties & {
@@ -44,7 +46,8 @@ interface AiChatInputProps {
     setAiRoutingMode: (val: string) => void;
 
     // Config data
-    MODELS: Array<{ group: string; items: Array<{ id: string; label: string; isNew?: boolean; warning?: boolean }> }>;
+    MODELS: AssistantModelGroup[];
+    modelStatuses: Record<string, AiModelRuntimeStatus>;
     MODES: Array<{ id: string; label: string; description: string }>;
     ROUTING_MODES: Array<{ id: string; label: string; description: string }>;
 
@@ -69,7 +72,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
     input, setInput, isLoading, attachments, removeAttachment, handleSend, handleStop, handleKeyDown,
     handleFileSelected, handlePasteQuery, handleMentionTable, fileInputRef,
     aiModel, setAiModel, aiMode, setAiMode, aiRoutingMode, setAiRoutingMode,
-    MODELS, MODES, ROUTING_MODES,
+    MODELS, modelStatuses, MODES, ROUTING_MODES,
     showContextMenu, setShowContextMenu,
     showRoutingMenu, setShowRoutingMenu,
     showModeMenu, setShowModeMenu,
@@ -78,6 +81,10 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
 }) => {
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const nosqlMqlQuery = useAppStore((state) => state.nosqlMqlQuery);
+    const lang = useAppStore((state) => state.lang);
+    const statusLabels: Record<AiModelRuntimeStatus, string> = lang === 'vi'
+        ? { 'rate-limited': 'Giới hạn', 'credits-required': 'Cần credit', unavailable: 'Không khả dụng' }
+        : { 'rate-limited': 'Rate limited', 'credits-required': 'Credits required', unavailable: 'Unavailable' };
     const hasEditorQuery = isNoSql
         ? Boolean(nosqlMqlQuery?.trim())
         : Boolean(activeTab?.type === 'query' && activeTab.metadata?.sql?.trim());
@@ -283,8 +290,14 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                         {getModelIcon(aiModel)}
                                     </div>
                                     <span className="truncate hidden sm:inline lg:hidden xl:inline">
-                                        {MODELS.flatMap(g => g.items).find(m => m.id === aiModel)?.label ?? 'Model'}
-                                    </span>
+                                         {MODELS.flatMap(g => g.items).find(m => m.id === aiModel)?.label ?? 'Model'}
+                                     </span>
+                                     {modelStatuses[aiModel] && (
+                                         <span
+                                             title={statusLabels[modelStatuses[aiModel]]}
+                                             className={cn('h-1.5 w-1.5 shrink-0 rounded-full', modelStatuses[aiModel] === 'unavailable' ? 'bg-red-500' : 'bg-amber-400')}
+                                         />
+                                     )}
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent side="top" align="start" className="w-[18rem] max-h-[400px] overflow-y-auto custom-scrollbar bg-[#1a1a1a]/98 backdrop-blur-2xl border border-white/5 rounded-2xl shadow-4xl p-1.5 z-[110]">
@@ -303,13 +316,27 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                                     <div className={cn("transition-all", aiModel === m.id ? "scale-110 opacity-100" : "scale-100 opacity-60 group-hover:opacity-100")}>
                                                         {getModelIcon(m.id)}
                                                     </div>
-                                                    <div className="flex flex-col">
-                                                        <span className={cn("text-[11px] transition-colors", aiModel === m.id ? "font-bold text-foreground" : "font-medium text-muted-foreground group-hover:text-foreground")}>{m.label}</span>
-                                                        {m.warning && <div className="flex items-center gap-1 text-[8px] text-yellow-500/80 mt-0.5"><Info className="w-2.5 h-2.5" /> High latency</div>}
+                                                    <div className={'flex flex-col'}>
+                                                        <span className={cn('text-[11px] transition-colors', aiModel === m.id ? 'font-bold text-foreground' : 'font-medium text-muted-foreground group-hover:text-foreground')}>{m.label}</span>
+                                                        {m.warning && <div className={'flex items-center gap-1 text-[8px] text-yellow-500/80 mt-0.5'}><Info className={'w-2.5 h-2.5'} /> High latency</div>}
+                                                        {m.capabilities?.length ? (
+                                                            <div className={'mt-1 flex gap-1'}>
+                                                                {m.capabilities.map((capability) => (
+                                                                    <span key={capability} className={'rounded bg-white/5 px-1 py-0.5 text-[7px] font-bold uppercase text-muted-foreground/70'}>
+                                                                        {capability === 'vision' ? 'IMG' : capability}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        ) : null}
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    {m.isNew && <span className="text-[8px] bg-violet-500/20 text-violet-400 font-black px-1.5 py-0.5 rounded-sm tracking-tighter shadow-sm ring-1 ring-violet-500/30 uppercase">NEW</span>}
+                                                <div className={'flex items-center gap-2'}>
+                                                    {modelStatuses[m.id] && (
+                                                        <span className={cn('text-[8px] font-semibold', modelStatuses[m.id] === 'unavailable' ? 'text-red-400' : 'text-amber-400')}>
+                                                            {statusLabels[modelStatuses[m.id]]}
+                                                        </span>
+                                                    )}
+                                                    {m.isNew && <span className={'text-[8px] bg-violet-500/20 text-violet-400 font-black px-1.5 py-0.5 rounded-sm tracking-tighter shadow-sm ring-1 ring-violet-500/30 uppercase'}>NEW</span>}
                                                     {aiModel === m.id && <div className="w-1.5 h-1.5 rounded-full bg-violet-500 shadow-[0_0_8px_rgba(139,92,246,0.6)] animate-pulse" />}
                                                 </div>
                                             </DropdownMenuItem>

@@ -312,6 +312,28 @@ export class AiProviderRunnerService {
     return textPayload ? { error: { message: textPayload } } : {};
   }
 
+  private getProviderHttpError(
+    provider: string,
+    model: string,
+    status: number,
+  ): Error {
+    const target = `${provider} model ${model}`;
+    if (status === 429) {
+      return new Error(
+        `${target} is temporarily rate limited (429). Wait and retry or choose another model.`,
+      );
+    }
+    if (status === 402) {
+      return new Error(
+        `${target} requires provider credits (402). Add credits or choose another model.`,
+      );
+    }
+    if (status === 404) {
+      return new Error(`${target} is unavailable (404). Choose another model.`);
+    }
+    return new Error(`${provider} error (${status})`);
+  }
+
   private extractProviderErrorMessage(errorPayload: unknown): string {
     if (typeof errorPayload === 'string') {
       return errorPayload;
@@ -789,7 +811,11 @@ export class AiProviderRunnerService {
           continue;
         }
 
-        throw new Error(`${plan.provider} error (${response.status})`);
+        throw this.getProviderHttpError(
+          plan.provider,
+          modelToUse,
+          response.status,
+        );
       }
 
       const result = await response.json();
@@ -1026,8 +1052,10 @@ export class AiProviderRunnerService {
           continue;
         }
 
-        throw new Error(
-          `${plan.provider} Stream API error [${response.status}]`,
+        throw this.getProviderHttpError(
+          plan.provider,
+          modelToUse,
+          response.status,
         );
       }
 

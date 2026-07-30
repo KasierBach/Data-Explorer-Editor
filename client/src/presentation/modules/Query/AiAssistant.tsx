@@ -28,6 +28,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         setInput,
         isLoading,
         attachments,
+        modelStatuses,
         messagesEndRef,
         fileInputRef,
         handleFileSelected,
@@ -231,6 +232,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                 aiRoutingMode={aiRoutingMode}
                 setAiRoutingMode={setAiRoutingMode}
                 MODELS={MODELS}
+                modelStatuses={modelStatuses}
                 MODES={MODES}
                 ROUTING_MODES={ROUTING_MODES}
                 showContextMenu={showContextMenu}

@@ -1,11 +1,19 @@
 import type { CustomAiProvider } from "@/core/services/aiPreferences";
 import { getCustomProviderModelId } from "@/core/services/aiPreferences";
 
+export type AssistantModelCapability = 'web' | 'vision' | 'pdf';
+
+const ALL_CAPABILITIES = ['web', 'vision', 'pdf'] as const;
+const VISION = ['vision'] as const;
+const WEB = ['web'] as const;
+const WEB_AND_PDF = ['web', 'pdf'] as const;
+
 export interface AssistantModelOption {
   id: string;
   label: string;
   isNew?: boolean;
   warning?: boolean;
+  capabilities?: readonly AssistantModelCapability[];
 }
 
 export interface AssistantModelGroup {
@@ -91,9 +99,30 @@ const BUILT_IN_MODEL_GROUPS: AssistantModelGroup[] = [
   },
 ];
 
+function getBuiltInCapabilities(modelId: string) {
+  if (modelId.startsWith('gemini-')) return ALL_CAPABILITIES;
+  if (modelId.startsWith('beeknoee:')) {
+    return /^beeknoee:(?:minimax\/|gemini-|claude-)/i.test(modelId)
+      ? VISION
+      : undefined;
+  }
+  if (/^groq:groq\/compound(?:-mini)?$/i.test(modelId)) return WEB;
+  if (modelId === 'groq:qwen/qwen3.6-27b') return VISION;
+  if (/gemma-4/i.test(modelId)) return ALL_CAPABILITIES;
+  if (modelId.includes('/') && modelId.endsWith(':free')) return WEB_AND_PDF;
+  return undefined;
+}
+
 export function getAssistantModelCatalog(
   customProviders: CustomAiProvider[] = [],
 ): AssistantModelGroup[] {
+  const builtInGroups = BUILT_IN_MODEL_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.map((item) => ({
+      ...item,
+      capabilities: getBuiltInCapabilities(item.id),
+    })),
+  }));
   const customProviderItems = customProviders
     .map((provider) => ({
       id: getCustomProviderModelId(provider.id),
@@ -107,9 +136,9 @@ export function getAssistantModelCatalog(
           group: "Custom Providers",
           items: customProviderItems,
         },
-        ...BUILT_IN_MODEL_GROUPS,
+        ...builtInGroups,
       ]
-    : BUILT_IN_MODEL_GROUPS;
+    : builtInGroups;
 }
 
 export function findAssistantModelLabel(

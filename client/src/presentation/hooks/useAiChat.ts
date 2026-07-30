@@ -8,6 +8,10 @@ import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { parseNodeId } from '@/core/utils/id-parser';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { findReplaySourceUserMessage } from './aiChatReplay';
+import {
+    describeAiProviderError,
+    type AiModelRuntimeStatus,
+} from '@/presentation/modules/Query/aiProviderStatus';
 
 export interface Attachment {
     id?: string;
@@ -209,6 +213,7 @@ export function useAiChat() {
     const [input, setInput] = useState(draftInput);
     const [isLoading, setIsLoading] = useState(false);
     const [attachments, setAttachments] = useState<Attachment[]>(draftAttachments);
+    const [modelStatuses, setModelStatuses] = useState<Record<string, AiModelRuntimeStatus>>({});
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -233,6 +238,16 @@ export function useAiChat() {
         () => resolveAiSelection(assistantSelection, aiModel, preferences.customProviders),
         [assistantSelection, aiModel, preferences.customProviders],
     );
+    const registerModelError = useCallback((message: string) => {
+        const failure = describeAiProviderError(message, store.lang);
+        if (failure.status) {
+            setModelStatuses((current) => ({
+                ...current,
+                [assistantSelection]: failure.status,
+            }));
+        }
+        return failure.message;
+    }, [assistantSelection, store.lang]);
     const queryClient = useQueryClient();
 
     const previousDraftKeyRef = useRef(draftKey);
@@ -496,6 +511,12 @@ export function useAiChat() {
                 return nextRaw;
             }
             if (event.type === 'done' && event.data) {
+                setModelStatuses((current) => {
+                    if (!current[assistantSelection]) return current;
+                    const next = { ...current };
+                    delete next[assistantSelection];
+                    return next;
+                });
                 const finalMsgContent = event.data.message || raw;
                 updateAiMessage(chatId, aiMessageId, {
                     content: finalMsgContent,
@@ -525,7 +546,7 @@ export function useAiChat() {
                 return raw;
             }
             if (event.type === 'error') {
-                const errorContent = text.aiChat.error(event.text || 'Unknown error');
+                const errorContent = text.aiChat.error(registerModelError(event.text || 'Unknown error'));
                 updateAiMessage(chatId, aiMessageId, {
                     content: errorContent,
                     error: true,
@@ -540,7 +561,7 @@ export function useAiChat() {
             }
         } catch { /* skip malformed */ }
         return raw;
-    }, [store, text, updateAiMessage]);
+    }, [assistantSelection, registerModelError, store, text, updateAiMessage]);
 
     const triggerGenerate = useCallback(async (chatId: string, prompt: string, customAttachments: Attachment[] = [], customImageData?: string) => {
         setIsLoading(true);
@@ -658,7 +679,7 @@ export function useAiChat() {
                     timestamp: Date.now(),
                 });
             } else {
-                const failedContent = text.aiChat.error(errorMessage);
+                const failedContent = text.aiChat.error(registerModelError(errorMessage));
                 updateAiMessage(chatId, aiMsgId, { content: failedContent, error: true });
                 void store.syncAiMessage(chatId, {
                     id: aiMsgId,
@@ -674,7 +695,7 @@ export function useAiChat() {
             pendingUpdateRef.current = null;
             abortControllerRef.current = null;
         }
-    }, [addAiMessage, updateAiMessage, processSseLine, activeDatabase, aiMode, aiRoutingMode, activeConnection?.type, resolvedAssistant.model, resolvedAssistant.providerOverride, store, text]);
+    }, [addAiMessage, updateAiMessage, processSseLine, activeDatabase, aiMode, aiRoutingMode, activeConnection?.type, resolvedAssistant.model, resolvedAssistant.providerOverride, registerModelError, store, text]);
 
     const handleStop = useCallback(() => {
         if (abortControllerRef.current) {
@@ -761,9 +782,8 @@ export function useAiChat() {
     };
 
     return {
-        input, setInput, isLoading, attachments, messagesEndRef, fileInputRef,
+        input, setInput, isLoading, attachments, modelStatuses, messagesEndRef, fileInputRef,
         handleFileSelected, handlePasteQuery, handleMentionTable, removeAttachment, handleSend, handleKeyDown, formatTime,
         handleRegenerate, handleEditSubmit, handleStop
     };
 }
-

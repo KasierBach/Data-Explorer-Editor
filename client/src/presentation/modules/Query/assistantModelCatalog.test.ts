@@ -59,4 +59,22 @@ describe("assistantModelCatalog", () => {
     expect(ids).not.toContain("openai/gpt-oss-120b:free");
     expect(ids).not.toContain("openrouter/owl-alpha");
   });
+  it('exposes only capabilities wired by the server', () => {
+    const models = getAssistantModelCatalog().flatMap((group) => group.items);
+    const capabilities = (id: string) =>
+      models.find((item) => item.id === id)?.capabilities;
+
+    expect(capabilities('groq:groq/compound')).toEqual(['web']);
+    expect(capabilities('groq:qwen/qwen3.6-27b')).toEqual(['vision']);
+    expect(capabilities('google/gemma-4-31b-it:free')).toEqual([
+      'web',
+      'vision',
+      'pdf',
+    ]);
+    expect(capabilities('nvidia/nemotron-3-super-120b-a12b:free')).toEqual([
+      'web',
+      'pdf',
+    ]);
+    expect(capabilities('beeknoee:glm-4.7-flash')).toBeUndefined();
+  });
 });
