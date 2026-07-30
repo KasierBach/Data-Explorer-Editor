@@ -75,7 +75,7 @@ describe('AiProviderRunnerService streaming', () => {
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
-  it('uses OpenRouter native web and PDF tools without silently retrying offline', async () => {
+  it('uses OpenRouter web and free PDF tools without silently retrying offline', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 400,
@@ -108,8 +108,9 @@ describe('AiProviderRunnerService streaming', () => {
     expect(body.model).toBe('google/gemma-4-31b-it:free');
     expect(body.tools).toEqual([{ type: 'openrouter:web_search' }]);
     expect(body.plugins).toEqual([
-      { id: 'file-parser', pdf: { engine: 'native' } },
+      { id: 'file-parser', pdf: { engine: 'cloudflare-ai' } },
     ]);
+    expect(body.max_tokens).toBe(12_288);
     expect(body.messages.at(-1)?.content).toEqual(
       expect.arrayContaining([
         {
@@ -147,9 +148,8 @@ describe('AiProviderRunnerService streaming', () => {
     }
 
     const body = JSON.parse(String(mockFetch.mock.calls[0]?.[1]?.body));
-    expect(body.compound_custom).toEqual({
-      tools: { enabled_tools: ['web_search'] },
-    });
+    expect(body.compound_custom).toBeUndefined();
+    expect(body.max_tokens).toBe(4_096);
   });
 
   it('retries transient completion failures from openai-compatible providers before falling through', async () => {
@@ -465,6 +465,48 @@ describe('AiProviderRunnerService streaming', () => {
     });
   });
 
+  it('preserves provider citations from openai-compatible streams', async () => {
+    const payload = JSON.stringify({
+      choices: [
+        {
+          delta: {
+            content: 'Grounded stream',
+            annotations: [
+              {
+                url_citation: { url: 'https://example.com/stream' },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    mockFetch.mockResolvedValue(
+      createSseResponse(['data: ' + payload + '\n', 'data: [DONE]\n']),
+    );
+
+    const events: StreamEvent[] = [];
+    for await (const event of service.streamOpenAiCompatible(
+      {
+        provider: 'openrouter',
+        model: 'google/gemma-4-26b-a4b-it:free',
+        apiKey: 'sk-test',
+        baseUrl: 'https://openrouter.ai/api/v1',
+      },
+      { prompt: 'Search for current data' },
+      'auto',
+      liveSearchDecision,
+    )) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toMatchObject({
+      type: 'done',
+      data: {
+        sources: ['https://example.com/stream'],
+      },
+    });
+  });
+
   it('appends structured sources to the visible message for openai-compatible responses', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
@@ -505,6 +547,44 @@ describe('AiProviderRunnerService streaming', () => {
     expect(result.message).toContain(
       '[https://example.com/news](https://example.com/news)',
     );
+  });
+
+  it('extracts citations and tool search results from provider metadata', () => {
+    const extractOpenAiSources = (
+      service as unknown as {
+        extractOpenAiSources: (payload: unknown) => string[];
+      }
+    ).extractOpenAiSources.bind(service);
+
+    expect(
+      extractOpenAiSources({
+        choices: [
+          {
+            message: {
+              annotations: [
+                {
+                  url_citation: { url: 'https://example.com/citation' },
+                },
+              ],
+              executed_tools: [
+                {
+                  arguments: JSON.stringify({
+                    url: 'https://example.com/visited',
+                  }),
+                  search_results: {
+                    results: [{ url: 'https://example.com/search' }],
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    ).toEqual([
+      'https://example.com/citation',
+      'https://example.com/search',
+      'https://example.com/visited',
+    ]);
   });
 
   it('rejects empty structured responses from openai-compatible completion lanes', async () => {

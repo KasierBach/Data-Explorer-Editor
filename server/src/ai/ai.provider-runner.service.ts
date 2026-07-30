@@ -382,15 +382,10 @@ export class AiProviderRunnerService {
   ) {
     const searchEnabled =
       routeDecision.needsLiveSearch && supportsLiveWebSearch(plan);
-    const requestOptions = !searchEnabled
-      ? {}
-      : plan.provider === 'openrouter'
+    const requestOptions =
+      searchEnabled && plan.provider === 'openrouter'
         ? { tools: [{ type: 'openrouter:web_search' }] }
-        : {
-            compound_custom: {
-              tools: { enabled_tools: ['web_search'] },
-            },
-          };
+        : {};
 
     return {
       searchEnabled,
@@ -406,9 +401,78 @@ export class AiProviderRunnerService {
   private getOpenAiDocumentOptions(plan: ProviderPlan, params: ChatParams) {
     return plan.provider === 'openrouter' && params.document
       ? {
-          plugins: [{ id: 'file-parser', pdf: { engine: 'native' } }],
+          plugins: [{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }],
         }
       : {};
+  }
+
+  private getOpenAiMaxOutputTokens(plan: ProviderPlan): number {
+    return plan.provider === 'groq'
+      ? AI_CONSTANTS.GROQ_MAX_OUTPUT_TOKENS
+      : AI_CONSTANTS.MAX_OUTPUT_TOKENS;
+  }
+
+  private extractOpenAiSources(payload: unknown): string[] {
+    if (!payload || typeof payload !== 'object') return [];
+
+    const choices = (payload as { choices?: unknown }).choices;
+    if (
+      !Array.isArray(choices) ||
+      !choices[0] ||
+      typeof choices[0] !== 'object'
+    )
+      return [];
+
+    const choice = choices[0] as {
+      message?: unknown;
+      delta?: unknown;
+    };
+    const sources: string[] = [];
+
+    for (const candidate of [choice.message, choice.delta]) {
+      if (!candidate || typeof candidate !== 'object') continue;
+      const message = candidate as {
+        annotations?: unknown;
+        executed_tools?: unknown;
+      };
+
+      if (Array.isArray(message.annotations)) {
+        for (const annotation of message.annotations) {
+          const url = (annotation as { url_citation?: { url?: unknown } })
+            ?.url_citation?.url;
+          if (typeof url === 'string') sources.push(url);
+        }
+      }
+
+      if (Array.isArray(message.executed_tools)) {
+        for (const tool of message.executed_tools) {
+          if (!tool || typeof tool !== 'object') continue;
+          const executedTool = tool as {
+            arguments?: unknown;
+            search_results?: { results?: unknown };
+          };
+          const results = executedTool.search_results?.results;
+          if (Array.isArray(results)) {
+            for (const result of results) {
+              const url = (result as { url?: unknown })?.url;
+              if (typeof url === 'string') sources.push(url);
+            }
+          }
+          if (typeof executedTool.arguments === 'string') {
+            try {
+              const parsed = JSON.parse(executedTool.arguments) as {
+                url?: unknown;
+              };
+              if (typeof parsed.url === 'string') sources.push(parsed.url);
+            } catch {
+              // Ignore provider-specific non-JSON tool arguments.
+            }
+          }
+        }
+      }
+    }
+
+    return this.promptBuilder.mergeSources(sources) || [];
   }
 
   private async readWithTimeout<T>(
@@ -690,7 +754,7 @@ export class AiProviderRunnerService {
               plan.provider === 'openrouter' ? params.document : undefined,
             ),
             temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
-            max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+            max_tokens: this.getOpenAiMaxOutputTokens(plan),
             ...this.getOpenAiDocumentOptions(plan, params),
             ...searchAttempt.requestOptions,
             ...(structuredResponseFormat
@@ -736,7 +800,10 @@ export class AiProviderRunnerService {
         responseText,
         `${plan.provider} (${modelToUse})`,
       );
-      const sources = this.promptBuilder.mergeSources(parsed.sources);
+      const sources = this.promptBuilder.mergeSources(
+        parsed.sources,
+        this.extractOpenAiSources(result),
+      );
       return {
         ...parsed,
         message: this.promptBuilder.appendSourcesToMessage(
@@ -923,7 +990,7 @@ export class AiProviderRunnerService {
               plan.provider === 'openrouter' ? params.document : undefined,
             ),
             temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
-            max_tokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+            max_tokens: this.getOpenAiMaxOutputTokens(plan),
             stream: true,
             ...this.getOpenAiDocumentOptions(plan, params),
             ...searchAttempt.requestOptions,
@@ -989,6 +1056,7 @@ export class AiProviderRunnerService {
     if (!reader) throw new Error('Response body is not readable');
     const decoder = new TextDecoder();
     let fullText = '';
+    const providerSources: string[] = [];
     try {
       let doneStream = false;
       let lineBuffer = '';
@@ -1010,6 +1078,7 @@ export class AiProviderRunnerService {
             }
             try {
               const parsed = JSON.parse(data);
+              providerSources.push(...this.extractOpenAiSources(parsed));
               const text = parsed.choices?.[0]?.delta?.content || '';
               if (text) {
                 fullText += text;
@@ -1029,6 +1098,7 @@ export class AiProviderRunnerService {
           if (data !== '[DONE]') {
             try {
               const parsed = JSON.parse(data);
+              providerSources.push(...this.extractOpenAiSources(parsed));
               const text = parsed.choices?.[0]?.delta?.content || '';
               if (text) {
                 fullText += text;
@@ -1046,7 +1116,10 @@ export class AiProviderRunnerService {
         fullText,
         `${provider} stream (${model})`,
       );
-      const sources = this.promptBuilder.mergeSources(parsed.sources);
+      const sources = this.promptBuilder.mergeSources(
+        parsed.sources,
+        providerSources,
+      );
       yield {
         type: 'done',
         data: {
