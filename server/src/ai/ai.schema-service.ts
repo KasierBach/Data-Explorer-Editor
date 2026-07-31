@@ -86,12 +86,14 @@ Rules:
     strategy: IDatabaseStrategy,
     database?: string,
     connectionId?: string,
+    searchTerm?: string,
   ): Promise<string> {
     return this.schemaContextService.gatherSchemaContext(
       pool,
       strategy,
       database,
       connectionId,
+      searchTerm,
     );
   }
 

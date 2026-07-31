@@ -41,12 +41,14 @@ export class AiService {
     strategy: IDatabaseStrategy,
     database?: string,
     connectionId?: string,
+    searchTerm?: string,
   ): Promise<string> {
     return this.schemaService.gatherSchemaContext(
       pool,
       strategy,
       database,
       connectionId,
+      searchTerm,
     );
   }
 

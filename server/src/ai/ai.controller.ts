@@ -105,7 +105,13 @@ export class AiController {
         database,
         req.user.id,
         (pool, strategy, db, connId) =>
-          this.aiService.gatherSchemaContext(pool, strategy, db, connId),
+          this.aiService.gatherSchemaContext(
+            pool,
+            strategy,
+            db,
+            connId,
+            prompt,
+          ),
       );
 
     try {
@@ -162,7 +168,7 @@ export class AiController {
       database,
       req.user.id,
       (pool, strategy, db, connId) =>
-        this.aiService.gatherSchemaContext(pool, strategy, db, connId),
+        this.aiService.gatherSchemaContext(pool, strategy, db, connId, prompt),
     );
 
     if (!ctx) {
@@ -225,7 +231,13 @@ export class AiController {
         database,
         req.user.id,
         (pool, strategy, db, connId) =>
-          this.aiService.gatherSchemaContext(pool, strategy, db, connId),
+          this.aiService.gatherSchemaContext(
+            pool,
+            strategy,
+            db,
+            connId,
+            context ? `${context}\n${beforeCursor}` : beforeCursor,
+          ),
       );
 
     const completion = await this.aiService.autocomplete({
@@ -335,7 +347,13 @@ export class AiController {
         database,
         req.user.id,
         (pool, strategy, db, connId) =>
-          this.aiService.gatherSchemaContext(pool, strategy, db, connId),
+          this.aiService.gatherSchemaContext(
+            pool,
+            strategy,
+            db,
+            connId,
+            prompt,
+          ),
       );
 
     try {
@@ -432,7 +450,13 @@ export class AiTestController {
           database,
           req.user.id,
           (pool, strategy, db, connId) =>
-            this.aiService.gatherSchemaContext(pool, strategy, db, connId),
+            this.aiService.gatherSchemaContext(
+              pool,
+              strategy,
+              db,
+              connId,
+              context ? `${context}\n${beforeCursor}` : beforeCursor,
+            ),
         );
 
       const completion = await this.aiService.autocomplete({

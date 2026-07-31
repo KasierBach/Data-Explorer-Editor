@@ -134,6 +134,17 @@ describe('AiController', () => {
     );
     expect(res.write).toHaveBeenCalledWith('data: [DONE]\n\n');
     expect(res.end).toHaveBeenCalled();
+
+    const gatherSchema =
+      connectionServiceMock.getConnectionContextForStream.mock.calls[0][3];
+    await gatherSchema({}, {}, 'app', 'conn-1');
+    expect(aiServiceMock.gatherSchemaContext).toHaveBeenCalledWith(
+      {},
+      {},
+      'app',
+      'conn-1',
+      'show me a table',
+    );
   });
 
   it('passes model and routing options into nlpToSql requests', async () => {

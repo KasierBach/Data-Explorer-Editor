@@ -14,6 +14,83 @@ interface SchemaTable {
   schema: string;
 }
 
+interface SchemaInventory {
+  tables: SchemaTable[];
+  relationships: Relationship[];
+}
+
+const MAX_DETAILED_TABLES = 24;
+const MAX_SCHEMA_CONTEXT_CHARACTERS = 32_000;
+
+function tokenize(value: string): string[] {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((token) => token.length > 1);
+}
+
+function selectRelevantTables(
+  tables: SchemaTable[],
+  relationships: Relationship[],
+  searchTerm: string,
+): SchemaTable[] {
+  if (tables.length <= MAX_DETAILED_TABLES) return tables;
+
+  const query = tokenize(searchTerm).join(' ');
+  const queryTokens = new Set(tokenize(searchTerm));
+  const ranked = tables
+    .map((table, index) => {
+      const name = tokenize(table.name).join(' ');
+      const identifierTokens = tokenize(`${table.schema} ${table.name}`);
+      let score = name && query.includes(name) ? 100 : 0;
+      for (const token of queryTokens) {
+        if (identifierTokens.includes(token)) score += 20;
+        else if (
+          token.length >= 3 &&
+          identifierTokens.some(
+            (identifier) =>
+              identifier.includes(token) || token.includes(identifier),
+          )
+        ) {
+          score += 4;
+        }
+      }
+      return { table, score, index };
+    })
+    .sort(
+      (left, right) => right.score - left.score || left.index - right.index,
+    );
+
+  const matched = ranked.filter(({ score }) => score > 0);
+  if (matched.length === 0) {
+    return tables.slice(0, MAX_DETAILED_TABLES);
+  }
+
+  const selected = matched
+    .slice(0, MAX_DETAILED_TABLES)
+    .map(({ table }) => table);
+  const selectedNames = new Set(selected.map(({ name }) => name));
+  const tablesByName = new Map(tables.map((table) => [table.name, table]));
+
+  for (const relationship of relationships) {
+    if (selected.length >= MAX_DETAILED_TABLES) break;
+    const relatedName = selectedNames.has(relationship.source_table)
+      ? relationship.target_table
+      : selectedNames.has(relationship.target_table)
+        ? relationship.source_table
+        : null;
+    const relatedTable = relatedName ? tablesByName.get(relatedName) : null;
+    if (relatedTable && !selectedNames.has(relatedTable.name)) {
+      selected.push(relatedTable);
+      selectedNames.add(relatedTable.name);
+    }
+  }
+
+  return selected;
+}
+
 function formatSchemaDefaultValue(value: unknown): string {
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'boolean') {
@@ -35,108 +112,140 @@ export class AiSchemaContextService {
     strategy: IDatabaseStrategy,
     database?: string,
     connectionId?: string,
+    searchTerm = '',
   ): Promise<string> {
-    const cacheKey = connectionId
-      ? await this.freshnessService.buildKey(
-          'ai-schema',
-          [connectionId, database || 'default'],
-          ['schema-context-v3-schema-only'],
-        )
+    const scope = [connectionId, database || 'default'];
+    const relevanceKey = tokenize(searchTerm).join('|') || 'default';
+    const inventoryCacheKey = connectionId
+      ? await this.freshnessService.buildKey('ai-schema', scope, [
+          'schema-inventory-v4',
+        ])
+      : null;
+    const contextCacheKey = connectionId
+      ? await this.freshnessService.buildKey('ai-schema', scope, [
+          'schema-context-v4-relevant',
+          relevanceKey,
+        ])
       : null;
 
-    if (cacheKey) {
-      const cached = await this.cacheManager.get<string>(cacheKey);
+    if (contextCacheKey) {
+      const cached = await this.cacheManager.get<string>(contextCacheKey);
       if (cached) return cached;
     }
 
     let schemaContext = '';
     try {
-      const schemas = await strategy.getSchemas(pool, database);
-      const allTables: SchemaTable[] = [];
-      const columnMap = new Map<string, ColumnInfo[]>();
-      const skipSchemas = [
-        'pg_catalog',
-        'information_schema',
-        'pg_toast',
-        'sys',
-        'performance_schema',
-        'mysql',
-      ];
+      let inventory = inventoryCacheKey
+        ? await this.cacheManager.get<SchemaInventory>(inventoryCacheKey)
+        : undefined;
+      if (!inventory) {
+        const schemas = await strategy.getSchemas(pool, database);
+        const allTables: SchemaTable[] = [];
+        const skipSchemas = [
+          'pg_catalog',
+          'information_schema',
+          'pg_toast',
+          'sys',
+          'performance_schema',
+          'mysql',
+        ];
 
-      // Limit table gathering to prevent context overflow
-      let tableCount = 0;
-      const MAX_TABLES = 100;
+        for (const schema of schemas) {
+          const schemaName =
+            typeof schema === 'string'
+              ? schema
+              : (schema as { name?: string }).name;
+          if (!schemaName || skipSchemas.includes(schemaName)) continue;
 
-      for (const schema of schemas) {
-        const schemaName =
-          typeof schema === 'string'
-            ? schema
-            : (schema as { name?: string }).name;
-        if (!schemaName || skipSchemas.includes(schemaName)) continue;
-
-        try {
-          const tables = await strategy.getTables(pool, schemaName, database);
-          for (const table of tables) {
-            if (tableCount >= MAX_TABLES) break;
-
-            const tableName =
-              typeof table === 'string'
-                ? table
-                : (table as { name?: string }).name;
-            if (!tableName) continue;
-
-            const tableObj: SchemaTable = {
-              name: tableName,
-              schema: schemaName,
-            };
-            allTables.push(tableObj);
-            tableCount++;
-
-            try {
-              const cols = await strategy.getColumns(
-                pool,
-                schemaName,
-                tableName,
-                database,
-              );
-              columnMap.set(`${schemaName}.${tableName}`, cols);
-            } catch {
-              // Continue building partial schema context.
+          try {
+            const tables = await strategy.getTables(pool, schemaName, database);
+            for (const table of tables) {
+              const tableName =
+                typeof table === 'string'
+                  ? table
+                  : (table as { name?: string }).name;
+              if (tableName) {
+                allTables.push({ name: tableName, schema: schemaName });
+              }
             }
+          } catch {
+            // Continue building a partial inventory.
           }
+        }
+
+        let relationships: Relationship[] = [];
+        try {
+          relationships = await strategy.getRelationships(pool, database);
+        } catch {
+          // Relationships are optional for some engines.
+        }
+        inventory = { tables: allTables, relationships };
+
+        if (inventoryCacheKey) {
+          await this.cacheManager.set(
+            inventoryCacheKey,
+            inventory,
+            AI_CONSTANTS.SCHEMA_CACHE_TTL_MS,
+          );
+        }
+      }
+
+      const selectedTables = selectRelevantTables(
+        inventory.tables,
+        inventory.relationships,
+        searchTerm,
+      );
+      const columnMap = new Map<string, ColumnInfo[]>();
+      for (const table of selectedTables) {
+        try {
+          const columns = await strategy.getColumns(
+            pool,
+            table.schema,
+            table.name,
+            database,
+          );
+          columnMap.set(`${table.schema}.${table.name}`, columns);
         } catch {
           // Continue building partial schema context.
         }
-        if (tableCount >= MAX_TABLES) break;
       }
 
-      let relationships: Relationship[] = [];
-      try {
-        relationships = await strategy.getRelationships(pool, database);
-      } catch {
-        // Relationships are optional for some engines.
-      }
-
+      const selectedTableRefs = new Set(
+        selectedTables.flatMap((table) => [
+          table.name,
+          `${table.schema}.${table.name}`,
+        ]),
+      );
+      const relationships = inventory.relationships.filter(
+        (relationship) =>
+          selectedTableRefs.has(relationship.source_table) &&
+          selectedTableRefs.has(relationship.target_table),
+      );
       schemaContext = this.buildSchemaContext(
-        allTables,
+        selectedTables,
         columnMap,
         relationships,
       );
+      if (schemaContext.length > MAX_SCHEMA_CONTEXT_CHARACTERS) {
+        schemaContext =
+          schemaContext.slice(0, MAX_SCHEMA_CONTEXT_CHARACTERS) +
+          '\n[Schema context truncated to fit the AI budget]\n';
+      }
 
       if (
-        cacheKey &&
+        contextCacheKey &&
         schemaContext &&
         !schemaContext.includes('Could not load')
       ) {
         await this.cacheManager.set(
-          cacheKey,
+          contextCacheKey,
           schemaContext,
           AI_CONSTANTS.SCHEMA_CACHE_TTL_MS,
         );
       }
 
       this.logger.log(
-        `[AiSchemaContextService] Schema-only context built: ${allTables.length} tables`,
+        `[AiSchemaContextService] Relevant schema context built: ${selectedTables.length}/${inventory.tables.length} tables`,
       );
     } catch (error) {
       this.logger.error(
