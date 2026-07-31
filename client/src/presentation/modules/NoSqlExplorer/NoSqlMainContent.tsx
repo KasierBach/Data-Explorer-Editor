@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '@/core/services/store';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
+import { openAiQueryFixDraft } from '@/core/services/aiQueryFix';
 import { Button } from '@/presentation/components/ui/button';
 import { useVerticalResizablePanel } from '@/presentation/hooks/useVerticalResizablePanel';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
@@ -496,6 +497,20 @@ export const NoSqlMainContent: React.FC = () => {
               <div className="h-full flex flex-col items-center justify-center gap-3 text-destructive">
                 <AlertCircle className="w-8 h-8" />
                 <span className="text-sm font-medium">{error.message}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-violet-500/30 text-violet-400 hover:bg-violet-500/10"
+                  onClick={() => void openAiQueryFixDraft(
+                    nosqlMqlQuery,
+                    error.message,
+                    activeConnection?.type === 'redis' ? 'Redis' : 'MQL',
+                    lang,
+                  )}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {lang === 'vi' ? 'Sửa bằng AI' : 'Fix with AI'}
+                </Button>
               </div>
             ) : !nosqlResult ? (
               <div className="h-full flex flex-col items-center justify-center opacity-30 gap-3">

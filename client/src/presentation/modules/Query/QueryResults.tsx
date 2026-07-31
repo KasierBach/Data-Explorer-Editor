@@ -5,7 +5,7 @@ import {
     TabsList,
     TabsTrigger
 } from "@/presentation/components/ui/tabs";
-import { Info, Table as TableIcon, Loader2, Play, GitBranch, X, Eraser, LayoutDashboard } from 'lucide-react';
+import { Info, Table as TableIcon, Loader2, Play, GitBranch, X, Eraser, LayoutDashboard, Sparkles } from 'lucide-react';
 import type { QueryResult } from '@/core/domain/entities';
 import { ResultTable } from './ResultTable';
 import { QueryPlanVisualizer } from './QueryPlanVisualizer';
@@ -13,6 +13,7 @@ import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayou
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/core/services/store';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
+import { Button } from '@/presentation/components/ui/button';
 
 interface QueryResultsProps {
     results: QueryResult | null;
@@ -26,6 +27,7 @@ interface QueryResultsProps {
     onClearResults?: () => void;
     onClose?: () => void;
     onSaveToDashboard?: () => void;
+    onFixWithAi?: () => void;
 }
 
 export const QueryResults: React.FC<QueryResultsProps> = ({
@@ -40,6 +42,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
     onClearResults,
     onClose,
     onSaveToDashboard,
+    onFixWithAi,
 }) => {
     const { lang } = useAppStore();
     const text = getWorkspaceText(lang).queryResults;
@@ -164,6 +167,17 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                                 <div className="font-bold mb-2">{text.error}</div>
                                 {(error as Error).message}
                             </div>
+                            {onFixWithAi && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-fit gap-2 border-violet-500/30 text-violet-400 hover:bg-violet-500/10"
+                                    onClick={onFixWithAi}
+                                >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    {lang === 'vi' ? 'Sửa bằng AI' : 'Fix with AI'}
+                                </Button>
+                            )}
                         </div>
                     ) : results ? (
                         <div className="space-y-4">

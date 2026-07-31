@@ -26,6 +26,7 @@ import { PresenceBadge } from '@/presentation/components/presence/PresenceBadge'
 import { SqlSequenceDialog } from './SqlSequenceDialog';
 import { AiQueryExplanationDialog } from './AiQueryExplanationDialog';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
+import { openAiQueryFixDraft } from '@/core/services/aiQueryFix';
 
 type SqlEditorHandle = editor.IStandaloneCodeEditor;
 
@@ -554,6 +555,14 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             onClearResults={handleClearResults}
                             onClose={toggleResultPanel}
                             onSaveToDashboard={results ? openDashboardDialog : undefined}
+                            onFixWithAi={executedQuery && error
+                                ? () => void openAiQueryFixDraft(
+                                    executedQuery,
+                                    getErrorMessage(error),
+                                    'SQL',
+                                    lang,
+                                )
+                                : undefined}
                         />
                     </div>
                 </div>

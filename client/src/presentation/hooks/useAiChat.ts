@@ -209,6 +209,7 @@ export function useAiChat() {
     const draftInput = draftState && typeof draftState.input === 'string'
         ? draftState.input
         : '';
+    const draftRevision = Number(draftState?.aiDraftRevision || 0);
     const draftAttachments = useMemo(
         () => (Array.isArray(draftState?.attachments)
             ? draftState.attachments.filter(isPersistedDraftAttachment)
@@ -271,6 +272,7 @@ export function useAiChat() {
     const queryClient = useQueryClient();
 
     const previousDraftKeyRef = useRef(draftKey);
+    const previousDraftRevisionRef = useRef(draftRevision);
 
     useEffect(() => {
         let cancelled = false;
@@ -285,14 +287,18 @@ export function useAiChat() {
     }, []);
 
     useEffect(() => {
-        if (previousDraftKeyRef.current === draftKey) {
+        if (
+            previousDraftKeyRef.current === draftKey &&
+            previousDraftRevisionRef.current === draftRevision
+        ) {
             return;
         }
 
         previousDraftKeyRef.current = draftKey;
+        previousDraftRevisionRef.current = draftRevision;
         setInput(draftInput);
         setAttachments(draftAttachments);
-    }, [draftAttachments, draftInput, draftKey]);
+    }, [draftAttachments, draftInput, draftKey, draftRevision]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
