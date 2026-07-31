@@ -155,6 +155,9 @@ describe('AiController', () => {
     aiServiceMock.generateSql.mockResolvedValue({
       sql: '{"action":"find","collection":"orders","filter":{}}',
       explanation: 'Reads orders.',
+      provider: 'groq',
+      model: 'openai/gpt-oss-120b',
+      routingMode: 'auto',
     });
 
     const result = await controller.nlpToSql(
@@ -189,7 +192,10 @@ describe('AiController', () => {
       details: expect.objectContaining({
         generationId: result.generationId,
         databaseType: 'mongodb',
-        model: 'gemini:gemini-2.5-flash',
+        requestedModel: 'gemini:gemini-2.5-flash',
+        provider: 'groq',
+        model: 'openai/gpt-oss-120b',
+        routingMode: 'auto',
         latencyMs: expect.any(Number),
       }),
     });

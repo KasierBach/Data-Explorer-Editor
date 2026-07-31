@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditAction } from '../audit/audit.service';
 
 type AiAuditDetails = {
+  provider?: string | null;
   model?: string | null;
   latencyMs?: number;
   rating?: 'up' | 'down';
@@ -45,7 +46,10 @@ export class AiQualityService {
       if (typeof details.latencyMs === 'number' && details.latencyMs >= 0) {
         latencies.push(details.latencyMs);
       }
-      const model = details.model?.trim() || 'default';
+      const model =
+        [details.provider?.trim(), details.model?.trim()]
+          .filter(Boolean)
+          .join('/') || 'default';
       const modelMetrics = models.get(model) ?? { success: 0, failed: 0 };
       if (log.action === String(AuditAction.AI_SQL_GENERATED)) {
         success += 1;

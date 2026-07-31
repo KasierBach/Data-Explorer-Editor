@@ -8,7 +8,11 @@ describe('AiQualityService', () => {
         findMany: jest.fn().mockResolvedValue([
           {
             action: AuditAction.AI_SQL_GENERATED,
-            details: JSON.stringify({ model: 'fast', latencyMs: 100 }),
+            details: JSON.stringify({
+              provider: 'openrouter',
+              model: 'fast',
+              latencyMs: 100,
+            }),
           },
           {
             action: AuditAction.AI_SQL_GENERATED,
@@ -38,6 +42,9 @@ describe('AiQualityService', () => {
         averageLatencyMs: 300,
         p95LatencyMs: 500,
         feedback: { up: 1, down: 0, total: 1 },
+        models: expect.arrayContaining([
+          expect.objectContaining({ model: 'openrouter/fast', success: 1 }),
+        ]),
       }),
     );
     expect(prisma.auditLog.findMany).toHaveBeenCalledWith(

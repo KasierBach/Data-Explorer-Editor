@@ -16,6 +16,9 @@ describe('AiService MongoDB command normalization', () => {
     chat.mockResolvedValue({
       sql: '{"action":"find","filter":{}}',
       message: 'Ready',
+      provider: 'groq',
+      model: 'openai/gpt-oss-120b',
+      routingMode: 'auto',
     });
   });
 
@@ -30,6 +33,13 @@ describe('AiService MongoDB command normalization', () => {
         action: 'find',
         collection: 'orders',
         filter: {},
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        provider: 'groq',
+        model: 'openai/gpt-oss-120b',
+        routingMode: 'auto',
       }),
     );
   });

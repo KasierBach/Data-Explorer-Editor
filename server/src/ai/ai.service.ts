@@ -94,7 +94,12 @@ export class AiService {
     mode?: AiChatMode;
     routingMode?: AiRoutingMode;
     providerOverride?: ChatParams['providerOverride'];
-  }): Promise<{ sql: string; explanation: string }> {
+  }): Promise<
+    Pick<ChatResult, 'provider' | 'model' | 'routingMode'> & {
+      sql: string;
+      explanation: string;
+    }
+  > {
     const {
       query,
       databaseType = 'postgres',
@@ -119,7 +124,13 @@ export class AiService {
     const explanation =
       result.explanation?.trim() || result.message?.trim() || 'Done.';
 
-    return { sql, explanation };
+    return {
+      sql,
+      explanation,
+      provider: result.provider,
+      model: result.model,
+      routingMode: result.routingMode,
+    };
   }
 
   private buildCommandGenerationPrompt(
