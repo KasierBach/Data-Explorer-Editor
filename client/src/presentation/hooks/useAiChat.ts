@@ -4,6 +4,7 @@ import { useAppStore, type AiMessage } from '@/core/services/store';
 import type { TableMetadata } from '@/core/domain/entities';
 import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
 import { connectionService } from '@/core/services/ConnectionService';
+import { aiService } from '@/core/services/AiService';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { parseNodeId } from '@/core/utils/id-parser';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -12,6 +13,10 @@ import {
     describeAiProviderError,
     type AiModelRuntimeStatus,
 } from '@/presentation/modules/Query/aiProviderStatus';
+import {
+    getAssistantModelCatalog,
+    getAssistantModelProvider,
+} from '@/presentation/modules/Query/assistantModelCatalog';
 
 export interface Attachment {
     id?: string;
@@ -213,7 +218,8 @@ export function useAiChat() {
     const [input, setInput] = useState(draftInput);
     const [isLoading, setIsLoading] = useState(false);
     const [attachments, setAttachments] = useState<Attachment[]>(draftAttachments);
-    const [modelStatuses, setModelStatuses] = useState<Record<string, AiModelRuntimeStatus>>({});
+    const [runtimeModelStatuses, setRuntimeModelStatuses] = useState<Record<string, AiModelRuntimeStatus>>({});
+    const [configuredProviders, setConfiguredProviders] = useState<Record<string, boolean> | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -238,10 +244,24 @@ export function useAiChat() {
         () => resolveAiSelection(assistantSelection, aiModel, preferences.customProviders),
         [assistantSelection, aiModel, preferences.customProviders],
     );
+    const modelStatuses = useMemo(() => {
+        const statuses = { ...runtimeModelStatuses };
+        if (!configuredProviders) return statuses;
+        for (const model of getAssistantModelCatalog().flatMap((group) => group.items)) {
+            const provider = getAssistantModelProvider(model.id);
+            if (provider && configuredProviders[provider] === false) {
+                statuses[model.id] = 'unconfigured';
+            }
+        }
+        return statuses;
+    }, [configuredProviders, runtimeModelStatuses]);
+    const selectedProvider = getAssistantModelProvider(assistantSelection);
+    const isSelectedProviderConfigured =
+        !selectedProvider || configuredProviders?.[selectedProvider] !== false;
     const registerModelError = useCallback((message: string) => {
         const failure = describeAiProviderError(message, store.lang);
         if (failure.status) {
-            setModelStatuses((current) => ({
+            setRuntimeModelStatuses((current) => ({
                 ...current,
                 [assistantSelection]: failure.status,
             }));
@@ -251,6 +271,18 @@ export function useAiChat() {
     const queryClient = useQueryClient();
 
     const previousDraftKeyRef = useRef(draftKey);
+
+    useEffect(() => {
+        let cancelled = false;
+        void aiService.getProviderStatus()
+            .then(({ providers }) => {
+                if (!cancelled) setConfiguredProviders(providers);
+            })
+            .catch(() => undefined);
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     useEffect(() => {
         if (previousDraftKeyRef.current === draftKey) {
@@ -511,7 +543,7 @@ export function useAiChat() {
                 return nextRaw;
             }
             if (event.type === 'done' && event.data) {
-                setModelStatuses((current) => {
+                setRuntimeModelStatuses((current) => {
                     if (!current[assistantSelection]) return current;
                     const next = { ...current };
                     delete next[assistantSelection];
@@ -704,7 +736,7 @@ export function useAiChat() {
     }, []);
 
     const handleSend = useCallback(async () => {
-        if ((!input.trim() && attachments.length === 0) || isLoading || !activeAiChatId) return;
+        if ((!input.trim() && attachments.length === 0) || isLoading || !activeAiChatId || !isSelectedProviderConfigured) return;
 
         if (!activeConnection) {
             addAiMessage(activeAiChatId, {
@@ -742,7 +774,7 @@ export function useAiChat() {
         setAttachments([]);
         
         await triggerGenerate(activeAiChatId, currentInput, currentAttachments);
-    }, [input, attachments, isLoading, activeAiChatId, activeConnection, addAiMessage, text, triggerGenerate]);
+    }, [input, attachments, isLoading, activeAiChatId, isSelectedProviderConfigured, activeConnection, addAiMessage, text, triggerGenerate]);
 
     const handleRegenerate = useCallback(async (chatId: string, aiMessageId?: string) => {
         const chat = store.aiChats.find(c => c.id === chatId);

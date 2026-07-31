@@ -83,8 +83,11 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
     const nosqlMqlQuery = useAppStore((state) => state.nosqlMqlQuery);
     const lang = useAppStore((state) => state.lang);
     const statusLabels: Record<AiModelRuntimeStatus, string> = lang === 'vi'
-        ? { 'rate-limited': 'Giới hạn', 'credits-required': 'Cần credit', unavailable: 'Không khả dụng' }
-        : { 'rate-limited': 'Rate limited', 'credits-required': 'Credits required', unavailable: 'Unavailable' };
+        ? { unconfigured: 'Chưa cấu hình', 'rate-limited': 'Giới hạn', 'credits-required': 'Cần credit', unavailable: 'Không khả dụng' }
+        : { unconfigured: 'Not configured', 'rate-limited': 'Rate limited', 'credits-required': 'Credits required', unavailable: 'Unavailable' };
+    const isBlockingStatus = (status?: AiModelRuntimeStatus) =>
+        status === 'unconfigured' || status === 'unavailable';
+    const selectedModelBlocked = isBlockingStatus(modelStatuses[aiModel]);
     const hasEditorQuery = isNoSql
         ? Boolean(nosqlMqlQuery?.trim())
         : Boolean(activeTab?.type === 'query' && activeTab.metadata?.sql?.trim());
@@ -295,7 +298,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                      {modelStatuses[aiModel] && (
                                          <span
                                              title={statusLabels[modelStatuses[aiModel]]}
-                                             className={cn('h-1.5 w-1.5 shrink-0 rounded-full', modelStatuses[aiModel] === 'unavailable' ? 'bg-red-500' : 'bg-amber-400')}
+                                             className={cn('h-1.5 w-1.5 shrink-0 rounded-full', isBlockingStatus(modelStatuses[aiModel]) ? 'bg-red-500' : 'bg-amber-400')}
                                          />
                                      )}
                                 </button>
@@ -309,6 +312,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                         {group.items.map(m => (
                                             <DropdownMenuItem
                                                 key={m.id}
+                                                disabled={isBlockingStatus(modelStatuses[m.id])}
                                                 className={cn("flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer mb-0.5 group", aiModel === m.id && "bg-white/10 ring-1 ring-white/10")}
                                                 onClick={() => setAiModel(m.id)}
                                             >
@@ -332,7 +336,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                                 </div>
                                                 <div className={'flex items-center gap-2'}>
                                                     {modelStatuses[m.id] && (
-                                                        <span className={cn('text-[8px] font-semibold', modelStatuses[m.id] === 'unavailable' ? 'text-red-400' : 'text-amber-400')}>
+                                                        <span className={cn('text-[8px] font-semibold', isBlockingStatus(modelStatuses[m.id]) ? 'text-red-400' : 'text-amber-400')}>
                                                             {statusLabels[modelStatuses[m.id]]}
                                                         </span>
                                                     )}
@@ -361,12 +365,12 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                 size="icon"
                                 className={cn(
                                     "h-8 w-8 rounded-full shrink-0 text-white transition-all duration-300 border-none",
-                                    (!input.trim() && attachments.length === 0) || !activeConnection
+                                    (!input.trim() && attachments.length === 0) || !activeConnection || selectedModelBlocked
                                         ? "bg-muted-foreground/10 text-muted-foreground/30"
                                         : "bg-gradient-to-tr from-violet-600 to-indigo-500 hover:scale-105 active:scale-95 shadow-lg shadow-violet-500/25"
                                 )}
                                 onClick={handleSend}
-                                disabled={(!input.trim() && attachments.length === 0) || !activeConnection}
+                                disabled={(!input.trim() && attachments.length === 0) || !activeConnection || selectedModelBlocked}
                             >
                                 <Send className={cn("w-3.5 h-3.5 ml-0.5 transition-transform", input.trim() && "translate-x-0.5 -translate-y-px")} />
                             </Button>

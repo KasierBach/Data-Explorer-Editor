@@ -5,11 +5,19 @@ export interface AutocompleteResponse {
     completion: string;
 }
 
+export interface AiProviderStatusResponse {
+    providers: Record<string, boolean>;
+}
+
 /**
  * AI Service for copilot and autocomplete features.
  * Standardized to use apiService.
  */
 class AiService {
+    getProviderStatus(): Promise<AiProviderStatusResponse> {
+        return apiService.get<AiProviderStatusResponse>('/ai/providers/status');
+    }
+
     async getAutocomplete(params: {
         connectionId: string;
         database?: string;

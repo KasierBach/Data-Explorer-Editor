@@ -1,5 +1,8 @@
 import type { CustomAiProvider } from "@/core/services/aiPreferences";
-import { getCustomProviderModelId } from "@/core/services/aiPreferences";
+import {
+  CUSTOM_PROVIDER_MODEL_PREFIX,
+  getCustomProviderModelId,
+} from "@/core/services/aiPreferences";
 
 export type AssistantModelCapability = 'web' | 'vision' | 'pdf';
 
@@ -20,6 +23,12 @@ export interface AssistantModelGroup {
   group: string;
   items: AssistantModelOption[];
 }
+
+export type AssistantBuiltInProvider =
+  | 'gemini'
+  | 'openrouter'
+  | 'groq'
+  | 'beeknoee';
 
 const BUILT_IN_MODEL_GROUPS: AssistantModelGroup[] = [
   {
@@ -150,4 +159,15 @@ export function findAssistantModelLabel(
     groups.flatMap((group) => group.items).find((item) => item.id === modelId)
       ?.label ?? modelId
   );
+}
+
+export function getAssistantModelProvider(
+  modelId: string,
+): AssistantBuiltInProvider | null {
+  if (modelId.startsWith(CUSTOM_PROVIDER_MODEL_PREFIX)) return null;
+  if (modelId.startsWith('gemini-')) return 'gemini';
+  if (modelId.startsWith('beeknoee:')) return 'beeknoee';
+  if (modelId.startsWith('groq:')) return 'groq';
+  if (modelId.includes('/') || modelId.includes(':')) return 'openrouter';
+  return null;
 }

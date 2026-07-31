@@ -4,6 +4,7 @@ import { AiService } from './ai.service';
 import { AiConnectionService } from './ai.connection-service';
 import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
 import { AuditAction, AuditService } from '../audit/audit.service';
+import { ConfigService } from '@nestjs/config';
 
 jest.mock('../common/utils/ssrf-validator.util', () => ({
   validateExternalUrl: jest.fn(),
@@ -34,6 +35,17 @@ describe('AiController', () => {
     log: jest.fn(),
   };
 
+  const configuredProviders: Record<string, string | undefined> = {
+    GEMINI_API_KEY: 'gemini-key',
+    OPENROUTER_API_KEY: 'openrouter-key',
+    GROQ_API_KEY: undefined,
+    CEREBRAS_API_KEY: 'cerebras-key',
+    BEEKNOEE_API_KEY: 'beeknoee-key',
+  };
+  const configServiceMock = {
+    get: jest.fn((key: string) => configuredProviders[key]),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
     validateExternalUrlMock.mockResolvedValue(true);
@@ -47,6 +59,7 @@ describe('AiController', () => {
           useValue: connectionServiceMock,
         },
         { provide: AuditService, useValue: auditServiceMock },
+        { provide: ConfigService, useValue: configServiceMock },
       ],
     }).compile();
 
@@ -55,6 +68,21 @@ describe('AiController', () => {
 
   afterEach(() => {
     global.fetch = originalFetch;
+  });
+
+  it('reports provider configuration without exposing API keys', () => {
+    const result = controller.getProviderStatus();
+
+    expect(result).toEqual({
+      providers: {
+        gemini: true,
+        openrouter: true,
+        groq: false,
+        cerebras: true,
+        beeknoee: true,
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain('-key');
   });
 
   it('passes history into chatStream for streaming requests', async () => {

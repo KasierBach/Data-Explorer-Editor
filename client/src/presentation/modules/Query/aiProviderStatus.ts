@@ -1,4 +1,5 @@
 export type AiModelRuntimeStatus =
+  | 'unconfigured'
   | 'rate-limited'
   | 'credits-required'
   | 'unavailable';

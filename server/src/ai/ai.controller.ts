@@ -1,6 +1,7 @@
 ﻿import {
   BadRequestException,
   Controller,
+  Get,
   Post,
   Body,
   UseGuards,
@@ -22,6 +23,7 @@ import { normalizeProviderBaseUrl } from './ai-url.util';
 import { randomUUID } from 'crypto';
 import { AuditAction, AuditService } from '../audit/audit.service';
 import { AiSqlFeedbackDto } from './dto/ai-sql-feedback.dto';
+import { ConfigService } from '@nestjs/config';
 
 const extractProviderErrorMessage = (payload: unknown) => {
   if (!payload || typeof payload !== 'object') {
@@ -54,7 +56,28 @@ export class AiController {
     private readonly aiService: AiService,
     private readonly connectionService: AiConnectionService,
     private readonly auditService: AuditService,
+    private readonly configService: ConfigService,
   ) {}
+
+  @Get('providers/status')
+  getProviderStatus() {
+    const providerKeys = {
+      gemini: 'GEMINI_API_KEY',
+      openrouter: 'OPENROUTER_API_KEY',
+      groq: 'GROQ_API_KEY',
+      cerebras: 'CEREBRAS_API_KEY',
+      beeknoee: 'BEEKNOEE_API_KEY',
+    } as const;
+
+    return {
+      providers: Object.fromEntries(
+        Object.entries(providerKeys).map(([provider, key]) => [
+          provider,
+          Boolean(this.configService.get<string>(key)?.trim()),
+        ]),
+      ),
+    };
+  }
 
   @Post('generate-sql')
   @Throttle({ default: { limit: 12, ttl: 60000 } })

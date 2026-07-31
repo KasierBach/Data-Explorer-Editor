@@ -47,6 +47,21 @@ describe('AiService (Frontend)', () => {
     expect(result).toBe('SELECT * FROM users');
   });
 
+  it('returns built-in provider configuration status', async () => {
+    const providers = { gemini: true, groq: false };
+    mockFetch.mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'application/json' },
+      json: () => Promise.resolve({ success: true, data: { providers } }),
+    });
+
+    await expect(aiService.getProviderStatus()).resolves.toEqual({ providers });
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/ai/providers/status'),
+      expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
   it('should return empty string on fetch error', async () => {
     mockFetch.mockResolvedValue({
       ok: false,

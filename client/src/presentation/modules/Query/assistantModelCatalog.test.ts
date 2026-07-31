@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAssistantModelCatalog } from "./assistantModelCatalog";
+import { getAssistantModelCatalog, getAssistantModelProvider } from "./assistantModelCatalog";
 
 describe("assistantModelCatalog", () => {
   it("includes a dedicated Beeknoee provider group for AI Assistant", () => {
@@ -76,5 +76,13 @@ describe("assistantModelCatalog", () => {
       'pdf',
     ]);
     expect(capabilities('beeknoee:glm-4.7-flash')).toBeUndefined();
+  });
+
+  it('maps selectable models to their configured provider', () => {
+    expect(getAssistantModelProvider('gemini-3.6-flash')).toBe('gemini');
+    expect(getAssistantModelProvider('groq:groq/compound')).toBe('groq');
+    expect(getAssistantModelProvider('beeknoee:glm-4.7-flash')).toBe('beeknoee');
+    expect(getAssistantModelProvider('google/gemma-4-31b-it:free')).toBe('openrouter');
+    expect(getAssistantModelProvider('custom-provider:local')).toBeNull();
   });
 });
