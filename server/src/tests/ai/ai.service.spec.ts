@@ -90,6 +90,9 @@ describe('AiService', () => {
       expect(result).toEqual({
         sql: 'SELECT * FROM users LIMIT 10',
         explanation: 'Reads the latest users.',
+        provider: 'openrouter',
+        model: 'openai/gpt-4o-mini',
+        routingMode: 'auto',
       });
     });
 
