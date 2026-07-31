@@ -1,4 +1,5 @@
 import { AiPromptBuilderService } from './ai.prompt-builder.service';
+import { AI_CONSTANTS } from './ai.constants';
 
 describe('AiPromptBuilderService', () => {
   let service: AiPromptBuilderService;
@@ -75,6 +76,75 @@ describe('AiPromptBuilderService', () => {
     expect(prompt).toContain('Live web research is available');
     expect(prompt).toContain('place citation URLs in the "sources" array');
     expect(prompt).toContain('An image is attached to this request');
+  });
+
+  it('keeps the reusable schema prefix ahead of the changing date context', () => {
+    const prompt = service.buildSystemPrompt({
+      schemaContext: 'TABLE users(id uuid)',
+    });
+
+    expect(prompt.indexOf('TABLE users')).toBeLessThan(
+      prompt.indexOf('<time_context>'),
+    );
+    expect(prompt).toContain('Current date (UTC)');
+    expect(prompt).not.toContain('Local time');
+  });
+
+  it('bounds chat history consistently for OpenAI-compatible and Gemini requests', () => {
+    const history = Array.from({ length: 30 }, (_, index) => ({
+      role: index % 2 === 0 ? ('user' as const) : ('ai' as const),
+      content: `${index}: ${'x'.repeat(2000)}`,
+    }));
+
+    const openAiMessages = service.buildOpenAiMessages(
+      'current prompt',
+      'system',
+      undefined,
+      history,
+    );
+    const openAiHistory = openAiMessages
+      .slice(1, -1)
+      .flatMap((message) =>
+        typeof message.content === 'string' ? [message.content] : [],
+      );
+    const geminiContents = service.buildGeminiContents(
+      'current prompt',
+      undefined,
+      history,
+    );
+    const geminiHistory = geminiContents
+      .slice(0, -1)
+      .map((message) => message.parts[0]?.text || '');
+
+    expect(openAiHistory).toEqual(geminiHistory);
+    expect(openAiHistory.length).toBeLessThanOrEqual(
+      AI_CONSTANTS.CHAT_HISTORY_MAX_MESSAGES,
+    );
+    expect(openAiHistory.join('').length).toBeLessThanOrEqual(
+      AI_CONSTANTS.CHAT_HISTORY_MAX_CHARACTERS,
+    );
+    expect(openAiHistory.at(-1)).toContain('29:');
+  });
+
+  it('does not duplicate the current user prompt in bounded history', () => {
+    const messages = service.buildOpenAiMessages(
+      'same prompt',
+      'system',
+      undefined,
+      [
+        { role: 'user', content: 'earlier prompt' },
+        { role: 'ai', content: 'earlier response' },
+        { role: 'user', content: 'same prompt' },
+      ],
+    );
+
+    expect(
+      messages.filter(
+        (message) =>
+          typeof message.content === 'string' &&
+          message.content === 'same prompt',
+      ),
+    ).toHaveLength(1);
   });
 
   it('parses valid base64 image data without a regular expression', () => {

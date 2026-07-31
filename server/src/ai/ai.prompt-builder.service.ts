@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as Prompts from './ai.prompts';
+import { AI_CONSTANTS } from './ai.constants';
 import type {
   AiDocument,
   AiChatMode,
@@ -24,7 +25,6 @@ export class AiPromptBuilderService {
       mode = 'planning',
       schemaContext,
       databaseType = 'postgres',
-      locale = 'en-US',
       responseFormat = 'chat',
       capabilities = {},
     } = params;
@@ -56,21 +56,10 @@ export class AiPromptBuilderService {
         ? Prompts.RESPONSE_FORMAT_STRUCTURED
         : Prompts.RESPONSE_FORMAT_CHAT;
 
-    const now = new Date();
-    const dateStr = now.toLocaleDateString(locale, {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    const timeStr = now.toLocaleTimeString(locale, {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const dateStr = new Date().toISOString().slice(0, 10);
 
     return [
       `<identity>\n${Prompts.SYSTEM_IDENTITY}\n</identity>`,
-      `<time_context>\n- Today is: ${dateStr}\n- Local time: ${timeStr}\n</time_context>`,
       `<global_rules>\n${Prompts.TRUTH_AND_SAFETY_RULES}\n</global_rules>`,
       `<mission>\n${Prompts.CORE_MISSION}\n</mission>`,
       `<task_mode>\n${modeSection}\n</task_mode>`,
@@ -78,6 +67,7 @@ export class AiPromptBuilderService {
       `<database_rules>\n${sqlRules}\n</database_rules>`,
       `<database_context>\n${dbContextSection}\n</database_context>`,
       `<output_contract>\n${responseSection}\n</output_contract>`,
+      `<time_context>\n- Current date (UTC): ${dateStr}\n</time_context>`,
     ].join('\n\n');
   }
 
@@ -106,16 +96,9 @@ export class AiPromptBuilderService {
         }
     > = [{ role: 'system', content: systemPrompt }];
 
-    if (history && history.length > 0) {
-      for (let i = 0; i < history.length; i++) {
-        const msg = history[i];
-        if (
-          i === history.length - 1 &&
-          msg.role === 'user' &&
-          msg.content === prompt
-        ) {
-          continue;
-        }
+    const boundedHistory = this.getBoundedHistory(history, prompt);
+    if (boundedHistory.length > 0) {
+      for (const msg of boundedHistory) {
         messages.push({
           role: msg.role === 'ai' ? 'assistant' : 'user',
           content: msg.content,
@@ -165,16 +148,9 @@ export class AiPromptBuilderService {
       >;
     }> = [];
 
-    if (history && history.length > 0) {
-      for (let i = 0; i < history.length; i++) {
-        const msg = history[i];
-        if (
-          i === history.length - 1 &&
-          msg.role === 'user' &&
-          msg.content === prompt
-        ) {
-          continue;
-        }
+    const boundedHistory = this.getBoundedHistory(history, prompt);
+    if (boundedHistory.length > 0) {
+      for (const msg of boundedHistory) {
         contents.push({
           role: msg.role === 'ai' ? 'model' : 'user',
           parts: [{ text: msg.content }],
@@ -194,6 +170,47 @@ export class AiPromptBuilderService {
     });
 
     return contents;
+  }
+
+  private getBoundedHistory(
+    history: ChatHistoryMessage[],
+    prompt: string,
+  ): ChatHistoryMessage[] {
+    const candidates = history.filter(
+      (message, index) =>
+        !(
+          index === history.length - 1 &&
+          message.role === 'user' &&
+          message.content === prompt
+        ),
+    );
+    const recent = candidates.slice(-AI_CONSTANTS.CHAT_HISTORY_MAX_MESSAGES);
+    const selected: ChatHistoryMessage[] = [];
+    let remaining = AI_CONSTANTS.CHAT_HISTORY_MAX_CHARACTERS;
+
+    for (let index = recent.length - 1; index >= 0 && remaining > 0; index--) {
+      const message = recent[index];
+      const content = message.content.trim();
+      if (!content) continue;
+
+      const boundedContent = this.truncateHistoryContent(content, remaining);
+      selected.unshift({ ...message, content: boundedContent });
+      remaining -= boundedContent.length;
+    }
+
+    return selected;
+  }
+
+  private truncateHistoryContent(content: string, maxLength: number): string {
+    if (content.length <= maxLength) return content;
+
+    const marker = '\n...[earlier content truncated]...\n';
+    if (maxLength <= marker.length) return content.slice(0, maxLength);
+
+    const available = maxLength - marker.length;
+    const headLength = Math.ceil(available / 2);
+    const tailLength = available - headLength;
+    return `${content.slice(0, headLength)}${marker}${content.slice(-tailLength)}`;
   }
 
   prepareGeminiParts(
