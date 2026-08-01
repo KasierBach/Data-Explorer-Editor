@@ -10,13 +10,14 @@ import {
     DropdownMenuLabel,
 } from '@/presentation/components/ui/dropdown-menu';
 import {
-    Plus, Image, FileCode2, Table2, ChevronUp, Send, X, Square,
-    Paperclip, Sparkles, Zap, Brain, Shield, Info
+    Plus, Image, FileCode2, Table2, ChevronUp, Send, Square,
+    Sparkles, Zap, Brain, Shield, Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Attachment } from '@/presentation/hooks/useAiChat';
 import type { AssistantModelGroup } from './assistantModelCatalog';
 import type { AiModelRuntimeStatus } from './aiProviderStatus';
+import { AiAttachmentCard } from './AiAttachmentCard';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type FieldSizingStyle = React.CSSProperties & {
@@ -122,7 +123,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
-                            className="px-4 pt-4 pb-2 flex flex-wrap gap-2 overflow-hidden"
+                            className="grid gap-2 overflow-hidden px-3 pt-3 pb-1 sm:flex sm:flex-wrap"
                         >
                             {attachments.map((att, i) => (
                                 <motion.div
@@ -131,36 +132,12 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                     animate={{ scale: 1, opacity: 1 }}
                                     exit={{ scale: 0.8, opacity: 0 }}
                                     key={att.id || att.label + i}
-                                    className={cn(
-                                        "flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold group border transition-colors shadow-sm",
-                                        att.type === 'image' && "bg-pink-500/10 text-pink-400 border-pink-500/20 hover:bg-pink-500/20",
-                                        att.type === 'sql' && "bg-cyan-500/10 text-cyan-400 border-cyan-500/20 hover:bg-cyan-500/20",
-                                        att.type === 'table' && "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20",
-                                        att.type === 'file' && "bg-indigo-500/10 text-indigo-400 border-indigo-500/20 hover:bg-indigo-500/20",
-                                    )}
+                                    className="min-w-0"
                                 >
-                                    {att.type === 'image' && (
-                                        <>
-                                            {att.preview && (
-                                                <div className="relative group">
-                                                    <img src={att.preview} className="w-6 h-6 rounded-md object-cover ring-1 ring-border/20 shadow-sm" alt={att.label || "attachment preview"} />
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                    {att.type === 'sql' && <FileCode2 className="w-3.5 h-3.5 min-w-3.5 text-cyan-400" />}
-                                    {att.type === 'table' && <Table2 className="w-3.5 h-3.5 min-w-3.5 text-emerald-400" />}
-                                    {att.type === 'file' && <Paperclip className="w-3.5 h-3.5 min-w-3.5 text-indigo-400" />}
-                                    
-                                    <span className="max-w-[140px] truncate" title={att.preview || att.label}>{att.label}</span>
-                                    
-                                    <button
-                                        onClick={() => removeAttachment(i)}
-                                        className="ml-1 opacity-50 group-hover:opacity-100 hover:text-red-400 transition-all p-0.5 rounded-full hover:bg-red-400/10"
-                                        aria-label="Remove attachment"
-                                    >
-                                        <X className="w-3 h-3" />
-                                    </button>
+                                    <AiAttachmentCard
+                                        attachment={att}
+                                        onRemove={() => removeAttachment(i)}
+                                    />
                                 </motion.div>
                             ))}
                         </motion.div>

@@ -9,6 +9,7 @@ import { useAppStore } from '@/core/services/store';
 import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AiMarkdownContent } from './AiMarkdownContent';
+import { AiAttachmentCard } from './AiAttachmentCard';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 type FieldSizingStyle = React.CSSProperties & {
@@ -23,6 +24,19 @@ interface AiMessageBubbleProps {
     onEditSubmit?: (messageId: string, newContent: string) => void;
 }
 
+const getVisibleUserContent = (msg: AiMessage) => {
+    const lines = msg.content.split('\n');
+    const labels = (msg.attachments || [])
+        .filter((attachment) => attachment.type !== 'image')
+        .map((attachment) => attachment.label);
+
+    for (let index = labels.length - 1; index >= 0; index -= 1) {
+        if (lines.at(-1)?.trim() === labels[index]) lines.pop();
+    }
+
+    return lines.join('\n').trim();
+};
+
 export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({ 
     msg, onInsertQuery, onRunQuery, onRegenerate, onEditSubmit 
 }) => {
@@ -30,9 +44,12 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';
     const text = getWorkspaceText(lang).aiMessageBubble;
+    const userContent = getVisibleUserContent(msg);
+    const imageAttachments = msg.attachments?.filter((attachment) => attachment.type === 'image' && attachment.preview) || [];
+    const fileAttachments = msg.attachments?.filter((attachment) => attachment.type !== 'image') || [];
 
     const [isEditing, setIsEditing] = useState(false);
-    const [editContent, setEditContent] = useState(msg.content);
+    const [editContent, setEditContent] = useState(userContent);
 
     const handleEditSave = () => {
         if (editContent.trim() && editContent !== msg.content) {
@@ -100,7 +117,10 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                 )}
             </div>
 
-            <div className="flex flex-col gap-1 max-w-[85%]">
+            <div className={cn(
+                'flex min-w-0 flex-col gap-1',
+                msg.role === 'user' && msg.attachments?.length ? 'max-w-[92%] sm:max-w-[85%]' : 'max-w-[85%]',
+            )}>
                 <div className={cn(
                     "relative rounded-xl p-2.5 text-xs leading-relaxed select-text cursor-text transition-all",
                     msg.role === 'user'
@@ -138,17 +158,31 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                             </div>
                         </div>
                     ) : msg.role === 'user' ? (
-                        <div className="flex flex-col gap-2">
-                            {msg.attachments?.filter(a => a.type === 'image' && a.preview).length ? (
+                        <div className="flex flex-col gap-2.5">
+                            {imageAttachments.length ? (
                                 <div className="flex flex-wrap gap-2">
-                                    {msg.attachments.filter(a => a.type === 'image' && a.preview).map((img, i) => (
+                                    {imageAttachments.map((img, i) => (
                                         <div key={i} className="relative rounded-md overflow-hidden border border-border/10">
                                             <img src={img.preview} alt={img.label} className="max-w-[240px] max-h-[160px] object-cover" />
                                         </div>
                                     ))}
                                 </div>
                             ) : null}
-                            {msg.content && <div className="whitespace-pre-wrap">{msg.content}</div>}
+                            {fileAttachments.length > 0 && (
+                                <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                                    {fileAttachments.map((attachment, index) => (
+                                        <AiAttachmentCard
+                                            key={attachment.label + '-' + index}
+                                            attachment={attachment}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                            {userContent && (
+                                <div className="whitespace-pre-wrap px-0.5 text-[12px] leading-relaxed text-foreground/90">
+                                    {userContent}
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <AiMarkdownContent content={msg.content} />
@@ -235,11 +269,11 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                     msg.role === 'user' ? "justify-end mr-1" : "justify-start ml-1"
                 )}>
                     {msg.role === 'user' && !isEditing && !!onEditSubmit && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => { setIsEditing(true); setEditContent(msg.content); }} title={text.editMessage} aria-label={text.editMessage}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => { setIsEditing(true); setEditContent(userContent); }} title={text.editMessage} aria-label={text.editMessage}>
                             <Pencil className="w-3.5 h-3.5" />
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => handleCopy(msg.content)} title={text.copyMessage} aria-label={text.copyMessage}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => handleCopy(msg.role === 'user' ? userContent : msg.content)} title={text.copyMessage} aria-label={text.copyMessage}>
                         <Copy className="w-3.5 h-3.5" />
                     </Button>
                     {msg.role === 'ai' && !msg.error && onRegenerate && (
