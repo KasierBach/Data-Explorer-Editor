@@ -24,6 +24,7 @@ import { randomUUID } from 'crypto';
 import { AuditAction, AuditService } from '../audit/audit.service';
 import { AiSqlFeedbackDto } from './dto/ai-sql-feedback.dto';
 import { ConfigService } from '@nestjs/config';
+import { AiProviderConnectionService } from './ai-provider-connection.service';
 
 const extractProviderErrorMessage = (payload: unknown) => {
   if (!payload || typeof payload !== 'object') {
@@ -57,6 +58,7 @@ export class AiController {
     private readonly connectionService: AiConnectionService,
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
+    private readonly providerConnections: AiProviderConnectionService,
   ) {}
 
   @Get('providers/status')
@@ -126,7 +128,10 @@ export class AiController {
         context,
         routingMode,
         history,
-        providerOverride,
+        providerOverride: await this.providerConnections.resolveOverride(
+          req.user.id,
+          providerOverride,
+        ),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -192,7 +197,10 @@ export class AiController {
         context,
         routingMode,
         history,
-        providerOverride,
+        providerOverride: await this.providerConnections.resolveOverride(
+          req.user.id,
+          providerOverride,
+        ),
       });
 
       for await (const event of stream) {
@@ -246,7 +254,10 @@ export class AiController {
       schemaContext: context ? `${context}\n\n${schemaContext}` : schemaContext,
       databaseType: connection.type,
       model,
-      providerOverride,
+      providerOverride: await this.providerConnections.resolveOverride(
+        req.user.id,
+        providerOverride,
+      ),
     });
 
     return { completion };
@@ -364,7 +375,10 @@ export class AiController {
         model,
         mode,
         routingMode,
-        providerOverride,
+        providerOverride: await this.providerConnections.resolveOverride(
+          req.user.id,
+          providerOverride,
+        ),
       });
 
       await this.auditService.log({
@@ -428,6 +442,7 @@ export class AiTestController {
   constructor(
     private readonly aiService: AiService,
     private readonly connectionService: AiConnectionService,
+    private readonly providerConnections: AiProviderConnectionService,
   ) {}
 
   @Post('autocomplete')
@@ -470,7 +485,10 @@ export class AiTestController {
           : schemaContext,
         databaseType: connection.type,
         model,
-        providerOverride,
+        providerOverride: await this.providerConnections.resolveOverride(
+          req.user.id,
+          providerOverride,
+        ),
       });
       return { completion, error: null };
     } catch (err) {

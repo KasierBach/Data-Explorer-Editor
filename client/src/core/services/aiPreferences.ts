@@ -3,6 +3,7 @@
 export const AI_PREFERENCES_STORAGE_KEY = "data-explorer-ai-preferences-v1";
 export const INHERIT_ASSISTANT_MODEL = "__assistant__";
 export const CUSTOM_PROVIDER_MODEL_PREFIX = "custom-provider:";
+const CUSTOM_PROVIDER_MODEL_SEPARATOR = "::";
 export const AI_PREFERENCES_EVENT = "data-explorer-ai-preferences-changed";
 
 const LEGACY_TOKENROUTER_MODEL_PREFIX = "tokenrouter:";
@@ -17,14 +18,27 @@ export interface CustomAiProvider {
   baseUrl: string;
   apiKey: string;
   model: string;
+  models?: string[];
+  serverManaged?: boolean;
+  apiKeyConfigured?: boolean;
+  capabilities?: {
+    vision?: boolean;
+    document?: boolean;
+  };
+  lastTestedAt?: string | null;
+  lastStatus?: string | null;
+  lastError?: string | null;
+  lastLatencyMs?: number | null;
 }
 
 export interface ClientAiProviderOverride {
   type: CustomAiProviderType;
+  providerId?: string;
   name: string;
-  baseUrl: string;
-  apiKey: string;
+  baseUrl?: string;
+  apiKey?: string;
   model: string;
+  capabilities?: CustomAiProvider["capabilities"];
 }
 
 export interface AiPreferences {
@@ -106,6 +120,9 @@ function sanitizePreferences(value: unknown): AiPreferences {
           baseUrl: provider.baseUrl.trim(),
           apiKey: provider.apiKey.trim(),
           model: provider.model.trim(),
+          models: Array.isArray(provider.models)
+            ? provider.models.filter((model) => typeof model === "string")
+            : undefined,
         }))
         .filter(
           (provider) =>
@@ -169,16 +186,38 @@ function emitPreferencesChanged() {
   window.dispatchEvent(new CustomEvent(AI_PREFERENCES_EVENT));
 }
 
-export function getCustomProviderModelId(providerId: string) {
-  return `${CUSTOM_PROVIDER_MODEL_PREFIX}${providerId}`;
+export function getCustomProviderModelId(providerId: string, model?: string) {
+  return model
+    ? `${CUSTOM_PROVIDER_MODEL_PREFIX}${providerId}${CUSTOM_PROVIDER_MODEL_SEPARATOR}${encodeURIComponent(model)}`
+    : `${CUSTOM_PROVIDER_MODEL_PREFIX}${providerId}`;
 }
 
-export function parseCustomProviderModelId(value?: string | null) {
+function parseCustomProviderSelection(value?: string | null) {
   if (!value || !value.startsWith(CUSTOM_PROVIDER_MODEL_PREFIX)) {
     return null;
   }
+  const raw = value.slice(CUSTOM_PROVIDER_MODEL_PREFIX.length);
+  const separatorIndex = raw.indexOf(CUSTOM_PROVIDER_MODEL_SEPARATOR);
+  if (separatorIndex < 0) {
+    return raw ? { providerId: raw, model: undefined } : null;
+  }
+  const providerId = raw.slice(0, separatorIndex);
+  const encodedModel = raw.slice(
+    separatorIndex + CUSTOM_PROVIDER_MODEL_SEPARATOR.length,
+  );
+  if (!providerId) return null;
+  try {
+    return {
+      providerId,
+      model: encodedModel ? decodeURIComponent(encodedModel) : undefined,
+    };
+  } catch {
+    return { providerId, model: undefined };
+  }
+}
 
-  return value.slice(CUSTOM_PROVIDER_MODEL_PREFIX.length) || null;
+export function parseCustomProviderModelId(value?: string | null) {
+  return parseCustomProviderSelection(value)?.providerId || null;
 }
 
 export function readAiPreferences(): AiPreferences {
@@ -263,7 +302,8 @@ export function resolveAiSelection(
     !selection || selection === INHERIT_ASSISTANT_MODEL
       ? assistantFallbackModel
       : selection;
-  const providerId = parseCustomProviderModelId(effectiveSelection);
+  const customSelection = parseCustomProviderSelection(effectiveSelection);
+  const providerId = customSelection?.providerId;
 
   if (!providerId) {
     return {
@@ -284,13 +324,18 @@ export function resolveAiSelection(
 
   return {
     selection: effectiveSelection,
-    model: provider.model,
+    model: customSelection?.model || provider.model,
     providerOverride: {
       type: "openai-compatible" as const,
+      ...(provider.serverManaged
+        ? { providerId: provider.id }
+        : {
+            baseUrl: provider.baseUrl,
+            apiKey: provider.apiKey,
+            capabilities: provider.capabilities,
+          }),
       name: provider.name,
-      baseUrl: provider.baseUrl,
-      apiKey: provider.apiKey,
-      model: provider.model,
+      model: customSelection?.model || provider.model,
     },
   };
 }

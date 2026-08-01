@@ -22,7 +22,7 @@ function matchesAnyPattern(value: string, patterns: RegExp[]) {
 }
 
 export function supportsVision(
-  plan: Pick<ProviderPlan, 'provider' | 'model'>,
+  plan: Pick<ProviderPlan, 'provider' | 'model' | 'capabilities'>,
 ): boolean {
   switch (plan.provider) {
     case 'gemini':
@@ -33,15 +33,21 @@ export function supportsVision(
       return matchesAnyPattern(plan.model, GROQ_VISION_PATTERNS);
     case 'openrouter':
       return matchesAnyPattern(plan.model, OPENROUTER_VISION_PATTERNS);
+    case 'custom':
+      return Boolean(plan.capabilities?.vision);
     default:
       return false;
   }
 }
 
 export function supportsDocument(
-  plan: Pick<ProviderPlan, 'provider' | 'model'>,
+  plan: Pick<ProviderPlan, 'provider' | 'model' | 'capabilities'>,
 ): boolean {
-  return plan.provider === 'gemini' || plan.provider === 'openrouter';
+  return (
+    plan.provider === 'gemini' ||
+    plan.provider === 'openrouter' ||
+    (plan.provider === 'custom' && Boolean(plan.capabilities?.document))
+  );
 }
 
 export function supportsLiveWebSearch(

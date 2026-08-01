@@ -111,4 +111,31 @@ describe("aiPreferences", () => {
     expect(preferences.customProviders[0].apiKey).toBe("sk-legacy-secret");
     expect(stored.customProviders[0].apiKey).toBe("");
   });
+
+  it("routes a server-managed provider by id and selected model", () => {
+    const provider = {
+      id: "provider-1",
+      name: "Custom Provider",
+      type: "openai-compatible" as const,
+      baseUrl: "https://provider.example.com/v1",
+      apiKey: "",
+      model: "default-model",
+      models: ["default-model", "vision-model"],
+      serverManaged: true,
+      apiKeyConfigured: true,
+    };
+
+    const resolved = resolveAiSelection(
+      getCustomProviderModelId(provider.id, "vision-model"),
+      "gemini-2.5-flash",
+      [provider],
+    );
+
+    expect(resolved.providerOverride).toEqual({
+      type: "openai-compatible",
+      providerId: "provider-1",
+      name: "Custom Provider",
+      model: "vision-model",
+    });
+  });
 });

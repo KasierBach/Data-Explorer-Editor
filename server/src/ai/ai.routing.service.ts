@@ -238,7 +238,10 @@ export class AiRoutingService {
 
     let requestedPlan: ProviderPlan | null = null;
     if (params.providerOverride?.type === 'openai-compatible') {
-      if (this.isTokenRouterBaseUrl(params.providerOverride.baseUrl)) {
+      if (
+        params.providerOverride.baseUrl &&
+        this.isTokenRouterBaseUrl(params.providerOverride.baseUrl)
+      ) {
         throw new Error(
           'TokenRouter support has been removed. Update this provider to a different OpenAI-compatible endpoint.',
         );
@@ -249,7 +252,8 @@ export class AiRoutingService {
         model: params.providerOverride.model,
         apiKey: params.providerOverride.apiKey || 'no-key',
         baseUrl: params.providerOverride.baseUrl,
-        displayName: params.providerOverride.name,
+        displayName: params.providerOverride.name || 'Custom provider',
+        capabilities: params.providerOverride.capabilities,
       };
     } else if (params.model) {
       if (params.model.startsWith('beeknoee:')) {
@@ -327,6 +331,27 @@ export class AiRoutingService {
       if (orderedPlans.length === 0) pushAll(lowCostPlans);
     } else if (requestedPlan) {
       push(requestedPlan);
+
+      if (requestedPlan.provider === 'custom') {
+        const capabilityFilteredPlans = orderedPlans.filter((plan) => {
+          if (params.image && !supportsVision(plan)) return false;
+          if (params.document && !supportsDocument(plan)) return false;
+          if (routeDecision.needsLiveSearch && !supportsLiveWebSearch(plan)) {
+            return false;
+          }
+          return true;
+        });
+        if (capabilityFilteredPlans.length === 0) {
+          throw new Error(
+            'The selected custom provider does not support this request capability.',
+          );
+        }
+        return {
+          routingMode,
+          plans: capabilityFilteredPlans,
+          routeDecision,
+        };
+      }
 
       if (
         routeDecision.needsLiveSearch ||

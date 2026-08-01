@@ -14,6 +14,8 @@ import { AiSchemaService } from './ai.schema-service';
 import { AiAutocompleteService } from './ai.autocomplete-service';
 import { AiConnectionService } from './ai.connection-service';
 import { AuditModule } from '../audit/audit.module';
+import { AiProviderConnectionController } from './ai-provider-connection.controller';
+import { AiProviderConnectionService } from './ai-provider-connection.service';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -22,6 +24,7 @@ const isProd = process.env.NODE_ENV === 'production';
   controllers: [
     AiController,
     AiChatController,
+    AiProviderConnectionController,
     ...(isProd ? [] : [AiTestController]),
   ],
   providers: [
@@ -35,6 +38,7 @@ const isProd = process.env.NODE_ENV === 'production';
     AiSchemaService,
     AiAutocompleteService,
     AiConnectionService,
+    AiProviderConnectionService,
   ],
   exports: [
     AiService,

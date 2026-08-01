@@ -57,10 +57,15 @@ export interface AiHistoryMessage {
 
 export interface AiProviderOverrideConfig {
     type: 'openai-compatible';
+    providerId?: string;
     name: string;
-    baseUrl: string;
-    apiKey: string;
+    baseUrl?: string;
+    apiKey?: string;
     model: string;
+    capabilities?: {
+        vision?: boolean;
+        document?: boolean;
+    };
 }
 
 export interface GenerateSqlParams {
@@ -95,12 +100,7 @@ export interface IDatabaseAdapter {
         pkValue: DatabaseValue;
         updates: RowData;
     }): Promise<MutationResult>;
-    insertRow(params: {
-        database?: string;
-        schema: string;
-        table: string;
-        data: RowData;
-    }): Promise<MutationResult>;
+    insertRow(params: { database?: string; schema: string; table: string; data: RowData }): Promise<MutationResult>;
     deleteRows(params: {
         database?: string;
         schema: string;
@@ -108,12 +108,7 @@ export interface IDatabaseAdapter {
         pkColumn: string;
         pkValues: DatabaseValue[];
     }): Promise<MutationResult>;
-    updateSchema(params: {
-        database?: string;
-        schema: string;
-        table: string;
-        operations: SchemaOperation[];
-    }): Promise<MutationResult>;
+    updateSchema(params: { database?: string; schema: string; table: string; operations: SchemaOperation[] }): Promise<MutationResult>;
     getMetrics(database?: string): Promise<DatabaseMetrics>;
     getDatabases(): Promise<string[]>;
     getRelationships(database?: string): Promise<DatabaseRelationship[]>;

@@ -103,6 +103,37 @@ describe('AiRoutingService', () => {
     );
   });
 
+  it('does not silently fall back from an explicitly selected custom provider', () => {
+    const service = new AiRoutingService(createConfig());
+
+    const result = service.buildPlanChain(
+      {
+        prompt: 'Summarize this PDF',
+        document: {
+          name: 'schema.pdf',
+          mimeType: 'application/pdf',
+          data: 'data:application/pdf;base64,aGVsbG8=',
+        },
+        providerOverride: {
+          type: 'openai-compatible',
+          name: 'Saved provider',
+          baseUrl: 'https://provider.example.com/v1',
+          apiKey: 'sk-test',
+          model: 'document-model',
+          capabilities: { document: true },
+        },
+      },
+      true,
+    );
+
+    expect(result.plans).toEqual([
+      expect.objectContaining({
+        provider: 'custom',
+        model: 'document-model',
+      }),
+    ]);
+  });
+
   it('puts an explicitly selected Gemini model first in the provider chain', () => {
     const service = new AiRoutingService(createConfig());
 

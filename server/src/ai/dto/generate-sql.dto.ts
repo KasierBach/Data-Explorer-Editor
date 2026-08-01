@@ -7,6 +7,7 @@ import {
   MaxLength,
   IsOptional,
   IsString,
+  IsUUID,
   ValidateNested,
 } from 'class-validator';
 import type {
@@ -14,6 +15,7 @@ import type {
   AiRoutingMode,
   ChatHistoryMessage,
 } from '../ai.types';
+import { AiProviderCapabilitiesDto } from './ai-provider-connection.dto';
 
 class ChatHistoryMessageDto implements ChatHistoryMessage {
   @IsString()
@@ -46,20 +48,35 @@ export class AiProviderOverrideDto {
   type: 'openai-compatible';
 
   @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @IsString()
-  @IsNotEmpty()
-  baseUrl: string;
+  @IsOptional()
+  @MaxLength(100)
+  @IsUUID()
+  providerId?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(100)
+  name?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(2000)
+  baseUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(4000)
   apiKey?: string;
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(255)
   model: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AiProviderCapabilitiesDto)
+  capabilities?: AiProviderCapabilitiesDto;
 }
 
 export class GenerateSqlDto {

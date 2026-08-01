@@ -789,7 +789,9 @@ export class AiProviderRunnerService {
               params.context,
               params.history,
               params.image,
-              plan.provider === 'openrouter' ? params.document : undefined,
+              plan.provider === 'openrouter' || plan.capabilities?.document
+                ? params.document
+                : undefined,
             ),
             temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
             max_tokens: this.getOpenAiMaxOutputTokens(plan),
@@ -1031,7 +1033,9 @@ export class AiProviderRunnerService {
               params.context,
               params.history,
               params.image,
-              plan.provider === 'openrouter' ? params.document : undefined,
+              plan.provider === 'openrouter' || plan.capabilities?.document
+                ? params.document
+                : undefined,
             ),
             temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
             max_tokens: this.getOpenAiMaxOutputTokens(plan),

@@ -4,12 +4,12 @@ import {
   getCustomProviderModelId,
 } from "@/core/services/aiPreferences";
 
-export type AssistantModelCapability = 'web' | 'vision' | 'pdf';
+export type AssistantModelCapability = "web" | "vision" | "pdf";
 
-const ALL_CAPABILITIES = ['web', 'vision', 'pdf'] as const;
-const VISION = ['vision'] as const;
-const WEB = ['web'] as const;
-const WEB_AND_PDF = ['web', 'pdf'] as const;
+const ALL_CAPABILITIES = ["web", "vision", "pdf"] as const;
+const VISION = ["vision"] as const;
+const WEB = ["web"] as const;
+const WEB_AND_PDF = ["web", "pdf"] as const;
 
 export interface AssistantModelOption {
   id: string;
@@ -25,17 +25,25 @@ export interface AssistantModelGroup {
 }
 
 export type AssistantBuiltInProvider =
-  | 'gemini'
-  | 'openrouter'
-  | 'groq'
-  | 'beeknoee';
+  | "gemini"
+  | "openrouter"
+  | "groq"
+  | "beeknoee";
 
 const BUILT_IN_MODEL_GROUPS: AssistantModelGroup[] = [
   {
     group: "Google (Gemini)",
     items: [
-      { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash (Latest)", isNew: true },
-      { id: "gemini-3.5-flash-lite", label: "Gemini 3.5 Flash Lite", isNew: true },
+      {
+        id: "gemini-3.6-flash",
+        label: "Gemini 3.6 Flash (Latest)",
+        isNew: true,
+      },
+      {
+        id: "gemini-3.5-flash-lite",
+        label: "Gemini 3.5 Flash Lite",
+        isNew: true,
+      },
       { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash (High)", isNew: true },
       {
         id: "gemini-3.1-pro-preview",
@@ -55,10 +63,10 @@ const BUILT_IN_MODEL_GROUPS: AssistantModelGroup[] = [
   {
     group: "Beeknoee",
     items: [
-      { id: "beeknoee:glm-4.7-flash", label: "GLM 4.7 Flash"},
+      { id: "beeknoee:glm-4.7-flash", label: "GLM 4.7 Flash" },
       {
         id: "beeknoee:minimax/minimax-m2.7",
-        label: "MiniMax M2.7",  
+        label: "MiniMax M2.7",
       },
       {
         id: "beeknoee:gemini-3.1-pro-preview",
@@ -85,7 +93,11 @@ const BUILT_IN_MODEL_GROUPS: AssistantModelGroup[] = [
         id: "groq:openai/gpt-oss-20b",
         label: "GPT OSS 20B (Fast)",
       },
-      { id: "groq:qwen/qwen3.6-27b", label: "Qwen 3.6 27B (Vision)", isNew: true },
+      {
+        id: "groq:qwen/qwen3.6-27b",
+        label: "Qwen 3.6 27B (Vision)",
+        isNew: true,
+      },
       { id: "groq:groq/compound", label: "Groq Compound (Web)", isNew: true },
       { id: "groq:groq/compound-mini", label: "Groq Compound Mini (Web)" },
     ],
@@ -109,16 +121,16 @@ const BUILT_IN_MODEL_GROUPS: AssistantModelGroup[] = [
 ];
 
 function getBuiltInCapabilities(modelId: string) {
-  if (modelId.startsWith('gemini-')) return ALL_CAPABILITIES;
-  if (modelId.startsWith('beeknoee:')) {
+  if (modelId.startsWith("gemini-")) return ALL_CAPABILITIES;
+  if (modelId.startsWith("beeknoee:")) {
     return /^beeknoee:(?:minimax\/|gemini-|claude-)/i.test(modelId)
       ? VISION
       : undefined;
   }
   if (/^groq:groq\/compound(?:-mini)?$/i.test(modelId)) return WEB;
-  if (modelId === 'groq:qwen/qwen3.6-27b') return VISION;
+  if (modelId === "groq:qwen/qwen3.6-27b") return VISION;
   if (/gemma-4/i.test(modelId)) return ALL_CAPABILITIES;
-  if (modelId.includes('/') && modelId.endsWith(':free')) return WEB_AND_PDF;
+  if (modelId.includes("/") && modelId.endsWith(":free")) return WEB_AND_PDF;
   return undefined;
 }
 
@@ -133,10 +145,18 @@ export function getAssistantModelCatalog(
     })),
   }));
   const customProviderItems = customProviders
-    .map((provider) => ({
-      id: getCustomProviderModelId(provider.id),
-      label: `${provider.name} (${provider.model})`,
-    }))
+    .flatMap((provider) =>
+      Array.from(new Set([provider.model, ...(provider.models || [])]))
+        .filter(Boolean)
+        .map((model) => ({
+          id: getCustomProviderModelId(provider.id, model),
+          label: `${provider.name} (${model})`,
+          capabilities: [
+            ...(provider.capabilities?.vision ? ["vision" as const] : []),
+            ...(provider.capabilities?.document ? ["pdf" as const] : []),
+          ],
+        })),
+    )
     .sort((left, right) => left.label.localeCompare(right.label));
 
   return customProviderItems.length > 0
@@ -165,9 +185,9 @@ export function getAssistantModelProvider(
   modelId: string,
 ): AssistantBuiltInProvider | null {
   if (modelId.startsWith(CUSTOM_PROVIDER_MODEL_PREFIX)) return null;
-  if (modelId.startsWith('gemini-')) return 'gemini';
-  if (modelId.startsWith('beeknoee:')) return 'beeknoee';
-  if (modelId.startsWith('groq:')) return 'groq';
-  if (modelId.includes('/') || modelId.includes(':')) return 'openrouter';
+  if (modelId.startsWith("gemini-")) return "gemini";
+  if (modelId.startsWith("beeknoee:")) return "beeknoee";
+  if (modelId.startsWith("groq:")) return "groq";
+  if (modelId.includes("/") || modelId.includes(":")) return "openrouter";
   return null;
 }

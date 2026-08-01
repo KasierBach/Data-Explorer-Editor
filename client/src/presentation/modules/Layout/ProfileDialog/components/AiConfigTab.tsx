@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Boxes, Check, ChevronsUpDown, Database, FileSearch, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { apiService } from '@/core/services/api.service';
 import {
-    getCustomProviderModelId,
+    parseCustomProviderModelId,
     INHERIT_ASSISTANT_MODEL,
     updateAiPreferences,
     useAiPreferences,
@@ -14,11 +15,7 @@ import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/presentation/components/ui/popover';
 import { getAssistantModelCatalog } from '@/presentation/modules/Query/assistantModelCatalog';
-import {
-    filterSearchableGroups,
-    normalizeProviderBaseUrl,
-    type SearchableGroup,
-} from './AiConfigTab.utils';
+import { filterSearchableGroups, normalizeProviderBaseUrl, type SearchableGroup } from './AiConfigTab.utils';
 
 interface AiConfigTabProps {
     t: (key: string) => string;
@@ -29,7 +26,23 @@ type ProviderFormState = {
     baseUrl: string;
     apiKey: string;
     model: string;
+    vision: boolean;
+    document: boolean;
 };
+
+type ProviderTestResult = {
+    ok: boolean;
+    models: string[];
+    latencyMs: number;
+    error?: string | null;
+};
+
+const toClientProvider = (provider: CustomAiProvider): CustomAiProvider => ({
+    ...provider,
+    apiKey: '',
+    serverManaged: true,
+    models: Array.isArray(provider.models) ? provider.models : [],
+});
 
 interface SearchableModelSelectProps {
     allowCustomValue?: boolean;
@@ -50,17 +63,13 @@ const EMPTY_FORM: ProviderFormState = {
     baseUrl: '',
     apiKey: '',
     model: '',
+    vision: false,
+    document: false,
 };
 
-const getErrorMessage = (error: unknown, fallback: string) => (
-    error instanceof Error && error.message ? error.message : fallback
-);
+const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error && error.message ? error.message : fallback);
 
-const getProviderModelsErrorMessage = (
-    error: unknown,
-    fallback: string,
-    backendUnavailable: string,
-) => {
+const getProviderModelsErrorMessage = (error: unknown, fallback: string, backendUnavailable: string) => {
     if (error instanceof TypeError && /fetch/i.test(error.message)) {
         return backendUnavailable;
     }
@@ -69,9 +78,8 @@ const getProviderModelsErrorMessage = (
     return /failed to fetch/i.test(message) ? backendUnavailable : message;
 };
 
-const findSearchableOption = (groups: SearchableGroup[], value: string) => (
-    groups.flatMap((group) => group.options).find((option) => option.value === value)
-);
+const findSearchableOption = (groups: SearchableGroup[], value: string) =>
+    groups.flatMap((group) => group.options).find((option) => option.value === value);
 
 const SearchableModelSelect: React.FC<SearchableModelSelectProps> = ({
     allowCustomValue = false,
@@ -94,14 +102,8 @@ const SearchableModelSelect: React.FC<SearchableModelSelectProps> = ({
     const searchInputRef = useRef<HTMLInputElement | null>(null);
     const isOpen = open ?? internalIsOpen;
 
-    const filteredGroups = useMemo(
-        () => filterSearchableGroups(groups, query),
-        [groups, query],
-    );
-    const selectedOption = useMemo(
-        () => findSearchableOption(groups, value),
-        [groups, value],
-    );
+    const filteredGroups = useMemo(() => filterSearchableGroups(groups, query), [groups, query]);
+    const selectedOption = useMemo(() => findSearchableOption(groups, value), [groups, value]);
     const hasVisibleGroupLabels = groups.filter((group) => group.label).length > 1;
 
     useEffect(() => {
@@ -137,9 +139,7 @@ const SearchableModelSelect: React.FC<SearchableModelSelectProps> = ({
         };
     }, [isOpen]);
 
-    const displayValue = value
-        ? selectedOption?.label ?? value
-        : placeholder;
+    const displayValue = value ? (selectedOption?.label ?? value) : placeholder;
     const contentStyle = {
         width: contentWidth ? Math.max(contentWidth, minContentWidth ?? 0) : minContentWidth,
         maxWidth: 'min(42rem, calc(100vw - 2rem))',
@@ -191,9 +191,7 @@ const SearchableModelSelect: React.FC<SearchableModelSelectProps> = ({
                     title={displayValue}
                     className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none transition-colors hover:border-ring/60 focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                    <span className={cn('truncate text-left', !value && 'text-muted-foreground')}>
-                        {displayValue}
-                    </span>
+                    <span className={cn('truncate text-left', !value && 'text-muted-foreground')}>{displayValue}</span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
             </PopoverTrigger>
@@ -227,9 +225,7 @@ const SearchableModelSelect: React.FC<SearchableModelSelectProps> = ({
 
                 <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
                     {filteredGroups.length === 0 ? (
-                        <div className="px-3 py-6 text-sm text-muted-foreground">
-                            {emptyLabel}
-                        </div>
+                        <div className="px-3 py-6 text-sm text-muted-foreground">{emptyLabel}</div>
                     ) : (
                         filteredGroups.map((group, groupIndex) => (
                             <div key={`${group.label ?? 'group'}-${groupIndex}`} className="mb-2 last:mb-0">
@@ -286,120 +282,160 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
     const [isProviderModelPickerOpen, setIsProviderModelPickerOpen] = useState(false);
     const [providerModels, setProviderModels] = useState<string[]>([]);
     const [isLoadingProviderModels, setIsLoadingProviderModels] = useState(false);
+    const [isSavingProvider, setIsSavingProvider] = useState(false);
     const isVi = lang === 'vi';
     const assistantSelection = preferences.assistantModel || aiModel;
-    const modelGroups = useMemo(
-        () => getAssistantModelCatalog(preferences.customProviders),
-        [preferences.customProviders],
-    );
+    const modelGroups = useMemo(() => getAssistantModelCatalog(preferences.customProviders), [preferences.customProviders]);
+
+    useEffect(() => {
+        let active = true;
+        apiService
+            .get<CustomAiProvider[]>('/ai/providers')
+            .then((providers) => {
+                if (!active) return;
+                const serverProviders = providers.map(toClientProvider);
+                updateAiPreferences((current) => ({
+                    ...current,
+                    customProviders: [...serverProviders, ...current.customProviders.filter((provider) => !provider.serverManaged)],
+                }));
+            })
+            .catch(() => undefined);
+        return () => {
+            active = false;
+        };
+    }, []);
 
     const labels = isVi
         ? {
-            aiTitle: t('tabs.ai'),
-            aiSubtitle: 'Thiết lập model và provider riêng cho từng vai trò AI trong ứng dụng. AI Assistant sẽ cập nhật ngay sau khi bạn đổi model mặc định.',
-            customProviders: 'Provider tùy chỉnh',
-            customProvidersHint: 'Hỗ trợ endpoint OpenAI-compatible kiểu /chat/completions. API key chỉ được giữ trong tab hiện tại và sẽ bị xóa khi tải lại trang.',
-            providerName: 'Tên provider',
-            providerBaseUrl: 'Base URL',
-            providerApiKey: 'API Key',
-            providerModel: 'Model mặc định',
-            providerType: 'OpenAI-compatible',
-            addProvider: 'Thêm provider',
-            saveProvider: 'Lưu chỉnh sửa',
-            cancelEdit: 'Hủy',
-            editProvider: 'Sửa',
-            loadModels: 'Tải model',
-            modelPlaceholder: 'Chọn hoặc nhập model',
-            searchLoadedModels: 'Search models...',
-            noLoadedModelMatch: 'Không tìm thấy model phù hợp.',
-            assistantRole: 'AI Assistant',
-            explainRole: 'Explain',
-            sqlRole: 'AI SQL',
-            nosqlRole: 'AI NoSQL',
-            autocompleteRole: 'Autocomplete',
-            roleModelPlaceholder: 'Chọn model',
-            searchRoleModels: 'Search models...',
-            noRoleModelMatch: 'Không tìm thấy model phù hợp.',
-            inheritAssistant: 'Dùng model của Assistant',
-            remove: 'Xóa',
-            providerAdded: 'Đã thêm provider AI tùy chỉnh.',
-            providerUpdated: 'Đã cập nhật provider AI tùy chỉnh.',
-            providerRemoved: 'Đã xóa provider AI tùy chỉnh.',
-            providerInvalid: 'Điền đủ tên, base URL và model trước khi lưu provider.',
-            providerBaseUrlRequired: 'Nhập Base URL trước khi tải danh sách model.',
-            providerModelsEmpty: 'Provider không trả về model nào.',
-            providerModelsLoaded: (count: number) => `Đã tải ${count} model. Mở dropdown để tìm nhanh hoặc nhập model thủ công.`,
-            providerModelsFailed: 'Không thể tải danh sách model từ provider.',
-            providerBackendUnavailable: 'Không gọi được backend AI. Hãy đảm bảo server đang chạy rồi thử lại.',
-            requiredHint: 'Tên, base URL và model là bắt buộc. API key có thể để trống nếu provider local của bạn không cần bearer token.',
-        }
+              aiTitle: t('tabs.ai'),
+              aiSubtitle:
+                  'Thiết lập model và provider riêng cho từng vai trò AI trong ứng dụng. AI Assistant sẽ cập nhật ngay sau khi bạn đổi model mặc định.',
+              customProviders: 'Provider tùy chỉnh',
+              customProvidersHint:
+                  'Hỗ trợ endpoint OpenAI-compatible kiểu /chat/completions. API key chỉ được giữ trong tab hiện tại và sẽ bị xóa khi tải lại trang.',
+              providerName: 'Tên provider',
+              providerBaseUrl: 'Base URL',
+              providerApiKey: 'API Key',
+              providerModel: 'Model mặc định',
+              providerType: 'OpenAI-compatible',
+              addProvider: 'Thêm provider',
+              saveProvider: 'Lưu chỉnh sửa',
+              cancelEdit: 'Hủy',
+              editProvider: 'Sửa',
+              loadModels: 'Tải model',
+              modelPlaceholder: 'Chọn hoặc nhập model',
+              searchLoadedModels: 'Search models...',
+              noLoadedModelMatch: 'Không tìm thấy model phù hợp.',
+              assistantRole: 'AI Assistant',
+              explainRole: 'Explain',
+              sqlRole: 'AI SQL',
+              nosqlRole: 'AI NoSQL',
+              autocompleteRole: 'Autocomplete',
+              roleModelPlaceholder: 'Chọn model',
+              searchRoleModels: 'Search models...',
+              noRoleModelMatch: 'Không tìm thấy model phù hợp.',
+              inheritAssistant: 'Dùng model của Assistant',
+              remove: 'Xóa',
+              providerAdded: 'Đã thêm provider AI tùy chỉnh.',
+              providerUpdated: 'Đã cập nhật provider AI tùy chỉnh.',
+              providerRemoved: 'Đã xóa provider AI tùy chỉnh.',
+              providerInvalid: 'Điền đủ tên, base URL và model trước khi lưu provider.',
+              providerBaseUrlRequired: 'Nhập Base URL trước khi tải danh sách model.',
+              providerModelsEmpty: 'Provider không trả về model nào.',
+              providerModelsLoaded: (count: number) => `Đã tải ${count} model. Mở dropdown để tìm nhanh hoặc nhập model thủ công.`,
+              providerModelsFailed: 'Không thể tải danh sách model từ provider.',
+              providerBackendUnavailable: 'Không gọi được backend AI. Hãy đảm bảo server đang chạy rồi thử lại.',
+              requiredHint:
+                  'Tên, base URL và model là bắt buộc. API key có thể để trống nếu provider local của bạn không cần bearer token.',
+          }
         : {
-            aiTitle: t('tabs.ai'),
-            aiSubtitle: 'Choose a dedicated model and provider for each AI role in the app. The AI Assistant updates immediately after you change its default model.',
-            customProviders: 'Custom providers',
-            customProvidersHint: 'Supports OpenAI-compatible /chat/completions endpoints. API keys stay only in the current tab and are cleared on reload.',
-            providerName: 'Provider name',
-            providerBaseUrl: 'Base URL',
-            providerApiKey: 'API key',
-            providerModel: 'Default model',
-            providerType: 'OpenAI-compatible',
-            addProvider: 'Add provider',
-            saveProvider: 'Save changes',
-            cancelEdit: 'Cancel',
-            editProvider: 'Edit',
-            loadModels: 'Load models',
-            modelPlaceholder: 'Pick or type a model',
-            searchLoadedModels: 'Search models...',
-            noLoadedModelMatch: 'No models found.',
-            assistantRole: 'AI Assistant',
-            explainRole: 'Explain',
-            sqlRole: 'AI SQL',
-            nosqlRole: 'AI NoSQL',
-            autocompleteRole: 'Autocomplete',
-            roleModelPlaceholder: 'Choose a model',
-            searchRoleModels: 'Search models...',
-            noRoleModelMatch: 'No models found.',
-            inheritAssistant: 'Use Assistant model',
-            remove: 'Remove',
-            providerAdded: 'Custom AI provider added.',
-            providerUpdated: 'Custom AI provider updated.',
-            providerRemoved: 'Custom AI provider removed.',
-            providerInvalid: 'Fill in the provider name, base URL, and model before saving.',
-            providerBaseUrlRequired: 'Enter the Base URL before loading models.',
-            providerModelsEmpty: 'The provider returned no models.',
-            providerModelsLoaded: (count: number) => `Loaded ${count} models. Open the dropdown to search fast, or type a custom model.`,
-            providerModelsFailed: 'Failed to load models from the provider.',
-            providerBackendUnavailable: 'Cannot reach the AI backend. Make sure the server is running, then try again.',
-            requiredHint: 'Provider name, base URL, and model are required. API key may stay empty if your local provider does not require bearer auth.',
-        };
+              aiTitle: t('tabs.ai'),
+              aiSubtitle:
+                  'Choose a dedicated model and provider for each AI role in the app. The AI Assistant updates immediately after you change its default model.',
+              customProviders: 'Custom providers',
+              customProvidersHint:
+                  'Supports OpenAI-compatible /chat/completions endpoints. API keys stay only in the current tab and are cleared on reload.',
+              providerName: 'Provider name',
+              providerBaseUrl: 'Base URL',
+              providerApiKey: 'API key',
+              providerModel: 'Default model',
+              providerType: 'OpenAI-compatible',
+              addProvider: 'Add provider',
+              saveProvider: 'Save changes',
+              cancelEdit: 'Cancel',
+              editProvider: 'Edit',
+              loadModels: 'Load models',
+              modelPlaceholder: 'Pick or type a model',
+              searchLoadedModels: 'Search models...',
+              noLoadedModelMatch: 'No models found.',
+              assistantRole: 'AI Assistant',
+              explainRole: 'Explain',
+              sqlRole: 'AI SQL',
+              nosqlRole: 'AI NoSQL',
+              autocompleteRole: 'Autocomplete',
+              roleModelPlaceholder: 'Choose a model',
+              searchRoleModels: 'Search models...',
+              noRoleModelMatch: 'No models found.',
+              inheritAssistant: 'Use Assistant model',
+              remove: 'Remove',
+              providerAdded: 'Custom AI provider added.',
+              providerUpdated: 'Custom AI provider updated.',
+              providerRemoved: 'Custom AI provider removed.',
+              providerInvalid: 'Fill in the provider name, base URL, and model before saving.',
+              providerBaseUrlRequired: 'Enter the Base URL before loading models.',
+              providerModelsEmpty: 'The provider returned no models.',
+              providerModelsLoaded: (count: number) => `Loaded ${count} models. Open the dropdown to search fast, or type a custom model.`,
+              providerModelsFailed: 'Failed to load models from the provider.',
+              providerBackendUnavailable: 'Cannot reach the AI backend. Make sure the server is running, then try again.',
+              requiredHint:
+                  'Provider name, base URL, and model are required. API key may stay empty if your local provider does not require bearer auth.',
+          };
+
+    const providerSecurityHint = isVi
+        ? 'API key được mã hóa và lưu phía server. Cloud chỉ kết nối tới endpoint HTTPS mà server truy cập được.'
+        : 'API keys are encrypted server-side. Cloud deployments require an HTTPS endpoint reachable by the server.';
 
     const providerModelGroups = useMemo<SearchableGroup[]>(
-        () => (
+        () =>
             providerModels.length > 0
-                ? [{ options: providerModels.map((model) => ({ value: model, label: model })) }]
-                : []
-        ),
+                ? [
+                      {
+                          options: providerModels.map((model) => ({
+                              value: model,
+                              label: model,
+                          })),
+                      },
+                  ]
+                : [],
         [providerModels],
     );
 
     const baseRoleModelGroups = useMemo<SearchableGroup[]>(
-        () => modelGroups.map((group) => ({
-            label: group.group,
-            options: group.items.map((item) => ({ value: item.id, label: item.label })),
-        })),
+        () =>
+            modelGroups.map((group) => ({
+                label: group.group,
+                options: group.items.map((item) => ({
+                    value: item.id,
+                    label: item.label,
+                })),
+            })),
         [modelGroups],
     );
 
-    const getRoleModelGroups = (includeInherit: boolean): SearchableGroup[] => (
+    const getRoleModelGroups = (includeInherit: boolean): SearchableGroup[] =>
         includeInherit
             ? [
-                {
-                    options: [{ value: INHERIT_ASSISTANT_MODEL, label: labels.inheritAssistant }],
-                },
-                ...baseRoleModelGroups,
-            ]
-            : baseRoleModelGroups
-    );
+                  {
+                      options: [
+                          {
+                              value: INHERIT_ASSISTANT_MODEL,
+                              label: labels.inheritAssistant,
+                          },
+                      ],
+                  },
+                  ...baseRoleModelGroups,
+              ]
+            : baseRoleModelGroups;
 
     const resetProviderForm = () => {
         setProviderForm(EMPTY_FORM);
@@ -434,64 +470,74 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
         }
     };
 
-    const handleSaveProvider = () => {
+    const handleSaveProvider = async () => {
         const name = providerForm.name.trim();
         const baseUrl = normalizeProviderBaseUrl(providerForm.baseUrl);
         const apiKey = providerForm.apiKey.trim();
         const model = providerForm.model.trim();
 
         if (!name || !baseUrl || !model) {
-            window.alert(labels.providerInvalid);
+            toast.error(labels.providerInvalid);
             return;
         }
 
-        if (editingProviderId) {
-            updateAiPreferences((current) => ({
-                ...current,
-                customProviders: current.customProviders.map((provider) => (
-                    provider.id === editingProviderId
-                        ? { ...provider, name, baseUrl, apiKey, model }
-                        : provider
-                )),
-            }));
-            resetProviderForm();
-            window.alert(labels.providerUpdated);
-            return;
-        }
-
-        const nextProvider: CustomAiProvider = {
-            id: `custom-provider-${Date.now()}`,
+        const existing = editingProviderId ? preferences.customProviders.find((provider) => provider.id === editingProviderId) : undefined;
+        const payload = {
             name,
-            type: 'openai-compatible',
+            type: 'openai-compatible' as const,
             baseUrl,
-            apiKey,
+            apiKey: apiKey || undefined,
             model,
+            models: providerModels.length > 0 ? providerModels : existing?.models || [],
+            capabilities: {
+                vision: providerForm.vision,
+                document: providerForm.document,
+            },
         };
 
-        updateAiPreferences((current) => ({
-            ...current,
-            customProviders: [...current.customProviders, nextProvider],
-        }));
-        resetProviderForm();
-        window.alert(labels.providerAdded);
+        setIsSavingProvider(true);
+        try {
+            const saved = existing?.serverManaged
+                ? await apiService.patch<CustomAiProvider>(`/ai/providers/${existing.id}`, payload)
+                : await apiService.post<CustomAiProvider>('/ai/providers', payload);
+            const nextProvider = toClientProvider(saved);
+            updateAiPreferences((current) => ({
+                ...current,
+                customProviders: existing
+                    ? current.customProviders.map((provider) => (provider.id === existing.id ? nextProvider : provider))
+                    : [...current.customProviders, nextProvider],
+            }));
+            resetProviderForm();
+            toast.success(existing ? labels.providerUpdated : labels.providerAdded);
+        } catch (error) {
+            toast.error(getErrorMessage(error, labels.providerModelsFailed));
+        } finally {
+            setIsSavingProvider(false);
+        }
     };
 
     const handleLoadProviderModels = async () => {
         const baseUrl = normalizeProviderBaseUrl(providerForm.baseUrl);
         if (!baseUrl) {
-            window.alert(labels.providerBaseUrlRequired);
+            toast.error(labels.providerBaseUrlRequired);
             return;
         }
 
         setIsLoadingProviderModels(true);
         try {
-            const response = await apiService.post<{ models?: string[] }>(
-                '/ai/provider-models',
-                {
-                    baseUrl,
-                    apiKey: providerForm.apiKey.trim(),
-                },
-            );
+            const existing = editingProviderId
+                ? preferences.customProviders.find((provider) => provider.id === editingProviderId)
+                : undefined;
+            const response = existing?.serverManaged
+                ? await apiService.post<ProviderTestResult>(`/ai/providers/${existing.id}/test`, {})
+                : await apiService.post<ProviderTestResult>('/ai/providers/test', {
+                      name: providerForm.name.trim() || 'Custom provider',
+                      type: 'openai-compatible',
+                      baseUrl,
+                      apiKey: providerForm.apiKey.trim(),
+                      model: providerForm.model.trim(),
+                      models: providerModels,
+                  });
             const models = Array.isArray(response.models) ? response.models : [];
             setProviderModels(models);
             setIsProviderModelPickerOpen(false);
@@ -501,17 +547,30 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                 model: current.model || (models.length === 1 ? models[0] : current.model),
             }));
 
-            if (models.length === 0) {
-                window.alert(labels.providerModelsEmpty);
+            if (!response.ok) {
+                toast.error(response.error || labels.providerModelsFailed);
+            } else {
+                if (existing?.serverManaged) {
+                    updateAiPreferences((current) => ({
+                        ...current,
+                        customProviders: current.customProviders.map((provider) =>
+                            provider.id === existing.id
+                                ? {
+                                      ...provider,
+                                      models,
+                                      lastStatus: 'healthy',
+                                      lastError: null,
+                                      lastLatencyMs: response.latencyMs,
+                                      lastTestedAt: new Date().toISOString(),
+                                  }
+                                : provider,
+                        ),
+                    }));
+                }
+                toast.success(isVi ? `Kết nối thành công trong ${response.latencyMs} ms.` : `Connected in ${response.latencyMs} ms.`);
             }
         } catch (error) {
-            window.alert(
-                getProviderModelsErrorMessage(
-                    error,
-                    labels.providerModelsFailed,
-                    labels.providerBackendUnavailable,
-                ),
-            );
+            toast.error(getProviderModelsErrorMessage(error, labels.providerModelsFailed, labels.providerBackendUnavailable));
         } finally {
             setIsLoadingProviderModels(false);
         }
@@ -520,39 +579,50 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
     const handleEditProvider = (provider: CustomAiProvider) => {
         setEditingProviderId(provider.id);
         setIsProviderModelPickerOpen(false);
-        setProviderModels([]);
+        setProviderModels(provider.models || []);
         setProviderForm({
             name: provider.name,
             baseUrl: provider.baseUrl,
             apiKey: provider.apiKey,
             model: provider.model,
+            vision: Boolean(provider.capabilities?.vision),
+            document: Boolean(provider.capabilities?.document),
         });
     };
 
-    const handleRemoveProvider = (providerId: string) => {
-        const customSelection = getCustomProviderModelId(providerId);
-        updateAiPreferences((current) => ({
-            ...current,
-            customProviders: current.customProviders.filter((provider) => provider.id !== providerId),
-            assistantModel: current.assistantModel === customSelection ? aiModel : current.assistantModel,
-            explainModel: current.explainModel === customSelection ? INHERIT_ASSISTANT_MODEL : current.explainModel,
-            sqlModel: current.sqlModel === customSelection ? INHERIT_ASSISTANT_MODEL : current.sqlModel,
-            nosqlModel: current.nosqlModel === customSelection ? INHERIT_ASSISTANT_MODEL : current.nosqlModel,
-            autocompleteModel: current.autocompleteModel === customSelection ? INHERIT_ASSISTANT_MODEL : current.autocompleteModel,
-        }));
+    const handleRemoveProvider = async (providerId: string) => {
+        const provider = preferences.customProviders.find((item) => item.id === providerId);
+        const confirmed = window.confirm(isVi ? 'Xóa provider này?' : 'Remove this provider?');
+        if (!confirmed) return;
 
-        if (editingProviderId === providerId) {
-            resetProviderForm();
+        try {
+            if (provider?.serverManaged) {
+                await apiService.delete(`/ai/providers/${providerId}`);
+            }
+            const isRemovedProviderSelection = (selection?: string) => parseCustomProviderModelId(selection) === providerId;
+            updateAiPreferences((current) => ({
+                ...current,
+                customProviders: current.customProviders.filter((provider) => provider.id !== providerId),
+                assistantModel: isRemovedProviderSelection(current.assistantModel) ? aiModel : current.assistantModel,
+                explainModel: isRemovedProviderSelection(current.explainModel) ? INHERIT_ASSISTANT_MODEL : current.explainModel,
+                sqlModel: isRemovedProviderSelection(current.sqlModel) ? INHERIT_ASSISTANT_MODEL : current.sqlModel,
+                nosqlModel: isRemovedProviderSelection(current.nosqlModel) ? INHERIT_ASSISTANT_MODEL : current.nosqlModel,
+                autocompleteModel: isRemovedProviderSelection(current.autocompleteModel)
+                    ? INHERIT_ASSISTANT_MODEL
+                    : current.autocompleteModel,
+            }));
+
+            if (editingProviderId === providerId) {
+                resetProviderForm();
+            }
+
+            toast.success(labels.providerRemoved);
+        } catch (error) {
+            toast.error(getErrorMessage(error, labels.providerModelsFailed));
         }
-
-        window.alert(labels.providerRemoved);
     };
 
-    const renderModelSelect = (
-        value: string,
-        onChange: (value: string) => void,
-        includeInherit: boolean,
-    ) => (
+    const renderModelSelect = (value: string, onChange: (value: string) => void, includeInherit: boolean) => (
         <SearchableModelSelect
             value={value}
             onChange={onChange}
@@ -607,7 +677,11 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                             <Search className="h-4 w-4 text-cyan-400" />
                             {labels.autocompleteRole}
                         </label>
-                        {renderModelSelect(preferences.autocompleteModel, (nextValue) => updateRoleSelection('autocompleteModel', nextValue), true)}
+                        {renderModelSelect(
+                            preferences.autocompleteModel,
+                            (nextValue) => updateRoleSelection('autocompleteModel', nextValue),
+                            true,
+                        )}
                     </div>
                 </div>
             </div>
@@ -615,7 +689,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
             <div className="space-y-4 rounded-2xl border border-border/60 bg-card/40 p-5">
                 <div>
                     <h3 className="text-lg font-medium">{labels.customProviders}</h3>
-                    <p className="text-sm text-muted-foreground">{labels.customProvidersHint}</p>
+                    <p className="text-sm text-muted-foreground">{providerSecurityHint}</p>
                 </div>
 
                 <div className="grid gap-3 lg:grid-cols-2">
@@ -666,7 +740,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                 disabled={isLoadingProviderModels}
                             >
                                 {isLoadingProviderModels ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                                {labels.loadModels}
+                                {isVi ? 'Kiểm tra kết nối' : 'Test connection'}
                             </Button>
                         </div>
                         {providerModels.length > 0 && (
@@ -691,15 +765,60 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                             type="password"
                             value={providerForm.apiKey}
                             onChange={(event) => updateProviderFormField('apiKey', event.target.value)}
-                            placeholder="sk-..."
+                            placeholder={
+                                editingProviderId &&
+                                preferences.customProviders.find((provider) => provider.id === editingProviderId)?.apiKeyConfigured
+                                    ? '•••••••• (configured)'
+                                    : 'sk-...'
+                            }
                         />
+                    </div>
+                    <div className="space-y-2 lg:col-span-2">
+                        <p className="text-sm font-medium">{isVi ? 'Khả năng input đã kiểm chứng' : 'Verified input capabilities'}</p>
+                        <div className="flex flex-wrap gap-4 rounded-xl border border-border/60 bg-background/50 px-4 py-3">
+                            <label className="flex cursor-pointer items-center gap-2 text-sm">
+                                <input
+                                    type="checkbox"
+                                    checked={providerForm.vision}
+                                    onChange={(event) =>
+                                        setProviderForm((current) => ({
+                                            ...current,
+                                            vision: event.target.checked,
+                                        }))
+                                    }
+                                />
+                                {isVi ? 'Đọc ảnh native' : 'Native vision'}
+                            </label>
+                            <label className="flex cursor-pointer items-center gap-2 text-sm">
+                                <input
+                                    type="checkbox"
+                                    checked={providerForm.document}
+                                    onChange={(event) =>
+                                        setProviderForm((current) => ({
+                                            ...current,
+                                            document: event.target.checked,
+                                        }))
+                                    }
+                                />
+                                {isVi ? 'Đọc PDF/file native' : 'Native PDF/file input'}
+                            </label>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            {isVi
+                                ? 'Chỉ bật khi model và endpoint thực sự hỗ trợ. Hệ thống sẽ không âm thầm đổi sang provider khác.'
+                                : 'Enable only when the model and endpoint support it. The app will not silently switch providers.'}
+                        </p>
                     </div>
                 </div>
 
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border/60 px-4 py-3">
                     <div>
                         <p className="text-sm font-medium">{labels.providerType}</p>
-                        <p className="text-xs text-muted-foreground">{labels.requiredHint}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {isVi
+                                ? 'Để trống API key khi sửa để giữ key hiện tại. Localhost chỉ dùng trong môi trường self-host/dev.'
+                                : 'Leave the API key blank while editing to keep the current key. Localhost is available only in self-hosted/dev environments.'}
+                        </p>
                     </div>
                     <div className="flex flex-wrap justify-end gap-2">
                         {editingProviderId && (
@@ -708,8 +827,14 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                 {labels.cancelEdit}
                             </Button>
                         )}
-                        <Button type="button" onClick={handleSaveProvider} className="gap-2">
-                            {editingProviderId ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                        <Button type="button" onClick={handleSaveProvider} className="gap-2" disabled={isSavingProvider}>
+                            {isSavingProvider ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : editingProviderId ? (
+                                <Pencil className="h-4 w-4" />
+                            ) : (
+                                <Plus className="h-4 w-4" />
+                            )}
                             {editingProviderId ? labels.saveProvider : labels.addProvider}
                         </Button>
                     </div>
@@ -718,32 +843,70 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                 <div className="space-y-3">
                     {preferences.customProviders.length === 0 ? (
                         <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                            {labels.customProvidersHint}
+                            {providerSecurityHint}
                         </div>
-                    ) : preferences.customProviders.map((provider) => (
-                        <div key={provider.id} className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/60 p-4 lg:flex-row lg:items-center lg:justify-between">
-                            <div className="min-w-0 space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="font-medium text-foreground">{provider.name}</span>
-                                    <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-300">
-                                        {labels.providerType}
-                                    </span>
+                    ) : (
+                        preferences.customProviders.map((provider) => (
+                            <div
+                                key={provider.id}
+                                className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/60 p-4 lg:flex-row lg:items-center lg:justify-between"
+                            >
+                                <div className="min-w-0 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-medium text-foreground">{provider.name}</span>
+                                        <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-300">
+                                            {labels.providerType}
+                                        </span>
+                                        {provider.lastStatus && (
+                                            <span
+                                                className={cn(
+                                                    'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                                                    provider.lastStatus === 'healthy'
+                                                        ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'
+                                                        : 'border-red-500/25 bg-red-500/10 text-red-300',
+                                                )}
+                                            >
+                                                {provider.lastStatus === 'healthy'
+                                                    ? isVi
+                                                        ? 'Đã kiểm tra'
+                                                        : 'Healthy'
+                                                    : isVi
+                                                      ? 'Lỗi kết nối'
+                                                      : 'Failed'}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="break-all text-xs text-muted-foreground">{provider.baseUrl}</p>
+                                    <p className="text-xs text-muted-foreground">{provider.model}</p>
+                                    {provider.lastLatencyMs != null && (
+                                        <p className="text-xs text-muted-foreground">{provider.lastLatencyMs} ms</p>
+                                    )}
                                 </div>
-                                <p className="break-all text-xs text-muted-foreground">{provider.baseUrl}</p>
-                                <p className="text-xs text-muted-foreground">{provider.model}</p>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-2"
+                                        onClick={() => handleEditProvider(provider)}
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                        {labels.editProvider}
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-2 text-red-400 hover:text-red-300"
+                                        onClick={() => handleRemoveProvider(provider.id)}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        {labels.remove}
+                                    </Button>
+                                </div>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                                <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => handleEditProvider(provider)}>
-                                    <Pencil className="h-4 w-4" />
-                                    {labels.editProvider}
-                                </Button>
-                                <Button type="button" variant="outline" size="sm" className="gap-2 text-red-400 hover:text-red-300" onClick={() => handleRemoveProvider(provider.id)}>
-                                    <Trash2 className="h-4 w-4" />
-                                    {labels.remove}
-                                </Button>
-                            </div>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
             </div>
         </div>

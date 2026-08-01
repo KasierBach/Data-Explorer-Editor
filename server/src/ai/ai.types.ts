@@ -62,10 +62,15 @@ export type PersistedAiMessagePayload =
 
 export interface AiProviderOverride {
   type: 'openai-compatible';
-  name: string;
-  baseUrl: string;
+  providerId?: string;
+  name?: string;
+  baseUrl?: string;
   apiKey?: string;
   model: string;
+  capabilities?: {
+    vision?: boolean;
+    document?: boolean;
+  };
 }
 
 export interface AiDocument {
@@ -106,6 +111,10 @@ export interface ProviderPlan {
   apiKey?: string;
   baseUrl?: string;
   displayName?: string;
+  capabilities?: {
+    vision?: boolean;
+    document?: boolean;
+  };
 }
 
 export interface RouteDecision {

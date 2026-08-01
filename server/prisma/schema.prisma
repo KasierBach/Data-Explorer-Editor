@@ -129,17 +129,41 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  auditLogs           AuditLog[]
-  connections         Connection[]
-  aiChats             AiChat[]
-  savedQueries        SavedQuery[]
-  dashboards          Dashboard[]
-  erdWorkspaces       ErdWorkspace[]
-  versionHistories    VersionHistory[]
-  organizationMembers OrganizationMember[]
-  createdTeamspaces   Teamspace[]
-  payments            Payment[]
-  billingSubscription BillingSubscription?
+  auditLogs             AuditLog[]
+  connections           Connection[]
+  aiChats               AiChat[]
+  savedQueries          SavedQuery[]
+  dashboards            Dashboard[]
+  erdWorkspaces         ErdWorkspace[]
+  versionHistories      VersionHistory[]
+  organizationMembers   OrganizationMember[]
+  createdTeamspaces     Teamspace[]
+  payments              Payment[]
+  billingSubscription   BillingSubscription?
+  aiProviderConnections AiProviderConnection[]
+}
+
+model AiProviderConnection {
+  id            String    @id @default(uuid())
+  name          String
+  type          String    @default("openai-compatible")
+  baseUrl       String
+  apiKey        String?
+  model         String
+  models        String[]  @default([])
+  capabilities  Json      @default("{}")
+  lastTestedAt  DateTime?
+  lastStatus    String?
+  lastError     String?
+  lastLatencyMs Int?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId, updatedAt])
 }
 
 model BillingSubscription {
