@@ -27,17 +27,23 @@ describe('TokenService notifications stream tickets', () => {
     );
   });
 
-  it('strips inline avatar payloads from the session profile', () => {
+  it('keeps the complete saved profile in refreshed sessions', () => {
     expect(
       tokenService.buildUserProfile({
         id: 'user-1',
         email: 'user@example.com',
         avatarUrl: 'data:image/png;base64,abc123',
+        bio: 'Data engineer',
+        phoneNumber: '+84 123',
+        address: 'Ho Chi Minh City',
       }),
     ).toMatchObject({
       id: 'user-1',
       email: 'user@example.com',
-      avatarUrl: null,
+      avatarUrl: 'data:image/png;base64,abc123',
+      bio: 'Data engineer',
+      phoneNumber: '+84 123',
+      address: 'Ho Chi Minh City',
     });
   });
 });

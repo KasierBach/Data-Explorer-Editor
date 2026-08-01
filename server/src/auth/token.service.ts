@@ -43,15 +43,28 @@ export class TokenService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      avatarUrl:
-        typeof user.avatarUrl === 'string' && user.avatarUrl.startsWith('data:')
-          ? null
-          : user.avatarUrl,
+      avatarUrl: user.avatarUrl,
+      bio: user.bio,
       isOnboarded: user.isOnboarded,
       role: user.role,
+      provider: user.provider,
       username: user.username,
       jobRole: user.jobRole,
+      phoneNumber: user.phoneNumber,
+      address: user.address,
+      theme: user.theme,
+      language: user.language,
       legalAcceptedAt: user.legalAcceptedAt,
+      emailNotifications: user.emailNotifications,
+      failedQueryAlerts: user.failedQueryAlerts,
+      productUpdates: user.productUpdates,
+      securityAlerts: user.securityAlerts,
+      plan: user.plan,
+      billingDate: user.billingDate,
+      paymentMethod: user.paymentMethod,
+      planExpiresAt: user.planExpiresAt,
+      subscriptionStatus: user.subscriptionStatus,
+      paymentProvider: user.paymentProvider,
     };
   }
 
