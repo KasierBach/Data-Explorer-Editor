@@ -1,5 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Boxes, Check, ChevronsUpDown, Database, FileSearch, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import {
+    Bot,
+    Boxes,
+    Check,
+    ChevronsUpDown,
+    Database,
+    FileSearch,
+    FileText,
+    ImageIcon,
+    Loader2,
+    Pencil,
+    Plus,
+    Search,
+    Trash2,
+    X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { apiService } from '@/core/services/api.service';
 import {
@@ -311,8 +326,6 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
               aiSubtitle:
                   'Thiết lập model và provider riêng cho từng vai trò AI trong ứng dụng. AI Assistant sẽ cập nhật ngay sau khi bạn đổi model mặc định.',
               customProviders: 'Provider tùy chỉnh',
-              customProvidersHint:
-                  'Hỗ trợ endpoint OpenAI-compatible kiểu /chat/completions. API key chỉ được giữ trong tab hiện tại và sẽ bị xóa khi tải lại trang.',
               providerName: 'Tên provider',
               providerBaseUrl: 'Base URL',
               providerApiKey: 'API Key',
@@ -345,16 +358,12 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
               providerModelsLoaded: (count: number) => `Đã tải ${count} model. Mở dropdown để tìm nhanh hoặc nhập model thủ công.`,
               providerModelsFailed: 'Không thể tải danh sách model từ provider.',
               providerBackendUnavailable: 'Không gọi được backend AI. Hãy đảm bảo server đang chạy rồi thử lại.',
-              requiredHint:
-                  'Tên, base URL và model là bắt buộc. API key có thể để trống nếu provider local của bạn không cần bearer token.',
           }
         : {
               aiTitle: t('tabs.ai'),
               aiSubtitle:
                   'Choose a dedicated model and provider for each AI role in the app. The AI Assistant updates immediately after you change its default model.',
               customProviders: 'Custom providers',
-              customProvidersHint:
-                  'Supports OpenAI-compatible /chat/completions endpoints. API keys stay only in the current tab and are cleared on reload.',
               providerName: 'Provider name',
               providerBaseUrl: 'Base URL',
               providerApiKey: 'API key',
@@ -387,13 +396,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
               providerModelsLoaded: (count: number) => `Loaded ${count} models. Open the dropdown to search fast, or type a custom model.`,
               providerModelsFailed: 'Failed to load models from the provider.',
               providerBackendUnavailable: 'Cannot reach the AI backend. Make sure the server is running, then try again.',
-              requiredHint:
-                  'Provider name, base URL, and model are required. API key may stay empty if your local provider does not require bearer auth.',
           };
-
-    const providerSecurityHint = isVi
-        ? 'API key được mã hóa và lưu phía server. Cloud chỉ kết nối tới endpoint HTTPS mà server truy cập được.'
-        : 'API keys are encrypted server-side. Cloud deployments require an HTTPS endpoint reachable by the server.';
 
     const providerModelGroups = useMemo<SearchableGroup[]>(
         () =>
@@ -686,14 +689,23 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                 </div>
             </div>
 
-            <div className="space-y-4 rounded-2xl border border-border/60 bg-card/40 p-5">
-                <div>
-                    <h3 className="text-lg font-medium">{labels.customProviders}</h3>
-                    <p className="text-sm text-muted-foreground">{providerSecurityHint}</p>
+            <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/40">
+                <div className="flex items-start justify-between gap-4 border-b border-border/50 px-5 py-4">
+                    <div className="min-w-0">
+                        <h3 className="text-lg font-semibold tracking-tight">{labels.customProviders}</h3>
+                        <p className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground">
+                            {isVi
+                                ? 'Kết nối endpoint OpenAI-compatible và chọn model riêng cho từng vai trò AI.'
+                                : 'Connect an OpenAI-compatible endpoint and assign its models to each AI role.'}
+                        </p>
+                    </div>
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {preferences.customProviders.length} {isVi ? 'đã lưu' : 'saved'}
+                    </span>
                 </div>
 
-                <div className="grid gap-3 lg:grid-cols-2">
-                    <div className="space-y-2">
+                <div className="grid gap-x-4 gap-y-4 p-5 sm:grid-cols-2">
+                    <div className="order-1 space-y-2">
                         <label className="text-sm font-medium">{labels.providerName}</label>
                         <Input
                             value={providerForm.name}
@@ -701,21 +713,21 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                             placeholder="My Provider"
                         />
                     </div>
-                    <div className="space-y-2 lg:col-span-2">
+                    <div className="order-4 space-y-2 sm:col-span-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <label className="text-sm font-medium">{labels.providerModel}</label>
                             {providerModels.length > 0 && (
-                                <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                                <span className="text-[11px] font-medium tabular-nums text-emerald-400">
                                     {providerModels.length} models
                                 </span>
                             )}
                         </div>
                         <p className="text-xs text-muted-foreground">
                             {isVi
-                                ? 'Tải danh sách model rồi chọn nhanh, hoặc nhập model thủ công nếu bạn đã biết tên.'
-                                : 'Load the model list to pick quickly, or type a model manually if you already know it.'}
+                                ? 'Chọn từ catalog của provider hoặc nhập chính xác model ID.'
+                                : 'Choose from the provider catalog or enter an exact model ID.'}
                         </p>
-                        <div className="flex flex-col gap-2 lg:flex-row lg:items-start">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                             <div className="min-w-0 flex-1">
                                 <SearchableModelSelect
                                     allowCustomValue
@@ -735,7 +747,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                className="gap-2 lg:h-10 lg:min-w-32 lg:px-4"
+                                className="h-10 shrink-0 gap-2 px-4 transition-colors active:translate-y-px"
                                 onClick={handleLoadProviderModels}
                                 disabled={isLoadingProviderModels}
                             >
@@ -751,15 +763,20 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                             </p>
                         )}
                     </div>
-                    <div className="space-y-2 lg:col-span-2">
+                    <div className="order-2 space-y-2">
                         <label className="text-sm font-medium">{labels.providerBaseUrl}</label>
                         <Input
                             value={providerForm.baseUrl}
                             onChange={(event) => updateProviderFormField('baseUrl', event.target.value)}
                             placeholder="https://your-provider.example.com/v1"
                         />
+                        <p className="text-xs leading-5 text-muted-foreground">
+                            {isVi
+                                ? 'Bản cloud yêu cầu HTTPS và server phải truy cập được URL này.'
+                                : 'Cloud requires HTTPS and a URL reachable by the server.'}
+                        </p>
                     </div>
-                    <div className="space-y-2 lg:col-span-2">
+                    <div className="order-3 space-y-2 sm:col-span-2">
                         <label className="text-sm font-medium">{labels.providerApiKey}</label>
                         <Input
                             type="password"
@@ -772,13 +789,31 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                     : 'sk-...'
                             }
                         />
+                        <p className="text-xs leading-5 text-muted-foreground">
+                            {isVi
+                                ? 'Được mã hóa trên server. Để trống khi sửa để giữ key hiện tại.'
+                                : 'Encrypted on the server. Leave blank while editing to keep the current key.'}
+                        </p>
                     </div>
-                    <div className="space-y-2 lg:col-span-2">
-                        <p className="text-sm font-medium">{isVi ? 'Khả năng input đã kiểm chứng' : 'Verified input capabilities'}</p>
-                        <div className="flex flex-wrap gap-4 rounded-xl border border-border/60 bg-background/50 px-4 py-3">
-                            <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <div className="order-5 space-y-2 sm:col-span-2">
+                        <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-medium">{isVi ? 'Khả năng của model' : 'Model capabilities'}</p>
+                            <span className="text-[11px] text-muted-foreground">
+                                {isVi ? 'Chỉ bật khi endpoint hỗ trợ' : 'Enable only when supported'}
+                            </span>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                            <label
+                                className={cn(
+                                    'flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors focus-within:ring-2 focus-within:ring-ring/60',
+                                    providerForm.vision
+                                        ? 'border-violet-500/40 bg-violet-500/10'
+                                        : 'border-border/60 bg-background/50 hover:border-border hover:bg-muted/25',
+                                )}
+                            >
                                 <input
                                     type="checkbox"
+                                    className="sr-only"
                                     checked={providerForm.vision}
                                     onChange={(event) =>
                                         setProviderForm((current) => ({
@@ -787,11 +822,36 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                         }))
                                     }
                                 />
-                                {isVi ? 'Đọc ảnh native' : 'Native vision'}
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
+                                    <ImageIcon className="h-4 w-4" />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-medium">{isVi ? 'Hình ảnh' : 'Images'}</span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {isVi ? 'Ảnh đính kèm trong prompt' : 'Image attachments in prompts'}
+                                    </span>
+                                </span>
+                                <span
+                                    aria-hidden="true"
+                                    className={cn(
+                                        'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors',
+                                        providerForm.vision ? 'border-violet-400 bg-violet-500 text-white' : 'border-border bg-background',
+                                    )}
+                                >
+                                    {providerForm.vision && <Check className="h-3.5 w-3.5" />}
+                                </span>
                             </label>
-                            <label className="flex cursor-pointer items-center gap-2 text-sm">
+                            <label
+                                className={cn(
+                                    'flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors focus-within:ring-2 focus-within:ring-ring/60',
+                                    providerForm.document
+                                        ? 'border-violet-500/40 bg-violet-500/10'
+                                        : 'border-border/60 bg-background/50 hover:border-border hover:bg-muted/25',
+                                )}
+                            >
                                 <input
                                     type="checkbox"
+                                    className="sr-only"
                                     checked={providerForm.document}
                                     onChange={(event) =>
                                         setProviderForm((current) => ({
@@ -800,34 +860,50 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                         }))
                                     }
                                 />
-                                {isVi ? 'Đọc PDF/file native' : 'Native PDF/file input'}
+                                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
+                                    <FileText className="h-4 w-4" />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-medium">{isVi ? 'PDF / tài liệu' : 'PDF / documents'}</span>
+                                    <span className="block text-xs text-muted-foreground">
+                                        {isVi ? 'File được gửi native tới model' : 'Files sent natively to the model'}
+                                    </span>
+                                </span>
+                                <span
+                                    aria-hidden="true"
+                                    className={cn(
+                                        'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors',
+                                        providerForm.document
+                                            ? 'border-violet-400 bg-violet-500 text-white'
+                                            : 'border-border bg-background',
+                                    )}
+                                >
+                                    {providerForm.document && <Check className="h-3.5 w-3.5" />}
+                                </span>
                             </label>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            {isVi
-                                ? 'Chỉ bật khi model và endpoint thực sự hỗ trợ. Hệ thống sẽ không âm thầm đổi sang provider khác.'
-                                : 'Enable only when the model and endpoint support it. The app will not silently switch providers.'}
-                        </p>
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border/60 px-4 py-3">
-                    <div>
-                        <p className="text-sm font-medium">{labels.providerType}</p>
-                        <p className="text-xs text-muted-foreground">
-                            {isVi
-                                ? 'Để trống API key khi sửa để giữ key hiện tại. Localhost chỉ dùng trong môi trường self-host/dev.'
-                                : 'Leave the API key blank while editing to keep the current key. Localhost is available only in self-hosted/dev environments.'}
-                        </p>
-                    </div>
+                <div className="flex flex-col gap-3 border-t border-border/50 bg-muted/15 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs leading-5 text-muted-foreground">
+                        {isVi
+                            ? 'OpenAI-compatible · không tự động đổi sang provider khác.'
+                            : 'OpenAI-compatible · no silent provider fallback.'}
+                    </p>
                     <div className="flex flex-wrap justify-end gap-2">
                         {editingProviderId && (
-                            <Button type="button" variant="ghost" className="gap-2" onClick={resetProviderForm}>
+                            <Button type="button" variant="ghost" className="gap-2 active:translate-y-px" onClick={resetProviderForm}>
                                 <X className="h-4 w-4" />
                                 {labels.cancelEdit}
                             </Button>
                         )}
-                        <Button type="button" onClick={handleSaveProvider} className="gap-2" disabled={isSavingProvider}>
+                        <Button
+                            type="button"
+                            onClick={handleSaveProvider}
+                            className="gap-2 px-5 transition-transform active:translate-y-px"
+                            disabled={isSavingProvider}
+                        >
                             {isSavingProvider ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                             ) : editingProviderId ? (
@@ -840,35 +916,33 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                     </div>
                 </div>
 
-                <div className="space-y-3">
-                    {preferences.customProviders.length === 0 ? (
-                        <div className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-                            {providerSecurityHint}
-                        </div>
-                    ) : (
-                        preferences.customProviders.map((provider) => (
+                {preferences.customProviders.length > 0 && (
+                    <div className="space-y-3 border-t border-border/50 p-5">
+                        {preferences.customProviders.map((provider) => (
                             <div
                                 key={provider.id}
-                                className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/60 p-4 lg:flex-row lg:items-center lg:justify-between"
+                                className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/60 p-4 transition-colors hover:border-border sm:flex-row sm:items-center sm:justify-between"
                             >
                                 <div className="min-w-0 space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="font-medium text-foreground">{provider.name}</span>
-                                        <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-300">
-                                            {labels.providerType}
-                                        </span>
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                        <span className="font-semibold text-foreground">{provider.name}</span>
+                                        <span className="text-xs text-muted-foreground">· {labels.providerType}</span>
                                         {provider.lastStatus && (
                                             <span
                                                 className={cn(
-                                                    'rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
-                                                    provider.lastStatus === 'healthy'
-                                                        ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'
-                                                        : 'border-red-500/25 bg-red-500/10 text-red-300',
+                                                    'inline-flex items-center gap-1.5 text-xs font-medium',
+                                                    provider.lastStatus === 'healthy' ? 'text-emerald-400' : 'text-red-400',
                                                 )}
                                             >
+                                                <span
+                                                    className={cn(
+                                                        'h-1.5 w-1.5 rounded-full',
+                                                        provider.lastStatus === 'healthy' ? 'bg-emerald-400' : 'bg-red-400',
+                                                    )}
+                                                />
                                                 {provider.lastStatus === 'healthy'
                                                     ? isVi
-                                                        ? 'Đã kiểm tra'
+                                                        ? 'Kết nối tốt'
                                                         : 'Healthy'
                                                     : isVi
                                                       ? 'Lỗi kết nối'
@@ -876,11 +950,13 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                             </span>
                                         )}
                                     </div>
-                                    <p className="break-all text-xs text-muted-foreground">{provider.baseUrl}</p>
-                                    <p className="text-xs text-muted-foreground">{provider.model}</p>
-                                    {provider.lastLatencyMs != null && (
-                                        <p className="text-xs text-muted-foreground">{provider.lastLatencyMs} ms</p>
-                                    )}
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                        <span className="font-mono text-foreground/80">{provider.model}</span>
+                                        <span className="break-all">{provider.baseUrl}</span>
+                                        {provider.lastLatencyMs != null && (
+                                            <span className="tabular-nums">{provider.lastLatencyMs} ms</span>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     <Button
@@ -905,10 +981,10 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                     </Button>
                                 </div>
                             </div>
-                        ))
-                    )}
-                </div>
-            </div>
+                        ))}
+                    </div>
+                )}
+            </section>
         </div>
     );
 };
