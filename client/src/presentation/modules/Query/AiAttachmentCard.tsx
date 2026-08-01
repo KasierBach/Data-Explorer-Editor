@@ -21,9 +21,11 @@ export const AiAttachmentCard: React.FC<AiAttachmentCardProps> = React.memo(({
 
     return (
         <article className={cn(
-            'group/attachment flex min-w-0 items-center gap-2.5 rounded-xl border border-white/[0.07] bg-slate-950/25 px-2.5 py-2',
+            'group/attachment flex min-w-0 items-center gap-2.5 rounded-xl px-2.5 py-2',
             'transition-[transform,border-color,background-color] duration-200',
-            onRemove ? 'w-full hover:-translate-y-px hover:border-violet-400/25 hover:bg-violet-500/[0.05] sm:w-[220px]' : 'w-full',
+            onRemove
+                ? 'w-full border border-white/[0.07] bg-slate-950/25 hover:-translate-y-px hover:border-violet-400/25 hover:bg-violet-500/[0.05] sm:w-[220px]'
+                : 'w-fit min-w-[158px] max-w-full border border-white/[0.06] bg-white/[0.035]',
         )}>
             <div className='flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-violet-500/10 text-violet-300'>
                 {isImage

@@ -119,12 +119,12 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
 
             <div className={cn(
                 'flex min-w-0 flex-col gap-1',
-                msg.role === 'user' && msg.attachments?.length ? 'max-w-[92%] sm:max-w-[85%]' : 'max-w-[85%]',
+                msg.role === 'user' ? 'max-w-[92%] items-end sm:max-w-[85%]' : 'max-w-[85%]',
             )}>
                 <div className={cn(
                     "relative rounded-xl p-2.5 text-xs leading-relaxed select-text cursor-text transition-all",
                     msg.role === 'user'
-                        ? 'bg-violet-500/20 text-foreground border border-violet-500/10 shadow-sm'
+                        ? 'w-fit max-w-full bg-violet-500/20 text-foreground border border-violet-500/10 shadow-sm'
                         : msg.error
                             ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                             : 'bg-muted/30 text-foreground/80 border border-border/30'
@@ -169,7 +169,7 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                                 </div>
                             ) : null}
                             {fileAttachments.length > 0 && (
-                                <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                                <div className="flex min-w-0 flex-col gap-2">
                                     {fileAttachments.map((attachment, index) => (
                                         <AiAttachmentCard
                                             key={attachment.label + '-' + index}
