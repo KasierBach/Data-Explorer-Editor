@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { AiMessage } from '@/core/services/store';
-import { findReplaySourceUserMessage } from './aiChatReplay';
+import {
+  findReplaySourceUserMessage,
+  hasAiResponseContent,
+  toRequestHistory,
+} from './aiChatReplay';
 
 describe('findReplaySourceUserMessage', () => {
   const messages: readonly AiMessage[] = [
@@ -18,5 +22,25 @@ describe('findReplaySourceUserMessage', () => {
 
   it('falls back to the latest user message when no AI target is provided', () => {
     expect(findReplaySourceUserMessage(messages)?.id).toBe('user-2');
+  });
+
+  it('omits the current placeholder and empty messages from request history', () => {
+    expect(toRequestHistory([
+      ...messages,
+      { id: 'empty-ai', role: 'ai', content: '', timestamp: 6 },
+      { id: 'current-ai', role: 'ai', content: '', timestamp: 7 },
+    ], 'current-ai')).toEqual(messages.map(({ role, content }) => ({ role, content })));
+  });
+
+  it('distinguishes an empty stream placeholder from a usable response', () => {
+    expect(hasAiResponseContent(undefined)).toBe(false);
+    expect(hasAiResponseContent({ id: 'empty', role: 'ai', content: '', timestamp: 6 })).toBe(false);
+    expect(hasAiResponseContent({
+      id: 'sql-only',
+      role: 'ai',
+      content: '',
+      sql: 'SELECT 1;',
+      timestamp: 7,
+    })).toBe(true);
   });
 });

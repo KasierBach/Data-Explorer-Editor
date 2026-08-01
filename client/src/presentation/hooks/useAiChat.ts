@@ -8,7 +8,11 @@ import { aiService } from '@/core/services/AiService';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { parseNodeId } from '@/core/utils/id-parser';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { findReplaySourceUserMessage } from './aiChatReplay';
+import {
+    findReplaySourceUserMessage,
+    hasAiResponseContent,
+    toRequestHistory,
+} from './aiChatReplay';
 import {
     describeAiProviderError,
     type AiModelRuntimeStatus,
@@ -651,7 +655,7 @@ export function useAiChat() {
 
             // Prepare chat history (filtered to only past messages)
             const chat = store.aiChats.find(c => c.id === chatId);
-            const history = chat?.messages?.filter(m => m.id !== aiMsgId) || [];
+            const history = toRequestHistory(chat?.messages || [], aiMsgId);
 
             const response = await adapter.generateSqlStream({
                 database: activeDatabase || undefined,
@@ -663,7 +667,7 @@ export function useAiChat() {
                 mode: aiMode,
                 routingMode: aiRoutingMode,
                 providerOverride: resolvedAssistant.providerOverride,
-                history: history.length > 0 ? history.map(m => ({ role: m.role, content: m.content })) : undefined,
+                history: history.length > 0 ? history : undefined,
             }, { signal: controller.signal });
 
             if (!response.ok) {
@@ -704,6 +708,12 @@ export function useAiChat() {
                 updateAiMessage(chatId, aiMsgId, { 
                     content: pendingUpdateRef.current.message,
                 });
+            }
+            const completedMessage = useAppStore.getState().aiChats
+                .find(chat => chat.id === chatId)?.messages
+                .find(message => message.id === aiMsgId);
+            if (!hasAiResponseContent(completedMessage)) {
+                throw new Error('AI provider returned an empty response.');
             }
         } catch (error) {
             const errorMessage = getErrorMessage(error);

@@ -231,12 +231,16 @@ describe('AiProviderRunnerService streaming', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
-  it('does not include provider error payloads in thrown errors', async () => {
+  it('includes safe provider error details without exposing credentials', async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 401,
       statusText: 'Unauthorized',
-      json: async () => ({ error: { message: 'Bearer sk-sensitive-token' } }),
+      json: async () => ({
+        error: {
+          message: 'Project rejected the request. Bearer sk-sensitive-token',
+        },
+      }),
     });
 
     let thrown: unknown;
@@ -256,7 +260,11 @@ describe('AiProviderRunnerService streaming', () => {
       thrown = error;
     }
 
-    expect(thrown).toHaveProperty('message', 'custom error (401)');
+    expect(thrown).toHaveProperty(
+      'message',
+      'custom error (401): Project rejected the request. Bearer [redacted]',
+    );
+    expect((thrown as Error).message).not.toContain('sk-sensitive-token');
   });
 
   it('sends json_schema response_format for structured openai-compatible completion requests', async () => {

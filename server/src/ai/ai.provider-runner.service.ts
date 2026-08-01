@@ -316,6 +316,8 @@ export class AiProviderRunnerService {
     provider: string,
     model: string,
     status: number,
+    errorPayload: unknown,
+    apiKey: string,
   ): Error {
     const target = `${provider} model ${model}`;
     if (status === 429) {
@@ -331,7 +333,21 @@ export class AiProviderRunnerService {
     if (status === 404) {
       return new Error(`${target} is unavailable (404). Choose another model.`);
     }
-    return new Error(`${provider} error (${status})`);
+    const extractedDetail = this.extractProviderErrorMessage(errorPayload);
+    const detail = extractedDetail
+      .split(apiKey)
+      .join('[redacted]')
+      .replace(/(Bearer\s+)[^\s,;]+/gi, '$1[redacted]')
+      .replace(
+        /((?:api[_ -]?key|token|secret)\s*[:=]\s*)[^\s,;]+/gi,
+        '$1[redacted]',
+      )
+      .replace(/[\r\n\t]+/g, ' ')
+      .trim()
+      .slice(0, 300);
+    return new Error(
+      `${provider} error (${status})${detail ? `: ${detail}` : ''}`,
+    );
   }
 
   private extractProviderErrorMessage(errorPayload: unknown): string {
@@ -815,6 +831,8 @@ export class AiProviderRunnerService {
           plan.provider,
           modelToUse,
           response.status,
+          errorPayload,
+          plan.apiKey,
         );
       }
 
@@ -1056,6 +1074,8 @@ export class AiProviderRunnerService {
           plan.provider,
           modelToUse,
           response.status,
+          errorPayload,
+          plan.apiKey,
         );
       }
 

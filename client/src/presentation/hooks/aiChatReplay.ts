@@ -23,3 +23,21 @@ export function findReplaySourceUserMessage(
 
     return undefined;
 }
+
+export function toRequestHistory(
+    messages: readonly AiMessage[],
+    excludedMessageId: string,
+) {
+    return messages
+        .filter((message) => message.id !== excludedMessageId && message.content.trim().length > 0)
+        .map(({ role, content }) => ({ role, content }));
+}
+
+export function hasAiResponseContent(message: AiMessage | undefined) {
+    return !!message && !!(
+        message.content.trim() ||
+        message.sql ||
+        message.explanation ||
+        message.recommendations?.length
+    );
+}
