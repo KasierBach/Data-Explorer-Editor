@@ -4,13 +4,14 @@ import {
     Boxes,
     Check,
     ChevronsUpDown,
+    CircleAlert,
     Database,
     FileSearch,
     FileText,
     ImageIcon,
     Loader2,
     Pencil,
-    Plus,
+    Save,
     Search,
     Trash2,
     X,
@@ -29,6 +30,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/presentation/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/presentation/components/ui/tooltip';
 import { getAssistantModelCatalog } from '@/presentation/modules/Query/assistantModelCatalog';
 import { filterSearchableGroups, normalizeProviderBaseUrl, type SearchableGroup } from './AiConfigTab.utils';
 
@@ -51,6 +53,25 @@ type ProviderTestResult = {
     latencyMs: number;
     error?: string | null;
 };
+
+const FieldHint = ({ label, text }: { label: string; text: string }) => (
+    <TooltipProvider delayDuration={180}>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button
+                    type="button"
+                    aria-label={label}
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                    <CircleAlert className="h-3.5 w-3.5" />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-64 text-pretty leading-5">
+                {text}
+            </TooltipContent>
+        </Tooltip>
+    </TooltipProvider>
+);
 
 const toClientProvider = (provider: CustomAiProvider): CustomAiProvider => ({
     ...provider,
@@ -331,7 +352,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
               providerApiKey: 'API Key',
               providerModel: 'Model mặc định',
               providerType: 'OpenAI-compatible',
-              addProvider: 'Thêm provider',
+              addProvider: 'Lưu provider',
               saveProvider: 'Lưu chỉnh sửa',
               cancelEdit: 'Hủy',
               editProvider: 'Sửa',
@@ -369,7 +390,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
               providerApiKey: 'API key',
               providerModel: 'Default model',
               providerType: 'OpenAI-compatible',
-              addProvider: 'Add provider',
+              addProvider: 'Save provider',
               saveProvider: 'Save changes',
               cancelEdit: 'Cancel',
               editProvider: 'Edit',
@@ -704,8 +725,8 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                     </span>
                 </div>
 
-                <div className="grid gap-x-4 gap-y-4 p-5 sm:grid-cols-2">
-                    <div className="order-1 space-y-2">
+                <div className="grid gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-2">
+                    <div className="order-1 space-y-1.5">
                         <label className="text-sm font-medium">{labels.providerName}</label>
                         <Input
                             value={providerForm.name}
@@ -713,20 +734,25 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                             placeholder="My Provider"
                         />
                     </div>
-                    <div className="order-4 space-y-2 sm:col-span-2">
+                    <div className="order-4 space-y-1.5 sm:col-span-2">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                            <label className="text-sm font-medium">{labels.providerModel}</label>
+                            <div className="flex items-center gap-1">
+                                <label className="text-sm font-medium">{labels.providerModel}</label>
+                                <FieldHint
+                                    label={`${labels.providerModel}: ${isVi ? 'hướng dẫn' : 'help'}`}
+                                    text={
+                                        isVi
+                                            ? 'Chọn từ catalog của provider hoặc nhập chính xác model ID.'
+                                            : 'Choose from the provider catalog or enter an exact model ID.'
+                                    }
+                                />
+                            </div>
                             {providerModels.length > 0 && (
                                 <span className="text-[11px] font-medium tabular-nums text-emerald-400">
                                     {providerModels.length} models
                                 </span>
                             )}
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            {isVi
-                                ? 'Chọn từ catalog của provider hoặc nhập chính xác model ID.'
-                                : 'Choose from the provider catalog or enter an exact model ID.'}
-                        </p>
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                             <div className="min-w-0 flex-1">
                                 <SearchableModelSelect
@@ -763,21 +789,36 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                             </p>
                         )}
                     </div>
-                    <div className="order-2 space-y-2">
-                        <label className="text-sm font-medium">{labels.providerBaseUrl}</label>
+                    <div className="order-2 space-y-1.5">
+                        <div className="flex items-center gap-1">
+                            <label className="text-sm font-medium">{labels.providerBaseUrl}</label>
+                            <FieldHint
+                                label={`${labels.providerBaseUrl}: ${isVi ? 'hướng dẫn' : 'help'}`}
+                                text={
+                                    isVi
+                                        ? 'Bản cloud yêu cầu HTTPS và server phải truy cập được URL này.'
+                                        : 'Cloud requires HTTPS and a URL reachable by the server.'
+                                }
+                            />
+                        </div>
                         <Input
                             value={providerForm.baseUrl}
                             onChange={(event) => updateProviderFormField('baseUrl', event.target.value)}
                             placeholder="https://your-provider.example.com/v1"
                         />
-                        <p className="text-xs leading-5 text-muted-foreground">
-                            {isVi
-                                ? 'Bản cloud yêu cầu HTTPS và server phải truy cập được URL này.'
-                                : 'Cloud requires HTTPS and a URL reachable by the server.'}
-                        </p>
                     </div>
-                    <div className="order-3 space-y-2 sm:col-span-2">
-                        <label className="text-sm font-medium">{labels.providerApiKey}</label>
+                    <div className="order-3 space-y-1.5 sm:col-span-2">
+                        <div className="flex items-center gap-1">
+                            <label className="text-sm font-medium">{labels.providerApiKey}</label>
+                            <FieldHint
+                                label={`${labels.providerApiKey}: ${isVi ? 'hướng dẫn' : 'help'}`}
+                                text={
+                                    isVi
+                                        ? 'Được mã hóa trên server. Để trống khi sửa để giữ key hiện tại.'
+                                        : 'Encrypted on the server. Leave blank while editing to keep the current key.'
+                                }
+                            />
+                        </div>
                         <Input
                             type="password"
                             value={providerForm.apiKey}
@@ -789,18 +830,18 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                     : 'sk-...'
                             }
                         />
-                        <p className="text-xs leading-5 text-muted-foreground">
-                            {isVi
-                                ? 'Được mã hóa trên server. Để trống khi sửa để giữ key hiện tại.'
-                                : 'Encrypted on the server. Leave blank while editing to keep the current key.'}
-                        </p>
                     </div>
-                    <div className="order-5 space-y-2 sm:col-span-2">
-                        <div className="flex items-center justify-between gap-3">
+                    <div className="order-5 space-y-1.5 sm:col-span-2">
+                        <div className="flex items-center gap-1">
                             <p className="text-sm font-medium">{isVi ? 'Khả năng của model' : 'Model capabilities'}</p>
-                            <span className="text-[11px] text-muted-foreground">
-                                {isVi ? 'Chỉ bật khi endpoint hỗ trợ' : 'Enable only when supported'}
-                            </span>
+                            <FieldHint
+                                label={`${isVi ? 'Khả năng của model' : 'Model capabilities'}: ${isVi ? 'hướng dẫn' : 'help'}`}
+                                text={
+                                    isVi
+                                        ? 'Chỉ bật khi endpoint thực sự hỗ trợ. Hệ thống không tự chuyển sang provider khác.'
+                                        : 'Enable only when the endpoint truly supports it. The system will not silently switch providers.'
+                                }
+                            />
                         </div>
                         <div className="grid gap-2 sm:grid-cols-2">
                             <label
@@ -885,35 +926,22 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-3 border-t border-border/50 bg-muted/15 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-xs leading-5 text-muted-foreground">
-                        {isVi
-                            ? 'OpenAI-compatible · không tự động đổi sang provider khác.'
-                            : 'OpenAI-compatible · no silent provider fallback.'}
-                    </p>
-                    <div className="flex flex-wrap justify-end gap-2">
-                        {editingProviderId && (
-                            <Button type="button" variant="ghost" className="gap-2 active:translate-y-px" onClick={resetProviderForm}>
-                                <X className="h-4 w-4" />
-                                {labels.cancelEdit}
-                            </Button>
-                        )}
-                        <Button
-                            type="button"
-                            onClick={handleSaveProvider}
-                            className="gap-2 px-5 transition-transform active:translate-y-px"
-                            disabled={isSavingProvider}
-                        >
-                            {isSavingProvider ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : editingProviderId ? (
-                                <Pencil className="h-4 w-4" />
-                            ) : (
-                                <Plus className="h-4 w-4" />
-                            )}
-                            {editingProviderId ? labels.saveProvider : labels.addProvider}
+                <div className="flex flex-wrap justify-end gap-2 border-t border-border/50 bg-muted/15 px-5 py-3">
+                    {editingProviderId && (
+                        <Button type="button" variant="ghost" className="gap-2 active:translate-y-px" onClick={resetProviderForm}>
+                            <X className="h-4 w-4" />
+                            {labels.cancelEdit}
                         </Button>
-                    </div>
+                    )}
+                    <Button
+                        type="button"
+                        onClick={handleSaveProvider}
+                        className="min-w-36 justify-center gap-2 px-5 transition-transform active:translate-y-px"
+                        disabled={isSavingProvider}
+                    >
+                        {isSavingProvider ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        {editingProviderId ? labels.saveProvider : labels.addProvider}
+                    </Button>
                 </div>
 
                 {preferences.customProviders.length > 0 && (
