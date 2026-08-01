@@ -5,6 +5,7 @@ import { AiConnectionService } from './ai.connection-service';
 import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
 import { AuditAction, AuditService } from '../audit/audit.service';
 import { ConfigService } from '@nestjs/config';
+import { AiProviderConnectionService } from './ai-provider-connection.service';
 
 jest.mock('../common/utils/ssrf-validator.util', () => ({
   validateExternalUrl: jest.fn(),
@@ -35,6 +36,12 @@ describe('AiController', () => {
     log: jest.fn(),
   };
 
+  const providerConnectionsMock = {
+    resolveOverride: jest.fn((_userId: string, providerOverride: unknown) =>
+      Promise.resolve(providerOverride),
+    ),
+  };
+
   const configuredProviders: Record<string, string | undefined> = {
     GEMINI_API_KEY: 'gemini-key',
     OPENROUTER_API_KEY: 'openrouter-key',
@@ -60,6 +67,10 @@ describe('AiController', () => {
         },
         { provide: AuditService, useValue: auditServiceMock },
         { provide: ConfigService, useValue: configServiceMock },
+        {
+          provide: AiProviderConnectionService,
+          useValue: providerConnectionsMock,
+        },
       ],
     }).compile();
 
