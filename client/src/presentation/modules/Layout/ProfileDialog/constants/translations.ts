@@ -1,5 +1,13 @@
 export const translations = {
     vi: {
+        labels: {
+            close: '\u0110\u00f3ng',
+            firstNamePlaceholder: 'T\u00ean',
+            lastNamePlaceholder: 'H\u1ecd',
+            jobRolePlaceholder: 'K\u1ef9 s\u01b0 d\u1eef li\u1ec7u',
+            addressPlaceholder: 'Th\u00e0nh ph\u1ed1, qu\u1ed1c gia',
+            bioPlaceholder: 'Gi\u1edbi thi\u1ec7u ng\u1eafn v\u1ec1 b\u1ea1n',
+        },
         title: 'Cài đặt tài khoản',
         subtitle: 'Quản lý hồ sơ và tùy chọn của bạn.',
         sign_out: 'Đăng xuất',
@@ -110,6 +118,14 @@ export const translations = {
     },
     en: {
         title: 'Account Settings',
+        labels: {
+            close: 'Close',
+            firstNamePlaceholder: 'First name',
+            lastNamePlaceholder: 'Last name',
+            jobRolePlaceholder: 'Data Engineer',
+            addressPlaceholder: 'City, Country',
+            bioPlaceholder: 'Tell us a little bit about yourself',
+        },
         subtitle: 'Manage your profile and preferences.',
         sign_out: 'Sign Out',
         not_implemented_suffix: 'is currently a UI mockup and not connected to a backend.',

@@ -18,6 +18,7 @@ describe('ApiService', () => {
   it('should inject Authorization header when token exists', async () => {
     mockStoreState({
       accessToken: 'fake-token',
+      lang: 'en',
     });
 
     mockFetch.mockResolvedValue({
@@ -34,6 +35,7 @@ describe('ApiService', () => {
         credentials: 'include',
         headers: expect.objectContaining({
           Authorization: 'Bearer fake-token',
+          'Accept-Language': 'en',
         }),
       }),
     );
@@ -43,6 +45,7 @@ describe('ApiService', () => {
     const logoutMock = vi.fn();
     mockStoreState({
       accessToken: 'expired-token',
+      lang: 'vi',
       logout: logoutMock,
     });
 
@@ -68,6 +71,9 @@ describe('ApiService', () => {
       expect.objectContaining({
         method: 'POST',
         credentials: 'include',
+        headers: expect.objectContaining({
+          'Accept-Language': 'vi',
+        }),
       }),
     );
   });

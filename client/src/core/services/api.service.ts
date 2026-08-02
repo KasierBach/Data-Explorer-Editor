@@ -26,9 +26,11 @@ class ApiService {
 
   public getHeaders(customHeaders: Record<string, string> = {}) {
     const token = useAppStore.getState().accessToken;
+    const lang = useAppStore.getState().lang || 'vi';
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Requested-With': 'XMLHttpRequest',
+      'Accept-Language': lang,
       ...customHeaders,
     };
     if (token) {
@@ -82,6 +84,7 @@ class ApiService {
           headers: {
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
+            'Accept-Language': useAppStore.getState().lang || 'vi',
           },
           credentials: 'include',
           body: JSON.stringify({}),

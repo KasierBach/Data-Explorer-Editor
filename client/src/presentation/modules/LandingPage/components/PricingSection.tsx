@@ -13,6 +13,24 @@ interface PricingSectionProps {
 
 export const PricingSection: React.FC<PricingSectionProps> = ({ lang, addToRevealRefs }) => {
     const text = getWorkspaceText(lang).pricingSection;
+    const plans = lang === 'vi'
+        ? billingPlans.map((plan) => {
+            if (plan.code === 'free') {
+                return {
+                    ...plan,
+                    name: 'Mi\u1ec5n ph\u00ed',
+                    cadence: 'm\u00e3i m\u00e3i',
+                    description: 'Kh\u00e1m ph\u00e1 c\u1ee5c b\u1ed9 v\u00e0 d\u1ef1 \u00e1n c\u00e1 nh\u00e2n.',
+                    features: ['SQL v\u00e0 NoSQL c\u1ee5c b\u1ed9', 'Tr\u1ee3 l\u00fd AI c\u01a1 b\u1ea3n', 'Duy\u1ec7t schema'],
+                };
+            }
+
+            return plan.code === 'pro_monthly'
+                ? { ...plan, name: 'Pro th\u00e1ng', cadence: '30 ng\u00e0y', description: 'G\u00f3i Pro linh ho\u1ea1t cho c\u00f4ng vi\u1ec7c database chuy\u00ean s\u00e2u.', features: ['Quy tr\u00ecnh AI n\u00e2ng cao', 'Lu\u1ed3ng database cloud', 'T\u00ednh n\u0103ng workspace \u01b0u ti\u00ean'] }
+                : { ...plan, name: 'Pro n\u0103m', cadence: '365 ng\u00e0y', description: 'Gi\u00e1 tr\u1ecb t\u1ed1t nh\u1ea5t cho nhu c\u1ea7u d\u00f9ng h\u1eb1ng ng\u00e0y.', features: ['M\u1ecdi quy\u1ec1n l\u1ee3i Pro th\u00e1ng', 'T\u1eb7ng th\u00eam hai th\u00e1ng', 'Th\u1eddi h\u1ea1n truy c\u1eadp d\u00e0i h\u01a1n'] };
+        })
+        : billingPlans;
+
 
     const handleOpenBilling = () => {
         window.location.href = '/sql-explorer';
@@ -31,7 +49,7 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ lang, addToRevea
                 </div>
 
                 <div className="mx-auto grid max-w-5xl gap-4 md:grid-cols-3">
-                    {billingPlans.map((plan, index) => {
+                    {plans.map((plan, index) => {
                         const isPopular = plan.code === 'pro_yearly';
                         return (
                             <div

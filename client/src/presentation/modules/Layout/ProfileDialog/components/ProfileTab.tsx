@@ -133,11 +133,11 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                         <label className="text-sm font-medium">{t('first_name_label')}</label>
-                        <Input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="First name" />
+                        <Input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder={t('labels.firstNamePlaceholder')} />
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm font-medium">{t('last_name_label')}</label>
-                        <Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Last name" />
+                        <Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder={t('labels.lastNamePlaceholder')} />
                     </div>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -147,7 +147,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm font-medium">{t('job_role_label')}</label>
-                        <Input value={jobRole} onChange={e => setJobRole(e.target.value)} placeholder="Data Engineer" />
+                        <Input value={jobRole} onChange={e => setJobRole(e.target.value)} placeholder={t('labels.jobRolePlaceholder')} />
                     </div>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -157,7 +157,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm font-medium">{t('address_label')}</label>
-                        <Input value={address} onChange={e => setAddress(e.target.value)} placeholder="City, Country" />
+                        <Input value={address} onChange={e => setAddress(e.target.value)} placeholder={t('labels.addressPlaceholder')} />
                     </div>
                 </div>
                 <div className="space-y-2">
@@ -171,7 +171,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                         value={bio}
                         onChange={e => setBio(e.target.value)}
                         className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        placeholder="Tell us a little bit about yourself"
+                        placeholder={t('labels.bioPlaceholder')}
                     />
                     <p className="text-[11px] text-muted-foreground">{t('bio_hint')}</p>
                 </div>

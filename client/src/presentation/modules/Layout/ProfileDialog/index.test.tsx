@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProfileDialog } from './index';
+import { useAppStore } from '@/core/services/store';
 
 vi.mock('./hooks/useProfileLogic', async () => {
   const ReactModule = await import('react');
@@ -59,7 +60,17 @@ vi.mock('./components/AdvancedTab', () => ({
 }));
 
 describe('ProfileDialog', () => {
+  it('uses the active app language instead of the persisted profile language', () => {
+    useAppStore.setState({ lang: 'vi' });
+
+    render(<ProfileDialog isOpen={true} onClose={vi.fn()} initialTab="profile" />);
+
+    expect(screen.getByRole('heading', { name: 'C\u00e0i \u0111\u1eb7t t\u00e0i kho\u1ea3n' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'C\u00e0i \u0111\u1eb7t n\u00e2ng cao' })).toBeInTheDocument();
+  });
+
   it('resets the content scroll position when switching tabs', () => {
+    useAppStore.setState({ lang: 'en' });
     render(<ProfileDialog isOpen={true} onClose={vi.fn()} initialTab="profile" />);
 
     const profileContent = screen.getByText('Profile content');

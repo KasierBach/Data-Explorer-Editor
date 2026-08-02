@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { Button } from '@/presentation/components/ui/button';
 import { User, X, Settings, CreditCard, Bell, Palette, Shield, LogOut, Bot } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAppStore } from '@/core/services/store';
 
 import { useProfileLogic } from './hooks/useProfileLogic';
 import { translations } from './constants/translations';
@@ -26,6 +27,7 @@ interface ProfileDialogProps {
 
 export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, initialTab }) => {
     const contentRef = useRef<HTMLDivElement | null>(null);
+    const lang = useAppStore((state) => state.lang);
     const {
         user,
         isLoading,
@@ -39,7 +41,6 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
     } = useProfileLogic(isOpen, initialTab, onClose);
 
     const t = (key: string) => {
-        const lang = appearanceState.language || 'en';
         const res = translations[lang as keyof typeof translations] as TranslationNode;
         const keys = key.split('.');
         let current: TranslationNode | undefined = res;
@@ -69,13 +70,13 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
     if (!isOpen) return null;
 
     const tabsList = [
-        { id: 'profile', label: 'Public Profile', icon: User },
-        { id: 'appearance', label: 'Appearance', icon: Palette },
-        { id: 'billing', label: 'Billing & Plan', icon: CreditCard },
-        { id: 'notifications', label: 'Notifications', icon: Bell },
-        { id: 'security', label: 'Security', icon: Shield },
-        { id: 'ai', label: 'Configure AI', icon: Bot },
-        { id: 'advanced', label: 'Advanced Settings', icon: Settings },
+        { id: 'profile', icon: User },
+        { id: 'appearance', icon: Palette },
+        { id: 'billing', icon: CreditCard },
+        { id: 'notifications', icon: Bell },
+        { id: 'security', icon: Shield },
+        { id: 'ai', icon: Bot },
+        { id: 'advanced', icon: Settings },
     ];
 
     const dialogContent = (
@@ -87,7 +88,7 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
                     className="absolute right-4 top-4 z-10 rounded-sm opacity-70 transition-opacity hover:opacity-100 hover:bg-muted p-1"
                 >
                     <X className="h-5 w-5" />
-                    <span className="sr-only">Close</span>
+                    <span className="sr-only">{t('labels.close')}</span>
                 </button>
 
                 {/* Sidebar */}
