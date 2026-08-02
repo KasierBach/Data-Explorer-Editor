@@ -16,6 +16,7 @@ import {
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
+import { LoadingState } from '@/presentation/components/shared/LoadingState';
 
 function getLogUserName(log: AuditLogEntry) {
     if (!log.user) return '';
@@ -69,14 +70,7 @@ export function AuditLogsView() {
     ), [logs, searchTerm, categoryFilter]);
 
     if (loading) {
-        return (
-            <div className="space-y-4 p-12 text-center">
-                <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
-                <p className="animate-pulse text-xs text-muted-foreground">
-                    {text.loading}
-                </p>
-            </div>
-        );
+        return <LoadingState className="min-h-[24rem]" label={text.loading} variant="table" />;
     }
 
     return (

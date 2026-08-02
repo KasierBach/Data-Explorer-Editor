@@ -5,7 +5,7 @@ import {
     Funnel, LabelList, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, Cell, Legend, Brush
 } from 'recharts';
-import { AlertCircle, BarChart3, PieChart as PieIcon, PanelLeft, RotateCcw } from 'lucide-react';
+import { AlertCircle, BarChart3, Loader2, PanelLeft, RotateCcw } from 'lucide-react';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
@@ -54,7 +54,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
     selectedTable, chartTypeName
 }) => {
     const { isCompactMobileLayout } = useResponsiveLayoutMode();
-    const { connections, activeConnectionId, nosqlActiveConnectionId } = useAppStore();
+    const { connections, activeConnectionId, nosqlActiveConnectionId, lang } = useAppStore();
 
     const isNoSql = (nosqlActiveConnectionId && connections.find(c => c.id === nosqlActiveConnectionId)) || 
                     connections.find(c => c.id === activeConnectionId)?.type.toLowerCase().includes('mongo');
@@ -328,17 +328,6 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                 </Button>
             )}
 
-            {isLoading && (
-                <div className="absolute inset-0 z-[100] flex items-center justify-center bg-background/40 backdrop-blur-xl animate-in fade-in duration-500">
-                    <div className="flex flex-col items-center gap-6">
-                        <div className="relative">
-                            <div className="w-16 h-16 rounded-full border-4 border-emerald-500/10 border-t-emerald-500 animate-spin" />
-                            <PieIcon className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-6 w-6 text-emerald-500 animate-pulse" />
-                        </div>
-                        <p className="font-black uppercase tracking-[0.3em] text-sm text-emerald-500">Processing</p>
-                    </div>
-                </div>
-            )}
 
             <div className={cn(
                 "pb-4 flex items-end justify-between",
@@ -372,7 +361,16 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                 "flex-1 pb-8 min-h-0",
                 isCompactMobileLayout ? "px-2" : "px-8"
             )}>
-                <div ref={chartRef} className="h-full relative group rounded-3xl overflow-hidden">
+                <div ref={chartRef} aria-busy={isLoading} className="h-full relative group rounded-3xl overflow-hidden">
+                    {isLoading && (
+                        <div role="status" aria-live="polite" className="pointer-events-none absolute inset-x-2 top-2 z-30 flex justify-end sm:inset-x-3 sm:top-3">
+                            <div className="flex max-w-full items-center gap-2 rounded-lg border border-border/60 bg-background/90 px-3 py-2 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
+                                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-emerald-500 motion-reduce:animate-none" />
+                                <span className="truncate">{lang === 'vi' ? 'Đang cập nhật biểu đồ...' : 'Updating visualization...'}</span>
+                            </div>
+                        </div>
+                    )}
+                    {isLoading && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-20 h-0.5 overflow-hidden bg-emerald-500/15"><div className="h-full w-1/3 animate-pulse bg-emerald-500 motion-reduce:animate-none" /></div>}
                     <div className="absolute -top-24 -right-24 w-[400px] h-[400px] bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none group-hover:bg-emerald-500/8 transition-colors duration-1000" />
                     <div className="absolute -bottom-24 -left-24 w-[400px] h-[400px] bg-blue-500/5 blur-[120px] rounded-full pointer-events-none group-hover:bg-blue-500/8 transition-colors duration-1000" />
 

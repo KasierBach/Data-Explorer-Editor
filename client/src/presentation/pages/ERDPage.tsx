@@ -6,9 +6,11 @@ import { Database, ArrowLeft, Plus, Wifi } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/presentation/components/ui/select';
 import { ConnectionDialog } from '@/presentation/modules/Connection/ConnectionDialog';
+import { LoadingState } from '@/presentation/components/shared/LoadingState';
 
 export function ERDPage() {
     const navigate = useNavigate();
+    const lang = useAppStore(state => state.lang);
     const sqlActiveConnectionId = useAppStore(state => state.activeConnectionId);
     const sqlActiveDatabase = useAppStore(state => state.activeDatabase);
     const setSqlActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
@@ -129,7 +131,7 @@ export function ERDPage() {
 
             {/* Full-Screen ERD */}
             <div className="flex-1 overflow-hidden">
-                <React.Suspense fallback={<div className="h-full w-full flex flex-col gap-3 items-center justify-center bg-muted/10 animate-pulse text-muted-foreground text-sm font-medium"><div className="w-8 h-8 rounded-full border-2 border-indigo-500/50 border-t-indigo-500 animate-spin" />Loading Visualizer...</div>}>
+                <React.Suspense fallback={<LoadingState label={lang === 'vi' ? 'Đang tải trình trực quan...' : 'Loading visualizer...'} variant="workspace" />}>
                     <ERDWorkspace
                         key={`erd-page-${activeConnectionId}-${activeDatabase || 'default'}`}
                         tabId={`erd-page-${activeConnectionId}-${activeDatabase || 'default'}`}

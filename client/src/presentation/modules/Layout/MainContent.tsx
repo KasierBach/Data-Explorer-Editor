@@ -6,11 +6,12 @@ import { Dashboard } from '@/presentation/pages/Dashboard';
 import { InsightsDashboard } from '@/presentation/modules/Dashboard/InsightsDashboard';
 import { SavedDashboardView } from '@/presentation/modules/Dashboard/SavedDashboardView';
 import { VisualizeWorkplace } from '@/presentation/modules/Visualization/VisualizeWorkplace';
+import { LoadingState } from '@/presentation/components/shared/LoadingState';
 const ERDWorkspace = React.lazy(() => import('@/presentation/modules/Visualization/ERDWorkspace').then(m => ({ default: m.ERDWorkspace })));
 const QueryEditor = React.lazy(() => import('@/presentation/modules/Query/QueryEditor').then(m => ({ default: m.QueryEditor })));
 
 export const MainContent: React.FC = () => {
-    const { tabs, activeTabId } = useAppStore();
+    const { tabs, activeTabId, lang } = useAppStore();
     const activeTab = tabs.find(t => t.id === activeTabId);
 
     return (
@@ -27,7 +28,7 @@ export const MainContent: React.FC = () => {
                                 <DataGrid key={activeTab.id} tableId={activeTab.metadata?.tableId || activeTab.id} />
                             )}
                             {activeTab.type === 'query' && (
-                                <React.Suspense fallback={<div className="h-full flex items-center justify-center text-sm text-muted-foreground">Loading query editor...</div>}>
+                                <React.Suspense fallback={<LoadingState label={lang === 'vi' ? 'Đang tải trình soạn thảo...' : 'Loading query editor...'} variant="workspace" />}>
                                     <QueryEditor key={activeTab.id} tabId={activeTab.id} />
                                 </React.Suspense>
                             )}
@@ -48,7 +49,7 @@ export const MainContent: React.FC = () => {
                                 <VisualizeWorkplace key={activeTab.id} />
                             )}
                             {activeTab.type === 'erd' && (
-                                <React.Suspense fallback={<div className="h-full w-full flex flex-col gap-3 items-center justify-center bg-muted/10 animate-pulse text-muted-foreground text-sm font-medium"><div className="w-8 h-8 rounded-full border-2 border-indigo-500/50 border-t-indigo-500 animate-spin" />Loading Visualizer...</div>}>
+                                <React.Suspense fallback={<LoadingState label={lang === 'vi' ? 'Đang tải trình trực quan...' : 'Loading visualizer...'} variant="workspace" />}>
                                     <ERDWorkspace
                                         key={activeTab.id}
                                         tabId={activeTab.id}

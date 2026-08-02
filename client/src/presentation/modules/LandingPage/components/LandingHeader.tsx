@@ -37,7 +37,7 @@ export const LandingHeader: React.FC<LandingHeaderProps> = ({
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
                         <Database className="w-4 h-4 text-white" aria-hidden="true" />
                     </div>
-                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">Data<span className="text-blue-500">Explorer</span></span>
+                    <span className="hidden min-[480px]:inline bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">Data<span className="text-blue-500">Explorer</span></span>
                 </button>
 
                 <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground absolute left-1/2 -translate-x-1/2">

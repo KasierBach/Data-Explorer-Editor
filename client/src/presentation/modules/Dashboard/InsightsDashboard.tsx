@@ -9,6 +9,7 @@ import {
 import { Database, Table, Zap, HardDrive, RefreshCw, ArrowRight, Share2, GitBranch, Layers, BarChart3 } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/presentation/components/ui/select";
+import { LoadingState } from '@/presentation/components/shared/LoadingState';
 
 export interface InsightsDashboardProps {
     connectionId?: string;
@@ -21,7 +22,7 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
     connectionId: propConnectionId,
     database: propDatabase
 }) => {
-    const { activeConnectionId: globalActiveId, connections } = useAppStore();
+    const { activeConnectionId: globalActiveId, connections, lang } = useAppStore();
     const activeConnectionId = propConnectionId || globalActiveId;
     const activeConnection = connections.find(c => c.id === activeConnectionId);
 
@@ -68,12 +69,7 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
     }
 
     if (isLoading && !metrics) {
-        return (
-            <div className="flex items-center justify-center h-full text-sm text-muted-foreground animate-pulse p-20">
-                <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                Gathering database intelligence...
-            </div>
-        );
+        return <LoadingState label={lang === 'vi' ? 'Đang tổng hợp dữ liệu database...' : 'Gathering database intelligence...'} variant="dashboard" />;
     }
 
     const formatBytes = (bytes: number) => {

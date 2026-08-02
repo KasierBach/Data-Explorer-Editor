@@ -17,6 +17,7 @@ import { getWorkspaceText } from '@/core/utils/workspaceText'
 import { Toaster } from 'sonner';
 import { DestructiveQueryDialog } from '@/presentation/components/Dialogs/DestructiveQueryDialog';
 import { CommandPalette } from '@/presentation/components/shared/CommandPalette';
+import { LoadingState } from '@/presentation/components/shared/LoadingState';
 
 type AppTheme = 'dark' | 'light' | 'system';
 
@@ -41,11 +42,7 @@ const LegalConsentPage = lazy(() => import('@/presentation/pages/LegalPages').th
 function RouteFallback() {
   const { lang } = useAppStore()
   const text = getWorkspaceText(lang).app
-  return (
-    <div className="flex h-dvh min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-      {text.routeLoading}
-    </div>
-  )
+  return <LoadingState label={text.routeLoading} variant="route" />
 }
 
 export function App() {

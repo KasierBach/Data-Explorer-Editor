@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DashboardService } from '@/core/services/DashboardService';
 import type { DashboardEntity, DashboardWidget } from '@/core/domain/entities';
 import { Button } from '@/presentation/components/ui/button';
+import { LoadingState } from '@/presentation/components/shared/LoadingState';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/presentation/components/ui/card';
 import { toast } from 'sonner';
 import { Loader2, LayoutDashboard, Pencil, Trash2, Share2 } from 'lucide-react';
@@ -198,6 +199,7 @@ function DashboardWidgetCard({
 export const SavedDashboardView: React.FC<{ dashboardId: string }> = ({ dashboardId }) => {
     const queryClient = useQueryClient();
     const closeTab = useAppStore((state) => state.closeTab);
+    const lang = useAppStore((state) => state.lang);
     const [isMutating, setIsMutating] = React.useState(false);
     const { data, isLoading, error, refetch, isFetching } = useQuery({
         queryKey: ['dashboard', dashboardId],
@@ -206,12 +208,7 @@ export const SavedDashboardView: React.FC<{ dashboardId: string }> = ({ dashboar
     });
 
     if (isLoading) {
-        return (
-            <div className="h-full flex items-center justify-center text-muted-foreground gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading dashboard...
-            </div>
-        );
+        return <LoadingState label={lang === 'vi' ? 'Đang tải dashboard...' : 'Loading dashboard...'} variant="dashboard" />;
     }
 
     if (error || !data) {

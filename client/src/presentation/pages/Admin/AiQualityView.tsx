@@ -5,6 +5,7 @@ import { adminService } from '@/core/services/AdminService';
 import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/presentation/components/ui/card';
+import { LoadingState } from '@/presentation/components/shared/LoadingState';
 
 export function AiQualityView() {
     const lang = useAppStore((state) => state.lang);
@@ -15,7 +16,7 @@ export function AiQualityView() {
         queryFn: () => adminService.getAiQualityMetrics(days),
     });
 
-    if (isLoading) return <div className="py-16 text-center text-sm text-muted-foreground">{vi ? 'Đang tổng hợp chất lượng AI...' : 'Loading AI quality...'}</div>;
+    if (isLoading) return <LoadingState className="min-h-[24rem]" label={vi ? 'Đang tổng hợp chất lượng AI...' : 'Loading AI quality...'} variant="dashboard" />;
     if (error || !data) return <div className="py-16 text-center text-sm text-red-500">{vi ? 'Không thể tải số liệu AI.' : 'Unable to load AI metrics.'}</div>;
 
     const cards = [

@@ -7,6 +7,7 @@ import { Badge } from '@/presentation/components/ui/badge';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { toast } from 'sonner';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
+import { LoadingState } from '@/presentation/components/shared/LoadingState';
 
 function getErrorMessage(error: unknown) {
     return error instanceof Error ? error.message : 'Unexpected error';
@@ -89,7 +90,7 @@ export function UsersView() {
     };
 
     if (loading) {
-        return <div className="flex justify-center p-8 text-muted-foreground">{text.loading}</div>;
+        return <LoadingState className="min-h-[24rem]" label={text.loading} variant="table" />;
     }
 
     const ActionButtons = ({ user }: { user: AdminUser }) => (
