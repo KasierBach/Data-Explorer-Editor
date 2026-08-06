@@ -23,7 +23,7 @@ interface DataGridDataResult {
     dbName: string | undefined;
     schema: string;
     cleanTableName: string | undefined;
-    dialect: 'mysql' | 'postgres';
+    dialect: 'mysql' | 'postgres' | 'mssql';
     pkField: string | undefined;
 }
 
@@ -38,7 +38,11 @@ export function useDataGridData({ tableId, tabId, enabled, includeTotalCount = f
     const offset = (page - 1) * pageSize;
 
     const { dbName, schema, table: cleanTableName } = parseNodeId(tableId);
-    const dialect: 'mysql' | 'postgres' = activeConnection?.type === 'mysql' ? 'mysql' : 'postgres';
+    const dialect: 'mysql' | 'postgres' | 'mssql' = activeConnection?.type === 'mysql'
+        ? 'mysql'
+        : activeConnection?.type === 'mssql'
+            ? 'mssql'
+            : 'postgres';
     const resolvedTableName = cleanTableName || tableId;
 
     // Fetch Metadata with long-term cache (5 minutes)

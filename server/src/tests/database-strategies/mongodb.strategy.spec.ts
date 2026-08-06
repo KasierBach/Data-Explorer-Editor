@@ -1,5 +1,5 @@
 import { MongoDbStrategy } from '../../database-strategies/mongodb.strategy';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 
 jest.mock('mongodb', () => {
   return {
@@ -8,7 +8,7 @@ jest.mock('mongodb', () => {
       close: jest.fn(),
       db: jest.fn(),
     })),
-    ObjectId: jest.fn(),
+    ObjectId: Object.assign(jest.fn(), { isValid: jest.fn() }),
   };
 });
 
@@ -27,6 +27,10 @@ describe('MongoDbStrategy', () => {
       limit: jest.fn().mockReturnThis(),
       skip: jest.fn().mockReturnThis(),
       maxTimeMS: jest.fn().mockReturnThis(),
+      updateOne: jest.fn().mockResolvedValue({
+        acknowledged: true,
+        modifiedCount: 1,
+      }),
       toArray: jest.fn().mockResolvedValue([]),
     };
 
@@ -119,10 +123,45 @@ describe('MongoDbStrategy', () => {
       expect(result.limitSource).toBe('protective_default');
     });
 
+    it('applies the requested offset to aggregate queries', async () => {
+      const payload = {
+        action: 'aggregate',
+        collection: 'test_col',
+        pipeline: [],
+      };
+
+      await strategy.executeQuery(mockClient, JSON.stringify(payload), {
+        limit: 10,
+        offset: 20,
+      });
+
+      expect(mockCollection.skip).toHaveBeenCalledWith(20);
+    });
+
     it('should throw an error for invalid JSON payload', async () => {
       await expect(
         strategy.executeQuery(mockClient, 'INVALID JSON'),
       ).rejects.toThrow();
+    });
+  });
+
+  describe('updateRow', () => {
+    it('does not retry with a different filter when an _id is invalid', async () => {
+      (ObjectId as any).isValid = jest.fn().mockReturnValue(false);
+
+      await strategy.updateRow(mockClient, {
+        schema: 'public',
+        table: 'test_col',
+        pkColumn: '_id',
+        pkValue: 'not-an-object-id',
+        updates: { name: 'updated' },
+      });
+
+      expect(mockCollection.updateOne).toHaveBeenCalledTimes(1);
+      expect(mockCollection.updateOne).toHaveBeenCalledWith(
+        { _id: 'not-an-object-id' },
+        { $set: { name: 'updated' } },
+      );
     });
   });
 });

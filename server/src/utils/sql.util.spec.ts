@@ -1,6 +1,30 @@
 import { SqlUtil } from './sql.util';
 
 describe('SqlUtil pagination', () => {
+  it('protects bare CTE queries with a LIMIT', () => {
+    expect(
+      SqlUtil.injectLimit(
+        'WITH active AS (SELECT 1) SELECT * FROM active',
+        100,
+      ),
+    ).toBe('WITH active AS (SELECT 1) SELECT * FROM active LIMIT 100;');
+  });
+
+  it('protects bare MSSQL CTE queries with OFFSET/FETCH', () => {
+    expect(
+      SqlUtil.injectTop('WITH active AS (SELECT 1) SELECT * FROM active', 100),
+    ).toBe(
+      'WITH active AS (SELECT 1) SELECT * FROM active ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 100 ROWS ONLY;',
+    );
+  });
+
+  it('does not append row limits to a data-changing CTE', () => {
+    const sql = 'WITH changed AS (SELECT 1) UPDATE users SET active = true';
+    expect(SqlUtil.injectLimit(sql, 100)).toBe(sql);
+    expect(SqlUtil.injectTop(sql, 100)).toBe(sql);
+    expect(SqlUtil.injectPagination(sql, 100, 0, 'postgres')).toBe(sql);
+  });
+
   it('pages a query that already has a LIMIT without loading the whole limited result', () => {
     expect(
       SqlUtil.injectPagination(
@@ -36,5 +60,17 @@ describe('SqlUtil pagination', () => {
         'postgres',
       ),
     ).toBe('UPDATE users SET active = false');
+  });
+
+  it('does not reverse a final partial page', () => {
+    expect(
+      SqlUtil.injectPagination(
+        'SELECT * FROM users ORDER BY id',
+        100,
+        10_000,
+        'postgres',
+        { totalCount: 10_001, primaryKey: 'id' },
+      ),
+    ).toBe('SELECT * FROM users ORDER BY id LIMIT 100 OFFSET 10000;');
   });
 });

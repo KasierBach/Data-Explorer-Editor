@@ -117,6 +117,31 @@ describe('MssqlStrategy', () => {
       );
     });
 
+    it('should honor a requested limit when offset is omitted', async () => {
+      mockRequest.query.mockResolvedValue({ recordset: [], rowsAffected: [0] });
+
+      await strategy.executeQuery(mockPool, 'SELECT * FROM big_table', {
+        limit: 100,
+      });
+
+      expect(mockRequest.query).toHaveBeenCalledWith(
+        'SELECT TOP 100 * FROM big_table',
+      );
+    });
+
+    it('should protect a bare CTE with MSSQL pagination', async () => {
+      mockRequest.query.mockResolvedValue({ recordset: [], rowsAffected: [0] });
+
+      await strategy.executeQuery(
+        mockPool,
+        'WITH active AS (SELECT 1 AS id) SELECT * FROM active',
+      );
+
+      expect(mockRequest.query).toHaveBeenCalledWith(
+        'WITH active AS (SELECT 1 AS id) SELECT * FROM active ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 50000 ROWS ONLY;',
+      );
+    });
+
     it('should not inject TOP into non-SELECT queries (e.g. UPDATE)', async () => {
       mockRequest.query.mockResolvedValue({
         recordset: undefined,

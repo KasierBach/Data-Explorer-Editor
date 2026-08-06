@@ -91,6 +91,47 @@ describe('PostgresStrategy', () => {
   });
 
   describe('identifier quoting', () => {
+    it('quotes schema operation identifiers', () => {
+      const quote = String.fromCharCode(34);
+      const sql = strategy.buildAlterTableSql(quote + 'users' + quote, {
+        type: 'add_fk',
+        name: 'fk' + quote + 'name',
+        columns: ['user' + quote + 'id'],
+        refTable: 'accounts',
+        refColumns: ['id'],
+      } as any);
+
+      expect(sql).toBe(
+        'ALTER TABLE ' +
+          quote +
+          'users' +
+          quote +
+          ' ADD CONSTRAINT ' +
+          quote +
+          'fk' +
+          quote +
+          quote +
+          'name' +
+          quote +
+          ' FOREIGN KEY (' +
+          quote +
+          'user' +
+          quote +
+          quote +
+          'id' +
+          quote +
+          ') REFERENCES ' +
+          quote +
+          'accounts' +
+          quote +
+          ' (' +
+          quote +
+          'id' +
+          quote +
+          ')',
+      );
+    });
+
     it('escapes delimiter characters in table and column identifiers', async () => {
       const quote = String.fromCharCode(34);
       mockPool.query.mockResolvedValue({ rowCount: 1 });

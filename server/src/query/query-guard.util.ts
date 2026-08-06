@@ -146,11 +146,21 @@ export function splitSqlStatements(sql: string): string[] {
       }
     }
 
-    if (ch === "'" && !insideDouble && prev !== '\\') {
-      insideSingle = !insideSingle;
+    if (ch === "'" && !insideDouble) {
+      if (insideSingle && next === "'") {
+        current += ch + next;
+        i += 1;
+        continue;
+      }
+      if (prev !== '\\') insideSingle = !insideSingle;
       current += ch;
-    } else if (ch === '"' && !insideSingle && prev !== '\\') {
-      insideDouble = !insideDouble;
+    } else if (ch === '"' && !insideSingle) {
+      if (insideDouble && next === '"') {
+        current += ch + next;
+        i += 1;
+        continue;
+      }
+      if (prev !== '\\') insideDouble = !insideDouble;
       current += ch;
     } else if (ch === ';' && !insideSingle && !insideDouble) {
       appendSqlStatement(statements, current);

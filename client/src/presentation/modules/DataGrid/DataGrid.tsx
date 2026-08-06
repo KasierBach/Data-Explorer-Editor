@@ -74,10 +74,10 @@ interface DataGridRowProps {
     pkField: string | null | undefined;
     metadata: TableMetadata | undefined;
     handleOpenCellInspector: (val: DatabaseValue, col: string, type: string, rowId: string) => void;
-    copyRowAsSQL: (row: RowData, cols: TableColumn[], schema: string, table: string, dialect: 'postgres' | 'mysql') => void;
+    copyRowAsSQL: (row: RowData, cols: TableColumn[], schema: string, table: string, dialect: 'postgres' | 'mysql' | 'mssql') => void;
     schema: string;
     tableName: string;
-    dialect: 'postgres' | 'mysql';
+    dialect: 'postgres' | 'mysql' | 'mssql';
     matchedCellKeys: Set<string>;
     activeCellKey: string | null;
 }

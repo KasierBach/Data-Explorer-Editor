@@ -82,13 +82,16 @@ export class MssqlStrategy implements IDatabaseStrategy {
     options?: { limit?: number; offset?: number },
   ): Promise<QueryResult> {
     let safeSql = sql;
-    if (options?.limit !== undefined && options?.offset !== undefined) {
-      safeSql = SqlUtil.injectPagination(
-        sql,
-        options.limit,
-        options.offset,
-        'mssql',
-      );
+    if (options?.limit !== undefined) {
+      safeSql =
+        options.offset !== undefined
+          ? SqlUtil.injectPagination(
+              sql,
+              options.limit,
+              options.offset,
+              'mssql',
+            )
+          : SqlUtil.injectTop(sql, options.limit);
     } else {
       safeSql = SqlUtil.injectTop(sql, 50000);
     }

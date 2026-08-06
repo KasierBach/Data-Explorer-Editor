@@ -196,4 +196,10 @@ describe('SQL input bounds', () => {
       `SQL query exceeds the maximum of ${MAX_SQL_STATEMENTS} statements.`,
     );
   });
+
+  it('keeps doubled SQL quotes inside a statement while splitting batches', () => {
+    expect(
+      splitSqlStatements("SELECT 'it''s; safe' AS label; SELECT 2"),
+    ).toEqual(["SELECT 'it''s; safe' AS label", 'SELECT 2']);
+  });
 });

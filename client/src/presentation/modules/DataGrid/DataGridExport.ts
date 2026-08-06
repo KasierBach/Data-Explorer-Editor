@@ -8,7 +8,7 @@ export interface ExportContext {
     columns: { name: string }[];
     schema: string;
     tableName: string;
-    dialect: 'mysql' | 'postgres';
+    dialect: 'mysql' | 'postgres' | 'mssql';
 }
 
 function downloadFile(content: string, filename: string, type: string) {
@@ -67,7 +67,7 @@ export function exportSQL(ctx: ExportContext) {
     downloadFile(inserts, `${tableName}_export.sql`, 'text/sql');
 }
 
-export function copyRowAsSQL(rowData: RowData, columns: { name: string }[], schema: string, tableName: string, dialect: 'mysql' | 'postgres') {
+export function copyRowAsSQL(rowData: RowData, columns: { name: string }[], schema: string, tableName: string, dialect: 'mysql' | 'postgres' | 'mssql') {
     const qSchema = getQuotedIdentifier(schema, dialect);
     const qTable = getQuotedIdentifier(tableName, dialect);
     const cols = columns.map(c => getQuotedIdentifier(c.name, dialect)).join(', ');

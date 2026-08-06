@@ -41,7 +41,7 @@ export class AiChatService {
       where: { id },
       include: {
         messages: {
-          orderBy: { createdAt: 'asc' },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         },
       },
     });
@@ -172,7 +172,13 @@ export class AiChatService {
       throw new NotFoundException('Message not found');
 
     const deleted = await this.prisma.aiMessage.deleteMany({
-      where: { chatId, createdAt: { gt: target.createdAt } },
+      where: {
+        chatId,
+        OR: [
+          { createdAt: { gt: target.createdAt } },
+          { createdAt: target.createdAt, id: { gt: target.id } },
+        ],
+      },
     });
 
     return { success: true, count: deleted.count };

@@ -116,8 +116,8 @@ export class QueryService {
     return /\b(LIMIT|TOP|FETCH\s+NEXT)\b/i.test(sql);
   }
 
-  private assertRawQueryLimit(sql: string, requestedLimit?: number): void {
-    if (requestedLimit !== undefined || !this.isSelectLikeQuery(sql)) return;
+  private assertRawQueryLimit(sql: string): void {
+    if (!this.isSelectLikeQuery(sql)) return;
 
     const hasUnlimitedLimit = /\bLIMIT\s+ALL\b/i.test(sql);
     const explicitLimits = [
@@ -489,7 +489,9 @@ export class QueryService {
       const statementCount = executableStatements.length;
       const finalSql = executableStatements[statementCount - 1];
       const isMultiStatement = executableStatements.length > 1;
-      this.assertRawQueryLimit(finalSql, limit);
+      for (const statement of executableStatements) {
+        this.assertRawQueryLimit(statement);
+      }
 
       let result: QueryResult;
       if (isMultiStatement) {

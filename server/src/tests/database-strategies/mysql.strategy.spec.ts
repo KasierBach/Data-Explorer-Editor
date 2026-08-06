@@ -78,6 +78,10 @@ describe('MysqlStrategy', () => {
       expect(mockPool.execute).toHaveBeenCalledWith(
         'UPDATE ' +
           quote +
+          'app' +
+          quote +
+          '.' +
+          quote +
           'users' +
           quote +
           quote +

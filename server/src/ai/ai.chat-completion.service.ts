@@ -62,31 +62,42 @@ export class AiChatCompletionService {
         this.providerRunner.isGeminiAvailable(),
       );
     let lastError: Error | null = null;
+    let emittedChunk = false;
 
     for (const plan of plans) {
       try {
-        if (plan.provider === 'gemini') {
-          yield* this.providerRunner.streamGemini(
-            plan,
-            params,
-            routingMode,
-            routeDecision,
-          );
-          return;
-        }
+        const stream =
+          plan.provider === 'gemini'
+            ? this.providerRunner.streamGemini(
+                plan,
+                params,
+                routingMode,
+                routeDecision,
+              )
+            : this.providerRunner.streamOpenAiCompatible(
+                plan,
+                params,
+                routingMode,
+                routeDecision,
+              );
 
-        yield* this.providerRunner.streamOpenAiCompatible(
-          plan,
-          params,
-          routingMode,
-          routeDecision,
-        );
+        for await (const event of stream) {
+          if (event.type === 'chunk') emittedChunk = true;
+          yield event;
+        }
         return;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         this.logger.warn(
           `[AiChatService:Stream] Provider ${plan.provider}/${plan.model} failed: ${lastError.message}`,
         );
+        if (emittedChunk) {
+          yield {
+            type: 'error',
+            text: `AI generation interrupted: ${lastError.message}`,
+          };
+          return;
+        }
       }
     }
 

@@ -711,6 +711,61 @@ describe('QueryService', () => {
 
     expect(strategy.executeQuery).not.toHaveBeenCalled();
   });
+
+  it('rejects an explicit SQL limit above the cap even when pagination is requested', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+
+    await expect(
+      service.executeQuery(
+        {
+          connectionId: 'conn-1',
+          sql: 'SELECT * FROM users LIMIT 50001',
+          limit: 100,
+          offset: 0,
+          includeTotalCount: false,
+        } as any,
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(strategy.executeQuery).not.toHaveBeenCalled();
+  });
+
+  it('checks every read statement in a multi-statement batch for the safety cap', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+
+    await expect(
+      service.executeQuery(
+        {
+          connectionId: 'conn-1',
+          sql: 'SELECT * FROM users LIMIT 50001; SELECT 1',
+          includeTotalCount: false,
+        } as any,
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(strategy.executeQuery).not.toHaveBeenCalled();
+  });
+
   it('marks raw select queries with the protective default limit when no explicit limit is requested', async () => {
     connectionsService.findOne.mockResolvedValue({
       id: 'conn-1',

@@ -173,7 +173,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         const limitMeta = this.resolveResultLimit(payload, options);
         appliedLimit = limitMeta.appliedLimit;
         limitSource = limitMeta.limitSource;
-        const skip = options?.offset || 0;
+        const skip = Math.max(0, options?.offset ?? 0);
         appliedOffset = skip;
         result = await col
           .find(filter, payload.options || {})
@@ -193,9 +193,12 @@ export class MongoDbStrategy implements IDatabaseStrategy {
           delete aggregateOptions.limit;
         }
 
+        const skip = Math.max(0, options?.offset ?? 0);
+        appliedOffset = skip;
         const aggregateCursor = col
           .aggregate(pipeline, aggregateOptions)
           .maxTimeMS(30000)
+          .skip(skip)
           .limit(appliedLimit + 1);
         result = await aggregateCursor.toArray();
         truncated = result.length > appliedLimit;
@@ -295,25 +298,18 @@ export class MongoDbStrategy implements IDatabaseStrategy {
     const updatesCpy = { ...params.updates };
     delete updatesCpy._id;
 
-    try {
-      const pkValue = params.pkValue;
-      const filter =
-        params.pkColumn === '_id'
-          ? { _id: new ObjectId(pkValue as string) }
-          : { [params.pkColumn]: pkValue };
-      const result = await col.updateOne(filter, { $set: updatesCpy });
-      return {
-        success: result.acknowledged,
-        rowCount: result.modifiedCount,
-      };
-    } catch (error) {
-      const filter = { [params.pkColumn]: params.pkValue };
-      const result = await col.updateOne(filter, { $set: updatesCpy });
-      return {
-        success: result.acknowledged,
-        rowCount: result.modifiedCount,
-      };
-    }
+    const pkValue = params.pkValue;
+    const filter =
+      params.pkColumn === '_id' &&
+      typeof pkValue === 'string' &&
+      ObjectId.isValid(pkValue)
+        ? { _id: new ObjectId(pkValue) }
+        : { [params.pkColumn]: pkValue };
+    const result = await col.updateOne(filter, { $set: updatesCpy });
+    return {
+      success: result.acknowledged,
+      rowCount: result.modifiedCount,
+    };
   }
 
   async insertRow(

@@ -221,54 +221,75 @@ export class PostgresStrategy implements IDatabaseStrategy {
     });
 
     const client = await pool.connect();
+    let releasePromise: Promise<void> | null = null;
 
-    // Disable statement_timeout for this client so long-running migration
-    // streams are not killed by the pool's default 30s timeout.
-    await client.query('SET statement_timeout = 0');
-
-    const stream = client.query(query);
-
-    // Guard: ensure client.release() is called exactly once
-    let released = false;
+    // The timeout override is session-scoped, so restore it before returning
+    // this client to the pool. The release guard also covers setup failures.
     const safeRelease = () => {
-      if (!released) {
-        released = true;
-        client.release();
+      if (!releasePromise) {
+        releasePromise = (async () => {
+          try {
+            await client.query('SELECT set_config($1, $2, false)', [
+              'statement_timeout',
+              previousTimeout,
+            ]);
+          } catch {
+            // A broken connection will be discarded by the pool on release.
+          } finally {
+            client.release();
+          }
+        })();
       }
+      return releasePromise;
     };
 
-    stream.on('end', safeRelease);
-    stream.on('error', safeRelease);
-    stream.on('close', safeRelease);
+    let previousTimeout = '30s';
+    try {
+      const timeoutResult = await client.query('SHOW statement_timeout');
+      previousTimeout =
+        timeoutResult.rows?.[0]?.statement_timeout || previousTimeout;
+      await client.query('SET statement_timeout = 0');
 
-    return stream;
+      const stream = client.query(query);
+      stream.on('end', () => void safeRelease());
+      stream.on('error', () => void safeRelease());
+      stream.on('close', () => void safeRelease());
+      return stream;
+    } catch (error) {
+      await safeRelease();
+      throw error;
+    }
   }
 
   buildAlterTableSql(quotedTable: string, op: SchemaOperation): string {
     switch (op.type) {
       case 'add_column':
-        return `ALTER TABLE ${quotedTable} ADD COLUMN "${op.name}" ${op.dataType} ${op.isNullable === false ? 'NOT NULL' : ''}`;
+        return `ALTER TABLE ${quotedTable} ADD COLUMN ${this.quoteIdentifier(op.name)} ${op.dataType} ${op.isNullable === false ? 'NOT NULL' : ''}`;
       case 'drop_column':
-        return `ALTER TABLE ${quotedTable} DROP COLUMN "${op.name}"`;
+        return `ALTER TABLE ${quotedTable} DROP COLUMN ${this.quoteIdentifier(op.name)}`;
       case 'alter_column_type':
-        return `ALTER TABLE ${quotedTable} ALTER COLUMN "${op.name}" TYPE ${op.newType}`;
+        return `ALTER TABLE ${quotedTable} ALTER COLUMN ${this.quoteIdentifier(op.name)} TYPE ${op.newType}`;
       case 'rename_column':
-        return `ALTER TABLE ${quotedTable} RENAME COLUMN "${op.name}" TO "${op.newName}"`;
+        return `ALTER TABLE ${quotedTable} RENAME COLUMN ${this.quoteIdentifier(op.name)} TO ${this.quoteIdentifier(op.newName)}`;
       case 'add_pk': {
-        const cols = op.columns.map((c) => `"${c}"`).join(', ');
+        const cols = op.columns.map((c) => this.quoteIdentifier(c)).join(', ');
         return `ALTER TABLE ${quotedTable} ADD PRIMARY KEY (${cols})`;
       }
       case 'drop_pk':
         return op.constraintName
-          ? `ALTER TABLE ${quotedTable} DROP CONSTRAINT "${op.constraintName}"`
+          ? `ALTER TABLE ${quotedTable} DROP CONSTRAINT ${this.quoteIdentifier(op.constraintName)}`
           : `ALTER TABLE ${quotedTable} DROP PRIMARY KEY`;
       case 'add_fk': {
-        const fkCols = op.columns.map((c) => `"${c}"`).join(', ');
-        const refCols = op.refColumns.map((c) => `"${c}"`).join(', ');
-        return `ALTER TABLE ${quotedTable} ADD CONSTRAINT ${op.name} FOREIGN KEY (${fkCols}) REFERENCES "${op.refTable}" (${refCols})`;
+        const fkCols = op.columns
+          .map((c) => this.quoteIdentifier(c))
+          .join(', ');
+        const refCols = op.refColumns
+          .map((c) => this.quoteIdentifier(c))
+          .join(', ');
+        return `ALTER TABLE ${quotedTable} ADD CONSTRAINT ${this.quoteIdentifier(op.name)} FOREIGN KEY (${fkCols}) REFERENCES ${this.quoteIdentifier(op.refTable)} (${refCols})`;
       }
       case 'drop_fk':
-        return `ALTER TABLE ${quotedTable} DROP CONSTRAINT "${op.name}"`;
+        return `ALTER TABLE ${quotedTable} DROP CONSTRAINT ${this.quoteIdentifier(op.name)}`;
       default:
         return '';
     }

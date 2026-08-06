@@ -25,7 +25,10 @@ describe('ConnectionsService security', () => {
     getStrategy: jest.fn().mockReturnValue(strategyMock),
   };
   const auditMock = { log: jest.fn() };
-  const sshTunnelMock = { openTunnel: jest.fn() };
+  const sshTunnelMock = {
+    openTunnel: jest.fn(),
+    closeTunnel: jest.fn(),
+  };
   const organizationsMock = {
     ensureMemberAccess: jest.fn(),
     ensureResourcePolicy: jest.fn(),
@@ -269,6 +272,7 @@ describe('ConnectionsService security', () => {
     await (service as any).cleanupPools();
 
     expect(strategyMock.closePool).toHaveBeenCalledWith({ id: 'stale' });
+    expect(sshTunnelMock.closeTunnel).toHaveBeenCalledWith('conn-1:db_a');
     expect((service as any).pools.has('conn-1:db_a')).toBe(false);
     expect((service as any).pools.has('conn-1:db_b')).toBe(true);
   });
@@ -300,7 +304,34 @@ describe('ConnectionsService security', () => {
     await (service as any).cleanupPools();
 
     expect(strategyMock.closePool).toHaveBeenCalledWith({ id: 'oldest' });
+    expect(sshTunnelMock.closeTunnel).toHaveBeenCalledWith('conn-1:db_a');
     expect((service as any).pools.has('conn-1:db_a')).toBe(false);
     expect((service as any).pools.has('conn-1:db_b')).toBe(true);
+  });
+
+  it('closes an SSH tunnel when pool creation fails', async () => {
+    const connection = {
+      id: 'conn-ssh-fail',
+      userId: 'user-1',
+      type: 'postgres',
+      host: 'db.example.com',
+      database: 'main',
+      password: null,
+      sshHost: 'ssh.example.com',
+      sshUsername: 'deploy',
+    };
+    const error = new Error('database unavailable');
+    prismaMock.connection.findFirst.mockResolvedValue(connection);
+    sshTunnelMock.openTunnel.mockResolvedValue(15432);
+    strategyMock.createPool.mockRejectedValue(error);
+    prismaMock.connection.update.mockResolvedValue(connection);
+
+    await expect(
+      service.getPool('conn-ssh-fail', 'main', 'user-1'),
+    ).rejects.toThrow('database unavailable');
+
+    expect(sshTunnelMock.closeTunnel).toHaveBeenCalledWith(
+      'conn-ssh-fail:main',
+    );
   });
 });

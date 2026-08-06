@@ -268,6 +268,7 @@ export class ConnectionsService implements OnModuleDestroy {
       await this.fallbackClosePool(poolData.pool);
     } finally {
       this.pools.delete(key);
+      await this.sshTunnelService.closeTunnel(key);
     }
   }
 
@@ -539,6 +540,7 @@ export class ConnectionsService implements OnModuleDestroy {
       await this.updateHealthState(id, { status: 'healthy', connected: true });
       return pool;
     } catch (error) {
+      await this.sshTunnelService.closeTunnel(poolKey);
       await this.updateHealthState(id, {
         status: 'error',
         error: getErrorMessage(error) || 'Connection failed',

@@ -66,7 +66,9 @@ export class MysqlStrategy implements IDatabaseStrategy {
   }
 
   quoteTable(schema: string | undefined, table: string): string {
-    return this.quoteIdentifier(table);
+    return schema
+      ? `${this.quoteIdentifier(schema)}.${this.quoteIdentifier(table)}`
+      : this.quoteIdentifier(table);
   }
 
   async executeQuery(
@@ -115,12 +117,12 @@ export class MysqlStrategy implements IDatabaseStrategy {
     pool: Pool,
     params: UpdateRowParams,
   ): Promise<{ success: boolean; rowCount: number }> {
-    const { table, pkColumn, pkValue, updates } = params;
+    const { schema, table, pkColumn, pkValue, updates } = params;
     const updateCols = Object.keys(updates);
     const setClause = updateCols
       .map((col) => `${this.quoteIdentifier(col)} = ?`)
       .join(', ');
-    const sql = `UPDATE ${this.quoteIdentifier(table)} SET ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = ?`;
+    const sql = `UPDATE ${this.quoteTable(schema, table)} SET ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = ?`;
     const values = [...updateCols.map((c) => updates[c]), pkValue];
 
     const [result] = await pool.execute<ResultSetHeader>(sql, values);
@@ -198,52 +200,65 @@ export class MysqlStrategy implements IDatabaseStrategy {
 
     // pool is from mysql2/promise. We need the raw connection for streaming
     const connection = await pool.getConnection();
+    let released = false;
+    const safeRelease = () => {
+      if (!released) {
+        released = true;
+        connection.release();
+      }
+    };
 
-    // .connection accesses the underlying non-promise mysql2 connection
-
-    const stream = (connection as any).connection.query(sql).stream();
-
-    stream.on('end', () => connection.release());
-    stream.on('error', () => connection.release());
-    stream.on('close', () => connection.release());
-
-    return stream;
+    try {
+      // .connection accesses the underlying non-promise mysql2 connection.
+      const stream = (connection as any).connection.query(sql).stream();
+      stream.on('end', safeRelease);
+      stream.on('error', safeRelease);
+      stream.on('close', safeRelease);
+      return stream;
+    } catch (error) {
+      safeRelease();
+      throw error;
+    }
   }
 
   buildAlterTableSql(quotedTable: string, op: SchemaOperation): string {
     switch (op.type) {
       case 'add_column':
-        return `ALTER TABLE ${quotedTable} ADD COLUMN \`${op.name}\` ${op.dataType} ${op.isNullable === false ? 'NOT NULL' : ''}`;
+        return `ALTER TABLE ${quotedTable} ADD COLUMN ${this.quoteIdentifier(op.name)} ${op.dataType} ${op.isNullable === false ? 'NOT NULL' : ''}`;
       case 'drop_column':
-        return `ALTER TABLE ${quotedTable} DROP COLUMN \`${op.name}\``;
+        return `ALTER TABLE ${quotedTable} DROP COLUMN ${this.quoteIdentifier(op.name)}`;
       case 'alter_column_type':
-        return `ALTER TABLE ${quotedTable} MODIFY COLUMN \`${op.name}\` ${op.newType}`;
+        return `ALTER TABLE ${quotedTable} MODIFY COLUMN ${this.quoteIdentifier(op.name)} ${op.newType}`;
       case 'rename_column':
-        return `ALTER TABLE ${quotedTable} RENAME COLUMN \`${op.name}\` TO \`${op.newName}\``;
+        return `ALTER TABLE ${quotedTable} RENAME COLUMN ${this.quoteIdentifier(op.name)} TO ${this.quoteIdentifier(op.newName)}`;
       case 'add_pk': {
-        const cols = op.columns.map((c) => `\`${c}\``).join(', ');
+        const cols = op.columns.map((c) => this.quoteIdentifier(c)).join(', ');
         return `ALTER TABLE ${quotedTable} ADD PRIMARY KEY (${cols})`;
       }
       case 'drop_pk':
         return `ALTER TABLE ${quotedTable} DROP PRIMARY KEY`;
       case 'add_fk': {
-        const fkCols = op.columns.map((c) => `\`${c}\``).join(', ');
-        const refCols = op.refColumns.map((c) => `\`${c}\``).join(', ');
-        return `ALTER TABLE ${quotedTable} ADD CONSTRAINT ${op.name} FOREIGN KEY (${fkCols}) REFERENCES \`${op.refTable}\` (${refCols})`;
+        const fkCols = op.columns
+          .map((c) => this.quoteIdentifier(c))
+          .join(', ');
+        const refCols = op.refColumns
+          .map((c) => this.quoteIdentifier(c))
+          .join(', ');
+        return `ALTER TABLE ${quotedTable} ADD CONSTRAINT ${this.quoteIdentifier(op.name)} FOREIGN KEY (${fkCols}) REFERENCES ${this.quoteIdentifier(op.refTable)} (${refCols})`;
       }
       case 'drop_fk':
-        return `ALTER TABLE ${quotedTable} DROP FOREIGN KEY \`${op.name}\``;
+        return `ALTER TABLE ${quotedTable} DROP FOREIGN KEY ${this.quoteIdentifier(op.name)}`;
       default:
         return '';
     }
   }
 
   async createDatabase(pool: Pool, name: string): Promise<void> {
-    await pool.execute(`CREATE DATABASE \`${name}\``);
+    await pool.execute(`CREATE DATABASE ${this.quoteIdentifier(name)}`);
   }
 
   async dropDatabase(pool: Pool, name: string): Promise<void> {
-    await pool.execute(`DROP DATABASE \`${name}\``);
+    await pool.execute(`DROP DATABASE ${this.quoteIdentifier(name)}`);
   }
 
   async getDatabases(pool: Pool): Promise<TreeNodeResult[]> {
@@ -347,7 +362,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
     dbName?: string,
   ): Promise<TreeNodeResult[]> {
     const [rows] = await pool.query(
-      `SHOW INDEX FROM \`${table}\` IN \`${schema}\``,
+      `SHOW INDEX FROM ${this.quoteIdentifier(table)} IN ${this.quoteIdentifier(schema)}`,
     );
     const parentId = dbName
       ? `db:${dbName}.schema:${schema}.table:${table}.folder:indexes`
@@ -549,15 +564,11 @@ export class MysqlStrategy implements IDatabaseStrategy {
     limit: number,
   ): Promise<Record<string, unknown>[]> {
     const sanitizedLimit = SqlUtil.sanitizeLimit(limit);
-    // In MySQL, we might need the schema name if it's the database name
-    const sql = `SELECT * FROM \`${schema}\`.\`${table}\` LIMIT ${sanitizedLimit}`;
-    const result = await this.executeQuery(pool, sql).catch(async () => {
-      // Fallback if schema prefix fails
-      return this.executeQuery(
-        pool,
-        `SELECT * FROM \`${table}\` LIMIT ${sanitizedLimit}`,
-      );
-    });
+    const quotedTable = this.quoteTable(schema, table);
+    const result = await this.executeQuery(
+      pool,
+      `SELECT * FROM ${quotedTable} LIMIT ${sanitizedLimit}`,
+    );
     return result.rows;
   }
 }
