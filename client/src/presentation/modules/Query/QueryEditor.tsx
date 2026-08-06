@@ -116,6 +116,23 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
     const lastSuccessRunNonceRef = useRef(0);
     const lastErrorRunNonceRef = useRef(0);
     const editorRef = useRef<SqlEditorHandle | null>(null);
+    const editorAliveRef = useRef(false);
+
+    useEffect(() => () => {
+        editorAliveRef.current = false;
+        editorRef.current = null;
+    }, []);
+
+    useEffect(() => {
+        if (!isActive) return;
+
+        const frame = requestAnimationFrame(() => {
+            const editor = editorRef.current;
+            if (!editor || !editorAliveRef.current) return;
+            editor.layout();
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [isActive]);
 
     const {
         saveQuery,
@@ -545,6 +562,11 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
                             height="100%"
                             onMount={(editor) => {
                                 editorRef.current = editor;
+                                editorAliveRef.current = true;
+                                requestAnimationFrame(() => {
+                                    if (!editorAliveRef.current || editorRef.current !== editor) return;
+                                    editor.layout();
+                                });
                             }}
                             schemaInfo={schemaInfo}
                         />

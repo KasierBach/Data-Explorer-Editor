@@ -24,7 +24,7 @@ export const MainContent: React.FC = () => {
                 ) : (
                     activeTab && (
                         <>
-                            {tabs.filter((tab) => tab.type === 'table' || tab.type === 'query').map((tab) => {
+                            {tabs.filter((tab) => tab.type === 'table' || tab.type === 'query').sort((left, right) => left.id.localeCompare(right.id)).map((tab) => {
                                 const isActive = tab.id === activeTabId;
 
                                 return (
