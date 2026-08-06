@@ -1,4 +1,4 @@
-﻿import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
 export const AI_PREFERENCES_STORAGE_KEY = "data-explorer-ai-preferences-v1";
 export const INHERIT_ASSISTANT_MODEL = "__assistant__";
@@ -21,6 +21,7 @@ export interface CustomAiProvider {
   models?: string[];
   serverManaged?: boolean;
   apiKeyConfigured?: boolean;
+  enabled?: boolean;
   capabilities?: {
     vision?: boolean;
     document?: boolean;
@@ -42,6 +43,8 @@ export interface ClientAiProviderOverride {
 }
 
 export interface AiPreferences {
+  enabled?: boolean;
+  disabledProviders?: string[];
   assistantModel?: string;
   explainModel: string;
   sqlModel: string;
@@ -51,6 +54,8 @@ export interface AiPreferences {
 }
 
 const DEFAULT_AI_PREFERENCES: AiPreferences = {
+  enabled: true,
+  disabledProviders: [],
   assistantModel: undefined,
   explainModel: INHERIT_ASSISTANT_MODEL,
   sqlModel: INHERIT_ASSISTANT_MODEL,
@@ -120,6 +125,7 @@ function sanitizePreferences(value: unknown): AiPreferences {
           baseUrl: provider.baseUrl.trim(),
           apiKey: provider.apiKey.trim(),
           model: provider.model.trim(),
+          enabled: typeof provider.enabled === "boolean" ? provider.enabled : true,
           models: Array.isArray(provider.models)
             ? provider.models.filter((model) => typeof model === "string")
             : undefined,
@@ -138,6 +144,10 @@ function sanitizePreferences(value: unknown): AiPreferences {
   );
 
   return {
+    enabled: typeof input.enabled === "boolean" ? input.enabled : true,
+    disabledProviders: Array.isArray(input.disabledProviders)
+      ? input.disabledProviders.filter((p): p is string => typeof p === "string")
+      : [],
     assistantModel: sanitizeModelSelection(
       input.assistantModel,
       undefined,
@@ -314,7 +324,7 @@ export function resolveAiSelection(
   }
 
   const provider = customProviders.find((item) => item.id === providerId);
-  if (!provider) {
+  if (!provider || provider.enabled === false) {
     return {
       selection: assistantFallbackModel,
       model: assistantFallbackModel,

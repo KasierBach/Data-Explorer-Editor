@@ -38,4 +38,12 @@ export class FetchTableWindowDto {
   @IsBoolean()
   @IsOptional()
   includeTotalCount?: boolean;
+
+  @IsString()
+  @IsOptional()
+  sortBy?: string;
+
+  @IsString()
+  @IsOptional()
+  sortOrder?: 'ASC' | 'DESC' | 'asc' | 'desc';
 }

@@ -116,6 +116,52 @@ export class QueryService {
     return /\b(LIMIT|TOP|FETCH\s+NEXT)\b/i.test(sql);
   }
 
+  private assertRawQueryLimit(sql: string, requestedLimit?: number): void {
+    if (requestedLimit !== undefined || !this.isSelectLikeQuery(sql)) return;
+
+    const hasUnlimitedLimit = /\bLIMIT\s+ALL\b/i.test(sql);
+    const explicitLimits = [
+      ...sql.matchAll(/\bLIMIT\s+(\d+)/gi),
+      ...sql.matchAll(/\bTOP\s*\(?\s*(\d+)\s*\)?/gi),
+      ...sql.matchAll(/\bFETCH\s+(?:FIRST|NEXT)\s+(\d+)/gi),
+    ].map((match) => Number.parseInt(match[1], 10));
+    const exceedsCap = explicitLimits.some(
+      (value) => Number.isFinite(value) && value > this.DEFAULT_QUERY_LIMIT,
+    );
+    const hasOffsetWithoutCap =
+      /\bOFFSET\b/i.test(sql) && explicitLimits.length === 0;
+
+    if (hasUnlimitedLimit || exceedsCap || hasOffsetWithoutCap) {
+      throw new BadRequestException(
+        `Raw query results are capped at ${this.DEFAULT_QUERY_LIMIT.toLocaleString()} rows. Use result pagination or export for larger datasets.`,
+      );
+    }
+  }
+
+  private buildQueryCountSql(sql: string): string | undefined {
+    if (!this.isSelectLikeQuery(sql)) return undefined;
+    const normalized = sql.trim().replace(/;$/, '');
+    return `SELECT COUNT(*) AS total FROM (${normalized}) AS _query_count`;
+  }
+
+  private async resolveQueryCount(
+    strategy: {
+      executeQuery: (pool: unknown, sql: string) => Promise<QueryResult>;
+    },
+    pool: unknown,
+    countSql: string,
+    cacheKey: string,
+  ): Promise<number | undefined> {
+    const cachedCount = await this.cacheManager.get<number>(cacheKey);
+    if (typeof cachedCount === 'number') return cachedCount;
+
+    const countResult = await strategy.executeQuery(pool, countSql);
+    const count = this.extractCountValue(countResult);
+    if (count !== undefined) {
+      await this.cacheManager.set(cacheKey, count, this.QUERY_CACHE_TTL_MS);
+    }
+    return count;
+  }
   private applyRawQueryMetadata(
     result: QueryResult,
     sql: string,
@@ -443,6 +489,7 @@ export class QueryService {
       const statementCount = executableStatements.length;
       const finalSql = executableStatements[statementCount - 1];
       const isMultiStatement = executableStatements.length > 1;
+      this.assertRawQueryLimit(finalSql, limit);
 
       let result: QueryResult;
       if (isMultiStatement) {
@@ -463,47 +510,42 @@ export class QueryService {
       }
       result = this.applyRawQueryMetadata(result, finalSql, { limit, offset });
 
-      // Attempt to get totalCount for table views (standard SELECT * queries)
-      if (
-        !isMultiStatement &&
-        includeTotalCount !== false &&
-        finalSql.trim().toUpperCase().startsWith('SELECT * FROM')
-      ) {
-        try {
-          const match = finalSql.match(/FROM\s+([\w"`.[\]]+)/i);
-          if (match) {
-            const tableRef = match[1];
-            const countSql =
-              connection.type === 'mongodb'
-                ? JSON.stringify({
-                    action: 'count',
-                    collection: tableRef.replace(/['"`]/g, ''),
-                  })
-                : `SELECT COUNT(*) as total FROM ${tableRef}`;
-
-            const countResult = await strategy.executeQuery(pool, countSql);
-            const totalCount = this.extractCountValue(countResult);
-
+      if (!isMultiStatement && includeTotalCount === true) {
+        const countSql = this.buildQueryCountSql(finalSql);
+        if (countSql) {
+          try {
+            const countCacheKey = await this.getQueryCacheKey(
+              connectionId,
+              `result-count:${countSql}`,
+              database || connection.database,
+            );
+            const totalCount = await this.resolveQueryCount(
+              strategy,
+              pool,
+              countSql,
+              countCacheKey,
+            );
             if (totalCount !== undefined) {
               result.totalCount = totalCount;
               result.countStatus = 'available';
             } else {
               result.countStatus = 'unavailable';
             }
+          } catch (countError) {
+            result.countStatus = 'unavailable';
+            this.logger.warn(
+              'Failed to fetch query result count:',
+              countError instanceof Error
+                ? countError.message
+                : String(countError),
+            );
           }
-        } catch (countError) {
-          result.countStatus = 'unavailable';
-          this.logger.warn(
-            'Failed to fetch total row count:',
-            countError instanceof Error
-              ? countError.message
-              : String(countError),
-          );
+        } else {
+          result.countStatus = 'skipped';
         }
-      } else if (includeTotalCount === false || isMultiStatement) {
+      } else {
         result.countStatus = 'skipped';
       }
-
       await this.auditService.log({
         action: AuditAction.DB_QUERY_EXECUTE,
         userId,
@@ -518,7 +560,8 @@ export class QueryService {
 
       return result;
     } catch (error) {
-      if (isForbiddenException(error)) throw error;
+      if (isForbiddenException(error) || error instanceof BadRequestException)
+        throw error;
 
       const resolvedDatabase = database || connection.database || null;
       const rootCause = getErrorMessage(error);
@@ -551,6 +594,8 @@ export class QueryService {
       includeTotalCount,
       limit,
       offset,
+      sortBy,
+      sortOrder,
     } = fetchTableWindowDto;
 
     const connection = await this.connectionsService.findOne(
@@ -589,7 +634,47 @@ export class QueryService {
       );
       const strategy = this.strategyFactory.getStrategy(connection.type);
       const quotedTable = strategy.quoteTable(schema, table);
-      const baseSql = `SELECT * FROM ${quotedTable}`;
+
+      // Deterministic ordering: use explicit sortBy, or auto-detect PK, or fall back to first column
+      let orderClause = '';
+      if (sortBy) {
+        const direction = sortOrder?.toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+        const quotedSort =
+          typeof strategy.quoteIdentifier === 'function'
+            ? strategy.quoteIdentifier(sortBy)
+            : `"${sortBy}"`;
+        orderClause = ` ORDER BY ${quotedSort} ${direction}`;
+      } else {
+        try {
+          const columns =
+            typeof strategy.getColumns === 'function'
+              ? await strategy.getColumns(
+                  pool,
+                  schema ?? '',
+                  table,
+                  database || connection.database,
+                )
+              : [];
+          const pkCol = columns?.find((c) => c.isPrimaryKey);
+          if (pkCol) {
+            const quotedPk =
+              typeof strategy.quoteIdentifier === 'function'
+                ? strategy.quoteIdentifier(pkCol.name)
+                : `"${pkCol.name}"`;
+            orderClause = ` ORDER BY ${quotedPk} ASC`;
+          } else if (columns && columns.length > 0) {
+            const quotedFirst =
+              typeof strategy.quoteIdentifier === 'function'
+                ? strategy.quoteIdentifier(columns[0].name)
+                : `"${columns[0].name}"`;
+            orderClause = ` ORDER BY ${quotedFirst} ASC`;
+          }
+        } catch {
+          orderClause = '';
+        }
+      }
+
+      const baseSql = `SELECT * FROM ${quotedTable}${orderClause}`;
       const result = await strategy.executeQuery(pool, baseSql, {
         limit: normalizedLimit,
         offset: normalizedOffset,

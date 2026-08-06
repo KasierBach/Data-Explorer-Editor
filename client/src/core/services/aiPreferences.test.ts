@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   AI_PREFERENCES_STORAGE_KEY,
   INHERIT_ASSISTANT_MODEL,
@@ -36,6 +36,8 @@ describe("aiPreferences", () => {
     );
 
     expect(readAiPreferences()).toEqual({
+      enabled: true,
+      disabledProviders: [],
       assistantModel: undefined,
       explainModel: INHERIT_ASSISTANT_MODEL,
       sqlModel: INHERIT_ASSISTANT_MODEL,

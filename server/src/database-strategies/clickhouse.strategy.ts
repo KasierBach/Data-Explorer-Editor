@@ -68,17 +68,20 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
   ): Promise<QueryResult> {
     let safeSql = sql;
     if (options?.limit !== undefined) {
-      const trimmed = safeSql.trim().replace(/;$/, '');
-      if (!/\b(LIMIT|OFFSET|FETCH)\b/i.test(trimmed)) {
-        safeSql = `${trimmed} LIMIT ${options.limit}`;
-      }
-    } else if (!/LIMIT\s+\d+/i.test(safeSql)) {
-      safeSql = `${safeSql.trim().replace(/;$/, '')} LIMIT 50000`;
-    }
-    if (options?.offset !== undefined) {
-      safeSql += ` OFFSET ${options.offset}`;
+      safeSql =
+        options.offset !== undefined
+          ? SqlUtil.injectPagination(
+              sql,
+              options.limit,
+              options.offset,
+              'clickhouse',
+            )
+          : SqlUtil.injectLimit(sql, options.limit);
+    } else {
+      safeSql = SqlUtil.injectLimit(sql, 50000);
     }
 
+    safeSql = safeSql.replace(/;$/, '');
     const resultSet = await pool.query({
       query: safeSql,
       format: 'JSONEachRow',

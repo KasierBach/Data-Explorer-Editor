@@ -6,6 +6,11 @@ import type { QueryResult, TableMetadata } from '@/core/domain/entities';
 
 interface DataGridDataParams {
     tableId: string;
+    tabId: string;
+    enabled: boolean;
+    includeTotalCount?: boolean;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC' | 'asc' | 'desc';
 }
 
 interface DataGridDataResult {
@@ -22,14 +27,14 @@ interface DataGridDataResult {
     pkField: string | undefined;
 }
 
-export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataResult {
-    const { activeConnectionId, connections, tabs, activeTabId } = useAppStore();
+export function useDataGridData({ tableId, tabId, enabled, includeTotalCount = false, sortBy, sortOrder }: DataGridDataParams): DataGridDataResult {
+    const { activeConnectionId, connections, tabs } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
-    const activeTab = tabs.find(t => t.id === activeTabId);
+    const tab = tabs.find(t => t.id === tabId);
     
     // Pagination state from tab metadata
-    const page = activeTab?.metadata?.page || 1;
-    const pageSize = activeTab?.metadata?.pageSize || 100;
+    const page = tab?.metadata?.page || 1;
+    const pageSize = tab?.metadata?.pageSize || 100;
     const offset = (page - 1) * pageSize;
 
     const { dbName, schema, table: cleanTableName } = parseNodeId(tableId);
@@ -48,7 +53,7 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
             const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
             return adapter.getMetadata(tableId);
         },
-        enabled: !!activeConnectionId,
+        enabled: enabled && !!activeConnectionId,
         staleTime: Infinity, // Metadata doesn't change unless schema changes
         refetchOnWindowFocus: false,
     });
@@ -60,7 +65,7 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
         isFetching: isFetchingData,
         refetch: refetchData,
     } = useQuery({
-        queryKey: ['data', activeConnectionId, tableId, page, pageSize],
+        queryKey: ['data', activeConnectionId, tableId, page, pageSize, includeTotalCount, sortBy, sortOrder],
         queryFn: async () => {
             if (!activeConnection) throw new Error("No active connection");
             if (!resolvedTableName) throw new Error("No table selected");
@@ -70,16 +75,17 @@ export function useDataGridData({ tableId }: DataGridDataParams): DataGridDataRe
                 database: dbName,
                 schema,
                 table: resolvedTableName,
-                includeTotalCount: false,
+                includeTotalCount,
                 limit: pageSize,
                 offset,
+                sortBy,
+                sortOrder,
             });
         },
-        enabled: !!activeConnectionId && !!metadata,
+        enabled: enabled && !!activeConnectionId && !!metadata,
         staleTime: 60 * 1000, // Keep data fresh for 1 minute
         gcTime: 15 * 60 * 1000,
         refetchOnWindowFocus: false, // CRITICAL: Stop the flickering/delay on refocus
-        placeholderData: (previousData) => previousData,
     });
 
     const pkField = metadata?.columns?.find(c => c.isPrimaryKey)?.name;

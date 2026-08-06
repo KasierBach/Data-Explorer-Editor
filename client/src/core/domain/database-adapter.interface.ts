@@ -20,6 +20,8 @@ export interface TableWindowRequest {
     limit?: number;
     offset?: number;
     includeTotalCount?: boolean;
+    sortBy?: string;
+    sortOrder?: 'ASC' | 'DESC' | 'asc' | 'desc';
 }
 
 export interface SchemaOperation {

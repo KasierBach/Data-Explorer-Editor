@@ -23,16 +23,25 @@ export const MainContent: React.FC = () => {
                     <Dashboard />
                 ) : (
                     activeTab && (
-                        <div className="h-full w-full bg-background">
-                            {activeTab.type === 'table' && (
-                                <DataGrid key={activeTab.id} tableId={activeTab.metadata?.tableId || activeTab.id} />
-                            )}
-                            {activeTab.type === 'query' && (
-                                <React.Suspense fallback={<LoadingState label={lang === 'vi' ? 'Đang tải trình soạn thảo...' : 'Loading query editor...'} variant="workspace" />}>
-                                    <QueryEditor key={activeTab.id} tabId={activeTab.id} />
-                                </React.Suspense>
-                            )}
-                            {activeTab.type === 'insights' && (
+                        <>
+                            {tabs.filter((tab) => tab.type === 'table' || tab.type === 'query').map((tab) => {
+                                const isActive = tab.id === activeTabId;
+
+                                return (
+                                    <div key={tab.id} className={isActive ? 'h-full w-full bg-background' : 'hidden'}>
+                                        {tab.type === 'table' ? (
+                                            <DataGrid tableId={tab.metadata?.tableId || tab.id} tabId={tab.id} isActive={isActive} />
+                                        ) : (
+                                            <React.Suspense fallback={<LoadingState label={lang === 'vi' ? 'Đang tải trình soạn thảo...' : 'Loading query editor...'} variant="workspace" />}>
+                                                <QueryEditor tabId={tab.id} isActive={isActive} />
+                                            </React.Suspense>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                            {activeTab.type !== 'table' && activeTab.type !== 'query' && (
+                                <div className="h-full w-full bg-background">
+                                    {activeTab.type === 'insights' && (
                                 <InsightsDashboard
                                     key={activeTab.id}
                                     connectionId={activeTab.metadata?.connectionId}
@@ -58,7 +67,9 @@ export const MainContent: React.FC = () => {
                                     />
                                 </React.Suspense>
                             )}
-                        </div>
+                                </div>
+                            )}
+                        </>
                     )
                 )}
             </div>

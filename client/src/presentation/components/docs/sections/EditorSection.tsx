@@ -29,7 +29,7 @@ export function EditorSection({ lang }: Props) {
                     {
                         icon: <Shield className="w-8 h-8 text-rose-500" />,
                         title: t ? 'Safe Execution' : 'Safe Execution',
-                        desc: t ? 'Toolbar hiển thị rõ giới hạn row, timeout, connection guardrails, và xác nhận khi chạy SQL do AI gợi ý. Chế độ “Tối đa 50k” là guardrail thật cho raw SQL, không phải no-limit.' : 'The toolbar shows row limits, timeout rules, connection guardrails, and confirmation before running AI-generated SQL. The “Max 50k” mode is a real raw-SQL guardrail, not a no-limit mode.'
+                        desc: t ? 'Kết quả SELECT được tải theo từng trang từ server; timeout, connection guardrails và xác nhận SQL rủi ro vẫn được áp dụng trước khi thực thi. Raw SQL không phân trang vẫn có trần bảo vệ 50.000 dòng.' : 'SELECT results are fetched page by page from the server; timeout rules, connection guardrails, and risky-SQL confirmation still run before execution. Unpaged raw SQL keeps a protective 50,000-row cap.'
                     }
                 ].map((item, i) => (
                     <div key={i} className="p-6 border rounded-3xl bg-card/50 space-y-4">
@@ -43,8 +43,8 @@ export function EditorSection({ lang }: Props) {
             <Callout type="info">
                 <p className="text-sm">
                     {t
-                        ? 'Raw SQL vẫn đi qua endpoint thực thi chung và được bảo vệ bằng giới hạn server-side. Khi bạn chỉ đang duyệt bảng trong grid, app dùng `/query/table-window` để lấy đúng trang dữ liệu với `limit`, `offset`, `countStatus` và metadata giới hạn rõ ràng.'
-                        : 'Raw SQL still uses the general execution endpoint and remains protected by a server-side cap. When you are only browsing a table in the grid, the app uses `/query/table-window` to fetch the requested data page with explicit `limit`, `offset`, `countStatus`, and limit metadata.'}
+                        ? 'DataGrid dùng `/query/table-window`; Query Result dùng endpoint thực thi chung với `limit` và `offset` theo trang. Cả hai đều chỉ tải cửa sổ dữ liệu đang xem, giữ tổng số dòng trong cache ngắn hạn và không đưa toàn bộ dataset vào trình duyệt.'
+                        : 'DataGrid uses `/query/table-window`; Query Result uses the general execution endpoint with page-level `limit` and `offset`. Both fetch only the visible data window, keep row counts in a short-lived cache, and avoid loading the full dataset into the browser.'}
                 </p>
             </Callout>
 

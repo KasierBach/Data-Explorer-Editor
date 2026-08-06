@@ -25,13 +25,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/presentation/components/ui/popover';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/presentation/components/ui/select';
+
 import { cn } from '@/lib/utils';
 import { AiQueryBox } from './AiQueryBox';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
@@ -43,7 +37,6 @@ interface QueryToolbarProps {
     isCompactMobileLayout: boolean;
     isSmallMobile: boolean;
     lang: 'vi' | 'en';
-    limit: string;
     activeConnectionId: string | null | undefined;
     activeDatabase?: string | null;
     rightSlot?: React.ReactNode;
@@ -58,7 +51,6 @@ interface QueryToolbarProps {
     onOpenHistory: () => void;
     onExplain: () => void;
     onOpenSqlSequence?: () => void;
-    onLimitChange: (limit: string) => void;
 }
 
 export const QueryToolbar: React.FC<QueryToolbarProps> = ({
@@ -68,7 +60,6 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
     isCompactMobileLayout,
     isSmallMobile,
     lang,
-    limit,
     activeConnectionId,
     activeDatabase,
     rightSlot,
@@ -83,7 +74,6 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
     onOpenHistory,
     onExplain,
     onOpenSqlSequence,
-    onLimitChange,
 }) => {
     const isExecutionDisabled = isLoading || allowQueryExecution === false;
     const text = getWorkspaceText(lang).queryToolbar;
@@ -234,21 +224,7 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                     </DropdownMenu>
                 )}
 
-                <div className="flex items-center gap-1 px-1 shrink-0">
-                    {!isCompactMobileLayout && <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{text.limit}</span>}
-                    <Select value={limit} onValueChange={onLimitChange}>
-                        <SelectTrigger className="h-7 w-[80px] text-[10px] py-0 border-none bg-muted hover:bg-muted/80 focus:ring-0 shadow-none shrink-0">
-                            <SelectValue placeholder={text.limit} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="100">100</SelectItem>
-                            <SelectItem value="500">500</SelectItem>
-                            <SelectItem value="1000">1000</SelectItem>
-                            <SelectItem value="5000">5000</SelectItem>
-                            <SelectItem value="all">{text.max50k}</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
+
             </div>
 
             {rightSlot && (

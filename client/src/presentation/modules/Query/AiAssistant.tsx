@@ -1,5 +1,6 @@
-﻿import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Button } from '@/presentation/components/ui/button';
+import { Switch } from '@/presentation/components/ui/switch';
 import {
     Sparkles, Plus, MessageSquare, Clock, X, Loader2
 } from 'lucide-react';
@@ -72,7 +73,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     ], []);
 
     const preferences = useAiPreferences();
-    const MODELS = useMemo(() => getAssistantModelCatalog(preferences.customProviders), [preferences.customProviders]);
+    const MODELS = useMemo(() => getAssistantModelCatalog(preferences.customProviders, preferences.disabledProviders), [preferences.customProviders, preferences.disabledProviders]);
     const assistantSelection = preferences.assistantModel || aiModel;
     const handleAssistantModelChange = React.useCallback((value: string) => {
         updateAiPreferences((current) => ({
@@ -150,6 +151,13 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                 <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-violet-400" />
                     <span className="text-xs font-bold text-foreground">AI Assistant</span>
+                    <Switch
+                        checked={preferences.enabled !== false}
+                        onCheckedChange={(checked) => {
+                            updateAiPreferences((current) => ({ ...current, enabled: checked }));
+                        }}
+                        title={preferences.enabled !== false ? 'AI đang Bật (Click để Tắt)' : 'AI đang Tắt (Click để Bật)'}
+                    />
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400 font-medium">
                         {ROUTING_MODES.find(m => m.id === aiRoutingMode)?.label || 'Auto'}
                     </span>

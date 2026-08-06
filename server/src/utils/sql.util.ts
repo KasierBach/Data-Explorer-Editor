@@ -23,22 +23,49 @@ export class SqlUtil {
 
   /**
    * Injects pagination (LIMIT/OFFSET or OFFSET/FETCH) into a SELECT statement.
+   * Supports Reverse Pagination optimization when offset is large (> totalCount / 2).
    */
   static injectPagination(
     sql: string,
     limit: number,
     offset: number,
-    dialect: 'postgres' | 'mysql' | 'mssql',
+    dialect: 'postgres' | 'mysql' | 'mssql' | 'sqlite' | 'clickhouse',
+    options?: { totalCount?: number; primaryKey?: string },
   ): string {
     const trimmed = sql.trim().replace(/;$/, '');
 
-    // Skip if not a SELECT or already has pagination keywords
-    if (!/^\s*SELECT/i.test(trimmed)) return sql;
-    if (/\b(LIMIT|OFFSET|FETCH)\b/i.test(trimmed)) return sql;
+    if (!/^\s*(SELECT|WITH)\b/i.test(trimmed)) return sql;
+
+    const hasExplicitPagination =
+      /\b(LIMIT|OFFSET|FETCH\s+(?:FIRST|NEXT)|TOP\s*\(?)\b/i.test(trimmed);
+    if (hasExplicitPagination) {
+      if (dialect === 'mssql') {
+        return `SELECT * FROM (${trimmed}) AS _paged_result ORDER BY (SELECT NULL) OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY;`;
+      }
+      return `SELECT * FROM (${trimmed}) AS _paged_result LIMIT ${limit} OFFSET ${offset};`;
+    }
+
+    // Optimization: Reverse pagination for deep offsets if totalCount is available
+    if (
+      options?.totalCount &&
+      options.totalCount > 10000 &&
+      offset > options.totalCount / 2
+    ) {
+      const reverseOffset = Math.max(0, options.totalCount - offset - limit);
+      if (!/GROUP\s+BY|HAVING|UNION/i.test(trimmed)) {
+        if (dialect === 'mssql') {
+          const pkOrder = options.primaryKey
+            ? `${options.primaryKey} DESC`
+            : '(SELECT NULL)';
+          return `SELECT * FROM (${trimmed} ORDER BY ${pkOrder} OFFSET ${reverseOffset} ROWS FETCH NEXT ${limit} ROWS ONLY) _rev ORDER BY ${options.primaryKey || '1'} ASC;`;
+        }
+        if (options.primaryKey) {
+          return `SELECT * FROM (${trimmed} ORDER BY "${options.primaryKey}" DESC LIMIT ${limit} OFFSET ${reverseOffset}) _rev ORDER BY "${options.primaryKey}" ASC;`;
+        }
+      }
+    }
 
     if (dialect === 'mssql') {
-      // MSSQL OFFSET/FETCH requires an ORDER BY clause.
-      // We use (SELECT NULL) as a dummy order if one isn't provided.
       let paginated = trimmed;
       if (!/ORDER\s+BY/i.test(trimmed)) {
         paginated = `${trimmed} ORDER BY (SELECT NULL)`;

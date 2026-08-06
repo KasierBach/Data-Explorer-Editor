@@ -43,10 +43,17 @@ export class SqliteStrategy implements IDatabaseStrategy {
   ): Promise<QueryResult> {
     let safeSql = sql;
     if (options?.limit !== undefined) {
-      safeSql += ` LIMIT ${options.limit}`;
-      if (options.offset !== undefined) safeSql += ` OFFSET ${options.offset}`;
+      safeSql =
+        options.offset !== undefined
+          ? SqlUtil.injectPagination(
+              sql,
+              options.limit,
+              options.offset,
+              'sqlite',
+            )
+          : SqlUtil.injectLimit(sql, options.limit);
     } else {
-      safeSql += ' LIMIT 50000';
+      safeSql = SqlUtil.injectLimit(sql, 50000);
     }
 
     const rows = pool.prepare(safeSql).all() as Record<string, unknown>[];

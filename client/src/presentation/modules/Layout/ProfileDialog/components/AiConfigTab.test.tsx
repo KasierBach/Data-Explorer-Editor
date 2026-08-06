@@ -248,4 +248,18 @@ describe("AiConfigTab", () => {
       expect(mockPreferences.autocompleteModel).toBe(INHERIT_ASSISTANT_MODEL);
     });
   });
+
+  it("toggles the custom provider's enabled state when Switch is toggled", async () => {
+    render(<AiConfigTab t={(key) => key} />);
+
+    const switchToggle = screen.getByRole("switch", { name: "Bật/Tắt provider" });
+    expect(switchToggle).toBeChecked();
+
+    fireEvent.click(switchToggle);
+
+    await waitFor(() => {
+      expect(mockPreferences.customProviders[0].enabled).toBe(false);
+    });
+    expect(aiConfigTabMocks.toastSuccess).toHaveBeenCalledWith("Đã tắt provider AI.");
+  });
 });

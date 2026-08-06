@@ -16,7 +16,7 @@ export function ResultsSection({ lang }: Props) {
                 {[
                     { title: t ? 'Sắp xếp thông minh' : 'Smart Sorting', desc: t ? 'Nhấn vào tiêu đề cột để sắp xếp tăng/giảm dần. Hỗ trợ sắp xếp đa cột bằng cách giữ Shift và click thêm cột. Tự động nhận diện kiểu dữ liệu (số, text, ngày) để sắp xếp chính xác.' : 'Click column headers to sort ascending/descending. Multi-column sort by holding Shift and clicking additional columns. Auto-detects data types (number, text, date) for accurate sorting.' },
                     { title: t ? 'Lọc nhanh (Quick Filter)' : 'Quick Filter', desc: t ? 'Thanh tìm kiếm trực tiếp trên lưới lọc bản ghi real-time khi bạn gõ. Hỗ trợ lọc theo cột cụ thể hoặc tìm kiếm toàn bộ bản ghi. Regex được hỗ trợ với prefix "re:".' : 'Search bar directly on the grid filters records in real-time as you type. Supports column-specific filtering or full-record search. Regex supported with "re:" prefix.' },
-                    { title: t ? 'Phân trang hiệu suất' : 'Performance Pagination', desc: t ? 'Khi duyệt bảng, lưới dùng cửa sổ dữ liệu phía server với limit/offset rõ ràng rồi mới render phần đang hiển thị. Raw SQL vẫn có guardrail tối đa 50,000 rows để tránh kéo quá nhiều dữ liệu vào trình duyệt.' : 'When browsing tables, the grid uses explicit server-side data windows with limit/offset before rendering the visible rows. Raw SQL still has a 50,000-row guardrail to avoid pulling too much data into the browser.' },
+                    { title: t ? 'Phân trang hiệu suất' : 'Performance Pagination', desc: t ? 'DataGrid và Query Result đều lấy dữ liệu theo từng trang từ server. User có thể duyệt tập dữ liệu lớn bằng nút Trước/Sau hoặc nhảy trang mà không phải tự viết LIMIT/OFFSET.' : 'DataGrid and Query Result both fetch server-side pages. Users can browse large datasets with Previous/Next or page jump controls without writing LIMIT/OFFSET manually.' },
                 ].map((feature, i) => (
                     <div key={i} className="p-6 border rounded-2xl bg-card space-y-2 hover:border-primary/50 transition-colors">
                         <h4 className="font-bold text-primary">{feature.title}</h4>
@@ -28,8 +28,8 @@ export function ResultsSection({ lang }: Props) {
             <Callout type="info">
                 <p className="text-sm">
                     {t
-                        ? 'Từ bản perf pass này, thao tác duyệt bảng dùng endpoint `/query/table-window` riêng. Response có `appliedLimit`, `appliedOffset`, `limitSource` và `countStatus`, nên UI có thể phân biệt giữa trang dữ liệu thật, giới hạn bảo vệ, và trường hợp không lấy được tổng số dòng.'
-                        : 'From this performance pass onward, table browsing uses a dedicated `/query/table-window` endpoint. Responses include `appliedLimit`, `appliedOffset`, `limitSource`, and `countStatus`, so the UI can distinguish real windows, protective caps, and unavailable counts.'}
+                        ? 'Footer của DataGrid và Query Result dùng cùng cách hiển thị số dòng, trang hiện tại, kích thước trang và tổng kết quả. Tổng chính xác được cache bằng Redis trong thời gian ngắn để tránh lặp lại COUNT(*) khi chuyển trang.'
+                        : 'DataGrid and Query Result footers use the same row, current-page, page-size, and total-result language. Exact totals are cached briefly in Redis so page changes do not repeat COUNT(*).'}
                 </p>
             </Callout>
 

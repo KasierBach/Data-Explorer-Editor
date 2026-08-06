@@ -5,7 +5,7 @@ import {
     TabsList,
     TabsTrigger
 } from "@/presentation/components/ui/tabs";
-import { Info, Table as TableIcon, Loader2, Play, GitBranch, X, Eraser, LayoutDashboard, Sparkles } from 'lucide-react';
+import { Info, Table as TableIcon, Loader2, Play, GitBranch, X, Eraser, LayoutDashboard, Sparkles, Download } from 'lucide-react';
 import type { QueryResult } from '@/core/domain/entities';
 import { ResultTable } from './ResultTable';
 import { QueryPlanVisualizer } from './QueryPlanVisualizer';
@@ -14,10 +14,12 @@ import { cn } from '@/lib/utils';
 import { useAppStore } from '@/core/services/store';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { Button } from '@/presentation/components/ui/button';
+import { toast } from 'sonner';
 
 interface QueryResultsProps {
     results: QueryResult | null;
     isLoading: boolean;
+    isFetching?: boolean;
     error: Error | null;
     executedQuery: string | null;
     dataUpdatedAt: number;
@@ -28,11 +30,16 @@ interface QueryResultsProps {
     onClose?: () => void;
     onSaveToDashboard?: () => void;
     onFixWithAi?: () => void;
+    pageIndex: number;
+    pageSize: number;
+    totalCount?: number;
+    onPaginationChange: (pageIndex: number, pageSize: number) => void;
 }
 
 export const QueryResults: React.FC<QueryResultsProps> = ({
     results,
     isLoading,
+    isFetching = false,
     error,
     executedQuery,
     dataUpdatedAt,
@@ -43,6 +50,10 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
     onClose,
     onSaveToDashboard,
     onFixWithAi,
+    pageIndex,
+    pageSize,
+    totalCount,
+    onPaginationChange,
 }) => {
     const { lang } = useAppStore();
     const text = getWorkspaceText(lang).queryResults;
@@ -81,7 +92,16 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
             );
         }
 
-        return <ResultTable results={results} />;
+        return (
+            <ResultTable
+                results={results}
+                pageIndex={pageIndex}
+                pageSize={pageSize}
+                totalCount={totalCount}
+                isFetching={isFetching}
+                onPaginationChange={onPaginationChange}
+            />
+        );
     };
 
     return (
@@ -133,6 +153,35 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                             <Eraser className="w-3.5 h-3.5" />
                         </button>
                     )}
+                    {results && !error && (
+                        <button
+                            onClick={() => {
+                                if (!results.rows?.length) return;
+                                const cols = results.columns || Object.keys(results.rows[0] || {});
+                                const csvHeaders = cols.join(',');
+                                const csvRows = results.rows.map(row =>
+                                    cols.map(col => {
+                                        const val = row[col];
+                                        if (val === null || val === undefined) return '';
+                                        const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+                                        return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str.replace(/"/g, '""')}"` : str;
+                                    }).join(',')
+                                ).join('\n');
+                                const blob = new Blob([`${csvHeaders}\n${csvRows}`], { type: 'text/csv;charset=utf-8;' });
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                link.href = url;
+                                link.download = `query_result_${Date.now()}.csv`;
+                                link.click();
+                                URL.revokeObjectURL(url);
+                                toast.success(lang === 'vi' ? 'Đã xuất trang kết quả hiện tại' : 'Exported the current result page');
+                            }}
+                            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-green-500 transition-colors"
+                            title={lang === 'vi' ? 'Xuất trang hiện tại' : 'Export current page'}
+                        >
+                            <Download className="w-3.5 h-3.5" />
+                        </button>
+                    )}
                     {results && !error && onSaveToDashboard && (
                         <button
                             onClick={onSaveToDashboard}
@@ -156,7 +205,7 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
             </div>
 
             <div className="flex-1 relative overflow-hidden bg-card">
-                <TabsContent value="data" className="m-0 h-full overflow-auto">
+                <TabsContent value="data" className="m-0 h-full overflow-hidden">
                     {renderDataContent()}
                 </TabsContent>
 

@@ -65,7 +65,7 @@ describe('useDataGridData', () => {
 
     mockUseAppStore.mockReturnValue({
       activeConnectionId: 'conn-1',
-      activeTabId: 'tab-1',
+      activeTabId: 'tab-2',
       connections: [
         {
           id: 'conn-1',
@@ -80,13 +80,20 @@ describe('useDataGridData', () => {
             pageSize: 50,
           },
         },
+        {
+          id: 'tab-2',
+          metadata: {
+            page: 1,
+            pageSize: 10,
+          },
+        },
       ],
     } as never);
   });
 
   it('uses the dedicated table-window API for paged table browsing', async () => {
     const { result } = renderHook(
-      () => useDataGridData({ tableId: 'db:analytics.schema:public.table:users' }),
+      () => useDataGridData({ tableId: 'db:analytics.schema:public.table:users', tabId: 'tab-1', enabled: true }),
       { wrapper: createWrapper() },
     );
 
@@ -104,6 +111,8 @@ describe('useDataGridData', () => {
       includeTotalCount: false,
       limit: 50,
       offset: 100,
+      sortBy: undefined,
+      sortOrder: undefined,
     });
     expect(result.current.queryResult).toEqual(
       expect.objectContaining({
@@ -116,7 +125,7 @@ describe('useDataGridData', () => {
 
   it('does not fall back to the legacy large_dataset raw-query shortcut', async () => {
     const { result } = renderHook(
-      () => useDataGridData({ tableId: 'large_dataset' }),
+      () => useDataGridData({ tableId: 'large_dataset', tabId: 'tab-1', enabled: true, includeTotalCount: true }),
       { wrapper: createWrapper() },
     );
 
@@ -128,11 +137,59 @@ describe('useDataGridData', () => {
       database: undefined,
       schema: 'public',
       table: 'large_dataset',
-      includeTotalCount: false,
+      includeTotalCount: true,
       limit: 50,
       offset: 100,
+      sortBy: undefined,
+      sortOrder: undefined,
     });
     expect(adapter.executeQuery).not.toHaveBeenCalled();
     expect(result.current.cleanTableName).toBe('large_dataset');
+  });
+  it('clears the previous page while the next page is loading', async () => {
+    let page = 1;
+    type WindowResult = {
+      columns: string[];
+      rows: { id: number }[];
+      rowCount: number;
+      countStatus: 'skipped';
+    };
+    let resolveNextPage: ((value: WindowResult) => void) | undefined;
+
+    mockUseAppStore.mockImplementation(() => ({
+      activeConnectionId: 'conn-1',
+      connections: [{ id: 'conn-1', type: 'postgres' }],
+      tabs: [{ id: 'tab-1', metadata: { page, pageSize: 10 } }],
+    } as never));
+    adapter.fetchTableWindow.mockImplementation(({ offset }) => {
+      if (offset === 0) {
+        return Promise.resolve({
+          columns: ['id'],
+          rows: [{ id: 1 }],
+          rowCount: 1,
+          countStatus: 'skipped' as const,
+        });
+      }
+
+      return new Promise<WindowResult>((resolve) => {
+        resolveNextPage = resolve;
+      });
+    });
+
+    const { result, rerender } = renderHook(
+      () => useDataGridData({ tableId: 'large_dataset', tabId: 'tab-1', enabled: true }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.queryResult?.rows).toEqual([{ id: 1 }]));
+
+    page = 2;
+    rerender();
+
+    await waitFor(() => expect(adapter.fetchTableWindow).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 10 })));
+    expect(result.current.queryResult).toBeUndefined();
+
+    resolveNextPage?.({ columns: ['id'], rows: [{ id: 11 }], rowCount: 1, countStatus: 'skipped' });
+    await waitFor(() => expect(result.current.queryResult?.rows).toEqual([{ id: 11 }]));
   });
 });

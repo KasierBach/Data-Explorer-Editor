@@ -75,13 +75,17 @@ export class MysqlStrategy implements IDatabaseStrategy {
     options?: { limit?: number; offset?: number },
   ): Promise<QueryResult> {
     let safeSql = sql;
-    if (options?.limit !== undefined && options?.offset !== undefined) {
-      safeSql = SqlUtil.injectPagination(
-        sql,
-        options.limit,
-        options.offset,
-        'mysql',
-      );
+    if (options?.limit !== undefined) {
+      if (options?.offset !== undefined) {
+        safeSql = SqlUtil.injectPagination(
+          sql,
+          options.limit,
+          options.offset,
+          'mysql',
+        );
+      } else {
+        safeSql = SqlUtil.injectLimit(sql, options.limit);
+      }
     } else {
       safeSql = SqlUtil.injectLimit(sql, 50000);
     }

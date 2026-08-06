@@ -29,9 +29,10 @@ import { useAppStore } from '@/core/services/store';
 import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
+import { Switch } from '@/presentation/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/presentation/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/presentation/components/ui/tooltip';
-import { getAssistantModelCatalog } from '@/presentation/modules/Query/assistantModelCatalog';
+import { getAssistantModelCatalog, BUILT_IN_PROVIDERS } from '@/presentation/modules/Query/assistantModelCatalog';
 import { filterSearchableGroups, normalizeProviderBaseUrl, type SearchableGroup } from './AiConfigTab.utils';
 
 interface AiConfigTabProps {
@@ -321,7 +322,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
     const [isSavingProvider, setIsSavingProvider] = useState(false);
     const isVi = lang === 'vi';
     const assistantSelection = preferences.assistantModel || aiModel;
-    const modelGroups = useMemo(() => getAssistantModelCatalog(preferences.customProviders), [preferences.customProviders]);
+    const modelGroups = useMemo(() => getAssistantModelCatalog(preferences.customProviders, preferences.disabledProviders), [preferences.customProviders, preferences.disabledProviders]);
 
     useEffect(() => {
         let active = true;
@@ -329,11 +330,20 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
             .get<CustomAiProvider[]>('/ai/providers')
             .then((providers) => {
                 if (!active) return;
-                const serverProviders = providers.map(toClientProvider);
-                updateAiPreferences((current) => ({
-                    ...current,
-                    customProviders: [...serverProviders, ...current.customProviders.filter((provider) => !provider.serverManaged)],
-                }));
+                updateAiPreferences((current) => {
+                    const serverProviders = providers.map((p) => {
+                        const clientProvider = toClientProvider(p);
+                        const existingLocal = current.customProviders.find((item) => item.id === p.id);
+                        return {
+                            ...clientProvider,
+                            enabled: existingLocal ? existingLocal.enabled : true,
+                        };
+                    });
+                    return {
+                        ...current,
+                        customProviders: [...serverProviders, ...current.customProviders.filter((provider) => !provider.serverManaged)],
+                    };
+                });
             })
             .catch(() => undefined);
         return () => {
@@ -379,6 +389,8 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
               providerModelsLoaded: (count: number) => `Đã tải ${count} model. Mở dropdown để tìm nhanh hoặc nhập model thủ công.`,
               providerModelsFailed: 'Không thể tải danh sách model từ provider.',
               providerBackendUnavailable: 'Không gọi được backend AI. Hãy đảm bảo server đang chạy rồi thử lại.',
+              providerEnabled: 'Đang hoạt động',
+              providerDisabled: 'Tạm tắt',
           }
         : {
               aiTitle: t('tabs.ai'),
@@ -417,6 +429,8 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
               providerModelsLoaded: (count: number) => `Loaded ${count} models. Open the dropdown to search fast, or type a custom model.`,
               providerModelsFailed: 'Failed to load models from the provider.',
               providerBackendUnavailable: 'Cannot reach the AI backend. Make sure the server is running, then try again.',
+              providerEnabled: 'Active',
+              providerDisabled: 'Disabled',
           };
 
     const providerModelGroups = useMemo<SearchableGroup[]>(
@@ -646,6 +660,38 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
         }
     };
 
+    const handleToggleProviderEnabled = (providerId: string, enabled: boolean) => {
+        updateAiPreferences((current) => ({
+            ...current,
+            customProviders: current.customProviders.map((provider) =>
+                provider.id === providerId ? { ...provider, enabled } : provider,
+            ),
+        }));
+        toast.success(
+            enabled
+                ? (isVi ? 'Đã bật provider AI.' : 'Provider enabled.')
+                : (isVi ? 'Đã tắt provider AI.' : 'Provider disabled.')
+        );
+    };
+
+    const handleToggleBuiltInProvider = (providerId: string, enabled: boolean) => {
+        updateAiPreferences((current) => {
+            const currentDisabled = current.disabledProviders || [];
+            const nextDisabled = enabled
+                ? currentDisabled.filter((id) => id !== providerId)
+                : Array.from(new Set([...currentDisabled, providerId]));
+            return {
+                ...current,
+                disabledProviders: nextDisabled,
+            };
+        });
+        toast.success(
+            enabled
+                ? (isVi ? 'Đã bật provider AI.' : 'Provider enabled.')
+                : (isVi ? 'Đã tắt provider AI.' : 'Provider disabled.')
+        );
+    };
+
     const renderModelSelect = (value: string, onChange: (value: string) => void, includeInherit: boolean) => (
         <SearchableModelSelect
             value={value}
@@ -658,6 +704,18 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
         />
     );
 
+    const handleToggleMasterEnabled = (enabled: boolean) => {
+        updateAiPreferences((current) => ({
+            ...current,
+            enabled,
+        }));
+        toast.success(
+            enabled
+                ? (isVi ? 'Đã bật hệ thống AI.' : 'AI features enabled.')
+                : (isVi ? 'Đã tắt hệ thống AI.' : 'AI features disabled.')
+        );
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div>
@@ -665,6 +723,41 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                 <p className="text-sm text-muted-foreground">{labels.aiSubtitle}</p>
             </div>
             <div className="h-px w-full bg-border/50" />
+
+            {/* Master AI Enable/Disable Switch Card */}
+            <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/60 bg-gradient-to-r from-violet-500/10 via-card/50 to-blue-500/10 p-5">
+                <div className="space-y-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                        <Bot className="h-5 w-5 text-violet-400" />
+                        <h4 className="font-semibold text-base">
+                            {isVi ? 'Trạng thái hệ thống AI' : 'AI System Status'}
+                        </h4>
+                        <span className={cn(
+                            "text-xs font-semibold px-2.5 py-0.5 rounded-full border",
+                            preferences.enabled !== false
+                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                                : "bg-muted text-muted-foreground border-border"
+                        )}>
+                            {preferences.enabled !== false
+                                ? (isVi ? 'ĐANG BẬT' : 'ENABLED')
+                                : (isVi ? 'ĐÃ TẮT' : 'DISABLED')}
+                        </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        {isVi
+                            ? 'Bật hoặc tắt toàn bộ các tính năng AI trong ứng dụng (Assistant, Explain SQL, Auto-complete...)'
+                            : 'Enable or disable all AI features in the app (Assistant, Explain SQL, Auto-complete...)'}
+                    </p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                    <Switch
+                        checked={preferences.enabled !== false}
+                        onCheckedChange={handleToggleMasterEnabled}
+                        className="scale-125"
+                        label={isVi ? 'Bật/Tắt AI' : 'Toggle AI'}
+                    />
+                </div>
+            </div>
 
             <div className="space-y-5 rounded-2xl border border-border/60 bg-card/40 p-5">
                 <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
@@ -709,6 +802,65 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Built-in AI Providers Section */}
+            <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/40">
+                <div className="flex items-start justify-between gap-4 border-b border-border/50 px-5 py-4">
+                    <div className="min-w-0">
+                        <h3 className="text-lg font-semibold tracking-tight">
+                            {isVi ? 'Nhà cung cấp AI mặc định' : 'Built-in AI Providers'}
+                        </h3>
+                        <p className="mt-1 max-w-xl text-sm leading-5 text-muted-foreground">
+                            {isVi
+                                ? 'Bật hoặc tắt từng nhà cung cấp AI hệ thống (Gemini, Beeknoee, Groq, OpenRouter). Khi tắt, các model của provider đó sẽ tự động ẩn khỏi menu chọn model.'
+                                : 'Enable or disable built-in AI providers (Gemini, Beeknoee, Groq, OpenRouter). Disabled provider models are hidden from selection menus.'}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="p-5 space-y-3">
+                    {BUILT_IN_PROVIDERS.map((provider) => {
+                        const isDisabled = (preferences.disabledProviders || []).includes(provider.id);
+                        const isEnabled = !isDisabled;
+                        return (
+                            <div
+                                key={provider.id}
+                                className={cn(
+                                    "flex flex-col gap-3 rounded-xl border border-border/60 bg-background/60 p-4 transition-all hover:border-border sm:flex-row sm:items-center sm:justify-between",
+                                    isDisabled && "opacity-60 grayscale-[30%]"
+                                )}
+                            >
+                                <div className="min-w-0 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className={cn("font-semibold text-foreground", isDisabled && "text-muted-foreground")}>
+                                            {provider.name}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">· Built-in</span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        {provider.description}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <Switch
+                                        checked={isEnabled}
+                                        onCheckedChange={(checked) => handleToggleBuiltInProvider(provider.id, checked)}
+                                        label={`${isVi ? 'Bật/Tắt' : 'Toggle'} ${provider.name}`}
+                                    />
+                                    <span className={cn(
+                                        'text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wider select-none',
+                                        isEnabled
+                                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                            : 'bg-muted text-muted-foreground border border-transparent'
+                                    )}>
+                                        {isEnabled ? labels.providerEnabled : labels.providerDisabled}
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </section>
 
             <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/40">
                 <div className="flex items-start justify-between gap-4 border-b border-border/50 px-5 py-4">
@@ -949,13 +1101,18 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                         {preferences.customProviders.map((provider) => (
                             <div
                                 key={provider.id}
-                                className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/60 p-4 transition-colors hover:border-border sm:flex-row sm:items-center sm:justify-between"
+                                className={cn(
+                                    "flex flex-col gap-3 rounded-xl border border-border/60 bg-background/60 p-4 transition-all hover:border-border sm:flex-row sm:items-center sm:justify-between",
+                                    provider.enabled === false && "opacity-60 grayscale-[30%]"
+                                )}
                             >
                                 <div className="min-w-0 space-y-1">
                                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                        <span className="font-semibold text-foreground">{provider.name}</span>
+                                        <span className={cn("font-semibold text-foreground", provider.enabled === false && "text-muted-foreground")}>
+                                            {provider.name}
+                                        </span>
                                         <span className="text-xs text-muted-foreground">· {labels.providerType}</span>
-                                        {provider.lastStatus && (
+                                        {provider.enabled !== false && provider.lastStatus && (
                                             <span
                                                 className={cn(
                                                     'inline-flex items-center gap-1.5 text-xs font-medium',
@@ -981,32 +1138,49 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                         <span className="font-mono text-foreground/80">{provider.model}</span>
                                         <span className="break-all">{provider.baseUrl}</span>
-                                        {provider.lastLatencyMs != null && (
+                                        {provider.enabled !== false && provider.lastLatencyMs != null && (
                                             <span className="tabular-nums">{provider.lastLatencyMs} ms</span>
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex flex-wrap gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="gap-2"
-                                        onClick={() => handleEditProvider(provider)}
-                                    >
-                                        <Pencil className="h-4 w-4" />
-                                        {labels.editProvider}
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="gap-2 text-red-400 hover:text-red-300"
-                                        onClick={() => handleRemoveProvider(provider.id)}
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                        {labels.remove}
-                                    </Button>
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <div className="flex items-center gap-2 border-r border-border/50 pr-3 mr-1">
+                                        <Switch
+                                            checked={provider.enabled !== false}
+                                            onCheckedChange={(checked) => handleToggleProviderEnabled(provider.id, checked)}
+                                            label={isVi ? 'Bật/Tắt provider' : 'Toggle provider'}
+                                        />
+                                        <span className={cn(
+                                            'text-[10px] font-medium px-2 py-0.5 rounded-full uppercase tracking-wider select-none',
+                                            provider.enabled !== false
+                                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                : 'bg-muted text-muted-foreground border border-transparent'
+                                        )}>
+                                            {provider.enabled !== false ? labels.providerEnabled : labels.providerDisabled}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-2"
+                                            onClick={() => handleEditProvider(provider)}
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                            {labels.editProvider}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="gap-2 text-red-400 hover:text-red-300"
+                                            onClick={() => handleRemoveProvider(provider.id)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            {labels.remove}
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         ))}

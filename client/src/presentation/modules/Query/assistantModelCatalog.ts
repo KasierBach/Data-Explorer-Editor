@@ -134,17 +134,61 @@ function getBuiltInCapabilities(modelId: string) {
   return undefined;
 }
 
+export interface BuiltInProviderConfig {
+  id: AssistantBuiltInProvider;
+  name: string;
+  groupName: string;
+  description: string;
+}
+
+export const BUILT_IN_PROVIDERS: BuiltInProviderConfig[] = [
+  {
+    id: "gemini",
+    name: "Google Gemini",
+    groupName: "Google (Gemini)",
+    description: "Gemini 3.6 Flash, 3.5 Flash, 3.1 Pro reasoning & Flash Lite",
+  },
+  {
+    id: "beeknoee",
+    name: "Beeknoee",
+    groupName: "Beeknoee",
+    description: "GLM 4.7 Flash, MiniMax M2.7, Claude Opus 4.6 Thinking & Sonnet 4.6",
+  },
+  {
+    id: "groq",
+    name: "Groq (Fast & Free)",
+    groupName: "Groq (Fast & Free)",
+    description: "GPT OSS 120B/20B, Qwen 3.6 27B Vision & Groq Compound Web",
+  },
+  {
+    id: "openrouter",
+    name: "OpenRouter (Free)",
+    groupName: "OpenRouter (Free)",
+    description: "Gemma 4 31B/26B & NVIDIA Nemotron 120B/550B",
+  },
+];
+
 export function getAssistantModelCatalog(
   customProviders: CustomAiProvider[] = [],
+  disabledProviders: string[] = [],
 ): AssistantModelGroup[] {
-  const builtInGroups = BUILT_IN_MODEL_GROUPS.map((group) => ({
-    ...group,
-    items: group.items.map((item) => ({
-      ...item,
-      capabilities: getBuiltInCapabilities(item.id),
-    })),
-  }));
+  const builtInGroups = BUILT_IN_MODEL_GROUPS
+    .filter((group) => {
+      if (group.group === "Google (Gemini)" && disabledProviders.includes("gemini")) return false;
+      if (group.group === "Beeknoee" && disabledProviders.includes("beeknoee")) return false;
+      if (group.group === "Groq (Fast & Free)" && disabledProviders.includes("groq")) return false;
+      if (group.group === "OpenRouter (Free)" && disabledProviders.includes("openrouter")) return false;
+      return true;
+    })
+    .map((group) => ({
+      ...group,
+      items: group.items.map((item) => ({
+        ...item,
+        capabilities: getBuiltInCapabilities(item.id),
+      })),
+    }));
   const customProviderItems = customProviders
+    .filter((provider) => provider.enabled !== false)
     .flatMap((provider) =>
       Array.from(new Set([provider.model, ...(provider.models || [])]))
         .filter(Boolean)

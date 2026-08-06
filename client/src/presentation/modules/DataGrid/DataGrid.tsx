@@ -55,6 +55,8 @@ import { getDataGridText } from './dataGridI18n';
 
 interface DataGridProps {
     tableId: string;
+    tabId: string;
+    isActive: boolean;
 }
 
 interface ActiveGridSearch {
@@ -160,26 +162,25 @@ const DataGridRow = React.memo(({
     );
 });
 
-export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
+export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) => {
     const {
         tabs,
-        activeTabId,
         setTabPagination,
         updateTabMetadata,
         connections,
         activeConnectionId,
         lang,
     } = useAppStore();
-    const activeTab = tabs.find((t: Tab) => t.id === activeTabId);
+    const tab = tabs.find((item: Tab) => item.id === tabId);
     const activeConnection = connections.find((connection) => connection.id === activeConnectionId);
-    const initialSorting = Array.isArray(activeTab?.metadata?.sorting)
-        ? activeTab.metadata.sorting as SortingState
+    const initialSorting = Array.isArray(tab?.metadata?.sorting)
+        ? tab.metadata.sorting as SortingState
         : [];
-    const initialGlobalFilter = typeof activeTab?.metadata?.globalFilter === 'string'
-        ? activeTab.metadata.globalFilter
+    const initialGlobalFilter = typeof tab?.metadata?.globalFilter === 'string'
+        ? tab.metadata.globalFilter
         : '';
-    const initialViewMode = activeTab?.metadata?.viewMode === 'design' ? 'design' : 'grid';
-    const tabStateId = activeTab?.id ?? tableId;
+    const initialViewMode = tab?.metadata?.viewMode === 'design' ? 'design' : 'grid';
+    const tabStateId = tab?.id ?? tableId;
     const [sorting, setSorting] = useState<SortingState>(initialSorting);
     const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
     const [columnOrder, setColumnOrder] = useState<string[]>([]);
@@ -193,6 +194,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const [draggingColumnId, setDraggingColumnId] = useState<string | null>(null);
     const [dropTargetColumnId, setDropTargetColumnId] = useState<string | null>(null);
     const [pageJumpValue, setPageJumpValue] = useState('1');
+    const [includeTotalCount, setIncludeTotalCount] = useState(false);
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const wheelMomentumFrameRef = useRef<number | null>(null);
     const wheelMomentumVelocityRef = useRef(0);
@@ -205,20 +207,30 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const dataEditsDisabled = queryExecutionDisabled || readOnlyConnection;
 
     // Sync local table pagination with store metadata
-    const pageIndex = (activeTab?.metadata?.page || 1) - 1;
-    const pageSize = activeTab?.metadata?.pageSize || 100;
+    const pageIndex = (tab?.metadata?.page || 1) - 1;
+    const pageSize = tab?.metadata?.pageSize || 100;
 
     const pagination = useMemo(() => ({ pageIndex, pageSize }), [pageIndex, pageSize]);
+
+    const activeSort = sorting.length > 0 ? sorting[0] : undefined;
+    const sortBy = activeSort?.id;
+    const sortOrder = activeSort ? (activeSort.desc ? 'DESC' : 'ASC') : undefined;
 
     // Custom hooks - data & editing logic
     const {
         metadata, queryResult, isLoadingMeta, isLoadingData, isFetchingData,
         refetch, dbName, schema, cleanTableName, dialect, pkField,
-    } = useDataGridData({ tableId });
+    } = useDataGridData({ tableId, tabId, enabled: isActive, includeTotalCount, sortBy, sortOrder });
     const tableName = cleanTableName || tableId;
-    const effectiveTotalCount = queryResult?.totalCount ?? metadata?.rowCount;
-    const totalPages = effectiveTotalCount
-        ? Math.max(1, Math.ceil(effectiveTotalCount / pagination.pageSize))
+    const exactTotalCount = queryResult?.countStatus === 'available' ? queryResult.totalCount : undefined;
+    const estimatedTotalCount = exactTotalCount === undefined && (metadata?.rowCount ?? 0) > 0
+        ? metadata?.rowCount
+        : undefined;
+    const totalPages = exactTotalCount !== undefined
+        ? Math.max(1, Math.ceil(exactTotalCount / pagination.pageSize))
+        : null;
+    const estimatedTotalPages = estimatedTotalCount !== undefined
+        ? Math.max(1, Math.ceil(estimatedTotalCount / pagination.pageSize))
         : null;
     const rowOverscan = isCompactMobileLayout
         ? 6
@@ -319,6 +331,12 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     useEffect(() => {
         setPageJumpValue(String(pagination.pageIndex + 1));
     }, [pagination.pageIndex]);
+
+    useEffect(() => {
+        if (totalPages && pagination.pageIndex >= totalPages) {
+            setTabPagination(tabStateId, totalPages, pagination.pageSize);
+        }
+    }, [pagination.pageIndex, pagination.pageSize, setTabPagination, tabStateId, totalPages]);
 
     useEffect(() => () => {
         if (wheelMomentumFrameRef.current !== null) {
@@ -503,13 +521,13 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
         const rowNumCol = helper.display({
             id: '__row_number',
             header: '#',
-            cell: info => <span className="text-muted-foreground/70 text-[10px] font-mono">{info.row.index + 1}</span>,
+            cell: info => <span className="text-muted-foreground/70 text-[10px] font-mono">{pagination.pageIndex * pagination.pageSize + info.row.index + 1}</span>,
             size: 50,
             enableResizing: false,
         });
 
         return [rowNumCol, ...dataCols];
-    }, [metadata, handleCellChange, isEditMode, pendingChanges, pkField]);
+    }, [metadata, handleCellChange, isEditMode, pagination.pageIndex, pagination.pageSize, pendingChanges, pkField]);
     const orderedMetadataColumns = useMemo(() => {
         if (!metadata?.columns) return [];
 
@@ -549,7 +567,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
             }
         },
         manualPagination: true, // Always manual now because we paginate server-side
-        pageCount: effectiveTotalCount ? Math.ceil(effectiveTotalCount / pageSize) : -1,
+        pageCount: exactTotalCount !== undefined ? Math.ceil(exactTotalCount / pageSize) : -1,
     });
 
     const { rows } = table.getRowModel();
@@ -565,8 +583,40 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     const bottomSpacerHeight = virtualRows.length > 0
         ? rowVirtualizer.getTotalSize() - (virtualRows[virtualRows.length - 1]?.end ?? 0)
         : 0;
-    const totalRowsLabel = (effectiveTotalCount ?? rows.length).toLocaleString();
+    const loadedThrough = pagination.pageIndex * pagination.pageSize + (queryResult?.rows.length ?? 0);
+    const totalRowsLabel = exactTotalCount !== undefined
+        ? exactTotalCount.toLocaleString()
+        : estimatedTotalCount !== undefined
+            ? '≈' + estimatedTotalCount.toLocaleString()
+            : loadedThrough.toLocaleString() + '+';
+    const rowCountTitle = exactTotalCount !== undefined
+        ? (lang === 'vi' ? 'Tổng số dòng chính xác' : 'Exact total row count')
+        : estimatedTotalCount !== undefined
+            ? (lang === 'vi' ? 'Số dòng ước tính từ metadata' : 'Estimated row count from metadata')
+            : (lang === 'vi' ? 'Chưa tính tổng số dòng' : 'Total row count is unknown');
+    const hasNextPage = exactTotalCount !== undefined
+        ? (pagination.pageIndex + 1) * pagination.pageSize < exactTotalCount
+        : (queryResult?.rows.length ?? 0) === pagination.pageSize;
     const text = useMemo(() => getDataGridText(lang), [lang]);
+    const rowCountControl = exactTotalCount !== undefined ? (
+        <span className="whitespace-nowrap rounded border border-border/50 bg-muted px-2 py-1 normal-case tracking-normal tabular-nums" title={rowCountTitle}>
+            {totalRowsLabel} {text.totalRows}
+        </span>
+    ) : (
+        <button
+            type="button"
+            className="flex items-center gap-1.5 whitespace-nowrap rounded border border-border/50 bg-muted px-2 py-1 normal-case tracking-normal tabular-nums transition-colors hover:bg-muted/80 disabled:cursor-wait disabled:opacity-60"
+            onClick={() => setIncludeTotalCount(true)}
+            disabled={includeTotalCount || isFetchingData}
+            title={includeTotalCount
+                ? (lang === 'vi' ? 'Đang đếm tổng số dòng chính xác' : 'Counting the exact total')
+                : (lang === 'vi' ? 'Nhấn để đếm tổng số dòng chính xác' : 'Click to count the exact total')}
+            aria-label={lang === 'vi' ? 'Đếm tổng số dòng chính xác' : 'Count the exact total'}
+        >
+            <RefreshCw className={cn('size-3', includeTotalCount && 'animate-spin')} />
+            {totalRowsLabel} {text.totalRows}
+        </button>
+    );
     const bulkSearchButtonLabel = editing.isEditMode ? text.findReplace : text.find;
     const pageReplaceTargets = useMemo<BulkReplaceTargetRow[]>(
         () => rows.map((row, rowIndex) => ({
@@ -660,6 +710,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
     useEffect(() => {
         setActiveSearch(null);
         stopMomentumScroll();
+        tableContainerRef.current?.scrollTo({ top: 0 });
     }, [globalFilter, pageIndex, pageSize, queryResult?.rows, stopMomentumScroll, tableId]);
 
     useEffect(() => {
@@ -810,9 +861,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                             </div>
 
                             <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono uppercase shrink-0">
-                                <span className="bg-muted px-1.5 py-1 rounded border border-border/50">
-                                    {totalRowsLabel} rows
-                                </span>
+                                {rowCountControl}
                                 {queryResult?.durationMs && <span className="opacity-70">{queryResult.durationMs}ms</span>}
                             </div>
                         </div>
@@ -909,10 +958,8 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
 
                         <FilterPopover lang={lang} onFilterChange={setGlobalFilter} currentFilter={globalFilter} />
 
-                        <div className="text-[10px] text-muted-foreground ml-auto flex items-center gap-3 pr-2 font-mono uppercase">
-                            <span className="bg-muted px-1.5 rounded border border-border/50">
-                                {totalRowsLabel} {text.totalRows}
-                            </span>
+                        <div className="ml-auto flex items-center gap-2 pr-2 font-mono text-[10px] text-muted-foreground">
+                            {rowCountControl}
                             {queryResult?.durationMs && <span className="opacity-70">{queryResult.durationMs}MS</span>}
                         </div>
                     </>
@@ -1178,7 +1225,10 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                 <div className="flex items-center gap-6">
                     <span className="flex items-center gap-1.5">
                         <div className={`w-1.5 h-1.5 rounded-full ${isFetchingData ? 'bg-blue-500 animate-pulse' : 'bg-green-500'}`} />
-                        {text.pageLabel(pagination.pageIndex + 1)}
+                        {isFetchingData
+                            ? (lang === 'vi' ? 'Đang tải…' : 'Loading…')
+                            : String(queryResult?.rows.length ?? 0) + ' ' + text.rowsLabel
+                        }
                     </span>
                     <div className="flex items-center gap-3 ml-2">
                         <div className="flex items-center gap-1">
@@ -1191,50 +1241,41 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
                             >
                                 ◀
                             </Button>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 normal-case tracking-normal">
+                                <span className="text-[9px] font-semibold uppercase">
+                                    {lang === 'vi' ? 'Trang' : 'Page'}
+                                </span>
                                 <Input
                                     value={pageJumpValue}
-                                    onChange={(e) => {
-                                        const nextValue = e.target.value.replace(/\D/g, '');
-                                        setPageJumpValue(nextValue);
-                                    }}
+                                    onChange={(e) => setPageJumpValue(e.target.value.replace(/\D/g, ''))}
                                     onBlur={commitPageJump}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
                                             commitPageJump();
                                         }
-                                        if (e.key === 'Escape') {
-                                            setPageJumpValue(String(pagination.pageIndex + 1));
-                                        }
+                                        if (e.key === 'Escape') setPageJumpValue(String(pagination.pageIndex + 1));
                                     }}
                                     inputMode="numeric"
                                     aria-label={text.jumpToPage}
-                                    className="h-5 w-12 border-border/40 bg-transparent px-1 text-center text-[10px] font-semibold tracking-normal"
+                                    className="h-5 w-12 border-border/40 bg-transparent px-1 text-center text-[10px] font-semibold tabular-nums"
                                 />
-                                <span className="min-w-[38px] text-center">
-                                    / {totalPages ?? '?'}
-                                </span>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-5 px-1.5 text-[9px] font-bold hover:bg-muted"
-                                    onClick={commitPageJump}
-                                >
-                                    {text.go}
-                                </Button>
+                                {(totalPages || estimatedTotalPages) && (
+                                    <span className="min-w-[38px] text-center tabular-nums">
+                                        / {totalPages ?? `≈${estimatedTotalPages}`}
+                                    </span>
+                                )}
                             </div>
                             <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-5 w-5 p-0 hover:bg-muted"
-                                disabled={effectiveTotalCount ? (pagination.pageIndex + 1) * pagination.pageSize >= effectiveTotalCount : rows.length < pagination.pageSize}
+                                disabled={!hasNextPage}
                                 onClick={() => setTabPagination(tabStateId, pagination.pageIndex + 2, pagination.pageSize)}
                             >
                                 ▶
                             </Button>
                         </div>
-                        <span className="text-[9px] opacity-70">{text.pageUnit}</span>
                         <div className="h-3 w-[1px] bg-border mx-1" />
                         <select
                             className="bg-transparent border-none outline-none cursor-pointer hover:text-foreground text-[9px] font-bold py-0 h-4"
@@ -1283,7 +1324,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId }) => {
             <MigrationHubDialog
                 isOpen={isMigrationDialogOpen}
                 onClose={() => setIsMigrationDialogOpen(false)}
-                sourceConnectionId={activeTab?.metadata?.connectionId || useAppStore.getState().activeConnectionId || ''}
+                sourceConnectionId={tab?.metadata?.connectionId || useAppStore.getState().activeConnectionId || ''}
                 sourceSchema={schema}
                 sourceTable={cleanTableName || tableId}
             />

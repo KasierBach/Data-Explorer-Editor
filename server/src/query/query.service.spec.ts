@@ -25,6 +25,10 @@ describe('QueryService', () => {
     quoteTable: jest.fn(
       (schema: string, table: string) => `${schema}.${table}`,
     ),
+    quoteIdentifier: jest.fn((col: string) => `"${col}"`),
+    getColumns: jest
+      .fn()
+      .mockResolvedValue([{ name: 'id', isPrimaryKey: true }]),
     buildAlterTableSql: jest.fn(),
     seedData: jest.fn(),
     createDatabase: jest.fn(),
@@ -331,7 +335,7 @@ describe('QueryService', () => {
     expect(strategy.executeQuery).toHaveBeenNthCalledWith(
       1,
       {},
-      'SELECT * FROM public.users',
+      'SELECT * FROM public.users ORDER BY "id" ASC',
       { limit: 25, offset: 50 },
     );
     expect(strategy.executeQuery).toHaveBeenNthCalledWith(
@@ -621,6 +625,92 @@ describe('QueryService', () => {
     );
   });
 
+  it('pages raw query results and caches the exact result count', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+    freshnessService.buildKey.mockResolvedValue('freshness:query:count');
+    cacheManager.get.mockResolvedValue(undefined);
+    strategy.executeQuery
+      .mockResolvedValueOnce({
+        rows: Array.from({ length: 100 }, (_, index) => ({ id: index + 1 })),
+        columns: ['id'],
+        rowCount: 100,
+      })
+      .mockResolvedValueOnce({
+        rows: [{ total: '500000' }],
+        columns: ['total'],
+        rowCount: 1,
+      });
+
+    const result = await service.executeQuery(
+      {
+        connectionId: 'conn-1',
+        sql: 'SELECT * FROM users ORDER BY id',
+        limit: 100,
+        offset: 0,
+        includeTotalCount: true,
+      } as any,
+      'user-1',
+    );
+
+    expect(strategy.executeQuery).toHaveBeenNthCalledWith(
+      1,
+      {},
+      'SELECT * FROM users ORDER BY id',
+      { limit: 100, offset: 0 },
+    );
+    expect(strategy.executeQuery).toHaveBeenNthCalledWith(
+      2,
+      {},
+      'SELECT COUNT(*) AS total FROM (SELECT * FROM users ORDER BY id) AS _query_count',
+    );
+    expect(cacheManager.set).toHaveBeenCalledWith(
+      'freshness:query:count',
+      500000,
+      60000,
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        totalCount: 500000,
+        countStatus: 'available',
+        appliedLimit: 100,
+        appliedOffset: 0,
+      }),
+    );
+  });
+
+  it('rejects an unpaged raw query that requests more than the safety cap', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+      allowImportExport: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+
+    await expect(
+      service.executeQuery(
+        {
+          connectionId: 'conn-1',
+          sql: 'SELECT * FROM users LIMIT 500001',
+        } as any,
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(strategy.executeQuery).not.toHaveBeenCalled();
+  });
   it('marks raw select queries with the protective default limit when no explicit limit is requested', async () => {
     connectionsService.findOne.mockResolvedValue({
       id: 'conn-1',

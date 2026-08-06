@@ -41,7 +41,7 @@ function getErrorMessage(error: unknown) {
     return error instanceof Error ? error.message : 'Unexpected error';
 }
 
-export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
+export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ tabId, isActive }) => {
     const queryClient = useQueryClient();
     const {
         activeConnectionId, connections, tabs, updateTabMetadata,
@@ -72,9 +72,22 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     });
 
     const [query, setQuery] = useState(initialMetadata.sql || tab?.initialSql || '');
-    const [executedQuery, setExecutedQuery] = useState<string | null>(null);
-    const [limit, setLimit] = useState(initialMetadata.limit || '1000');
-    const [runNonce, setRunNonce] = useState(0);
+    const [executedQuery, setExecutedQuery] = useState<string | null>(
+        typeof initialMetadata.executedQuery === 'string' ? initialMetadata.executedQuery : null,
+    );
+    const [clientPageIndex, setClientPageIndex] = useState<number>(
+        typeof initialMetadata.pageIndex === 'number' ? initialMetadata.pageIndex : 0,
+    );
+    const [clientPageSize, setClientPageSize] = useState<number>(
+        typeof initialMetadata.pageSize === 'number' &&
+            [50, 100, 500, 1000].includes(initialMetadata.pageSize)
+            ? initialMetadata.pageSize
+            : 100,
+    );
+    const [serverTotalCount, setServerTotalCount] = useState<number | undefined>(
+        typeof initialMetadata.totalCount === 'number' ? initialMetadata.totalCount : undefined,
+    );
+    const [runNonce, setRunNonce] = useState(initialMetadata.executedQuery ? 1 : 0);
     const [activeResultTab, setActiveResultTab] = useState(
         typeof initialMetadata.resultTab === 'string' ? initialMetadata.resultTab : 'data',
     );
@@ -100,11 +113,9 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     const isFirstLoad = useRef(true);
     const lastHandledRunRequestRef = useRef<number | null>(null);
     const lastExternalSqlRef = useRef(externalSql);
-    const lastSuccessHistoryAtRef = useRef(0);
-    const lastErrorHistoryAtRef = useRef(0);
+    const lastSuccessRunNonceRef = useRef(0);
+    const lastErrorRunNonceRef = useRef(0);
     const editorRef = useRef<SqlEditorHandle | null>(null);
-    const effectiveLimit = limit === 'all' ? undefined : Number.parseInt(limit, 10);
-    const requestLimit = Number.isInteger(effectiveLimit) ? effectiveLimit : undefined;
 
     const {
         saveQuery,
@@ -142,13 +153,16 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         const timer = setTimeout(() => {
             updateTabMetadata(tabId, {
                 sql: query,
-                limit,
                 resultTab: activeResultTab,
+                executedQuery,
+                pageIndex: clientPageIndex,
+                pageSize: clientPageSize,
+                totalCount: serverTotalCount,
             });
         }, 500);
 
         return () => clearTimeout(timer);
-    }, [query, limit, activeResultTab, tabId, updateTabMetadata]);
+    }, [query, activeResultTab, executedQuery, clientPageIndex, clientPageSize, serverTotalCount, tabId, updateTabMetadata]);
 
     useEffect(() => {
         if (activeResultTab === 'plan' && !explainPlan) {
@@ -174,14 +188,16 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
         if (externalSql.trim()) {
             setQuery(externalSql);
+            setClientPageIndex(0);
+            setServerTotalCount(undefined);
             setExecutedQuery(externalSql);
             setRunNonce((current) => current + 1);
-            updateTabMetadata(tabId, { runRequestedAt: null });
+            updateTabMetadata(tabId, { runRequestedAt: null, pageIndex: 0, totalCount: undefined });
         }
     }, [externalRunRequest, externalSql, tabId, updateTabMetadata]);
 
-    const { data: results, isLoading, error, dataUpdatedAt, errorUpdatedAt, isSuccess, isError } = useQuery<QueryResult | null, Error>({
-        queryKey: ['query-execution', activeConnectionId, activeDatabase, executedQuery, requestLimit, runNonce],
+    const { data: results, isLoading, isFetching, error, dataUpdatedAt, errorUpdatedAt, isSuccess, isError } = useQuery<QueryResult | null, Error>({
+        queryKey: ['query-execution', activeConnectionId, activeDatabase, executedQuery, clientPageIndex, clientPageSize, runNonce],
         queryFn: async () => {
             if (!executedQuery) return null;
             if (!activeConnection) throw new Error('No active connection');
@@ -189,9 +205,12 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
             await adapter.connect(activeConnection);
 
+            const shouldPaginate = /^\s*(SELECT|WITH)\b/i.test(executedQuery);
             return adapter.executeQuery(executedQuery, {
                 database: activeDatabase || undefined,
-                limit: requestLimit,
+                limit: shouldPaginate ? clientPageSize : undefined,
+                offset: shouldPaginate ? clientPageIndex * clientPageSize : undefined,
+                includeTotalCount: shouldPaginate && clientPageIndex === 0 && serverTotalCount === undefined,
             });
         },
         enabled: !!executedQuery && !!activeConnectionId && runNonce > 0,
@@ -200,6 +219,12 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         refetchOnReconnect: false,
         refetchOnMount: false,
     });
+
+    useEffect(() => {
+        if (results?.countStatus !== 'available' || typeof results.totalCount !== 'number') return;
+        setServerTotalCount(results.totalCount);
+        updateTabMetadata(tabId, { totalCount: results.totalCount });
+    }, [results?.countStatus, results?.totalCount, tabId, updateTabMetadata]);
 
     const resultColumns = React.useMemo(() => {
         if (results?.columns?.length) return results.columns;
@@ -249,11 +274,11 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             return;
         }
 
-        if (lastSuccessHistoryAtRef.current === dataUpdatedAt) {
+        if (clientPageIndex !== 0 || lastSuccessRunNonceRef.current === runNonce) {
             return;
         }
 
-        lastSuccessHistoryAtRef.current = dataUpdatedAt;
+        lastSuccessRunNonceRef.current = runNonce;
         setActiveResultTab('data');
         addQueryHistory({
             id: `history-${Date.now()}`,
@@ -262,21 +287,21 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             connectionName: activeConnection?.name,
             executedAt: Date.now(),
             durationMs: results.durationMs,
-            rowCount: results.rowCount ?? results.rows?.length,
+            rowCount: serverTotalCount ?? results.totalCount ?? results.rowCount ?? results.rows?.length,
             status: 'success',
         });
-    }, [isSuccess, results, executedQuery, dataUpdatedAt, activeDatabase, activeConnection?.name, addQueryHistory]);
+    }, [isSuccess, results, executedQuery, dataUpdatedAt, clientPageIndex, runNonce, serverTotalCount, activeDatabase, activeConnection?.name, addQueryHistory]);
 
     useEffect(() => {
         if (!isError || !executedQuery || !errorUpdatedAt) {
             return;
         }
 
-        if (lastErrorHistoryAtRef.current === errorUpdatedAt) {
+        if (clientPageIndex !== 0 || lastErrorRunNonceRef.current === runNonce) {
             return;
         }
 
-        lastErrorHistoryAtRef.current = errorUpdatedAt;
+        lastErrorRunNonceRef.current = runNonce;
         setActiveResultTab('messages');
         addQueryHistory({
             id: `history-${Date.now()}`,
@@ -287,7 +312,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
             status: 'error',
             errorMessage: (error as Error)?.message,
         });
-    }, [isError, executedQuery, errorUpdatedAt, activeDatabase, activeConnection?.name, error, addQueryHistory]);
+    }, [isError, executedQuery, errorUpdatedAt, clientPageIndex, runNonce, activeDatabase, activeConnection?.name, error, addQueryHistory]);
 
     const handleRun = (overrideSql?: string) => {
         let sqlToExecute = overrideSql || query;
@@ -304,6 +329,9 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
 
         if (!sqlToExecute.trim()) return;
         setExplainPlan(null);
+        setClientPageIndex(0);
+        setServerTotalCount(undefined);
+        updateTabMetadata(tabId, { pageIndex: 0, totalCount: undefined });
         setExecutedQuery(sqlToExecute);
         setRunNonce((current) => current + 1);
     };
@@ -444,6 +472,8 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
     handleSaveRef.current = handleSave;
 
     useEffect(() => {
+        if (!isActive) return;
+
         const handler = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
                 e.preventDefault();
@@ -468,7 +498,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
         };
         window.addEventListener('keydown', handler, { capture: true });
         return () => window.removeEventListener('keydown', handler, { capture: true });
-    }, []);
+    }, [isActive]);
 
     return (
         <>
@@ -480,7 +510,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                     isCompactMobileLayout={isCompactMobileLayout}
                     isSmallMobile={isSmallMobile}
                     lang={lang}
-                    limit={limit}
                     activeConnectionId={activeConnectionId}
                     activeDatabase={activeDatabase}
                     onRun={() => handleRun()}
@@ -495,7 +524,6 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                     onOpenSaved={() => setIsSavedDialogOpen(true)}
                     onOpenHistory={() => setIsHistoryDialogOpen(true)}
                     onExplain={() => void handleExplain()}
-                    onLimitChange={setLimit}
                     showSqlSequence={supportsSqlSequence}
                     onOpenSqlSequence={() => setIsSqlSequenceDialogOpen(true)}
                     rightSlot={currentSavedQuery?.organizationId ? (
@@ -546,6 +574,7 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                         <QueryResults
                             results={results || null}
                             isLoading={isLoading}
+                            isFetching={isFetching}
                             error={(error as Error) || null}
                             executedQuery={executedQuery}
                             dataUpdatedAt={dataUpdatedAt}
@@ -555,6 +584,17 @@ export const QueryEditor: React.FC<{ tabId: string }> = ({ tabId }) => {
                             onClearResults={handleClearResults}
                             onClose={toggleResultPanel}
                             onSaveToDashboard={results ? openDashboardDialog : undefined}
+                            pageIndex={clientPageIndex}
+                            pageSize={clientPageSize}
+                            totalCount={serverTotalCount ?? results?.totalCount}
+                            onPaginationChange={(pageIdx, size) => {
+                                setClientPageIndex(pageIdx);
+                                setClientPageSize(size);
+                                updateTabMetadata(tabId, {
+                                    pageIndex: pageIdx,
+                                    pageSize: size,
+                                });
+                            }}
                             onFixWithAi={executedQuery && error
                                 ? () => void openAiQueryFixDraft(
                                     executedQuery,
