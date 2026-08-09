@@ -14,6 +14,7 @@ import type {
   IDatabaseStrategy,
   Relationship,
 } from '../database-strategies/database-strategy.interface';
+import { validateMongoExecutableCommand } from './mongo-payload-validator';
 
 interface SchemaTable {
   name: string;
@@ -110,7 +111,7 @@ export class AiService {
       providerOverride,
     } = params;
 
-    const result = await this.chatService.chat({
+    let result = await this.chatService.chat({
       model,
       mode,
       prompt: this.buildCommandGenerationPrompt(query, databaseType),
@@ -120,9 +121,42 @@ export class AiService {
       providerOverride,
     });
 
-    const sql = this.normalizeGeneratedCommand(result.sql, databaseType, query);
-    const explanation =
+    let sql = this.normalizeGeneratedCommand(result.sql, databaseType, query);
+    let explanation =
       result.explanation?.trim() || result.message?.trim() || 'Done.';
+
+    if (databaseType.toLowerCase().includes('mongodb')) {
+      const validationIssues = validateMongoExecutableCommand(sql);
+      if (validationIssues.length > 0) {
+        const repairResult = await this.chatService.chat({
+          model,
+          mode,
+          prompt: this.buildMongoRepairPrompt(query, sql, validationIssues),
+          schemaContext,
+          databaseType,
+          routingMode,
+          providerOverride,
+        });
+        const repairedSql = this.normalizeGeneratedCommand(
+          repairResult.sql,
+          databaseType,
+          query,
+        );
+        const repairIssues = validateMongoExecutableCommand(repairedSql);
+
+        result = repairResult;
+        if (repairIssues.length === 0) {
+          sql = repairedSql;
+          explanation =
+            repairResult.explanation?.trim() ||
+            repairResult.message?.trim() ||
+            'Generated and validated a MongoDB command.';
+        } else {
+          sql = '';
+          explanation = `The AI response could not be converted into a safe executable MongoDB payload: ${repairIssues[0]}`;
+        }
+      }
+    }
 
     return {
       sql,
@@ -140,7 +174,30 @@ export class AiService {
     const normalizedType = databaseType.toLowerCase();
 
     if (normalizedType.includes('mongodb')) {
-      return `Generate an executable MongoDB MQL query payload for this request. Return a JSON payload for this app, not shell syntax like db.collection.find(...).\n\nUser request:\n${query}`;
+      return `Generate one executable MongoDB JSON payload for this app.
+
+OUTPUT CONTRACT:
+- Follow the system structured-response contract.
+- Put the serialized executable payload in the top-level "sql" string field.
+- The value inside "sql" uses this shape: { "action": "aggregate", "collection": "orders", "pipeline": [...] }.
+- Do not put Markdown or Mongo shell syntax inside "sql".
+- Briefly explain the selected fields and assumptions in "explanation".
+- Prefer read-only actions: find, aggregate, count, or distinct.
+- Use only fields present in SCHEMA CONTEXT. Never invent a field.
+- If the request is vague, choose a useful categorical or date field from SCHEMA CONTEXT; avoid _id and high-cardinality identifier fields.
+
+AGGREGATION RULES:
+1. Every pipeline item contains exactly one stage operator.
+2. Supported stages: $match, $group, $project, $sort, $limit, $skip, $lookup, $unwind, $facet, $addFields.
+3. $unwind uses a field path such as { "$unwind": "$genres" }.
+4. $group always contains "_id". Every other output field must contain exactly one accumulator object.
+5. Correct group example: { "$group": { "_id": "$genres", "count": { "$sum": 1 } } }.
+6. Never place accumulators directly beside $group and never use a plain number as a grouped output field.
+7. $sort directions are 1 or -1. $limit is a positive integer. $skip is a non-negative integer.
+8. For an array field grouped by each element, unwind it before grouping.
+
+USER REQUEST:
+${query}`;
     }
 
     if (normalizedType === 'redis') {
@@ -150,12 +207,46 @@ export class AiService {
     return `Generate an executable SQL query for this request.\n\nUser request:\n${query}`;
   }
 
+  private buildMongoRepairPrompt(
+    query: string,
+    invalidCommand: string,
+    validationIssues: string[],
+  ): string {
+    return `Repair the MongoDB JSON payload below so this app can execute it safely.
+
+ORIGINAL USER REQUEST:
+${query}
+
+VALIDATION ERRORS:
+${validationIssues.map((issue) => `- ${issue}`).join('\n')}
+
+INVALID PAYLOAD:
+${invalidCommand.slice(0, 12000)}
+
+Follow the system structured-response contract and put only the corrected serialized MongoDB payload in the top-level "sql" string field. Keep the requested collection and intent.
+Every pipeline item must contain exactly one supported stage operator.
+For $group, include "_id" and make every other output field an accumulator object, for example:
+{ "$group": { "_id": "$genres", "count": { "$sum": 1 } } }
+Do not return Markdown, commentary, or Mongo shell syntax.`;
+  }
+
   private normalizeGeneratedCommand(
-    candidate: string | undefined,
+    candidate: unknown,
     databaseType: string,
     query: string,
   ): string {
-    const raw = this.stripCodeFences(candidate || '');
+    let candidateText = '';
+    if (typeof candidate === 'string') {
+      candidateText = candidate;
+    } else if (candidate !== null && candidate !== undefined) {
+      try {
+        candidateText = JSON.stringify(candidate);
+      } catch {
+        candidateText = '';
+      }
+    }
+
+    const raw = this.stripCodeFences(candidateText);
     if (!raw) {
       return '';
     }
