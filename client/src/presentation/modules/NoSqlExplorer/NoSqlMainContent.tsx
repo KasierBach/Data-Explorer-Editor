@@ -37,6 +37,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/presentation/components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/presentation/components/ui/dialog';
 
 export const NoSqlMainContent: React.FC = () => {
   const {
@@ -87,15 +93,18 @@ export const NoSqlMainContent: React.FC = () => {
   const { isLoading, error, executeMql, result } = useNoSqlQuery();
   const [pageJumpValue, setPageJumpValue] = React.useState(String(nosqlPageIndex + 1));
   const isAggregationView = nosqlViewMode === 'aggregation';
-  const resultViewMode = React.useMemo<'tree' | 'grid' | 'schema'>(() => {
-    if (isAggregationView) {
-      return 'tree';
-    }
-
-    return nosqlViewMode;
-  }, [isAggregationView, nosqlViewMode]);
+  const isSchemaDialogOpen = nosqlViewMode === 'schema';
+  const [resultViewMode, setResultViewMode] = React.useState<'tree' | 'grid'>(
+    nosqlViewMode === 'grid' ? 'grid' : 'tree',
+  );
   const canRunQuery =
     !isLoading && activeConnection?.allowQueryExecution !== false;
+
+  React.useEffect(() => {
+    if (nosqlViewMode === 'tree' || nosqlViewMode === 'grid') {
+      setResultViewMode(nosqlViewMode);
+    }
+  }, [nosqlViewMode]);
 
   React.useEffect(() => {
     setPageJumpValue(String(nosqlPageIndex + 1));
@@ -106,18 +115,13 @@ export const NoSqlMainContent: React.FC = () => {
           title: text.gridTitle,
           description: text.gridDescription,
         }
-      : resultViewMode === 'schema'
-          ? {
-              title: text.schemaTitle,
-              description: text.schemaDescription,
-            }
-          : {
-              title:
-                isAggregationView && result
-                  ? text.pipelineOutputTitle
-                  : text.treeTitle,
-              description: text.treeDescription,
-            };
+      : {
+          title:
+            isAggregationView && result
+              ? text.pipelineOutputTitle
+              : text.treeTitle,
+          description: text.treeDescription,
+        };
   const resultPillLabel =
     result?.summaryLabel || text.docsLabel;
   const resultPillValue = result?.summaryValue ?? result?.rowCount ?? result?.rows.length;
@@ -125,10 +129,21 @@ export const NoSqlMainContent: React.FC = () => {
   const resultRangeStart = result?.rows.length ? resultOffset + 1 : resultOffset;
   const resultRangeEnd = resultOffset + (result?.rows.length || 0);
 
-  const handleViewModeChange = (
-    mode: 'tree' | 'grid' | 'schema' | 'aggregation',
-  ) => {
-    setNosqlViewMode(mode);
+  const handleResultViewModeChange = (mode: 'tree' | 'grid') => {
+    setResultViewMode(mode);
+    if (!isAggregationView && !isSchemaDialogOpen) {
+      setNosqlViewMode(mode);
+    }
+  };
+
+  const returnToQueryWorkspace = () => {
+    setNosqlViewMode(resultViewMode);
+  };
+
+  const handleSchemaDialogChange = (open: boolean) => {
+    if (!open) {
+      setNosqlViewMode(resultViewMode);
+    }
   };
 
   const handleRunPreparedQuery = async (query?: string) => {
@@ -199,61 +214,104 @@ export const NoSqlMainContent: React.FC = () => {
           }`,
         )}
       >
-        <div className="flex items-center gap-1.5 min-w-0 shrink-0">
+        <div
+          className="flex items-center gap-1.5 min-w-0 shrink-0"
+          title={`db.${nosqlActiveCollection}`}
+        >
           <Database className="w-4 h-4 text-green-500 shrink-0" />
-          <span className="font-semibold text-sm truncate max-w-[160px]">
+          <span
+            className={cn(
+              'max-w-[160px] truncate text-sm font-semibold',
+              isCompactMobileLayout && 'sr-only',
+            )}
+          >
             db.{nosqlActiveCollection}
           </span>
         </div>
 
         <div className="w-px h-5 bg-border/40 shrink-0" />
 
-        <div className="flex items-center bg-muted/50 rounded-md p-1 border flex-1 min-w-0 overflow-x-auto scrollbar-none">
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-none">
           <Button
-            variant={nosqlViewMode === 'tree' ? 'secondary' : 'ghost'}
+            variant={!isAggregationView ? 'secondary' : 'ghost'}
             size="sm"
-            className="h-7 px-3 text-xs gap-1.5 shrink-0"
-            onClick={() => handleViewModeChange('tree')}
+            className="h-8 shrink-0 gap-1.5 px-3 text-xs"
+            onClick={returnToQueryWorkspace}
           >
-            <TreeDeciduous className="w-3.5 h-3.5 text-green-600" />
+            <Database className="h-3.5 w-3.5 text-green-500" />
             <span className="whitespace-nowrap">
-              {isCompactMobileLayout ? 'Tree' : 'Tree (JSON)'}
+              {isCompactMobileLayout ? 'Query' : lang === 'vi' ? 'Truy vấn' : 'Query'}
             </span>
           </Button>
           <Button
-            variant={nosqlViewMode === 'grid' ? 'secondary' : 'ghost'}
+            variant={isAggregationView ? 'secondary' : 'ghost'}
             size="sm"
-            className="h-7 px-3 text-xs gap-1.5 shrink-0"
-            onClick={() => handleViewModeChange('grid')}
+            className="h-8 shrink-0 gap-1.5 px-3 text-xs"
+            onClick={() => setNosqlViewMode('aggregation')}
           >
-            <Filter className="w-3.5 h-3.5 text-blue-500" />
+            <Layers className="h-3.5 w-3.5 text-emerald-500" />
             <span className="whitespace-nowrap">
-              {isCompactMobileLayout ? 'Grid' : 'Auto-Flatten Grid'}
-            </span>
-          </Button>
-          <Button
-            variant={nosqlViewMode === 'schema' ? 'secondary' : 'ghost'}
-            size="sm"
-            className="h-7 px-3 text-xs gap-1.5 shrink-0"
-            onClick={() => handleViewModeChange('schema')}
-          >
-            <SearchCode className="w-3.5 h-3.5 text-indigo-500" />
-            <span className="whitespace-nowrap">
-              {isCompactMobileLayout ? 'Schema' : 'Schema Analysis'}
-            </span>
-          </Button>
-          <Button
-            variant={nosqlViewMode === 'aggregation' ? 'secondary' : 'ghost'}
-            size="sm"
-            className="h-7 px-3 text-xs gap-1.5 shrink-0"
-            onClick={() => handleViewModeChange('aggregation')}
-          >
-            <Layers className="w-3.5 h-3.5 text-pink-500" />
-            <span className="whitespace-nowrap">
-              {isCompactMobileLayout ? 'Steps' : 'Aggregation Builder'}
+              {isCompactMobileLayout ? 'Pipeline' : 'Aggregation Pipeline'}
             </span>
           </Button>
         </div>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 shrink-0 gap-1.5 px-2 text-xs text-green-500/80 hover:bg-green-500/10 hover:text-green-400"
+              title={text.askAiMql}
+            >
+              <Sparkles className="h-3.5 w-3.5 fill-green-500/10" />
+              <span className={cn('whitespace-nowrap', isCompactMobileLayout && 'sr-only')}>
+                AI NoSQL
+              </span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-[min(450px,calc(100vw-1rem))] overflow-hidden rounded-2xl border-white/10 bg-background/95 p-0 shadow-2xl backdrop-blur-xl"
+            align="end"
+            sideOffset={10}
+          >
+            <NoSqlAiQueryBox
+              currentConnectionId={nosqlActiveConnectionId || ''}
+              currentDatabase={nosqlEffectiveDatabase}
+              collectionName={nosqlActiveCollection}
+              onGenerate={(generatedMql) => setNosqlMqlQuery(generatedMql)}
+            />
+          </PopoverContent>
+        </Popover>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 shrink-0 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+          onClick={toggleResultPanel}
+          title={isResultPanelOpen ? text.hideResultsPanelTitle : text.showResultsPanelTitle}
+        >
+          {isResultPanelOpen ? (
+            <EyeOff className="h-3.5 w-3.5" />
+          ) : (
+            <Eye className="h-3.5 w-3.5" />
+          )}
+          <span className="sr-only">
+            {isResultPanelOpen ? text.hideResults : text.showResults}
+          </span>
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 shrink-0 gap-1.5 px-2 text-xs text-muted-foreground hover:bg-indigo-500/10 hover:text-indigo-400"
+          onClick={() => setNosqlViewMode('schema')}
+        >
+          <SearchCode className="h-3.5 w-3.5" />
+          <span className={cn('whitespace-nowrap', isCompactMobileLayout && 'sr-only')}>
+            {lang === 'vi' ? 'Phân tích schema' : 'Schema Analysis'}
+          </span>
+        </Button>
 
         <Button
           variant="ghost"
@@ -268,6 +326,7 @@ export const NoSqlMainContent: React.FC = () => {
 
       <div className="flex-1 flex flex-col min-h-0 relative">
         <div className="flex-1 min-h-0 relative bg-muted/10 flex flex-col">
+          {!isAggregationView && (
           <div className="px-3 py-1.5 border-b text-xs font-semibold text-muted-foreground bg-muted/30 uppercase tracking-widest flex items-center justify-between gap-2 overflow-hidden">
             <div className="flex items-center gap-2 min-w-0 shrink truncate">
               <span className="truncate whitespace-nowrap">
@@ -283,38 +342,6 @@ export const NoSqlMainContent: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 gap-1.5 px-2 hover:bg-green-500/10 text-green-500/80 hover:text-green-400 transition-all border border-transparent hover:border-green-500/20"
-                    title={text.askAiMql}
-                  >
-                    <Sparkles className="w-3.5 h-3.5 fill-green-500/10" />
-                    <span className="font-semibold text-[10px] uppercase tracking-wider">
-                      {isCompactMobileLayout ? 'AI' : 'AI NoSQL'}
-                    </span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[min(450px,calc(100vw-1rem))] p-0 border-white/10 bg-background/95 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden"
-                  align="start"
-                  sideOffset={10}
-                >
-                  <NoSqlAiQueryBox
-                    currentConnectionId={nosqlActiveConnectionId || ''}
-                    currentDatabase={nosqlEffectiveDatabase}
-                    collectionName={nosqlActiveCollection}
-                    onGenerate={(generatedMql) => {
-                      setNosqlMqlQuery(generatedMql);
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-
-              <div className="w-px h-4 bg-border/40" />
-
               {result && (
                 <div className="flex items-center gap-1 px-2 py-0.5 bg-green-500/10 border border-green-500/20 rounded-full shrink-0">
                   <span className="text-[10px] font-bold text-green-500/80">
@@ -344,23 +371,6 @@ export const NoSqlMainContent: React.FC = () => {
                   )}
                 </div>
               )}
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-                onClick={toggleResultPanel}
-                title={isResultPanelOpen ? text.hideResultsPanelTitle : text.showResultsPanelTitle}
-              >
-                {isResultPanelOpen ? (
-                  <EyeOff className="w-3.5 h-3.5" />
-                ) : (
-                  <Eye className="w-3.5 h-3.5" />
-                )}
-                <span className={cn('whitespace-nowrap', isCompactMobileLayout && 'hidden')}>
-                  {isResultPanelOpen ? text.hideResults : text.showResults}
-                </span>
-              </Button>
 
               {!isAggregationView && (
                 <>
@@ -415,6 +425,7 @@ export const NoSqlMainContent: React.FC = () => {
               )}
             </div>
           </div>
+          )}
 
           <div className="flex-1 min-h-0 w-full relative">
             {isAggregationView ? (
@@ -423,6 +434,7 @@ export const NoSqlMainContent: React.FC = () => {
                 mqlQuery={nosqlMqlQuery}
                 onApply={setNosqlMqlQuery}
                 onRun={handleRunPreparedQuery}
+                onBack={returnToQueryWorkspace}
                 canRun={canRunQuery}
               />
             ) : (
@@ -460,8 +472,30 @@ export const NoSqlMainContent: React.FC = () => {
         >
           <div className="flex items-start justify-between gap-3 border-b bg-muted/20 px-4 py-3">
             <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                {resultPanelCopy.title}
+              <div className="flex items-center gap-2">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                  {resultPanelCopy.title}
+                </div>
+                <div className="flex items-center rounded-md border border-border/60 bg-background/70 p-0.5">
+                  <Button
+                    variant={resultViewMode === 'tree' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-6 gap-1 px-2 text-[10px]"
+                    onClick={() => handleResultViewModeChange('tree')}
+                  >
+                    <TreeDeciduous className="h-3 w-3" />
+                    Tree
+                  </Button>
+                  <Button
+                    variant={resultViewMode === 'grid' ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="h-6 gap-1 px-2 text-[10px]"
+                    onClick={() => handleResultViewModeChange('grid')}
+                  >
+                    <Filter className="h-3 w-3" />
+                    Grid
+                  </Button>
+                </div>
               </div>
               <p className="mt-1 text-xs text-muted-foreground/80">
                 {result?.summaryHint || resultPanelCopy.description}
@@ -536,7 +570,6 @@ export const NoSqlMainContent: React.FC = () => {
                   </div>
                 )}
                 {resultViewMode === 'grid' && <NoSqlGridView data={nosqlResult} />}
-                {resultViewMode === 'schema' && <NoSqlSchemaAnalysisView />}
               </>
             )}
           </div>
@@ -603,6 +636,18 @@ export const NoSqlMainContent: React.FC = () => {
           )}
         </div>
       </div>
+
+      <Dialog open={isSchemaDialogOpen} onOpenChange={handleSchemaDialogChange}>
+        <DialogContent className="z-[80] block h-[calc(100dvh-1rem)] max-h-[860px] max-w-[calc(100vw-1rem)] overflow-hidden border-border/70 bg-background p-0 shadow-2xl sm:h-[82dvh] sm:max-w-[min(1200px,calc(100vw-2rem))]">
+          <DialogTitle className="sr-only">Phân tích schema</DialogTitle>
+          <DialogDescription className="sr-only">
+            Kiểm tra field, kiểu dữ liệu và giá trị mẫu của collection đang chọn.
+          </DialogDescription>
+          <div className="h-full overflow-hidden px-4 pb-4 pt-12 sm:px-6 sm:pb-6 sm:pt-6">
+            <NoSqlSchemaAnalysisView />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

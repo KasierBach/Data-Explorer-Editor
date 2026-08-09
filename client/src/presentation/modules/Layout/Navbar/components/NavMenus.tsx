@@ -248,7 +248,6 @@ export const NavMenus: React.FC<NavMenusProps> = ({
                             <DropdownMenuItem onClick={() => setNosqlViewMode('tree')} disabled={!hasActiveNoSqlCollection || nosqlViewMode === 'tree'}>{noSqlText.treeView}</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setNosqlViewMode('grid')} disabled={!hasActiveNoSqlCollection || nosqlViewMode === 'grid'}>{noSqlText.gridView}</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setNosqlViewMode('schema')} disabled={!hasActiveNoSqlCollection || nosqlViewMode === 'schema'}>{noSqlText.schemaView}</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setNosqlViewMode('aggregation')} disabled={!hasActiveNoSqlCollection || nosqlViewMode === 'aggregation'}>{noSqlText.aggregationBuilder}</DropdownMenuItem>
                         </>
                     )}
                     <DropdownMenuSeparator />

@@ -1,52 +1,140 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  ChevronLeft,
   ChevronDown,
   ChevronUp,
   Eye,
   EyeOff,
+  Lightbulb,
   Layers,
   Play,
   Plus,
   Save,
+  Sparkles,
   Trash2,
-} from 'lucide-react';
-import { Button } from '@/presentation/components/ui/button';
-import { useAppStore } from '@/core/services/store';
+  Wand2,
+} from "lucide-react";
+import { Button } from "@/presentation/components/ui/button";
+import { useAppStore } from "@/core/services/store";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/presentation/components/ui/select';
-import { MqlEditor } from './MqlEditor';
-import { cn } from '@/lib/utils';
-import type { NoSqlPipelineStage } from '@/core/services/store/slices/nosqlSlice';
+} from "@/presentation/components/ui/select";
+import { MqlEditor } from "./MqlEditor";
+import { cn } from "@/lib/utils";
+import type { NoSqlPipelineStage } from "@/core/services/store/slices/nosqlSlice";
 import {
   buildAggregationQuery,
   createPipelineStage,
+  getDefaultStageValue,
   getPipelineStageSignature,
   NOSQL_STAGE_TYPES,
   parseAggregationQuery,
-} from './aggregationBuilderUtils';
+} from "./aggregationBuilderUtils";
+import { NoSqlAiQueryBox } from "./components/NoSqlAiQueryBox";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/presentation/components/ui/popover";
+
+const STAGE_GUIDES: Record<
+  string,
+  {
+    titleVi: string;
+    titleEn: string;
+    descriptionVi: string;
+    descriptionEn: string;
+  }
+> = {
+  $match: {
+    titleVi: "Lọc document",
+    titleEn: "Filter documents",
+    descriptionVi: "Chỉ giữ lại những document khớp điều kiện bạn nhập.",
+    descriptionEn: "Keep only documents that match the conditions you enter.",
+  },
+  $group: {
+    titleVi: "Nhóm và tính toán",
+    titleEn: "Group and calculate",
+    descriptionVi:
+      "Nhóm document theo một field rồi đếm, tính tổng hoặc trung bình.",
+    descriptionEn:
+      "Group documents by a field, then count, sum, or average them.",
+  },
+  $project: {
+    titleVi: "Chọn field đầu ra",
+    titleEn: "Choose output fields",
+    descriptionVi: "Giữ, ẩn hoặc tạo field cho kết quả cuối.",
+    descriptionEn: "Keep, hide, or create fields for the final result.",
+  },
+  $sort: {
+    titleVi: "Sắp xếp kết quả",
+    titleEn: "Sort results",
+    descriptionVi: "Dùng 1 để tăng dần và -1 để giảm dần.",
+    descriptionEn: "Use 1 for ascending order and -1 for descending order.",
+  },
+  $limit: {
+    titleVi: "Giới hạn số lượng",
+    titleEn: "Limit the result count",
+    descriptionVi: "Nhập một số nguyên dương, ví dụ 10 hoặc 50.",
+    descriptionEn: "Enter a positive integer, such as 10 or 50.",
+  },
+  $skip: {
+    titleVi: "Bỏ qua kết quả đầu",
+    titleEn: "Skip initial results",
+    descriptionVi: "Nhập số document cần bỏ qua trước khi lấy kết quả.",
+    descriptionEn: "Enter how many documents to skip before returning results.",
+  },
+  $lookup: {
+    titleVi: "Nối collection",
+    titleEn: "Join a collection",
+    descriptionVi: "Ghép dữ liệu từ collection khác bằng các field liên kết.",
+    descriptionEn: "Join data from another collection using related fields.",
+  },
+  $unwind: {
+    titleVi: "Tách phần tử mảng",
+    titleEn: "Expand array items",
+    descriptionVi: "Biến từng phần tử trong mảng thành một document riêng.",
+    descriptionEn: "Turn each array item into a separate document.",
+  },
+  $facet: {
+    titleVi: "Chạy nhiều nhánh",
+    titleEn: "Run multiple branches",
+    descriptionVi:
+      "Tạo nhiều pipeline con và trả kết quả trong cùng một lần chạy.",
+    descriptionEn: "Run multiple sub-pipelines and return them in one result.",
+  },
+  $addFields: {
+    titleVi: "Thêm field tính toán",
+    titleEn: "Add calculated fields",
+    descriptionVi: "Tạo field mới từ dữ liệu đang có trong document.",
+    descriptionEn: "Create new fields from values already in each document.",
+  },
+};
 
 interface NoSqlAggregationBuilderViewProps {
   collectionName: string;
   mqlQuery: string;
   onApply: (query: string) => void;
   onRun: (query: string) => void | Promise<void>;
+  onBack: () => void;
   canRun?: boolean;
 }
 
-function summarizeStage(stage: NoSqlPipelineStage) {
-  const compact = (stage.value || '')
-    .replace(/\s+/g, ' ')
-    .replace(/\{\s+\}/g, '{}')
+function summarizeStage(stage: NoSqlPipelineStage, lang: string) {
+  const compact = (stage.value || "")
+    .replace(/\s+/g, " ")
+    .replace(/\{\s+\}/g, "{}")
     .trim();
 
-  if (!compact || compact === '{}') {
-    return 'Stage body is empty. Add fields to shape this step.';
+  if (!compact || compact === "{}") {
+    return lang === "vi"
+      ? "Chưa có điều kiện. Chọn “Điền mẫu” hoặc dùng AI để bắt đầu."
+      : "No value yet. Use the example or ask AI to get started.";
   }
 
   return compact.length > 110 ? `${compact.slice(0, 107)}...` : compact;
@@ -54,16 +142,17 @@ function summarizeStage(stage: NoSqlPipelineStage) {
 
 export const NoSqlAggregationBuilderView: React.FC<
   NoSqlAggregationBuilderViewProps
-> = ({
-  collectionName,
-  mqlQuery,
-  onApply,
-  onRun,
-  canRun = true,
-}) => {
-  const { nosqlPipelineStages, setNosqlPipelineStages } = useAppStore();
+> = ({ collectionName, mqlQuery, onApply, onRun, onBack, canRun = true }) => {
+  const {
+    nosqlPipelineStages,
+    setNosqlPipelineStages,
+    nosqlActiveConnectionId,
+    nosqlActiveDatabase,
+    lang,
+  } = useAppStore();
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+  const [isAiOpen, setIsAiOpen] = useState(false);
   const stageItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   useEffect(() => {
@@ -100,8 +189,8 @@ export const NoSqlAggregationBuilderView: React.FC<
   useEffect(() => {
     if (!effectiveSelectedStageId) return;
     stageItemRefs.current[effectiveSelectedStageId]?.scrollIntoView({
-      block: 'nearest',
-      behavior: 'smooth',
+      block: "nearest",
+      behavior: "smooth",
     });
   }, [effectiveSelectedStageId]);
 
@@ -112,7 +201,9 @@ export const NoSqlAggregationBuilderView: React.FC<
   };
 
   const removeStage = (id: string) => {
-    const removedIndex = nosqlPipelineStages.findIndex((stage) => stage.id === id);
+    const removedIndex = nosqlPipelineStages.findIndex(
+      (stage) => stage.id === id,
+    );
     const nextStages = nosqlPipelineStages.filter((stage) => stage.id !== id);
     setNosqlPipelineStages(nextStages);
 
@@ -131,9 +222,16 @@ export const NoSqlAggregationBuilderView: React.FC<
     );
   };
 
-  const moveStage = (index: number, direction: 'up' | 'down') => {
+  const changeStageType = (id: string, type: string) => {
+    updateStage(id, {
+      type,
+      value: getDefaultStageValue(type),
+    });
+  };
+
+  const moveStage = (index: number, direction: "up" | "down") => {
     const nextStages = [...nosqlPipelineStages];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= nextStages.length) return;
 
     [nextStages[index], nextStages[targetIndex]] = [
@@ -166,348 +264,467 @@ export const NoSqlAggregationBuilderView: React.FC<
     await onRun(assembled.serialized);
   };
 
-  return (
-    <div className="h-full min-h-0 animate-in slide-in-from-right duration-500 p-2">
-      <div className="flex h-full min-h-0 flex-col rounded-2xl border border-border/60 bg-card/20">
-        <div className="flex flex-col gap-4 border-b border-border/60 px-4 py-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="rounded-xl bg-pink-500/10 p-2.5">
-              <Layers className="h-5 w-5 text-pink-500" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="truncate text-lg font-bold">
-                Visual Aggregation Builder
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Keep the stage list compact, then edit one step at a time.
-              </p>
-            </div>
-          </div>
+  const applyAiPipeline = (generatedMql: string) => {
+    const parsed = parseAggregationQuery(generatedMql);
+    if (!parsed) return false;
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1 lg:max-w-[60%] lg:justify-end">
-            <div className="shrink-0 rounded-full border border-border/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap">
-              {assembled.payload.pipeline.length} active stage
-              {assembled.payload.pipeline.length === 1 ? '' : 's'}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 shrink-0 gap-2 text-xs border-dashed whitespace-nowrap"
-              onClick={addStage}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Stage
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 shrink-0 gap-2 text-xs whitespace-nowrap"
-              onClick={assemblePipeline}
-              disabled={hasIssues}
-            >
-              <Save className="h-3.5 w-3.5" />
-              Apply to Editor
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="h-8 shrink-0 gap-2 text-xs whitespace-nowrap bg-pink-600 text-white shadow-lg shadow-pink-500/20 hover:bg-pink-700"
-              onClick={runPipeline}
-              disabled={hasIssues || !canRun}
-            >
-              <Play className="h-3.5 w-3.5 fill-current" />
-              Run Pipeline
-            </Button>
+    setNosqlPipelineStages(parsed.stages);
+    setSelectedStageId(parsed.stages[0]?.id ?? null);
+    onApply(generatedMql);
+    setIsAiOpen(false);
+    return true;
+  };
+
+  const selectedStageGuide = selectedStage
+    ? STAGE_GUIDES[selectedStage.type]
+    : null;
+  const selectedStageTitle = selectedStageGuide
+    ? lang === "vi"
+      ? selectedStageGuide.titleVi
+      : selectedStageGuide.titleEn
+    : selectedStage?.type;
+  const selectedStageDescription = selectedStageGuide
+    ? lang === "vi"
+      ? selectedStageGuide.descriptionVi
+      : selectedStageGuide.descriptionEn
+    : lang === "vi"
+      ? "Nhập giá trị JSON hợp lệ cho stage này."
+      : "Enter a valid JSON value for this stage.";
+
+  return (
+    <div className="flex h-full min-h-0 flex-col animate-in slide-in-from-right duration-300 bg-card/10">
+      <div className="flex flex-col gap-3 border-b border-border/60 bg-card/50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 shrink-0 gap-1.5 px-2 text-xs text-muted-foreground"
+            onClick={onBack}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            {lang === "vi" ? "Truy vấn" : "Query"}
+          </Button>
+          <div className="h-5 w-px bg-border/60" />
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-semibold">
+              Aggregation Pipeline
+            </h3>
+            <p className="truncate text-[11px] text-muted-foreground">
+              db.{collectionName} ·{" "}
+              {lang === "vi"
+                ? "Dựng từng bước, kiểm tra rồi mới chạy"
+                : "Build each step, review it, then run"}
+            </p>
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-auto p-4 custom-scrollbar lg:overflow-hidden">
-          <div className="grid gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]">
-            <section className="rounded-2xl border border-border/60 bg-background/40 lg:flex lg:min-h-0 lg:flex-col">
-              <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 shrink-0">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                    Pipeline Stages
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground/80">
-                    Add, reorder, or disable steps without losing context.
-                  </p>
-                </div>
-                <div className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  {nosqlPipelineStages.length} total
-                </div>
+        <div className="-mb-1 flex w-full items-center gap-1.5 overflow-x-auto pb-1 lg:w-auto lg:max-w-[60%] lg:justify-end lg:gap-2">
+          <div className="hidden shrink-0 rounded-full border border-border/60 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground whitespace-nowrap sm:block">
+            {assembled.payload.pipeline.length}{" "}
+            {lang === "vi" ? "stage đang bật" : "active stage"}
+            {lang !== "vi" && assembled.payload.pipeline.length !== 1
+              ? "s"
+              : ""}
+          </div>
+          <Popover open={isAiOpen} onOpenChange={setIsAiOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0 gap-2 border-emerald-500/30 bg-emerald-500/10 text-xs text-emerald-500 hover:bg-emerald-500/15 hover:text-emerald-400"
+                disabled={!nosqlActiveConnectionId}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {lang === "vi" ? "Tạo bằng AI" : "Build with AI"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={10}
+              className="w-[min(520px,calc(100vw-1rem))] overflow-hidden rounded-2xl border-emerald-500/20 bg-background/95 p-0 shadow-2xl backdrop-blur-xl"
+            >
+              <NoSqlAiQueryBox
+                aggregateOnly
+                initiallyExpanded
+                currentConnectionId={nosqlActiveConnectionId || ""}
+                currentDatabase={nosqlActiveDatabase || undefined}
+                collectionName={collectionName}
+                onGenerate={applyAiPipeline}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0 gap-2 text-xs border-dashed whitespace-nowrap"
+            onClick={addStage}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {lang === "vi" ? "Thêm stage" : "Add stage"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0 gap-2 text-xs whitespace-nowrap"
+            onClick={assemblePipeline}
+            disabled={hasIssues}
+          >
+            <Save className="h-3.5 w-3.5" />
+            {lang === "vi" ? "Đưa vào editor" : "Apply to editor"}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="order-first h-8 shrink-0 gap-2 bg-emerald-600 text-xs text-white whitespace-nowrap hover:bg-emerald-700 lg:order-none"
+            onClick={runPipeline}
+            disabled={hasIssues || !canRun}
+          >
+            <Play className="h-3.5 w-3.5 fill-current" />
+            {lang === "vi" ? "Chạy pipeline" : "Run pipeline"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-auto p-4 custom-scrollbar lg:overflow-hidden">
+        <div className="grid gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]">
+          <section className="rounded-2xl border border-border/60 bg-background/40 lg:flex lg:min-h-0 lg:flex-col">
+            <div className="flex items-center justify-between border-b border-border/60 px-4 py-3 shrink-0">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  {lang === "vi" ? "Các bước xử lý" : "Pipeline stages"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground/80">
+                  {lang === "vi"
+                    ? "Mỗi stage làm một việc. Kết quả chạy từ trên xuống dưới."
+                    : "Each stage does one job. The pipeline runs from top to bottom."}
+                </p>
               </div>
+              <div className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {nosqlPipelineStages.length} {lang === "vi" ? "bước" : "total"}
+              </div>
+            </div>
 
-              <div className="space-y-2 p-3 custom-scrollbar lg:flex-1 lg:min-h-0 lg:overflow-auto">
-                {nosqlPipelineStages.map((stage, index) => {
-                  const isSelected = stage.id === effectiveSelectedStageId;
-                  const issue = issuesByStage.get(stage.id);
+            <div className="space-y-2 p-3 custom-scrollbar lg:flex-1 lg:min-h-0 lg:overflow-auto">
+              {nosqlPipelineStages.map((stage, index) => {
+                const isSelected = stage.id === effectiveSelectedStageId;
+                const issue = issuesByStage.get(stage.id);
 
-                  return (
-                    <button
-                      key={stage.id}
-                      ref={(node) => {
-                        stageItemRefs.current[stage.id] = node;
-                      }}
-                      type="button"
-                      onClick={() => setSelectedStageId(stage.id)}
-                      className={cn(
-                        'w-full rounded-xl border px-3 py-3 text-left transition-all',
-                        isSelected
-                          ? 'border-pink-500/40 bg-pink-500/10 shadow-lg shadow-pink-500/10'
-                          : 'border-border/60 bg-card/40 hover:border-pink-500/20 hover:bg-card',
-                        !stage.enabled && 'opacity-70',
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground/60">
-                              #{index + 1}
-                            </span>
-                            <span className="text-sm font-semibold uppercase tracking-tight">
-                              {stage.type}
-                            </span>
-                            {!stage.enabled && (
-                              <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                                Hidden
-                              </span>
-                            )}
-                            {issue && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-500">
-                                <AlertTriangle className="h-3 w-3" />
-                                Invalid JSON
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-2 truncate text-xs text-muted-foreground/80">
-                            {summarizeStage(stage)}
-                          </p>
-                        </div>
-                        {isSelected && (
-                          <span className="rounded-full bg-background px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-pink-500">
-                            Editing
+                return (
+                  <button
+                    key={stage.id}
+                    ref={(node) => {
+                      stageItemRefs.current[stage.id] = node;
+                    }}
+                    type="button"
+                    onClick={() => setSelectedStageId(stage.id)}
+                    className={cn(
+                      "w-full rounded-xl border px-3 py-3 text-left transition-all",
+                      isSelected
+                        ? "border-pink-500/40 bg-pink-500/10 shadow-lg shadow-pink-500/10"
+                        : "border-border/60 bg-card/40 hover:border-pink-500/20 hover:bg-card",
+                      !stage.enabled && "opacity-70",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-[10px] font-black uppercase tracking-wide text-muted-foreground/60">
+                            #{index + 1}
                           </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-
-                {nosqlPipelineStages.length === 0 && (
-                  <div className="flex h-40 flex-col items-center justify-center gap-3 rounded-xl border border-dashed text-muted-foreground">
-                    <Layers className="h-8 w-8 opacity-20" />
-                    <p className="text-xs">
-                      No stages added. Start by adding your first aggregation
-                      stage.
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8"
-                      onClick={addStage}
-                    >
-                      <Plus className="mr-2 h-3.5 w-3.5" />
-                      Add Match Stage
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section className="flex flex-col gap-4 lg:min-h-0">
-              {selectedStage ? (
-                <div className="overflow-hidden rounded-2xl border border-border/60 bg-background/40 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
-                  <div className="flex flex-col gap-3 border-b border-border/60 bg-muted/20 px-4 py-3 shrink-0 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="flex min-w-0 items-center gap-3 overflow-x-auto pb-1 -mb-1">
-                      <span className="shrink-0 rounded-full bg-background px-2 py-1 text-[10px] font-black uppercase tracking-wide text-muted-foreground whitespace-nowrap">
-                        Stage #{selectedStageIndex + 1}
-                      </span>
-                      <Select
-                        value={selectedStage.type}
-                        onValueChange={(value) =>
-                          updateStage(selectedStage.id, { type: value })
-                        }
-                      >
-                        <SelectTrigger className="h-9 w-36 shrink-0 border-border/60 bg-background text-[11px] font-bold uppercase tracking-tight">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {NOSQL_STAGE_TYPES.map((type) => (
-                            <SelectItem
-                              key={type}
-                              value={type}
-                              className="text-[11px] uppercase"
-                            >
-                              {type}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {issuesByStage.has(selectedStage.id) && (
-                        <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-500 whitespace-nowrap">
-                          <AlertTriangle className="h-3 w-3" />
-                          Stage body must be valid JSON
+                          <span className="text-sm font-semibold uppercase tracking-tight">
+                            {stage.type}
+                          </span>
+                          <span className="truncate text-[11px] font-medium normal-case text-muted-foreground">
+                            {lang === "vi"
+                              ? STAGE_GUIDES[stage.type]?.titleVi
+                              : STAGE_GUIDES[stage.type]?.titleEn}
+                          </span>
+                          {!stage.enabled && (
+                            <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                              {lang === "vi" ? "Đã tắt" : "Hidden"}
+                            </span>
+                          )}
+                          {issue && (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-500">
+                              <AlertTriangle className="h-3 w-3" />
+                              {lang === "vi" ? "Cần kiểm tra" : "Needs review"}
+                            </span>
+                          )}
                         </div>
+                        <p className="mt-2 truncate text-xs text-muted-foreground/80">
+                          {summarizeStage(stage, lang)}
+                        </p>
+                      </div>
+                      {isSelected && (
+                        <span className="rounded-full bg-background px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-pink-500">
+                          {lang === "vi" ? "Đang sửa" : "Editing"}
+                        </span>
                       )}
                     </div>
+                  </button>
+                );
+              })}
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() =>
-                          updateStage(selectedStage.id, {
-                            enabled: !selectedStage.enabled,
-                          })
-                        }
-                        title={
-                          selectedStage.enabled
-                            ? 'Hide stage from the pipeline'
-                            : 'Enable stage in the pipeline'
-                        }
-                      >
-                        {selectedStage.enabled ? (
-                          <Eye className="h-3.5 w-3.5" />
-                        ) : (
-                          <EyeOff className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => moveStage(selectedStageIndex, 'up')}
-                        disabled={selectedStageIndex === 0}
-                        title="Move stage up"
-                      >
-                        <ChevronUp className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => moveStage(selectedStageIndex, 'down')}
-                        disabled={
-                          selectedStageIndex === nosqlPipelineStages.length - 1
-                        }
-                        title="Move stage down"
-                      >
-                        <ChevronDown className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                        onClick={() => removeStage(selectedStage.id)}
-                        title="Remove stage"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="border-b border-border/60 px-4 py-3 text-xs text-muted-foreground shrink-0">
-                    Edit the selected stage here. The full pipeline preview stays
-                    below so the result panel does not crowd the editor anymore.
-                  </div>
-
-                  <div className="relative h-[240px] bg-background lg:flex-1 lg:min-h-[240px]">
-                    <MqlEditor
-                      value={selectedStage.value}
-                      onChange={(value) =>
-                        updateStage(selectedStage.id, { value: value || '' })
-                      }
-                      height="100%"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-[240px] items-center justify-center rounded-2xl border border-dashed text-sm text-muted-foreground">
-                  Select or add a stage to start editing the pipeline.
+              {nosqlPipelineStages.length === 0 && (
+                <div className="flex h-40 flex-col items-center justify-center gap-3 rounded-xl border border-dashed text-muted-foreground">
+                  <Layers className="h-8 w-8 opacity-20" />
+                  <p className="text-xs">
+                    {lang === "vi"
+                      ? "Pipeline chưa có bước nào. Hãy thêm một stage hoặc tạo bằng AI."
+                      : "This pipeline has no stages. Add one or build it with AI."}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={addStage}
+                  >
+                    <Plus className="mr-2 h-3.5 w-3.5" />
+                    {lang === "vi" ? "Thêm bước lọc" : "Add a filter stage"}
+                  </Button>
                 </div>
               )}
+            </div>
+          </section>
 
-              <div
-                className={cn(
-                  'rounded-2xl border shrink-0',
-                  hasIssues
-                    ? 'border-amber-500/20 bg-amber-500/5'
-                    : 'border-indigo-500/10 bg-indigo-500/5',
-                )}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-4">
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={cn(
-                        'rounded-full p-2',
-                        hasIssues ? 'bg-amber-500/20' : 'bg-indigo-500/20',
-                      )}
+          <section className="flex flex-col gap-4 lg:min-h-0">
+            {selectedStage ? (
+              <div className="overflow-hidden rounded-2xl border border-border/60 bg-background/40 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col">
+                <div className="flex flex-col gap-3 border-b border-border/60 bg-muted/20 px-4 py-3 shrink-0 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex min-w-0 items-center gap-3 overflow-x-auto pb-1 -mb-1">
+                    <span className="shrink-0 rounded-full bg-background px-2 py-1 text-[10px] font-black uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                      Stage #{selectedStageIndex + 1}
+                    </span>
+                    <Select
+                      value={selectedStage.type}
+                      onValueChange={(value) =>
+                        changeStageType(selectedStage.id, value)
+                      }
                     >
-                      <Layers
-                        className={cn(
-                          'h-4 w-4',
-                          hasIssues ? 'text-amber-500' : 'text-indigo-500',
-                        )}
-                      />
+                      <SelectTrigger className="h-9 w-36 shrink-0 border-border/60 bg-background text-[11px] font-bold uppercase tracking-tight">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {NOSQL_STAGE_TYPES.map((type) => (
+                          <SelectItem
+                            key={type}
+                            value={type}
+                            className="text-[11px] uppercase"
+                          >
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {issuesByStage.has(selectedStage.id) && (
+                      <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-500 whitespace-nowrap">
+                        <AlertTriangle className="h-3 w-3" />
+                        {lang === "vi"
+                          ? "Giá trị chưa hợp lệ"
+                          : "Invalid stage value"}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() =>
+                        updateStage(selectedStage.id, {
+                          enabled: !selectedStage.enabled,
+                        })
+                      }
+                      title={
+                        selectedStage.enabled
+                          ? "Hide stage from the pipeline"
+                          : "Enable stage in the pipeline"
+                      }
+                    >
+                      {selectedStage.enabled ? (
+                        <Eye className="h-3.5 w-3.5" />
+                      ) : (
+                        <EyeOff className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => moveStage(selectedStageIndex, "up")}
+                      disabled={selectedStageIndex === 0}
+                      title="Move stage up"
+                    >
+                      <ChevronUp className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => moveStage(selectedStageIndex, "down")}
+                      disabled={
+                        selectedStageIndex === nosqlPipelineStages.length - 1
+                      }
+                      title="Move stage down"
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                      onClick={() => removeStage(selectedStage.id)}
+                      title="Remove stage"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 flex-col gap-3 border-b border-emerald-500/15 bg-emerald-500/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="mt-0.5 rounded-lg bg-emerald-500/10 p-2 text-emerald-500">
+                      <Lightbulb className="h-4 w-4" />
                     </div>
-                    <div className="text-xs">
-                      <p
-                        className={cn(
-                          'font-bold',
-                          hasIssues
-                            ? 'text-amber-600 dark:text-amber-400'
-                            : 'text-indigo-600 dark:text-indigo-400',
-                        )}
-                      >
-                        {hasIssues
-                          ? 'Pipeline needs attention'
-                          : 'Generated MQL preview'}
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-foreground">
+                        {lang === "vi" ? "Bước này: " : "This step: "}
+                        {selectedStageTitle}
+                        <span className="ml-1.5 font-mono text-[10px] text-emerald-500">
+                          {selectedStage.type}
+                        </span>
                       </p>
-                      <p className="text-muted-foreground/70">
-                        {hasIssues
-                          ? `${assembled.issues.length} stage(s) need valid JSON before apply or run.`
-                          : 'Preview the final aggregate payload only when you need it.'}
+                      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                        {selectedStageDescription}
                       </p>
                     </div>
                   </div>
-
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="h-8 gap-2 px-3 text-xs"
-                    onClick={() => setIsPreviewExpanded((current) => !current)}
+                    className="h-8 shrink-0 gap-1.5 text-xs"
+                    onClick={() =>
+                      updateStage(selectedStage.id, {
+                        value: getDefaultStageValue(selectedStage.type),
+                      })
+                    }
                   >
-                    {isPreviewExpanded ? 'Hide JSON' : 'Show JSON'}
-                    {isPreviewExpanded ? (
-                      <ChevronUp className="h-3.5 w-3.5" />
-                    ) : (
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    )}
+                    <Wand2 className="h-3.5 w-3.5" />
+                    {lang === "vi" ? "Điền mẫu" : "Use example"}
                   </Button>
                 </div>
 
-                {hasIssues && (
-                  <div className="mx-4 mb-4 space-y-1 rounded-xl border border-amber-500/10 bg-background/60 p-3 text-xs text-muted-foreground">
-                    {assembled.issues.map((issue) => (
-                      <div key={issue.stageId}>
-                        Stage #{issue.stageIndex + 1}{' '}
-                        <span className="font-mono">{issue.stageType}</span>:{' '}
-                        {issue.message}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {isPreviewExpanded && (
-                  <pre className="mx-4 mb-4 max-h-56 overflow-auto whitespace-pre-wrap rounded-xl border border-border/60 bg-background/70 p-3 text-[11px] text-foreground/80">
-                    {assembled.serialized}
-                  </pre>
-                )}
+                <div className="relative h-[240px] bg-background lg:flex-1 lg:min-h-[240px]">
+                  <MqlEditor
+                    value={selectedStage.value}
+                    onChange={(value) =>
+                      updateStage(selectedStage.id, { value: value || "" })
+                    }
+                    height="100%"
+                  />
+                </div>
               </div>
-            </section>
-          </div>
+            ) : (
+              <div className="flex h-[240px] items-center justify-center rounded-2xl border border-dashed text-sm text-muted-foreground">
+                {lang === "vi"
+                  ? "Chọn hoặc thêm một stage để bắt đầu."
+                  : "Select or add a stage to start editing."}
+              </div>
+            )}
+
+            <div
+              className={cn(
+                "rounded-2xl border shrink-0",
+                hasIssues
+                  ? "border-amber-500/20 bg-amber-500/5"
+                  : "border-indigo-500/10 bg-indigo-500/5",
+              )}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-4">
+                <div className="flex items-start gap-3">
+                  <div
+                    className={cn(
+                      "rounded-full p-2",
+                      hasIssues ? "bg-amber-500/20" : "bg-indigo-500/20",
+                    )}
+                  >
+                    <Layers
+                      className={cn(
+                        "h-4 w-4",
+                        hasIssues ? "text-amber-500" : "text-indigo-500",
+                      )}
+                    />
+                  </div>
+                  <div className="text-xs">
+                    <p
+                      className={cn(
+                        "font-bold",
+                        hasIssues
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-indigo-600 dark:text-indigo-400",
+                      )}
+                    >
+                      {hasIssues
+                        ? lang === "vi"
+                          ? "Pipeline cần kiểm tra"
+                          : "Pipeline needs attention"
+                        : lang === "vi"
+                          ? "MQL sẽ được tạo"
+                          : "Generated MQL preview"}
+                    </p>
+                    <p className="text-muted-foreground/70">
+                      {hasIssues
+                        ? lang === "vi"
+                          ? `${assembled.issues.length} stage chưa hợp lệ. Sửa trước khi đưa vào editor hoặc chạy.`
+                          : `${assembled.issues.length} stage(s) need valid values before apply or run.`
+                        : lang === "vi"
+                          ? "Bạn có thể xem JSON hoàn chỉnh trước khi chạy."
+                          : "Review the complete JSON before running when needed."}
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-2 px-3 text-xs"
+                  onClick={() => setIsPreviewExpanded((current) => !current)}
+                >
+                  {isPreviewExpanded
+                    ? lang === "vi"
+                      ? "Ẩn JSON"
+                      : "Hide JSON"
+                    : lang === "vi"
+                      ? "Xem JSON"
+                      : "Show JSON"}
+                  {isPreviewExpanded ? (
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </div>
+
+              {hasIssues && (
+                <div className="mx-4 mb-4 space-y-1 rounded-xl border border-amber-500/10 bg-background/60 p-3 text-xs text-muted-foreground">
+                  {assembled.issues.map((issue) => (
+                    <div key={issue.stageId}>
+                      {lang === "vi" ? "Bước" : "Stage"} #{issue.stageIndex + 1}{" "}
+                      <span className="font-mono">{issue.stageType}</span>:{" "}
+                      {issue.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {isPreviewExpanded && (
+                <pre className="mx-4 mb-4 max-h-56 overflow-auto whitespace-pre-wrap rounded-xl border border-border/60 bg-background/70 p-3 text-[11px] text-foreground/80">
+                  {assembled.serialized}
+                </pre>
+              )}
+            </div>
+          </section>
         </div>
       </div>
     </div>

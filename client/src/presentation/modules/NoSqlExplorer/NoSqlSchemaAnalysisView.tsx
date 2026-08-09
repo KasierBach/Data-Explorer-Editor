@@ -174,7 +174,7 @@ export const NoSqlSchemaAnalysisView: React.FC = () => {
               {isCached && (
                 <Badge className="h-4 gap-1 border-none bg-indigo-500/10 px-1.5 text-[10px] text-indigo-500 hover:bg-indigo-500/20">
                   <Zap className="h-2.5 w-2.5 fill-current" />
-                  Redis Cached
+                  Cached analysis
                 </Badge>
               )}
             </h3>
@@ -212,7 +212,7 @@ export const NoSqlSchemaAnalysisView: React.FC = () => {
       )}
 
       <div className="flex-1 overflow-auto rounded-xl border bg-card/30">
-        <table className="w-full border-collapse text-left text-xs">
+        <table className="min-w-[760px] w-full border-collapse text-left text-xs">
           <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur-sm">
             <tr className="border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               <th className="px-6 py-4">Field Name</th>
