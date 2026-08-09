@@ -9,7 +9,7 @@ import {
 } from "../../components/ui/select"
 import { useAppStore } from "@/core/services/store"
 import { PlusCircle, Server, Trash, Loader2, Activity, RefreshCw, Share2, Users } from "lucide-react"
-import { SiPostgresql, SiMysql, SiClickhouse, SiMongodb, SiRedis } from "react-icons/si"
+import { SiPostgresql, SiMysql, SiClickhouse, SiMongodb } from "react-icons/si"
 import { DiMsqlServer } from "react-icons/di"
 import { ConnectionService } from "@/core/services/ConnectionService"
 import { ShareConnectionDialog } from "../Connection/ShareConnectionDialog"
@@ -60,14 +60,6 @@ const getDbBranding = (type?: string) => {
                 label: 'MONGO',
                 icon: <SiMongodb className="w-3.5 h-3.5" />,
             };
-        case 'redis':
-            return {
-                color: 'text-red-400',
-                bg: 'bg-red-500/10',
-                bgHover: 'group-hover:bg-red-500/20',
-                label: 'REDIS',
-                icon: <SiRedis className="w-3.5 h-3.5" />,
-            };
         default:
             return {
                 color: 'text-blue-400',
@@ -79,11 +71,11 @@ const getDbBranding = (type?: string) => {
     }
 };
 
-const NOSQL_TYPES = ['mongodb', 'mongodb+srv', 'redis'];
+const NOSQL_TYPES = ['mongodb', 'mongodb+srv'];
 const SQL_TYPES = ['postgres', 'mysql', 'mssql', 'clickhouse'];
 
 interface ConnectionSelectorProps {
-    /** 'sql' = only relational, 'nosql' = only MongoDB/Redis, undefined = all */
+    /** 'sql' = only relational, 'nosql' = only supported MongoDB sources, undefined = all */
     filter?: 'sql' | 'nosql';
 }
 

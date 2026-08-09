@@ -52,6 +52,7 @@ export interface QueryResult {
   rowCount?: number;
   totalCount?: number;
   truncated?: boolean;
+  hasNextPage?: boolean;
   countStatus?: 'available' | 'unavailable' | 'skipped';
   appliedLimit?: number;
   appliedOffset?: number;

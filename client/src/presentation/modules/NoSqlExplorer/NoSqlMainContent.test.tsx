@@ -279,16 +279,32 @@ describe('NoSqlMainContent', () => {
     expect(executeMql).toHaveBeenCalled();
   });
 
-  it('migrates the legacy charts view mode back to grid', () => {
+  it('loads the next server page when more documents are available', () => {
+    const executeMql = vi.fn().mockResolvedValue(undefined);
+    mockUseNoSqlQuery.mockReturnValue({
+      result: {
+        rows: [{ _id: '1' }],
+        durationMs: 12,
+        truncated: true,
+        appliedLimit: 50,
+        appliedOffset: 50,
+      },
+      isLoading: false,
+      error: null,
+      executeMql,
+    });
+
     mockUseAppStore.mockReturnValue({
       nosqlActiveCollection: 'products',
       nosqlActiveDatabase: 'warehouse',
       setNosqlCollection: vi.fn(),
       nosqlMqlQuery: '{\n  "action": "find",\n  "collection": "products"\n}',
       setNosqlMqlQuery: vi.fn(),
-      nosqlResult: [],
-      nosqlViewMode: 'charts',
+      nosqlResult: [{ _id: '1' }],
+      nosqlViewMode: 'tree',
       setNosqlViewMode,
+      nosqlPageIndex: 1,
+      nosqlPageSize: 50,
       nosqlActiveConnectionId: 'mongo-1',
       connections: [
         {
@@ -307,7 +323,9 @@ describe('NoSqlMainContent', () => {
 
     render(<NoSqlMainContent />);
 
-    expect(setNosqlViewMode).toHaveBeenCalledWith('grid');
+    fireEvent.click(screen.getByRole('button', { name: /next page/i }));
+
+    expect(executeMql).toHaveBeenCalledWith({ pageIndex: 2, pageSize: 50 });
   });
 
   it('surfaces a capped-result badge when the hook reports truncated NoSQL output', () => {

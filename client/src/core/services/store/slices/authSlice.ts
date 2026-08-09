@@ -1,7 +1,14 @@
 import type { StateCreator } from 'zustand';
 import type { AiChat } from './aiChatSlice';
 import type { Connection } from './connectionSlice';
-import type { NoSqlFilterState, NoSqlPipelineStage, NoSqlSchemaFieldStat, NoSqlSlice } from './nosqlSlice';
+import type {
+    NoSqlFilterState,
+    NoSqlPipelineStage,
+    NoSqlSchemaFieldStat,
+    NoSqlSlice,
+    NoSqlViewMode,
+    NoSqlWorkspaceState,
+} from './nosqlSlice';
 import type { QueryHistoryEntry, SavedQuery } from './querySlice';
 import type { Tab } from './tabSlice';
 import type { PageState } from './uiSlice';
@@ -55,13 +62,16 @@ interface AuthResetState {
     nosqlActiveConnectionId: string | null;
     nosqlActiveDatabase: string | null;
     nosqlActiveCollection: string | null;
-    nosqlViewMode: 'tree' | 'grid' | 'charts' | 'schema' | 'aggregation';
+    nosqlViewMode: NoSqlViewMode;
     nosqlFilter: NoSqlFilterState;
     nosqlMqlQuery: string;
     nosqlResult: NoSqlSlice['nosqlResult'];
     nosqlIsQueryRunning: boolean;
     nosqlPipelineStages: NoSqlPipelineStage[];
     nosqlSchemaStats: NoSqlSchemaFieldStat[] | null;
+    nosqlPageIndex: number;
+    nosqlPageSize: number;
+    nosqlWorkspaceStates: Record<string, NoSqlWorkspaceState>;
 }
 
 interface LogoutOptions {
@@ -85,6 +95,9 @@ type WorkspaceRecoverySnapshot = Pick<
     | 'nosqlFilter'
     | 'nosqlMqlQuery'
     | 'nosqlPipelineStages'
+    | 'nosqlPageIndex'
+    | 'nosqlPageSize'
+    | 'nosqlWorkspaceStates'
 >;
 
 interface WorkspaceRecoveryPayload {
@@ -193,6 +206,9 @@ function buildWorkspaceRecovery(state: AuthSlice & AuthResetState) {
         nosqlFilter: state.nosqlFilter,
         nosqlMqlQuery: state.nosqlMqlQuery,
         nosqlPipelineStages: state.nosqlPipelineStages,
+        nosqlPageIndex: state.nosqlPageIndex,
+        nosqlPageSize: state.nosqlPageSize,
+        nosqlWorkspaceStates: state.nosqlWorkspaceStates,
     } satisfies WorkspaceRecoverySnapshot;
 }
 
@@ -236,6 +252,9 @@ function takeWorkspaceRecovery(user: AuthUser) {
         nosqlFilter,
         nosqlMqlQuery,
         nosqlPipelineStages,
+        nosqlPageIndex,
+        nosqlPageSize,
+        nosqlWorkspaceStates,
     } = payload.snapshot;
 
     return {
@@ -254,6 +273,9 @@ function takeWorkspaceRecovery(user: AuthUser) {
         nosqlFilter,
         nosqlMqlQuery,
         nosqlPipelineStages,
+        nosqlPageIndex,
+        nosqlPageSize,
+        nosqlWorkspaceStates,
     } satisfies WorkspaceRecoverySnapshot;
 }
 
@@ -299,6 +321,9 @@ const resetSessionState: AuthResetState = {
     nosqlIsQueryRunning: false,
     nosqlPipelineStages: defaultNoSqlPipelineStages,
     nosqlSchemaStats: null,
+    nosqlPageIndex: 0,
+    nosqlPageSize: 50,
+    nosqlWorkspaceStates: {},
 };
 
 export const createAuthSlice: StateCreator<AuthSlice & AuthResetState, [], [], AuthSlice> = (set) => ({

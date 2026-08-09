@@ -65,6 +65,7 @@ export interface QueryResult {
     totalCount?: number; // Total rows in table for pagination
     durationMs?: number;
     truncated?: boolean;
+    hasNextPage?: boolean;
     countStatus?: 'available' | 'unavailable' | 'skipped';
     appliedLimit?: number;
     appliedOffset?: number;

@@ -18,7 +18,7 @@ import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 const isNoSqlConnectionType = (type: string) => {
   const normalizedType = type.toLowerCase();
-  return normalizedType.includes('mongo') || normalizedType.includes('redis');
+  return normalizedType.includes('mongo');
 };
 
 export function VisualizePage() {

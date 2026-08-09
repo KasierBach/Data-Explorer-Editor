@@ -57,45 +57,21 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const activeConnection = connections.find((connection) => connection.id === currentConnectionId);
-    const isRedis = activeConnection?.type === 'redis';
     const isReadOnly = !!activeConnection?.readOnly;
-    const commandLabel = isRedis ? text.noSqlAi.redisCommandLabel : text.noSqlAi.mqlCommandLabel;
-    const generatorLabel = isRedis ? text.noSqlAi.redisGeneratorTitle : text.noSqlAi.mqlGeneratorTitle;
-    const collapsedPrompt = isRedis
-        ? text.noSqlAi.collapsedPromptRedis
-        : text.noSqlAi.collapsedPromptMongo;
-    const expandedPlaceholder = isRedis
-        ? text.noSqlAi.expandedPlaceholderRedis
-        : text.noSqlAi.expandedPlaceholderMongo;
-    const capabilityTags = isRedis
-        ? ['scan', 'get', 'set', 'del']
-        : isReadOnly
-            ? ['find', 'aggregate']
-            : ['find', 'aggregate', 'update', 'delete'];
-    const capabilityNote = isRedis
-        ? text.noSqlAi.capabilityNoteRedis
-        : isReadOnly
-            ? text.noSqlAi.capabilityNoteReadOnly
-            : text.noSqlAi.capabilityNoteMutable;
+    const commandLabel = text.noSqlAi.mqlCommandLabel;
+    const generatorLabel = text.noSqlAi.mqlGeneratorTitle;
+    const collapsedPrompt = text.noSqlAi.collapsedPromptMongo;
+    const expandedPlaceholder = text.noSqlAi.expandedPlaceholderMongo;
+    const capabilityTags = isReadOnly
+        ? ['find', 'aggregate']
+        : ['find', 'aggregate', 'update', 'delete'];
+    const capabilityNote = isReadOnly
+        ? text.noSqlAi.capabilityNoteReadOnly
+        : text.noSqlAi.capabilityNoteMutable;
     const runHotkeyLabel = navigator.platform.toUpperCase().indexOf('MAC') >= 0
         ? text.noSqlAi.runHotkey.replace('CTRL', 'CMD')
         : text.noSqlAi.runHotkey;
-    const quickPrompts: QuickPrompt[] = isRedis
-        ? [
-            {
-                label: text.noSqlAi.quickScanSessions,
-                prompt: text.noSqlAi.quickScanSessionsPrompt,
-            },
-            {
-                label: text.noSqlAi.quickInspectTtl,
-                prompt: text.noSqlAi.quickInspectTtlPrompt,
-            },
-            {
-                label: text.noSqlAi.quickDeleteOldKey,
-                prompt: text.noSqlAi.quickDeleteOldKeyPrompt,
-            },
-        ]
-        : isReadOnly
+    const quickPrompts: QuickPrompt[] = isReadOnly
             ? [
                 {
                     label: text.noSqlAi.quickTopCategories,
@@ -139,7 +115,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
             const result = await apiService.post<{ sql: string, explanation: string }>('/ai/nlp-to-sql', {
                 connectionId: currentConnectionId,
                 database: currentDatabase,
-                prompt: collectionName && !isRedis
+                prompt: collectionName
                     ? `For collection "${collectionName}": ${query}`
                     : query,
                 model: resolvedNoSql.model,
@@ -154,7 +130,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
             const isMutatingCommand = !!mutationAction && MUTATING_MONGO_ACTIONS.has(mutationAction);
             const isTooLong = generatedCommand.length > 1200 || generatedCommand.split('\n').length > 20;
 
-            if (generatedCommand && !isRedis && !explicitMutationIntent && (isMutatingCommand || isTooLong)) {
+            if (generatedCommand && !explicitMutationIntent && (isMutatingCommand || isTooLong)) {
                 const safeguardExplanation = text.noSqlAi.safeguardExplanation;
                 setExplanation(result.explanation
                     ? `${result.explanation} ${safeguardExplanation}`
@@ -305,7 +281,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
                                 <div className="flex items-center space-x-1.5 opacity-40 hover:opacity-100 transition-opacity cursor-help">
                                     <Database className="w-3.5 h-3.5" />
                                     <span className="text-[10px] font-bold uppercase tracking-widest leading-none">
-                                        {isRedis ? 'DB' : 'COLL'}: {collectionName || currentDatabase || text.noSqlAi.defaultCollection}
+                                        COLL: {collectionName || currentDatabase || text.noSqlAi.defaultCollection}
                                     </span>
                                 </div>
                             </div>

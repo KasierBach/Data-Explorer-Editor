@@ -81,7 +81,7 @@ describe('MongoDbStrategy', () => {
       await strategy.executeQuery(mockClient, JSON.stringify(payload));
 
       expect(mockCollection.find).toHaveBeenCalledWith({}, {});
-      expect(mockCollection.limit).toHaveBeenCalledWith(50000);
+      expect(mockCollection.limit).toHaveBeenCalledWith(50001);
       expect(mockCollection.maxTimeMS).toHaveBeenCalledWith(30000);
       expect(mockCollection.toArray).toHaveBeenCalled();
     });
@@ -95,8 +95,29 @@ describe('MongoDbStrategy', () => {
 
       await strategy.executeQuery(mockClient, JSON.stringify(payload));
 
-      expect(mockCollection.limit).toHaveBeenCalledWith(10);
+      expect(mockCollection.limit).toHaveBeenCalledWith(11);
       expect(mockCollection.maxTimeMS).toHaveBeenCalledWith(30000);
+    });
+
+    it('returns one page and marks find results when another page exists', async () => {
+      mockCollection.toArray.mockResolvedValue([
+        { _id: 1 },
+        { _id: 2 },
+        { _id: 3 },
+      ]);
+
+      const result = await strategy.executeQuery(
+        mockClient,
+        JSON.stringify({ action: 'find', collection: 'test_col' }),
+        { limit: 2, offset: 4 },
+      );
+
+      expect(mockCollection.skip).toHaveBeenCalledWith(4);
+      expect(mockCollection.limit).toHaveBeenCalledWith(3);
+      expect(result.rows).toEqual([{ _id: 1 }, { _id: 2 }]);
+      expect(result.truncated).toBe(true);
+      expect(result.hasNextPage).toBe(true);
+      expect(result.appliedOffset).toBe(4);
     });
 
     it('should slice aggregate() results to 50000 and append maxTimeMS 30s', async () => {

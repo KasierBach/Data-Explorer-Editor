@@ -98,7 +98,7 @@ export const NoSqlSidebar: React.FC = () => {
     const triggerRefresh = () => {
         void runRefresh();
     };
-    const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv' || activeConnection?.type === 'redis';
+    const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';
 
     return (
         <div className="h-full flex flex-col border-r bg-card/50 backdrop-blur-md overflow-hidden ring-1 ring-white/5">
@@ -152,7 +152,9 @@ export const NoSqlSidebar: React.FC = () => {
                     <div className="flex flex-col items-center justify-center h-full p-6 text-center text-muted-foreground opacity-60">
                         <Leaf className="w-12 h-12 mb-4 text-muted-foreground/30" />
                         <p className="text-sm font-medium">
-                            {text.onlySupports}
+                            {lang === 'vi'
+                                ? 'Không gian NoSQL hiện hỗ trợ kết nối MongoDB.'
+                                : 'The NoSQL workspace currently supports MongoDB connections.'}
                         </p>
                         <p className="text-xs mt-2">
                             {text.currentSelection(activeConnection.type.toUpperCase())}

@@ -28,7 +28,7 @@ export const NoSqlDashboard: React.FC = () => {
     };
 
     // Filter only NoSQL connections
-    const noSqlConnections = connections.filter(c => c.type === 'mongodb' || c.type === 'mongodb+srv' || c.type === 'redis');
+    const noSqlConnections = connections.filter(c => c.type === 'mongodb' || c.type === 'mongodb+srv');
 
     return (
         <div className="h-full w-full bg-background p-4 md:p-8 overflow-auto animate-in fade-in duration-300">

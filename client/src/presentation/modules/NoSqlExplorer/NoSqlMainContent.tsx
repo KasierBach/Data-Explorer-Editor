@@ -2,6 +2,8 @@ import React from 'react';
 import {
   AlignLeft,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
   Database,
   Eye,
   EyeOff,
@@ -46,6 +48,8 @@ export const NoSqlMainContent: React.FC = () => {
     nosqlResult,
     nosqlViewMode,
     setNosqlViewMode,
+    nosqlPageIndex,
+    nosqlPageSize,
     nosqlActiveConnectionId,
     connections,
     lang,
@@ -61,8 +65,7 @@ export const NoSqlMainContent: React.FC = () => {
     activeConnection?.database || nosqlActiveDatabase || undefined;
   const isNoSql =
     activeConnection?.type === 'mongodb' ||
-    activeConnection?.type === 'mongodb+srv' ||
-    activeConnection?.type === 'redis';
+    activeConnection?.type === 'mongodb+srv';
   const hasPersistentGuardrail = Boolean(
     activeConnection?.readOnly || activeConnection?.allowQueryExecution === false,
   );
@@ -82,14 +85,11 @@ export const NoSqlMainContent: React.FC = () => {
   });
 
   const { isLoading, error, executeMql, result } = useNoSqlQuery();
+  const [pageJumpValue, setPageJumpValue] = React.useState(String(nosqlPageIndex + 1));
   const isAggregationView = nosqlViewMode === 'aggregation';
-  const resultViewMode = React.useMemo<'tree' | 'grid' | 'charts' | 'schema'>(() => {
+  const resultViewMode = React.useMemo<'tree' | 'grid' | 'schema'>(() => {
     if (isAggregationView) {
       return 'tree';
-    }
-
-    if (nosqlViewMode === 'charts') {
-      return 'grid';
     }
 
     return nosqlViewMode;
@@ -98,22 +98,15 @@ export const NoSqlMainContent: React.FC = () => {
     !isLoading && activeConnection?.allowQueryExecution !== false;
 
   React.useEffect(() => {
-    if (nosqlViewMode === 'charts') {
-      setNosqlViewMode('grid');
-    }
-  }, [nosqlViewMode, setNosqlViewMode]);
+    setPageJumpValue(String(nosqlPageIndex + 1));
+  }, [nosqlPageIndex]);
   const resultPanelCopy =
     resultViewMode === 'grid'
       ? {
           title: text.gridTitle,
           description: text.gridDescription,
         }
-      : resultViewMode === 'charts'
-        ? {
-            title: text.insightsTitle,
-            description: text.insightsDescription,
-          }
-        : resultViewMode === 'schema'
+      : resultViewMode === 'schema'
           ? {
               title: text.schemaTitle,
               description: text.schemaDescription,
@@ -128,6 +121,9 @@ export const NoSqlMainContent: React.FC = () => {
   const resultPillLabel =
     result?.summaryLabel || text.docsLabel;
   const resultPillValue = result?.summaryValue ?? result?.rowCount ?? result?.rows.length;
+  const resultOffset = result?.appliedOffset ?? nosqlPageIndex * nosqlPageSize;
+  const resultRangeStart = result?.rows.length ? resultOffset + 1 : resultOffset;
+  const resultRangeEnd = resultOffset + (result?.rows.length || 0);
 
   const handleViewModeChange = (
     mode: 'tree' | 'grid' | 'schema' | 'aggregation',
@@ -144,7 +140,20 @@ export const NoSqlMainContent: React.FC = () => {
       toggleResultPanel();
     }
 
-    await executeMql();
+    await executeMql({ pageIndex: 0 });
+  };
+
+  const loadPage = async (pageIndex: number, pageSize = nosqlPageSize) => {
+    await executeMql({ pageIndex, pageSize });
+  };
+
+  const commitPageJump = () => {
+    const parsed = Number(pageJumpValue);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setPageJumpValue(String(nosqlPageIndex + 1));
+      return;
+    }
+    void loadPage(Math.floor(parsed) - 1);
   };
 
   if (!isNoSql) {
@@ -321,7 +330,7 @@ export const NoSqlMainContent: React.FC = () => {
                 </div>
               )}
 
-              {result?.truncated && (
+              {result?.truncated && result.limitSource !== 'requested' && (
                 <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-full shrink-0">
                   <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-amber-500/80">
                     {text.capped}
@@ -485,7 +494,7 @@ export const NoSqlMainContent: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto p-4 custom-scrollbar">
+          <div className="flex-1 min-h-0 overflow-auto p-4 custom-scrollbar">
             {isLoading ? (
               <div className="h-full flex flex-col items-center justify-center gap-3">
                 <div className="w-8 h-8 rounded-full border-2 border-green-500/20 border-t-green-500 animate-spin" />
@@ -504,7 +513,7 @@ export const NoSqlMainContent: React.FC = () => {
                   onClick={() => void openAiQueryFixDraft(
                     nosqlMqlQuery,
                     error.message,
-                    activeConnection?.type === 'redis' ? 'Redis' : 'MQL',
+                    'MQL',
                     lang,
                   )}
                 >
@@ -531,6 +540,67 @@ export const NoSqlMainContent: React.FC = () => {
               </>
             )}
           </div>
+
+          {result?.appliedLimit && (
+            <div className="flex min-h-11 shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border/60 bg-muted/15 px-3 py-2 text-xs">
+              <div className="text-muted-foreground max-sm:hidden">
+                {lang === 'vi'
+                  ? `${resultRangeStart}–${resultRangeEnd} trên trang này`
+                  : `${resultRangeStart}–${resultRangeEnd} on this page`}
+              </div>
+
+              <div className="ml-auto flex max-w-full items-center gap-2 overflow-x-auto">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  disabled={nosqlPageIndex === 0 || isLoading}
+                  onClick={() => void loadPage(nosqlPageIndex - 1)}
+                  title={lang === 'vi' ? 'Trang trước' : 'Previous page'}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+
+                <label className="flex items-center gap-1 text-muted-foreground">
+                  <span>{lang === 'vi' ? 'Trang' : 'Page'}</span>
+                  <input
+                    aria-label={lang === 'vi' ? 'Đi đến trang' : 'Go to page'}
+                    className="h-7 w-14 rounded-md border border-border bg-background px-2 text-center text-foreground outline-none focus:border-green-500"
+                    inputMode="numeric"
+                    value={pageJumpValue}
+                    onChange={(event) => setPageJumpValue(event.target.value.replace(/\D/g, ''))}
+                    onBlur={commitPageJump}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') commitPageJump();
+                    }}
+                  />
+                </label>
+
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  disabled={!(result.hasNextPage ?? result.truncated) || isLoading}
+                  onClick={() => void loadPage(nosqlPageIndex + 1)}
+                  title={lang === 'vi' ? 'Trang sau' : 'Next page'}
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+
+                <select
+                  aria-label={lang === 'vi' ? 'Số tài liệu mỗi trang' : 'Documents per page'}
+                  className="h-7 rounded-md border border-border bg-background px-2 text-foreground outline-none focus:border-green-500"
+                  value={nosqlPageSize}
+                  onChange={(event) => void loadPage(0, Number(event.target.value))}
+                  disabled={isLoading}
+                >
+                  {[50, 100, 500, 1000].map((size) => (
+                    <option key={size} value={size}>{size} / {lang === 'vi' ? 'trang' : 'page'}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

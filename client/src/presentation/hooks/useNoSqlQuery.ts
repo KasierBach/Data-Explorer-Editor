@@ -11,7 +11,9 @@ interface NoSqlQueryResult {
     rowCount?: number;
     durationMs?: number;
     truncated?: boolean;
+    hasNextPage?: boolean;
     appliedLimit?: number;
+    appliedOffset?: number;
     limitSource?: 'requested' | 'protective_default' | 'table_window';
     summaryLabel?: string;
     summaryValue?: number;
@@ -161,7 +163,12 @@ interface UseNoSqlQueryReturn {
     result: NoSqlQueryResult | null;
     isLoading: boolean;
     error: Error | null;
-    executeMql: () => Promise<void>;
+    executeMql: (options?: NoSqlExecuteOptions) => Promise<void>;
+}
+
+interface NoSqlExecuteOptions {
+    pageIndex?: number;
+    pageSize?: number;
 }
 
 /**
@@ -178,7 +185,7 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<Error | null>(null);
 
-    const executeMql = useCallback(async () => {
+    const executeMql = useCallback(async (options?: NoSqlExecuteOptions) => {
         const state = useAppStore.getState();
         const { 
             nosqlActiveCollection,
@@ -227,6 +234,7 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
 
         const action = String(payload.action || '');
         const isMutatingAction = MUTATING_ACTIONS.has(action as MutationAction);
+        const isPageableAction = action === 'find' || action === 'aggregate';
         if (activeConnection.readOnly && isMutatingAction) {
             toast.error(text.readOnlyViolation);
             return;
@@ -239,6 +247,18 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
         const startTime = performance.now();
 
         try {
+            const requestedPageSize = Math.min(
+                1000,
+                Math.max(1, Math.floor(options?.pageSize ?? state.nosqlPageSize)),
+            );
+            const requestedPageIndex = Math.max(
+                0,
+                Math.floor(options?.pageIndex ?? state.nosqlPageIndex),
+            );
+            if (isPageableAction) {
+                state.setNosqlPagination(requestedPageIndex, requestedPageSize);
+            }
+
             const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
             await adapter.connect(activeConnection);
 
@@ -246,7 +266,13 @@ export function useNoSqlQuery(): UseNoSqlQueryReturn {
             // interprets as a JSON payload string — zero modification needed.
             const queryResult = await adapter.executeQuery(
                 JSON.stringify(payload),
-                { database: nosqlActiveDatabase || undefined }
+                {
+                    database: nosqlActiveDatabase || undefined,
+                    limit: isPageableAction ? requestedPageSize : undefined,
+                    offset: isPageableAction
+                        ? requestedPageIndex * requestedPageSize
+                        : undefined,
+                }
             );
 
             const durationMs = Math.round(performance.now() - startTime);

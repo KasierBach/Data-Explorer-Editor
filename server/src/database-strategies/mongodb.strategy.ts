@@ -178,10 +178,11 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         result = await col
           .find(filter, payload.options || {})
           .skip(skip)
-          .limit(appliedLimit)
+          .limit(appliedLimit + 1)
           .maxTimeMS(30000)
           .toArray();
-        rows = result;
+        truncated = result.length > appliedLimit;
+        rows = result.slice(0, appliedLimit);
         break;
       }
       case 'aggregate': {
@@ -282,6 +283,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
       columns,
       rowCount: rows.length,
       truncated: truncated || undefined,
+      hasNextPage: truncated || undefined,
       appliedLimit,
       appliedOffset,
       limitSource,

@@ -42,6 +42,9 @@ export const useAppStore = create<AppState>()(
                 if (persisted.expandedNodes && !Array.isArray(persisted.expandedNodes)) {
                     persisted.expandedNodes = [];
                 }
+                if ((persisted as { nosqlViewMode?: string }).nosqlViewMode === 'charts') {
+                    persisted.nosqlViewMode = 'grid';
+                }
                 delete persisted.isAuthenticated;
                 delete persisted.isAuthBootstrapped;
                 delete persisted.accessToken;
@@ -102,6 +105,9 @@ export const useAppStore = create<AppState>()(
                 nosqlFilter: state.nosqlFilter,
                 nosqlMqlQuery: state.nosqlMqlQuery,
                 nosqlPipelineStages: state.nosqlPipelineStages,
+                nosqlPageIndex: state.nosqlPageIndex,
+                nosqlPageSize: state.nosqlPageSize,
+                nosqlWorkspaceStates: state.nosqlWorkspaceStates,
                 explorerSearchMode: state.explorerSearchMode,
                 defaultResultHeight: state.defaultResultHeight,
             }),
