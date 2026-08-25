@@ -55,6 +55,10 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm ci
       - run: node ../.github/scripts/npm-audit.mjs
+        env:
+          # Prisma 6.19.3 still resolves deepmerge-ts 7.x; npm's only fix is a Prisma 6.12 downgrade.
+          # Keep this known transitive CLI/config advisory explicit while retaining all other blockers.
+          NPM_AUDIT_ALLOW_GHSA: GHSA-GGR8-5VV4-36MX
       - run: npm run prisma:generate
       - run: npm run lint
       - run: npm run test:ci
