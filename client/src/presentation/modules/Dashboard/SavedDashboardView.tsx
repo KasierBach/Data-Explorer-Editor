@@ -179,6 +179,7 @@ function DashboardWidgetCard({
                     <CardDescription className="truncate">
                         {widget.chartType.toUpperCase()}
                         {widget.queryText ? ' · query snapshot' : ' · dashboard widget'}
+                        {' · '}{new Date(widget.updatedAt).toLocaleString()}
                     </CardDescription>
                 </div>
                 {canDelete && (
@@ -211,7 +212,7 @@ export const SavedDashboardView: React.FC<{ dashboardId: string }> = ({ dashboar
         return <LoadingState label={lang === 'vi' ? 'Đang tải dashboard...' : 'Loading dashboard...'} variant="dashboard" />;
     }
 
-    if (error || !data) {
+    if (!data) {
         return (
             <div className="h-full flex flex-col items-center justify-center gap-3 text-center">
                 <LayoutDashboard className="h-10 w-10 text-muted-foreground/20" />
@@ -303,6 +304,14 @@ export const SavedDashboardView: React.FC<{ dashboardId: string }> = ({ dashboar
                         </Button>
                     </div>
                 </div>
+
+                {error && (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+                        {lang === 'vi'
+                            ? 'Không thể làm mới dashboard. Đang hiển thị snapshot gần nhất.'
+                            : 'Dashboard refresh failed. Showing the latest available snapshot.'}
+                    </div>
+                )}
 
                 {data.widgets.length === 0 ? (
                     <Card className="border-dashed">
