@@ -15,6 +15,7 @@ import { useAppStore } from '@/core/services/store';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { Button } from '@/presentation/components/ui/button';
 import { toast } from 'sonner';
+import { csvDocument } from '@/core/utils/csv';
 
 interface QueryResultsProps {
     results: QueryResult | null;
@@ -158,16 +159,8 @@ export const QueryResults: React.FC<QueryResultsProps> = ({
                             onClick={() => {
                                 if (!results.rows?.length) return;
                                 const cols = results.columns || Object.keys(results.rows[0] || {});
-                                const csvHeaders = cols.join(',');
-                                const csvRows = results.rows.map(row =>
-                                    cols.map(col => {
-                                        const val = row[col];
-                                        if (val === null || val === undefined) return '';
-                                        const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
-                                        return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str.replace(/"/g, '""')}"` : str;
-                                    }).join(',')
-                                ).join('\n');
-                                const blob = new Blob([`${csvHeaders}\n${csvRows}`], { type: 'text/csv;charset=utf-8;' });
+                                const csv = csvDocument(cols, results.rows.map(row => cols.map(col => row[col])));
+                                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                                 const url = URL.createObjectURL(blob);
                                 const link = document.createElement('a');
                                 link.href = url;

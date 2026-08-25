@@ -12,6 +12,7 @@ import { queryService } from '@/core/services/QueryService';
 import { useAppStore } from '@/core/services/store';
 import { toast } from 'sonner';
 import type { RowData } from '@/core/domain/entities';
+import { parseCsv } from '@/core/utils/csv';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface BulkImportDialogProps {
@@ -42,37 +43,26 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const processFile = (selectedFile: File) => {
-        if (!selectedFile.name.endsWith('.csv')) {
+    const processFile = async (selectedFile: File) => {
+        if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
             toast.error(text.csvOnly);
             return;
         }
         
         setFile(selectedFile);
+        setData([]);
         setError(null);
         
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const csv = event.target?.result as string;
-            const lines = csv.split('\n').filter(l => l.trim());
-            if (lines.length < 2) {
+        try {
+            const rows = await parseCsv(await selectedFile.arrayBuffer()) as RowData[];
+            if (!rows.length || rows.length > 10000) {
                 setError(text.invalidCsv);
                 return;
             }
-
-            const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-            const rows = lines.slice(1).map(line => {
-                const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                const obj: RowData = {};
-                headers.forEach((h, i) => {
-                    obj[h] = values[i];
-                });
-                return obj;
-            });
-
             setData(rows);
-        };
-        reader.readAsText(selectedFile);
+        } catch {
+            setError(text.invalidCsv);
+        }
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,7 +203,7 @@ export const BulkImportDialog: React.FC<BulkImportDialogProps> = ({
                         {text.cancel}
                     </Button>
                     <Button 
-                        disabled={!file || isImporting || !importAllowed || readOnly} 
+                        disabled={!file || data.length === 0 || isImporting || !importAllowed || readOnly}
                         onClick={handleImport}
                     >
                         {isImporting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}

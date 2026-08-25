@@ -5,6 +5,7 @@ import { useAppStore } from '@/core/services/store';
 import { connectionService } from '@/core/services/ConnectionService';
 import { toast } from 'sonner';
 import type { RowData, TreeNode } from '@/core/domain/entities';
+import { csvDocument } from '@/core/utils/csv';
 
 export type DataMode = 'table' | 'sql';
 export type CurveType = 'basis' | 'linear' | 'monotone' | 'natural' | 'step';
@@ -211,9 +212,8 @@ export const useVisualizeLogic = () => {
 
     const handleExportCSV = useCallback(() => {
         if (!chartData || chartData.length === 0) return;
-        const headers = Object.keys(chartData[0]).join(',');
-        const rows = chartData.map(r => Object.values(r).map(v => typeof v === 'string' ? `"${v}"` : v).join(','));
-        const csv = [headers, ...rows].join('\n');
+        const headers = Object.keys(chartData[0]);
+        const csv = csvDocument(headers, chartData.map((row) => headers.map((header) => row[header])));
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');

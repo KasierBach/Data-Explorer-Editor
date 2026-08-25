@@ -2,6 +2,7 @@ import { getQuotedIdentifier } from '@/core/utils/id-parser';
 import type { RowData } from '@/core/domain/entities';
 import type { Row } from '@tanstack/react-table';
 import { toast } from 'sonner';
+import { csvDocument } from '@/core/utils/csv';
 
 export interface ExportContext {
     rows: Row<RowData>[];
@@ -29,19 +30,9 @@ function formatValue(v: unknown): string {
 
 export function exportCSV(ctx: ExportContext) {
     if (!ctx.rows.length || !ctx.columns.length) return;
-    const csvHeaders = ctx.columns.map(c => c.name).join(',');
-    const csvRows = ctx.rows.map(row => {
-        return ctx.columns.map(col => {
-            const val = row.getValue(col.name);
-            if (val === null || val === undefined) return '';
-            const str = String(val);
-            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-                return `"${str.replace(/"/g, '""')}"`;
-            }
-            return str;
-        }).join(',');
-    }).join('\n');
-    downloadFile(`${csvHeaders}\n${csvRows}`, `${ctx.tableName}_export.csv`, 'text/csv');
+    const columns = ctx.columns.map((column) => column.name);
+    const rows = ctx.rows.map((row) => columns.map((column) => row.getValue(column)));
+    downloadFile(csvDocument(columns, rows), `${ctx.tableName}_export.csv`, 'text/csv');
 }
 
 export function exportJSON(ctx: ExportContext) {
