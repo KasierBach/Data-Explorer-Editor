@@ -18,6 +18,7 @@ import { Toaster } from 'sonner';
 import { DestructiveQueryDialog } from '@/presentation/components/Dialogs/DestructiveQueryDialog';
 import { CommandPalette } from '@/presentation/components/shared/CommandPalette';
 import { LoadingState } from '@/presentation/components/shared/LoadingState';
+import { ErrorBoundary } from '@/presentation/components/shared/ErrorBoundary';
 
 type AppTheme = 'dark' | 'light' | 'system';
 
@@ -95,8 +96,9 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <Suspense fallback={<RouteFallback />}>
-            <Routes>
+          <ErrorBoundary>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
               <Route path="/forgot-password" element={<RedirectIfAuth><ForgotPasswordPage /></RedirectIfAuth>} />
@@ -136,8 +138,9 @@ export function App() {
               <Route path="/nosql-explorer/visualize" element={<RequireAuth><VisualizePage /></RequireAuth>} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
           <Toaster richColors position="top-center" />
           <DestructiveQueryDialog />
           <CommandPalette />
