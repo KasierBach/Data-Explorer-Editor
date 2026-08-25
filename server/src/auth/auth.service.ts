@@ -365,7 +365,13 @@ export class AuthService implements OnModuleInit {
     const userLang = this.resolveLanguage(user.language, lang);
 
     if (user.isEmailVerified) {
-      return this.issueSession(user);
+      throw new ConflictException(
+        this.t(
+          userLang,
+          'Tài khoản này đã được xác minh.',
+          'This account is already verified.',
+        ),
+      );
     }
 
     if (!user.verifyOtp || !user.verifyOtpExpiry) {

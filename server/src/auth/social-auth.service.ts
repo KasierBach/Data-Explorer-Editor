@@ -8,7 +8,13 @@ export class SocialAuthService {
 
   async validateOAuthLogin(profile: any, provider: 'google' | 'github') {
     const { id, emails, name, photos, username } = profile;
-    const email = emails?.[0]?.value;
+    const emailEntry =
+      emails?.find((entry: any) => entry?.verified === true) ?? emails?.[0];
+    const email = emailEntry?.value;
+    const emailVerified =
+      provider === 'google'
+        ? profile._json?.email_verified === true
+        : emailEntry?.verified === true;
 
     // Improve avatar extraction (Github uses _json.avatar_url sometimes)
     let avatarUrl = photos?.[0]?.value;
@@ -33,15 +39,17 @@ export class SocialAuthService {
       throw new Error('No email provided by the OAuth provider');
     }
 
-    // 1. Check if user exists by providerId OR email
+    // Provider identity is always safe to resume. Email linking requires a
+    // provider-verified address to prevent account takeover.
     let user = await this.prisma.user.findFirst({
       where: {
-        OR: [
-          { providerId: id, provider },
-          { email }, // Account linking if email matches
-        ],
+        providerId: id,
+        provider,
       },
     });
+    if (!user && emailVerified) {
+      user = await this.prisma.user.findUnique({ where: { email } });
+    }
 
     // Check if user is banned
     if (user && user.isBanned) {
@@ -61,6 +69,9 @@ export class SocialAuthService {
         },
       });
     } else {
+      if (!emailVerified) {
+        throw new Error('OAuth provider email is not verified');
+      }
       // 3. Register new user
       user = await this.prisma.user.create({
         data: {

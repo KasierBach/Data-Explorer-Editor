@@ -27,6 +27,7 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
         configService.get<string>('GITHUB_CALLBACK_URL') ||
         'http://localhost:3001/api/auth/github/callback',
       scope: ['user:email'],
+      allRawEmails: true,
       store: new OAuthStateCookieStore('de_oauth_github_state'),
     } as any);
 
@@ -44,10 +45,8 @@ export class GithubStrategy extends PassportStrategy(Strategy, 'github') {
     done: (error: Error | null, user?: unknown) => void,
   ): Promise<any> {
     try {
-      // Github API might not return emails in the default profile object if they are private
       if (!profile.emails || profile.emails.length === 0) {
-        // Best effort fallback to username if email is completely hidden
-        profile.emails = [{ value: `${profile.username}@github.local` }];
+        throw new Error('GitHub did not provide a verified email address');
       }
 
       const result = await this.socialAuthService.validateOAuthLogin(

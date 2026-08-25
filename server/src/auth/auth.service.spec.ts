@@ -1,10 +1,16 @@
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 
 describe('AuthService - login', () => {
   let authService: AuthService;
-  const mockPrisma: any = { user: { findUnique: jest.fn() } };
+  const mockPrisma: any = {
+    user: { findUnique: jest.fn(), update: jest.fn() },
+  };
   const mockMailService = {} as any;
   const mockOtpService = {} as any;
   const mockSeedService = {} as any;
@@ -13,6 +19,7 @@ describe('AuthService - login', () => {
 
   beforeEach(() => {
     mockPrisma.user.findUnique = jest.fn();
+    mockPrisma.user.update = jest.fn();
     mockAuditService.log.mockClear();
     authService = new AuthService(
       mockPrisma,
@@ -81,5 +88,23 @@ describe('AuthService - login', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('does not issue a session when an already verified account submits an OTP', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'verified@example.com',
+      language: 'en',
+      isEmailVerified: true,
+    });
+
+    await expect(
+      authService.verifyEmail({
+        email: 'verified@example.com',
+        otp: '000000',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
   });
 });

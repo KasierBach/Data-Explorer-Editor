@@ -78,6 +78,51 @@ describe('ApiService', () => {
     );
   });
 
+  it('should retry with the refreshed access token after a 401', async () => {
+    const logoutMock = vi.fn();
+    const restoreSessionMock = vi.fn((token: string) => {
+      storeState.accessToken = token;
+    });
+    const storeState = {
+      accessToken: 'expired-token',
+      lang: 'en',
+      logout: logoutMock,
+      restoreSession: restoreSessionMock,
+    } as unknown as AppState;
+    vi.spyOn(useAppStore, 'getState').mockImplementation(() => storeState);
+
+    mockFetch
+      .mockResolvedValueOnce({ ok: false, status: 401 })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({
+          access_token: 'fresh-token',
+          user: { id: 'user-1', email: 'user@example.com' },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({ data: 'success' }),
+      });
+
+    await expect(apiService.get('/secure-endpoint')).resolves.toEqual({
+      data: 'success',
+    });
+
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('/secure-endpoint'),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer fresh-token',
+        }),
+      }),
+    );
+    expect(logoutMock).not.toHaveBeenCalled();
+  });
+
   it('should expose structured error fields for auth flows', async () => {
     mockStoreState({
       accessToken: null,

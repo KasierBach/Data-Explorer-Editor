@@ -34,6 +34,7 @@ export class TokenService {
       email: user.email,
       sub: user.id,
       role: user.role,
+      type: 'access',
     };
   }
 

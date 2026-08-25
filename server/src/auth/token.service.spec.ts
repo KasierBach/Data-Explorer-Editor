@@ -46,4 +46,17 @@ describe('TokenService notifications stream tickets', () => {
       address: 'Ho Chi Minh City',
     });
   });
+
+  it('marks generated bearer tokens as access tokens', () => {
+    const token = tokenService.createAccessToken({
+      id: 'user-1',
+      email: 'user@example.com',
+      role: 'user',
+    });
+
+    expect(tokenService['jwtService'].decode(token)).toMatchObject({
+      sub: 'user-1',
+      type: 'access',
+    });
+  });
 });

@@ -136,7 +136,17 @@ class ApiService {
     if (response.status === 401 && allowRefresh && endpoint !== '/auth/refresh' && endpoint !== '/auth/login') {
       const refreshed = await this.tryRefreshSession();
       if (refreshed) {
-        return this.requestInternal<T>(endpoint, options, false);
+        return this.requestInternal<T>(
+          endpoint,
+          {
+            ...options,
+            headers: {
+              ...(options.headers as Record<string, string>),
+              ...this.getHeaders(),
+            },
+          },
+          false,
+        );
       }
     }
 
