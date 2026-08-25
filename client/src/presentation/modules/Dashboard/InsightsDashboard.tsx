@@ -26,7 +26,12 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
     const activeConnectionId = propConnectionId || globalActiveId;
     const activeConnection = connections.find(c => c.id === activeConnectionId);
 
-    const [selectedDatabase, setSelectedDatabase] = useState<string | undefined>(propDatabase || activeConnection?.database);
+    const defaultDatabase = propDatabase || activeConnection?.database;
+    const databaseScope = `${activeConnectionId || ''}:${defaultDatabase || ''}`;
+    const [databaseSelection, setDatabaseSelection] = useState({ scope: databaseScope, value: defaultDatabase });
+    const selectedDatabase = databaseSelection.scope === databaseScope
+        ? databaseSelection.value
+        : defaultDatabase;
 
     // Fetch Database list
     const { data: databases } = useQuery({
@@ -39,7 +44,7 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
         enabled: !!activeConnectionId && !!activeConnection
     });
 
-    const { data: metrics, isLoading, refetch, isFetching } = useQuery({
+    const { data: metrics, isLoading, error: metricsError, refetch: refetchMetrics, isFetching: isFetchingMetrics } = useQuery({
         queryKey: ['db-metrics', activeConnectionId, selectedDatabase],
         queryFn: async () => {
             if (!activeConnectionId || !activeConnection) throw new Error("No active connection");
@@ -49,7 +54,7 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
         enabled: !!activeConnectionId && !!activeConnection
     });
 
-    const { data: relationships } = useQuery({
+    const { data: relationships, refetch: refetchRelationships, isFetching: isFetchingRelationships } = useQuery({
         queryKey: ['db-relationships', activeConnectionId, selectedDatabase],
         queryFn: async () => {
             if (!activeConnectionId || !activeConnection) return [];
@@ -71,6 +76,28 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
     if (isLoading && !metrics) {
         return <LoadingState label={lang === 'vi' ? 'Đang tổng hợp dữ liệu database...' : 'Gathering database intelligence...'} variant="dashboard" />;
     }
+
+    if (metricsError && !metrics) {
+        return (
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                <BarChart3 className="h-10 w-10 text-muted-foreground/20" />
+                <div>
+                    <div className="font-semibold">Database insights unavailable</div>
+                    <div className="text-sm text-muted-foreground">
+                        {metricsError instanceof Error ? metricsError.message : 'Unable to load database metrics.'}
+                    </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => void refetchMetrics()}>
+                    Retry
+                </Button>
+            </div>
+        );
+    }
+
+    const isRefreshing = isFetchingMetrics || isFetchingRelationships;
+    const refreshDashboard = () => {
+        void Promise.all([refetchMetrics(), refetchRelationships()]);
+    };
 
     const formatBytes = (bytes: number) => {
         if (bytes === 0) return '0 Bytes';
@@ -100,7 +127,10 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
                         </div>
                     </div>
                     <div className="flex items-center gap-3 bg-card p-1.5 rounded-xl border shadow-sm">
-                        <Select value={selectedDatabase} onValueChange={setSelectedDatabase}>
+                        <Select
+                            value={selectedDatabase}
+                            onValueChange={(value) => setDatabaseSelection({ scope: databaseScope, value })}
+                        >
                             <SelectTrigger className="w-[180px] h-8 border-none bg-transparent focus:ring-0">
                                 <SelectValue placeholder="Select Database" />
                             </SelectTrigger>
@@ -111,8 +141,8 @@ export const InsightsDashboard: React.FC<InsightsDashboardProps> = ({
                             </SelectContent>
                         </Select>
                         <div className="w-px h-4 bg-border" />
-                        <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isFetching} className="h-8 gap-2">
-                            <RefreshCw className={`h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} />
+                        <Button variant="ghost" size="sm" onClick={refreshDashboard} disabled={isRefreshing} className="h-8 gap-2">
+                            <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
                             Refresh
                         </Button>
                     </div>
