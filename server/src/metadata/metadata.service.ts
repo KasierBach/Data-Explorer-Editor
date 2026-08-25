@@ -35,7 +35,7 @@ export class MetadataService {
     ttl?: number,
   ): Promise<T> {
     const cached = await this.cacheManager.get<T>(cacheKey);
-    if (cached) return cached;
+    if (cached !== undefined && cached !== null) return cached;
     const result = await fetchFn();
     // TTL is in milliseconds for redisStore in recent versions
     await this.cacheManager.set(cacheKey, result, ttl as any);

@@ -38,7 +38,7 @@ export class AiSchemaService {
       .update(searchTerm + tableNames.join('|'))
       .digest('hex')}`;
     const cached = await this.cacheManager.get<string[]>(cacheKey);
-    if (cached) return cached;
+    if (cached !== undefined && cached !== null) return cached;
 
     const prompt = `Given the database table names below, find the most relevant ones for the search term: "${searchTerm}".
 TABLES:
@@ -64,13 +64,11 @@ Rules:
         .filter((s) => tableNames.includes(s))
         .slice(0, 5);
 
-      if (suggestions.length > 0) {
-        await this.cacheManager.set(
-          cacheKey,
-          suggestions,
-          AI_CONSTANTS.AUTOCOMPLETE_CACHE_TTL_MS,
-        );
-      }
+      await this.cacheManager.set(
+        cacheKey,
+        suggestions,
+        AI_CONSTANTS.AUTOCOMPLETE_CACHE_TTL_MS,
+      );
       return suggestions;
     } catch (error) {
       this.logger.warn(

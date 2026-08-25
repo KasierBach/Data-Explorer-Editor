@@ -27,6 +27,8 @@ describe('MongoDbStrategy', () => {
       limit: jest.fn().mockReturnThis(),
       skip: jest.fn().mockReturnThis(),
       maxTimeMS: jest.fn().mockReturnThis(),
+      countDocuments: jest.fn().mockResolvedValue(3),
+      distinct: jest.fn().mockResolvedValue(['a', 'b']),
       updateOne: jest.fn().mockResolvedValue({
         acknowledged: true,
         modifiedCount: 1,
@@ -157,6 +159,31 @@ describe('MongoDbStrategy', () => {
       });
 
       expect(mockCollection.skip).toHaveBeenCalledWith(20);
+    });
+
+    it('applies the 30s server timeout to count and distinct queries', async () => {
+      await strategy.executeQuery(
+        mockClient,
+        JSON.stringify({ action: 'count', collection: 'test_col' }),
+      );
+      await strategy.executeQuery(
+        mockClient,
+        JSON.stringify({
+          action: 'distinct',
+          collection: 'test_col',
+          field: 'status',
+        }),
+      );
+
+      expect(mockCollection.countDocuments).toHaveBeenCalledWith(
+        {},
+        { maxTimeMS: 30000 },
+      );
+      expect(mockCollection.distinct).toHaveBeenCalledWith(
+        'status',
+        {},
+        { maxTimeMS: 30000 },
+      );
     });
 
     it('should throw an error for invalid JSON payload', async () => {

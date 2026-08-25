@@ -130,7 +130,7 @@ export class AiSchemaContextService {
 
     if (contextCacheKey) {
       const cached = await this.cacheManager.get<string>(contextCacheKey);
-      if (cached) return cached;
+      if (cached !== undefined && cached !== null) return cached;
     }
 
     let schemaContext = '';

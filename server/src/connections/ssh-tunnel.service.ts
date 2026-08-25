@@ -102,6 +102,11 @@ export class SshTunnelService {
 
       sshClient.on('error', (err) => {
         this.logger.error(`SSH tunnel error for ${key}: ${err.message}`);
+        const active = this.tunnels.get(key);
+        if (active) {
+          active.server.close();
+          this.tunnels.delete(key);
+        }
         reject(err);
       });
 

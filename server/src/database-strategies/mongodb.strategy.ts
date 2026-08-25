@@ -207,7 +207,10 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         break;
       }
       case 'count':
-        result = await col.countDocuments(filter, payload.options || {});
+        result = await col.countDocuments(filter, {
+          ...(payload.options || {}),
+          maxTimeMS: 30000,
+        });
         rows = [{ count: result }];
         break;
       case 'insertOne':
@@ -249,11 +252,10 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         if (!distinctField || typeof distinctField !== 'string') {
           throw new Error('Distinct action requires a "field" parameter.');
         }
-        result = await col.distinct(
-          distinctField,
-          filter,
-          payload.options || {},
-        );
+        result = await col.distinct(distinctField, filter, {
+          ...(payload.options || {}),
+          maxTimeMS: 30000,
+        });
         rows = result.map((value: unknown) => ({ value }));
         break;
       }

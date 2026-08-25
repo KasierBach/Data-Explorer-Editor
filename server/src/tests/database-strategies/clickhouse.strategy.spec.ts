@@ -51,6 +51,20 @@ describe('ClickHouseStrategy', () => {
     });
   });
 
+  it('preserves numeric and boolean bind types', async () => {
+    await strategy.insertRow(mockPool as never, {
+      schema: 'default',
+      table: 'users',
+      data: { age: 42, active: true },
+    });
+
+    expect(mockPool.exec).toHaveBeenCalledWith({
+      query:
+        'INSERT INTO `default`.`users` (`age`, `active`) VALUES ({p0:Int64}, {p1:Bool})',
+      query_params: { p0: 42, p1: true },
+    });
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
   });

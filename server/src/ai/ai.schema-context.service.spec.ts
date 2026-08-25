@@ -105,4 +105,26 @@ describe('AiSchemaContextService', () => {
       'app',
     );
   });
+
+  it('returns a cached empty context without rebuilding schema metadata', async () => {
+    const cacheManager = {
+      get: jest.fn().mockResolvedValue(''),
+      set: jest.fn(),
+    };
+    const freshnessService = {
+      buildKey: jest.fn().mockResolvedValue('ai-schema:context'),
+    };
+    const strategy = {
+      getSchemas: jest.fn(),
+    };
+    const service = new AiSchemaContextService(
+      cacheManager as never,
+      freshnessService as never,
+    );
+
+    await expect(
+      service.gatherSchemaContext({}, strategy as never, 'app', 'connection-1'),
+    ).resolves.toBe('');
+    expect(strategy.getSchemas).not.toHaveBeenCalled();
+  });
 });

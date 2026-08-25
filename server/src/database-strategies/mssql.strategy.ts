@@ -13,6 +13,7 @@ import type {
 } from './database-strategy.interface';
 import { SchemaOperation } from '../query/dto/schema-operations.types';
 import { Injectable, Logger } from '@nestjs/common';
+import { PassThrough } from 'stream';
 import * as mssql from 'mssql';
 import { SqlUtil } from '../utils/sql.util';
 import {
@@ -210,17 +211,25 @@ export class MssqlStrategy implements IDatabaseStrategy {
     request.stream = true;
 
     // Wrap the mssql event emitter in a standard Node Readable stream for consistency
-    const { PassThrough } = await import('stream');
     const pt = new PassThrough({ objectMode: true });
 
-    request.on('row', (row: Record<string, unknown>) => pt.write(row));
+    request.on('row', (row: Record<string, unknown>) => {
+      if (!pt.write(row) && typeof request.pause === 'function') {
+        request.pause();
+      }
+    });
+    pt.on('drain', () => {
+      if (typeof request.resume === 'function') request.resume();
+    });
     request.on('done', () => pt.end());
     request.on('error', (err: unknown) =>
       pt.destroy(err instanceof Error ? err : new Error(String(err))),
     );
 
     // Start the query
-    request.query(sql);
+    void Promise.resolve(request.query(sql)).catch((error: unknown) => {
+      pt.destroy(error instanceof Error ? error : new Error(String(error)));
+    });
 
     return pt;
   }

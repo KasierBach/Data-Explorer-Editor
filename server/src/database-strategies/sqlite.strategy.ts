@@ -138,10 +138,10 @@ export class SqliteStrategy implements IDatabaseStrategy {
     table: string,
   ): Promise<unknown> {
     const sql = `SELECT * FROM ${this.quoteIdentifier(table)}`;
-    const rows = pool.prepare(sql).all();
+    const iterator = pool.prepare(sql).iterate();
     return {
       [Symbol.asyncIterator]: async function* () {
-        for (const row of rows) yield row;
+        for (const row of iterator) yield row;
       },
     };
   }

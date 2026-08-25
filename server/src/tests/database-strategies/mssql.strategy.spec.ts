@@ -1,5 +1,6 @@
 import { MssqlStrategy } from '../../database-strategies/mssql.strategy';
 import * as mssql from 'mssql';
+import { EventEmitter } from 'events';
 
 jest.mock('mssql', () => {
   return {
@@ -197,5 +198,27 @@ describe('MssqlStrategy', () => {
       );
       expect(result).toEqual({ success: true, rowCount: 2 });
     });
+  });
+
+  it('surfaces a streaming query rejection on the returned stream', async () => {
+    const request = new EventEmitter() as any;
+    request.query = jest.fn().mockRejectedValue(new Error('query failed'));
+    request.stream = false;
+    mockPool.request.mockReturnValue(request);
+
+    const stream = (await strategy.exportStream(
+      mockPool,
+      'dbo',
+      'users',
+    )) as NodeJS.ReadableStream;
+    await expect(
+      new Promise<void>((resolve, reject) => {
+        stream.once('error', (error) => {
+          expect(error).toEqual(new Error('query failed'));
+          resolve();
+        });
+        stream.resume();
+      }),
+    ).resolves.toBeUndefined();
   });
 });

@@ -22,6 +22,13 @@ import {
 
 @Injectable()
 export class ClickHouseStrategy implements IDatabaseStrategy {
+  private parameterType(value: unknown): string {
+    if (typeof value === 'boolean') return 'Bool';
+    if (typeof value === 'number')
+      return Number.isInteger(value) ? 'Int64' : 'Float64';
+    return 'String';
+  }
+
   private async readJsonRows<T extends Record<string, unknown>>(
     resultSet: Awaited<ReturnType<ClickHouseClient['query']>>,
   ): Promise<T[]> {
@@ -104,10 +111,10 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
       .map((column, index) => {
         const parameter = `p${index}`;
         values[parameter] = updates[column];
-        return `${this.quoteIdentifier(column)} = {${parameter}:String}`;
+        return `${this.quoteIdentifier(column)} = {${parameter}:${this.parameterType(updates[column])}}`;
       })
       .join(', ');
-    const sql = `ALTER TABLE ${this.quoteTable(schema, table)} UPDATE ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = {pk:String}`;
+    const sql = `ALTER TABLE ${this.quoteTable(schema, table)} UPDATE ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = {pk:${this.parameterType(pkValue)}}`;
 
     await pool.exec({ query: sql, query_params: values });
     return { success: true, rowCount: 1 };
@@ -124,7 +131,9 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
     const values = Object.fromEntries(
       cols.map((column, index) => [`p${index}`, data[column]]),
     );
-    const placeholders = cols.map((_, index) => `{p${index}:String}`);
+    const placeholders = cols.map(
+      (column, index) => `{p${index}:${this.parameterType(data[column])}}`,
+    );
     const sql = `INSERT INTO ${this.quoteTable(schema, table)} (${cols.map((c) => this.quoteIdentifier(c)).join(', ')}) VALUES (${placeholders.join(', ')})`;
     await pool.exec({ query: sql, query_params: values });
     return { success: true, rowCount: 1 };
@@ -137,7 +146,9 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
     const { schema, table, pkColumn, pkValues } = params;
     if (pkValues.length === 0) return { success: true, rowCount: 0 };
 
-    const placeholders = pkValues.map((_v, i) => `{pk${i}:String}`).join(', ');
+    const placeholders = pkValues
+      .map((value, i) => `{pk${i}:${this.parameterType(value)}}`)
+      .join(', ');
     const sql = `ALTER TABLE ${this.quoteTable(schema, table)} DELETE WHERE ${this.quoteIdentifier(pkColumn)} IN (${placeholders})`;
     const values: Record<string, unknown> = {};
     pkValues.forEach((v, i) => (values[`pk${i}`] = v));
