@@ -96,8 +96,12 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-foreground focus:ring-2 focus:ring-ring">
+            Skip to content
+          </a>
           <ErrorBoundary>
-            <Suspense fallback={<RouteFallback />}>
+            <div id="main-content" tabIndex={-1}>
+              <Suspense fallback={<RouteFallback />}>
               <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
@@ -139,7 +143,8 @@ export function App() {
 
               <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
-            </Suspense>
+              </Suspense>
+            </div>
           </ErrorBoundary>
           <Toaster richColors position="top-center" />
           <DestructiveQueryDialog />

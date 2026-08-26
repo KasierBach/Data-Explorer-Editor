@@ -14,7 +14,7 @@ export const NavBrand: React.FC<NavBrandProps> = ({ isSmallMobile, onNavigate })
             </div>
             {!isSmallMobile && (
                 <div>
-                    <h1 className="font-semibold text-sm leading-none">Data Explorer</h1>
+                    <span className="font-semibold text-sm leading-none">Data Explorer</span>
                 </div>
             )}
         </div>

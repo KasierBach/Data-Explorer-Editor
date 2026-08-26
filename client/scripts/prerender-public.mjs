@@ -40,6 +40,12 @@ export function renderPage(source, route, metadata) {
   const canonical = `${SITE_URL}${route === '/' ? '' : route}`;
   const title = escapeAttribute(metadata.title);
   const description = escapeAttribute(metadata.description);
+  const staticContent = [
+    '<main data-static-content>',
+    `    <h1>${title}</h1>`,
+    `    <p>${description}</p>`,
+    '  </main>',
+  ].join('\n  ');
   const socialTags = [
     `<link rel="canonical" href="${canonical}" data-static-seo />`,
     '<meta name="robots" content="index, follow" data-static-seo />',
@@ -55,7 +61,8 @@ export function renderPage(source, route, metadata) {
   return source
     .replace(/<title>.*?<\/title>/s, `<title>${title}</title>`)
     .replace(/<meta name="description"[\s\S]*?\/>/, `<meta name="description" content="${description}" />`)
-    .replace('<!-- Dynamic meta tags are managed by react-helmet-async in SEO component -->', socialTags);
+    .replace('<!-- Dynamic meta tags are managed by react-helmet-async in SEO component -->', socialTags)
+    .replace('<div id="root"></div>', `<div id="root">${staticContent}</div>`);
 }
 
 export async function prerender(distDir) {

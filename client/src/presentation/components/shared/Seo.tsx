@@ -60,11 +60,11 @@ export function SEO({
       <meta property="og:image" content={ogImage} />
       <meta property="og:site_name" content={siteName} />
 
-      <meta property="twitter:card" content="summary_large_image" />
-      <meta property="twitter:url" content={ogUrl} />
-      <meta property="twitter:title" content={siteTitle} />
-      <meta property="twitter:description" content={description} />
-      <meta property="twitter:image" content={ogImage} />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:url" content={ogUrl} />
+      <meta name="twitter:title" content={siteTitle} />
+      <meta name="twitter:description" content={description} />
+      <meta name="twitter:image" content={ogImage} />
 
       <meta name="robots" content={robots} />
       <meta name="googlebot" content={robots} />

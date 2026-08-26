@@ -48,9 +48,9 @@ export const AiSpotlightSection: React.FC<AiSpotlightSectionProps> = ({ lang, ad
                         <Badge className="mb-4 md:mb-6 bg-purple-500/20 text-purple-400 border-purple-500/30 font-black tracking-[0.2em] px-4 py-1">
                             {text.badge}
                         </Badge>
-                        <h1 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 md:mb-8 uppercase leading-none">
+                        <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 md:mb-8 uppercase leading-none">
                             <>{text.titleLine1} <br /> {text.titleLine2}</>
-                        </h1>
+                        </h2>
                         <p className="text-lg text-muted-foreground/80 mb-10 max-w-xl font-medium">
                             {text.description}
                         </p>
