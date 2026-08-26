@@ -1278,6 +1278,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
                         </div>
                         <div className="h-3 w-[1px] bg-border mx-1" />
                         <select
+                            aria-label={lang === 'vi' ? 'Số dòng mỗi trang' : 'Rows per page'}
                             className="bg-transparent border-none outline-none cursor-pointer hover:text-foreground text-[9px] font-bold py-0 h-4"
                             value={pagination.pageSize}
                             onChange={(e) => setTabPagination(tabStateId, 1, Number(e.target.value))}

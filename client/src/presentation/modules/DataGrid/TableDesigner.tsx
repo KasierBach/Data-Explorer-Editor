@@ -156,6 +156,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                                             </td>
                                             <td className="p-1 px-2 border-r border-border/40">
                                                 <input
+                                                    aria-label={`${text.columnName}: ${col.name || idx + 1}`}
                                                     className="w-full bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-500/40 rounded-lg px-2 py-1.5 h-8 font-medium placeholder:text-muted-foreground/20 transition-all"
                                                     value={col.name}
                                                     placeholder="e.g. user_email"
@@ -165,6 +166,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                                             </td>
                                             <td className="p-1 px-2 border-r border-border/40 text-center">
                                                 <select
+                                                    aria-label={`Type: ${col.name || idx + 1}`}
                                                     className="w-full bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-500/40 rounded-lg px-2 py-1.5 h-8 cursor-pointer text-muted-foreground/80 font-mono"
                                                     value={col.type}
                                                     onChange={(e) => handleUpdateColumn(idx, { type: e.target.value })}
@@ -182,6 +184,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                                             </td>
                                             <td className="text-center border-r border-border/40">
                                                 <input
+                                                    aria-label={`Null: ${col.name || idx + 1}`}
                                                     type="checkbox"
                                                     className="rounded-md border-muted-foreground/20 bg-transparent text-blue-600 focus:ring-blue-500/40 w-4 h-4 cursor-pointer transition-all"
                                                     checked={col.isNullable}
@@ -191,6 +194,7 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                                             </td>
                                             <td className="text-center border-r border-border/40">
                                                 <input
+                                                    aria-label={`PK: ${col.name || idx + 1}`}
                                                     type="checkbox"
                                                     className="rounded-md border-muted-foreground/20 bg-transparent text-yellow-600 focus:ring-yellow-500/40 w-4 h-4 cursor-pointer transition-all"
                                                     checked={col.isPrimaryKey}
@@ -236,8 +240,9 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                                 {relationships.map((rel) => (
                                     <div key={rel.id} className="flex flex-wrap items-center gap-4 p-5 bg-card/60 border border-border/50 rounded-2xl group relative hover:border-blue-500/30 hover:shadow-2xl hover:shadow-blue-500/[0.03] transition-all animate-in zoom-in-95 duration-200">
                                         <div className="flex flex-col gap-2 flex-1 min-w-[140px]">
-                                            <label className="text-[9px] uppercase font-black text-muted-foreground/30 tracking-tighter ml-1">Local Column</label>
+                                            <label htmlFor={`relationship-source-${rel.id}`} className="text-[9px] uppercase font-black text-muted-foreground/30 tracking-tighter ml-1">Local Column</label>
                                             <select 
+                                                id={`relationship-source-${rel.id}`}
                                                 className="bg-muted/40 border border-border/50 rounded-xl px-3 h-10 text-[11px] font-medium outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer appearance-none"
                                                 value={rel.source}
                                                 onChange={(e) => handleUpdateRelationship(rel.id, { source: e.target.value })}
@@ -251,8 +256,9 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                                         </div>
 
                                         <div className="flex flex-col gap-2 flex-1 min-w-[180px]">
-                                            <label className="text-[9px] uppercase font-black text-muted-foreground/30 tracking-tighter ml-1">Referenced Table</label>
+                                            <label htmlFor={`relationship-table-${rel.id}`} className="text-[9px] uppercase font-black text-muted-foreground/30 tracking-tighter ml-1">Referenced Table</label>
                                             <input 
+                                                id={`relationship-table-${rel.id}`}
                                                 placeholder="e.g. users"
                                                 className="bg-muted/40 border border-border/50 rounded-xl px-4 h-10 text-[11px] font-medium outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                                                 value={rel.targetTable}
@@ -261,8 +267,9 @@ export const TableDesigner: React.FC<TableDesignerProps> = ({ tableName, metadat
                                         </div>
 
                                         <div className="flex flex-col gap-2 flex-1 min-w-[180px]">
-                                            <label className="text-[9px] uppercase font-black text-muted-foreground/30 tracking-tighter ml-1">Referenced Column</label>
+                                            <label htmlFor={`relationship-column-${rel.id}`} className="text-[9px] uppercase font-black text-muted-foreground/30 tracking-tighter ml-1">Referenced Column</label>
                                             <input 
+                                                id={`relationship-column-${rel.id}`}
                                                 placeholder="e.g. id"
                                                 className="bg-muted/40 border border-border/50 rounded-xl px-4 h-10 text-[11px] font-medium outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
                                                 value={rel.targetColumn}
