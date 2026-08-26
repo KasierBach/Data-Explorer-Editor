@@ -1,10 +1,16 @@
 ﻿import type { ProviderPlan } from './ai.types';
 
-const BEEKNOEE_VISION_PATTERNS = [/^minimax\//i, /^gemini-/i, /^claude-/i];
+const BEEKNOEE_VISION_PATTERNS = [
+  /^minimax\//i,
+  /^gemini-/i,
+  /^bee(?:-tok)?\/gemini-/i,
+  /^claude-/i,
+];
 const GROQ_VISION_PATTERNS = [/^qwen\/qwen3\.6-27b$/i];
 
 const OPENROUTER_VISION_PATTERNS = [
   /gemma-4/i,
+  /minimax-m3/i,
   /gpt-4o/i,
   /gemini/i,
   /claude-3/i,

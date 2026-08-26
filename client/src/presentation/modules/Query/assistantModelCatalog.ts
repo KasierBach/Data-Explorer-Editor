@@ -34,30 +34,29 @@ const BUILT_IN_MODEL_GROUPS: AssistantModelGroup[] = [
   {
     group: "Google (Gemini)",
     items: [
+      { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite (Fast)" },
       {
-        id: "gemini-3.6-flash",
-        label: "Gemini 3.6 Flash (Latest)",
-        isNew: true,
+        id: "gemini-3.1-flash-lite",
+        label: "Gemini 3.1 Flash Lite (Fast)",
       },
       {
         id: "gemini-3.5-flash-lite",
         label: "Gemini 3.5 Flash Lite",
         isNew: true,
       },
+      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Balanced)" },
+      { id: "gemini-3-flash-preview", label: "Gemini 3 Flash (Fast)" },
       { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash (High)", isNew: true },
+      {
+        id: "gemini-3.6-flash",
+        label: "Gemini 3.6 Flash (Latest)",
+        isNew: true,
+      },
+      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (Balanced)" },
       {
         id: "gemini-3.1-pro-preview",
         label: "Gemini 3.1 Pro (Reasoning)",
-        isNew: true,
       },
-      {
-        id: "gemini-3.1-flash-lite",
-        label: "Gemini 3.1 Flash Lite (Fast)",
-      },
-      { id: "gemini-3-flash-preview", label: "Gemini 3 Flash (Fast)" },
-      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (Balanced)" },
-      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (Balanced)" },
-      { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite (Fast)" },
     ],
   },
   {
@@ -65,22 +64,24 @@ const BUILT_IN_MODEL_GROUPS: AssistantModelGroup[] = [
     items: [
       { id: "beeknoee:glm-4.7-flash", label: "GLM 4.7 Flash" },
       {
+        id: "beeknoee:bee/gemini-3.6-flash",
+        label: "Gemini 3.6 Flash (Bee)",
+        isNew: true,
+      },
+      {
+        id: "beeknoee:bee-tok/gemini-3.6-flash",
+        label: "Gemini 3.6 Flash (Bee Token)",
+        isNew: true,
+      },
+      {
         id: "beeknoee:minimax/minimax-m2.7",
         label: "MiniMax M2.7",
       },
-      {
-        id: "beeknoee:gemini-3.1-pro-preview",
-        label: "Gemini 3.1 Pro (Reasoning)",
-        isNew: true,
-      },
+      { id: "beeknoee:claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+      { id: "beeknoee:gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (Reasoning)" },
       {
         id: "beeknoee:claude-opus-4-6-thinking",
         label: "Claude Opus 4.6 Thinking",
-        isNew: true,
-      },
-      {
-        id: "beeknoee:claude-sonnet-4-6",
-        label: "Claude Sonnet 4.6",
         isNew: true,
       },
     ],
@@ -88,28 +89,52 @@ const BUILT_IN_MODEL_GROUPS: AssistantModelGroup[] = [
   {
     group: "Groq (Fast & Free)",
     items: [
-      { id: "groq:openai/gpt-oss-120b", label: "GPT OSS 120B" },
       {
         id: "groq:openai/gpt-oss-20b",
         label: "GPT OSS 20B (Fast)",
       },
+      { id: "groq:groq/compound-mini", label: "Groq Compound Mini (Web)" },
       {
         id: "groq:qwen/qwen3.6-27b",
         label: "Qwen 3.6 27B (Vision)",
-        isNew: true,
       },
-      { id: "groq:groq/compound", label: "Groq Compound (Web)", isNew: true },
-      { id: "groq:groq/compound-mini", label: "Groq Compound Mini (Web)" },
+      { id: "groq:openai/gpt-oss-120b", label: "GPT OSS 120B" },
+      { id: "groq:groq/compound", label: "Groq Compound (Web)" },
     ],
   },
   {
     group: "OpenRouter (Free)",
     items: [
-      { id: "google/gemma-4-31b-it:free", label: "Gemma 4 31B" },
+      {
+        id: "cohere/north-mini-code:free",
+        label: "Cohere North Mini Code",
+        isNew: true,
+      },
+      {
+        id: "poolside/laguna-xs-2.1:free",
+        label: "Poolside Laguna XS 2.1",
+        isNew: true,
+      },
       { id: "google/gemma-4-26b-a4b-it:free", label: "Gemma 4 26B" },
+      {
+        id: "nvidia/nemotron-3.5-lightning:free",
+        label: "NVIDIA Nemotron 3.5 Lightning",
+        isNew: true,
+      },
+      { id: "google/gemma-4-31b-it:free", label: "Gemma 4 31B" },
+      {
+        id: "poolside/laguna-s-2.1:free",
+        label: "Poolside Laguna S 2.1",
+        isNew: true,
+      },
       {
         id: "nvidia/nemotron-3-super-120b-a12b:free",
         label: "NVIDIA Nemotron 120B",
+      },
+      {
+        id: "minimax/minimax-m3:free",
+        label: "MiniMax M3",
+        isNew: true,
       },
       {
         id: "nvidia/nemotron-3-ultra-550b-a55b:free",
@@ -123,13 +148,16 @@ const BUILT_IN_MODEL_GROUPS: AssistantModelGroup[] = [
 function getBuiltInCapabilities(modelId: string) {
   if (modelId.startsWith("gemini-")) return ALL_CAPABILITIES;
   if (modelId.startsWith("beeknoee:")) {
-    return /^beeknoee:(?:minimax\/|gemini-|claude-)/i.test(modelId)
+    return /^beeknoee:(?:minimax\/|gemini-|bee(?:-tok)?\/gemini-|claude-)/i.test(modelId)
       ? VISION
       : undefined;
   }
   if (/^groq:groq\/compound(?:-mini)?$/i.test(modelId)) return WEB;
   if (modelId === "groq:qwen/qwen3.6-27b") return VISION;
   if (/gemma-4/i.test(modelId)) return ALL_CAPABILITIES;
+  if (modelId === "minimax/minimax-m3:free") {
+    return ["web", "vision", "pdf"] as const;
+  }
   if (modelId.includes("/") && modelId.endsWith(":free")) return WEB_AND_PDF;
   return undefined;
 }
@@ -152,7 +180,7 @@ export const BUILT_IN_PROVIDERS: BuiltInProviderConfig[] = [
     id: "beeknoee",
     name: "Beeknoee",
     groupName: "Beeknoee",
-    description: "GLM 4.7 Flash, MiniMax M2.7, Claude Opus 4.6 Thinking & Sonnet 4.6",
+    description: "Gemini 3.6 Flash Bee/Bee Token, GLM 4.7, MiniMax M2.7 & Claude 4.6",
   },
   {
     id: "groq",
@@ -164,7 +192,7 @@ export const BUILT_IN_PROVIDERS: BuiltInProviderConfig[] = [
     id: "openrouter",
     name: "OpenRouter (Free)",
     groupName: "OpenRouter (Free)",
-    description: "Gemma 4 31B/26B & NVIDIA Nemotron 120B/550B",
+    description: "Laguna 2.1, Nemotron 3/3.5, North Mini Code, MiniMax M3 & Gemma 4",
   },
 ];
 
