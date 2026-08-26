@@ -339,10 +339,11 @@ The repository includes a production Blueprint at `render.yaml` and a gated deli
 
 1. Create or sync the backend service from the Render Blueprint and set its required `sync: false` secrets (`DATABASE_URL`, `REDIS_URL`, JWT secrets, and encryption key). Add AI, OAuth, mail, or billing secrets only when those features are enabled. Keep `ALLOW_INSECURE_DATABASE_TLS=false`.
 2. Create a Render Deploy Hook for the backend service and store it as the GitHub Actions secret `RENDER_DEPLOY_HOOK_URL`.
-3. For another deployment or a custom domain, set the GitHub Actions repository variable `PRODUCTION_API_URL` to the public backend origin. This repository defaults to its verified Render origin, and the backend derives `API_PUBLIC_URL` from Render's built-in `RENDER_EXTERNAL_URL` unless explicitly overridden.
-4. Protect the GitHub `production` environment if deployment approval is required.
+3. Link the `client` directory to the production Vercel project, then store `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as secrets in the GitHub `production` environment. Git-triggered Vercel deployments are disabled in `client/vercel.json`, so production frontend releases only run after CI succeeds.
+4. For another deployment or a custom domain, set the GitHub Actions repository variable `PRODUCTION_API_URL` to the public backend origin. This repository defaults to its verified Render origin, and the backend derives `API_PUBLIC_URL` from Render's built-in `RENDER_EXTERNAL_URL` unless explicitly overridden.
+5. Protect the GitHub `production` environment if deployment approval is required.
 
-Every push to `main` must pass lint, unit tests, production dependency audit, client build, browser E2E/accessibility checks, server build, and container builds. The delivery workflow then deploys the exact tested commit and waits for `/api/health/ready` to confirm PostgreSQL, Redis, and `RENDER_GIT_COMMIT` before succeeding. `/api/health/live` is the process-only liveness endpoint.
+Every push to `main` must pass lint, unit tests, production dependency audit, client build, browser E2E/accessibility checks, server build, migration validation, and container builds. The delivery workflows then deploy the exact tested commit to Render and Vercel. Backend delivery waits for `/api/health/ready` to confirm PostgreSQL, Redis, and `RENDER_GIT_COMMIT` before succeeding; frontend delivery deploys the prebuilt Vercel output with the production API URL. `/api/health/live` is the process-only liveness endpoint.
 
 Render keeps the previous healthy instance serving traffic when a new deploy fails. Database changes must therefore remain backward-compatible during rolling releases.
 

@@ -43,9 +43,25 @@ jobs:
   server:
     name: Server
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: data_explorer_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d data_explorer_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: server
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/data_explorer_ci
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -60,6 +76,7 @@ jobs:
           # Keep this known transitive CLI/config advisory explicit while retaining all other blockers.
           NPM_AUDIT_ALLOW_GHSA: GHSA-GGR8-5VV4-36MX
       - run: npm run prisma:generate
+      - run: npx prisma migrate deploy
       - run: npm run lint
       - run: npm run test:ci
       - run: npm run build
@@ -76,9 +93,11 @@ jobs:
       - name: Build images
         env:
           IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+          PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL || 'https://data-explorer-editor-9v55.onrender.com' }}
         run: |
           image_prefix="$(echo "$IMAGE_PREFIX" | tr '[:upper:]' '[:lower:]')"
-          docker build --tag "$image_prefix/client:${GITHUB_SHA}" --tag "$image_prefix/client:main" client
+          api_url="${PRODUCTION_API_URL%/}/api"
+          docker build --build-arg "VITE_API_URL=$api_url" --tag "$image_prefix/client:${GITHUB_SHA}" --tag "$image_prefix/client:main" client
           docker build --tag "$image_prefix/server:${GITHUB_SHA}" --tag "$image_prefix/server:main" server
           echo "IMAGE_PREFIX=$image_prefix" >> "$GITHUB_ENV"
       - name: Publish images
