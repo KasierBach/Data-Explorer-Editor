@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, ExternalLink, Globe2, Search } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -12,6 +12,35 @@ type CodeProps = React.ComponentProps<'code'> & {
 };
 
 const getCodeText = (children: React.ReactNode) => String(children).replace(/\n$/, '');
+
+const normalizeLegacySourceLabels = (content: string) => {
+    let index = 0;
+    return content.replace(
+        /\[(?:https:\/\/vertexaisearch\.cloud\.google\.com\/[^\]]+|Google Search (?:result|source))\]\((https:\/\/vertexaisearch\.cloud\.google\.com\/[^)]+)\)/g,
+        (_match, href: string) => `[Google Search source ${++index}](${href})`,
+    );
+};
+
+const getLinkDetails = (href: string | undefined, children: React.ReactNode) => {
+    const raw = String(children);
+    if (!href) return { title: raw };
+    try {
+        const url = new URL(href);
+        if (url.hostname.includes('vertexaisearch.cloud.google.com')) {
+            const suffix = ` - ${url.hostname}`;
+            return { title: raw.endsWith(suffix) ? raw.slice(0, -suffix.length) : raw, site: 'Google Search' };
+        }
+        const suffix = ` - ${url.hostname}`;
+        if (raw.endsWith(suffix)) {
+            return { title: raw.slice(0, -suffix.length), site: url.hostname, favicon: url.hostname };
+        }
+        if (raw.length < 80) return { title: raw, site: url.hostname, favicon: url.hostname };
+        const path = url.pathname.split('/').filter(Boolean).slice(-2).join(' / ');
+        return { title: path || url.hostname, site: url.hostname, favicon: url.hostname };
+    } catch {
+        return { title: raw.slice(0, 64) + (raw.length > 64 ? '...' : '') };
+    }
+};
 
 export const AiMarkdownContent: React.FC<AiMarkdownContentProps> = ({ content }) => {
     const [copiedBlock, setCopiedBlock] = useState<string | null>(null);
@@ -34,14 +63,42 @@ export const AiMarkdownContent: React.FC<AiMarkdownContentProps> = ({ content })
                 remarkPlugins={[remarkGfm]}
                 skipHtml
                 components={{
-                    a: ({ className, ...props }: React.ComponentProps<'a'>) => (
-                        <a
-                            className={className || 'text-violet-400 hover:underline'}
-                            {...props}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                        />
-                    ),
+                    a: ({ className, children, ...props }: React.ComponentProps<'a'>) => {
+                        const details = getLinkDetails(props.href, children);
+                        const isGoogleRedirect = props.href?.includes('vertexaisearch.cloud.google.com');
+                        return (
+                            <a
+                                className={`${className ?? ''} inline-flex max-w-full items-center gap-2.5 rounded-lg border border-violet-400/20 bg-violet-400/5 px-2.5 py-2 align-bottom text-violet-200 no-underline transition-colors hover:border-violet-300/40 hover:bg-violet-400/10`}
+                                {...props}
+                                title={props.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                <span className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-violet-400/10">
+                                    {isGoogleRedirect ? <Search className="h-3.5 w-3.5" /> : <Globe2 className="h-3.5 w-3.5" />}
+                                    {details.favicon ? (
+                                        <img
+                                            src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(details.favicon)}&sz=32`}
+                                            alt=""
+                                            className="absolute h-4 w-4 rounded-sm"
+                                            onError={(event) => { event.currentTarget.style.display = 'none'; }}
+                                        />
+                                    ) : null}
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-[13px] font-semibold leading-4">{details.title}</span>
+                                    {details.site ? <span className="block truncate text-[10px] leading-4 text-slate-400">{details.site}</span> : null}
+                                </span>
+                                <ExternalLink aria-hidden="true" className="h-3 w-3 shrink-0 opacity-60" />
+                            </a>
+                        );
+                    },
+                    li: ({ children, ...props }: React.ComponentProps<'li'>) => {
+                        const linkOnly = React.Children.toArray(children).some(
+                            (child) => React.isValidElement(child) && child.type === 'a',
+                        );
+                        return <li className={linkOnly ? 'not-prose -ml-5 list-none py-1' : undefined} {...props}>{children}</li>;
+                    },
                     pre({ children }: React.ComponentProps<'pre'>) {
                         const codeChild = React.Children.toArray(children)[0];
                         const text = React.isValidElement<{ children?: React.ReactNode }>(codeChild)
@@ -87,7 +144,7 @@ export const AiMarkdownContent: React.FC<AiMarkdownContentProps> = ({ content })
                     },
                 }}
             >
-                {content}
+                {normalizeLegacySourceLabels(content)}
             </ReactMarkdown>
         </div>
     );

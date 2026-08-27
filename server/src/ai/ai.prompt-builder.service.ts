@@ -11,6 +11,8 @@ import type {
   ChatHistoryMessage,
 } from './ai.types';
 
+type SourceDetail = { title: string; url: string };
+
 @Injectable()
 export class AiPromptBuilderService {
   buildSystemPrompt(params: {
@@ -342,17 +344,28 @@ export class AiPromptBuilderService {
       };
     }>;
   }): string[] {
+    return this.extractSourceDetails(response).map((source) => source.url);
+  }
+
+  extractSourceDetails(response: {
+    candidates?: Array<{
+      groundingMetadata?: {
+        groundingChunks?: Array<{ web?: { title?: string; uri?: string } }>;
+      };
+    }>;
+  }): SourceDetail[] {
     const candidate = response.candidates?.[0];
     if (!candidate?.groundingMetadata?.groundingChunks) return [];
 
-    const urls = candidate.groundingMetadata.groundingChunks
+    return candidate.groundingMetadata.groundingChunks
       .filter(
         (chunk): chunk is { web: { title: string; uri: string } } =>
           !!chunk.web?.uri && !!chunk.web?.title,
       )
-      .map((chunk) => chunk.web.uri);
-
-    return this.normalizeSources(urls) || [];
+      .flatMap((chunk) => {
+        const url = this.normalizeSources([chunk.web.uri])?.[0];
+        return url ? [{ title: chunk.web.title.trim(), url }] : [];
+      });
   }
 
   mergeSources(
@@ -361,7 +374,11 @@ export class AiPromptBuilderService {
     return this.normalizeSources(sourceLists.flatMap((list) => list || []));
   }
 
-  appendSourcesToMessage(message: string, sources?: string[]): string {
+  appendSourcesToMessage(
+    message: string,
+    sources?: string[],
+    sourceDetails: SourceDetail[] = [],
+  ): string {
     if (!sources?.length) {
       return message;
     }
@@ -373,7 +390,7 @@ export class AiPromptBuilderService {
       return message;
     }
 
-    return `${message}${this.buildSourcesMarkdown(missingSources)}`;
+    return `${message}${this.buildSourcesMarkdown(missingSources, sourceDetails)}`;
   }
 
   extractOpenAiStreamText(payload: {
@@ -502,9 +519,34 @@ export class AiPromptBuilderService {
     return normalized.length ? normalized : undefined;
   }
 
-  private buildSourcesMarkdown(sources: string[]): string {
+  private buildSourcesMarkdown(
+    sources: string[],
+    sourceDetails: SourceDetail[],
+  ): string {
     return `\n\n---\n**Sources**\n${sources
-      .map((source) => `- [${source}](${source})`)
+      .map((source, index) => {
+        let label = sourceDetails.find((detail) => detail.url === source)?.title;
+        if (label) {
+          let hostname = '';
+          try {
+            hostname = new URL(source).hostname;
+          } catch {
+            // normalizeSources already filters invalid URLs.
+          }
+          return `- [${label}${hostname ? ` - ${hostname}` : ''}](${source})`;
+        }
+
+        label = `Source ${index + 1}`;
+        try {
+          const url = new URL(source);
+          label = url.hostname.includes('vertexaisearch.cloud.google.com')
+            ? `Google Search source ${index + 1}`
+            : `Source ${index + 1} - ${url.hostname}`;
+        } catch {
+          // normalizeSources already filters invalid URLs; keep a safe fallback.
+        }
+        return `- [${label}](${source})`;
+      })
       .join('\n')}`;
   }
 }

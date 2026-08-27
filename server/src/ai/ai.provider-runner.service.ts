@@ -722,15 +722,19 @@ export class AiProviderRunnerService {
       `Gemini (${plan.model})`,
     );
 
+    const sourceDetails = searchEnabled
+      ? this.promptBuilder.extractSourceDetails(result)
+      : [];
     const sources = this.promptBuilder.mergeSources(
       parsed.sources,
-      searchEnabled ? this.promptBuilder.extractSources(result) : undefined,
+      sourceDetails.map((source) => source.url),
     );
     return {
       ...parsed,
       message: this.promptBuilder.appendSourcesToMessage(
         parsed.message,
         sources,
+        sourceDetails,
       ),
       sources,
       provider: 'gemini',
@@ -935,7 +939,7 @@ export class AiProviderRunnerService {
     }
 
     let fullText = '';
-    const providerSources: string[] = [];
+    const providerSourceDetails: Array<{ title: string; url: string }> = [];
     const iterator = result;
     while (true) {
       const nextChunk = await this.withTimeout<
@@ -948,8 +952,8 @@ export class AiProviderRunnerService {
       if (nextChunk.done) break;
       const chunkText = nextChunk.value.text || '';
       if (searchEnabled) {
-        providerSources.push(
-          ...this.promptBuilder.extractSources(nextChunk.value),
+        providerSourceDetails.push(
+          ...this.promptBuilder.extractSourceDetails(nextChunk.value),
         );
       }
       if (chunkText) {
@@ -966,7 +970,7 @@ export class AiProviderRunnerService {
 
     const sources = this.promptBuilder.mergeSources(
       parsed.sources,
-      searchEnabled ? providerSources : undefined,
+      providerSourceDetails.map((source) => source.url),
     );
     yield {
       type: 'done',
@@ -975,6 +979,7 @@ export class AiProviderRunnerService {
         message: this.promptBuilder.appendSourcesToMessage(
           parsed.message,
           sources,
+          providerSourceDetails,
         ),
         sources,
         provider: 'gemini',

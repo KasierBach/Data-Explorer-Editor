@@ -43,6 +43,23 @@ describe('AiPromptBuilderService', () => {
     });
   });
 
+  it('renders readable source labels instead of exposing redirect URLs', () => {
+    const message = service.appendSourcesToMessage('Fresh answer', [
+      'https://vertexaisearch.cloud.google.com/grounding-api-redirect/long-token',
+      'https://example.com/articles/data-explorer',
+    ]);
+
+    expect(message).toContain(
+      '[Google Search source 1](https://vertexaisearch.cloud.google.com/',
+    );
+    expect(message).toContain(
+      '[Source 2 - example.com](https://example.com/articles/data-explorer)',
+    );
+    expect(message).not.toContain(
+      '[https://vertexaisearch.cloud.google.com/',
+    );
+  });
+
   it('uses explicit structured response contracts for database-style requests', () => {
     const prompt = service.buildSystemPrompt({
       responseFormat: 'structured',

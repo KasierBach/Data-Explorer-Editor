@@ -553,7 +553,7 @@ describe('AiProviderRunnerService streaming', () => {
     expect(result.sources).toEqual(['https://example.com/news']);
     expect(result.message).toContain('Latest market snapshot');
     expect(result.message).toContain(
-      '[https://example.com/news](https://example.com/news)',
+      '[Source 1 - example.com](https://example.com/news)',
     );
   });
 
@@ -722,6 +722,9 @@ describe('AiProviderRunnerService streaming', () => {
     expect(events.at(-1)).toMatchObject({
       type: 'done',
       data: {
+        message: expect.stringContaining(
+          '[Gemini docs - ai.google.dev](https://ai.google.dev/gemini-api/docs)',
+        ),
         sources: ['https://ai.google.dev/gemini-api/docs'],
       },
     });
