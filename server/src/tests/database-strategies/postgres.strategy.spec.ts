@@ -177,7 +177,7 @@ describe('PostgresStrategy', () => {
 
     it('escapes imported column names', async () => {
       const quote = String.fromCharCode(34);
-      mockPool.query.mockResolvedValue({ rowCount: 1 });
+      mockClient.query.mockResolvedValue({ rowCount: 1 });
 
       await strategy.importData(mockPool, {
         schema: 'public',
@@ -185,9 +185,58 @@ describe('PostgresStrategy', () => {
         data: [{ ['display' + quote + 'name']: 'Ada' }],
       });
 
-      expect(mockPool.query.mock.calls[0][0]).toContain(
+      const insertCall = mockClient.query.mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].startsWith('INSERT'),
+      );
+      expect(insertCall?.[0]).toContain(
         '(' + quote + 'display' + quote + quote + 'name' + quote + ')',
       );
+    });
+
+    it('chunks large imports to stay under the Postgres parameter limit and wraps them in a transaction', async () => {
+      mockClient.query.mockResolvedValue({ rowCount: 1 });
+
+      // 3 columns × 25000 rows = 75000 parameters > 60000 → must split into 2 chunks.
+      const rows = Array.from({ length: 25000 }, () => ({
+        a: 1,
+        b: 2,
+        c: 3,
+      }));
+
+      const result = await strategy.importData(mockPool, {
+        schema: 'public',
+        table: 'users',
+        data: rows,
+      });
+
+      const insertCalls = mockClient.query.mock.calls.filter(
+        (call) => typeof call[0] === 'string' && call[0].startsWith('INSERT'),
+      );
+      expect(insertCalls.length).toBe(2);
+      expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+      expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
+      expect(result).toEqual({ success: true, rowCount: 2 });
+    });
+
+    it('rolls back the import when a chunk fails', async () => {
+      mockClient.query.mockImplementation((sql: string) => {
+        if (sql === 'BEGIN') return Promise.resolve({});
+        if (sql.startsWith('INSERT')) {
+          return Promise.reject(new Error('insert failed'));
+        }
+        return Promise.resolve({});
+      });
+
+      await expect(
+        strategy.importData(mockPool, {
+          schema: 'public',
+          table: 'users',
+          data: [{ a: 1 }],
+        }),
+      ).rejects.toThrow('insert failed');
+
+      expect(mockClient.query).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClient.release).toHaveBeenCalled();
     });
   });
 

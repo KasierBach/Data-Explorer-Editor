@@ -88,22 +88,25 @@ export class AiChatService {
     if (!chat) throw new NotFoundException('Chat not found');
     if (chat.userId !== userId) throw new ForbiddenException('Access denied');
 
-    // Update the updatedAt timestamp of the chat
-    await this.prisma.aiChat.update({
-      where: { id: chatId },
-      data: { updatedAt: new Date() },
-    });
+    // Update the chat timestamp and create the message atomically so a failed
+    // write cannot leave updatedAt bumped without the message existing.
+    return this.prisma.$transaction(async (tx) => {
+      await tx.aiChat.update({
+        where: { id: chatId },
+        data: { updatedAt: new Date() },
+      });
 
-    return this.prisma.aiMessage.create({
-      data: {
-        chatId,
-        role: dto.role,
-        content: dto.content,
-        sql: dto.sql,
-        explanation: dto.explanation,
-        error: dto.error || false,
-        attachments: this.toPrismaMessagePayload(dto),
-      },
+      return tx.aiMessage.create({
+        data: {
+          chatId,
+          role: dto.role,
+          content: dto.content,
+          sql: dto.sql,
+          explanation: dto.explanation,
+          error: dto.error || false,
+          attachments: this.toPrismaMessagePayload(dto),
+        },
+      });
     });
   }
 
@@ -124,21 +127,23 @@ export class AiChatService {
     if (!target || target.chatId !== chatId)
       throw new NotFoundException('Message not found');
 
-    await this.prisma.aiChat.update({
-      where: { id: chatId },
-      data: { updatedAt: new Date() },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      await tx.aiChat.update({
+        where: { id: chatId },
+        data: { updatedAt: new Date() },
+      });
 
-    return this.prisma.aiMessage.update({
-      where: { id: messageId },
-      data: {
-        role: dto.role,
-        content: dto.content,
-        sql: dto.sql,
-        explanation: dto.explanation,
-        error: dto.error || false,
-        attachments: this.toPrismaMessagePayload(dto),
-      },
+      return tx.aiMessage.update({
+        where: { id: messageId },
+        data: {
+          role: dto.role,
+          content: dto.content,
+          sql: dto.sql,
+          explanation: dto.explanation,
+          error: dto.error || false,
+          attachments: this.toPrismaMessagePayload(dto),
+        },
+      });
     });
   }
 

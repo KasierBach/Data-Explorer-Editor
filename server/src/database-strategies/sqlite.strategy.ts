@@ -62,6 +62,58 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return { rows: rows.slice(0, 50000), columns, rowCount: rows.length };
   }
 
+  async runStatementsInTransaction(
+    pool: Database.Database,
+    statements: string[],
+    options?: { limit?: number; offset?: number },
+  ): Promise<QueryResult> {
+    let result: QueryResult = { rows: [], columns: [], countStatus: 'skipped' };
+    const runAll = pool.transaction(() => {
+      for (const statement of statements) {
+        const isLast = statement === statements[statements.length - 1];
+        let safeSql = statement;
+        if (isLast && options?.limit !== undefined) {
+          safeSql =
+            options.offset !== undefined
+              ? SqlUtil.injectPagination(
+                  statement,
+                  options.limit,
+                  options.offset,
+                  'sqlite',
+                )
+              : SqlUtil.injectLimit(statement, options.limit);
+        }
+        const stmt = pool.prepare(safeSql);
+        if (stmt.reader) {
+          // SELECT-like statements return rows via .all().
+          const rows = stmt.all() as Record<string, unknown>[];
+          if (isLast) {
+            const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+            result = {
+              rows: rows.slice(0, 50000),
+              columns,
+              rowCount: rows.length,
+            };
+          }
+        } else {
+          // INSERT/UPDATE/DELETE/DDL statements must use .run(); better-sqlite3
+          // throws "This statement does not return data" when calling .all().
+          const runResult = stmt.run();
+          if (isLast) {
+            result = {
+              rows: [],
+              columns: [],
+              rowCount: Number(runResult.changes),
+            };
+          }
+        }
+      }
+    });
+    // better-sqlite3 throws on failure, which rolls back automatically.
+    runAll();
+    return result;
+  }
+
   async updateRow(
     pool: Database.Database,
     params: UpdateRowParams,

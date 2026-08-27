@@ -107,6 +107,56 @@ export class MssqlStrategy implements IDatabaseStrategy {
     };
   }
 
+  async runStatementsInTransaction(
+    pool: mssql.ConnectionPool,
+    statements: string[],
+    options?: { limit?: number; offset?: number },
+  ): Promise<QueryResult> {
+    const transaction = new mssql.Transaction(pool);
+    try {
+      await transaction.begin();
+      let result: QueryResult = {
+        rows: [],
+        columns: [],
+        countStatus: 'skipped',
+      };
+      for (const statement of statements) {
+        const isLast = statement === statements[statements.length - 1];
+        let safeSql = statement;
+        if (isLast && options?.limit !== undefined) {
+          safeSql =
+            options.offset !== undefined
+              ? SqlUtil.injectPagination(
+                  statement,
+                  options.limit,
+                  options.offset,
+                  'mssql',
+                )
+              : SqlUtil.injectTop(statement, options.limit);
+        }
+        const raw = await transaction.request().query(safeSql);
+        if (isLast) {
+          result = {
+            rows: raw.recordset ? raw.recordset.slice(0, 50000) : [],
+            columns: raw.recordset?.columns
+              ? Object.keys(raw.recordset.columns)
+              : [],
+            rowCount: raw.rowsAffected?.[0] ?? 0,
+          };
+        }
+      }
+      await transaction.commit();
+      return result;
+    } catch (error) {
+      try {
+        await transaction.rollback();
+      } catch {
+        // Connection will be discarded by the pool if broken.
+      }
+      throw error;
+    }
+  }
+
   async updateRow(
     pool: mssql.ConnectionPool,
     params: UpdateRowParams,

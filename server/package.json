@@ -21,6 +21,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:ci": "jest --runInBand",
+    "test:e2e": "jest --config jest-e2e.json --runInBand --forceExit",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:load": "node scripts/load/http-load.mjs load",

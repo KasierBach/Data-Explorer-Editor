@@ -131,6 +131,17 @@ export class MongoDbStrategy implements IDatabaseStrategy {
     }
   }
 
+  async runStatementsInTransaction(
+    client: MongoClient,
+    statements: string[],
+    options?: { limit?: number; offset?: number },
+  ): Promise<QueryResult> {
+    // The query service always passes a single statement for MongoDB, so
+    // simply delegate to executeQuery.
+    const last = statements[statements.length - 1];
+    return this.executeQuery(client, last, options);
+  }
+
   async executeQuery(
     client: MongoClient,
     queryPayloadStr: string,

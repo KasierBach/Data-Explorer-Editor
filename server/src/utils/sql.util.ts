@@ -52,11 +52,17 @@ export class SqlUtil {
 
   /**
    * Appends a LIMIT clause to a bare SELECT statement if it lacks one, to prevent OOM.
+   * Also rewrites `LIMIT ALL` (Postgres) to a bounded limit so the query cannot
+   * return an unbounded number of rows.
    */
   static injectLimit(sql: string, limit: number = 50000): string {
     let safeSql = sql;
-    if (SqlUtil.isSelectStatement(safeSql) && !/\bLIMIT\b/i.test(safeSql)) {
-      safeSql = `${safeSql.trim().replace(/;$/, '')} LIMIT ${limit};`;
+    if (SqlUtil.isSelectStatement(safeSql)) {
+      if (/\bLIMIT\s+ALL\b/i.test(safeSql)) {
+        safeSql = safeSql.replace(/\bLIMIT\s+ALL\b/i, `LIMIT ${limit}`);
+      } else if (!/\bLIMIT\b/i.test(safeSql)) {
+        safeSql = `${safeSql.trim().replace(/;$/, '')} LIMIT ${limit};`;
+      }
     }
     return safeSql;
   }
@@ -117,7 +123,14 @@ export class SqlUtil {
             return `SELECT * FROM (${trimmed} ORDER BY ${pkOrder} OFFSET ${reverseOffset} ROWS FETCH NEXT ${limit} ROWS ONLY) _rev ORDER BY ${options.primaryKey || '1'} ASC;`;
           }
           if (options.primaryKey) {
-            return `SELECT * FROM (${trimmed} ORDER BY "${options.primaryKey}" DESC LIMIT ${limit} OFFSET ${reverseOffset}) _rev ORDER BY "${options.primaryKey}" ASC;`;
+            // Quote the primary key per dialect: MySQL treats "id" as a string
+            // literal (not an identifier) unless ANSI_QUOTES is enabled, which
+            // would make the ORDER BY ineffective and break pagination.
+            const quotedPk =
+              dialect === 'mysql'
+                ? `\`${options.primaryKey.replace(/`/g, '``')}\``
+                : `"${options.primaryKey.replace(/"/g, '""')}"`;
+            return `SELECT * FROM (${trimmed} ORDER BY ${quotedPk} DESC LIMIT ${limit} OFFSET ${reverseOffset}) _rev ORDER BY ${quotedPk} ASC;`;
           }
         }
       }

@@ -98,6 +98,25 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
     return { rows: rows.slice(0, 50000), columns, rowCount: rows.length };
   }
 
+  async runStatementsInTransaction(
+    pool: ClickHouseClient,
+    statements: string[],
+    options?: { limit?: number; offset?: number },
+  ): Promise<QueryResult> {
+    // ClickHouse does not support multi-statement transactions; execute
+    // sequentially and return the last statement's result.
+    let result: QueryResult = { rows: [], columns: [], countStatus: 'skipped' };
+    for (const statement of statements) {
+      const isLast = statement === statements[statements.length - 1];
+      result = await this.executeQuery(
+        pool,
+        statement,
+        isLast ? options : undefined,
+      );
+    }
+    return result;
+  }
+
   async updateRow(
     pool: ClickHouseClient,
     params: UpdateRowParams,

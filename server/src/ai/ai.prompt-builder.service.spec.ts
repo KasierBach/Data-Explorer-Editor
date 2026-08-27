@@ -55,9 +55,7 @@ describe('AiPromptBuilderService', () => {
     expect(message).toContain(
       '[Source 2 - example.com](https://example.com/articles/data-explorer)',
     );
-    expect(message).not.toContain(
-      '[https://vertexaisearch.cloud.google.com/',
-    );
+    expect(message).not.toContain('[https://vertexaisearch.cloud.google.com/');
   });
 
   it('uses explicit structured response contracts for database-style requests', () => {

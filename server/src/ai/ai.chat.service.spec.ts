@@ -15,9 +15,10 @@ describe('AiChatService', () => {
           .mockResolvedValue({ id: 'msg-1', chatId: 'chat-1' }),
         update: jest.fn().mockResolvedValue({ id: 'msg-1' }),
       },
+      $transaction: jest.fn(async (fn: (tx: unknown) => unknown) => fn(prisma)),
     };
 
-    const service = new AiChatService(prisma as any);
+    const service = new AiChatService(prisma);
 
     await (service as any).updateMessage('user-1', 'chat-1', 'msg-1', {
       role: 'user',

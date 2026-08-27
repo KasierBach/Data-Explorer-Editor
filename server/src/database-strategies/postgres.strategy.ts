@@ -127,6 +127,59 @@ export class PostgresStrategy implements IDatabaseStrategy {
     }
   }
 
+  async runStatementsInTransaction(
+    pool: Pool,
+    statements: string[],
+    options?: { limit?: number; offset?: number },
+  ): Promise<QueryResult> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      let result: QueryResult = {
+        rows: [],
+        columns: [],
+        countStatus: 'skipped',
+      };
+      for (const statement of statements) {
+        const isLast = statement === statements[statements.length - 1];
+        let safeSql = statement;
+        if (isLast && options?.limit !== undefined) {
+          safeSql =
+            options.offset !== undefined
+              ? SqlUtil.injectPagination(
+                  statement,
+                  options.limit,
+                  options.offset,
+                  'postgres',
+                )
+              : SqlUtil.injectLimit(statement, options.limit);
+        }
+        const raw = await client.query(safeSql);
+        if (isLast) {
+          const queryResult = Array.isArray(raw) ? raw[raw.length - 1] : raw;
+          result = {
+            rows: queryResult.rows ? queryResult.rows.slice(0, 50000) : [],
+            columns: queryResult.fields
+              ? queryResult.fields.map((f: { name: string }) => f.name)
+              : [],
+            rowCount: queryResult.rowCount,
+          };
+        }
+      }
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // Connection will be discarded by the pool on release if broken.
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async updateRow(
     pool: Pool,
     params: UpdateRowParams,
@@ -188,21 +241,49 @@ export class PostgresStrategy implements IDatabaseStrategy {
     const quotedTable = this.quoteTable(schema, table);
     const colNames = columns.map((c) => this.quoteIdentifier(c)).join(', ');
 
-    const valuePlaceholders: string[] = [];
-    const flatValues: unknown[] = [];
+    // Postgres limits each statement to 65535 bound parameters. Chunk rows so
+    // that columns × rows stays safely below the limit, and wrap all chunks in
+    // a single transaction so a failed import leaves no partial data behind.
+    const MAX_PARAMETERS = 60000;
+    const maxRowsPerChunk = Math.max(
+      1,
+      Math.floor(MAX_PARAMETERS / columns.length),
+    );
+    const chunks: Record<string, unknown>[][] = [];
+    for (let i = 0; i < data.length; i += maxRowsPerChunk) {
+      chunks.push(data.slice(i, i + maxRowsPerChunk));
+    }
 
-    data.forEach((row, rowIndex) => {
-      const rowPlaceholders = columns.map((col, colIndex) => {
-        flatValues.push(row[col]);
-        return `$${rowIndex * columns.length + colIndex + 1}`;
-      });
-      valuePlaceholders.push(`(${rowPlaceholders.join(', ')})`);
-    });
-
-    const sql = `INSERT INTO ${quotedTable} (${colNames}) VALUES ${valuePlaceholders.join(', ')}`;
-
-    const res = await pool.query(sql, flatValues);
-    return { success: true, rowCount: res.rowCount };
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      let totalRows = 0;
+      for (const chunk of chunks) {
+        const valuePlaceholders: string[] = [];
+        const flatValues: unknown[] = [];
+        chunk.forEach((row, rowIndex) => {
+          const rowPlaceholders = columns.map((col, colIndex) => {
+            flatValues.push(row[col]);
+            return `$${rowIndex * columns.length + colIndex + 1}`;
+          });
+          valuePlaceholders.push(`(${rowPlaceholders.join(', ')})`);
+        });
+        const sql = `INSERT INTO ${quotedTable} (${colNames}) VALUES ${valuePlaceholders.join(', ')}`;
+        const res = await client.query(sql, flatValues);
+        totalRows += res.rowCount ?? 0;
+      }
+      await client.query('COMMIT');
+      return { success: true, rowCount: totalRows };
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        // Connection will be discarded by the pool on release if broken.
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async exportStream(
@@ -211,9 +292,8 @@ export class PostgresStrategy implements IDatabaseStrategy {
     table: string,
   ): Promise<unknown> {
     // Dynamic import because pg-query-stream might only be used here
-    const QueryStream =
-      (await import('pg-query-stream')).default ||
-      (await import('pg-query-stream'));
+    const queryStreamModule = await import('pg-query-stream');
+    const QueryStream = queryStreamModule.default ?? queryStreamModule;
 
     const quotedTable = this.quoteTable(schema, table);
     const query = new QueryStream(`SELECT * FROM ${quotedTable}`, undefined, {
@@ -222,6 +302,8 @@ export class PostgresStrategy implements IDatabaseStrategy {
 
     const client = await pool.connect();
     let releasePromise: Promise<void> | null = null;
+    // Declared before safeRelease to avoid a temporal-dead-zone reference.
+    let previousTimeout = '30s';
 
     // The timeout override is session-scoped, so restore it before returning
     // this client to the pool. The release guard also covers setup failures.
@@ -243,7 +325,6 @@ export class PostgresStrategy implements IDatabaseStrategy {
       return releasePromise;
     };
 
-    let previousTimeout = '30s';
     try {
       const timeoutResult = await client.query('SHOW statement_timeout');
       previousTimeout =

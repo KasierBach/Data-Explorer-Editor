@@ -19,6 +19,7 @@ describe('QueryService', () => {
   };
   const strategy = {
     executeQuery: jest.fn(),
+    runStatementsInTransaction: jest.fn(),
     updateRow: jest.fn(),
     insertRow: jest.fn(),
     deleteRows: jest.fn(),
@@ -205,7 +206,7 @@ describe('QueryService', () => {
     expect(cacheManager.get).not.toHaveBeenCalled();
   });
 
-  it('runs multi-statement SQL sequentially and returns the final statement result', async () => {
+  it('runs multi-statement SQL in a transaction and returns the final statement result', async () => {
     connectionsService.findOne.mockResolvedValue({
       id: 'conn-1',
       type: 'postgres',
@@ -216,17 +217,11 @@ describe('QueryService', () => {
       allowImportExport: true,
     });
     connectionsService.getPool.mockResolvedValue({});
-    strategy.executeQuery
-      .mockResolvedValueOnce({
-        rows: [{ sample: 'hello; world' }],
-        columns: ['sample'],
-        rowCount: 1,
-      })
-      .mockResolvedValueOnce({
-        rows: [{ id: 2 }],
-        columns: ['id'],
-        rowCount: 1,
-      });
+    strategy.runStatementsInTransaction.mockResolvedValue({
+      rows: [{ id: 2 }],
+      columns: ['id'],
+      rowCount: 1,
+    });
 
     const result = await service.executeQuery(
       {
@@ -239,18 +234,12 @@ describe('QueryService', () => {
       'user-1',
     );
 
-    expect(strategy.executeQuery).toHaveBeenNthCalledWith(
-      1,
+    expect(strategy.runStatementsInTransaction).toHaveBeenCalledWith(
       {},
-      "SELECT 'hello; world' AS sample",
-      undefined,
-    );
-    expect(strategy.executeQuery).toHaveBeenNthCalledWith(
-      2,
-      {},
-      'SELECT * FROM users',
+      ["SELECT 'hello; world' AS sample", 'SELECT * FROM users'],
       { limit: 10, offset: 5 },
     );
+    expect(strategy.executeQuery).not.toHaveBeenCalled();
     expect(cacheManager.get).not.toHaveBeenCalled();
     expect(freshnessService.buildKey).not.toHaveBeenCalled();
     expect(result).toEqual(

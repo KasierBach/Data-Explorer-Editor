@@ -73,4 +73,57 @@ describe('SqlUtil pagination', () => {
       ),
     ).toBe('SELECT * FROM users ORDER BY id LIMIT 100 OFFSET 10000;');
   });
+
+  it('quotes the primary key with backticks for MySQL reverse pagination', () => {
+    const result = SqlUtil.injectPagination(
+      'SELECT * FROM users ORDER BY id',
+      100,
+      6_000,
+      'mysql',
+      { totalCount: 11_000, primaryKey: 'id' },
+    );
+    // MySQL treats "id" as a string literal, so backticks are required.
+    expect(result).toBe(
+      'SELECT * FROM (SELECT * FROM users ORDER BY id ORDER BY `id` DESC LIMIT 100 OFFSET 4900) _rev ORDER BY `id` ASC;',
+    );
+  });
+
+  it('quotes the primary key with double quotes for Postgres reverse pagination', () => {
+    const result = SqlUtil.injectPagination(
+      'SELECT * FROM users ORDER BY id',
+      100,
+      6_000,
+      'postgres',
+      { totalCount: 11_000, primaryKey: 'id' },
+    );
+    expect(result).toBe(
+      'SELECT * FROM (SELECT * FROM users ORDER BY id ORDER BY "id" DESC LIMIT 100 OFFSET 4900) _rev ORDER BY "id" ASC;',
+    );
+  });
+
+  it('escapes embedded quote characters in the primary key name', () => {
+    const result = SqlUtil.injectPagination(
+      'SELECT * FROM users ORDER BY id',
+      100,
+      6_000,
+      'mysql',
+      { totalCount: 11_000, primaryKey: 'id`x' },
+    );
+    expect(result).toContain('ORDER BY `id``x` DESC');
+  });
+
+  it('rewrites LIMIT ALL to a bounded limit', () => {
+    expect(SqlUtil.injectLimit('SELECT * FROM users LIMIT ALL', 500)).toBe(
+      'SELECT * FROM users LIMIT 500',
+    );
+  });
+
+  it('rewrites LIMIT ALL in CTE queries', () => {
+    expect(
+      SqlUtil.injectLimit(
+        'WITH active AS (SELECT 1) SELECT * FROM active LIMIT ALL',
+        100,
+      ),
+    ).toBe('WITH active AS (SELECT 1) SELECT * FROM active LIMIT 100');
+  });
 });

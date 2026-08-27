@@ -121,6 +121,16 @@ export interface IDatabaseStrategy {
     sql: string,
     options?: { limit?: number; offset?: number },
   ): Promise<QueryResult>;
+  /**
+   * Executes multiple SQL statements atomically inside a single transaction.
+   * If any statement fails, all changes are rolled back. The last statement's
+   * result is returned (with pagination options applied to it).
+   */
+  runStatementsInTransaction(
+    pool: unknown,
+    statements: string[],
+    options?: { limit?: number; offset?: number },
+  ): Promise<QueryResult>;
   updateRow(
     pool: unknown,
     params: UpdateRowParams,

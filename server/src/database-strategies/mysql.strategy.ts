@@ -40,7 +40,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
         : 10000;
     const isLocalhost = isLocalDatabaseHost(host);
 
-    return mysql.createPool({
+    const pool = mysql.createPool({
       host,
       port: connectionConfig.port || 3306,
       user: connectionConfig.username || undefined,
@@ -55,6 +55,11 @@ export class MysqlStrategy implements IDatabaseStrategy {
         ? undefined
         : { rejectUnauthorized: !allowInsecureDatabaseTls() },
     });
+    // Carry the configured statement timeout so executeQuery can apply it as
+    // the per-query timeout (mysql2 pools have no query-timeout config option).
+    (pool as Pool & { __statementTimeout?: number }).__statementTimeout =
+      timeoutMs;
+    return pool;
   }
 
   async closePool(pool: Pool): Promise<void> {
@@ -92,9 +97,12 @@ export class MysqlStrategy implements IDatabaseStrategy {
       safeSql = SqlUtil.injectLimit(sql, 50000);
     }
 
+    const queryTimeout =
+      (pool as Pool & { __statementTimeout?: number }).__statementTimeout ??
+      30000;
     const [result, fields] = await pool.query({
       sql: safeSql,
-      timeout: 30000,
+      timeout: queryTimeout,
     });
 
     const rows: Record<string, unknown>[] = Array.isArray(result)
@@ -111,6 +119,70 @@ export class MysqlStrategy implements IDatabaseStrategy {
           ? (result as ResultSetHeader).affectedRows
           : undefined,
     };
+  }
+
+  async runStatementsInTransaction(
+    pool: Pool,
+    statements: string[],
+    options?: { limit?: number; offset?: number },
+  ): Promise<QueryResult> {
+    const queryTimeout =
+      (pool as Pool & { __statementTimeout?: number }).__statementTimeout ??
+      30000;
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      let result: QueryResult = {
+        rows: [],
+        columns: [],
+        countStatus: 'skipped',
+      };
+      for (const statement of statements) {
+        const isLast = statement === statements[statements.length - 1];
+        let safeSql = statement;
+        if (isLast && options?.limit !== undefined) {
+          safeSql =
+            options.offset !== undefined
+              ? SqlUtil.injectPagination(
+                  statement,
+                  options.limit,
+                  options.offset,
+                  'mysql',
+                )
+              : SqlUtil.injectLimit(statement, options.limit);
+        }
+        const [rows, fields] = await connection.query({
+          sql: safeSql,
+          timeout: queryTimeout,
+        });
+        if (isLast) {
+          const rowList: Record<string, unknown>[] = Array.isArray(rows)
+            ? (rows as RowDataPacket[]).map((r) => r as Record<string, unknown>)
+            : [];
+          const actualFields = Array.isArray(fields) ? fields : [];
+          result = {
+            rows: rowList.slice(0, 50000),
+            columns: actualFields.map((f) => f.name),
+            rowCount:
+              !Array.isArray(rows) &&
+              (rows as ResultSetHeader).affectedRows !== undefined
+                ? (rows as ResultSetHeader).affectedRows
+                : undefined,
+          };
+        }
+      }
+      await connection.commit();
+      return result;
+    } catch (error) {
+      try {
+        await connection.rollback();
+      } catch {
+        // Connection will be discarded by the pool on release if broken.
+      }
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 
   async updateRow(

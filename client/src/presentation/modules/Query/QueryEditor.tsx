@@ -298,7 +298,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
         lastSuccessRunNonceRef.current = runNonce;
         setActiveResultTab('data');
         addQueryHistory({
-            id: `history-${Date.now()}`,
+            id: `history-${crypto.randomUUID()}`,
             sql: executedQuery,
             database: activeDatabase || undefined,
             connectionName: activeConnection?.name,
@@ -321,7 +321,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
         lastErrorRunNonceRef.current = runNonce;
         setActiveResultTab('messages');
         addQueryHistory({
-            id: `history-${Date.now()}`,
+            id: `history-${crypto.randomUUID()}`,
             sql: executedQuery,
             database: activeDatabase || undefined,
             connectionName: activeConnection?.name,
@@ -468,7 +468,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
 
     const handleOpenSavedQuery = useCallback((sq: SavedQuery) => {
         openTab({
-            id: `query-${Date.now()}`,
+            id: `query-${crypto.randomUUID()}`,
             title: sq.name,
             type: 'query',
             metadata: { sql: sq.sql, savedQueryId: sq.id },

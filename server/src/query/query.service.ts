@@ -113,7 +113,7 @@ export class QueryService {
   }
 
   private hasExplicitSqlLimit(sql: string): boolean {
-    return /\b(LIMIT|TOP|FETCH\s+NEXT)\b/i.test(sql);
+    return /\b(LIMIT|TOP|FETCH\s+(?:FIRST|NEXT))\b/i.test(sql);
   }
 
   private assertRawQueryLimit(sql: string): void {
@@ -495,17 +495,13 @@ export class QueryService {
 
       let result: QueryResult;
       if (isMultiStatement) {
-        result = { rows: [], columns: [], countStatus: 'skipped' };
-        for (let index = 0; index < MAX_SQL_STATEMENTS; index++) {
-          if (index >= statementCount) break;
-          const statement = executableStatements[index];
-          const isLastStatement = index === statementCount - 1;
-          result = await strategy.executeQuery(
-            pool,
-            statement,
-            isLastStatement ? { limit, offset } : undefined,
-          );
-        }
+        // Run all statements atomically: if any statement fails, all changes
+        // are rolled back instead of leaving the database half-committed.
+        result = await strategy.runStatementsInTransaction(
+          pool,
+          executableStatements,
+          { limit, offset },
+        );
         result.countStatus ??= 'skipped';
       } else {
         result = await strategy.executeQuery(pool, finalSql, { limit, offset });
@@ -775,7 +771,7 @@ export class QueryService {
     try {
       const pool = await this.connectionsService.getPool(
         connectionId,
-        database,
+        database || connection.database,
         userId,
       );
       const strategy = this.strategyFactory.getStrategy(connection.type);

@@ -525,7 +525,9 @@ export class AiPromptBuilderService {
   ): string {
     return `\n\n---\n**Sources**\n${sources
       .map((source, index) => {
-        let label = sourceDetails.find((detail) => detail.url === source)?.title;
+        let label = sourceDetails.find(
+          (detail) => detail.url === source,
+        )?.title;
         if (label) {
           let hostname = '';
           try {
