@@ -43,9 +43,25 @@ export type SchemaOperation =
     | { type: 'add_fk'; name: string; columns: string[]; refTable: string; refColumns: string[]; onDelete?: string; onUpdate?: string }
     | { type: 'drop_fk'; name: string; constraintName?: string };
 
+export interface ActiveQuery {
+    queryId: string;
+    connectionId: string;
+    sql: string;
+    startedAt: number;
+    elapsedMs: number;
+}
+
 export const queryService = {
     executeQuery: async (payload: ExecuteQueryPayload) => {
         return await apiService.post<QueryResult>('/query', payload);
+    },
+
+    getActiveQueries: async () => {
+        return await apiService.get<ActiveQuery[]>('/query/active');
+    },
+
+    cancelQuery: async (queryId: string) => {
+        return await apiService.post<boolean>(`/query/${queryId}/cancel`, {});
     },
 
     updateRow: async (payload: UpdateRowPayload) => {

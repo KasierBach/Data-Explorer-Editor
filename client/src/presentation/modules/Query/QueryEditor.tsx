@@ -8,6 +8,7 @@ import { useAppStore, type SavedQuery } from '@/core/services/store';
 import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
 import { SavedQueriesDialog } from './SavedQueriesDialog';
 import { QueryHistoryDialog } from './QueryHistoryDialog';
+import { ActiveQueriesPanel } from './ActiveQueriesPanel';
 import type { QueryResult } from '@/core/domain/entities';
 import { QueryResults } from './QueryResults';
 import { useSchemaInfo } from '@/presentation/hooks/useSchemaInfo';
@@ -94,6 +95,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
     const [isSavedDialogOpen, setIsSavedDialogOpen] = useState(false);
     const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
     const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+    const [isActiveQueriesOpen, setIsActiveQueriesOpen] = useState(false);
     const [isSqlSequenceDialogOpen, setIsSqlSequenceDialogOpen] = useState(false);
     const [currentSavedQueryId, setCurrentSavedQueryId] = useState<string | null>(initialMetadata.savedQueryId || null);
     const [explainPlan, setExplainPlan] = useState<unknown>(null);
@@ -540,6 +542,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
                     onSave={handleSave}
                     onOpenSaved={() => setIsSavedDialogOpen(true)}
                     onOpenHistory={() => setIsHistoryDialogOpen(true)}
+                    onOpenActiveQueries={() => setIsActiveQueriesOpen(true)}
                     onExplain={() => void handleExplain()}
                     showSqlSequence={supportsSqlSequence}
                     onOpenSqlSequence={() => setIsSqlSequenceDialogOpen(true)}
@@ -652,6 +655,10 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
                     setQuery(sql);
                     handleRun(sql);
                 }}
+            />
+            <ActiveQueriesPanel
+                open={isActiveQueriesOpen}
+                onOpenChange={setIsActiveQueriesOpen}
             />
             <SqlSequenceDialog
                 open={isSqlSequenceDialogOpen}

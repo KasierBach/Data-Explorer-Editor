@@ -11,6 +11,7 @@ import {
     RefreshCw,
     Save,
     Sparkles,
+    Activity,
 } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import {
@@ -49,6 +50,7 @@ interface QueryToolbarProps {
     onSave: () => void;
     onOpenSaved: () => void;
     onOpenHistory: () => void;
+    onOpenActiveQueries: () => void;
     onExplain: () => void;
     onOpenSqlSequence?: () => void;
 }
@@ -72,6 +74,7 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
     onSave,
     onOpenSaved,
     onOpenHistory,
+    onOpenActiveQueries,
     onExplain,
     onOpenSqlSequence,
 }) => {
@@ -172,6 +175,10 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                             <History className="w-3.5 h-3.5" />
                             <span className="whitespace-nowrap">{text.history}</span>
                         </Button>
+                        <Button variant="ghost" size="sm" onClick={onOpenActiveQueries} className="h-7 gap-1 px-1.5 text-xs shrink-0" title="Running queries">
+                            <Activity className="w-3.5 h-3.5" />
+                            <span className="whitespace-nowrap">Active</span>
+                        </Button>
                         <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
                         <Button variant="ghost" size="sm" onClick={onExplain} disabled={isExplaining || !activeConnectionId} className="h-7 gap-1 px-1.5 text-xs text-orange-500 hover:text-orange-600 shrink-0" title={explainLabel}>
                             {isExplaining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
@@ -203,6 +210,10 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                             <DropdownMenuItem onClick={onOpenHistory}>
                                 <History className="mr-2 h-4 w-4" />
                                 <span>{text.history}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={onOpenActiveQueries}>
+                                <Activity className="mr-2 h-4 w-4" />
+                                <span>Active Queries</span>
                             </DropdownMenuItem>
                             {showSqlSequence && onOpenSqlSequence && (
                                 <DropdownMenuItem onClick={onOpenSqlSequence}>
