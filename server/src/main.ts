@@ -11,10 +11,15 @@ import { randomUUID } from 'crypto';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
-  // Use nestjs-pino as the application logger (structured JSON + request ID).
-  app.useLogger(app.get(PinoLogger));
   const isProduction = process.env.NODE_ENV === 'production';
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: isProduction,
+  });
+  // In production use nestjs-pino for structured JSON logs with request IDs;
+  // in development keep Nest's default logger output that developers expect.
+  if (isProduction) {
+    app.useLogger(app.get(PinoLogger));
+  }
   const trustProxy = Number(process.env.TRUST_PROXY || 0);
   if (trustProxy > 0) {
     app.getHttpAdapter().getInstance().set('trust proxy', trustProxy);
@@ -121,6 +126,6 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
-  app.get(PinoLogger).log(`Application is running on port ${port}`);
+  console.log(`Application is running on port ${port}`);
 }
 bootstrap();

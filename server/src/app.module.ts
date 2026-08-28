@@ -46,16 +46,15 @@ import { AiQualityModule } from './ai-quality/ai-quality.module';
 
 @Module({
   imports: [
-    // Structured JSON logging with automatic request-ID correlation.
+    // Structured JSON logging for production (with request correlation IDs).
+    // In development the default Nest Logger output is preserved: pino-http
+    // auto-logging is disabled and main.ts keeps Nest's built-in logger, so
+    // logs look exactly like a standard Nest app while developing.
     LoggerModule.forRoot({
       pinoHttp: {
         level:
           process.env.LOG_LEVEL ||
           (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
-        transport:
-          process.env.NODE_ENV === 'production'
-            ? undefined
-            : { target: 'pino-pretty', options: { singleLine: true } },
         redact: {
           paths: [
             'req.headers.authorization',
@@ -65,13 +64,18 @@ import { AiQualityModule } from './ai-quality/ai-quality.module';
           ],
           censor: '[REDACTED]',
         },
-        autoLogging: {
-          ignore: (req) => {
-            const url = (req as { url?: string }).url || '';
-            // Skip health checks and docs to avoid log noise.
-            return url.includes('/api/health') || url.includes('/api/docs');
-          },
-        },
+        autoLogging:
+          process.env.NODE_ENV === 'production'
+            ? {
+                ignore: (req) => {
+                  const url = (req as { url?: string }).url || '';
+                  // Skip health checks and docs to avoid log noise.
+                  return (
+                    url.includes('/api/health') || url.includes('/api/docs')
+                  );
+                },
+              }
+            : false,
         customProps: (req) => ({ requestId: (req as { id?: string }).id }),
       },
     }),
