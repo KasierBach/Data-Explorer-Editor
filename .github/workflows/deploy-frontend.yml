@@ -46,7 +46,7 @@ jobs:
           test -n "$VERCEL_PROJECT_ID" || { echo "VERCEL_PROJECT_ID is not configured in the production environment"; exit 1; }
       - run: npm ci
       - name: Link Vercel project
-        run: npx vercel@59.6.2 link --yes --project="$VERCEL_PROJECT_ID" --scope="$VERCEL_ORG_ID" --token="$VERCEL_TOKEN"
+        run: npx vercel@59.6.2 link --yes --project="$VERCEL_PROJECT_ID" --team="$VERCEL_ORG_ID" --token="$VERCEL_TOKEN"
       - name: Pull Vercel production settings
         run: npx vercel@59.6.2 pull --yes --environment=production --token="$VERCEL_TOKEN"
       - name: Build verified production frontend
