@@ -28,3 +28,5 @@ PROJECT_EXPLANATION.md
 yeucau.md
 /docs/superpowers/plans/
 /plans/
+.vercel
+.env*

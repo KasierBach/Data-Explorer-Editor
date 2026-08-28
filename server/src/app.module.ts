@@ -1,4 +1,5 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { LoggerModule } from 'nestjs-pino';
 import { LoggerMiddleware } from './common/middlewares/logger.middleware';
 import { CsrfMiddleware } from './common/middlewares/csrf.middleware';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -45,6 +46,35 @@ import { AiQualityModule } from './ai-quality/ai-quality.module';
 
 @Module({
   imports: [
+    // Structured JSON logging with automatic request-ID correlation.
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level:
+          process.env.LOG_LEVEL ||
+          (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+        transport:
+          process.env.NODE_ENV === 'production'
+            ? undefined
+            : { target: 'pino-pretty', options: { singleLine: true } },
+        redact: {
+          paths: [
+            'req.headers.authorization',
+            'req.headers.cookie',
+            'req.headers["x-requested-with"]',
+            'res.headers["set-cookie"]',
+          ],
+          censor: '[REDACTED]',
+        },
+        autoLogging: {
+          ignore: (req) => {
+            const url = (req as { url?: string }).url || '';
+            // Skip health checks and docs to avoid log noise.
+            return url.includes('/api/health') || url.includes('/api/docs');
+          },
+        },
+        customProps: (req) => ({ requestId: (req as { id?: string }).id }),
+      },
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
