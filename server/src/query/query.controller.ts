@@ -1,7 +1,9 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
+  Param,
   Patch,
   Delete,
   UseGuards,
@@ -43,6 +45,17 @@ export class QueryController {
     @Req() req: RequestWithUser,
   ) {
     return this.queryService.executeQuery(createQueryDto, req.user.id);
+  }
+
+  @Get('active')
+  listActiveQueries(@Req() req: RequestWithUser) {
+    return this.queryService.getActiveQueries(req.user.id);
+  }
+
+  @Post(':queryId/cancel')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  cancelQuery(@Param('queryId') queryId: string, @Req() req: RequestWithUser) {
+    return this.queryService.cancelQuery(queryId, req.user.id);
   }
 
   @Post('table-window')

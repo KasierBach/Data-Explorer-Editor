@@ -122,6 +122,11 @@ export interface IDatabaseStrategy {
     options?: { limit?: number; offset?: number },
   ): Promise<QueryResult>;
   /**
+   * Cancels the query currently running on the given execution, if the
+   * engine supports it. Returns true when a cancellation was issued.
+   */
+  cancelActiveQuery(execution: unknown): Promise<boolean>;
+  /**
    * Executes multiple SQL statements atomically inside a single transaction.
    * If any statement fails, all changes are rolled back. The last statement's
    * result is returned (with pagination options applied to it).

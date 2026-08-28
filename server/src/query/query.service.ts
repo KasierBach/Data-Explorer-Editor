@@ -6,6 +6,7 @@ import {
   Logger,
   Inject,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { CreateQueryDto } from './dto/create-query.dto';
@@ -37,10 +38,22 @@ import { PermissionsService } from '../permissions/services/permissions.service'
 import { Permission } from '../permissions/enums/permission.enum';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
 
+interface ActiveQueryEntry {
+  queryId: string;
+  userId: string;
+  connectionId: string;
+  sql: string;
+  startedAt: number;
+  cancel: () => Promise<boolean>;
+}
+
 @Injectable()
 export class QueryService {
   private readonly logger = new Logger(QueryService.name);
   private readonly QUERY_CACHE_TTL_MS = 60_000;
+  /** In-flight queries per user, keyed by queryId, for cancellation. */
+  private readonly activeQueries = new Map<string, ActiveQueryEntry>();
+  private readonly MAX_ACTIVE_PER_USER = 5;
   private readonly DEFAULT_QUERY_LIMIT = 50_000;
   private readonly DEFAULT_TABLE_WINDOW_LIMIT = 100;
   private readonly MAX_TABLE_WINDOW_LIMIT = 1_000;
@@ -493,18 +506,36 @@ export class QueryService {
         this.assertRawQueryLimit(statement);
       }
 
+      // Register the in-flight query so the user can cancel it.
+      const queryId = randomUUID();
+      this.registerActiveQuery(
+        queryId,
+        userId,
+        connectionId,
+        sql,
+        strategy,
+        pool,
+      );
+
       let result: QueryResult;
-      if (isMultiStatement) {
-        // Run all statements atomically: if any statement fails, all changes
-        // are rolled back instead of leaving the database half-committed.
-        result = await strategy.runStatementsInTransaction(
-          pool,
-          executableStatements,
-          { limit, offset },
-        );
-        result.countStatus ??= 'skipped';
-      } else {
-        result = await strategy.executeQuery(pool, finalSql, { limit, offset });
+      try {
+        if (isMultiStatement) {
+          // Run all statements atomically: if any statement fails, all changes
+          // are rolled back instead of leaving the database half-committed.
+          result = await strategy.runStatementsInTransaction(
+            pool,
+            executableStatements,
+            { limit, offset },
+          );
+          result.countStatus ??= 'skipped';
+        } else {
+          result = await strategy.executeQuery(pool, finalSql, {
+            limit,
+            offset,
+          });
+        }
+      } finally {
+        this.activeQueries.delete(queryId);
       }
       result = this.applyRawQueryMetadata(result, finalSql, { limit, offset });
 
@@ -578,6 +609,64 @@ export class QueryService {
         },
       });
     }
+  }
+
+  /** Registers an in-flight query with a cancellation handle. */
+  private registerActiveQuery(
+    queryId: string,
+    userId: string,
+    connectionId: string,
+    sql: string,
+    strategy: { cancelActiveQuery: (execution: unknown) => Promise<boolean> },
+    pool: unknown,
+  ): void {
+    // Enforce a per-user cap on concurrent queries.
+    const userActive = [...this.activeQueries.values()].filter(
+      (entry) => entry.userId === userId,
+    );
+    if (userActive.length >= this.MAX_ACTIVE_PER_USER) {
+      throw new BadRequestException(
+        `You already have ${this.MAX_ACTIVE_PER_USER} queries running. Wait for them to finish or cancel them.`,
+      );
+    }
+    this.activeQueries.set(queryId, {
+      queryId,
+      userId,
+      connectionId,
+      sql: sql.length > 200 ? `${sql.slice(0, 200)}...` : sql,
+      startedAt: Date.now(),
+      cancel: () => strategy.cancelActiveQuery(pool),
+    });
+  }
+
+  /** Cancels a running query owned by the given user. */
+  async cancelQuery(queryId: string, userId: string): Promise<boolean> {
+    const entry = this.activeQueries.get(queryId);
+    if (!entry) return false;
+    if (entry.userId !== userId) {
+      throw new ForbiddenException('You can only cancel your own queries.');
+    }
+    try {
+      return await entry.cancel();
+    } catch (error) {
+      this.logger.warn(
+        `Query cancellation failed for ${queryId}: ${getErrorMessage(error)}`,
+      );
+      return false;
+    }
+  }
+
+  /** Lists the user's in-flight queries (for an active-queries panel). */
+  getActiveQueries(userId: string) {
+    return [...this.activeQueries.values()]
+      .filter((entry) => entry.userId === userId)
+      .map(({ queryId, connectionId, sql, startedAt }) => ({
+        queryId,
+        connectionId,
+        sql,
+        startedAt,
+        elapsedMs: Date.now() - startedAt,
+      }));
   }
 
   async fetchTableWindow(

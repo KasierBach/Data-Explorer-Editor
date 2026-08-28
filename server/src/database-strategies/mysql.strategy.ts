@@ -121,6 +121,25 @@ export class MysqlStrategy implements IDatabaseStrategy {
     };
   }
 
+  async cancelActiveQuery(execution: unknown): Promise<boolean> {
+    // MySQL: kill the query running on the given connection thread.
+    const connection = execution as {
+      threadId?: number;
+      query?: (opts: { sql: string }) => Promise<unknown>;
+    } | null;
+    if (
+      !connection ||
+      typeof connection.threadId !== 'number' ||
+      typeof connection.query !== 'function'
+    ) {
+      return false;
+    }
+    await connection.query({
+      sql: `KILL QUERY ${connection.threadId}`,
+    });
+    return true;
+  }
+
   async runStatementsInTransaction(
     pool: Pool,
     statements: string[],

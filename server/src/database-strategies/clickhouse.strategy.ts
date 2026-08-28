@@ -98,6 +98,11 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
     return { rows: rows.slice(0, 50000), columns, rowCount: rows.length };
   }
 
+  async cancelActiveQuery(_execution: unknown): Promise<boolean> {
+    // The ClickHouse JS client does not expose query cancellation.
+    return false;
+  }
+
   async runStatementsInTransaction(
     pool: ClickHouseClient,
     statements: string[],

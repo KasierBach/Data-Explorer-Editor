@@ -127,6 +127,19 @@ export class PostgresStrategy implements IDatabaseStrategy {
     }
   }
 
+  async cancelActiveQuery(execution: unknown): Promise<boolean> {
+    // Postgres: cancel via pg_cancel_backend on the backend PID.
+    const client = execution as import('pg').PoolClient;
+    if (!client || typeof client.query !== 'function') return false;
+    const pidResult = await client.query<{ pid: number | null }>(
+      'SELECT pg_backend_pid() AS pid',
+    );
+    const pid = pidResult.rows?.[0]?.pid;
+    if (!pid) return false;
+    await client.query('SELECT pg_cancel_backend($1)', [pid]);
+    return true;
+  }
+
   async runStatementsInTransaction(
     pool: Pool,
     statements: string[],

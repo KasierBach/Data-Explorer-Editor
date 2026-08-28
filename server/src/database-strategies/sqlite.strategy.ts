@@ -62,6 +62,11 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return { rows: rows.slice(0, 50000), columns, rowCount: rows.length };
   }
 
+  async cancelActiveQuery(_execution: unknown): Promise<boolean> {
+    // better-sqlite3 is synchronous; queries cannot be cancelled mid-flight.
+    return false;
+  }
+
   async runStatementsInTransaction(
     pool: Database.Database,
     statements: string[],

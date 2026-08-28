@@ -131,6 +131,12 @@ export class MongoDbStrategy implements IDatabaseStrategy {
     }
   }
 
+  async cancelActiveQuery(_execution: unknown): Promise<boolean> {
+    // MongoDB operations support maxTimeMS but no mid-flight cancellation
+    // handle is exposed by the driver for this use case.
+    return false;
+  }
+
   async runStatementsInTransaction(
     client: MongoClient,
     statements: string[],

@@ -107,6 +107,14 @@ export class MssqlStrategy implements IDatabaseStrategy {
     };
   }
 
+  async cancelActiveQuery(execution: unknown): Promise<boolean> {
+    // SQL Server: cancel via request.cancel() if available.
+    const request = execution as { cancel?: () => void } | null;
+    if (!request || typeof request.cancel !== 'function') return false;
+    request.cancel();
+    return true;
+  }
+
   async runStatementsInTransaction(
     pool: mssql.ConnectionPool,
     statements: string[],
