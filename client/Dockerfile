@@ -3,7 +3,9 @@
 # ──────────────────────────────────────────────
 
 # ── Stage 1: Build ───────────────────────────
-FROM node:22-alpine AS build
+# Base image pinned by digest for supply-chain reproducibility.
+# Update deliberately: docker buildx imagetools inspect node:22-alpine
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build
 
 WORKDIR /app
 
@@ -25,7 +27,9 @@ COPY . .
 RUN npm run build
 
 # ── Stage 2: Serve with Nginx ───────────────
-FROM nginx:1.27-alpine
+# Base image pinned by digest for supply-chain reproducibility.
+# Update deliberately: docker buildx imagetools inspect nginx:1.27-alpine
+FROM nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
 
 # Install wget for healthcheck
 RUN apk add --no-cache wget

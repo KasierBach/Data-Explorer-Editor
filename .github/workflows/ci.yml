@@ -100,6 +100,36 @@ jobs:
           docker build --build-arg "VITE_API_URL=$api_url" --tag "$image_prefix/client:${GITHUB_SHA}" --tag "$image_prefix/client:main" client
           docker build --tag "$image_prefix/server:${GITHUB_SHA}" --tag "$image_prefix/server:main" server
           echo "IMAGE_PREFIX=$image_prefix" >> "$GITHUB_ENV"
+      - name: Scan images for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE_PREFIX }}/server:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+      - name: Scan client image for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE_PREFIX }}/client:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+      - name: Generate SBOM (server)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_PREFIX }}/server:${{ github.sha }}
+          artifact-name: sbom-server-${{ github.sha }}.spdx.json
+          format: spdx-json
+      - name: Generate SBOM (client)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_PREFIX }}/client:${{ github.sha }}
+          artifact-name: sbom-client-${{ github.sha }}.spdx.json
+          format: spdx-json
       - name: Publish images
         if: github.event_name == 'push'
         env:

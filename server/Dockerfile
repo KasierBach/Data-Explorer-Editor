@@ -3,7 +3,9 @@
 # ──────────────────────────────────────────────
 
 # ── Stage 1: Build ───────────────────────────
-FROM node:22-alpine AS build
+# Base image pinned by digest for supply-chain reproducibility.
+# Update deliberately: docker buildx imagetools inspect node:22-alpine
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build
 
 # Install openssl for Prisma + native deps
 RUN apk add --no-cache openssl
@@ -28,7 +30,8 @@ RUN npm run build
 RUN npm prune --omit=dev
 
 # ── Stage 2: Runtime ─────────────────────────
-FROM node:22-alpine AS runtime
+# Base image pinned by digest for supply-chain reproducibility.
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS runtime
 
 # Install openssl for Prisma + wget for healthcheck
 RUN apk add --no-cache openssl wget
