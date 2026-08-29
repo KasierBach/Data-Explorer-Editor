@@ -33,6 +33,8 @@ RUN npm prune --omit=dev
 # Base image pinned by digest for supply-chain reproducibility.
 FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS runtime
 
+# Upgrade OS packages to pick up security patches (e.g. CVE fixes in tar/busybox)
+RUN apk upgrade --no-cache
 # Install openssl for Prisma + wget for healthcheck
 RUN apk add --no-cache openssl wget
 
