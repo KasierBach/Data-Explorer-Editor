@@ -119,6 +119,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
     const lastErrorRunNonceRef = useRef(0);
     const editorRef = useRef<SqlEditorHandle | null>(null);
     const editorAliveRef = useRef(false);
+    const aiExplanationCacheRef = useRef<Map<string, string>>(new Map());
 
     useEffect(() => () => {
         editorAliveRef.current = false;
@@ -302,14 +303,14 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
         addQueryHistory({
             id: `history-${crypto.randomUUID()}`,
             sql: executedQuery,
-            database: activeDatabase || undefined,
+            database: activeDatabase || activeConnection?.database || undefined,
             connectionName: activeConnection?.name,
             executedAt: Date.now(),
-            durationMs: results.durationMs,
+            durationMs: results.durationMs ?? (typeof (results as { duration?: number }).duration === 'number' ? (results as { duration?: number }).duration : undefined),
             rowCount: serverTotalCount ?? results.totalCount ?? results.rowCount ?? results.rows?.length,
             status: 'success',
         });
-    }, [isSuccess, results, executedQuery, dataUpdatedAt, clientPageIndex, runNonce, serverTotalCount, activeDatabase, activeConnection?.name, addQueryHistory]);
+    }, [isSuccess, results, executedQuery, dataUpdatedAt, clientPageIndex, runNonce, serverTotalCount, activeDatabase, activeConnection?.database, activeConnection?.name, addQueryHistory]);
 
     useEffect(() => {
         if (!isError || !executedQuery || !errorUpdatedAt) {
@@ -325,13 +326,13 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
         addQueryHistory({
             id: `history-${crypto.randomUUID()}`,
             sql: executedQuery,
-            database: activeDatabase || undefined,
+            database: activeDatabase || activeConnection?.database || undefined,
             connectionName: activeConnection?.name,
             executedAt: Date.now(),
             status: 'error',
             errorMessage: (error as Error)?.message,
         });
-    }, [isError, executedQuery, errorUpdatedAt, clientPageIndex, runNonce, activeDatabase, activeConnection?.name, error, addQueryHistory]);
+    }, [isError, executedQuery, errorUpdatedAt, clientPageIndex, runNonce, activeDatabase, activeConnection?.database, activeConnection?.name, error, addQueryHistory]);
 
     const handleRun = (overrideSql?: string) => {
         let sqlToExecute = overrideSql || query;
@@ -355,9 +356,13 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
         setRunNonce((current) => current + 1);
     };
 
-    const handleExplain = async () => {
-        let sqlToExplain = query;
-        if (editorRef.current) {
+    const handleExplain = async (
+        sqlOverride?: string,
+        customPromptOverride?: string,
+        forceRefresh = false
+    ) => {
+        let sqlToExplain = sqlOverride || query;
+        if (!sqlOverride && editorRef.current) {
             const selection = editorRef.current.getSelection();
             if (selection && !selection.isEmpty()) {
                 const selectedText = editorRef.current.getModel()?.getValueInRange(selection);
@@ -367,18 +372,30 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
 
         if (!sqlToExplain.trim() || !activeConnectionId) return;
 
+        const cacheKey = `${activeConnectionId}:${activeDatabase || ''}:${sqlToExplain.trim()}`;
         setExplainPlan(null);
         setAiExplainSql(sqlToExplain);
-        setAiExplanation(null);
         setAiExplainError(null);
         setIsAiExplainDialogOpen(true);
+
+        // If explanation already cached for this exact SQL and connection, restore instantly unless force refresh or custom prompt
+        if (!forceRefresh && !customPromptOverride && aiExplanationCacheRef.current.has(cacheKey)) {
+            setAiExplanation(aiExplanationCacheRef.current.get(cacheKey) || null);
+            setIsAiExplaining(false);
+            return;
+        }
+
         setIsAiExplaining(true);
+        if (!customPromptOverride) {
+            setAiExplanation(null);
+        }
 
         try {
+            const promptToUse = customPromptOverride || text.explainPrompt;
             const result = await apiService.post<AiExplanationResponse>('/ai/generate-sql', {
                 connectionId: activeConnectionId,
                 database: activeDatabase || undefined,
-                prompt: text.explainPrompt,
+                prompt: promptToUse,
                 context: `SQL to explain:\n${sqlToExplain}`,
                 model: resolvedExplain.model,
                 mode: 'planning',
@@ -386,7 +403,11 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
                 providerOverride: resolvedExplain.providerOverride,
             });
 
-            setAiExplanation(result.message?.trim() || result.explanation?.trim() || null);
+            const explanationText = result.message?.trim() || result.explanation?.trim() || null;
+            setAiExplanation(explanationText);
+            if (explanationText && !customPromptOverride) {
+                aiExplanationCacheRef.current.set(cacheKey, explanationText);
+            }
         } catch (explainError) {
             setAiExplainError(getErrorMessage(explainError));
         } finally {
@@ -655,6 +676,9 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
                     setQuery(sql);
                     handleRun(sql);
                 }}
+                onExplainQuery={(sql) => {
+                    void handleExplain(sql);
+                }}
             />
             <ActiveQueriesPanel
                 open={isActiveQueriesOpen}
@@ -683,6 +707,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
                 explanation={aiExplanation}
                 isLoading={isAiExplaining}
                 error={aiExplainError}
+                onRegenerate={(customPrompt) => handleExplain(aiExplainSql, customPrompt, true)}
             />
             <SaveQueryDialog
                 open={isSaveDialogOpen}
