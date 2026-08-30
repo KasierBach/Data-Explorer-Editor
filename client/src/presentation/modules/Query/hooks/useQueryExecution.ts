@@ -28,7 +28,8 @@ export function useQueryExecution({
     onExecutionEnd,
 }: UseQueryExecutionOptions) {
     const queryClient = useQueryClient();
-    const { activeConnectionId, activeDatabase, addQueryHistory } = useAppStore();
+    const { activeConnectionId, activeDatabase, connections, addQueryHistory } = useAppStore();
+    const activeConnection = connections.find((c) => c.id === activeConnectionId);
     const [executedQuery, setExecutedQuery] = useState<string | null>(null);
     const [runNonce, setRunNonce] = useState(0);
     const effectiveLimit = limit === 'all' ? undefined : Number.parseInt(limit, 10);
@@ -46,27 +47,32 @@ export function useQueryExecution({
             if (!activeConnectionId || !query.trim()) return null;
             
             onExecutionStart?.();
+            const startTime = Date.now();
             try {
-            const result = await apiService.post<QueryResult>('/query', {
+                const targetDb = activeDatabase || activeConnection?.database || undefined;
+                const result = await apiService.post<QueryResult>('/query', {
                     connectionId: activeConnectionId,
                     sql: query,
-                    database: activeDatabase || undefined,
+                    database: targetDb,
                     limit: requestLimit,
                     confirmed: true,
                 });
+                const elapsedMs = Date.now() - startTime;
                 
                 setExecutedQuery(query);
                 addQueryHistory({
                     id: `hist-${Date.now()}`,
                     sql: query,
-                    database: activeDatabase || undefined,
+                    database: targetDb,
+                    connectionName: activeConnection?.name,
                     executedAt: Date.now(),
-                    rowCount: result?.rowCount,
+                    durationMs: result?.durationMs ?? elapsedMs,
+                    rowCount: result?.rowCount ?? result?.rows?.length,
                     status: 'success',
                 });
 
                 if (shouldSyncSearchIndex(query)) {
-                    void MetadataService.refresh(activeConnectionId, activeDatabase || undefined)
+                    void MetadataService.refresh(activeConnectionId, targetDb)
                         .then(() => Promise.all([
                             queryClient.invalidateQueries({ queryKey: ['hierarchy'] }),
                             queryClient.invalidateQueries({ queryKey: ['metadata'] }),
@@ -81,11 +87,14 @@ export function useQueryExecution({
                 
                 return result;
             } catch (err) {
+                const elapsedMs = Date.now() - startTime;
                 addQueryHistory({
                     id: `hist-${Date.now()}`,
                     sql: query,
-                    database: activeDatabase || undefined,
+                    database: activeDatabase || activeConnection?.database || undefined,
+                    connectionName: activeConnection?.name,
                     executedAt: Date.now(),
+                    durationMs: elapsedMs,
                     status: 'error',
                     errorMessage: err instanceof Error ? err.message : 'Unknown error',
                 });
