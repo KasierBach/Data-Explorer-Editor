@@ -57,5 +57,8 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: './src/test/setup.ts',
+    // The default "threads" pool breaks module resolution on Windows when the
+    // project path contains spaces (e.g. "Data Explorer"); vmThreads is immune.
+    pool: 'vmThreads',
   },
 })

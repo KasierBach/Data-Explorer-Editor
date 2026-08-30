@@ -1,3 +1,6 @@
+// @vitest-environment happy-dom
+// jsdom 29 makes `window.location` unforgeable, so this file runs under
+// happy-dom where the location object can be stubbed for the reload test.
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
