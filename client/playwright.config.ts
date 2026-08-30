@@ -30,6 +30,11 @@ export default defineConfig({
       testIgnore: /mobile-workspace\.spec\.ts/,
     },
     {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+      testIgnore: /mobile-workspace\.spec\.ts/,
+    },
+    {
       name: 'mobile-chrome',
       use: { ...devices['Pixel 7'] },
       testMatch: /(?:mobile-workspace|public-pages)\.spec\.ts/,

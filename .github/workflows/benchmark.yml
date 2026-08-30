@@ -1,0 +1,124 @@
+name: Performance benchmark
+
+# Nightly performance benchmarks against real Postgres + Redis via
+# Testcontainers-style services. Fails when a benchmark errors or when
+# a hard latency budget is exceeded, so performance regressions surface
+# within a day instead of reaching users.
+on:
+  schedule:
+    - cron: '0 17 * * *' # daily 17:00 UTC (00:00 +07:00)
+  workflow_dispatch: {} # manual runs
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: Runtime benchmarks (Postgres + Redis)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: benchmark
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/benchmark
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: benchmark-secret-at-least-32-characters-long!!
+      REFRESH_TOKEN_SECRET: benchmark-refresh-secret-at-least-32-chars!!
+      ENCRYPTION_KEY: benchmark-encryption-key-at-least-32-char!!
+      FRONTEND_URL: http://localhost:5173
+      # Hard latency budgets (ms). The benchmark scripts print p95 values;
+      # this gate fails the job when budgets are exceeded.
+      BENCH_QUERY_WINDOW_P95_BUDGET_MS: '150'
+      BENCH_MIGRATION_P95_BUDGET_MS: '200'
+      BENCH_SEARCH_P95_BUDGET_MS: '150'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run migrations
+        working-directory: server
+        run: npx prisma migrate deploy
+
+      - name: Run query-window benchmark
+        working-directory: server
+        run: |
+          output=$(node scripts/benchmarks/query-window-benchmark.mjs 2>&1 | tee benchmark-query-window.log)
+          echo "$output"
+          p95=$(echo "$output" | grep -oP 'p95Ms[": ]+\K[0-9.]+' | head -1 || echo '')
+          if [ -n "$p95" ] && [ -n "$BENCH_QUERY_WINDOW_P95_BUDGET_MS" ]; then
+            echo "query-window p95=${p95}ms budget=${BENCH_QUERY_WINDOW_P95_BUDGET_MS}ms"
+            awk -v p="$p95" -v b="$BENCH_QUERY_WINDOW_P95_BUDGET_MS" 'BEGIN { exit (p > b) ? 1 : 0 }' \
+              || { echo "::error::query-window p95 ${p95}ms exceeded budget ${BENCH_QUERY_WINDOW_P95_BUDGET_MS}ms"; exit 1; }
+          fi
+
+      - name: Run migration benchmark
+        working-directory: server
+        run: |
+          output=$(node scripts/benchmarks/migration-benchmark.mjs 2>&1 | tee benchmark-migration.log)
+          echo "$output"
+          p95=$(echo "$output" | grep -oP 'p95Ms[": ]+\K[0-9.]+' | head -1 || echo '')
+          if [ -n "$p95" ] && [ -n "$BENCH_MIGRATION_P95_BUDGET_MS" ]; then
+            echo "migration p95=${p95}ms budget=${BENCH_MIGRATION_P95_BUDGET_MS}ms"
+            awk -v p="$p95" -v b="$BENCH_MIGRATION_P95_BUDGET_MS" 'BEGIN { exit (p > b) ? 1 : 0 }' \
+              || { echo "::error::migration p95 ${p95}ms exceeded budget ${BENCH_MIGRATION_P95_BUDGET_MS}ms"; exit 1; }
+          fi
+
+      - name: Run search benchmark
+        working-directory: server
+        run: |
+          output=$(node scripts/benchmarks/search-benchmark.mjs 2>&1 | tee benchmark-search.log)
+          echo "$output"
+          p95=$(echo "$output" | grep -oP 'p95Ms[": ]+\K[0-9.]+' | head -1 || echo '')
+          if [ -n "$p95" ] && [ -n "$BENCH_SEARCH_P95_BUDGET_MS" ]; then
+            echo "search p95=${p95}ms budget=${BENCH_SEARCH_P95_BUDGET_MS}ms"
+            awk -v p="$p95" -v b="$BENCH_SEARCH_P95_BUDGET_MS" 'BEGIN { exit (p > b) ? 1 : 0 }' \
+              || { echo "::error::search p95 ${p95}ms exceeded budget ${BENCH_SEARCH_P95_BUDGET_MS}ms"; exit 1; }
+          fi
+
+      - name: Upload benchmark logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-logs-${{ github.run_id }}
+          path: server/benchmark-*.log
+          retention-days: 30
