@@ -1,0 +1,92 @@
+name: Load test
+
+# Weekly scheduled load test against a locally booted server so the
+# baseline numbers are reproducible and do not depend on the deployed
+# environment. Uses the existing scripts/load/http-load.mjs harness.
+'on':
+  schedule:
+    - cron: '0 3 * * 1' # every Monday 03:00 UTC
+  workflow_dispatch: {} # allow manual runs
+
+permissions:
+  contents: read
+
+jobs:
+  load-test:
+    name: HTTP load test (local server)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      PORT: '3001'
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/loadtest
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: load-test-secret-at-least-32-characters-long!!
+      REFRESH_TOKEN_SECRET: load-test-refresh-secret-at-least-32-chars!!
+      ENCRYPTION_KEY: load-test-encryption-key-at-least-32-chars!!
+      FRONTEND_URL: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Start Postgres
+        run: |
+          sudo systemctl start postgresql
+          sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
+          sudo -u postgres psql -c "CREATE DATABASE loadtest;"
+
+      - name: Install dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run migrations
+        working-directory: server
+        run: npx prisma migrate deploy
+
+      - name: Build server
+        working-directory: server
+        run: npm run build
+
+      - name: Start server in background
+        working-directory: server
+        run: |
+          node dist/src/main.js > server.log 2>&1 &
+          echo $! > server.pid
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3001/api/health/live > /dev/null; then
+              echo "Server is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Server failed to start"
+          cat server.log
+          exit 1
+
+      - name: Run load test (20 concurrent, 15s)
+        working-directory: server
+        run: node scripts/load/http-load.mjs --mode load --url http://localhost:3001/api/health/live
+
+      - name: Run stress test (100 concurrent, 30s)
+        working-directory: server
+        run: node scripts/load/http-load.mjs --mode stress --url http://localhost:3001/api/health/live
+
+      - name: Print server log on failure
+        if: failure()
+        working-directory: server
+        run: cat server.log || true

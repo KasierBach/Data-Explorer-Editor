@@ -91,21 +91,41 @@ export function isPrivateIp(ip: string): boolean {
     // Link-local (169.254.0.0/16)
     if (parts[0] === 169 && parts[1] === 254) return true;
 
+    // Alibaba Cloud metadata (100.100.100.200)
+    if (ip === '100.100.100.200') return true;
+
     // Broadcast
     if (ip === '255.255.255.255') return true;
+
+    // Unspecified ("this" network, 0.0.0.0/8) — on many platforms
+    // connecting to 0.0.0.0 reaches localhost
+    if (parts[0] === 0) return true;
   }
 
   // IPv6 Private/Reserved
   if (net.isIPv6(ip)) {
+    const normalized = ip.toLowerCase();
+
     // Loopback (::1)
-    if (ip === '::1' || ip === '0:0:0:0:0:0:0:1') return true;
+    if (normalized === '::1' || normalized === '0:0:0:0:0:0:0:1') return true;
+
+    // Unspecified (::) — equivalent of 0.0.0.0
+    if (normalized === '::' || normalized === '0:0:0:0:0:0:0:0') return true;
 
     // Unique Local (fc00::/7)
-    if (ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd'))
-      return true;
+    if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
 
-    // Link-local (fe80::/10)
-    if (ip.toLowerCase().startsWith('fe8')) return true;
+    // Link-local (fe80::/10) — fe8, fe9, fea, feb prefixes
+    if (/^fe[89ab]/.test(normalized)) return true;
+
+    // IPv4-mapped IPv6 (::ffff:a.b.c.d) — attackers use this to bypass
+    // IPv4 checks. Extract the embedded IPv4 and re-check it.
+    const mappedMatch = normalized.match(
+      /^(?:::ffff:|0:0:0:0:0:ffff:)(\d{1,3}(?:\.\d{1,3}){3})$/,
+    );
+    if (mappedMatch) {
+      return isPrivateIp(mappedMatch[1]);
+    }
   }
 
   return false;
