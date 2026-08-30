@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { BillingService } from './billing.service';
+import type { PrismaService } from '../prisma/prisma.service';
 import type {
   PaymentProvider,
   VerifiedPayment,
@@ -73,7 +74,7 @@ describe('BillingService', () => {
       $transaction: jest.fn((callback) => callback(prisma)),
     };
 
-    return prisma;
+    return prisma as unknown as PrismaService;
   };
 
   it('creates checkout from the server-side plan catalog amount only', async () => {
@@ -169,7 +170,9 @@ describe('BillingService', () => {
 
   it('does not extend a subscription twice when another webhook won the race', async () => {
     const prisma = createPrisma();
-    prisma.payment.updateMany.mockResolvedValueOnce({ count: 0 });
+    (prisma.payment.updateMany as jest.Mock).mockResolvedValueOnce({
+      count: 0,
+    });
     const service = new BillingService(prisma, [createProvider()]);
 
     await expect(service.handleProviderWebhook('momo', {})).resolves.toEqual({

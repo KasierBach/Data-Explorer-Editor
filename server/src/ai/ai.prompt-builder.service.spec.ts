@@ -127,9 +127,10 @@ describe('AiPromptBuilderService', () => {
       undefined,
       history,
     );
-    const geminiHistory = geminiContents
-      .slice(0, -1)
-      .map((message) => message.parts[0]?.text || '');
+    const geminiHistory = geminiContents.slice(0, -1).map((message) => {
+      const firstPart = message.parts[0];
+      return (firstPart && 'text' in firstPart ? firstPart.text : '') || '';
+    });
 
     expect(openAiHistory).toEqual(geminiHistory);
     expect(openAiHistory.length).toBeLessThanOrEqual(

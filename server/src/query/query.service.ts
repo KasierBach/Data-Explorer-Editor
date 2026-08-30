@@ -481,6 +481,7 @@ export class QueryService {
       confirmed,
     );
 
+    const startedAt = Date.now();
     try {
       const pool = await this.connectionsService.getPool(
         connectionId,
@@ -582,6 +583,9 @@ export class QueryService {
           category: 'query',
           connectionId,
           database: database || connection.database,
+          connectionName: connection.name,
+          durationMs: Date.now() - startedAt,
+          rowCount: result.rowCount ?? result.rows?.length,
           sql,
           sqlSnippet: sql.substring(0, 100) + (sql.length > 100 ? '...' : ''),
         },

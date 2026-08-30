@@ -1,4 +1,5 @@
 import { AiChatCompletionService } from './ai.chat-completion.service';
+import type { StreamEvent } from './ai.types';
 
 describe('AiChatCompletionService streaming fallback', () => {
   it('does not append a fallback response after a provider emitted partial output', async () => {
@@ -34,7 +35,7 @@ describe('AiChatCompletionService streaming fallback', () => {
       routingService as never,
     );
 
-    const events = [];
+    const events: StreamEvent[] = [];
     for await (const event of service.chatStream({ prompt: 'hello' })) {
       events.push(event);
     }
