@@ -56,6 +56,12 @@ COPY --from=build /app/prisma ./prisma
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
+# Remove the bundled npm/corepack/yarn toolchains: the runtime only needs
+# `node` itself. This eliminates ~11 HIGH/CRITICAL CVEs that Trivy flags in
+# the npm toolchain shipped inside the node base image (tar, brace-expansion,
+# pacote, sigstore, ...), none of which the application uses at runtime.
+RUN rm -rf /usr/local/lib/node_modules /opt/yarn-v1.22.22 /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg
+
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app
 
