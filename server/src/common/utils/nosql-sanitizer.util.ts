@@ -15,6 +15,9 @@ const BANNED_OPERATORS = new Set([
 ]);
 
 const MAX_DEPTH = 10;
+const MAX_ARRAY_LENGTH = 10_000;
+const MAX_OBJECT_KEYS = 2_000;
+const MAX_PIPELINE_STAGES = 100;
 
 /**
  * Recursively scans an object for NoSQL injection patterns.
@@ -23,7 +26,7 @@ const MAX_DEPTH = 10;
 export function sanitizeNoSql(obj: any, depth = 0): any {
   if (depth > MAX_DEPTH) {
     throw new ForbiddenException(
-      'Query quá sâu hoặc chứa vòng lặp (NoSQL security).',
+      'Query is too deep or contains a cycle (NoSQL security).',
     );
   }
 
@@ -32,16 +35,22 @@ export function sanitizeNoSql(obj: any, depth = 0): any {
   }
 
   if (Array.isArray(obj)) {
+    if (obj.length > MAX_ARRAY_LENGTH) {
+      throw new ForbiddenException('NoSQL array exceeds the maximum size.');
+    }
     return obj.map((item) => sanitizeNoSql(item, depth + 1));
   }
 
   const sanitized: Record<string, any> = {};
+  if (Object.keys(obj).length > MAX_OBJECT_KEYS) {
+    throw new ForbiddenException('NoSQL object contains too many fields.');
+  }
 
   for (const [key, value] of Object.entries(obj)) {
     // Check if key is a banned operator
     if (BANNED_OPERATORS.has(key)) {
       throw new ForbiddenException(
-        `Sử dụng toán tử NoSQL bị cấm: ${key} (Bảo mật NoSQL).`,
+        `Banned NoSQL operator used: ${key} (NoSQL security).`,
       );
     }
 
@@ -76,14 +85,34 @@ export function validateNoSqlPayload(payload: any) {
   ];
 
   if (!payload.action || !allowedActions.includes(payload.action)) {
-    throw new ForbiddenException(
-      `Hành động NoSQL không hợp lệ: ${payload.action}`,
-    );
+    throw new ForbiddenException(`Invalid NoSQL action: ${payload.action}`);
   }
 
   if (!payload.collection || typeof payload.collection !== 'string') {
     throw new ForbiddenException(
       'Collection name is required and must be a string.',
     );
+  }
+
+  if (payload.pipeline !== undefined) {
+    if (
+      !Array.isArray(payload.pipeline) ||
+      payload.pipeline.length > MAX_PIPELINE_STAGES
+    ) {
+      throw new ForbiddenException(
+        'MongoDB pipeline exceeds the maximum of 100 stages.',
+      );
+    }
+  }
+
+  if (payload.documents !== undefined) {
+    if (
+      !Array.isArray(payload.documents) ||
+      payload.documents.length > MAX_ARRAY_LENGTH
+    ) {
+      throw new ForbiddenException(
+        'MongoDB insertMany payload exceeds the maximum size.',
+      );
+    }
   }
 }

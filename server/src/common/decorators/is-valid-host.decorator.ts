@@ -15,7 +15,7 @@ export class IsValidHostConstraint implements ValidatorConstraintInterface {
   }
 
   defaultMessage(args: ValidationArguments) {
-    return 'Địa chỉ host ($value) không được phép truy cập vì lý do bảo mật (SSRF).';
+    return `Host address ($value) is not allowed for security reasons (SSRF).`;
   }
 }
 

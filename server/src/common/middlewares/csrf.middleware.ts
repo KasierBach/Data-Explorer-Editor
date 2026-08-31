@@ -1,5 +1,6 @@
 import { Injectable, NestMiddleware, ForbiddenException } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
+import { pickLocalizedText, resolveRequestLanguage } from '../utils/i18n.util';
 
 @Injectable()
 export class CsrfMiddleware implements NestMiddleware {
@@ -28,8 +29,13 @@ export class CsrfMiddleware implements NestMiddleware {
       // Since browser-based CSRF attacks cannot set custom headers easily
       // (due to CORS Preflight), this is a common and effective protection.
       if (requestedWith !== 'XMLHttpRequest') {
+        const lang = resolveRequestLanguage(req.headers['accept-language']);
         throw new ForbiddenException(
-          'Yêu cầu bị từ chối do thiếu header bảo mật (CSRF Protection).',
+          pickLocalizedText(
+            lang,
+            'Yêu cầu bị từ chối do thiếu header bảo mật (CSRF Protection).',
+            'Request rejected: missing the security header (CSRF Protection).',
+          ),
         );
       }
     }
