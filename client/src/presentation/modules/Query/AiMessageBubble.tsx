@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/presentation/components/ui/button';
-import { 
-    ChevronDown, Play, Copy, Database, LineChart, Wrench, 
+import {
+    ChevronDown, Play, Copy, Database, LineChart, Wrench,
     Pencil, Trash2, Check, X as CloseIcon, RotateCcw
 } from 'lucide-react';
 import type { AiMessage } from '@/core/services/store';
@@ -37,8 +37,8 @@ const getVisibleUserContent = (msg: AiMessage) => {
     return lines.join('\n').trim();
 };
 
-export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({ 
-    msg, onInsertQuery, onRunQuery, onRegenerate, onEditSubmit 
+export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
+    msg, onInsertQuery, onRunQuery, onRegenerate, onEditSubmit
 }) => {
     const { user, activeConnectionId, connections, deleteAiMessage, activeAiChatId, lang } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
@@ -94,9 +94,9 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                     <div className="h-7 w-7 rounded-full bg-muted border border-border/50 overflow-hidden relative flex items-center justify-center">
                         {user?.avatarUrl ? (
                             <>
-                                <img 
-                                    src={user.avatarUrl} 
-                                    className="h-full w-full object-cover relative z-10" 
+                                <img
+                                    src={user.avatarUrl}
+                                    className="h-full w-full object-cover relative z-10"
                                     alt="User"
                                     onError={(e) => (e.target as HTMLImageElement).classList.add('hidden')}
                                 />
@@ -277,11 +277,11 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                         <Copy className="w-3.5 h-3.5" />
                     </Button>
                     {msg.role === 'ai' && !msg.error && onRegenerate && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => onRegenerate(msg.id)} title="Thử lại" aria-label="Regenerate message">
+                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => onRegenerate(msg.id)} title={text.retryTitle} aria-label="Regenerate message">
                             <RotateCcw className="w-3.5 h-3.5" />
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-red-500/10 text-muted-foreground/60 hover:text-red-400" onClick={handleDelete} title="Xóa" aria-label="Delete message">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-red-500/10 text-muted-foreground/60 hover:text-red-400" onClick={handleDelete} title={text.deleteTitle} aria-label="Delete message">
                         <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                 </div>

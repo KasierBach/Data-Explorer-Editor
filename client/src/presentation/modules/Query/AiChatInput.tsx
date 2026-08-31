@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { useAppStore } from '@/core/services/store';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { Button } from '@/presentation/components/ui/button';
 import {
     DropdownMenu,
@@ -83,6 +84,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const nosqlMqlQuery = useAppStore((state) => state.nosqlMqlQuery);
     const lang = useAppStore((state) => state.lang);
+    const chatText = getWorkspaceText(lang).aiChatInput;
     const statusLabels: Record<AiModelRuntimeStatus, string> = lang === 'vi'
         ? { unconfigured: 'Chưa cấu hình', 'rate-limited': 'Giới hạn', 'credits-required': 'Cần credit', unavailable: 'Không khả dụng' }
         : { unconfigured: 'Not configured', 'rate-limited': 'Rate limited', 'credits-required': 'Credits required', unavailable: 'Unavailable' };
@@ -94,7 +96,11 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
         : Boolean(activeTab?.type === 'query' && activeTab.metadata?.sql?.trim());
     const hasSqlTableContext = Boolean(!isNoSql && activeTab?.metadata?.tableId);
     const contextLabel = isNoSql ? 'Schema Context' : hasSqlTableContext ? 'Table Schema' : 'Database Context';
-    const contextDescription = isNoSql ? 'Cấu trúc collection đang chọn' : hasSqlTableContext ? 'Schema của bảng đang mở' : 'Kết nối DB đang dùng';
+    const contextDescription = isNoSql
+        ? chatText.schemaContextDescription
+        : hasSqlTableContext
+            ? chatText.tableSchemaDescription
+            : chatText.databaseContextDescription;
 
     const getModelIcon = (modelId: string) => {
         if (modelId.includes('gemini')) return <Sparkles className="w-3 h-3 text-violet-400" />;
@@ -115,11 +121,11 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
             />
 
             <div className="relative bg-muted/20 border border-border/50 rounded-2xl focus-within:ring-2 focus-within:ring-violet-500/20 focus-within:border-violet-500/40 transition-all duration-300 flex flex-col shadow-sm">
-                
+
                 {/* Attachments preview */}
                 <AnimatePresence>
                     {attachments.length > 0 && (
-                        <motion.div 
+                        <motion.div
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
@@ -159,7 +165,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                 {/* Toolbar */}
                 <div className="flex items-center justify-between p-2 pt-0 gap-1.5">
                     <div className="flex items-center gap-1 min-w-0 flex-1 overflow-x-auto scrollbar-none">
-                        
+
                         {/* Attachments Dropdown */}
                         <DropdownMenu open={showContextMenu} onOpenChange={setShowContextMenu}>
                             <DropdownMenuTrigger asChild>
@@ -167,23 +173,23 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 rounded-lg text-muted-foreground hover:text-violet-400 hover:bg-violet-500/10 transition-colors shrink-0"
-                                    title="Đính kèm context"
+                                    title={chatText.attachContextTitle}
                                 >
                                     <Plus className="w-4 h-4" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent side="top" align="start" className="w-56 bg-popover/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl p-1.5 animate-in slide-in-from-bottom-2 duration-300 z-[110]">
-                                <DropdownMenuLabel className="px-3 py-2 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Đính kèm</DropdownMenuLabel>
+                                <DropdownMenuLabel className="px-3 py-2 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">{chatText.attachMenuLabel}</DropdownMenuLabel>
                                 <DropdownMenuItem className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-accent/50 group" onClick={() => fileInputRef.current?.click()}>
                                     <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center group-hover:bg-pink-500/20 transition-colors">
                                         <Image className="w-4 h-4 text-pink-400" />
                                     </div>
                                     <div>
-                                        <div className="text-[11px] font-bold">Tệp / Hình ảnh</div>
-                                        <div className="text-[9px] text-muted-foreground">Ảnh, PDF, Excel, Code...</div>
+                                        <div className="text-[11px] font-bold">{chatText.fileImage}</div>
+                                        <div className="text-[9px] text-muted-foreground">{chatText.fileImageHint}</div>
                                     </div>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                     className={cn("flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer group", !hasEditorQuery && "opacity-40 grayscale pointer-events-none")}
                                     onClick={handlePasteQuery}
                                 >
@@ -191,11 +197,11 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                         <FileCode2 className="w-4 h-4 text-cyan-400" />
                                     </div>
                                     <div>
-                                        <div className="text-[11px] font-bold">{isNoSql ? 'MQL từ Editor' : 'SQL từ Editor'}</div>
-                                        <div className="text-[9px] text-muted-foreground">Dùng code đang mở</div>
+                                        <div className="text-[11px] font-bold">{isNoSql ? chatText.mqlFromEditor : chatText.sqlFromEditor}</div>
+                                        <div className="text-[9px] text-muted-foreground">{chatText.useOpenCode}</div>
                                     </div>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                     className={cn("flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer group", (!activeConnection || (!activeDatabase && !hasSqlTableContext)) && "opacity-40 grayscale pointer-events-none")}
                                     onClick={handleMentionTable}
                                 >
@@ -270,14 +276,14 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                         {getModelIcon(aiModel)}
                                     </div>
                                     <span className="truncate hidden sm:inline lg:hidden xl:inline">
-                                         {MODELS.flatMap(g => g.items).find(m => m.id === aiModel)?.label ?? 'Model'}
-                                     </span>
-                                     {modelStatuses[aiModel] && (
-                                         <span
-                                             title={statusLabels[modelStatuses[aiModel]]}
-                                             className={cn('h-1.5 w-1.5 shrink-0 rounded-full', isBlockingStatus(modelStatuses[aiModel]) ? 'bg-red-500' : 'bg-amber-400')}
-                                         />
-                                     )}
+                                        {MODELS.flatMap(g => g.items).find(m => m.id === aiModel)?.label ?? 'Model'}
+                                    </span>
+                                    {modelStatuses[aiModel] && (
+                                        <span
+                                            title={statusLabels[modelStatuses[aiModel]]}
+                                            className={cn('h-1.5 w-1.5 shrink-0 rounded-full', isBlockingStatus(modelStatuses[aiModel]) ? 'bg-red-500' : 'bg-amber-400')}
+                                        />
+                                    )}
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent side="top" align="start" className="w-[18rem] max-h-[400px] overflow-y-auto custom-scrollbar bg-[#1a1a1a]/98 backdrop-blur-2xl border border-white/5 rounded-2xl shadow-4xl p-1.5 z-[110]">
@@ -369,9 +375,9 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                 <span>{activeDatabase}</span>
                             </div>
                         )}
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-);
+    );
 });

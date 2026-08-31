@@ -685,7 +685,7 @@ export const QueryHistoryDialog: React.FC<QueryHistoryDialogProps> = ({
                                                             size="sm"
                                                             className="h-5 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 gap-1"
                                                             onClick={() => handleCopy(selectedQuery.errorMessage!)}
-                                                            title="Sao chép toàn bộ lỗi"
+                                                            title={text.copyErrorTitle}
                                                         >
                                                             <Copy className="w-3 h-3" />
                                                             <span>{lang === 'vi' ? 'Sao chép lỗi' : 'Copy error'}</span>

@@ -6,6 +6,7 @@ import {
     ChevronLeft, X, Plus, MessageSquare, Clock, Check, Edit2, Trash2
 } from 'lucide-react';
 import { useAppStore } from '@/core/services/store';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface AiChatListProps {
     onClose: () => void;
@@ -15,8 +16,9 @@ interface AiChatListProps {
 export const AiChatList: React.FC<AiChatListProps> = ({ onClose, onHideHistory }) => {
     const {
         aiChats, activeAiChatId, createAiChat, deleteAiChat,
-        setActiveAiChat, updateAiChatTitle
+        setActiveAiChat, updateAiChatTitle, lang
     } = useAppStore();
+    const text = getWorkspaceText(lang).aiChatList;
 
     const [editingChatId, setEditingChatId] = useState<string | null>(null);
     const [editingTitle, setEditingTitle] = useState('');
@@ -63,8 +65,8 @@ export const AiChatList: React.FC<AiChatListProps> = ({ onClose, onHideHistory }
         const d = new Date(ts);
         const now = new Date();
         const isToday = d.toDateString() === now.toDateString();
-        if (isToday) return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-        return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+        if (isToday) return d.toLocaleTimeString(text.timeLocale, { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleDateString(text.timeLocale, { day: '2-digit', month: '2-digit' });
     };
 
     return (
@@ -74,7 +76,7 @@ export const AiChatList: React.FC<AiChatListProps> = ({ onClose, onHideHistory }
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onHideHistory}>
                         <ChevronLeft className="w-3 h-3" />
                     </Button>
-                    <span className="text-xs font-bold text-foreground">Lịch sử chat</span>
+                    <span className="text-xs font-bold text-foreground">{text.historyTitle}</span>
                 </div>
                 <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onClose}>
                     <X className="w-3 h-3" />
@@ -89,7 +91,7 @@ export const AiChatList: React.FC<AiChatListProps> = ({ onClose, onHideHistory }
                     onClick={handleNewChat}
                 >
                     <Plus className="w-3 h-3" />
-                    Cuộc trò chuyện mới
+                    {text.newChat}
                 </Button>
             </div>
 
@@ -97,7 +99,7 @@ export const AiChatList: React.FC<AiChatListProps> = ({ onClose, onHideHistory }
                 {aiChats.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-xs">
                         <MessageSquare className="w-8 h-8 mb-2 opacity-30" />
-                        <span>Chưa có cuộc trò chuyện nào</span>
+                        <span>{text.empty}</span>
                     </div>
                 ) : (
                     <div className="p-1 space-y-0.5">
@@ -130,7 +132,7 @@ export const AiChatList: React.FC<AiChatListProps> = ({ onClose, onHideHistory }
                                     <div className="text-[9px] text-muted-foreground/60 flex items-center gap-1">
                                         <Clock className="w-2.5 h-2.5" />
                                         {formatTime(chat.updatedAt)}
-                                        <span className="ml-1">• {chat.messages.length - 1} tin nhắn</span>
+                                        <span className="ml-1">• {chat.messages.length - 1} {lang === 'vi' ? 'tin nhắn' : 'messages'}</span>
                                     </div>
                                 </div>
                                 <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
