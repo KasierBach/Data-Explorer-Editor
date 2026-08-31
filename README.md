@@ -288,7 +288,7 @@ Data Explorer/
 
 ### Requirements
 
-- **Node.js 20+**
+- **Node.js 22+** (matches the committed `.nvmrc`)
 - **npm**
 - **PostgreSQL** for the app metadata database
 - **Redis** for caching, notifications, presence, search, and background jobs
@@ -485,6 +485,10 @@ Recent hardening introduced a few important changes:
 - **Sanitized DB Errors**: Database error messages are sanitized before being sent to the client to prevent infrastructure information leakage.
 - **AI request guardrails**: Provider calls now use request timeouts and streaming idle timeouts so a slow lane cannot hang the backend indefinitely.
 - **Legal access flow**: New local registrations require Terms + Privacy consent, and users who have not accepted the legal flow are redirected to `/legal-consent` before entering the main workspace.
+- **CSRF protection**: Mutating requests must carry the `X-Requested-With: XMLHttpRequest` header (browser-based CSRF attacks cannot set custom headers without a CORS preflight), with a small exempt list for public auth and payment-webhook endpoints.
+- **NoSQL injection sanitizer**: MongoDB payloads are validated against an action whitelist, depth/size limits, and a banned-operator list (`$where`, `$function`, `$eval`, and similar server-side JavaScript vectors).
+- **Fail-closed SSRF validation**: Host validation rejects empty or whitespace-only hosts instead of treating them as safe targets, alongside the existing DNS-rebinding and private-range checks.
+- **Adversarial pentest coverage**: The server ships dedicated pentest suites (SQL guard bypass, statement-splitter evasion, NoSQL sanitizer bypass, identifier injection, SSRF IP confusion, CSRF header spoofing) — 160 security tests in total run as part of the standard test suite.
 
 ---
 
@@ -541,6 +545,15 @@ npm test
 cd ../server
 npm test
 ```
+
+### Security Tests Only
+
+```bash
+cd server
+npx jest --runInBand --testPathPatterns "(pentest|security|attack|fuzz|ssrf|guard)"
+```
+
+This runs the adversarial pentest suites (SQL guard bypass, NoSQL sanitizer bypass, SSRF IP confusion, CSRF header spoofing) together with the existing security, fuzz, and attack-vector coverage — 160 tests in total.
 
 ### Common Issues
 
