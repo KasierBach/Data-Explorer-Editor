@@ -54,7 +54,7 @@ export const NoSqlDashboard: React.FC = () => {
 
                 {/* Quick Actions */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                    <div className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer hover:border-green-500/50" onClick={() => setSidebarOpen(true)}>
+                    <div role="button" tabIndex={0} aria-label={text.selectCollectionTitle} className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer hover:border-green-500/50" onClick={() => setSidebarOpen(true)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSidebarOpen(true); } }}>
                         <div className="p-4 md:p-6 flex flex-col gap-3 md:gap-4">
                             <div className="p-2 md:p-3 w-fit rounded-lg bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400">
                                 <BoxSelect className="h-6 w-6" />
@@ -68,7 +68,7 @@ export const NoSqlDashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer" onClick={() => openConnectionDialog()}>
+                    <div role="button" tabIndex={0} aria-label={text.newConnectionTitle} className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer" onClick={() => openConnectionDialog()} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openConnectionDialog(); } }}>
                         <div className="p-4 md:p-6 flex flex-col gap-3 md:gap-4">
                             <div className="p-2 md:p-3 w-fit rounded-lg bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400">
                                 <Plus className="h-6 w-6" />
@@ -82,7 +82,7 @@ export const NoSqlDashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer" onClick={() => setSidebarOpen(true)}>
+                    <div role="button" tabIndex={0} aria-label={text.browseDocumentsTitle} className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer" onClick={() => setSidebarOpen(true)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSidebarOpen(true); } }}>
                         <div className="p-4 md:p-6 flex flex-col gap-3 md:gap-4">
                             <div className="p-2 md:p-3 w-fit rounded-lg bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400">
                                 <Search className="h-6 w-6" />

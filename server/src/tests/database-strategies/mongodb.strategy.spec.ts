@@ -29,10 +29,18 @@ describe('MongoDbStrategy', () => {
       maxTimeMS: jest.fn().mockReturnThis(),
       countDocuments: jest.fn().mockResolvedValue(3),
       distinct: jest.fn().mockResolvedValue(['a', 'b']),
+      insertOne: jest.fn().mockResolvedValue({ insertedId: 'new-id' }),
+      insertMany: jest.fn().mockResolvedValue({ insertedCount: 1 }),
       updateOne: jest.fn().mockResolvedValue({
         acknowledged: true,
+        matchedCount: 1,
         modifiedCount: 1,
       }),
+      updateMany: jest
+        .fn()
+        .mockResolvedValue({ matchedCount: 1, modifiedCount: 1 }),
+      deleteOne: jest.fn().mockResolvedValue({ deletedCount: 1 }),
+      deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 }),
       toArray: jest.fn().mockResolvedValue([]),
     };
 
@@ -70,9 +78,37 @@ describe('MongoDbStrategy', () => {
         }),
       );
     });
+
+    it('should apply a selected database to an existing MongoDB URL', async () => {
+      await strategy.createPool(
+        {
+          url: 'mongodb://admin:password@127.0.0.1:27017/default_db?retryWrites=true',
+          type: 'mongodb',
+        },
+        'reports',
+      );
+
+      expect(MongoClient).toHaveBeenCalledWith(
+        'mongodb://admin:password@127.0.0.1:27017/reports?retryWrites=true',
+        expect.any(Object),
+      );
+    });
   });
 
   describe('executeQuery (OOM Protections & Timeouts)', () => {
+    it('rejects oversized MongoDB payload arrays before execution', async () => {
+      const payload = {
+        action: 'aggregate',
+        collection: 'test_col',
+        pipeline: new Array(101).fill({ $match: {} }),
+      };
+
+      await expect(
+        strategy.executeQuery(mockClient, JSON.stringify(payload)),
+      ).rejects.toThrow('pipeline exceeds the maximum of 100 stages');
+      expect(mockCollection.aggregate).not.toHaveBeenCalled();
+    });
+
     it('should restrict find() limit to 50000 even if payload requested more, and append maxTimeMS 30s', async () => {
       const payload = {
         action: 'find',
@@ -184,6 +220,41 @@ describe('MongoDbStrategy', () => {
         {},
         { maxTimeMS: 30000 },
       );
+    });
+
+    it('sanitizes mutation options and enforces a 30s timeout', async () => {
+      await strategy.executeQuery(
+        mockClient,
+        JSON.stringify({
+          action: 'updateMany',
+          collection: 'test_col',
+          filter: {},
+          update: { $set: { active: true } },
+          options: { upsert: false, maxTimeMS: 999999 },
+        }),
+      );
+
+      expect(mockCollection.updateMany).toHaveBeenCalledWith(
+        {},
+        { $set: { active: true } },
+        { upsert: false, maxTimeMS: 30000 },
+      );
+    });
+
+    it('serializes nested ObjectIds in returned documents', async () => {
+      const objectId = { _bsontype: 'ObjectId', toString: () => 'nested-id' };
+      mockCollection.toArray.mockResolvedValue([
+        { _id: objectId, nested: { ref: objectId }, refs: [objectId] },
+      ]);
+
+      const result = await strategy.executeQuery(
+        mockClient,
+        JSON.stringify({ action: 'find', collection: 'test_col' }),
+      );
+
+      expect(result.rows).toEqual([
+        { _id: 'nested-id', nested: { ref: 'nested-id' }, refs: ['nested-id'] },
+      ]);
     });
 
     it('should throw an error for invalid JSON payload', async () => {

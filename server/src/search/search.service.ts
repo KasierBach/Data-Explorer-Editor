@@ -46,49 +46,58 @@ export class SearchService {
           userId,
         );
 
-        // Get all schemas
-        const schemas = await strategy.getSchemas(pool);
+        const databases =
+          conn.type === 'mongodb' || conn.type === 'mongodb+srv'
+            ? await strategy.getDatabases(pool)
+            : [null];
 
-        for (const schema of schemas) {
-          // Robust parsing of schema and db names from ID
-          // Format could be: "db:NAME.schema:NAME" or just "schema:NAME"
-          let schemaName = schema.name;
-          let dbName = '';
+        for (const database of databases) {
+          const schemas = await strategy.getSchemas(
+            pool,
+            database?.name || undefined,
+          );
 
-          const id = schema.id;
-          if (id.includes('db:')) {
-            const dbPart = id.split('.schema:')[0] || '';
-            dbName = dbPart.replace('db:', '');
+          for (const schema of schemas) {
+            // Robust parsing of schema and db names from ID
+            // Format could be: "db:NAME.schema:NAME" or just "schema:NAME"
+            let schemaName = schema.name;
+            let dbName = '';
 
-            if (id.includes('.schema:')) {
-              schemaName = id.split('.schema:')[1] || schema.name;
+            const id = schema.id;
+            if (id.includes('db:')) {
+              const dbPart = id.split('.schema:')[0] || '';
+              dbName = dbPart.replace('db:', '');
+
+              if (id.includes('.schema:')) {
+                schemaName = id.split('.schema:')[1] || schema.name;
+              }
+            } else if (id.includes('schema:')) {
+              schemaName = id.replace('schema:', '');
             }
-          } else if (id.includes('schema:')) {
-            schemaName = id.replace('schema:', '');
+
+            const tables = await strategy.getTables(
+              pool,
+              schemaName,
+              dbName || undefined,
+            );
+            const views = await strategy.getViews(
+              pool,
+              schemaName,
+              dbName || undefined,
+            );
+
+            const items = [...tables, ...views].map((node) => ({
+              id: node.id,
+              name: node.name,
+              type: node.type,
+              connectionId: conn.id,
+              connectionName: conn.name,
+              database: dbName || conn.database || 'default',
+              schema: schemaName,
+            }));
+
+            indexedItems.push(...items);
           }
-
-          const tables = await strategy.getTables(
-            pool,
-            schemaName,
-            dbName || undefined,
-          );
-          const views = await strategy.getViews(
-            pool,
-            schemaName,
-            dbName || undefined,
-          );
-
-          const items = [...tables, ...views].map((node) => ({
-            id: node.id,
-            name: node.name,
-            type: node.type,
-            connectionId: conn.id,
-            connectionName: conn.name,
-            database: dbName || conn.database || 'default',
-            schema: schemaName,
-          }));
-
-          indexedItems.push(...items);
         }
       } catch (err) {
         this.logger.error(

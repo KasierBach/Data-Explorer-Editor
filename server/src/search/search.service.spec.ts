@@ -160,5 +160,39 @@ describe('SearchService', () => {
         ],
       );
     });
+
+    it('indexes collections from every visible MongoDB database', async () => {
+      connectionsService.findAll.mockResolvedValue([
+        { id: 'mongo-1', name: 'Mongo', type: 'mongodb' },
+      ] as any);
+      const strategyMock = {
+        getDatabases: jest
+          .fn()
+          .mockResolvedValue([{ name: 'warehouse' }, { name: 'analytics' }]),
+        getSchemas: jest.fn((_: unknown, database: string) => [
+          { id: `db:${database}.schema:public`, name: 'public' },
+        ]),
+        getTables: jest.fn((_: unknown, __: string, database: string) => [
+          {
+            id: `db:${database}.collection:events`,
+            name: 'events',
+            type: 'collection',
+          },
+        ]),
+        getViews: jest.fn().mockResolvedValue([]),
+      };
+      strategyFactory.getStrategy.mockReturnValue(strategyMock as any);
+      connectionsService.getPool.mockResolvedValue({} as any);
+
+      await service.syncIndex('user-1');
+
+      expect(searchIndexRepository.replaceUserIndex).toHaveBeenCalledWith(
+        'user-1',
+        expect.arrayContaining([
+          expect.objectContaining({ database: 'warehouse', name: 'events' }),
+          expect.objectContaining({ database: 'analytics', name: 'events' }),
+        ]),
+      );
+    });
   });
 });

@@ -15,6 +15,7 @@ import { DeleteDatabaseDialog } from '@/presentation/components/Dialogs/DeleteDa
 import { handleTreeAction as importedHandleTreeAction } from '../Explorer/treeActions';
 import { toast } from 'sonner';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
+import { SearchService, type SearchResult } from '@/core/services/SearchService';
 
 export const NoSqlSidebar: React.FC = () => {
     const lang = useAppStore(state => state.lang);
@@ -40,7 +41,11 @@ export const NoSqlSidebar: React.FC = () => {
     const [isCreateDatabaseDialogOpen, setCreateDatabaseDialogOpen] = useState(false);
     const [isDeleteDatabaseDialogOpen, setDeleteDatabaseDialogOpen] = useState(false);
     const [databaseToDelete, setDatabaseToDelete] = useState<string | null>(null);
+    const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
     const queryClient = useQueryClient();
+    const setNosqlDatabase = useAppStore(state => state.setNosqlDatabase);
+    const setNosqlCollection = useAppStore(state => state.setNosqlCollection);
 
     React.useEffect(() => {
         setSearchTerm(savedSearchTerm);
@@ -53,6 +58,39 @@ export const NoSqlSidebar: React.FC = () => {
 
         return () => clearTimeout(timer);
     }, [pageId, searchTerm, setPageState]);
+
+    React.useEffect(() => {
+        const query = searchTerm.trim();
+        if (query.length < 2 || !nosqlActiveConnectionId) {
+            setSearchResults([]);
+            setIsSearching(false);
+            return;
+        }
+
+        let cancelled = false;
+        setIsSearching(true);
+        const timer = setTimeout(() => {
+            void SearchService.search(query)
+                .then((results) => {
+                    if (!cancelled) {
+                        setSearchResults(results.filter(
+                            (result) => result.connectionId === nosqlActiveConnectionId && result.type === 'collection',
+                        ));
+                    }
+                })
+                .catch(() => {
+                    if (!cancelled) setSearchResults([]);
+                })
+                .finally(() => {
+                    if (!cancelled) setIsSearching(false);
+                });
+        }, 250);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [nosqlActiveConnectionId, searchTerm]);
 
     const runRefresh = React.useEffectEvent(async () => {
         const t = toast.loading(refreshLoadingLabel);
@@ -173,6 +211,38 @@ export const NoSqlSidebar: React.FC = () => {
 
                 {isNoSql && !isLoading && (
                     <div className="px-2">
+                        {searchTerm.trim().length >= 2 ? (
+                            <div className="space-y-1 py-1">
+                                {isSearching && (
+                                    <div className="py-6 text-center text-xs text-muted-foreground">
+                                        {lang === 'vi' ? 'Đang tìm collection...' : 'Searching collections...'}
+                                    </div>
+                                )}
+                                {!isSearching && searchResults.length === 0 && (
+                                    <div className="py-8 text-center text-xs text-muted-foreground">
+                                        {text.noCollectionsFound}
+                                    </div>
+                                )}
+                                {searchResults.map((result) => (
+                                    <button
+                                        key={result.id}
+                                        type="button"
+                                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
+                                        onClick={() => {
+                                            setNosqlDatabase(result.database || null);
+                                            setNosqlCollection(result.name);
+                                            setSearchTerm('');
+                                        }}
+                                    >
+                                        <Database className="h-4 w-4 shrink-0 text-emerald-500" />
+                                        <span className="min-w-0 flex-1 truncate">{result.name}</span>
+                                        <span className="max-w-24 truncate text-[10px] text-muted-foreground">
+                                            {result.database}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
                         <SidebarContextMenu
                             type="connection"
                             connectionId={nosqlActiveConnectionId}
@@ -210,6 +280,7 @@ export const NoSqlSidebar: React.FC = () => {
                                 ))}
                             </div>
                         </SidebarContextMenu>
+                        )}
                     </div>
                 )}
             </div>

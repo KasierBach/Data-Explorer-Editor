@@ -91,7 +91,6 @@ export const NoSqlMainContent: React.FC = () => {
   });
 
   const { isLoading, error, executeMql, result } = useNoSqlQuery();
-  const [pageJumpValue, setPageJumpValue] = React.useState(String(nosqlPageIndex + 1));
   const isAggregationView = nosqlViewMode === 'aggregation';
   const isSchemaDialogOpen = nosqlViewMode === 'schema';
   const [resultViewMode, setResultViewMode] = React.useState<'tree' | 'grid'>(
@@ -106,9 +105,6 @@ export const NoSqlMainContent: React.FC = () => {
     }
   }, [nosqlViewMode]);
 
-  React.useEffect(() => {
-    setPageJumpValue(String(nosqlPageIndex + 1));
-  }, [nosqlPageIndex]);
   const resultPanelCopy =
     resultViewMode === 'grid'
       ? {
@@ -160,15 +156,6 @@ export const NoSqlMainContent: React.FC = () => {
 
   const loadPage = async (pageIndex: number, pageSize = nosqlPageSize) => {
     await executeMql({ pageIndex, pageSize });
-  };
-
-  const commitPageJump = () => {
-    const parsed = Number(pageJumpValue);
-    if (!Number.isFinite(parsed) || parsed < 1) {
-      setPageJumpValue(String(nosqlPageIndex + 1));
-      return;
-    }
-    void loadPage(Math.floor(parsed) - 1);
   };
 
   if (!isNoSql) {
@@ -482,18 +469,20 @@ export const NoSqlMainContent: React.FC = () => {
                     size="sm"
                     className="h-6 gap-1 px-2 text-[10px]"
                     onClick={() => handleResultViewModeChange('tree')}
+                    aria-label={text.treeTitle}
                   >
                     <TreeDeciduous className="h-3 w-3" />
-                    Tree
+                    {lang === 'vi' ? 'Cây' : 'Tree'}
                   </Button>
                   <Button
                     variant={resultViewMode === 'grid' ? 'secondary' : 'ghost'}
                     size="sm"
                     className="h-6 gap-1 px-2 text-[10px]"
                     onClick={() => handleResultViewModeChange('grid')}
+                    aria-label={text.gridTitle}
                   >
                     <Filter className="h-3 w-3" />
-                    Grid
+                    {lang === 'vi' ? 'Bảng' : 'Grid'}
                   </Button>
                 </div>
               </div>
@@ -594,20 +583,9 @@ export const NoSqlMainContent: React.FC = () => {
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
 
-                <label className="flex items-center gap-1 text-muted-foreground">
-                  <span>{lang === 'vi' ? 'Trang' : 'Page'}</span>
-                  <input
-                    aria-label={lang === 'vi' ? 'Đi đến trang' : 'Go to page'}
-                    className="h-7 w-14 rounded-md border border-border bg-background px-2 text-center text-foreground outline-none focus:border-green-500"
-                    inputMode="numeric"
-                    value={pageJumpValue}
-                    onChange={(event) => setPageJumpValue(event.target.value.replace(/\D/g, ''))}
-                    onBlur={commitPageJump}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') commitPageJump();
-                    }}
-                  />
-                </label>
+                <span className="text-muted-foreground">
+                  {lang === 'vi' ? `Trang ${nosqlPageIndex + 1}` : `Page ${nosqlPageIndex + 1}`}
+                </span>
 
                 <Button
                   variant="outline"
@@ -639,9 +617,9 @@ export const NoSqlMainContent: React.FC = () => {
 
       <Dialog open={isSchemaDialogOpen} onOpenChange={handleSchemaDialogChange}>
         <DialogContent className="z-[80] block h-[calc(100dvh-1rem)] max-h-[860px] max-w-[calc(100vw-1rem)] overflow-hidden border-border/70 bg-background p-0 shadow-2xl sm:h-[82dvh] sm:max-w-[min(1200px,calc(100vw-2rem))]">
-          <DialogTitle className="sr-only">Phân tích schema</DialogTitle>
+          <DialogTitle className="sr-only">{text.schemaTitle}</DialogTitle>
           <DialogDescription className="sr-only">
-            Kiểm tra field, kiểu dữ liệu và giá trị mẫu của collection đang chọn.
+            {text.schemaDescription}
           </DialogDescription>
           <div className="h-full overflow-hidden px-4 pb-4 pt-12 sm:px-6 sm:pb-6 sm:pt-6">
             <NoSqlSchemaAnalysisView />

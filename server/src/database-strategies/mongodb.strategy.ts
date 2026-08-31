@@ -28,6 +28,22 @@ const inferType = (value: unknown): string => {
   return typeof value;
 };
 
+const serializeMongoValue = (value: any): any => {
+  if (value === null || value === undefined) return value;
+  if (value?._bsontype === 'ObjectId') return value.toString();
+  if (Array.isArray(value)) return value.map(serializeMongoValue);
+  if (value instanceof Date) return value;
+  if (typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nested]) => [
+        key,
+        serializeMongoValue(nested),
+      ]),
+    );
+  }
+  return value;
+};
+
 @Injectable()
 export class MongoDbStrategy implements IDatabaseStrategy {
   private readonly logger = new Logger(MongoDbStrategy.name);
@@ -105,6 +121,10 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         protocol === 'mongodb+srv'
           ? `${protocol}://${auth}${host}${dbName}${queryString}`
           : `${protocol}://${auth}${host}:${port}${dbName}${queryString}`;
+    } else if (databaseOverride) {
+      const parsedUri = new URL(uri);
+      parsedUri.pathname = `/${encodeURIComponent(databaseOverride)}`;
+      uri = parsedUri.toString();
     }
 
     this.logger.log(
@@ -173,6 +193,8 @@ export class MongoDbStrategy implements IDatabaseStrategy {
     const pipeline = Array.isArray(payload.pipeline)
       ? payload.pipeline.map((p) => sanitizeNoSql(p))
       : [];
+    const mongoOptions = sanitizeNoSql(payload.options || {});
+    const timedOptions = { ...mongoOptions, maxTimeMS: 30000 };
 
     const db = client.db();
     const col = db.collection(payload.collection);
@@ -193,7 +215,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         const skip = Math.max(0, options?.offset ?? 0);
         appliedOffset = skip;
         result = await col
-          .find(filter, payload.options || {})
+          .find(filter, mongoOptions)
           .skip(skip)
           .limit(appliedLimit + 1)
           .maxTimeMS(30000)
@@ -206,7 +228,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         const limitMeta = this.resolveResultLimit(payload, options);
         appliedLimit = limitMeta.appliedLimit;
         limitSource = limitMeta.limitSource;
-        const aggregateOptions = { ...(payload.options || {}) };
+        const aggregateOptions = { ...mongoOptions };
         if ('limit' in aggregateOptions) {
           delete aggregateOptions.limit;
         }
@@ -225,21 +247,20 @@ export class MongoDbStrategy implements IDatabaseStrategy {
       }
       case 'count':
         result = await col.countDocuments(filter, {
-          ...(payload.options || {}),
-          maxTimeMS: 30000,
+          ...timedOptions,
         });
         rows = [{ count: result }];
         break;
       case 'insertOne':
-        result = await col.insertOne(document);
+        result = await col.insertOne(document, timedOptions);
         rows = [{ insertedId: result.insertedId.toString() }];
         break;
       case 'insertMany':
-        result = await col.insertMany(documents);
+        result = await col.insertMany(documents, timedOptions);
         rows = [{ insertedCount: result.insertedCount }];
         break;
       case 'updateOne':
-        result = await col.updateOne(filter, update, payload.options || {});
+        result = await col.updateOne(filter, update, timedOptions);
         rows = [
           {
             matchedCount: result.matchedCount,
@@ -248,7 +269,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         ];
         break;
       case 'updateMany':
-        result = await col.updateMany(filter, update, payload.options || {});
+        result = await col.updateMany(filter, update, timedOptions);
         rows = [
           {
             matchedCount: result.matchedCount,
@@ -257,11 +278,11 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         ];
         break;
       case 'deleteOne':
-        result = await col.deleteOne(filter);
+        result = await col.deleteOne(filter, timedOptions);
         rows = [{ deletedCount: result.deletedCount }];
         break;
       case 'deleteMany':
-        result = await col.deleteMany(filter);
+        result = await col.deleteMany(filter, timedOptions);
         rows = [{ deletedCount: result.deletedCount }];
         break;
       case 'distinct': {
@@ -270,8 +291,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
           throw new Error('Distinct action requires a "field" parameter.');
         }
         result = await col.distinct(distinctField, filter, {
-          ...(payload.options || {}),
-          maxTimeMS: 30000,
+          ...timedOptions,
         });
         rows = result.map((value: unknown) => ({ value }));
         break;
@@ -286,16 +306,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
     }
     columns = Array.from(colSet);
 
-    // Serialize ObjectIds
-    rows = rows.map((row) => {
-      const cleanRow = { ...row };
-      for (const key of Object.keys(cleanRow)) {
-        if (cleanRow[key] && cleanRow[key]._bsontype === 'ObjectId') {
-          cleanRow[key] = cleanRow[key].toString();
-        }
-      }
-      return cleanRow;
-    });
+    rows = rows.map(serializeMongoValue);
 
     return {
       rows,
