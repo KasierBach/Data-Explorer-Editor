@@ -136,7 +136,10 @@ export function isPrivateIp(ip: string): boolean {
  * Resolves the host to an IP to prevent DNS Rebinding.
  */
 export async function validateHost(host: string): Promise<boolean> {
-  if (!host) return true;
+  // Fail-closed: an empty host is not a valid target. Optional fields are
+  // skipped by callers (e.g. IsValidHost returns true for falsy values),
+  // so anything that actually reaches this check must have a real host.
+  if (!host || !host.trim()) return false;
   const normalizedHost = normalizeHost(host);
 
   // Environment override for local development if needed
