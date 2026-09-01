@@ -1141,7 +1141,7 @@ export class QueryService {
     const adminDb =
       connection.database && connection.database !== databaseName
         ? connection.database
-        : connection.type === 'postgres'
+        : connection.type === 'postgres' || connection.type === 'cockroach'
           ? 'postgres'
           : connection.database;
 

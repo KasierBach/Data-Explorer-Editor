@@ -3,7 +3,7 @@ import type { StateCreator } from 'zustand';
 export interface Connection {
     id: string;
     name: string;
-    type: 'postgres' | 'mysql' | 'mssql' | 'sqlite' | 'clickhouse' | 'mock' | 'mongodb' | 'mongodb+srv' | 'redis';
+    type: 'postgres' | 'cockroach' | 'mysql' | 'mariadb' | 'mssql' | 'sqlite' | 'clickhouse' | 'mock' | 'mongodb' | 'mongodb+srv' | 'redis';
     host?: string;
     port?: number;
     username?: string;
@@ -20,6 +20,12 @@ export interface Connection {
     lastConnectedAt?: string;
     lastConnectionLatencyMs?: number | null;
     organizationId?: string | null;
+    sshHost?: string;
+    sshPort?: number;
+    sshUsername?: string;
+    sshPrivateKey?: string;
+    sshPassphrase?: string;
+    environment?: 'development' | 'staging' | 'production';
 }
 
 export interface ConnectionSlice {

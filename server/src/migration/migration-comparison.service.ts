@@ -21,7 +21,10 @@ export class MigrationComparisonService {
 
   normalizeSchemaName(type: string, schema?: string): string {
     if (this.isMongoLike(type)) return '';
-    return schema?.trim() || (type === 'postgres' ? 'public' : '');
+    return (
+      schema?.trim() ||
+      (type === 'postgres' || type === 'cockroach' ? 'public' : '')
+    );
   }
 
   normalizeTableName(table: string): string {

@@ -122,6 +122,10 @@
     padding: 0;
   }
 
+  body {
+    pointer-events: auto !important;
+  }
+
   /* GPU-accelerated transitions on all interactive elements */
   button,
   a,

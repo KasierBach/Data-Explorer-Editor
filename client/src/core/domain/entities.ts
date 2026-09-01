@@ -1,4 +1,15 @@
-export type ConnectionType = 'postgres' | 'mysql' | 'mssql' | 'mongodb' | 'mongodb+srv' | 'redis';
+export type ConnectionType =
+    | 'postgres'
+    | 'cockroach'
+    | 'mysql'
+    | 'mariadb'
+    | 'mssql'
+    | 'sqlite'
+    | 'clickhouse'
+    | 'mongodb'
+    | 'mongodb+srv'
+    | 'mock'
+    | 'redis';
 
 export type JsonValue =
     | string

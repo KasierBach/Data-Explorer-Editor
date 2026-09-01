@@ -5,7 +5,9 @@
 
 export type ConnectionType =
   | 'postgres'
+  | 'cockroach'
   | 'mysql'
+  | 'mariadb'
   | 'mssql'
   | 'sqlite'
   | 'clickhouse'

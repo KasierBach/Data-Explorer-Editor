@@ -41,7 +41,9 @@ Current documentation focus reflects the **v3.6.4** workspace: configurable AI r
 
 - **Unified Engine Architecture**: Connect to multiple engines through a strategy-based backend:
   - **PostgreSQL** (Neon, Supabase, RDS, Local)
+  - **CockroachDB** (PostgreSQL wire-compatible, default port 26257)
   - **MySQL** (PlanetScale, Local, TiDB)
+  - **MariaDB** (MySQL drop-in compatible, default port 3306)
   - **SQL Server** (Azure SQL, Local MSSQL)
   - **ClickHouse**
   - **MongoDB** and **MongoDB Atlas (SRV)**

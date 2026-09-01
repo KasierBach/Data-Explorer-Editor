@@ -27,12 +27,28 @@ const getDbBranding = (type?: string) => {
                 label: 'PG',
                 icon: <SiPostgresql className="w-3.5 h-3.5" />,
             };
+        case 'cockroach':
+            return {
+                color: 'text-indigo-400',
+                bg: 'bg-indigo-500/10',
+                bgHover: 'group-hover:bg-indigo-500/20',
+                label: 'CR',
+                icon: <Server className="w-3.5 h-3.5" />,
+            };
         case 'mysql':
             return {
                 color: 'text-orange-400',
                 bg: 'bg-orange-500/10',
                 bgHover: 'group-hover:bg-orange-500/20',
                 label: 'MY',
+                icon: <SiMysql className="w-4 h-4" />,
+            };
+        case 'mariadb':
+            return {
+                color: 'text-amber-400',
+                bg: 'bg-amber-500/10',
+                bgHover: 'group-hover:bg-amber-500/20',
+                label: 'MA',
                 icon: <SiMysql className="w-4 h-4" />,
             };
         case 'mssql':
@@ -72,7 +88,7 @@ const getDbBranding = (type?: string) => {
 };
 
 const NOSQL_TYPES = ['mongodb', 'mongodb+srv'];
-const SQL_TYPES = ['postgres', 'mysql', 'mssql', 'clickhouse'];
+const SQL_TYPES = ['postgres', 'cockroach', 'mysql', 'mariadb', 'mssql', 'clickhouse'];
 
 interface ConnectionSelectorProps {
     /** 'sql' = only relational, 'nosql' = only supported MongoDB sources, undefined = all */
@@ -204,110 +220,124 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
     return (
         <div className="px-0">
             <div className="space-y-2">
-            <Select value={currentConnectionId || ''} onValueChange={handleConnectionChange}>
-                <SelectTrigger className="w-full h-10 bg-muted/30 border-none ring-1 ring-border/50 hover:ring-blue-500/30 transition-all rounded-xl shadow-inner group">
-                    <div className="flex items-center gap-2.5 truncate">
-                        <div className={`w-6 h-6 rounded-lg ${activeBranding.bg} flex items-center justify-center shrink-0 ${activeBranding.bgHover} transition-colors ${activeBranding.color}`}>
-                            {activeBranding.icon}
+                <Select value={currentConnectionId || ''} onValueChange={handleConnectionChange}>
+                    <SelectTrigger className="w-full h-10 bg-muted/30 border-none ring-1 ring-border/50 hover:ring-blue-500/30 transition-all rounded-xl shadow-inner group">
+                        <div className="flex items-center gap-2.5 truncate">
+                            <div className={`w-6 h-6 rounded-lg ${activeBranding.bg} flex items-center justify-center shrink-0 ${activeBranding.bgHover} transition-colors ${activeBranding.color}`}>
+                                {activeBranding.icon}
+                            </div>
+                            <span className="truncate">
+                                {activeConn ? activeConn.name : text.selectInstance}
+                            </span>
                         </div>
-                        <span className="truncate">
-                            {activeConn ? activeConn.name : text.selectInstance}
-                        </span>
-                    </div>
-                </SelectTrigger>
-                <SelectContent className="rounded-xl border-none shadow-2xl ring-1 ring-black/5 backdrop-blur-xl bg-card/95">
-                    <SelectGroup>
-                        <SelectLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/70 px-4 py-2">
-                            {filter === 'nosql' 
-                                ? text.noSqlInstances
-                                : filter === 'sql' 
-                                    ? text.sqlInstances
-                                    : text.availableInstances}
-                        </SelectLabel>
-                        {visibleConnections.map((conn) => {
-                            const branding = getDbBranding(conn.type);
-                            const isAutoNamed = conn.name.includes('@');
-                            
-                            return (
-                                <div key={conn.id} className="group relative flex items-center pr-2">
-                                    <SelectItem value={conn.id} textValue={conn.name} className="cursor-pointer focus:bg-blue-500/10 focus:text-blue-600 rounded-lg mx-1 flex-1 pr-20">
-                                        <div className="flex items-center gap-2.5 text-left py-0.5">
-                                            <div className={`w-5 h-5 rounded-md ${branding.bg} flex items-center justify-center shrink-0 ${branding.color}`}>
-                                                {branding.icon}
-                                            </div>
-                                            <div className="flex flex-col min-w-0">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="font-bold text-sm truncate">{conn.name}</span>
-                                                    {conn.organizationId && (
-                                                        <Users className="w-3 h-3 text-blue-400 shrink-0" />
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-2 opacity-60 flex-wrap">
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-none shadow-2xl ring-1 ring-black/5 backdrop-blur-xl bg-card/95">
+                        <SelectGroup>
+                            <SelectLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/70 px-4 py-2">
+                                {filter === 'nosql'
+                                    ? text.noSqlInstances
+                                    : filter === 'sql'
+                                        ? text.sqlInstances
+                                        : text.availableInstances}
+                            </SelectLabel>
+                            {visibleConnections.map((conn) => {
+                                const branding = getDbBranding(conn.type);
+                                const isAutoNamed = conn.name.includes('@');
 
-                                                    <span className={`text-[9px] font-bold uppercase ${branding.color}`}>{branding.label}</span>
-                                                    {/* Only show host if it's not already in the name and not localhost */}
-                                                    {!isAutoNamed && conn.host && conn.host !== 'localhost' && (
-                                                        <>
-                                                            <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/40" />
-                                                            <span className="text-[10px] truncate max-w-[100px]">{conn.host}</span>
-                                                        </>
-                                                    )}
-                                                    {conn.readOnly && (
-                                                        <>
-                                                            <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/40" />
-                                                            <span className="text-[9px] font-bold uppercase text-amber-400">RO</span>
-                                                        </>
-                                                    )}
-                                                    {conn.lastHealthStatus && (
-                                                        <>
-                                                            <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/40" />
-                                                            <span className={`text-[9px] font-bold uppercase ${conn.lastHealthStatus === 'healthy' ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                                {conn.lastHealthStatus}
-                                                            </span>
-                                                        </>
-                                                    )}
+                                return (
+                                    <div key={conn.id} className="group relative flex items-center pr-2">
+                                        <SelectItem value={conn.id} textValue={conn.name} className="cursor-pointer focus:bg-blue-500/10 focus:text-blue-600 rounded-lg mx-1 flex-1 pr-20">
+                                            <div className="flex items-center gap-2.5 text-left py-0.5">
+                                                <div className={`w-5 h-5 rounded-md ${branding.bg} flex items-center justify-center shrink-0 ${branding.color}`}>
+                                                    {branding.icon}
+                                                </div>
+                                                <div className="flex flex-col min-w-0">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="font-bold text-sm truncate">{conn.name}</span>
+                                                        {conn.organizationId && (
+                                                            <Users className="w-3 h-3 text-blue-400 shrink-0" />
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 opacity-60 flex-wrap">
+
+                                                        <span className={`text-[9px] font-bold uppercase ${branding.color}`}>{branding.label}</span>
+                                                        {/* Only show host if it's not already in the name and not localhost */}
+                                                        {!isAutoNamed && conn.host && conn.host !== 'localhost' && (
+                                                            <>
+                                                                <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/40" />
+                                                                <span className="text-[10px] truncate max-w-[100px]">{conn.host}</span>
+                                                            </>
+                                                        )}
+                                                        {conn.environment && (
+                                                            <>
+                                                                <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/40" />
+                                                                <span className={`text-[9px] font-bold uppercase px-1 py-0.2 rounded ${
+                                                                    conn.environment === 'production'
+                                                                        ? 'text-red-500 bg-red-500/10'
+                                                                        : conn.environment === 'staging'
+                                                                        ? 'text-amber-500 bg-amber-500/10'
+                                                                        : 'text-emerald-500 bg-emerald-500/10'
+                                                                }`}>
+                                                                    {conn.environment === 'production' ? 'PROD' : conn.environment === 'staging' ? 'STAGE' : 'DEV'}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                        {conn.readOnly && (
+                                                            <>
+                                                                <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/40" />
+                                                                <span className="text-[9px] font-bold uppercase text-amber-400">RO</span>
+                                                            </>
+                                                        )}
+                                                        {conn.lastHealthStatus && (
+                                                            <>
+                                                                <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/40" />
+                                                                <span className={`text-[9px] font-bold uppercase ${conn.lastHealthStatus === 'healthy' ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                                    {conn.lastHealthStatus}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </SelectItem>
-                                    <div className="absolute right-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                        <div
-                                            className="p-1.5 rounded-md hover:bg-blue-500/20 text-muted-foreground hover:text-blue-500 cursor-pointer"
-                                            onPointerDown={(e) => handleShare(e, conn.id)}
-                                        >
-                                            <Share2 className="w-3.5 h-3.5" />
-                                        </div>
-                                        <div
-                                            className="p-1.5 rounded-md hover:bg-red-500/20 text-muted-foreground hover:text-red-500 cursor-pointer"
-                                            onPointerDown={(e) => handleDelete(e, conn.id)}
-                                        >
-                                            {isDeleting === conn.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash className="w-3.5 h-3.5" />}
+                                        </SelectItem>
+                                        <div className="absolute right-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                            <div
+                                                className="p-1.5 rounded-md hover:bg-blue-500/20 text-muted-foreground hover:text-blue-500 cursor-pointer"
+                                                onPointerDown={(e) => handleShare(e, conn.id)}
+                                            >
+                                                <Share2 className="w-3.5 h-3.5" />
+                                            </div>
+                                            <div
+                                                className="p-1.5 rounded-md hover:bg-red-500/20 text-muted-foreground hover:text-red-500 cursor-pointer"
+                                                onPointerDown={(e) => handleDelete(e, conn.id)}
+                                            >
+                                                {isDeleting === conn.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash className="w-3.5 h-3.5" />}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </SelectGroup>
-                    <div className="p-2 border-t border-border/10 mt-2 bg-muted/10">
-                        <div
-                            className="flex items-center gap-3 px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-blue-500/10 hover:text-blue-600 transition-all cursor-pointer text-muted-foreground/70"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                openConnectionDialog();
-                            }}
-                        >
-                            <PlusCircle className="w-4 h-4" />
-                            <span>{text.provisionServer}</span>
+                                );
+                            })}
+                        </SelectGroup>
+                        <div className="p-2 border-t border-border/10 mt-2 bg-muted/10">
+                            <div
+                                className="flex items-center gap-3 px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-blue-500/10 hover:text-blue-600 transition-all cursor-pointer text-muted-foreground/70"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    openConnectionDialog();
+                                }}
+                            >
+                                <PlusCircle className="w-4 h-4" />
+                                <span>{text.provisionServer}</span>
+                            </div>
                         </div>
-                    </div>
 
-                </SelectContent>
-            </Select>
-            <ShareConnectionDialog 
-                connectionId={shareConnectionId} 
-                open={!!shareConnectionId} 
-                onOpenChange={(open) => !open && setShareConnectionId(null)} 
-            />
+                    </SelectContent>
+                </Select>
+                <ShareConnectionDialog
+                    connectionId={shareConnectionId}
+                    open={!!shareConnectionId}
+                    onOpenChange={(open) => !open && setShareConnectionId(null)}
+                />
                 {activeConn && (
                     <div className="flex items-center justify-between gap-2 rounded-xl border border-border/50 bg-muted/20 px-3 py-2">
                         <div className="flex items-center gap-2 min-w-0">

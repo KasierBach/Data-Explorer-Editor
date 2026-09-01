@@ -22,7 +22,9 @@ export class CreateConnectionDto {
   @ApiProperty({
     enum: [
       'postgres',
+      'cockroach',
       'mysql',
+      'mariadb',
       'mssql',
       'sqlite',
       'clickhouse',
@@ -35,7 +37,9 @@ export class CreateConnectionDto {
   @IsString()
   @IsIn([
     'postgres',
+    'cockroach',
     'mysql',
+    'mariadb',
     'mssql',
     'sqlite',
     'clickhouse',
@@ -45,7 +49,9 @@ export class CreateConnectionDto {
   ])
   type:
     | 'postgres'
+    | 'cockroach'
     | 'mysql'
+    | 'mariadb'
     | 'mssql'
     | 'sqlite'
     | 'clickhouse'
@@ -119,4 +125,42 @@ export class CreateConnectionDto {
   @IsString()
   @IsOptional()
   organizationId?: string;
+
+  @ApiPropertyOptional({ description: 'SSH host for tunneling' })
+  @IsString()
+  @IsOptional()
+  @IsValidHost({
+    message: 'SSH host address is not allowed for security reasons (SSRF).',
+  })
+  sshHost?: string;
+
+  @ApiPropertyOptional({ example: 22, description: 'SSH port' })
+  @IsInt()
+  @IsOptional()
+  sshPort?: number;
+
+  @ApiPropertyOptional({ description: 'SSH username' })
+  @IsString()
+  @IsOptional()
+  sshUsername?: string;
+
+  @ApiPropertyOptional({ description: 'SSH private key (encrypted at rest)' })
+  @IsString()
+  @IsOptional()
+  sshPrivateKey?: string;
+
+  @ApiPropertyOptional({ description: 'SSH passphrase (encrypted at rest)' })
+  @IsString()
+  @IsOptional()
+  sshPassphrase?: string;
+
+  @ApiPropertyOptional({
+    enum: ['development', 'staging', 'production'],
+    description: 'Environment classification tag',
+    default: 'development',
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(['development', 'staging', 'production'])
+  environment?: 'development' | 'staging' | 'production';
 }

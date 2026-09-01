@@ -31,18 +31,20 @@ export function useDataGridData({ tableId, tabId, enabled, includeTotalCount = f
     const { activeConnectionId, connections, tabs } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const tab = tabs.find(t => t.id === tabId);
-    
+
     // Pagination state from tab metadata
     const page = tab?.metadata?.page || 1;
     const pageSize = tab?.metadata?.pageSize || 100;
     const offset = (page - 1) * pageSize;
 
     const { dbName, schema, table: cleanTableName } = parseNodeId(tableId);
-    const dialect: 'mysql' | 'postgres' | 'mssql' = activeConnection?.type === 'mysql'
-        ? 'mysql'
-        : activeConnection?.type === 'mssql'
-            ? 'mssql'
-            : 'postgres';
+    const connType = activeConnection?.type;
+    const dialect: 'mysql' | 'postgres' | 'mssql' =
+        connType === 'mysql' || connType === 'mariadb'
+            ? 'mysql'
+            : connType === 'mssql'
+                ? 'mssql'
+                : 'postgres'; // postgres, cockroach, sqlite, clickhouse
     const resolvedTableName = cleanTableName || tableId;
 
     // Fetch Metadata with long-term cache (5 minutes)
@@ -74,7 +76,7 @@ export function useDataGridData({ tableId, tabId, enabled, includeTotalCount = f
             if (!activeConnection) throw new Error("No active connection");
             if (!resolvedTableName) throw new Error("No table selected");
             const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
-            
+
             return adapter.fetchTableWindow({
                 database: dbName,
                 schema,

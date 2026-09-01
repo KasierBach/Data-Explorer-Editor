@@ -3,7 +3,9 @@ export class Connection {
   name: string;
   type:
     | 'postgres'
+    | 'cockroach'
     | 'mysql'
+    | 'mariadb'
     | 'mssql'
     | 'sqlite'
     | 'clickhouse'
@@ -27,4 +29,10 @@ export class Connection {
   lastConnectionLatencyMs?: number | null;
   createdAt: Date;
   organizationId?: string | null;
+  sshHost?: string | null;
+  sshPort?: number;
+  sshUsername?: string | null;
+  sshPrivateKey?: string | null;
+  sshPassphrase?: string | null;
+  environment?: 'development' | 'staging' | 'production' | null;
 }

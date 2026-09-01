@@ -154,9 +154,11 @@ export class ConnectionsService implements OnModuleDestroy {
   private async pingPool(pool: any, type: string) {
     switch (type) {
       case 'postgres':
+      case 'cockroach':
         await pool.query('SELECT 1');
         return;
       case 'mysql':
+      case 'mariadb':
         await pool.query('SELECT 1');
         return;
       case 'mssql':
@@ -305,8 +307,21 @@ export class ConnectionsService implements OnModuleDestroy {
     createConnectionDto: CreateConnectionDto,
     userId: string,
   ): Promise<Connection> {
-    const { name, password, organizationId, ...rest } = createConnectionDto;
+    const {
+      name,
+      password,
+      organizationId,
+      sshPrivateKey,
+      sshPassphrase,
+      ...rest
+    } = createConnectionDto;
     const encryptedPassword = password ? encryptAttribute(password) : undefined;
+    const encryptedSshPrivateKey = sshPrivateKey
+      ? encryptAttribute(sshPrivateKey)
+      : undefined;
+    const encryptedSshPassphrase = sshPassphrase
+      ? encryptAttribute(sshPassphrase)
+      : undefined;
     const teamOrganizationId = organizationId?.trim() || null;
     this.ensureHostConfigured(
       createConnectionDto.type,
@@ -329,6 +344,8 @@ export class ConnectionsService implements OnModuleDestroy {
         ...(hasHost ? { host: normalizedHost } : {}),
         name,
         password: encryptedPassword,
+        sshPrivateKey: encryptedSshPrivateKey,
+        sshPassphrase: encryptedSshPassphrase,
         userId,
         readOnly: createConnectionDto.readOnly ?? false,
         allowSchemaChanges: createConnectionDto.readOnly
@@ -386,9 +403,34 @@ export class ConnectionsService implements OnModuleDestroy {
     const strategy = this.strategyFactory.getStrategy(createConnectionDto.type);
     const startedAt = Date.now();
     let pool: any;
+    let localSshKey: string | null = null;
 
     try {
-      pool = await strategy.createPool(createConnectionDto);
+      let testDto = { ...createConnectionDto };
+      if (createConnectionDto.sshHost && createConnectionDto.sshUsername) {
+        localSshKey = `test:${Date.now()}:${Math.random()}`;
+        const dbHost = this.normalizeHost(createConnectionDto.host);
+        if (!dbHost) {
+          throw new BadRequestException(
+            'Host is required for SSH tunnel connections.',
+          );
+        }
+        const localPort = await this.sshTunnelService.openTunnel(localSshKey, {
+          sshHost: createConnectionDto.sshHost,
+          sshPort: createConnectionDto.sshPort || 22,
+          sshUsername: createConnectionDto.sshUsername,
+          sshPrivateKey: createConnectionDto.sshPrivateKey,
+          sshPassphrase: createConnectionDto.sshPassphrase,
+          dbHost,
+          dbPort: createConnectionDto.port || 5432,
+        });
+        testDto = {
+          ...testDto,
+          host: '127.0.0.1',
+          port: localPort,
+        };
+      }
+      pool = await strategy.createPool(testDto);
       await this.pingPool(pool, createConnectionDto.type);
 
       return {
@@ -405,6 +447,11 @@ export class ConnectionsService implements OnModuleDestroy {
     } finally {
       if (pool) {
         await strategy.closePool(pool).catch(() => undefined);
+      }
+      if (localSshKey) {
+        await this.sshTunnelService
+          .closeTunnel(localSshKey)
+          .catch(() => undefined);
       }
     }
   }
@@ -601,10 +648,19 @@ export class ConnectionsService implements OnModuleDestroy {
     // Close existing pools for this connection if config changed
     await this.closePoolsByConnectionId(id);
 
-    const { password, ...rest } = updateConnectionDto;
+    const { password, sshPrivateKey, sshPassphrase, ...rest } =
+      updateConnectionDto;
     const encryptedPassword =
       password !== undefined && password !== null
         ? encryptAttribute(password)
+        : undefined;
+    const encryptedSshPrivateKey =
+      sshPrivateKey !== undefined && sshPrivateKey !== null
+        ? encryptAttribute(sshPrivateKey)
+        : undefined;
+    const encryptedSshPassphrase =
+      sshPassphrase !== undefined && sshPassphrase !== null
+        ? encryptAttribute(sshPassphrase)
         : undefined;
     const hasOrganizationId = Object.prototype.hasOwnProperty.call(
       updateConnectionDto,
@@ -636,6 +692,12 @@ export class ConnectionsService implements OnModuleDestroy {
       ...(hasHost ? { host: this.normalizeHost(nextHost) } : {}),
       ...(password !== undefined && password !== null
         ? { password: encryptedPassword }
+        : {}),
+      ...(sshPrivateKey !== undefined && sshPrivateKey !== null
+        ? { sshPrivateKey: encryptedSshPrivateKey }
+        : {}),
+      ...(sshPassphrase !== undefined && sshPassphrase !== null
+        ? { sshPassphrase: encryptedSshPassphrase }
         : {}),
       readOnly,
       allowSchemaChanges: readOnly

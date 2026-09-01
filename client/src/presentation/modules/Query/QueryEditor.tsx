@@ -36,7 +36,7 @@ type AiExplanationResponse = {
     explanation?: string;
 };
 
-const SQL_SEQUENCE_TYPES = new Set(['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse']);
+const SQL_SEQUENCE_TYPES = new Set(['postgres', 'cockroach', 'mysql', 'mariadb', 'mssql', 'sqlite', 'clickhouse']);
 
 function getErrorMessage(error: unknown) {
     return error instanceof Error ? error.message : 'Unexpected error';

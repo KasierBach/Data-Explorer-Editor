@@ -20,9 +20,13 @@ export const handleTreeAction = (
 
     const { dbName, schema, table: tableName } = parseNodeId(nodeId);
 
-    // Cast dialect to 'postgres' | 'mysql' since getQuotedIdentifier only supports these currently
-    // Defaulting to postgres if it's mssql or clickhouse for safe quoting fallback
-    const qDialect = activeConnection.type === 'mysql' ? 'mysql' : 'postgres';
+    // Cast dialect to 'postgres' | 'mysql' since getQuotedIdentifier only supports these currently.
+    // MariaDB uses MySQL quoting (backticks); everything else falls back to
+    // ANSI postgres quoting.
+    const qDialect =
+        activeConnection.type === 'mysql' || activeConnection.type === 'mariadb'
+            ? 'mysql'
+            : 'postgres';
     const qualifiedName = getFullyQualifiedTable(nodeId, qDialect);
     const q = (name: string) => getQuotedIdentifier(name, qDialect);
 

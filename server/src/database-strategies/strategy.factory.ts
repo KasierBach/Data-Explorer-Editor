@@ -28,7 +28,13 @@ export class DatabaseStrategyFactory {
   ) {
     this.strategies = new Map<string, IDatabaseStrategy>([
       ['postgres', postgresStrategy],
+      // CockroachDB speaks the PostgreSQL wire protocol, so it reuses the
+      // Postgres strategy (default port 26257).
+      ['cockroach', postgresStrategy],
       ['mysql', mysqlStrategy],
+      // MariaDB is a MySQL drop-in, so it reuses the MySQL strategy
+      // (default port 3306).
+      ['mariadb', mysqlStrategy],
       ['mssql', mssqlStrategy],
       ['mongodb', mongoDbStrategy],
       ['mongodb+srv', mongoDbStrategy],
