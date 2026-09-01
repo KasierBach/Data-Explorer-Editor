@@ -60,11 +60,18 @@ export function App() {
   useNotifications();
 
   const { theme: appTheme, setTheme: setAppTheme } = useTheme();
-  const { user, restoreSession, setAuthBootstrapped } = useAppStore();
+  const { user, restoreSession, setAuthBootstrapped, lang } = useAppStore();
+
+  // Keep the <html lang> attribute in sync with the active app language so
+  // screen readers pick the right pronunciation and SEO crawlers see the
+  // correct document language.
+  useEffect(() => {
+    document.documentElement.lang = lang === 'en' ? 'en' : 'vi';
+  }, [lang]);
 
   useEffect(() => {
     if (isAppTheme(user?.theme) && user.theme !== appTheme) {
-        setAppTheme(user.theme);
+      setAppTheme(user.theme);
     }
   }, [user?.theme, appTheme, setAppTheme]);
 
@@ -95,61 +102,61 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-foreground focus:ring-2 focus:ring-ring">
-            Skip to content
-          </a>
-          <ErrorBoundary>
-            <div id="main-content" tabIndex={-1}>
-              <Suspense fallback={<RouteFallback />}>
+      <BrowserRouter>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-foreground focus:ring-2 focus:ring-ring">
+          Skip to content
+        </a>
+        <ErrorBoundary>
+          <div id="main-content" tabIndex={-1}>
+            <Suspense fallback={<RouteFallback />}>
               <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/login" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
-              <Route path="/forgot-password" element={<RedirectIfAuth><ForgotPasswordPage /></RedirectIfAuth>} />
-              <Route path="/legal-consent" element={<RequireAuth><LegalConsentPage /></RequireAuth>} />
-              <Route path="/onboarding" element={<RequireAuth><OnboardingPage /></RequireAuth>} />
-              <Route path="/docs" element={<DocumentationPage />} />
-              <Route path="/changelog" element={<ChangelogPage />} />
-              <Route path="/legal" element={<LegalCenterPage />} />
-              <Route path="/privacy" element={<PrivacyPage />} />
-              <Route path="/terms" element={<TermsPage />} />
-              <Route path="/teams" element={<RequireAuth><TeamPage /></RequireAuth>} />
-              <Route path="/billing/return" element={<RequireAuth><BillingReturnPage /></RequireAuth>} />
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
+                <Route path="/forgot-password" element={<RedirectIfAuth><ForgotPasswordPage /></RedirectIfAuth>} />
+                <Route path="/legal-consent" element={<RequireAuth><LegalConsentPage /></RequireAuth>} />
+                <Route path="/onboarding" element={<RequireAuth><OnboardingPage /></RequireAuth>} />
+                <Route path="/docs" element={<DocumentationPage />} />
+                <Route path="/changelog" element={<ChangelogPage />} />
+                <Route path="/legal" element={<LegalCenterPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/teams" element={<RequireAuth><TeamPage /></RequireAuth>} />
+                <Route path="/billing/return" element={<RequireAuth><BillingReturnPage /></RequireAuth>} />
 
-              <Route path="/admin" element={<RequireAuth requireAdmin={true}><AdminDashboardPage /></RequireAuth>} />
+                <Route path="/admin" element={<RequireAuth requireAdmin={true}><AdminDashboardPage /></RequireAuth>} />
 
-              <Route path="/sql-explorer/erd" element={<RequireAuth><ERDPage /></RequireAuth>} />
-              <Route path="/sql-explorer/visualize" element={<RequireAuth><VisualizePage /></RequireAuth>} />
+                <Route path="/sql-explorer/erd" element={<RequireAuth><ERDPage /></RequireAuth>} />
+                <Route path="/sql-explorer/visualize" element={<RequireAuth><VisualizePage /></RequireAuth>} />
 
-              <Route
-                path="/sql-explorer/*"
-                element={
-                  <RequireAuth>
-                    <AppShell />
-                  </RequireAuth>
-                }
-              />
+                <Route
+                  path="/sql-explorer/*"
+                  element={
+                    <RequireAuth>
+                      <AppShell />
+                    </RequireAuth>
+                  }
+                />
 
-              <Route
-                path="/nosql-explorer/*"
-                element={
-                  <RequireAuth>
-                    <NoSqlShell />
-                  </RequireAuth>
-                }
-              />
-              <Route path="/nosql-explorer/erd" element={<RequireAuth><ERDPage /></RequireAuth>} />
-              <Route path="/nosql-explorer/visualize" element={<RequireAuth><VisualizePage /></RequireAuth>} />
+                <Route
+                  path="/nosql-explorer/*"
+                  element={
+                    <RequireAuth>
+                      <NoSqlShell />
+                    </RequireAuth>
+                  }
+                />
+                <Route path="/nosql-explorer/erd" element={<RequireAuth><ERDPage /></RequireAuth>} />
+                <Route path="/nosql-explorer/visualize" element={<RequireAuth><VisualizePage /></RequireAuth>} />
 
-              <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
-              </Suspense>
-            </div>
-          </ErrorBoundary>
-          <Toaster richColors position="top-center" />
-          <DestructiveQueryDialog />
-          <CommandPalette />
-        </BrowserRouter>
+            </Suspense>
+          </div>
+        </ErrorBoundary>
+        <Toaster richColors position="top-center" />
+        <DestructiveQueryDialog />
+        <CommandPalette />
+      </BrowserRouter>
     </QueryClientProvider>
   )
 }

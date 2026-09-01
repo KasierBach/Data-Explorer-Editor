@@ -1,0 +1,33 @@
+{
+    "name": "Data Explorer - Multi-Engine Database IDE",
+    "short_name": "Data Explorer",
+    "description": "A unified workspace for PostgreSQL, MySQL, SQL Server, ClickHouse, and MongoDB with AI-assisted querying, schema exploration, ERD tools, and team-aware access controls.",
+    "id": "/",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "any",
+    "background_color": "#0a0a0f",
+    "theme_color": "#0a0a0f",
+    "lang": "en",
+    "dir": "ltr",
+    "categories": [
+        "developer",
+        "productivity",
+        "business"
+    ],
+    "icons": [
+        {
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        },
+        {
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "maskable"
+        }
+    ]
+}
