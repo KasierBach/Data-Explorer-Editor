@@ -310,7 +310,9 @@ export class QueryService {
     }
   }
 
-  // â”€â”€â”€ Query Execution â”€â”€â”€
+  // ─────────────────────────────────────────────
+  // Query Execution
+  // ─────────────────────────────────────────────
 
   private async assertQueryAllowed(
     connection: any,
@@ -576,6 +578,9 @@ export class QueryService {
       } else {
         result.countStatus = 'skipped';
       }
+      // Expose the wall-clock execution time to the client so the results
+      // panel and query history can display it.
+      result.durationMs = Date.now() - startedAt;
       await this.auditService.log({
         action: AuditAction.DB_QUERY_EXECUTE,
         userId,
@@ -964,7 +969,9 @@ export class QueryService {
     }
   }
 
-  // â”€â”€â”€ Schema Operations â”€â”€â”€
+  // ─────────────────────────────────────────────
+  // Schema Operations
+  // ─────────────────────────────────────────────
 
   async updateSchema(updateSchemaDto: UpdateSchemaDto, userId: string) {
     const { connectionId, database, schema, table, operations } =
@@ -1169,7 +1176,9 @@ export class QueryService {
     }
   }
 
-  // â”€â”€â”€ Data Import â”€â”€â”€
+  // ─────────────────────────────────────────────
+  // Data Import
+  // ─────────────────────────────────────────────
 
   async importData(
     body: { connectionId: string; schema: string; table: string; data: any[] },

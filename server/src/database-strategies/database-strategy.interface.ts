@@ -58,6 +58,7 @@ export interface QueryResult {
   appliedOffset?: number;
   limitSource?: 'requested' | 'protective_default' | 'table_window';
   cached?: boolean;
+  durationMs?: number;
 }
 
 export interface Relationship {
