@@ -96,9 +96,7 @@ describe('MysqlStrategy', () => {
 
   describe('tree nodes', () => {
     it('lists views from information_schema', async () => {
-      mockPool.query.mockResolvedValueOnce([
-        [{ TABLE_NAME: 'active_users' }],
-      ]);
+      mockPool.query.mockResolvedValueOnce([[{ TABLE_NAME: 'active_users' }]]);
 
       const views = await strategy.getViews(mockPool, 'app');
 
@@ -116,9 +114,7 @@ describe('MysqlStrategy', () => {
     });
 
     it('lists functions from information_schema', async () => {
-      mockPool.query.mockResolvedValueOnce([
-        [{ routine_name: 'calc_total' }],
-      ]);
+      mockPool.query.mockResolvedValueOnce([[{ routine_name: 'calc_total' }]]);
 
       const functions = await strategy.getFunctions(mockPool, 'app');
 
@@ -173,31 +169,31 @@ describe('MysqlStrategy', () => {
 
       expect(mockPool.execute).toHaveBeenCalledWith(
         'UPDATE ' +
-        quote +
-        'app' +
-        quote +
-        '.' +
-        quote +
-        'users' +
-        quote +
-        quote +
-        '; DROP TABLE audit; --' +
-        quote +
-        ' SET ' +
-        quote +
-        'display' +
-        quote +
-        quote +
-        'name' +
-        quote +
-        ' = ? WHERE ' +
-        quote +
-        'id' +
-        quote +
-        quote +
-        ' OR 1=1 --' +
-        quote +
-        ' = ?',
+          quote +
+          'app' +
+          quote +
+          '.' +
+          quote +
+          'users' +
+          quote +
+          quote +
+          '; DROP TABLE audit; --' +
+          quote +
+          ' SET ' +
+          quote +
+          'display' +
+          quote +
+          quote +
+          'name' +
+          quote +
+          ' = ? WHERE ' +
+          quote +
+          'id' +
+          quote +
+          quote +
+          ' OR 1=1 --' +
+          quote +
+          ' = ?',
         ['Ada', 1],
       );
     });

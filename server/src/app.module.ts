@@ -64,14 +64,14 @@ import { AiQualityModule } from './ai-quality/ai-quality.module';
         autoLogging:
           process.env.NODE_ENV === 'production'
             ? {
-              ignore: (req) => {
-                const url = (req as { url?: string }).url || '';
-                // Skip health checks and docs to avoid log noise.
-                return (
-                  url.includes('/api/health') || url.includes('/api/docs')
-                );
-              },
-            }
+                ignore: (req) => {
+                  const url = (req as { url?: string }).url || '';
+                  // Skip health checks and docs to avoid log noise.
+                  return (
+                    url.includes('/api/health') || url.includes('/api/docs')
+                  );
+                },
+              }
             : false,
         customProps: (req) => ({ requestId: (req as { id?: string }).id }),
       },

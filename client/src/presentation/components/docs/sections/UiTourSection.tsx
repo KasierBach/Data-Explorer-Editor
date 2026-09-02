@@ -1,4 +1,4 @@
-import { MousePointerClick, LayoutDashboard, Database, FileCode, Bot, BarChart3, Users, Activity } from 'lucide-react';
+import { MousePointerClick, Database, FileCode, Bot, BarChart3, Users, Activity } from 'lucide-react';
 import { DocPageLayout, DocSection, DocSubSection, Prose, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }

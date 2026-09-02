@@ -652,12 +652,8 @@ export class ConnectionsService implements OnModuleDestroy {
     // Close existing pools for this connection if config changed
     await this.closePoolsByConnectionId(id);
 
-    const {
-      password,
-      sshPrivateKey,
-      sshPassphrase,
-      ...rest
-    } = updateConnectionDto;
+    const { password, sshPrivateKey, sshPassphrase, ...rest } =
+      updateConnectionDto;
     const encryptedPassword =
       password !== undefined && password !== null
         ? encryptAttribute(password)

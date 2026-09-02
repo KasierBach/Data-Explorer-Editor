@@ -117,7 +117,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
       columns: actualFields.map((f) => f.name),
       rowCount:
         !Array.isArray(result) &&
-          (result as ResultSetHeader).affectedRows !== undefined
+        (result as ResultSetHeader).affectedRows !== undefined
           ? (result as ResultSetHeader).affectedRows
           : undefined,
     };
@@ -165,11 +165,11 @@ export class MysqlStrategy implements IDatabaseStrategy {
           safeSql =
             options.offset !== undefined
               ? SqlUtil.injectPagination(
-                statement,
-                options.limit,
-                options.offset,
-                'mysql',
-              )
+                  statement,
+                  options.limit,
+                  options.offset,
+                  'mysql',
+                )
               : SqlUtil.injectLimit(statement, options.limit);
         }
         const [rows, fields] = await connection.query({
@@ -186,7 +186,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
             columns: actualFields.map((f) => f.name),
             rowCount:
               !Array.isArray(rows) &&
-                (rows as ResultSetHeader).affectedRows !== undefined
+              (rows as ResultSetHeader).affectedRows !== undefined
                 ? (rows as ResultSetHeader).affectedRows
                 : undefined,
           };

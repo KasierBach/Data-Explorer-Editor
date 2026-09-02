@@ -5,4 +5,3 @@ export function isLocalDatabaseHost(host: string): boolean {
 export function allowInsecureDatabaseTls(): boolean {
   return process.env.ALLOW_INSECURE_DATABASE_TLS !== 'false';
 }
-

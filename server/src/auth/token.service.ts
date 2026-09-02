@@ -8,7 +8,7 @@ const NOTIFICATIONS_STREAM_TICKET_TTL_SECONDS = 15 * 60;
 
 @Injectable()
 export class TokenService {
-  constructor(private readonly jwtService: JwtService) { }
+  constructor(private readonly jwtService: JwtService) {}
 
   // Allow for small clock skew between services.
   private readonly clockToleranceSeconds = 5;

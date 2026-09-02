@@ -14,7 +14,7 @@ export class SearchService {
     private readonly strategyFactory: DatabaseStrategyFactory,
     private readonly aiService: AiService,
     private readonly searchIndexRepository: SearchIndexRepository,
-  ) { }
+  ) {}
 
   private async suggestNames(userId: string, query: string) {
     const names =

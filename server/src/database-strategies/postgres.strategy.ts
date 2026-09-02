@@ -52,11 +52,11 @@ export class PostgresStrategy implements IDatabaseStrategy {
       ssl: isLocalhost
         ? false
         : {
-          rejectUnauthorized: !allowInsecureDatabaseTls(),
-          ...(host.toLowerCase().endsWith(SUPABASE_POOLER_HOST_SUFFIX)
-            ? { ca: SUPABASE_ROOT_2021_CA }
-            : {}),
-        },
+            rejectUnauthorized: !allowInsecureDatabaseTls(),
+            ...(host.toLowerCase().endsWith(SUPABASE_POOLER_HOST_SUFFIX)
+              ? { ca: SUPABASE_ROOT_2021_CA }
+              : {}),
+          },
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
@@ -161,11 +161,11 @@ export class PostgresStrategy implements IDatabaseStrategy {
           safeSql =
             options.offset !== undefined
               ? SqlUtil.injectPagination(
-                statement,
-                options.limit,
-                options.offset,
-                'postgres',
-              )
+                  statement,
+                  options.limit,
+                  options.offset,
+                  'postgres',
+                )
               : SqlUtil.injectLimit(statement, options.limit);
         }
         const raw = await client.query(safeSql);

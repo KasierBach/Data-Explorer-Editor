@@ -34,4 +34,4 @@ import { RedisStrategy } from './redis.strategy';
     DatabaseStrategyFactory,
   ],
 })
-export class DatabaseStrategiesModule { }
+export class DatabaseStrategiesModule {}
