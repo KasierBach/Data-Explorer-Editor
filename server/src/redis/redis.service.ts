@@ -6,19 +6,19 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { redisOptions, redisUrl } from './redis-client-options';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private client: Redis;
   private readonly defaultScanCount = 100;
+  private readonly maxScanKeys = 10_000;
 
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
-    const redisUrl =
-      this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
-    this.client = new Redis(redisUrl);
+    this.client = new Redis(redisUrl(this.configService), redisOptions());
 
     this.client.on('error', (err) => {
       this.logger.error('Redis connection error:', err);
@@ -39,7 +39,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async set(key: string, value: any, ttlSeconds?: number): Promise<void> {
     const stringValue =
       typeof value === 'string' ? value : JSON.stringify(value);
-    if (ttlSeconds) {
+    if (ttlSeconds !== undefined && ttlSeconds > 0) {
       await this.client.set(key, stringValue, 'EX', ttlSeconds);
     } else {
       await this.client.set(key, stringValue);
@@ -95,8 +95,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         count,
       );
       cursor = nextCursor;
-      batch.forEach((key) => discovered.add(key));
-    } while (cursor !== '0');
+      batch.forEach((key) => {
+        if (discovered.size < this.maxScanKeys) discovered.add(key);
+      });
+    } while (cursor !== '0' && discovered.size < this.maxScanKeys);
 
     return [...discovered];
   }

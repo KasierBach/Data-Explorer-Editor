@@ -168,6 +168,9 @@ export class ConnectionsService implements OnModuleDestroy {
       case 'mongodb+srv':
         await pool.db().admin().ping();
         return;
+      case 'redis':
+        await (pool as { ping(): Promise<string> }).ping();
+        return;
       default:
         return;
     }
@@ -355,6 +358,7 @@ export class ConnectionsService implements OnModuleDestroy {
           ? false
           : (createConnectionDto.allowImportExport ?? true),
         allowQueryExecution: createConnectionDto.allowQueryExecution ?? true,
+        environment: createConnectionDto.environment || 'none',
         ...(teamOrganizationId ? { organizationId: teamOrganizationId } : {}),
       } as any,
     });
@@ -648,8 +652,12 @@ export class ConnectionsService implements OnModuleDestroy {
     // Close existing pools for this connection if config changed
     await this.closePoolsByConnectionId(id);
 
-    const { password, sshPrivateKey, sshPassphrase, ...rest } =
-      updateConnectionDto;
+    const {
+      password,
+      sshPrivateKey,
+      sshPassphrase,
+      ...rest
+    } = updateConnectionDto;
     const encryptedPassword =
       password !== undefined && password !== null
         ? encryptAttribute(password)
@@ -711,6 +719,9 @@ export class ConnectionsService implements OnModuleDestroy {
       allowQueryExecution:
         updateConnectionDto.allowQueryExecution ??
         connection.allowQueryExecution,
+      ...(updateConnectionDto.environment !== undefined
+        ? { environment: updateConnectionDto.environment || 'none' }
+        : {}),
       ...(hasOrganizationId ? { organizationId: nextOrganizationId } : {}),
     };
 

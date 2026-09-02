@@ -1,0 +1,1 @@
+ALTER TABLE "Connection" ADD COLUMN "tls" BOOLEAN NOT NULL DEFAULT false;

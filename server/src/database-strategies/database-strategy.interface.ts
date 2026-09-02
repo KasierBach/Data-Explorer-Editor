@@ -104,6 +104,7 @@ export interface ConnectionConfig {
   username?: string | null;
   password?: string;
   database?: string | null;
+  tls?: boolean;
   statementTimeout?: number;
   queryTimeout?: number;
 }

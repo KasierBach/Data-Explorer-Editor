@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PermissionsService } from '../permissions/services/permissions.service';
 import { Permission } from '../permissions/enums/permission.enum';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
+import { redisOptions, redisUrl } from '../redis/redis-client-options';
 
 export interface PresenceParticipant {
   id: string;
@@ -55,13 +56,14 @@ export class PresenceService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    const redisUrl =
-      this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
-    this.redis = new Redis(redisUrl);
+    this.redis = new Redis(redisUrl(this.configService), redisOptions());
+    this.redis.on('error', (error) =>
+      this.logger.error('Redis presence error', error),
+    );
   }
 
-  onModuleDestroy() {
-    this.redis?.quit();
+  async onModuleDestroy() {
+    if (this.redis) await this.redis.quit();
   }
 
   async heartbeatTeamspace(

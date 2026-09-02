@@ -31,6 +31,7 @@ export interface Connection {
     port?: number;
     username?: string;
     database?: string; // Default DB
+    tls?: boolean;
     readOnly?: boolean;
     allowSchemaChanges?: boolean;
     allowImportExport?: boolean;

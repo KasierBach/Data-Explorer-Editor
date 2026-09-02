@@ -9,6 +9,7 @@ export interface Connection {
     username?: string;
     password?: string;
     database?: string;
+    tls?: boolean;
     showAllDatabases?: boolean;
     readOnly?: boolean;
     allowSchemaChanges?: boolean;
@@ -25,7 +26,7 @@ export interface Connection {
     sshUsername?: string;
     sshPrivateKey?: string;
     sshPassphrase?: string;
-    environment?: 'development' | 'staging' | 'production';
+    environment?: 'development' | 'staging' | 'production' | 'none';
 }
 
 export interface ConnectionSlice {
@@ -33,7 +34,8 @@ export interface ConnectionSlice {
     activeConnectionId: string | null;
     activeDatabase: string | null;
     isConnectionDialogOpen: boolean;
-    openConnectionDialog: () => void;
+    editingConnectionId: string | null;
+    openConnectionDialog: (connectionId?: string | null) => void;
     closeConnectionDialog: () => void;
     setActiveConnectionId: (id: string | null) => void;
     setActiveDatabase: (db: string | null) => void;
@@ -48,8 +50,9 @@ export const createConnectionSlice: StateCreator<ConnectionSlice> = (set) => ({
     activeConnectionId: null,
     activeDatabase: null,
     isConnectionDialogOpen: false,
-    openConnectionDialog: () => set({ isConnectionDialogOpen: true }),
-    closeConnectionDialog: () => set({ isConnectionDialogOpen: false }),
+    editingConnectionId: null,
+    openConnectionDialog: (connectionId?: string | null) => set({ isConnectionDialogOpen: true, editingConnectionId: connectionId ?? null }),
+    closeConnectionDialog: () => set({ isConnectionDialogOpen: false, editingConnectionId: null }),
     setActiveConnectionId: (id) => set({ activeConnectionId: id, activeDatabase: null }),
     setActiveDatabase: (db) => set({ activeDatabase: db }),
     addConnection: (connection) => set((state) => ({

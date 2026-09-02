@@ -11,12 +11,14 @@ export class Connection {
     | 'clickhouse'
     | 'mock'
     | 'mongodb'
-    | 'mongodb+srv';
+    | 'mongodb+srv'
+    | 'redis';
   host?: string;
   port?: number;
   username?: string;
   password?: string;
   database?: string;
+  tls: boolean;
   showAllDatabases: boolean;
   readOnly: boolean;
   allowSchemaChanges: boolean;
@@ -34,5 +36,5 @@ export class Connection {
   sshUsername?: string | null;
   sshPrivateKey?: string | null;
   sshPassphrase?: string | null;
-  environment?: 'development' | 'staging' | 'production' | null;
+  environment?: 'development' | 'staging' | 'production' | 'none' | null;
 }

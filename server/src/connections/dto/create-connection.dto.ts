@@ -31,6 +31,7 @@ export class CreateConnectionDto {
       'mock',
       'mongodb',
       'mongodb+srv',
+      'redis',
     ],
     description: 'Database engine type',
   })
@@ -46,6 +47,7 @@ export class CreateConnectionDto {
     'mock',
     'mongodb',
     'mongodb+srv',
+    'redis',
   ])
   type:
     | 'postgres'
@@ -57,7 +59,8 @@ export class CreateConnectionDto {
     | 'clickhouse'
     | 'mock'
     | 'mongodb'
-    | 'mongodb+srv';
+    | 'mongodb+srv'
+    | 'redis';
 
   @ApiPropertyOptional({
     description:
@@ -94,6 +97,11 @@ export class CreateConnectionDto {
   @IsString()
   @IsOptional()
   database?: string;
+
+  @ApiPropertyOptional({ description: 'Use TLS for Redis connections' })
+  @IsBoolean()
+  @IsOptional()
+  tls?: boolean;
 
   @ApiPropertyOptional({ description: 'List all databases on the server' })
   @IsOptional()
@@ -155,12 +163,12 @@ export class CreateConnectionDto {
   sshPassphrase?: string;
 
   @ApiPropertyOptional({
-    enum: ['development', 'staging', 'production'],
+    enum: ['development', 'staging', 'production', 'none'],
     description: 'Environment classification tag',
-    default: 'development',
+    default: 'none',
   })
   @IsString()
   @IsOptional()
-  @IsIn(['development', 'staging', 'production'])
-  environment?: 'development' | 'staging' | 'production';
+  @IsIn(['development', 'staging', 'production', 'none'])
+  environment?: 'development' | 'staging' | 'production' | 'none';
 }

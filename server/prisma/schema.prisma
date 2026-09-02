@@ -38,6 +38,7 @@ model Connection {
   username                String?
   password                String?
   database                String?
+  tls                     Boolean   @default(false)
   showAllDatabases        Boolean   @default(false)
   readOnly                Boolean   @default(false)
   allowSchemaChanges      Boolean   @default(true)
@@ -55,6 +56,7 @@ model Connection {
   sshUsername   String?
   sshPrivateKey String?
   sshPassphrase String?
+  environment   String?   @default("none")
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)

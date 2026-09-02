@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { Subject, Observable } from 'rxjs';
+import { redisOptions, redisUrl } from '../redis/redis-client-options';
 
 type NotificationPayload = {
   userId?: string;
@@ -28,11 +29,16 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
-    const redisUrl =
-      this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
+    const url = redisUrl(this.configService);
+    this.pubClient = new Redis(url, redisOptions());
+    this.subClient = new Redis(url, redisOptions());
 
-    this.pubClient = new Redis(redisUrl);
-    this.subClient = new Redis(redisUrl);
+    this.pubClient.on('error', (error) =>
+      this.logger.error('Redis notification publisher error', error),
+    );
+    this.subClient.on('error', (error) =>
+      this.logger.error('Redis notification subscriber error', error),
+    );
 
     this.subClient.on('message', (channel, message) => {
       try {
@@ -57,11 +63,10 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  onModuleDestroy() {
+  async onModuleDestroy() {
     this.userStreams.forEach(({ subject }) => subject.complete());
     this.userStreams.clear();
-    this.pubClient.quit();
-    this.subClient.quit();
+    await Promise.allSettled([this.pubClient.quit(), this.subClient.quit()]);
   }
 
   private channelForUser(userId: string) {

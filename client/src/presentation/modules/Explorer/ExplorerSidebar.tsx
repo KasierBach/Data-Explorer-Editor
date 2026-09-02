@@ -29,6 +29,7 @@ export const ExplorerSidebar: React.FC = memo(() => {
     const activeConnectionId = useAppStore(state => state.activeConnectionId);
     const setActiveConnectionId = useAppStore(state => state.setActiveConnectionId);
     const updateConnection = useAppStore(state => state.updateConnection);
+    const openConnectionDialog = useAppStore(state => state.openConnectionDialog);
     const activeDatabase = useAppStore(state => state.activeDatabase);
     const lang = useAppStore(state => state.lang);
     const text = getWorkspaceText(lang).explorerSidebar;
@@ -258,6 +259,7 @@ export const ExplorerSidebar: React.FC = memo(() => {
                                 if (action === 'refresh') void handleRefresh();
                                 if (action === 'toggleShowAll') void handleToggleShowAllDatabases();
                                 if (action === 'createDatabase') setCreateDatabaseDialogOpen(true);
+                                if (action === 'edit' && activeConnectionId) openConnectionDialog(activeConnectionId);
                             }}
                         >
                             <div className="flex items-center py-2 px-3 rounded-xl mb-1 bg-blue-500/5 border border-blue-500/10 text-blue-600/90 shadow-sm">

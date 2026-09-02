@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
 import { InsightsDashboard } from '../modules/Dashboard/InsightsDashboard';
-import { Plus, Database, Search, Clock, FileText, BarChart3, ArrowLeft, Trash, Loader2, Share2 } from 'lucide-react';
+import { Plus, Database, Search, Clock, FileText, BarChart3, ArrowLeft, Trash, Loader2, Share2, Pencil } from 'lucide-react';
 import { ConnectionService } from '@/core/services/ConnectionService';
 import { LanguageSwitcher } from '@/presentation/components/shared/LanguageSwitcher';
 import { useQuery } from '@tanstack/react-query';
@@ -252,6 +252,15 @@ export const Dashboard: React.FC = () => {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
+                                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 h-8 w-8"
+                                                    onClick={(e) => { e.stopPropagation(); openConnectionDialog(conn.id); }}
+                                                    title={lang === 'vi' ? 'Chỉnh sửa kết nối' : 'Edit Connection'}
+                                                >
+                                                    <Pencil className="w-4 h-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
                                                     className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-600 hover:bg-blue-500/10 h-8 w-8"
                                                     onClick={(e) => openShareDialog(e, conn.id)}
                                                     title={text.shareWithTeam}
@@ -315,10 +324,10 @@ export const Dashboard: React.FC = () => {
                             <BarChart3 className="h-5 w-5 text-muted-foreground" />
                             {text.recentDashboards}
                         </h2>
-                        <div className="rounded-lg border bg-card">
+                        <div className="rounded-lg border bg-card max-h-[340px] overflow-hidden flex flex-col">
                             {dashboards.length > 0 ? (
-                                <div className="divide-y">
-                                    {dashboards.slice(0, 6).map((dashboard) => (
+                                <div className="divide-y overflow-y-auto flex-1">
+                                    {dashboards.slice(0, 10).map((dashboard) => (
                                         <button
                                             key={dashboard.id}
                                             onClick={() => openDashboardTab(dashboard.id, dashboard.name)}
@@ -339,7 +348,7 @@ export const Dashboard: React.FC = () => {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="p-8 text-center text-muted-foreground">
+                                <div className="p-8 text-center text-muted-foreground flex-1 flex items-center justify-center">
                                     {text.noDashboards}
                                 </div>
                             )}
@@ -348,45 +357,44 @@ export const Dashboard: React.FC = () => {
 
                     {/* Team Activity Feed */}
                     <div className="space-y-4">
-                        <h2 className="text-xl font-semibold flex items-center gap-2">
-                            <Share2 className="h-5 w-5 text-muted-foreground" />
-                            {text.teamActivity}
+                        <h2 className="text-xl font-semibold flex items-center gap-2 whitespace-nowrap">
+                            <Share2 className="h-5 w-5 text-muted-foreground shrink-0" />
+                            <span className="truncate">{text.teamActivity}</span>
+                            {teamActivities.length > 0 && (
+                                <span className="text-[10px] font-semibold text-muted-foreground/60 bg-muted/50 px-1.5 py-0.5 rounded shrink-0">
+                                    {teamActivities.length}
+                                </span>
+                            )}
                         </h2>
-                        <div className="rounded-lg border bg-card p-4">
+                        <div className="rounded-lg border bg-card p-3.5 max-h-[340px] overflow-hidden flex flex-col">
                             {teamActivities.length > 0 ? (
-                                <div className="space-y-6">
-                                    {teamActivities.map((log: ActivityLog) => {
+                                <div className="space-y-3.5 overflow-y-auto pr-1.5 flex-1">
+                                    {teamActivities.slice(0, 30).map((log: ActivityLog) => {
                                         const user = log.user;
                                         const resourceName = getStringDetail(log.details, 'resourceName');
                                         const detailName = getStringDetail(log.details, 'name');
                                         const initials = user
                                             ? `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}` || user.email?.[0]?.toUpperCase() || 'U'
                                             : 'U';
+                                        const actorName = getActivityActorName(user, text.systemActor);
+                                        const action = formatActivityAction(log.action);
                                         return (
-                                            <div key={log.id} className="relative flex gap-3">
-                                                <div className="relative z-10 shrink-0">
-                                                    <Avatar className="h-8 w-8 border-2 border-background shadow-sm">
-                                                        {user?.avatarUrl && <AvatarImage src={user.avatarUrl} />}
-                                                        <AvatarFallback className="bg-blue-500/10 text-blue-600 text-[10px] font-bold">
-                                                            {initials}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                </div>
-                                                <div className="flex flex-col gap-1 min-w-0 pt-0.5">
-                                                    <p className="text-xs leading-relaxed text-foreground">
-                                                        <span className="font-bold">{getActivityActorName(user, text.systemActor)}</span>
-                                                        {' '}
-                                                        <span className="text-muted-foreground lowercase">
-                                                            {formatActivityAction(log.action)}
-                                                        </span>
-                                                        {resourceName && (
-                                                            <> <span className="font-semibold text-blue-500">"{resourceName}"</span></>
-                                                        )}
-                                                        {detailName && (
-                                                            <> <span className="font-semibold text-blue-500">"{detailName}"</span></>
+                                            <div key={log.id} className="flex items-center gap-2.5 py-1.5 px-1 rounded-lg hover:bg-muted/30 transition-colors">
+                                                <Avatar className="h-7 w-7 shrink-0 border border-border/50">
+                                                    {user?.avatarUrl && <AvatarImage src={user.avatarUrl} />}
+                                                    <AvatarFallback className="bg-blue-500/10 text-blue-600 text-[9px] font-bold">
+                                                        {initials}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-[11px] leading-snug text-foreground truncate">
+                                                        <span className="font-semibold">{actorName}</span>
+                                                        <span className="text-muted-foreground"> {action}</span>
+                                                        {(resourceName || detailName) && (
+                                                            <span className="text-blue-400"> "{resourceName || detailName}"</span>
                                                         )}
                                                     </p>
-                                                    <span className="text-[10px] text-muted-foreground">
+                                                    <span className="text-[10px] text-muted-foreground/60 font-mono">
                                                         {new Date(log.createdAt).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', { 
                                                             hour: '2-digit', 
                                                             minute: '2-digit',
@@ -400,7 +408,7 @@ export const Dashboard: React.FC = () => {
                                     })}
                                 </div>
                             ) : (
-                                <div className="p-4 text-center text-muted-foreground text-xs italic">
+                                <div className="p-4 text-center text-muted-foreground text-xs italic flex-1 flex items-center justify-center">
                                     {text.noTeamActivity}
                                 </div>
                             )}
@@ -410,7 +418,7 @@ export const Dashboard: React.FC = () => {
 
                 <ShareConnectionDialog 
                     connectionId={shareConnectionId} 
-                    open={!!shareConnectionId} 
+                    open={Boolean(shareConnectionId)} 
                     onOpenChange={(open) => !open && setShareConnectionId(null)} 
                 />
 

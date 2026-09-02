@@ -8,8 +8,8 @@ import {
     SelectTrigger,
 } from "../../components/ui/select"
 import { useAppStore } from "@/core/services/store"
-import { PlusCircle, Server, Trash, Loader2, Activity, RefreshCw, Share2, Users } from "lucide-react"
-import { SiPostgresql, SiMysql, SiClickhouse, SiMongodb } from "react-icons/si"
+import { PlusCircle, Server, Trash, Loader2, Activity, RefreshCw, Share2, Users, Pencil } from "lucide-react"
+import { SiPostgresql, SiMysql, SiClickhouse, SiMongodb, SiRedis } from "react-icons/si"
 import { DiMsqlServer } from "react-icons/di"
 import { ConnectionService } from "@/core/services/ConnectionService"
 import { ShareConnectionDialog } from "../Connection/ShareConnectionDialog"
@@ -76,6 +76,14 @@ const getDbBranding = (type?: string) => {
                 label: 'MONGO',
                 icon: <SiMongodb className="w-3.5 h-3.5" />,
             };
+        case 'redis':
+            return {
+                color: 'text-red-400',
+                bg: 'bg-red-500/10',
+                bgHover: 'group-hover:bg-red-500/20',
+                label: 'REDIS',
+                icon: <SiRedis className="w-3.5 h-3.5" />,
+            };
         default:
             return {
                 color: 'text-blue-400',
@@ -87,7 +95,7 @@ const getDbBranding = (type?: string) => {
     }
 };
 
-const NOSQL_TYPES = ['mongodb', 'mongodb+srv'];
+const NOSQL_TYPES = ['mongodb', 'mongodb+srv', 'redis'];
 const SQL_TYPES = ['postgres', 'cockroach', 'mysql', 'mariadb', 'mssql', 'clickhouse'];
 
 interface ConnectionSelectorProps {
@@ -201,11 +209,17 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
     }
 
 
-    const handleShare = (e: React.MouseEvent, id: string) => {
-        e.preventDefault();
+    const handleShare = (e: React.MouseEvent | React.PointerEvent, connectionId: string) => {
         e.stopPropagation();
-        setShareConnectionId(id);
-    }
+        e.preventDefault();
+        setShareConnectionId(connectionId);
+    };
+
+    const handleEdit = (e: React.MouseEvent | React.PointerEvent, connectionId: string) => {
+        e.stopPropagation();
+        e.preventDefault();
+        openConnectionDialog(connectionId);
+    };
 
     const getHealthTone = (status?: string) => {
         if (status === 'healthy') {
@@ -246,13 +260,13 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
 
                                 return (
                                     <div key={conn.id} className="group relative flex items-center pr-2">
-                                        <SelectItem value={conn.id} textValue={conn.name} className="cursor-pointer focus:bg-blue-500/10 focus:text-blue-600 rounded-lg mx-1 flex-1 pr-20">
-                                            <div className="flex items-center gap-2.5 text-left py-0.5">
+                                        <SelectItem value={conn.id} textValue={conn.name} className="cursor-pointer focus:bg-blue-500/10 focus:text-blue-600 rounded-lg mx-1 flex-1 pr-28">
+                                            <div className="flex items-center gap-2.5 text-left py-0.5 min-w-0">
                                                 <div className={`w-5 h-5 rounded-md ${branding.bg} flex items-center justify-center shrink-0 ${branding.color}`}>
                                                     {branding.icon}
                                                 </div>
-                                                <div className="flex flex-col min-w-0">
-                                                    <div className="flex items-center gap-1.5">
+                                                <div className="flex flex-col min-w-0 flex-1 pr-2">
+                                                    <div className="flex items-center gap-1.5 min-w-0">
                                                         <span className="font-bold text-sm truncate">{conn.name}</span>
                                                         {conn.organizationId && (
                                                             <Users className="w-3 h-3 text-blue-400 shrink-0" />
@@ -268,16 +282,15 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
                                                                 <span className="text-[10px] truncate max-w-[100px]">{conn.host}</span>
                                                             </>
                                                         )}
-                                                        {conn.environment && (
+                                                        {conn.environment && conn.environment !== 'none' && (
                                                             <>
                                                                 <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/40" />
-                                                                <span className={`text-[9px] font-bold uppercase px-1 py-0.2 rounded ${
-                                                                    conn.environment === 'production'
+                                                                <span className={`text-[9px] font-bold uppercase px-1 py-0.2 rounded ${conn.environment === 'production'
                                                                         ? 'text-red-500 bg-red-500/10'
                                                                         : conn.environment === 'staging'
-                                                                        ? 'text-amber-500 bg-amber-500/10'
-                                                                        : 'text-emerald-500 bg-emerald-500/10'
-                                                                }`}>
+                                                                            ? 'text-amber-500 bg-amber-500/10'
+                                                                            : 'text-emerald-500 bg-emerald-500/10'
+                                                                    }`}>
                                                                     {conn.environment === 'production' ? 'PROD' : conn.environment === 'staging' ? 'STAGE' : 'DEV'}
                                                                 </span>
                                                             </>
@@ -300,15 +313,24 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
                                                 </div>
                                             </div>
                                         </SelectItem>
-                                        <div className="absolute right-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                        <div className="absolute right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-background/95 dark:bg-card/95 backdrop-blur-md px-1.5 py-0.5 rounded-lg border border-border/70 shadow-md">
                                             <div
                                                 className="p-1.5 rounded-md hover:bg-blue-500/20 text-muted-foreground hover:text-blue-500 cursor-pointer"
+                                                title={lang === 'vi' ? 'Chỉnh sửa kết nối' : 'Edit Connection'}
+                                                onPointerDown={(e) => handleEdit(e, conn.id)}
+                                            >
+                                                <Pencil className="w-3.5 h-3.5" />
+                                            </div>
+                                            <div
+                                                className="p-1.5 rounded-md hover:bg-blue-500/20 text-muted-foreground hover:text-blue-500 cursor-pointer"
+                                                title={lang === 'vi' ? 'Chia sẻ kết nối' : 'Share Connection'}
                                                 onPointerDown={(e) => handleShare(e, conn.id)}
                                             >
                                                 <Share2 className="w-3.5 h-3.5" />
                                             </div>
                                             <div
                                                 className="p-1.5 rounded-md hover:bg-red-500/20 text-muted-foreground hover:text-red-500 cursor-pointer"
+                                                title={lang === 'vi' ? 'Xóa kết nối' : 'Delete Connection'}
                                                 onPointerDown={(e) => handleDelete(e, conn.id)}
                                             >
                                                 {isDeleting === conn.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash className="w-3.5 h-3.5" />}
