@@ -49,8 +49,8 @@ export function IntroductionSection({ lang }: Props) {
         >
           <p>
             {t
-              ? "Kết nối bản địa tới PostgreSQL, MySQL, SQL Server và MongoDB/Atlas thông qua một giao diện thống nhất. Mỗi engine sử dụng driver riêng biệt được tối ưu hóa cho hiệu suất tốt nhất — không chỉ là một wrapper chung chung."
-              : "Native connections to PostgreSQL, MySQL, SQL Server, and MongoDB/Atlas through a unified interface. Each engine uses its own optimized driver for maximum performance — not just a generic wrapper."}
+              ? "Kết nối bản địa tới PostgreSQL, MySQL, MariaDB, CockroachDB, SQL Server, MongoDB/Atlas, Redis, SQLite và ClickHouse thông qua một giao diện thống nhất. Mỗi engine sử dụng driver riêng biệt được tối ưu hóa cho hiệu suất tốt nhất — không chỉ là một wrapper chung chung."
+              : "Native connections to PostgreSQL, MySQL, MariaDB, CockroachDB, SQL Server, MongoDB/Atlas, Redis, SQLite, and ClickHouse through a unified interface. Each engine uses its own optimized driver for maximum performance — not just a generic wrapper."}
           </p>
         </InfoCard>
         <InfoCard
@@ -287,8 +287,8 @@ export function IntroductionSection({ lang }: Props) {
                 {
                   feature: t ? "Đa kết nối DB" : "Multi-DB Connections",
                   desc: t
-                    ? "PostgreSQL, MySQL, MSSQL, MongoDB, MongoDB Atlas"
-                    : "PostgreSQL, MySQL, MSSQL, MongoDB, MongoDB Atlas",
+                    ? "PostgreSQL, MySQL, MariaDB, CockroachDB, MSSQL, MongoDB, MongoDB Atlas, Redis, SQLite, ClickHouse"
+                    : "PostgreSQL, MySQL, MariaDB, CockroachDB, MSSQL, MongoDB, MongoDB Atlas, Redis, SQLite, ClickHouse",
                   status: "✅",
                 },
                 {

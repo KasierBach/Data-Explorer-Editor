@@ -3,7 +3,13 @@ import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment
 
 interface Props {
     lang: 'vi' | 'en';
-    engine: 'postgres' | 'mysql' | 'mssql' | 'mongodb';
+    engine:
+    | 'postgres'
+    | 'mysql'
+    | 'mariadb'
+    | 'cockroach'
+    | 'mssql'
+    | 'mongodb';
 }
 
 interface EngineConfig {
@@ -63,6 +69,53 @@ ORDER BY table_name, ordinal_position;`,
         sslNote: {
             en: 'For PlanetScale or similar providers, SSL is mandatory. Use the provided connection string directly from the dashboard.',
             vi: 'Với PlanetScale hoặc các nhà cung cấp tương tự, SSL là bắt buộc. Sử dụng chuỗi kết nối trực tiếp từ dashboard.',
+        },
+        introspectQuery: `SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+ORDER BY TABLE_NAME, ORDINAL_POSITION;`,
+    },
+    cockroach: {
+        name: 'CockroachDB',
+        port: '26257',
+        icon: '🪳',
+        uriScheme: 'postgresql',
+        uriExample: 'postgresql://root@localhost:26257/defaultdb?sslmode=require',
+        dockerImage: 'cockroachdb/cockroach:latest-v24.3',
+        dockerEnv: [
+            'start-single-node --insecure',
+        ],
+        features: {
+            en: ['PostgreSQL wire-protocol compatibility', 'Dedicated strategy with the 26257 default port', 'Metrics via crdb_internal tables', 'Graceful degradation when crdb_internal is unavailable', 'Schema and view browsing via information_schema', 'CRUD and transactional query support'],
+            vi: ['Tương thích wire-protocol PostgreSQL', 'Strategy riêng với default port 26257', 'Metrics qua các bảng crdb_internal', 'Tự hạ cấp êm khi crdb_internal không khả dụng', 'Duyệt schema và view qua information_schema', 'Hỗ trợ CRUD và query trong transaction'],
+        },
+        sslNote: {
+            en: 'CockroachDB clusters usually require TLS. Use the connection string from the cluster dashboard, or start a local insecure single-node container for development.',
+            vi: 'Cluster CockroachDB thường yêu cầu TLS. Dùng chuỗi kết nối từ dashboard của cluster, hoặc chạy container single-node insecure cho môi trường dev.',
+        },
+        introspectQuery: `SELECT table_name, column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_schema = 'public'
+ORDER BY table_name, ordinal_position;`,
+    },
+    mariadb: {
+        name: 'MariaDB',
+        port: '3306',
+        icon: '🦭',
+        uriScheme: 'mariadb',
+        uriExample: 'mariadb://root:password@localhost:3306/mydb',
+        dockerImage: 'mariadb:11',
+        dockerEnv: [
+            '-e MARIADB_ROOT_PASSWORD=secret123',
+            '-e MARIADB_DATABASE=dev_database',
+        ],
+        features: {
+            en: ['MySQL drop-in strategy with connection pooling', 'Views, functions, and function parameter browsing', 'Full INFORMATION_SCHEMA introspection', 'Per-connection TLS toggle for servers without SSL', 'Guarded row updates with parameterized SQL', 'Health checks via SELECT 1'],
+            vi: ['Strategy drop-in của MySQL với connection pooling', 'Duyệt views, functions và tham số hàm', 'Phân tích INFORMATION_SCHEMA đầy đủ', 'Toggle TLS riêng cho server không có SSL', 'Cập nhật dòng có guard, SQL parameterized', 'Health check qua SELECT 1'],
+        },
+        sslNote: {
+            en: 'Remote MariaDB servers that reject SSL handshakes can be connected by turning the TLS toggle off in the connection form.',
+            vi: 'Server MariaDB từ chối SSL handshake thì tắt toggle TLS trong form kết nối.',
         },
         introspectQuery: `SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE
 FROM INFORMATION_SCHEMA.COLUMNS

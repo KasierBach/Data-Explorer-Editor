@@ -141,6 +141,20 @@ export function PrerequisitesSection({ lang }: Props) {
                     : "SQL workspace, guardrails, saved queries, AI context.",
                 },
                 {
+                  engine: "MariaDB",
+                  ver: "10.6+",
+                  feat: t
+                    ? "Drop-in của MySQL: CRUD/query, views, functions, TLS toggle riêng cho server không SSL."
+                    : "MySQL drop-in: CRUD/query, views, functions, and a dedicated TLS toggle for servers without SSL.",
+                },
+                {
+                  engine: "CockroachDB",
+                  ver: "v23+",
+                  feat: t
+                    ? "PostgreSQL wire-compatible: query/CRUD qua strategy riêng (port 26257), metrics qua crdb_internal."
+                    : "PostgreSQL wire-compatible: query/CRUD via a dedicated strategy (port 26257) with crdb_internal metrics.",
+                },
+                {
                   engine: "SQL Server",
                   ver: "2017+",
                   feat: t

@@ -1,4 +1,5 @@
 export { IntroductionSection } from './IntroductionSection';
+export { UiTourSection } from './UiTourSection';
 export { InstallationSection } from './InstallationSection';
 export { PrerequisitesSection } from './PrerequisitesSection';
 export { NoSqlStudioSection } from './NoSqlStudioSection';

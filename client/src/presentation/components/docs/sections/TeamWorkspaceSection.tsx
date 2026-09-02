@@ -154,6 +154,54 @@ export function TeamWorkspaceSection({ lang }: Props) {
                 </div>
             </DocSection>
 
+            <DocSection title={t ? 'Di chuyển dữ liệu giữa hai connection (Migration)' : 'Moving data between two connections (Migration)'}>
+                <Prose>
+                    {t
+                        ? 'Migration tool cho phép stream dữ liệu từ một bảng/collection ở connection nguồn sang bảng/collection ở connection đích — kể cả khác loại engine (ví dụ MySQL sang PostgreSQL).'
+                        : 'The migration tool streams data from a table/collection on a source connection to a target on another connection — even across engine types (e.g. MySQL to PostgreSQL).'}
+                </Prose>
+                <div className="space-y-3">
+                    {[
+                        {
+                            step: '1',
+                            title: t ? 'Chọn nguồn và đích' : 'Pick source and target',
+                            desc: t
+                                ? 'Chọn connection nguồn, database/schema và bảng cần chuyển; sau đó chọn connection đích và bảng nhận. Hệ thống tự chặn nếu nguồn và đích trỏ vào cùng một bảng.'
+                                : 'Select the source connection, database/schema, and table; then pick the target connection and receiving table. The system blocks source and target pointing at the same table.',
+                        },
+                        {
+                            step: '2',
+                            title: t ? 'Kiểm tra tương thích schema' : 'Verify schema compatibility',
+                            desc: t
+                                ? 'Preflight so sánh cột của hai bảng và báo lỗi nếu đích thiếu cột bắt buộc. Hãy tạo schema đích trước (qua SQL Steps hoặc schema editor) nếu chưa có.'
+                                : 'A preflight compares the columns of both tables and fails when the target is missing required columns. Create the target schema first (via SQL Steps or the schema editor) if it does not exist yet.',
+                        },
+                        {
+                            step: '3',
+                            title: t ? 'Chạy và theo dõi tiến độ' : 'Run and watch progress',
+                            desc: t
+                                ? 'Quá trình chuyển chạy theo batch thích ứng trong một background job: bạn thấy số dòng đã xử lý, số batch, và stage hiện tại (validating → connecting → preflight → streaming → completed).'
+                                : 'The transfer runs in adaptive batches inside a background job: you see processed rows, batch count, and the current stage (validating → connecting → preflight → streaming → completed).',
+                        },
+                        {
+                            step: '4',
+                            title: t ? 'Xử lý lỗi giữa chừng' : 'Handling mid-run failures',
+                            desc: t
+                                ? 'Nếu kết nối nguồn hoặc đích đứt, job chuyển sang failed và dừng ở batch hiện tại — không ghi dữ liệu nửa vời vì mỗi batch được ghi trong transaction. Sửa lỗi rồi chạy lại từ đầu.'
+                                : 'If the source or target connection drops, the job fails and stops at the current batch — no partial writes because each batch is committed in a transaction. Fix the issue and rerun from the start.',
+                        },
+                    ].map((item) => (
+                        <div key={item.step} className="flex items-start gap-4 p-4 border rounded-xl bg-muted/20">
+                            <span className="bg-primary/10 text-primary border rounded-lg px-3 py-1 text-xs font-bold whitespace-nowrap">{item.step}</span>
+                            <div>
+                                <p className="text-sm font-semibold mb-1">{item.title}</p>
+                                <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </DocSection>
+
             <Callout type="warning">
                 <p className="text-sm">
                     {t

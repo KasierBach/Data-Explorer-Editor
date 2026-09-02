@@ -19,6 +19,7 @@ import {
     InstallationSection,
     IntroductionSection,
     LifecycleSection,
+    UiTourSection,
     NoSqlInsightsSection,
     NoSqlStudioSection,
     PrerequisitesSection,
@@ -43,12 +44,15 @@ export function DocContent({ sectionId, lang }: DocContentProps) {
 
     const sectionMap: Record<string, React.ReactNode> = {
         introduction: <IntroductionSection lang={lang} />,
+        'ui-tour': <UiTourSection lang={lang} />,
         installation: <InstallationSection lang={lang} />,
         prerequisites: <PrerequisitesSection lang={lang} />,
         'env-vars': <EnvVarsSection lang={lang} />,
 
         postgres: <ConnectionSection lang={lang} engine="postgres" />,
         mysql: <ConnectionSection lang={lang} engine="mysql" />,
+        mariadb: <ConnectionSection lang={lang} engine="mariadb" />,
+        cockroach: <ConnectionSection lang={lang} engine="cockroach" />,
         mssql: <ConnectionSection lang={lang} engine="mssql" />,
         mongodb: <ConnectionSection lang={lang} engine="mongodb" />,
 

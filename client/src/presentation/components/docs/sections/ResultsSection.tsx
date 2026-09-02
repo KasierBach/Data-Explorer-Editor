@@ -87,6 +87,34 @@ export function ResultsSection({ lang }: Props) {
                 </div>
             </DocSection>
 
+            {/* Direct Editing */}
+            <DocSection title={t ? 'Chỉnh sửa dữ liệu trực tiếp' : 'Direct Data Editing'}>
+                <Prose>{t
+                    ? 'Với DataGrid (tab bảng trong Explorer), bạn có thể sửa dữ liệu ngay trên lưới mà không cần viết SQL:'
+                    : 'In the DataGrid (table tab in the Explorer), you can edit data directly on the grid without writing SQL:'}</Prose>
+                <div className="space-y-3">
+                    {[
+                        { action: t ? 'Double-click ô để sửa' : 'Double-click a cell to edit', result: t ? 'Ô chuyển sang chế độ nhập liệu. Nhấn Enter để lưu, Esc để hủy. Giá trị mới được gửi qua UPDATE parameterized an toàn phía server.' : 'The cell switches to edit mode. Press Enter to save, Esc to cancel. The new value is sent through a safe parameterized UPDATE on the server.' },
+                        { action: t ? 'Nút "Add Row"' : '"Add Row" button', result: t ? 'Thêm một dòng trống mới ở cuối lưới, điền giá trị rồi lưu — server sinh INSERT parameterized tương ứng.' : 'Appends a new empty row at the bottom; fill in values and save — the server generates the matching parameterized INSERT.' },
+                        { action: t ? 'Chọn dòng → nút Delete' : 'Select rows → Delete button', result: t ? 'Xóa một hoặc nhiều dòng đã chọn qua DELETE ... WHERE pk IN (...). Bước xác nhận luôn xuất hiện trước khi xóa.' : 'Deletes one or more selected rows via DELETE ... WHERE pk IN (...). A confirmation step always appears before deletion.' },
+                        { action: t ? 'Bulk Replace (Ctrl+H)' : 'Bulk Replace (Ctrl+H)', result: t ? 'Thay thế hàng loạt giá trị trong một cột theo giá trị hoặc pattern, xem trước các dòng bị ảnh hưởng trước khi áp dụng.' : 'Bulk-replace values in one column by exact value or pattern, with a preview of affected rows before applying.' },
+                        { action: t ? 'Cell Inspector' : 'Cell Inspector', result: t ? 'Mở panel chi tiết cho ô đang chọn để xem và sửa giá trị dài, JSON nhiều dòng mà không bị giới hạn chiều cao ô.' : 'Opens a detail panel for the selected cell to view and edit long, multi-line JSON values without the cell-height limit.' },
+                    ].map((item, i) => (
+                        <div key={i} className="flex items-start gap-4 p-4 border rounded-xl bg-muted/20">
+                            <kbd className="bg-background border-2 border-muted-foreground/20 rounded-lg px-3 py-1 text-[10px] font-bold shadow-sm whitespace-nowrap">{item.action}</kbd>
+                            <span className="text-sm text-muted-foreground leading-relaxed">{item.result}</span>
+                        </div>
+                    ))}
+                </div>
+                <Callout type="warning">
+                    <p className="text-sm">
+                        {t
+                            ? 'Chỉnh sửa trực tiếp bị vô hiệu trên connection read-only hoặc connection tắt allowQueryExecution — guard được thực thi ở backend chứ không chỉ ẩn UI. Bảng cần có primary key để cập nhật từng dòng.'
+                            : 'Direct editing is disabled on read-only connections or connections with allowQueryExecution off — the guard is enforced in the backend, not just hidden in the UI. Tables need a primary key for row-level updates.'}
+                    </p>
+                </Callout>
+            </DocSection>
+
             {/* Execution Info */}
             <DocSection title={t ? 'Thông tin thực thi' : 'Execution Info'}>
                 <Prose>{t

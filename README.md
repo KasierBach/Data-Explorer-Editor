@@ -47,7 +47,7 @@ Current documentation focus reflects the **v3.6.4** workspace: configurable AI r
   - **SQL Server** (Azure SQL, Local MSSQL)
   - **ClickHouse**
   - **MongoDB** and **MongoDB Atlas (SRV)**
-  - **Redis** (runtime infrastructure for caching, queues, notifications, presence, and search indexing)
+  - **Redis** (as a browsable key-value database with a read-only command whitelist, plus runtime infrastructure for caching, queues, notifications, presence, and search indexing)
 - **Enterprise-Grade Credential Protection**: Saved connection passwords are encrypted using **AES-256-GCM** before persistence.
 - **Connection Safety Controls**: Each saved connection can now be configured as read-only and can independently allow or block query execution, schema changes, and import/export flows.
 - **Connection Health Visibility**: Saved connections track their last health-check result, latency, and last successful connection timestamp so operators can spot broken credentials or degraded endpoints faster.
@@ -143,7 +143,7 @@ Current documentation focus reflects the **v3.6.4** workspace: configurable AI r
 | **Architecture**      | NestJS                                                                                                                               |
 | **ORM / Persistence** | Prisma                                                                                                                               |
 | **AI Engine**         | Gemini plus OpenAI-compatible provider routing (Cerebras, OpenRouter, Groq, Beeknoee), SSE streaming, attachment-aware orchestration |
-| **Engines Support**   | `pg`, `mysql2`, `mssql`, `mongodb`, `@clickhouse/client`                                                                             |
+| **Engines Support**   | `pg`, `mysql2` (MySQL & MariaDB), `pg`-wire CockroachDB, `mssql`, `mongodb`, `@clickhouse/client`                                    |
 | **Security**          | JWT, Passport.js, AES-256-GCM encryption                                                                                             |
 | **Infrastructure**    | Redis, BullMQ, SSE notifications, presence coordination, search indexing                                                             |
 
@@ -435,7 +435,7 @@ Built-in AI lanes such as Gemini, OpenRouter, Groq, Cerebras, and Beeknoee are b
 | Variable                    | Required | Description                                                                                                                                                                  |
 | --------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`              | Yes      | Connection string for the app's central PostgreSQL database. Docker default: `postgresql://postgres:postgres@db:5432/data_explorer`.                                         |
-| `REDIS_URL`                 | No       | Redis connection string for caching, notifications, queues, presence, search indexing, and throttling. Docker default: `redis://redis:6379`.                                 |
+| `REDIS_URL`                 | Yes      | Redis connection string for caching, notifications, queues, presence, search indexing, and throttling. Docker default: `redis://redis:6379`.                                 |
 | `GEMINI_API_KEY`            | No       | Gemini API key used for the premium AI lane, vision-capable prompts, and current-info capable flows.                                                                         |
 | `AI_PROVIDER_TIMEOUT_MS`    | No       | Timeout in milliseconds for AI provider requests. Default: `90000`.                                                                                                          |
 | `AI_STREAM_IDLE_TIMEOUT_MS` | No       | Idle timeout in milliseconds for streaming AI responses. Default: `90000`.                                                                                                   |

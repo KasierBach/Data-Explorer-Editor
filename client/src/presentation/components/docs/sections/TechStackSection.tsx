@@ -381,6 +381,34 @@ export function TechStackSection({ lang }: Props) {
                     ? "TypeScript transform cho backend test suite."
                     : "TypeScript transform for the backend test suite.",
                 },
+                {
+                  tech: "fast-check",
+                  ver: "4.x",
+                  role: t
+                    ? "Property-based fuzzing sinh hàng nghìn input ngẫu nhiên cho SQL/NoSQL guard và SSRF validator."
+                    : "Property-based fuzzing generating thousands of randomized inputs against the SQL/NoSQL guards and SSRF validator.",
+                },
+                {
+                  tech: t ? "Pentest suites (Jest)" : "Pentest suites (Jest)",
+                  ver: "—",
+                  role: t
+                    ? "Bộ đối kháng mô phỏng tấn công thực tế: identifier smuggling, CSRF header spoofing, IPv4-mapped IPv6, unterminated literals."
+                    : "Adversarial suites simulating real attacks: identifier smuggling, CSRF header spoofing, IPv4-mapped IPv6, and unterminated literals.",
+                },
+                {
+                  tech: "Playwright",
+                  ver: "1.5x",
+                  role: t
+                    ? "E2E đa trình duyệt (Chromium + Firefox) cho checkout, billing return và responsive workspace."
+                    : "Multi-browser E2E (Chromium + Firefox) covering checkout, billing return, and the responsive workspace.",
+                },
+                {
+                  tech: "Trivy + SBOM",
+                  ver: "CI",
+                  role: t
+                    ? "Scan lỗ hổng image, sinh SBOM và pin base image trong pipeline containers."
+                    : "Image vulnerability scanning, SBOM generation, and pinned base images in the containers pipeline.",
+                },
               ].map((row, i) => (
                 <tr key={i} className="hover:bg-muted/10 transition-colors">
                   <td className="p-4 font-bold text-primary">{row.tech}</td>

@@ -35,6 +35,58 @@ export function AiServiceSection({ lang }: Props) {
       }
       gradient
     >
+      <DocSection title={t ? "Cách dùng Trợ lý AI hằng ngày" : "Using the AI Assistant day to day"}>
+        <div className="space-y-3">
+          {[
+            {
+              step: "1",
+              title: t ? "Mở panel AI và chọn model" : "Open the AI panel and pick a model",
+              desc: t
+                ? "Nhấn Ctrl+J để mở panel AI. Chọn model từ dropdown (hoặc để Auto), chọn routing mode phù hợp: Auto cho cân bằng, Fast / Cheap cho prompt nhẹ, Best Quality cho việc quan trọng, Gemini Only khi cần ổn định nhất."
+                : "Press Ctrl+J to open the AI panel. Pick a model from the dropdown (or leave Auto), then choose a routing mode: Auto for balance, Fast / Cheap for light prompts, Best Quality for important work, or Gemini Only for maximum consistency.",
+            },
+            {
+              step: "2",
+              title: t ? "Đặt câu hỏi với ngữ cảnh schema" : "Ask questions with schema context",
+              desc: t
+                ? "Gõ câu hỏi tự nhiên ở ô nhập dưới cùng — AI đã tự biết các bảng, cột của connection đang active. Ví dụ: 'viết truy vấn đếm đơn hàng theo tháng trong năm nay'. Schema context được lấy tự động theo prompt."
+                : "Type a natural-language question in the composer at the bottom — the AI already knows the tables and columns of the active connection. Example: 'write a query counting orders per month this year'. Schema context is selected automatically per prompt.",
+            },
+            {
+              step: "3",
+              title: t ? "Chạy SQL gợi ý ngay trong editor" : "Run suggested SQL straight in the editor",
+              desc: t
+                ? "Khi AI trả về SQL, nhấn nút chạy trên khối code để chèn vào editor và thực thi luôn (với query rủi ro sẽ có bước xác nhận). Hoặc copy thủ công để chỉnh trước khi chạy."
+                : "When the AI returns SQL, press the run button on the code block to insert it into the editor and execute immediately (risky queries still require confirmation). Or copy manually to edit before running.",
+            },
+            {
+              step: "4",
+              title: t ? "Đính kèm ảnh, PDF và hỏi follow-up" : "Attach images/PDFs and ask follow-ups",
+              desc: t
+                ? "Nhấn nút kẹp giấy để đính kèm ảnh chụp màn hình lỗi, sơ đồ, hoặc PDF — AI sẽ phân tích nội dung. Sau mỗi câu trả lời, tiếp tục hỏi follow-up trong cùng luồng hội thoại; AI giữ ngữ cảnh của các lượt trước."
+                : "Press the paperclip to attach an error screenshot, a diagram, or a PDF — the AI analyzes the content. After each answer, keep asking follow-ups in the same conversation; the AI retains the context of previous turns.",
+            },
+            {
+              step: "5",
+              title: t ? "Kiểm tra provider/model thực tế đã trả lời" : "Check which provider/model actually answered",
+              desc: t
+                ? "Mỗi phản hồi hiển thị provider và model thực tế đã xử lý (ví dụ 'Gemini 3.6 Flash') cùng nguồn trích dẫn nếu có live search — để bạn không nhầm lane khi routing đang hoạt động."
+                : "Every response shows the actual provider and model that handled it (e.g. 'Gemini 3.6 Flash') plus cited sources when live search was used — so you never mistake the lane while routing is active.",
+            },
+          ].map((item) => (
+            <div key={item.step} className="flex items-start gap-4 p-4 border rounded-xl bg-muted/20">
+              <span className="bg-primary/10 text-primary border rounded-lg px-3 py-1 text-xs font-bold whitespace-nowrap">
+                {item.step}
+              </span>
+              <div>
+                <p className="text-sm font-semibold mb-1">{item.title}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </DocSection>
+
       <FeatureGrid columns={3}>
         <InfoCard
           icon={<Route className="h-6 w-6 text-blue-500" />}

@@ -83,6 +83,45 @@ export function EditorSection({ lang }: Props) {
                 </div>
             </DocSection>
 
+            {/* Query Execution Control */}
+            <DocSection title={t ? 'Điều khiển thực thi truy vấn' : 'Query Execution Control'}>
+                <div className="mt-2 space-y-6">
+                    <div className="p-6 border rounded-2xl bg-muted/5 group hover:border-primary/50 transition-colors">
+                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2">
+                            <Activity className="w-4 h-4 text-emerald-500" />
+                            {t ? 'Hủy truy vấn đang chạy' : 'Cancel a running query'}
+                        </h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            {t
+                                ? 'Mỗi engine có cơ chế hủy riêng (pg_cancel_backend cho PostgreSQL, KILL QUERY cho MySQL/MariaDB) nên việc hủy diễn ra ngay trên server thay vì chỉ bỏ qua kết quả phía client.'
+                                : 'Each engine has its own cancellation path (pg_cancel_backend for PostgreSQL, KILL QUERY for MySQL/MariaDB), so cancellation happens on the server instead of merely discarding the client-side result.'}
+                        </p>
+                    </div>
+                    <div className="p-6 border rounded-2xl bg-muted/5 group hover:border-primary/50 transition-colors">
+                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2">
+                            <Cpu className="w-4 h-4 text-blue-500" />
+                            {t ? 'Panel Active Queries' : 'Active Queries panel'}
+                        </h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            {t
+                                ? 'Panel Active Queries liệt kê các truy vấn đang chạy trên connection, hiển thị thời lượng thực thi (durationMs) và cho phép hủy từng truy vấn trực tiếp.'
+                                : 'The Active Queries panel lists queries currently running on a connection, shows execution duration (durationMs), and lets you cancel individual queries in place.'}
+                        </p>
+                    </div>
+                    <div className="p-6 border rounded-2xl bg-muted/5 group hover:border-primary/50 transition-colors">
+                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-purple-500" />
+                            {t ? 'AI Explain có cache và follow-up' : 'Cached AI Explain with follow-ups'}
+                        </h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            {t
+                                ? 'Giải thích truy vấn bằng AI được cache theo nội dung câu SQL, và sau mỗi lời giải thích bạn có thể đặt câu hỏi follow-up ngay trong luồng đó thay vì bắt đầu lại.'
+                                : 'AI-powered query explanations are cached by SQL content, and each explanation supports inline follow-up questions instead of starting over.'}
+                        </p>
+                    </div>
+                </div>
+            </DocSection>
+
             {/* IntelliSense Deep Dive */}
             <DocSection title={t ? 'IntelliSense & Schema Awareness' : 'IntelliSense & Schema Awareness'}>
                 <Prose>
@@ -130,7 +169,7 @@ export function EditorSection({ lang }: Props) {
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                             {[
+                            {[
                                 { a: t ? 'Thực thi khối lệnh / Toàn bộ' : 'Execute Block / All', s: 'Ctrl + Enter' },
                                 { a: t ? 'Truy vấn mới (New Query)' : 'New Query Tab', s: 'Ctrl + N' },
                                 { a: t ? 'Bật/Tắt Bảng kết quả' : 'Toggle Result Panel', s: 'Ctrl + J' },
@@ -158,8 +197,8 @@ export function EditorSection({ lang }: Props) {
                 <div className="grid md:grid-cols-2 gap-8">
                     <div className="space-y-4">
                         <h5 className="text-sm font-bold flex items-center gap-2 text-primary">
-                             <Cpu className="w-4 h-4" />
-                             {t ? 'Custom SQL Worker' : 'Custom SQL Worker'}
+                            <Cpu className="w-4 h-4" />
+                            {t ? 'Custom SQL Worker' : 'Custom SQL Worker'}
                         </h5>
                         <Prose className="text-xs">
                             {t
@@ -169,8 +208,8 @@ export function EditorSection({ lang }: Props) {
                     </div>
                     <div className="space-y-4">
                         <h5 className="text-sm font-bold flex items-center gap-2 text-primary">
-                             <Zap className="w-4 h-4" />
-                             {t ? 'Schema-Aware IntelliSense' : 'Schema-Aware IntelliSense'}
+                            <Zap className="w-4 h-4" />
+                            {t ? 'Schema-Aware IntelliSense' : 'Schema-Aware IntelliSense'}
                         </h5>
                         <Prose className="text-xs">
                             {t

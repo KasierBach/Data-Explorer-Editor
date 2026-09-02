@@ -64,6 +64,12 @@ export function NoSqlStudioSection({ lang }: Props) {
                 <div className="grid gap-4 md:grid-cols-2">
                     {[
                         {
+                            title: t ? 'Tìm kiếm collection qua chỉ mục' : 'Indexed collection search',
+                            desc: t
+                                ? 'Sidebar có ô tìm kiếm điều hướng qua chỉ mục search đã sync sẵn, giúp nhảy tới đúng database/collection ngay cả khi cluster có hàng trăm collection.'
+                                : 'The sidebar has a search box backed by the synced search index, letting you jump straight to the right database/collection even on clusters with hundreds of collections.',
+                        },
+                        {
                             title: t ? 'Trước khi chọn collection' : 'Before a collection is selected',
                             desc: t
                                 ? 'Workspace hiển thị dashboard NoSQL để bạn kiểm tra kết nối, trạng thái health, và định hướng điểm bắt đầu. Đây là bước tốt để xác nhận bạn đang ở đúng cluster hoặc database.'

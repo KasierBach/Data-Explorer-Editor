@@ -49,9 +49,11 @@ export function SecuritySection({ lang }: Props) {
                     {[
                         t ? 'Credential lưu trong app database được mã hóa bằng AES-256-GCM.' : 'Credentials stored in the app database are encrypted with AES-256-GCM.',
                         t ? 'SQL Guard chặn đứng các kỹ thuật bypass nâng cao như EXEC, EXECUTE trong kết nối Read-only.' : 'SQL Guard blocks advanced bypass techniques like EXEC, EXECUTE in Read-only connections.',
-                        t ? 'SSRF guard chặn tuyệt đối các target nội bộ hoặc localhost (chống quét mạng nội bộ qua Tunnel).' : 'SSRF guard strictly blocks internal or localhost targets (preventing intranet scanning via Tunnels).',
+                        t ? 'SSRF guard chặn tuyệt đối các target nội bộ hoặc localhost (chống quét mạng nội bộ qua Tunnel), fail-closed với host rỗng và chặn IPv4-mapped IPv6.' : 'SSRF guard strictly blocks internal or localhost targets (preventing intranet scanning via Tunnels), fails closed on empty hosts, and blocks IPv4-mapped IPv6 bypasses.',
                         t ? 'Quyền riêng tư Team được cô lập, không còn chia sẻ tự động dựa trên domain email công cộng.' : 'Team privacy is isolated, removing insecure auto-sharing based on public email domains.',
                         t ? 'Thông báo lỗi Database được làm sạch (Sanitize) để tránh rò rỉ thông tin hạ tầng nhạy cảm.' : 'Database error messages are sanitized to prevent sensitive infrastructure information leakage.',
+                        t ? 'Bộ pentest đối kháng chạy thường xuyên mô phỏng identifier smuggling, CSRF header spoofing, và property-based fuzzing cho mọi guard.' : 'Adversarial pentest suites run continuously, simulating identifier smuggling, CSRF header spoofing, and property-based fuzzing against every guard.',
+                        t ? 'security.txt công khai kênh responsible disclosure cho researcher báo cáo lỗ hổng.' : 'A public security.txt documents the responsible disclosure channel for vulnerability reports.',
                     ].map((item) => (
                         <li key={item} className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
                             {item}

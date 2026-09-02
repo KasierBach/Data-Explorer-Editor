@@ -37,6 +37,7 @@ export const DOCS_STRUCTURE: DocSection[] = [
         icon: <Terminal className="w-4 h-4" />,
         items: [
             { id: 'introduction', title: 'Giới thiệu', titleEn: 'Introduction' },
+            { id: 'ui-tour', title: 'Hướng dẫn giao diện', titleEn: 'UI Tour' },
             { id: 'installation', title: 'Cài đặt', titleEn: 'Installation' },
             { id: 'prerequisites', title: 'Điều kiện tiên quyết', titleEn: 'Prerequisites' },
             { id: 'env-vars', title: 'Biến môi trường', titleEn: 'Environment Variables' },
@@ -50,6 +51,8 @@ export const DOCS_STRUCTURE: DocSection[] = [
         items: [
             { id: 'postgres', title: 'PostgreSQL', titleEn: 'PostgreSQL' },
             { id: 'mysql', title: 'MySQL', titleEn: 'MySQL' },
+            { id: 'mariadb', title: 'MariaDB', titleEn: 'MariaDB' },
+            { id: 'cockroach', title: 'CockroachDB', titleEn: 'CockroachDB' },
             { id: 'mssql', title: 'SQL Server', titleEn: 'SQL Server' },
             { id: 'mongodb', title: 'MongoDB & Atlas', titleEn: 'MongoDB & Atlas' },
         ],

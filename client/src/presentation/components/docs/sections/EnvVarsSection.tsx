@@ -114,6 +114,13 @@ export function EnvVarsSection({ lang }: Props) {
           example: "http://localhost:3001/api",
         },
         {
+          name: "ALLOW_INSECURE_DATABASE_TLS",
+          desc: t
+            ? "Đặt 'false' để bật verify certificate TLS cho mọi kết nối database remote (Postgres, MySQL/MariaDB, CockroachDB, Redis, ClickHouse, MSSQL). Mặc định chấp nhận certificate tự ký cho dễ dev."
+            : "Set to 'false' to enforce TLS certificate verification on every remote database connection (Postgres, MySQL/MariaDB, CockroachDB, Redis, ClickHouse, MSSQL). Defaults to accepting self-signed certificates for easier development.",
+          example: "false",
+        },
+        {
           name: "VITE_API_URL",
           desc: t
             ? "API base URL mà frontend Vite sẽ gọi tới"
