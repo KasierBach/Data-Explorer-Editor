@@ -2,6 +2,9 @@ import { MssqlStrategy } from '../../database-strategies/mssql.strategy';
 import * as mssql from 'mssql';
 import { EventEmitter } from 'events';
 
+// These specs assert encrypted verified transport; the default env accepts self-signed certs.
+process.env.ALLOW_INSECURE_DATABASE_TLS = 'false';
+
 jest.mock('mssql', () => {
   return {
     ConnectionPool: jest.fn().mockImplementation(() => ({

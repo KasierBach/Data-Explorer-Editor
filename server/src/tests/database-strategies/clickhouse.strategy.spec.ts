@@ -1,6 +1,9 @@
 import { ClickHouseStrategy } from '../../database-strategies/clickhouse.strategy';
 import { createClient } from '@clickhouse/client';
 
+// These specs assert HTTPS transport; the default env accepts self-signed certs.
+process.env.ALLOW_INSECURE_DATABASE_TLS = 'false';
+
 jest.mock('@clickhouse/client', () => ({
   createClient: jest.fn(),
 }));

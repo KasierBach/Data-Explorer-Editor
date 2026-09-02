@@ -1,6 +1,9 @@
 import { PostgresStrategy } from '../../database-strategies/postgres.strategy';
 import { Pool } from 'pg';
 
+// These specs assert verified TLS; the default env accepts self-signed certs.
+process.env.ALLOW_INSECURE_DATABASE_TLS = 'false';
+
 jest.mock('pg', () => {
   return {
     Pool: jest.fn().mockImplementation(() => ({
@@ -103,32 +106,32 @@ describe('PostgresStrategy', () => {
 
       expect(sql).toBe(
         'ALTER TABLE ' +
-          quote +
-          'users' +
-          quote +
-          ' ADD CONSTRAINT ' +
-          quote +
-          'fk' +
-          quote +
-          quote +
-          'name' +
-          quote +
-          ' FOREIGN KEY (' +
-          quote +
-          'user' +
-          quote +
-          quote +
-          'id' +
-          quote +
-          ') REFERENCES ' +
-          quote +
-          'accounts' +
-          quote +
-          ' (' +
-          quote +
-          'id' +
-          quote +
-          ')',
+        quote +
+        'users' +
+        quote +
+        ' ADD CONSTRAINT ' +
+        quote +
+        'fk' +
+        quote +
+        quote +
+        'name' +
+        quote +
+        ' FOREIGN KEY (' +
+        quote +
+        'user' +
+        quote +
+        quote +
+        'id' +
+        quote +
+        ') REFERENCES ' +
+        quote +
+        'accounts' +
+        quote +
+        ' (' +
+        quote +
+        'id' +
+        quote +
+        ')',
       );
     });
 
@@ -146,31 +149,31 @@ describe('PostgresStrategy', () => {
 
       expect(mockPool.query).toHaveBeenCalledWith(
         'UPDATE ' +
-          quote +
-          'public' +
-          quote +
-          '.' +
-          quote +
-          'users' +
-          quote +
-          quote +
-          '; DROP TABLE audit; --' +
-          quote +
-          ' SET ' +
-          quote +
-          'display' +
-          quote +
-          quote +
-          'name' +
-          quote +
-          ' = $1 WHERE ' +
-          quote +
-          'id' +
-          quote +
-          quote +
-          ' OR 1=1 --' +
-          quote +
-          ' = $2',
+        quote +
+        'public' +
+        quote +
+        '.' +
+        quote +
+        'users' +
+        quote +
+        quote +
+        '; DROP TABLE audit; --' +
+        quote +
+        ' SET ' +
+        quote +
+        'display' +
+        quote +
+        quote +
+        'name' +
+        quote +
+        ' = $1 WHERE ' +
+        quote +
+        'id' +
+        quote +
+        quote +
+        ' OR 1=1 --' +
+        quote +
+        ' = $2',
         ['Ada', 1],
       );
     });

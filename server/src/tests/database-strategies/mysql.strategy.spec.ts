@@ -1,6 +1,9 @@
 import { MysqlStrategy } from '../../database-strategies/mysql.strategy';
 import * as mysql from 'mysql2/promise';
 
+// These specs assert verified TLS; the default env accepts self-signed certs.
+process.env.ALLOW_INSECURE_DATABASE_TLS = 'false';
+
 jest.mock('mysql2/promise', () => ({
   createPool: jest.fn(),
 }));
@@ -169,31 +172,31 @@ describe('MysqlStrategy', () => {
 
       expect(mockPool.execute).toHaveBeenCalledWith(
         'UPDATE ' +
-          quote +
-          'app' +
-          quote +
-          '.' +
-          quote +
-          'users' +
-          quote +
-          quote +
-          '; DROP TABLE audit; --' +
-          quote +
-          ' SET ' +
-          quote +
-          'display' +
-          quote +
-          quote +
-          'name' +
-          quote +
-          ' = ? WHERE ' +
-          quote +
-          'id' +
-          quote +
-          quote +
-          ' OR 1=1 --' +
-          quote +
-          ' = ?',
+        quote +
+        'app' +
+        quote +
+        '.' +
+        quote +
+        'users' +
+        quote +
+        quote +
+        '; DROP TABLE audit; --' +
+        quote +
+        ' SET ' +
+        quote +
+        'display' +
+        quote +
+        quote +
+        'name' +
+        quote +
+        ' = ? WHERE ' +
+        quote +
+        'id' +
+        quote +
+        quote +
+        ' OR 1=1 --' +
+        quote +
+        ' = ?',
         ['Ada', 1],
       );
     });
