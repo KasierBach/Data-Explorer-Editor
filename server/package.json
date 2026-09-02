@@ -1,6 +1,6 @@
 {
   "name": "data-explorer-server",
-  "version": "3.6.4",
+  "version": "3.6.7",
   "description": "",
   "author": "",
   "private": true,
@@ -57,7 +57,7 @@
     "ioredis": "^5.10.1",
     "mongodb": "^7.1.1",
     "mssql": "^12.2.0",
-    "mysql2": "^3.16.3",
+    "mysql2": "^3.24.2",
     "nestjs-pino": "^4.6.1",
     "nodemailer": "9.0.3",
     "passport": "^0.7.0",
