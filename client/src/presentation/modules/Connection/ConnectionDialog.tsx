@@ -11,13 +11,13 @@ import {
     FileWarning, Upload, Users, CheckCircle2, XCircle, Server, Eye, EyeOff,
     Terminal, KeyRound, ChevronDown, ChevronUp, Loader2
 } from 'lucide-react';
-import { SiPostgresql, SiMysql, SiMariadb, SiMongodb, SiClickhouse, SiSqlite } from 'react-icons/si';
+import { SiPostgresql, SiMysql, SiMariadb, SiMongodb, SiClickhouse, SiSqlite, SiRedis } from 'react-icons/si';
 import { DiMsqlServer } from 'react-icons/di';
 
 import { ConnectionService } from '@/core/services/ConnectionService';
 import { OrganizationService, type OrganizationEntity } from '@/core/services/OrganizationService';
 
-type EditableConnectionType = Exclude<Connection['type'], 'mock' | 'redis'>;
+type EditableConnectionType = Exclude<Connection['type'], 'mock'>;
 type ConnectionPayload = Omit<Connection, 'id'>;
 
 const getErrorMessage = (error: unknown, fallback: string) => (
@@ -25,8 +25,9 @@ const getErrorMessage = (error: unknown, fallback: string) => (
 );
 
 export const ConnectionDialog: React.FC = () => {
-    const { isConnectionDialogOpen, closeConnectionDialog, addConnection, lang } = useAppStore();
+    const { isConnectionDialogOpen, closeConnectionDialog, addConnection, updateConnection, editingConnectionId, connections, lang } = useAppStore();
     const t = lang === 'vi';
+    const isEditing = Boolean(editingConnectionId);
 
     const [type, setType] = useState<EditableConnectionType>('postgres');
     const [name, setName] = useState('');
@@ -36,6 +37,7 @@ export const ConnectionDialog: React.FC = () => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [database, setDatabase] = useState('');
+    const [tls, setTls] = useState(false);
     const [showAllDatabases] = useState(false);
     const [readOnly, setReadOnly] = useState(false);
     const [allowSchemaChanges, setAllowSchemaChanges] = useState(true);
@@ -57,42 +59,79 @@ export const ConnectionDialog: React.FC = () => {
     const [sshPassphrase, setSshPassphrase] = useState('');
     const [showSshPassphrase, setShowSshPassphrase] = useState(false);
 
-    const [environment, setEnvironment] = useState<'development' | 'staging' | 'production'>('development');
+    const [environment, setEnvironment] = useState<'development' | 'staging' | 'production' | 'none'>('none');
 
     const [teams, setTeams] = useState<OrganizationEntity[]>([]);
     const [organizationId, setOrganizationId] = useState<string>('none');
 
-    // Reset form states when dialog opens and clean up pointer-events on close/unmount
+    // Reset or populate form states when dialog opens and clean up pointer-events on close/unmount
     React.useEffect(() => {
         if (isConnectionDialogOpen) {
-            setType('postgres');
-            setName('');
-            setHost('localhost');
-            setPort('5432');
-            setUsername('postgres');
-            setPassword('');
-            setShowPassword(false);
-            setDatabase('');
-            setReadOnly(false);
-            setAllowSchemaChanges(true);
-            setAllowImportExport(true);
-            setAllowQueryExecution(true);
-            setConnectionString('');
-            setError(null);
-            setTestResult(null);
-            setIsSaving(false);
-            setEnvironment('development');
+            const editingConn = editingConnectionId
+                ? connections.find((c) => c.id === editingConnectionId)
+                : null;
 
-            setUseSshTunnel(false);
-            setSshHost('');
-            setSshPort('22');
-            setSshUsername('');
-            setSshAuthType('password');
-            setSshPrivateKey('');
-            setSshPassphrase('');
-            setShowSshPassphrase(false);
+            if (editingConn) {
+                setType((editingConn.type === 'mock' ? 'postgres' : editingConn.type) as EditableConnectionType);
+                setName(editingConn.name || '');
+                setHost(editingConn.host || 'localhost');
+                setPort(editingConn.port ? String(editingConn.port) : '');
+                setUsername(editingConn.username || '');
+                setPassword('');
+                setShowPassword(false);
+                setDatabase(editingConn.database || '');
+                setTls(Boolean(editingConn.tls));
+                setReadOnly(Boolean(editingConn.readOnly));
+                setAllowSchemaChanges(editingConn.allowSchemaChanges ?? true);
+                setAllowImportExport(editingConn.allowImportExport ?? true);
+                setAllowQueryExecution(editingConn.allowQueryExecution ?? true);
+                setConnectionString('');
+                setError(null);
+                setTestResult(null);
+                setIsSaving(false);
+                setEnvironment(editingConn.environment || 'none');
+                setOrganizationId(editingConn.organizationId || 'none');
 
-            setOrganizationId('none');
+                const hasSsh = Boolean(editingConn.sshHost && editingConn.sshHost.trim());
+                setUseSshTunnel(hasSsh);
+                setSshHost(editingConn.sshHost || '');
+                setSshPort(editingConn.sshPort ? String(editingConn.sshPort) : '22');
+                setSshUsername(editingConn.sshUsername || '');
+                setSshAuthType(editingConn.sshPrivateKey ? 'key' : 'password');
+                setSshPrivateKey(editingConn.sshPrivateKey || '');
+                setSshPassphrase(editingConn.sshPassphrase || '');
+                setShowSshPassphrase(false);
+            } else {
+                setType('postgres');
+                setName('');
+                setHost('localhost');
+                setPort('5432');
+                setUsername('postgres');
+                setPassword('');
+                setShowPassword(false);
+                setDatabase('');
+                setTls(false);
+                setReadOnly(false);
+                setAllowSchemaChanges(true);
+                setAllowImportExport(true);
+                setAllowQueryExecution(true);
+                setConnectionString('');
+                setError(null);
+                setTestResult(null);
+                setIsSaving(false);
+                setEnvironment('none');
+
+                setUseSshTunnel(false);
+                setSshHost('');
+                setSshPort('22');
+                setSshUsername('');
+                setSshAuthType('password');
+                setSshPrivateKey('');
+                setSshPassphrase('');
+                setShowSshPassphrase(false);
+                setOrganizationId('none');
+            }
+
             // Load teams
             OrganizationService.getMyOrganizations()
                 .then(setTeams)
@@ -106,7 +145,7 @@ export const ConnectionDialog: React.FC = () => {
                 document.body.style.pointerEvents = '';
             }
         };
-    }, [isConnectionDialogOpen]);
+    }, [isConnectionDialogOpen, editingConnectionId, connections]);
 
     const isMongoType = type === 'mongodb' || type === 'mongodb+srv';
     const isFileType = type === 'sqlite';
@@ -144,7 +183,7 @@ export const ConnectionDialog: React.FC = () => {
 
             const url = new URL(raw);
 
-            let parsedType: 'postgres' | 'cockroach' | 'mysql' | 'mariadb' | 'mssql' | 'clickhouse' = 'postgres';
+            let parsedType: 'postgres' | 'cockroach' | 'mysql' | 'mariadb' | 'mssql' | 'clickhouse' | 'redis' = 'postgres';
             if (url.protocol.includes('cockroach')) {
                 parsedType = 'cockroach';
                 setType('cockroach');
@@ -163,6 +202,10 @@ export const ConnectionDialog: React.FC = () => {
             } else if (url.protocol.includes('clickhouse')) {
                 parsedType = 'clickhouse';
                 setType('clickhouse');
+            } else if (url.protocol.includes('redis')) {
+                parsedType = 'redis';
+                setType('redis');
+                setTls(url.protocol === 'rediss:');
             }
 
             if (url.hostname) setHost(url.hostname);
@@ -175,12 +218,14 @@ export const ConnectionDialog: React.FC = () => {
                 if (parsedType === 'mariadb') setPort('3306');
                 if (parsedType === 'mssql') setPort('1433');
                 if (parsedType === 'clickhouse') setPort('8123');
+                if (parsedType === 'redis') setPort('6379');
             }
 
             if (url.username) setUsername(decodeURIComponent(url.username));
             if (url.password) setPassword(decodeURIComponent(url.password));
             if (url.pathname && url.pathname.length > 1) {
-                setDatabase(decodeURIComponent(url.pathname.substring(1)));
+                const cleanDb = decodeURIComponent(url.pathname.substring(1)).split('?')[0];
+                setDatabase(cleanDb);
             }
             if (!name) setName(`${parsedType} @ ${url.hostname}`);
             setError(null);
@@ -220,19 +265,23 @@ export const ConnectionDialog: React.FC = () => {
     };
 
     const getConnectionData = (): ConnectionPayload => {
-        const connectionData: ConnectionPayload = {
-            name: name || `${type}@${host}`,
+        const connectionData: Partial<ConnectionPayload> & { password?: string } = {
             type,
-            host: isFileType ? undefined : host.trim(),
-            username: isFileType ? undefined : username.trim(),
-            password: isFileType ? undefined : password,
+            name: name.trim() || `${type} @ ${host}`,
+            ...(!isFileType && host.trim() ? { host: host.trim() } : {}),
+            ...(!isFileType && username.trim() ? { username: username.trim() } : {}),
+            ...(password ? { password } : (isEditing ? {} : { password: '' })),
+            tls:
+                type === 'redis' || type === 'mysql' || type === 'mariadb'
+                    ? tls
+                    : undefined,
             showAllDatabases,
             readOnly,
             allowSchemaChanges: readOnly ? false : allowSchemaChanges,
             allowImportExport: readOnly ? false : allowImportExport,
             allowQueryExecution,
-            environment,
-            ...(organizationId && organizationId !== 'none' ? { organizationId } : {}),
+            environment: environment === 'none' ? undefined : environment,
+            organizationId: organizationId === 'none' ? null : organizationId,
             ...(useSshTunnel ? {
                 sshHost: sshHost.trim(),
                 sshPort: parseInt(sshPort, 10) || 22,
@@ -249,7 +298,7 @@ export const ConnectionDialog: React.FC = () => {
         const parsedPort = parseInt(port, 10);
         if (!isNaN(parsedPort)) connectionData.port = parsedPort;
         if (database && database.trim() !== '') connectionData.database = database.trim();
-        return connectionData;
+        return connectionData as ConnectionPayload;
     };
 
     const handleTest = async () => {
@@ -293,39 +342,50 @@ export const ConnectionDialog: React.FC = () => {
         const connectionData = getConnectionData();
 
         try {
-            const savedConnection = await ConnectionService.createConnection(connectionData);
+            if (isEditing && editingConnectionId) {
+                await ConnectionService.updateConnection(editingConnectionId, connectionData);
+                updateConnection(editingConnectionId, {
+                    ...connectionData,
+                    organizationId: connectionData.organizationId ?? null,
+                    environment,
+                });
+                closeConnectionDialog();
+            } else {
+                const savedConnection = await ConnectionService.createConnection(connectionData);
 
-            const newConnection: Connection = {
-                id: savedConnection.id,
-                name: savedConnection.name,
-                type: savedConnection.type,
-                host: savedConnection.host,
-                port: savedConnection.port,
-                username: savedConnection.username,
-                password: savedConnection.password,
-                database: savedConnection.database,
-                showAllDatabases: savedConnection.showAllDatabases,
-                readOnly: savedConnection.readOnly,
-                allowSchemaChanges: savedConnection.allowSchemaChanges,
-                allowImportExport: savedConnection.allowImportExport,
-                allowQueryExecution: savedConnection.allowQueryExecution,
-                lastHealthCheckAt: savedConnection.lastHealthCheckAt,
-                lastHealthStatus: savedConnection.lastHealthStatus,
-                lastHealthError: savedConnection.lastHealthError,
-                lastConnectedAt: savedConnection.lastConnectedAt,
-                lastConnectionLatencyMs: savedConnection.lastConnectionLatencyMs,
-                sshHost: savedConnection.sshHost,
-                sshPort: savedConnection.sshPort,
-                sshUsername: savedConnection.sshUsername,
-                environment: savedConnection.environment || environment,
-            };
-            addConnection(newConnection);
-            closeConnectionDialog();
+                const newConnection: Connection = {
+                    id: savedConnection.id,
+                    name: savedConnection.name,
+                    type: savedConnection.type,
+                    host: savedConnection.host,
+                    port: savedConnection.port,
+                    username: savedConnection.username,
+                    password: savedConnection.password,
+                    database: savedConnection.database,
+                    tls: savedConnection.tls,
+                    showAllDatabases: savedConnection.showAllDatabases,
+                    readOnly: savedConnection.readOnly,
+                    allowSchemaChanges: savedConnection.allowSchemaChanges,
+                    allowImportExport: savedConnection.allowImportExport,
+                    allowQueryExecution: savedConnection.allowQueryExecution,
+                    lastHealthCheckAt: savedConnection.lastHealthCheckAt,
+                    lastHealthStatus: savedConnection.lastHealthStatus,
+                    lastHealthError: savedConnection.lastHealthError,
+                    lastConnectedAt: savedConnection.lastConnectedAt,
+                    lastConnectionLatencyMs: savedConnection.lastConnectionLatencyMs,
+                    sshHost: savedConnection.sshHost,
+                    sshPort: savedConnection.sshPort,
+                    sshUsername: savedConnection.sshUsername,
+                    environment: savedConnection.environment || environment,
+                };
+                addConnection(newConnection);
+                closeConnectionDialog();
+            }
             setName('');
             setPassword('');
             setError(null);
         } catch (err) {
-            setError(getErrorMessage(err, 'Failed to save connection'));
+            setError(getErrorMessage(err, isEditing ? 'Failed to update connection' : 'Failed to save connection'));
         } finally {
             setIsSaving(false);
         }
@@ -347,11 +407,17 @@ export const ConnectionDialog: React.FC = () => {
                         <DialogTitle asChild>
                             <h2 className="text-base sm:text-lg font-bold tracking-tight flex items-center gap-2">
                                 <Database className="w-5 h-5 text-violet-500" />
-                                {t ? 'Thêm kết nối mới' : 'Add New Connection'}
+                                {isEditing
+                                    ? (t ? 'Chỉnh sửa kết nối' : 'Edit Connection')
+                                    : (t ? 'Thêm kết nối mới' : 'Add New Connection')}
                             </h2>
                         </DialogTitle>
                         <DialogDescription asChild>
-                            <p className="text-xs text-muted-foreground mt-0.5">{t ? 'Cấu hình thông tin để truy cập database an toàn.' : 'Configure credentials to securely access your database.'}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                {isEditing
+                                    ? (t ? 'Cập nhật thông tin cấu hình, môi trường và quyền an toàn.' : 'Update credentials, environment, and security settings.')
+                                    : (t ? 'Cấu hình thông tin để truy cập database an toàn.' : 'Configure credentials to securely access your database.')}
+                            </p>
                         </DialogDescription>
                     </div>
 
@@ -427,6 +493,7 @@ export const ConnectionDialog: React.FC = () => {
                                             { value: 'sqlite', label: 'SQLite', icon: <SiSqlite className="w-5 h-5" />, accent: 'text-slate-400', accentBg: 'bg-slate-400/10 border-slate-400/40' },
                                             { value: 'mongodb', label: 'MongoDB', icon: <SiMongodb className="w-5 h-5" />, accent: 'text-green-500', accentBg: 'bg-green-500/10 border-green-500/40' },
                                             { value: 'mongodb+srv', label: 'Atlas (SRV)', icon: <SiMongodb className="w-5 h-5" />, accent: 'text-emerald-500', accentBg: 'bg-emerald-500/10 border-emerald-500/40' },
+                                            { value: 'redis', label: 'Redis', icon: <SiRedis className="w-5 h-5" />, accent: 'text-red-500', accentBg: 'bg-red-500/10 border-red-500/40' },
                                         ] as const).map((engine) => {
                                             const isActive = type === engine.value;
                                             return (
@@ -438,13 +505,14 @@ export const ConnectionDialog: React.FC = () => {
                                                         setType(nextType);
                                                         if (nextType === 'postgres') { setPort('5432'); setUsername('postgres'); setHost('localhost'); }
                                                         else if (nextType === 'cockroach') { setPort('26257'); setUsername('root'); setHost('localhost'); }
-                                                        else if (nextType === 'mysql') { setPort('3306'); setUsername('root'); setHost('localhost'); }
-                                                        else if (nextType === 'mariadb') { setPort('3306'); setUsername('root'); setHost('localhost'); }
+                                                        else if (nextType === 'mysql') { setPort('3306'); setUsername('root'); setHost('localhost'); setTls(true); }
+                                                        else if (nextType === 'mariadb') { setPort('3306'); setUsername('root'); setHost('localhost'); setTls(true); }
                                                         else if (nextType === 'mssql') { setPort('1433'); setUsername('sa'); setHost('localhost'); }
                                                         else if (nextType === 'mongodb') { setPort('27017'); setUsername(''); setHost('localhost'); }
                                                         else if (nextType === 'mongodb+srv') { setPort(''); setUsername(''); setHost(''); }
                                                         else if (nextType === 'sqlite') { setPort(''); setUsername(''); setHost(''); setDatabase(''); }
                                                         else if (nextType === 'clickhouse') { setPort('8123'); setUsername('default'); setHost('localhost'); }
+                                                        else if (nextType === 'redis') { setPort('6379'); setUsername(''); setHost('localhost'); }
                                                     }}
                                                     className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border px-2 py-3 transition-all text-center ${isActive
                                                         ? `${engine.accentBg} ${engine.accent} shadow-sm`
@@ -466,11 +534,17 @@ export const ConnectionDialog: React.FC = () => {
                                     </div>
                                     <div className="col-span-1 space-y-1">
                                         <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Môi trường' : 'Environment'}</Label>
-                                        <Select value={environment} onValueChange={(v: 'development' | 'staging' | 'production') => setEnvironment(v)}>
+                                        <Select value={environment} onValueChange={(v: 'development' | 'staging' | 'production' | 'none') => setEnvironment(v)}>
                                             <SelectTrigger className="h-9 text-xs">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
+                                                <SelectItem value="none">
+                                                    <div className="flex items-center gap-2 text-xs">
+                                                        <span className="w-2 h-2 rounded-full bg-muted-foreground/40 shrink-0" />
+                                                        <span>{t ? 'Không (Mặc định)' : 'None'}</span>
+                                                    </div>
+                                                </SelectItem>
                                                 <SelectItem value="development">
                                                     <div className="flex items-center gap-2 text-xs">
                                                         <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
@@ -551,6 +625,7 @@ export const ConnectionDialog: React.FC = () => {
                                                         type={showPassword ? 'text' : 'password'}
                                                         value={password}
                                                         onChange={e => setPassword(e.target.value)}
+                                                        placeholder={isEditing ? (t ? '•••••••• (Để trống nếu giữ nguyên)' : '•••••••• (Leave blank to keep unchanged)') : undefined}
                                                         className="h-9 text-xs pr-8"
                                                     />
                                                     <button
@@ -570,6 +645,29 @@ export const ConnectionDialog: React.FC = () => {
                                                 <Label className="text-[10px] text-muted-foreground">Database</Label>
                                                 <Input value={database} onChange={e => { setDatabase(e.target.value); setError(null); }} placeholder="mydatabase" className="h-9 font-mono text-xs" />
                                             </div>
+                                        )}
+                                        {(type === 'redis' || type === 'mysql' || type === 'mariadb') && (
+                                            <label className="flex items-start gap-3 cursor-pointer pt-1">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={tls}
+                                                    onChange={(e) => setTls(e.target.checked)}
+                                                    className="mt-0.5"
+                                                />
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2 text-xs font-semibold">
+                                                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                                                        {type === 'redis'
+                                                            ? (t ? 'Dùng TLS cho Redis' : 'Use TLS for Redis')
+                                                            : (t ? 'Dùng TLS cho MySQL/MariaDB' : 'Use TLS for MySQL/MariaDB')}
+                                                    </div>
+                                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                        {type === 'redis'
+                                                            ? (t ? 'Bật cho Redis cloud hoặc URI rediss://.' : 'Enable for managed Redis or rediss:// URIs.')
+                                                            : (t ? 'Tắt nếu server từ chối kết nối SSL (MariaDB không TLS).' : 'Turn off if the server rejects SSL handshakes (non-TLS MariaDB).')}
+                                                    </p>
+                                                </div>
+                                            </label>
                                         )}
                                         {/* Refined Security Micro-Indicator */}
                                         <div className="flex items-center gap-1.5 pt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium select-none">
@@ -820,11 +918,10 @@ export const ConnectionDialog: React.FC = () => {
                         {/* Full Error / Test Result Message Strip */}
                         {testResult && (
                             <div
-                                className={`flex items-start gap-2.5 text-xs p-2.5 rounded-lg border leading-relaxed animate-in fade-in zoom-in-95 ${
-                                    testResult.status === 'healthy'
-                                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                                        : 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400'
-                                }`}
+                                className={`flex items-start gap-2.5 text-xs p-2.5 rounded-lg border leading-relaxed animate-in fade-in zoom-in-95 ${testResult.status === 'healthy'
+                                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                                    : 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400'
+                                    }`}
                             >
                                 {testResult.status === 'healthy' ? (
                                     <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500" />
@@ -875,7 +972,9 @@ export const ConnectionDialog: React.FC = () => {
                                     {t ? 'Hủy' : 'Cancel'}
                                 </Button>
                                 <Button size="sm" onClick={handleSave} disabled={isSaving} className="bg-violet-600 hover:bg-violet-700 text-white min-w-[110px] text-xs h-8">
-                                    {isSaving ? (t ? 'Đang kết nối...' : 'Connecting...') : (t ? 'Lưu & Kết nối' : 'Save & Connect')}
+                                    {isSaving
+                                        ? (t ? 'Đang lưu...' : 'Saving...')
+                                        : (isEditing ? (t ? 'Lưu thay đổi' : 'Save Changes') : (t ? 'Lưu & Kết nối' : 'Save & Connect'))}
                                 </Button>
                             </div>
                         </div>

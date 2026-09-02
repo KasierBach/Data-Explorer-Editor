@@ -60,6 +60,102 @@ describe('MysqlStrategy', () => {
         }),
       );
     });
+
+    it('skips TLS when tls=false for remote MariaDB/MySQL servers without TLS', () => {
+      strategy.createPool({
+        host: 'db.example.com',
+        port: 3306,
+        username: 'root',
+        password: 'password',
+        database: 'test_db',
+        tls: false,
+      });
+
+      expect(mysql.createPool).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ssl: undefined,
+        }),
+      );
+    });
+  });
+
+  describe('updateRow', () => {
+    it('rejects empty updates instead of generating invalid SQL', async () => {
+      const result = await strategy.updateRow(mockPool, {
+        schema: 'app',
+        table: 'users',
+        pkColumn: 'id',
+        pkValue: 1,
+        updates: {},
+      });
+
+      expect(result).toEqual({ success: false, rowCount: 0 });
+      expect(mockPool.execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('tree nodes', () => {
+    it('lists views from information_schema', async () => {
+      mockPool.query.mockResolvedValueOnce([
+        [{ TABLE_NAME: 'active_users' }],
+      ]);
+
+      const views = await strategy.getViews(mockPool, 'app');
+
+      expect(mockPool.query).toHaveBeenCalledWith(
+        expect.stringContaining("TABLE_TYPE = 'VIEW'"),
+        ['app'],
+      );
+      expect(views).toEqual([
+        expect.objectContaining({
+          name: 'active_users',
+          type: 'view',
+          hasChildren: true,
+        }),
+      ]);
+    });
+
+    it('lists functions from information_schema', async () => {
+      mockPool.query.mockResolvedValueOnce([
+        [{ routine_name: 'calc_total' }],
+      ]);
+
+      const functions = await strategy.getFunctions(mockPool, 'app');
+
+      expect(functions).toEqual([
+        expect.objectContaining({
+          name: 'calc_total',
+          type: 'function',
+          hasChildren: true,
+        }),
+      ]);
+    });
+
+    it('lists function parameters from information_schema', async () => {
+      mockPool.query.mockResolvedValueOnce([
+        [
+          {
+            PARAMETER_NAME: 'price',
+            DTD_IDENTIFIER: 'decimal',
+            PARAMETER_MODE: 'IN',
+          },
+        ],
+      ]);
+
+      const params = await strategy.getFunctionParameters(
+        mockPool,
+        'app',
+        'calc_total',
+      );
+
+      expect(params).toEqual([
+        expect.objectContaining({
+          name: 'price',
+          type: 'IN decimal',
+          isPrimaryKey: false,
+        }),
+      ]);
+    });
   });
 
   describe('identifier quoting', () => {
@@ -77,31 +173,31 @@ describe('MysqlStrategy', () => {
 
       expect(mockPool.execute).toHaveBeenCalledWith(
         'UPDATE ' +
-          quote +
-          'app' +
-          quote +
-          '.' +
-          quote +
-          'users' +
-          quote +
-          quote +
-          '; DROP TABLE audit; --' +
-          quote +
-          ' SET ' +
-          quote +
-          'display' +
-          quote +
-          quote +
-          'name' +
-          quote +
-          ' = ? WHERE ' +
-          quote +
-          'id' +
-          quote +
-          quote +
-          ' OR 1=1 --' +
-          quote +
-          ' = ?',
+        quote +
+        'app' +
+        quote +
+        '.' +
+        quote +
+        'users' +
+        quote +
+        quote +
+        '; DROP TABLE audit; --' +
+        quote +
+        ' SET ' +
+        quote +
+        'display' +
+        quote +
+        quote +
+        'name' +
+        quote +
+        ' = ? WHERE ' +
+        quote +
+        'id' +
+        quote +
+        quote +
+        ' OR 1=1 --' +
+        quote +
+        ' = ?',
         ['Ada', 1],
       );
     });

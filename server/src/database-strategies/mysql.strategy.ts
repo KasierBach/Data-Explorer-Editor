@@ -53,7 +53,9 @@ export class MysqlStrategy implements IDatabaseStrategy {
       connectTimeout: timeoutMs,
       ssl: isLocalhost
         ? undefined
-        : { rejectUnauthorized: !allowInsecureDatabaseTls() },
+        : connectionConfig.tls === false
+          ? undefined
+          : { rejectUnauthorized: !allowInsecureDatabaseTls() },
     });
     // Carry the configured statement timeout so executeQuery can apply it as
     // the per-query timeout (mysql2 pools have no query-timeout config option).
@@ -115,7 +117,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
       columns: actualFields.map((f) => f.name),
       rowCount:
         !Array.isArray(result) &&
-        (result as ResultSetHeader).affectedRows !== undefined
+          (result as ResultSetHeader).affectedRows !== undefined
           ? (result as ResultSetHeader).affectedRows
           : undefined,
     };
@@ -163,11 +165,11 @@ export class MysqlStrategy implements IDatabaseStrategy {
           safeSql =
             options.offset !== undefined
               ? SqlUtil.injectPagination(
-                  statement,
-                  options.limit,
-                  options.offset,
-                  'mysql',
-                )
+                statement,
+                options.limit,
+                options.offset,
+                'mysql',
+              )
               : SqlUtil.injectLimit(statement, options.limit);
         }
         const [rows, fields] = await connection.query({
@@ -184,7 +186,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
             columns: actualFields.map((f) => f.name),
             rowCount:
               !Array.isArray(rows) &&
-              (rows as ResultSetHeader).affectedRows !== undefined
+                (rows as ResultSetHeader).affectedRows !== undefined
                 ? (rows as ResultSetHeader).affectedRows
                 : undefined,
           };
@@ -210,13 +212,19 @@ export class MysqlStrategy implements IDatabaseStrategy {
   ): Promise<{ success: boolean; rowCount: number }> {
     const { schema, table, pkColumn, pkValue, updates } = params;
     const updateCols = Object.keys(updates);
+    if (updateCols.length === 0) {
+      return { success: false, rowCount: 0 };
+    }
     const setClause = updateCols
       .map((col) => `${this.quoteIdentifier(col)} = ?`)
       .join(', ');
     const sql = `UPDATE ${this.quoteTable(schema, table)} SET ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = ?`;
     const values = [...updateCols.map((c) => updates[c]), pkValue];
 
-    const [result] = await pool.execute<ResultSetHeader>(sql, values);
+    const [result] = await pool.execute<ResultSetHeader>(
+      sql,
+      values as never[],
+    );
     return { success: true, rowCount: result.affectedRows };
   }
 
@@ -234,7 +242,10 @@ export class MysqlStrategy implements IDatabaseStrategy {
     const sql = `INSERT INTO ${quotedTable} (${colNames}) VALUES (${placeholders})`;
     const values = columns.map((c) => data[c]);
 
-    const [result] = await pool.execute<ResultSetHeader>(sql, values);
+    const [result] = await pool.execute<ResultSetHeader>(
+      sql,
+      values as never[],
+    );
     return { success: true, rowCount: result.affectedRows };
   }
 
@@ -249,7 +260,10 @@ export class MysqlStrategy implements IDatabaseStrategy {
     const placeholders = pkValues.map(() => `?`).join(', ');
     const sql = `DELETE FROM ${quotedTable} WHERE ${this.quoteIdentifier(pkColumn)} IN (${placeholders})`;
 
-    const [result] = await pool.execute<ResultSetHeader>(sql, pkValues);
+    const [result] = await pool.execute<ResultSetHeader>(
+      sql,
+      pkValues as never[],
+    );
     return { success: true, rowCount: result.affectedRows };
   }
 
@@ -277,7 +291,10 @@ export class MysqlStrategy implements IDatabaseStrategy {
 
     const sql = `INSERT INTO ${quotedTable} (${colNames}) VALUES ${valuePlaceholders.join(', ')}`;
 
-    const [result] = await pool.execute<ResultSetHeader>(sql, flatValues);
+    const [result] = await pool.execute<ResultSetHeader>(
+      sql,
+      flatValues as never[],
+    );
     return { success: true, rowCount: result.affectedRows };
   }
 
@@ -392,27 +409,71 @@ export class MysqlStrategy implements IDatabaseStrategy {
   }
 
   async getViews(
-    _pool: Pool,
-    _schema: string,
-    _dbName?: string,
+    pool: Pool,
+    schema: string,
+    dbName?: string,
   ): Promise<TreeNodeResult[]> {
-    return [];
+    const sql = `SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'VIEW'`;
+    const [rows] = await pool.query(sql, [schema]);
+    return (rows as Array<{ TABLE_NAME: string }>).map((row) => ({
+      id: dbName
+        ? `db:${dbName}.schema:${schema}.view:${row.TABLE_NAME}`
+        : `schema:${schema}.view:${row.TABLE_NAME}`,
+      name: row.TABLE_NAME,
+      type: 'view',
+      parentId: dbName
+        ? `db:${dbName}.schema:${schema}.folder:views`
+        : `schema:${schema}.folder:views`,
+      hasChildren: true,
+    }));
   }
 
   async getFunctions(
-    _pool: Pool,
-    _schema: string,
-    _dbName?: string,
+    pool: Pool,
+    schema: string,
+    dbName?: string,
   ): Promise<TreeNodeResult[]> {
-    return [];
+    const sql = `SELECT routine_name FROM information_schema.routines WHERE routine_schema = ?`;
+    const [rows] = await pool.query(sql, [schema]);
+    return (rows as Array<{ routine_name: string }>).map((row) => ({
+      id: dbName
+        ? `db:${dbName}.schema:${schema}.func:${row.routine_name}`
+        : `schema:${schema}.func:${row.routine_name}`,
+      name: row.routine_name,
+      type: 'function',
+      parentId: dbName
+        ? `db:${dbName}.schema:${schema}.folder:functions`
+        : `schema:${schema}.folder:functions`,
+      hasChildren: true,
+    }));
   }
 
   async getFunctionParameters(
-    _pool: Pool,
-    _schema: string,
-    _func: string,
+    pool: Pool,
+    schema: string,
+    func: string,
   ): Promise<ColumnInfo[]> {
-    return [];
+    const sql = `
+            SELECT PARAMETER_NAME, DTD_IDENTIFIER, PARAMETER_MODE
+            FROM information_schema.parameters
+            WHERE SPECIFIC_SCHEMA = ? AND SPECIFIC_NAME = ?
+            ORDER BY ORDINAL_POSITION
+        `;
+    const [rows] = await pool.query(sql, [schema, func]);
+    return (
+      rows as Array<{
+        PARAMETER_NAME: string | null;
+        DTD_IDENTIFIER: string | null;
+        PARAMETER_MODE: string | null;
+      }>
+    ).map((row) => ({
+      name: row.PARAMETER_NAME || '(unnamed)',
+      type: `${row.PARAMETER_MODE || 'IN'} ${row.DTD_IDENTIFIER || ''}`.trim(),
+      isNullable: true,
+      defaultValue: null,
+      isPrimaryKey: false,
+      pkConstraintName: null,
+    }));
   }
 
   async getColumns(

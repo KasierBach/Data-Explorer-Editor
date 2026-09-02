@@ -23,6 +23,7 @@ import {
 import { SUPABASE_ROOT_2021_CA } from '../common/constants/supabase-ca.constant';
 
 const SUPABASE_POOLER_HOST_SUFFIX = '.pooler.supabase.com';
+const DEFAULT_POSTGRES_PORT = 5432;
 
 @Injectable()
 export class PostgresStrategy implements IDatabaseStrategy {
@@ -44,18 +45,18 @@ export class PostgresStrategy implements IDatabaseStrategy {
 
     const pool = new Pool({
       host,
-      port: connectionConfig.port,
+      port: connectionConfig.port ?? DEFAULT_POSTGRES_PORT,
       user: connectionConfig.username,
       password: connectionConfig.password || undefined,
       database: databaseOverride || connectionConfig.database,
       ssl: isLocalhost
         ? false
         : {
-            rejectUnauthorized: !allowInsecureDatabaseTls(),
-            ...(host.toLowerCase().endsWith(SUPABASE_POOLER_HOST_SUFFIX)
-              ? { ca: SUPABASE_ROOT_2021_CA }
-              : {}),
-          },
+          rejectUnauthorized: !allowInsecureDatabaseTls(),
+          ...(host.toLowerCase().endsWith(SUPABASE_POOLER_HOST_SUFFIX)
+            ? { ca: SUPABASE_ROOT_2021_CA }
+            : {}),
+        },
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
@@ -160,11 +161,11 @@ export class PostgresStrategy implements IDatabaseStrategy {
           safeSql =
             options.offset !== undefined
               ? SqlUtil.injectPagination(
-                  statement,
-                  options.limit,
-                  options.offset,
-                  'postgres',
-                )
+                statement,
+                options.limit,
+                options.offset,
+                'postgres',
+              )
               : SqlUtil.injectLimit(statement, options.limit);
         }
         const raw = await client.query(safeSql);
@@ -254,9 +255,7 @@ export class PostgresStrategy implements IDatabaseStrategy {
     const quotedTable = this.quoteTable(schema, table);
     const colNames = columns.map((c) => this.quoteIdentifier(c)).join(', ');
 
-    // Postgres limits each statement to 65535 bound parameters. Chunk rows so
-    // that columns × rows stays safely below the limit, and wrap all chunks in
-    // a single transaction so a failed import leaves no partial data behind.
+    // Chunk to stay under the 65535 parameter limit, in one transaction.
     const MAX_PARAMETERS = 60000;
     const maxRowsPerChunk = Math.max(
       1,
@@ -315,11 +314,9 @@ export class PostgresStrategy implements IDatabaseStrategy {
 
     const client = await pool.connect();
     let releasePromise: Promise<void> | null = null;
-    // Declared before safeRelease to avoid a temporal-dead-zone reference.
     let previousTimeout = '30s';
 
-    // The timeout override is session-scoped, so restore it before returning
-    // this client to the pool. The release guard also covers setup failures.
+    // Restore the session-scoped timeout before returning the client.
     const safeRelease = () => {
       if (!releasePromise) {
         releasePromise = (async () => {

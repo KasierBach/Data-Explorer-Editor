@@ -1,6 +1,7 @@
 export { DatabaseStrategiesModule } from './database-strategies.module';
 export { DatabaseStrategyFactory } from './strategy.factory';
 export { PostgresStrategy } from './postgres.strategy';
+export { CockroachDbStrategy } from './cockroach.strategy';
 export { MysqlStrategy } from './mysql.strategy';
 export { MssqlStrategy } from './mssql.strategy';
 export { MongoDbStrategy } from './mongodb.strategy';
