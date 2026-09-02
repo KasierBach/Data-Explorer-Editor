@@ -8,10 +8,9 @@ const NOTIFICATIONS_STREAM_TICKET_TTL_SECONDS = 15 * 60;
 
 @Injectable()
 export class TokenService {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(private readonly jwtService: JwtService) { }
 
-  // Allow a small amount of clock skew to avoid false negatives
-  // when multiple services/machines have slightly different times.
+  // Allow for small clock skew between services.
   private readonly clockToleranceSeconds = 5;
 
   private getRefreshSecret() {

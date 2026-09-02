@@ -14,7 +14,7 @@ export class SearchService {
     private readonly strategyFactory: DatabaseStrategyFactory,
     private readonly aiService: AiService,
     private readonly searchIndexRepository: SearchIndexRepository,
-  ) {}
+  ) { }
 
   private async suggestNames(userId: string, query: string) {
     const names =
@@ -58,8 +58,7 @@ export class SearchService {
           );
 
           for (const schema of schemas) {
-            // Robust parsing of schema and db names from ID
-            // Format could be: "db:NAME.schema:NAME" or just "schema:NAME"
+            // ID format: "db:NAME.schema:NAME" or "schema:NAME".
             let schemaName = schema.name;
             let dbName = '';
 
@@ -118,8 +117,7 @@ export class SearchService {
       50,
     );
 
-    // 2. Semantic Search (AI Fallback)
-    // If results are few and query is meaningful, call AI
+    // 2. Semantic search fallback for short keyword result sets.
     if (keywordResults.length < 5 && query.length > 2) {
       const aiTableSuggestions = await this.suggestNames(userId, query);
 

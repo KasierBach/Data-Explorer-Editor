@@ -4,7 +4,7 @@ import { UserUtils } from '../users/user.utils';
 
 @Injectable()
 export class SocialAuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async validateOAuthLogin(profile: any, provider: 'google' | 'github') {
     const { id, emails, name, photos, username } = profile;
@@ -39,8 +39,7 @@ export class SocialAuthService {
       throw new Error('No email provided by the OAuth provider');
     }
 
-    // Provider identity is always safe to resume. Email linking requires a
-    // provider-verified address to prevent account takeover.
+    // Email linking requires a provider-verified address.
     let user = await this.prisma.user.findFirst({
       where: {
         providerId: id,

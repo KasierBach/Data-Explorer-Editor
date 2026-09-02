@@ -25,10 +25,8 @@ function formatNoSqlSchemaFields(stats: unknown) {
 }
 
 /**
- * Custom hook that registers an AI-powered Inline Completions Provider for Monaco.
- * This provides "Ghost Text" functionality similar to GitHub Copilot or VS Code.
- * 
- * It automatically handles Tab to accept and Esc to dismiss.
+ * Registers a Monaco inline-completions provider ("ghost text").
+ * Tab accepts, Esc dismisses.
  */
 export function useAiGhostText(
     monaco: Monaco | null,
@@ -49,7 +47,7 @@ export function useAiGhostText(
         ),
         [preferences.autocompleteModel, assistantSelection, preferences.customProviders],
     );
-    
+
     useEffect(() => {
         if (!monaco || !activeConnectionId) return;
 
@@ -69,25 +67,23 @@ export function useAiGhostText(
                 _context: languages.InlineCompletionContext,
                 token: CancellationToken,
             ) => {
-                // 1. Basic Validation
                 const lineContent = model.getLineContent(position.lineNumber);
                 const textBefore = lineContent.substring(0, position.column - 1);
 
-                // 2. Intelligence: Don't trigger if we're in the middle of a word unless at the end
+                // Don't trigger in the middle of a word.
                 const charAfter = lineContent[position.column - 1] || '';
                 if (charAfter && /[a-zA-Z0-9_]/.test(charAfter)) return;
 
-                // 3. Debounce: Wait a bit before making the request
-                // We use 350ms for a balance between responsiveness and server load
+                // 3. Debounce
                 await new Promise(resolve => setTimeout(resolve, 350));
                 if (token.isCancellationRequested) return;
 
-                // 4. Check for keywords to avoid overlapping with standard popup
+                // Avoid overlapping with the standard keyword popup.
                 const words = textBefore.trimEnd().split(/\s+/);
                 const lastWord = words[words.length - 1]?.toUpperCase() || '';
                 if (textBefore.endsWith(' ') && POPUP_KEYWORDS.has(lastWord)) return;
 
-                // 5. Gather Context
+                // Gather context before the cursor.
                 const beforeCursor = model.getValueInRange({
                     startLineNumber: Math.max(1, position.lineNumber - 50),
                     startColumn: 1,
@@ -103,9 +99,7 @@ export function useAiGhostText(
                 });
 
                 try {
-                    // Pass the Monaco CancellationToken converted to AbortSignal if needed,
-                    // but AiService just needs it to check during processing.
-                    // 5. Build Context (including NoSQL schema if available)
+                    // Include NoSQL schema when available.
                     let contextStr = undefined;
                     const isNoSql = language === 'json';
                     if (isNoSql && nosqlActiveCollection && nosqlSchemaStats) {
@@ -126,7 +120,7 @@ export function useAiGhostText(
 
                     let finalCompletion = completion;
 
-                    // 6. Handle Auto-Spacing (Aggressive)
+                    // Auto-spacing.
                     const charBefore = textBefore.length > 0 ? textBefore[textBefore.length - 1] : '';
                     const firstCharOfCompletion = finalCompletion[0];
 
@@ -141,7 +135,7 @@ export function useAiGhostText(
                         }
                     }
 
-                    // 7. Semicolon protection: Avoid redundant semicolons
+                    // Avoid redundant semicolons.
                     if (finalCompletion.trim().startsWith(';')) {
                         if (textBefore.trim().endsWith(';') || afterCursor.trim().startsWith(';')) {
                             // If user already has a semicolon, don't suggest another one at the start
@@ -150,7 +144,7 @@ export function useAiGhostText(
                         }
                     }
 
-                    // 8. Deduplication: Don't suggest what's already there
+                    // Don't suggest what's already typed.
                     const normalizedAfter = afterCursor.trim().toLowerCase();
                     const normalizedCompletion = finalCompletion.trim().toLowerCase();
                     if (normalizedAfter.startsWith(normalizedCompletion) || (normalizedAfter.length > 3 && normalizedCompletion.startsWith(normalizedAfter))) return;

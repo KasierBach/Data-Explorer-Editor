@@ -15,9 +15,7 @@ export class MigrationProcessor extends WorkerHost {
     this.logger.log(`Processing migration job ${job.id}`);
     const { userId, dto } = job.data;
 
-    // The actual migration logic will be called here.
-    // We will refactor migration.service to have a method that performs the work
-    // which this processor will call.
+    // TODO: call into migration.service to perform the work.
     try {
       await this.migrationService.runMigrationPipeline(userId, job.id!, dto);
       return { success: true };

@@ -86,7 +86,7 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
             const msgs = await AiChatService.loadMessages(chatId);
             // Ensure welcome message is always first if empty
             if (msgs.length === 0) {
-                 msgs.push({
+                msgs.push({
                     id: 'welcome',
                     role: 'ai',
                     content: 'Xin chào! Tôi là AI Assistant — bạn có thể hỏi tôi bất cứ điều gì: SQL, coding, kiến thức chung, hay chỉ đơn giản là trò chuyện. Khi cần truy vấn database, tôi sẽ tự động sinh SQL dựa trên schema của bạn.',
@@ -226,7 +226,7 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
     },
     editAiMessage: async (chatId, messageId, newContent) => {
         try {
-            // ChatGPT logic: delete all messages after the edited message
+            // Delete all messages after the edited message.
             await AiChatService.deleteMessagesAfter(chatId, messageId);
 
             const state = get();
@@ -235,18 +235,18 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
             if (msgToUpdate) {
                 await AiChatService.updateMessage(chatId, messageId, { ...msgToUpdate, content: newContent });
             }
-            
+
             set((state) => ({
                 aiChats: state.aiChats.map(chat => {
                     if (chat.id !== chatId) return chat;
-                    
+
                     const messageIndex = chat.messages.findIndex(m => m.id === messageId);
                     if (messageIndex === -1) return chat;
-                    
-                    const updatedMessages = chat.messages.slice(0, messageIndex + 1).map(m => 
+
+                    const updatedMessages = chat.messages.slice(0, messageIndex + 1).map(m =>
                         m.id === messageId ? { ...m, content: newContent } : m
                     );
-                    
+
                     return {
                         ...chat,
                         messages: updatedMessages,
@@ -254,7 +254,7 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get) => ({
                     };
                 })
             }));
-            
+
             // Note: The caller (UI) is responsible for triggering the new AI request
         } catch (e) {
             console.error('Failed to edit message', e);

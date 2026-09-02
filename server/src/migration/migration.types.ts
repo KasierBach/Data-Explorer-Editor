@@ -1,6 +1,5 @@
 /**
  * Shared types for the Migration module.
- * Extracted from migration.service.ts for SRP and reusability.
  */
 
 export type ConnectionType =

@@ -20,9 +20,8 @@ export const handleTreeAction = (
 
     const { dbName, schema, table: tableName } = parseNodeId(nodeId);
 
-    // Cast dialect to 'postgres' | 'mysql' since getQuotedIdentifier only supports these currently.
-    // MariaDB uses MySQL quoting (backticks); everything else falls back to
-    // ANSI postgres quoting.
+    // getQuotedIdentifier only supports postgres/mysql quoting; MariaDB uses
+    // MySQL backticks and everything else falls back to ANSI quoting.
     const qDialect =
         activeConnection.type === 'mysql' || activeConnection.type === 'mariadb'
             ? 'mysql'

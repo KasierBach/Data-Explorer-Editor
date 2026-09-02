@@ -14,12 +14,10 @@ export function useExplainPlan({ query }: UseExplainPlanOptions) {
 
     const executeExplain = useCallback(async () => {
         if (!activeConnectionId || !query.trim()) return;
-        
+
         setIsExplaining(true);
         try {
             const explainQuery = `EXPLAIN ANALYZE ${query}`;
-            // Use ConnectionService API to execute explain query if available
-            // Fallback: execute via ConnectionService if available
             const result = await apiService.post<QueryResult>('/query', {
                 connectionId: activeConnectionId,
                 sql: explainQuery,
@@ -27,7 +25,7 @@ export function useExplainPlan({ query }: UseExplainPlanOptions) {
                 limit: 1,
                 confirmed: true,
             });
-            
+
             setExplainPlan(result.rows[0] || null);
         } catch (error) {
             console.error('Explain plan error:', error);

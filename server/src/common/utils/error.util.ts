@@ -4,7 +4,6 @@
 
 /**
  * Extracts a human-readable message from an unknown error value.
- * Replaces the repeated pattern: `error instanceof Error ? error.message : String(error)`
  */
 export function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

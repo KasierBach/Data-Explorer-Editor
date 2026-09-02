@@ -123,9 +123,7 @@ export class SqlUtil {
             return `SELECT * FROM (${trimmed} ORDER BY ${pkOrder} OFFSET ${reverseOffset} ROWS FETCH NEXT ${limit} ROWS ONLY) _rev ORDER BY ${options.primaryKey || '1'} ASC;`;
           }
           if (options.primaryKey) {
-            // Quote the primary key per dialect: MySQL treats "id" as a string
-            // literal (not an identifier) unless ANSI_QUOTES is enabled, which
-            // would make the ORDER BY ineffective and break pagination.
+            // MySQL treats "id" as a string literal unless ANSI_QUOTES is on.
             const quotedPk =
               dialect === 'mysql'
                 ? `\`${options.primaryKey.replace(/`/g, '``')}\``

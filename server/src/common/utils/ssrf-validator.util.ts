@@ -118,8 +118,7 @@ export function isPrivateIp(ip: string): boolean {
     // Link-local (fe80::/10) — fe8, fe9, fea, feb prefixes
     if (/^fe[89ab]/.test(normalized)) return true;
 
-    // IPv4-mapped IPv6 (::ffff:a.b.c.d) — attackers use this to bypass
-    // IPv4 checks. Extract the embedded IPv4 and re-check it.
+    // IPv4-mapped IPv6 can bypass IPv4 checks; re-check the embedded IPv4.
     const mappedMatch = normalized.match(
       /^(?:::ffff:|0:0:0:0:0:ffff:)(\d{1,3}(?:\.\d{1,3}){3})$/,
     );
@@ -136,9 +135,8 @@ export function isPrivateIp(ip: string): boolean {
  * Resolves the host to an IP to prevent DNS Rebinding.
  */
 export async function validateHost(host: string): Promise<boolean> {
-  // Fail-closed: an empty host is not a valid target. Optional fields are
-  // skipped by callers (e.g. IsValidHost returns true for falsy values),
-  // so anything that actually reaches this check must have a real host.
+  // Fail-closed: callers skip optional fields, so a host reaching this
+  // check must be non-empty.
   if (!host || !host.trim()) return false;
   const normalizedHost = normalizeHost(host);
 

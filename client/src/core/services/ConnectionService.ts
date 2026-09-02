@@ -52,8 +52,7 @@ export class ConnectionService {
     public async setActiveConnection(connection: Connection): Promise<void> {
         const adapter = this.getAdapter(connection.id, connection.type);
 
-        // Always connect to ensure config is updated (e.g. showAllDatabases flag)
-        // The adapter should handle efficient re-connection or no-op if identical
+        // Always connect so config (e.g. showAllDatabases) is refreshed.
         if (this.activeAdapter !== adapter) {
             if (this.activeAdapter) {
                 // Optional: await this.activeAdapter.disconnect(); 

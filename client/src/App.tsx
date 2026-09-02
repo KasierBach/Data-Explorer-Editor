@@ -62,9 +62,7 @@ export function App() {
   const { theme: appTheme, setTheme: setAppTheme } = useTheme();
   const { user, restoreSession, setAuthBootstrapped, lang } = useAppStore();
 
-  // Keep the <html lang> attribute in sync with the active app language so
-  // screen readers pick the right pronunciation and SEO crawlers see the
-  // correct document language.
+  // Keep <html lang> in sync with the active app language.
   useEffect(() => {
     document.documentElement.lang = lang === 'en' ? 'en' : 'vi';
   }, [lang]);

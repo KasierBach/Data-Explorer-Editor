@@ -77,10 +77,7 @@ export const queryService = {
     },
 
     dropDatabase: async (connectionId: string, name: string) => {
-        // apiService.delete takes headers as 2nd arg. 
-        // Our backend expects connectionId/name in the body for this particular DELETE 
-        // but apiService.delete doesn't take a body. 
-        // We can use apiService.request
+        // DELETE with a body: apiService.delete does not support one.
         return await apiService.request<MutationResult>('/query/database', {
             method: 'DELETE',
             body: JSON.stringify({ connectionId, name })

@@ -84,8 +84,7 @@ export function encryptAttribute(text: string): string {
 
     const authTag = cipher.getAuthTag();
 
-    // Format: version:iv:authTag:encryptedText
-    // We use base64 encoding for the final packaged string for compact storage
+    // Format: version:iv:authTag:encryptedText, base64-encoded.
     const payload = Buffer.concat([iv, authTag, Buffer.from(encrypted, 'hex')]);
     return `v1:${payload.toString('base64')}`;
   } catch (error) {

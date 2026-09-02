@@ -25,9 +25,7 @@ export class CsrfMiddleware implements NestMiddleware {
     ) {
       const requestedWith = req.headers['x-requested-with'];
 
-      // Simple custom header check (Defense in Depth)
-      // Since browser-based CSRF attacks cannot set custom headers easily
-      // (due to CORS Preflight), this is a common and effective protection.
+      // Defense in depth: browsers cannot set custom headers cross-site.
       if (requestedWith !== 'XMLHttpRequest') {
         const lang = resolveRequestLanguage(req.headers['accept-language']);
         throw new ForbiddenException(
