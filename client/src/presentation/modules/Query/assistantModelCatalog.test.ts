@@ -41,48 +41,54 @@ describe("assistantModelCatalog", () => {
     );
   });
 
-  it("orders each built-in provider from weaker to stronger tiers", () => {
+  it("orders built-in providers from higher to lower tiers", () => {
     const groups = getAssistantModelCatalog();
     const ids = (group: string) =>
       groups.find((entry) => entry.group === group)?.items.map((item) => item.id);
 
     expect(ids("Google (Gemini)")).toEqual([
-      "gemini-2.5-flash-lite",
-      "gemini-3.1-flash-lite",
-      "gemini-3.5-flash-lite",
-      "gemini-2.5-flash",
-      "gemini-3-flash-preview",
-      "gemini-3.5-flash",
+      "gemini-3.8-flash",
       "gemini-3.6-flash",
-      "gemini-2.5-pro",
+      "gemini-3.5-flash",
+      "gemini-3.5-flash-lite",
       "gemini-3.1-pro-preview",
+      "gemini-3.1-flash-lite",
+      "gemini-3-flash-preview",
+      "gemini-2.5-pro",
+      "gemini-2.5-flash",
+      "gemini-2.5-flash-lite",
     ]);
     expect(ids("Beeknoee")).toEqual([
-      "beeknoee:glm-4.7-flash",
+      "beeknoee:bee/gemini-3.8-flash",
       "beeknoee:bee/gemini-3.6-flash",
       "beeknoee:bee-tok/gemini-3.6-flash",
-      "beeknoee:minimax/minimax-m2.7",
-      "beeknoee:claude-sonnet-4-6",
       "beeknoee:gemini-3.1-pro-preview",
       "beeknoee:claude-opus-4-6-thinking",
+      "beeknoee:claude-sonnet-4-6",
+      "beeknoee:minimax/minimax-m2.7",
+      "beeknoee:glm-4.7-flash",
     ]);
     expect(ids("Groq (Fast & Free)")).toEqual([
-      "groq:openai/gpt-oss-20b",
-      "groq:groq/compound-mini",
-      "groq:qwen/qwen3.6-27b",
-      "groq:openai/gpt-oss-120b",
       "groq:groq/compound",
+      "groq:openai/gpt-oss-120b",
+      "groq:qwen/qwen3.6-27b",
+      "groq:groq/compound-mini",
+      "groq:openai/gpt-oss-20b",
     ]);
     expect(ids("OpenRouter (Free)")).toEqual([
-      "cohere/north-mini-code:free",
-      "poolside/laguna-xs-2.1:free",
-      "google/gemma-4-26b-a4b-it:free",
+      "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "minimax/minimax-m3:free",
+      "z-ai/glm-5.2:free",
+      "minimax/minimax-m2.7:free",
+      "nvidia/nemotron-3-super-120b-a12b:free",
       "nvidia/nemotron-3.5-lightning:free",
       "google/gemma-4-31b-it:free",
+      "google/gemma-4-26b-a4b-it:free",
+      "inclusionai/ling-3.0-flash-fin:free",
       "poolside/laguna-s-2.1:free",
-      "nvidia/nemotron-3-super-120b-a12b:free",
-      "minimax/minimax-m3:free",
-      "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "thinkingmachines/inkling:free",
+      "poolside/laguna-xs-2.1:free",
+      "cohere/north-mini-code:free",
     ]);
   });
 
