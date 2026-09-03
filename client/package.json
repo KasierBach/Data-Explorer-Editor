@@ -49,7 +49,7 @@
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
     "sql-formatter": "^15.7.0",
-    "tailwind-merge": "^3.4.0",
+    "tailwind-merge": "^3.6.0",
     "xlsx": "file:vendor/xlsx-0.20.3.tgz",
     "zustand": "^5.0.11"
   },
