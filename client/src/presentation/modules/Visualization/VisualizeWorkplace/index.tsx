@@ -132,6 +132,7 @@ export const VisualizeWorkplace: React.FC = () => {
                 chartType={state.chartType}
                 xAxis={state.xAxis}
                 yAxis={state.yAxis}
+                columns={state.columns}
                 showGrid={state.showGrid}
                 showLegend={state.showLegend}
                 showBrush={state.showBrush}

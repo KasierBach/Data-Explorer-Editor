@@ -173,8 +173,22 @@ export const useVisualizeLogic = () => {
     });
 
     // ─── Memos ───
-    const columns = useMemo(() => (chartData && chartData.length > 0) ? Object.keys(chartData[0]) : [], [chartData]);
-    const numericColumns = useMemo(() => columns.filter(col => typeof (chartData?.[0]?.[col]) === 'number'), [chartData, columns]);
+    // Collect columns across ALL rows: NoSQL documents are sparse, so the
+    // first row alone would drop fields that only later documents carry.
+    const columns = useMemo(() => {
+        if (!chartData || chartData.length === 0) return [];
+        const seen = new Set<string>();
+        for (const row of chartData) {
+            for (const key of Object.keys(row)) seen.add(key);
+        }
+        return Array.from(seen);
+    }, [chartData]);
+    const numericColumns = useMemo(
+        () => columns.filter((col) =>
+            chartData?.some((row) => typeof row[col] === 'number' && Number.isFinite(row[col] as number)),
+        ),
+        [chartData, columns],
+    );
     const filteredTables = useMemo(() => allTables ? (searchTable ? allTables.filter(t => t.name.toLowerCase().includes(searchTable.toLowerCase())) : allTables) : [], [allTables, searchTable]);
 
     const downsampledData = useMemo(() => {
@@ -188,12 +202,12 @@ export const useVisualizeLogic = () => {
         if (chartData && chartData.length > 0 && columns.length > 0) {
             if (!xAxis || !columns.includes(xAxis)) {
                 setXAxis(columns[0]);
-                const nums = columns.filter(col => typeof chartData[0][col] === 'number');
+                const nums = numericColumns;
                 if (nums.length > 0) setYAxis([nums[0]]);
                 else if (columns.length > 1) setYAxis([columns[1]]);
             }
         }
-    }, [chartData, columns, xAxis]);
+    }, [chartData, columns, numericColumns, xAxis]);
 
     // ─── Handlers ───
     const handleExportPNG = useCallback(() => {

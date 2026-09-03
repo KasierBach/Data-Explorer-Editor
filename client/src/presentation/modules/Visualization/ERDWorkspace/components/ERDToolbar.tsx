@@ -82,6 +82,7 @@ export const ERDToolbar: React.FC<ERDToolbarProps> = ({
     currentWorkspaceName,
     onOpenSaveDialog,
     onOpenWorkspaceDialog,
+    onFitView,
 }) => {
     if (isToolbarCollapsed) {
         return (
@@ -180,6 +181,11 @@ export const ERDToolbar: React.FC<ERDToolbarProps> = ({
                             </DropdownMenuContent>
                         </DropdownMenu>
 
+                        <Button variant="ghost" size="sm" className="h-8 text-[11px] font-bold gap-2 px-3 rounded-lg" onClick={onFitView} title={t(lang, 'Về toàn cảnh', 'Fit to view')}>
+                            <Maximize2 className="h-3.5 w-3.5" />
+                            {t(lang, 'Toàn cảnh', 'Fit view')}
+                        </Button>
+
                         <div className="w-px h-6 bg-border/20 mx-1" />
 
                         <DropdownMenu>
@@ -219,8 +225,8 @@ export const ERDToolbar: React.FC<ERDToolbarProps> = ({
                                 <DropdownMenuItem onClick={() => setPerformanceMode(!performanceMode)} className={performanceMode ? 'bg-primary/10 text-primary font-bold' : ''}>
                                     <div className="flex items-center gap-2">
                                         <Activity className="h-3.5 w-3.5 text-blue-400" />
-                                        {performanceMode 
-                                            ? t(lang, 'Giảm chi tiết (Tối ưu PIN/RAM)', 'Performance Mode (Low Detal)') 
+                                        {performanceMode
+                                            ? t(lang, 'Giảm chi tiết (Tối ưu PIN/RAM)', 'Performance Mode (Low Detal)')
                                             : t(lang, 'Chi tiết cao (Đồ họa sắc nét)', 'High Fidelity (Crisp Detail)')}
                                     </div>
                                 </DropdownMenuItem>

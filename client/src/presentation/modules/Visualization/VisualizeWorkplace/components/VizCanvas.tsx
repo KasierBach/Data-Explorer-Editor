@@ -29,6 +29,7 @@ interface VizCanvasProps {
     chartType: string;
     xAxis: string;
     yAxis: string[];
+    columns: string[];
     showGrid: boolean;
     showLegend: boolean;
     showBrush: boolean;
@@ -48,7 +49,7 @@ interface VizCanvasProps {
 }
 
 export const VizCanvas: React.FC<VizCanvasProps> = ({
-    chartData, error, refetch, chartType, xAxis, yAxis, showGrid, showLegend, showBrush,
+    chartData, error, refetch, chartType, xAxis, yAxis, columns, showGrid, showLegend, showBrush,
     curveType, animationEnabled, labelVisible, palette, isLargeDataset,
     getChartData, chartRef, title, isSidebarCollapsed, setSidebarCollapsed, isLoading,
     selectedTable, chartTypeName
@@ -56,8 +57,8 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
     const { isCompactMobileLayout } = useResponsiveLayoutMode();
     const { connections, activeConnectionId, nosqlActiveConnectionId, lang } = useAppStore();
 
-    const isNoSql = (nosqlActiveConnectionId && connections.find(c => c.id === nosqlActiveConnectionId)) || 
-                    connections.find(c => c.id === activeConnectionId)?.type.toLowerCase().includes('mongo');
+    const isNoSql = (nosqlActiveConnectionId && connections.find(c => c.id === nosqlActiveConnectionId)) ||
+        connections.find(c => c.id === activeConnectionId)?.type.toLowerCase().includes('mongo');
 
 
     const tooltipStyle = {
@@ -208,7 +209,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie data={chartData.slice(0, 20)} cx="50%" cy="50%" outerRadius="75%"
-                                dataKey={yAxis[0] || Object.keys(chartData[0])[0]} nameKey={xAxis} paddingAngle={3} isAnimationActive={effectiveAnimation}>
+                                dataKey={yAxis[0] || columns[0]} nameKey={xAxis} paddingAngle={3} isAnimationActive={effectiveAnimation}>
                                 {chartData.slice(0, 20).map((_entry, index) => (
                                     <Cell key={`cell-${index}`} fill={palette[index % palette.length]} stroke="hsl(var(--background))" strokeWidth={2} />
                                 ))}
@@ -225,7 +226,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie data={chartData.slice(0, 20)} cx="50%" cy="50%" innerRadius="45%" outerRadius="75%"
-                                dataKey={yAxis[0] || Object.keys(chartData[0])[0]} nameKey={xAxis} paddingAngle={5} isAnimationActive={effectiveAnimation}>
+                                dataKey={yAxis[0] || columns[0]} nameKey={xAxis} paddingAngle={5} isAnimationActive={effectiveAnimation}>
                                 {chartData.slice(0, 20).map((_entry, index) => (
                                     <Cell key={`cell-${index}`} fill={palette[index % palette.length]} stroke="hsl(var(--background))" strokeWidth={3} />
                                 ))}
@@ -271,8 +272,8 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                     <ResponsiveContainer width="100%" height="100%">
                         <Treemap
                             data={chartData.slice(0, 30).map((d, i) => ({
-                                name: String(d[xAxis] || `Item ${i}`),
-                                size: Number(d[yAxis[0]] || 0),
+                                name: String(d[xAxis] ?? `Item ${i}`),
+                                size: Number(d[yAxis[0]]) || 0,
                                 fill: palette[i % palette.length]
                             }))}
                             dataKey="size" nameKey="name"
@@ -304,7 +305,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                         <FunnelChart>
                             <Tooltip contentStyle={tooltipStyle} />
                             <Funnel
-                                dataKey={yAxis[0] || Object.keys(chartData[0])[0]}
+                                dataKey={yAxis[0] || columns[0]}
                                 nameKey={xAxis}
                                 data={chartData.slice(0, 8).map((d, i) => ({ ...d, fill: palette[i % palette.length] }))}
                                 isAnimationActive={effectiveAnimation}

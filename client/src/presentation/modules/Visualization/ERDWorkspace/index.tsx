@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useERDLogic } from './useERDLogic';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore } from '@/core/services/store';
@@ -22,6 +22,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
     const { state, actions } = useERDLogic(tabId, connectionId, databaseProp);
     const connections = useAppStore(state => state.connections);
     const activeConnection = connections.find(c => c.id === connectionId);
+    const [fitViewSignal, setFitViewSignal] = useState(0);
 
     // Ensure adapter is connected
     useEffect(() => {
@@ -56,9 +57,16 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                 globalSearchResults={state.globalSearchResults}
                 isSearchingGlobal={state.isSearchingGlobal}
                 onAddGlobalTable={(item) => {
-                    // Logic to handle adding a table from another DB/Connection
-                    toast.info(`Smart Add: ${item.name} (${item.connectionName})`);
-                    // For now, toggle if it exists in local context, or show warning
+                    const sameConnection = item.connectionId === connectionId;
+                    const sameDatabase = !state.selectedDatabase || !item.database || item.database === state.selectedDatabase;
+                    if (!sameConnection || !sameDatabase) {
+                        toast.warning(
+                            state.lang === 'vi'
+                                ? 'Bảng thuộc connection hoặc database khác. Hãy chuyển context trước khi thêm.'
+                                : 'This table belongs to another connection or database. Switch context before adding it.',
+                        );
+                        return;
+                    }
                     actions.toggleTable(item.name);
                 }}
                 isRefreshing={state.isRefreshing}
@@ -66,6 +74,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
             />
 
             <ERDCanvas
+                fitViewSignal={fitViewSignal}
                 nodes={state.nodes}
                 edges={state.edges}
                 onNodesChange={actions.onNodesChange}
@@ -110,7 +119,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                         currentWorkspaceName={state.currentWorkspaceName}
                         onOpenSaveDialog={actions.openSaveDialog}
                         onOpenWorkspaceDialog={actions.openWorkspaceDialog}
-                        onFitView={() => {}}
+                        onFitView={() => setFitViewSignal((n) => n + 1)}
                     />
                 )}
             />

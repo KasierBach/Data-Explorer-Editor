@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
     ReactFlow,
     Controls,
@@ -10,6 +10,7 @@ import {
     type OnNodesChange,
     type OnEdgesChange,
     type OnConnect,
+    type ReactFlowInstance,
     BackgroundVariant,
 } from '@xyflow/react';
 import TableNode from '../../TableNode';
@@ -38,13 +39,20 @@ interface ERDCanvasProps {
     hoveredEdgeId?: string | null;
     backgroundVariant?: 'dots' | 'lines' | 'cross';
     toolbar?: React.ReactNode;
+    fitViewSignal?: number;
 }
 
 export const ERDCanvas: React.FC<ERDCanvasProps> = ({
     nodes, edges, onNodesChange, onEdgesChange, onConnect, isLoading, lang, showMinimap, pendingConnection, setPendingConnection, handleCreateForeignKey,
-    handleEdgeMouseEnter, handleEdgeMouseLeave, hoverPosition, hoveredEdgeId, backgroundVariant = 'dots', toolbar
+    handleEdgeMouseEnter, handleEdgeMouseLeave, hoverPosition, hoveredEdgeId, backgroundVariant = 'dots', toolbar, fitViewSignal = 0
 }) => {
     const reactFlowRef = useRef<HTMLDivElement | null>(null);
+    const flowInstanceRef = useRef<ReactFlowInstance | null>(null);
+
+    // Re-fit the viewport whenever the toolbar requests it (fitViewSignal bump).
+    useEffect(() => {
+        if (fitViewSignal > 0) flowInstanceRef.current?.fitView({ padding: 0.2, duration: 300 });
+    }, [fitViewSignal]);
 
     return (
         <div className="flex-1 relative">
@@ -59,6 +67,7 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
 
             <ReactFlow
                 ref={reactFlowRef}
+                onInit={(instance) => { flowInstanceRef.current = instance; }}
                 nodes={nodes}
                 edges={edges}
                 onNodesChange={onNodesChange}
@@ -77,12 +86,12 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
                 snapToGrid={true}
                 snapGrid={[15, 15]}
             >
-                {backgroundVariant !== 'lines' && backgroundVariant !== 'cross' ? 
-                    <Background color="hsl(var(--muted-foreground))" gap={20} style={{ opacity: 0.1 }} variant={BackgroundVariant.Dots} /> 
+                {backgroundVariant !== 'lines' && backgroundVariant !== 'cross' ?
+                    <Background color="hsl(var(--muted-foreground))" gap={20} style={{ opacity: 0.1 }} variant={BackgroundVariant.Dots} />
                     : backgroundVariant === 'lines' ?
-                    <Background color="hsl(var(--muted-foreground))" gap={20} style={{ opacity: 0.05 }} variant={BackgroundVariant.Lines} />
-                    :
-                    <Background color="hsl(var(--muted-foreground))" gap={20} style={{ opacity: 0.05 }} variant={BackgroundVariant.Cross} />
+                        <Background color="hsl(var(--muted-foreground))" gap={20} style={{ opacity: 0.05 }} variant={BackgroundVariant.Lines} />
+                        :
+                        <Background color="hsl(var(--muted-foreground))" gap={20} style={{ opacity: 0.05 }} variant={BackgroundVariant.Cross} />
                 }
                 <Controls className="bg-card border-border/40 shadow-2xl rounded-xl overflow-hidden" />
 
@@ -99,10 +108,10 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
             </ReactFlow>
 
             {hoverPosition && (
-                <div 
+                <div
                     className="fixed z-[9999] pointer-events-none transform -translate-x-1/2 -translate-y-[120%]"
-                    style={{ 
-                        left: hoverPosition.x, 
+                    style={{
+                        left: hoverPosition.x,
                         top: hoverPosition.y,
                     }}
                 >
