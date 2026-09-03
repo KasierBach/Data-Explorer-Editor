@@ -116,41 +116,33 @@ export const useVisualizeLogic = () => {
                     } else if (node.type === 'schema') {
                         toCrawlIds.push(node.id);
                     } else if (node.type === 'folder') {
-                        // Only crawl folders that contain data sources (tables/views), skip functions/triggers/etc.
                         if (node.id.endsWith('folder:tables') || node.id.endsWith('folder:views')) {
                             toCrawlIds.push(node.id);
                         }
                     }
                 }
 
-                // Crawl child branches in parallel for maximum performance
                 if (toCrawlIds.length > 0) {
                     await Promise.all(toCrawlIds.map((id) => crawl(id)));
                 }
             };
-            // Always crawl from the root: engines like MySQL map databases to
-            // schemas, so `db:<name>` returns an empty schema list and the
-            // crawl dies immediately. The database filter above already
-            // restricts the traversal to the selected database.
             await crawl(null);
             return results;
         },
         enabled: !!activeConnectionId && !!activeConnection,
-        staleTime: 5 * 60 * 1000, // 5 minutes cache to avoid redundant network crawls
+        staleTime: 5 * 60 * 1000,
     });
 
     const buildQuery = useCallback(() => {
         if (dataMode === 'sql') return customSql;
         if (!selectedTable) return '';
 
-        // Handle NoSQL (MongoDB) query generation
         if (activeConnection?.type.toLowerCase().includes('mongo')) {
             return JSON.stringify({
                 action: 'find',
                 collection: selectedTable,
                 filter: {},
                 limit: dataLimit,
-                // Add sort if present
                 options: (sortColumn && sortColumn !== 'none') ? {
                     sort: { [sortColumn]: sortDir === 'ASC' ? 1 : -1 }
                 } : {}
@@ -182,21 +174,34 @@ export const useVisualizeLogic = () => {
         retry: false
     });
 
-    // Recharts crashes when a chart value is an object/array (JSON columns,
-    // nested documents). Normalize every non-primitive cell to a string so
-    // axes, labels, and tooltips always receive renderable values.
+    const MAX_CHART_ROWS = 2000;
+    const truncationWarnedRef = useRef(false);
     const chartData = useMemo(() => {
         if (!rawChartData || rawChartData.length === 0) return rawChartData;
+
+        let rows = rawChartData;
+        if (rows.length > MAX_CHART_ROWS) {
+            rows = rows.slice(0, MAX_CHART_ROWS);
+            if (!truncationWarnedRef.current) {
+                truncationWarnedRef.current = true;
+                toast.warning(
+                    `Result set too large for charting — showing the first ${MAX_CHART_ROWS} rows. Add a LIMIT or filter to visualize more precisely.`,
+                );
+            }
+        } else {
+            truncationWarnedRef.current = false;
+        }
+
         let hasComplex = false;
-        for (const row of rawChartData) {
+        for (const row of rows) {
             for (const key of Object.keys(row)) {
                 const v = row[key];
                 if (v !== null && typeof v === 'object') { hasComplex = true; break; }
             }
             if (hasComplex) break;
         }
-        if (!hasComplex) return rawChartData;
-        return rawChartData.map((row) => {
+        if (!hasComplex) return rows;
+        return rows.map((row) => {
             const out: Record<string, unknown> = {};
             for (const key of Object.keys(row)) {
                 const v = row[key];
@@ -209,8 +214,6 @@ export const useVisualizeLogic = () => {
     }, [rawChartData]);
 
     // ─── Memos ───
-    // Collect columns across ALL rows: NoSQL documents are sparse, so the
-    // first row alone would drop fields that only later documents carry.
     const columns = useMemo(() => {
         if (!chartData || chartData.length === 0) return [];
         const seen = new Set<string>();
