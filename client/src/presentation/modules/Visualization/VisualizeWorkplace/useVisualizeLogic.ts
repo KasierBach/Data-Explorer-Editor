@@ -105,7 +105,7 @@ export const useVisualizeLogic = () => {
             const results: TreeNode[] = [];
             const crawl = async (parentId: string | null) => {
                 const nodes = await adapter.getHierarchy(parentId, currentDb || undefined);
-                const toCrawlIds = [];
+                const toCrawlIds: string[] = [];
                 for (const node of nodes) {
                     if (node.type === 'table' || node.type === 'view' || node.type === 'collection') {
                         results.push(node);
@@ -113,14 +113,19 @@ export const useVisualizeLogic = () => {
                         if (!currentDb || node.name === currentDb || node.id.includes(currentDb)) {
                             toCrawlIds.push(node.id);
                         }
-                    } else if (node.type === 'schema' || node.type === 'folder') {
+                    } else if (node.type === 'schema') {
                         toCrawlIds.push(node.id);
+                    } else if (node.type === 'folder') {
+                        // Only crawl folders that contain data sources (tables/views), skip functions/triggers/etc.
+                        if (node.id.endsWith('folder:tables') || node.id.endsWith('folder:views')) {
+                            toCrawlIds.push(node.id);
+                        }
                     }
                 }
 
-                // Execute strictly sequentially to prevent recursion concurrency explosion
-                for (const id of toCrawlIds) {
-                    await crawl(id);
+                // Crawl child branches in parallel for maximum performance
+                if (toCrawlIds.length > 0) {
+                    await Promise.all(toCrawlIds.map((id) => crawl(id)));
                 }
             };
             // Always crawl from the root: engines like MySQL map databases to
@@ -130,7 +135,8 @@ export const useVisualizeLogic = () => {
             await crawl(null);
             return results;
         },
-        enabled: !!activeConnectionId && !!activeConnection
+        enabled: !!activeConnectionId && !!activeConnection,
+        staleTime: 5 * 60 * 1000, // 5 minutes cache to avoid redundant network crawls
     });
 
     const buildQuery = useCallback(() => {
