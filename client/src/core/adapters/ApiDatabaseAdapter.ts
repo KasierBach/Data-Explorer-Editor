@@ -53,12 +53,13 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         this.connectionId = null;
     }
 
-    async getHierarchy(parentId: string | null): Promise<TreeNode[]> {
+    async getHierarchy(parentId: string | null, database?: string): Promise<TreeNode[]> {
         if (!this.connectionId) throw new Error('Not connected');
 
         return await apiService.post<TreeNode[]>('/metadata/hierarchy', {
             connectionId: this.connectionId,
-            parentId: parentId
+            parentId: parentId,
+            ...(database ? { database } : {})
         });
     }
 

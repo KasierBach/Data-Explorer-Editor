@@ -6,6 +6,7 @@ import {
     ResponsiveContainer, Cell, Legend, Brush
 } from 'recharts';
 import { AlertCircle, BarChart3, Loader2, PanelLeft, RotateCcw } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
 import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
@@ -55,10 +56,10 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
     selectedTable, chartTypeName
 }) => {
     const { isCompactMobileLayout } = useResponsiveLayoutMode();
-    const { connections, activeConnectionId, nosqlActiveConnectionId, lang } = useAppStore();
+    const { lang } = useAppStore();
 
-    const isNoSql = (nosqlActiveConnectionId && connections.find(c => c.id === nosqlActiveConnectionId)) ||
-        connections.find(c => c.id === activeConnectionId)?.type.toLowerCase().includes('mongo');
+    const location = useLocation();
+    const isNoSql = location.pathname.startsWith('/nosql');
 
 
     const tooltipStyle = {

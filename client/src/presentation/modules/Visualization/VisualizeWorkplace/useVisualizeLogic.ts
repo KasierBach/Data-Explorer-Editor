@@ -104,7 +104,7 @@ export const useVisualizeLogic = () => {
             const adapter = connectionService.getAdapter(activeConnectionId, activeConnection.type);
             const results: TreeNode[] = [];
             const crawl = async (parentId: string | null) => {
-                const nodes = await adapter.getHierarchy(parentId);
+                const nodes = await adapter.getHierarchy(parentId, currentDb || undefined);
                 const toCrawlIds = [];
                 for (const node of nodes) {
                     if (node.type === 'table' || node.type === 'view' || node.type === 'collection') {
@@ -117,13 +117,17 @@ export const useVisualizeLogic = () => {
                         toCrawlIds.push(node.id);
                     }
                 }
-                
+
                 // Execute strictly sequentially to prevent recursion concurrency explosion
                 for (const id of toCrawlIds) {
                     await crawl(id);
                 }
             };
-            await crawl(currentDb ? `db:${currentDb}` : null);
+            // Always crawl from the root: engines like MySQL map databases to
+            // schemas, so `db:<name>` returns an empty schema list and the
+            // crawl dies immediately. The database filter above already
+            // restricts the traversal to the selected database.
+            await crawl(null);
             return results;
         },
         enabled: !!activeConnectionId && !!activeConnection

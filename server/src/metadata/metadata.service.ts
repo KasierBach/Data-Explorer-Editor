@@ -68,7 +68,12 @@ export class MetadataService {
     };
   }
 
-  async getHierarchy(connectionId: string, parentId: unknown, userId: string) {
+  async getHierarchy(
+    connectionId: string,
+    parentId: unknown,
+    userId: string,
+    database?: string,
+  ) {
     if (
       parentId !== null &&
       parentId !== undefined &&
@@ -80,12 +85,17 @@ export class MetadataService {
     const cacheKey = await this.getCacheKey(
       'hierarchy',
       connectionId,
-      normalizedParentId || 'root',
+      `${normalizedParentId || 'root'}:${database || ''}`,
     );
     return this.withCache(
       cacheKey,
       () =>
-        this._getHierarchyUncached(connectionId, normalizedParentId, userId),
+        this._getHierarchyUncached(
+          connectionId,
+          normalizedParentId,
+          userId,
+          database,
+        ),
       3600000,
     );
   }
@@ -94,12 +104,14 @@ export class MetadataService {
     connectionId: string,
     parentId: string | null,
     userId: string,
+    database?: string,
   ) {
     const parsed = this.parseNodeId(parentId || '');
+    const dbName = parsed.dbName || database;
     const { connection, pool, strategy } = await this.getConnectionContext(
       connectionId,
       userId,
-      parsed.dbName,
+      dbName,
     );
 
     if (!parentId) {

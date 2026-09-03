@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
     Database, Table, Search, Code2, Play, BarChart3, PieChart as PieIcon, 
     Type, Palette, Settings2, PanelLeftClose, FileText, Maximize2 
@@ -8,7 +9,6 @@ import { Input } from '@/presentation/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/presentation/components/ui/select";
 import { cn } from '@/lib/utils';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
-import { useAppStore } from '@/core/services/store';
 import type { CurveType, DataMode } from '../useVisualizeLogic';
 import type { RowData, TreeNode } from '@/core/domain/entities';
 import type { LucideIcon } from 'lucide-react';
@@ -91,11 +91,8 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
     handleExportCSV, chartData
 }) => {
     const { isCompactMobileLayout } = useResponsiveLayoutMode();
-    const { connections, activeConnectionId, nosqlActiveConnectionId } = useAppStore();
-    
-    // Detect context (either from activeConnectionId or if we are in NoSQL shell)
-    const isNoSql = (nosqlActiveConnectionId && connections.find(c => c.id === nosqlActiveConnectionId)) || 
-                    connections.find(c => c.id === activeConnectionId)?.type.toLowerCase().includes('mongo');
+    const location = useLocation();
+    const isNoSql = location.pathname.startsWith('/nosql');
 
     const sidebarSections = [
         { id: 'source', label: 'Data Source', icon: Database },

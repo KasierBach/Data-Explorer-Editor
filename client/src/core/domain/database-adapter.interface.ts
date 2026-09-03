@@ -90,7 +90,7 @@ export interface GenerateSqlParams {
 export interface IDatabaseAdapter {
     connect(config?: DatabaseConnectionConfig): Promise<void>;
     disconnect(): Promise<void>;
-    getHierarchy(parentId: string | null): Promise<TreeNode[]>;
+    getHierarchy(parentId: string | null, database?: string): Promise<TreeNode[]>;
     executeQuery(sql: string, context?: QueryExecutionContext): Promise<QueryResult>;
     fetchTableWindow(params: TableWindowRequest): Promise<QueryResult>;
     getMetadata(tableId: string): Promise<TableMetadata>;

@@ -20,12 +20,14 @@ export class MetadataController {
   getHierarchy(
     @Body('connectionId') connectionId: string,
     @Body('parentId') parentId: unknown,
+    @Body('database') database: string | undefined,
     @Req() req: AuthenticatedRequest,
   ) {
     return this.metadataService.getHierarchy(
       connectionId,
       parentId,
       req.user.id,
+      database,
     );
   }
 
