@@ -133,9 +133,11 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
                         <button key={s.id} onClick={() => setActiveSection(s.id)}
                             className={cn(
                                 "flex-1 py-2.5 flex flex-col items-center gap-1 text-[8px] font-bold uppercase tracking-wider transition-all border-b-2",
-                                activeSection === s.id ? "text-emerald-500 border-emerald-500 bg-emerald-500/5" : "text-muted-foreground/40 border-transparent hover:text-muted-foreground/60"
+                                activeSection === s.id
+                                    ? "text-emerald-500 border-emerald-500 bg-emerald-500/10 shadow-sm"
+                                    : "text-muted-foreground/60 border-transparent hover:text-foreground hover:bg-muted/15"
                             )}>
-                            <s.icon className="h-3.5 w-3.5" />
+                            <s.icon className={cn("h-3.5 w-3.5 transition-transform", activeSection === s.id ? "scale-110" : "opacity-80 group-hover:opacity-100")} />
                             {s.label.split(' ')[0]}
                         </button>
                     ))}
@@ -254,13 +256,13 @@ export const VizSidebar: React.FC<VizSidebarProps> = ({
                             {chartTypes.map(type => (
                                 <button key={type.id} onClick={() => setChartType(type.id)}
                                     className={cn(
-                                        "p-3 rounded-xl flex flex-col items-center gap-2 transition-all border text-[9px] font-bold uppercase tracking-wider",
+                                        "p-3 rounded-xl flex flex-col items-center gap-2 transition-all border text-[9px] font-bold uppercase tracking-wider group",
                                         chartType === type.id
-                                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30 shadow-lg shadow-emerald-500/5"
-                                            : "bg-muted/5 text-muted-foreground/50 border-border/10 hover:bg-muted/10 hover:text-muted-foreground"
+                                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/30"
+                                            : "bg-muted/10 text-muted-foreground/70 border-border/20 hover:bg-muted/20 hover:text-foreground hover:border-border/40"
                                     )}>
-                                    <type.icon className="h-5 w-5" />
-                                    {type.name}
+                                    <type.icon className={cn("h-5 w-5 transition-transform group-hover:scale-110", chartType === type.id ? "text-emerald-400" : "text-muted-foreground group-hover:text-foreground")} />
+                                    <span>{type.name}</span>
                                 </button>
                             ))}
                         </div>

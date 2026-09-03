@@ -64,10 +64,24 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
 
     const tooltipStyle = {
         backgroundColor: 'hsl(var(--card))',
+        color: 'hsl(var(--card-foreground))',
         borderRadius: '16px',
         border: '1px solid hsl(var(--border))',
         boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.5)',
         fontSize: '11px',
+    };
+
+    const tooltipItemStyle = {
+        color: 'hsl(var(--card-foreground))',
+        fontSize: '11px',
+        fontWeight: 600,
+    };
+
+    const tooltipLabelStyle = {
+        color: 'hsl(var(--muted-foreground))',
+        fontSize: '11px',
+        fontWeight: 700,
+        marginBottom: '4px',
     };
 
     const effectiveAnimation = isLargeDataset ? false : animationEnabled;
@@ -109,7 +123,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                             {gridEl}
                             <XAxis dataKey={xAxis} axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" />
                             <YAxis axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" />
-                            <Tooltip contentStyle={tooltipStyle} />
+                            <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                             {legendEl}{brushEl}
                             {yAxis.map((col, i) => (
                                 <Bar key={col} dataKey={col} fill={palette[i % palette.length]} radius={[6, 6, 0, 0]} isAnimationActive={effectiveAnimation}>
@@ -127,7 +141,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                             {gridEl}
                             <XAxis dataKey={xAxis} axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" />
                             <YAxis axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" />
-                            <Tooltip contentStyle={tooltipStyle} />
+                            <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                             {legendEl}{brushEl}
                             {yAxis.map((col, i) => (
                                 <Bar key={col} dataKey={col} fill={palette[i % palette.length]} stackId="stack" radius={i === yAxis.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]} isAnimationActive={effectiveAnimation} />
@@ -143,7 +157,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                             {gridEl}
                             <XAxis type="number" axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" />
                             <YAxis type="category" dataKey={xAxis} axisLine={false} tickLine={false} fontSize={10} stroke="currentColor" width={100} />
-                            <Tooltip contentStyle={tooltipStyle} />
+                            <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                             {legendEl}
                             {yAxis.map((col, i) => (
                                 <Bar key={col} dataKey={col} fill={palette[i % palette.length]} radius={[0, 6, 6, 0]} isAnimationActive={effectiveAnimation} />
@@ -159,7 +173,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                             {gridEl}
                             <XAxis dataKey={xAxis} axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" />
                             <YAxis axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" />
-                            <Tooltip contentStyle={tooltipStyle} />
+                            <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                             {legendEl}{brushEl}
                             {yAxis.map((col, i) => (
                                 <Line key={col} type={curveType} dataKey={col} stroke={palette[i % palette.length]}
@@ -177,7 +191,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                             {gridEl}
                             <XAxis dataKey={xAxis} axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" />
                             <YAxis axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" />
-                            <Tooltip contentStyle={tooltipStyle} />
+                            <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                             {legendEl}{brushEl}
                             {yAxis.map((col, i) => (
                                 <Area key={col} type={curveType} dataKey={col} fill={palette[i % palette.length]}
@@ -194,7 +208,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                             {gridEl}
                             <XAxis dataKey={xAxis} axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" />
                             <YAxis axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" />
-                            <Tooltip contentStyle={tooltipStyle} />
+                            <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                             {legendEl}{brushEl}
                             {yAxis.map((col, i) => (
                                 i % 2 === 0 ?
@@ -216,7 +230,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                                 ))}
                                 {effectiveLabels && <LabelList dataKey={xAxis} position="outside" fontSize={10} />}
                             </Pie>
-                            <Tooltip contentStyle={tooltipStyle} />
+                            <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                             {legendEl}
                         </PieChart>
                     </ResponsiveContainer>
@@ -232,7 +246,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                                     <Cell key={`cell-${index}`} fill={palette[index % palette.length]} stroke="hsl(var(--background))" strokeWidth={3} />
                                 ))}
                             </Pie>
-                            <Tooltip contentStyle={tooltipStyle} />
+                            <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                             {legendEl}
                         </PieChart>
                     </ResponsiveContainer>
@@ -245,7 +259,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                             {gridEl}
                             <XAxis dataKey={xAxis} name={xAxis} axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" type="number" />
                             <YAxis dataKey={yAxis[0]} name={yAxis[0]} axisLine={false} tickLine={false} fontSize={11} stroke="currentColor" />
-                            <Tooltip contentStyle={tooltipStyle} cursor={{ strokeDasharray: '3 3' }} />
+                            <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} cursor={{ strokeDasharray: '3 3' }} />
                             {legendEl}
                             <Scatter name={`${xAxis} vs ${yAxis[0]}`} data={renderData} fill={palette[0]} isAnimationActive={effectiveAnimation} />
                         </ScatterChart>
@@ -263,6 +277,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                                 <Radar key={col} name={col} dataKey={col} stroke={palette[i % palette.length]}
                                     fill={palette[i % palette.length]} fillOpacity={0.2} strokeWidth={2} isAnimationActive={effectiveAnimation} />
                             ))}
+                            <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                             {legendEl}
                         </RadarChart>
                     </ResponsiveContainer>
@@ -304,7 +319,7 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
                 return (
                     <ResponsiveContainer width="100%" height="100%">
                         <FunnelChart>
-                            <Tooltip contentStyle={tooltipStyle} />
+                            <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} labelStyle={tooltipLabelStyle} />
                             <Funnel
                                 dataKey={yAxis[0] || columns[0]}
                                 nameKey={xAxis}
