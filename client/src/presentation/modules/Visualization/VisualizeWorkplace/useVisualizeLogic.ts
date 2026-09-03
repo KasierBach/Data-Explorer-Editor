@@ -163,7 +163,7 @@ export const useVisualizeLogic = () => {
         return q;
     }, [dataMode, customSql, selectedTable, dataLimit, sortColumn, sortDir, activeConnection]);
 
-    const { data: chartData, isLoading, refetch } = useQuery<RowData[]>({
+    const { data: rawChartData, isLoading, refetch } = useQuery<RowData[]>({
         queryKey: ['viz-data', activeConnectionId, buildQuery()],
         queryFn: async () => {
             const query = buildQuery();
@@ -181,6 +181,32 @@ export const useVisualizeLogic = () => {
         enabled: false,
         retry: false
     });
+
+    // Recharts crashes when a chart value is an object/array (JSON columns,
+    // nested documents). Normalize every non-primitive cell to a string so
+    // axes, labels, and tooltips always receive renderable values.
+    const chartData = useMemo(() => {
+        if (!rawChartData || rawChartData.length === 0) return rawChartData;
+        let hasComplex = false;
+        for (const row of rawChartData) {
+            for (const key of Object.keys(row)) {
+                const v = row[key];
+                if (v !== null && typeof v === 'object') { hasComplex = true; break; }
+            }
+            if (hasComplex) break;
+        }
+        if (!hasComplex) return rawChartData;
+        return rawChartData.map((row) => {
+            const out: Record<string, unknown> = {};
+            for (const key of Object.keys(row)) {
+                const v = row[key];
+                out[key] = v !== null && typeof v === 'object'
+                    ? JSON.stringify(v)
+                    : v;
+            }
+            return out as RowData;
+        });
+    }, [rawChartData]);
 
     // ─── Memos ───
     // Collect columns across ALL rows: NoSQL documents are sparse, so the
