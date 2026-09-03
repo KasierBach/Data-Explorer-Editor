@@ -12,11 +12,11 @@
 [![Redis](https://img.shields.io/badge/Redis-Infrastructure-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![Framer_Motion](https://img.shields.io/badge/Framer_Motion-12-0055FF?logo=framer&logoColor=white)](https://www.framer.com/motion/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](#license)
-[![Version](https://img.shields.io/badge/Version-3.6.4-blue.svg)](https://github.com/KasierBach/Data-Explorer-Editor/releases)
+[![Version](https://img.shields.io/badge/Version-1.6.7-blue.svg)](https://github.com/KasierBach/Data-Explorer-Editor/releases)
 
 **Data Explorer** is a high-fidelity, high-performance database management and visualization IDE. It provides a unified, intelligent interface for developers and data engineers to explore, query, and visualize multi-engine databases, all supercharged by a context-aware AI.
 
-Current documentation focus reflects the **v3.6.4** workspace: configurable AI roles with custom OpenAI-compatible providers, higher-signal query safety warnings, SQL Steps plus AI Explain inside the editor, broader bilingual coverage, and a legal center with signup consent flow.
+Current documentation focus reflects the **v1.6.7** workspace: production-grade CockroachDB and MariaDB engines with a shared TLS contract, adversarial security testing, a hardened web platform (PWA, security.txt), query cancellation with an Active Queries panel, and configurable AI roles with custom OpenAI-compatible providers.
 
 ---
 

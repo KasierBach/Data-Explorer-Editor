@@ -69,7 +69,7 @@ export function getChangelogPageContent(
     ),
     releases: [
       {
-        version: 'v3.6.7',
+        version: 'v1.6.7',
         date: pickLocalizedText(currentLang, '2 tháng 9, 2026', 'September 2, 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -121,7 +121,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.6.6',
+        version: 'v1.6.6',
         date: pickLocalizedText(currentLang, '29 tháng 8, 2026', 'August 29, 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -180,7 +180,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.6.5',
+        version: 'v1.6.5',
         date: pickLocalizedText(currentLang, '31 tháng 7, 2026', 'July 31, 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -231,7 +231,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.6.4',
+        version: 'v1.6.4',
         date: pickLocalizedText(currentLang, '22 tháng 6, 2026', 'June 22, 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -282,7 +282,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.6.3',
+        version: 'v1.6.3',
         date: pickLocalizedText(currentLang, '13 tháng 6, 2026', 'June 13, 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -333,7 +333,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.6.2',
+        version: 'v1.6.2',
         date: pickLocalizedText(currentLang, '28 tháng 5, 2026', 'May 28, 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -384,7 +384,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.6.1',
+        version: 'v1.6.1',
         date: pickLocalizedText(currentLang, '21 tháng 5, 2026', 'May 21, 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -435,7 +435,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.6.0',
+        version: 'v1.6.0',
         date: pickLocalizedText(currentLang, 'Giữa tháng 5, 2026', 'Mid May 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -486,7 +486,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.5.0',
+        version: 'v1.5.0',
         date: pickLocalizedText(currentLang, '8 tháng 5, 2026', 'May 8, 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -545,7 +545,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.4.0',
+        version: 'v1.4.0',
         date: pickLocalizedText(currentLang, 'Đầu tháng 5, 2026', 'Early May 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -588,7 +588,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.3.1',
+        version: 'v1.3.1',
         date: pickLocalizedText(currentLang, 'Cuối tháng 4, 2026', 'Late April 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -631,7 +631,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.3.0',
+        version: 'v1.3.0',
         date: pickLocalizedText(currentLang, 'Giữa tháng 4, 2026', 'Mid April 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -674,7 +674,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.2.0',
+        version: 'v1.2.0',
         date: pickLocalizedText(currentLang, 'Đầu tháng 4, 2026', 'Early April 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -709,7 +709,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.1.0',
+        version: 'v1.1.0',
         date: pickLocalizedText(currentLang, 'Cuối tháng 3, 2026', 'Late March 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -736,7 +736,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.0.5',
+        version: 'v1.0.5',
         date: pickLocalizedText(currentLang, 'Giữa tháng 3, 2026', 'Mid March 2026'),
         title: pickLocalizedText(
           currentLang,
@@ -763,7 +763,7 @@ export function getChangelogPageContent(
         ],
       },
       {
-        version: 'v3.0.0',
+        version: 'v1.0.0',
         date: pickLocalizedText(currentLang, 'Cuối tháng 1, 2026', 'Late January 2026'),
         title: pickLocalizedText(currentLang, 'Nền tảng cốt lõi', 'The Core Platform Genesis'),
         features: [

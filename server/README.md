@@ -1,6 +1,6 @@
 # Data Explorer Server
 
-The `server/` workspace is the NestJS backend for Data Explorer v3.6.2. It owns authentication, saved connections, query execution, AI routing, team collaboration, notifications, billing hooks, and the Redis-backed runtime flows used by the app.
+The `server/` workspace is the NestJS backend for Data Explorer v1.6.7. It owns authentication, saved connections, query execution, AI routing, team collaboration, notifications, billing hooks, and the Redis-backed runtime flows used by the app.
 
 ## What lives here
 

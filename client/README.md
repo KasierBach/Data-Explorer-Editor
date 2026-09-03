@@ -1,6 +1,6 @@
 # Data Explorer Client
 
-The `client/` workspace is the React 19 + Vite frontend for Data Explorer v3.6.2. It contains the SQL IDE, NoSQL workspace, AI assistant panel, team surfaces, docs pages, dashboards, and the landing experience.
+The `client/` workspace is the React 19 + Vite frontend for Data Explorer v1.6.7. It contains the SQL IDE, NoSQL workspace, AI assistant panel, team surfaces, docs pages, dashboards, and the landing experience.
 
 ## Main areas
 

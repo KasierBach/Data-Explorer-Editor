@@ -772,7 +772,7 @@ const workspaceText = {
             ],
         },
         heroSection: {
-            badge: 'v3.6.4: AI TÙY CHỈNH, QUERY GUARD THÔNG MINH & SONG NGỮ',
+            badge: 'v1.6.7: COCKROACHDB & MARIADB THỰC CHIẾN, BẢO MẬT ĐỐI KHÁNG',
             titlePrefix: 'HỆ QUẢN TRỊ',
             titleHighlight: 'CƠ SỞ DỮ LIỆU BẰNG AI',
             description: 'Điều phối AI theo từng vai trò, làm việc với SQL & NoSQL trong cùng một workspace, và giữ các truy vấn rủi ro sau lớp cảnh báo rõ ràng hơn.',
@@ -1698,7 +1698,7 @@ const workspaceText = {
             ],
         },
         heroSection: {
-            badge: 'v3.6.4: CONFIGURABLE AI, SMARTER GUARDS & BILINGUAL WORKSPACE',
+            badge: 'v1.6.7: PRODUCTION COCKROACHDB & MARIADB, ADVERSARIAL SECURITY',
             titlePrefix: 'THE AI-POWERED',
             titleHighlight: 'DATABASE IDE',
             description: 'Route AI by role, work across SQL & NoSQL in one workspace, and keep risky queries behind clearer execution guardrails.',

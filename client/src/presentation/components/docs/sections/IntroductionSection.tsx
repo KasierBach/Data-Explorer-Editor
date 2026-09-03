@@ -36,8 +36,8 @@ export function IntroductionSection({ lang }: Props) {
       <Callout type="info">
         <p className="text-sm">
           {t
-            ? "Điểm nhấn của v3.6.2+: ảnh đính kèm đi thẳng vào AI chat, catalog model explicit có thêm Beeknoee/Groq/OpenRouter, billing checkout thật, phân quyền resource chặt hơn, và i18n vi/en chạy xuyên client lẫn server. Đợt perf pass mới cũng làm rõ search index, table-window browsing, cap NoSQL aggregate, batch migration thích ứng và Redis guardrails."
-            : "v3.6.2+ highlights: image attachments now flow directly into AI chat, the explicit model catalog includes Beeknoee/Groq/OpenRouter, billing is now real, resource permissions are tighter, and vi/en localization runs across both client and server. The latest performance pass also clarified search indexing, table-window browsing, capped NoSQL aggregate execution, adaptive migration batching, and Redis guardrails."}
+            ? "Điểm nhấn của v1.6.7: CockroachDB và MariaDB nâng cấp lên production-ready với TLS contract dùng chung, bộ pentest đối kháng cho mọi guard, PWA và security.txt cho nền web hardened, hủy query qua panel Active Queries, cùng cấu hình AI theo vai trò với provider OpenAI-compatible tùy chỉnh."
+            : "v1.6.7 highlights: CockroachDB and MariaDB are now production-ready with a shared TLS contract, adversarial pentest suites cover every guard, PWA and security.txt harden the web platform, queries can be cancelled from the Active Queries panel, and AI roles are configurable with custom OpenAI-compatible providers."}
         </p>
       </Callout>
       {/* Overview Cards */}

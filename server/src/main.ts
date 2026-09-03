@@ -114,7 +114,7 @@ async function bootstrap() {
     const config = new DocumentBuilder()
       .setTitle('Data Explorer API')
       .setDescription('REST API for the Data Explorer web-based database tool')
-      .setVersion(process.env.npm_package_version || '3.6.4')
+      .setVersion(process.env.npm_package_version || '1.6.4')
       .addBearerAuth()
       .build();
     const document = SwaggerModule.createDocument(app, config);

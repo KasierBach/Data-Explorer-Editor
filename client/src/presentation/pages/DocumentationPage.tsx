@@ -282,7 +282,7 @@ export function DocumentationPage() {
                                         {text.editPage}
                                     </button>
                                     <span className="opacity-30 hidden sm:block">|</span>
-                                    <span className="text-xs">v3.6.2 • {text.releaseDate}</span>
+                                    <span className="text-xs">v1.6.7 • {text.releaseDate}</span>
                                 </div>
                             </footer>
                         </div>
