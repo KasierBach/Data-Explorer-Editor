@@ -90,6 +90,30 @@ const getLegalDocument = (lang: 'vi' | 'en', key: LegalDocKey): LegalDocument =>
                         ],
                     },
                     {
+                        title: 'Thông tin đăng nhập database của bạn',
+                        paragraphs: [
+                            'Mật khẩu, SSH private key và API key của AI provider mà bạn cung cấp được mã hóa bằng AES-256-GCM trước khi lưu trữ và chỉ được giải mã trong khoảnh khắc thiết lập kết nối theo yêu cầu của bạn.',
+                            'Chúng tôi không bao giờ hiển thị lại các thông tin này sau khi đã lưu, không ghi chúng vào log và không chia sẻ với bên thứ ba. Việc xóa connection sẽ xóa vĩnh viễn các thông tin đăng nhập liên quan.',
+                        ],
+                    },
+                    {
+                        title: 'Dịch vụ bên thứ ba',
+                        paragraphs: [
+                            'Data Explorer vận hành trên hạ tầng cloud và sử dụng một số dịch vụ hỗ trợ. Các bên này chỉ nhận dữ liệu ở mức tối thiểu cần thiết để thực hiện chức năng:',
+                        ],
+                        bullets: [
+                            'Nhà cung cấp AI (OpenRouter, Google, Groq...) chỉ nhận schema metadata và prompt bạn chủ động gửi; không nhận giá trị dòng dữ liệu trừ khi bạn tự dán vào chat.',
+                            'Dịch vụ email dùng để gửi mã xác minh và thông báo tài khoản.',
+                            'Hạ tầng hosting và CDN phục vụ ứng dụng.',
+                        ],
+                    },
+                    {
+                        title: 'Cookie và lưu trữ cục bộ',
+                        paragraphs: [
+                            'Chúng tôi sử dụng một cookie httpOnly mã hóa để duy trì phiên đăng nhập và localStorage để lưu trạng thái giao diện (tab mở, theme, ngôn ngữ). Không dùng cookie quảng cáo hay theo dõi bên thứ ba.',
+                        ],
+                    },
+                    {
                         title: 'Lưu giữ và bảo mật',
                         paragraphs: [
                             'Chúng tôi áp dụng cơ chế xác thực, kiểm soát quyền và guardrail mức ứng dụng để giảm rủi ro truy cập trái phép. Dữ liệu chỉ được giữ trong phạm vi cần thiết để cung cấp dịch vụ và đáp ứng yêu cầu vận hành hợp lý.',
@@ -99,6 +123,13 @@ const getLegalDocument = (lang: 'vi' | 'en', key: LegalDocKey): LegalDocument =>
                         title: 'Quyền của bạn',
                         paragraphs: [
                             'Bạn có thể yêu cầu xem, chỉnh sửa hoặc xóa dữ liệu tài khoản của mình trong phạm vi sản phẩm hỗ trợ hoặc thông qua kênh liên hệ pháp lý.',
+                            'Bạn có thể xuất hoặc xóa toàn bộ connections, saved queries và workspace bất cứ lúc nào trực tiếp trong sản phẩm mà không cần liên hệ.',
+                        ],
+                    },
+                    {
+                        title: 'Thay đổi chính sách',
+                        paragraphs: [
+                            'Khi có thay đổi đáng kể về chính sách riêng tư, chúng tôi sẽ thông báo qua email hoặc thông báo trong ứng dụng trước khi thay đổi có hiệu lực. Ngày hiệu lực ở đầu tài liệu luôn phản ánh phiên bản mới nhất.',
                         ],
                     },
                 ],
@@ -135,9 +166,37 @@ const getLegalDocument = (lang: 'vi' | 'en', key: LegalDocKey): LegalDocument =>
                         ],
                     },
                     {
+                        title: 'Thanh toán và gói dịch vụ',
+                        paragraphs: [
+                            'Các gói trả phí (nếu có) được tính theo chu kỳ bạn chọn khi đăng ký. Phí đã thanh toán cho chu kỳ hiện tại không hoàn lại khi bạn hủy giữa chu kỳ, nhưng bạn vẫn dùng được đến hết chu kỳ đó.',
+                            'Bạn có thể hủy gia hạn bất cứ lúc nào trong phần cài đặt tài khoản. Việc không thanh toán đúng hạn có thể dẫn đến việc hạ cấp tài khoản về gói miễn phí.',
+                        ],
+                    },
+                    {
+                        title: 'Sở hữu trí tuệ',
+                        paragraphs: [
+                            'Bạn giữ toàn bộ quyền sở hữu với dữ liệu của mình: connections, truy vấn, dashboard, schema và mọi nội dung bạn tạo trong workspace.',
+                            'Data Explorer giữ quyền sở hữu với phần mềm, giao diện, thương hiệu và mọi cải tiến của sản phẩm. Bạn không được sao chép, reverse engineer hoặc tạo sản phẩm phái sinh từ mã nguồn của chúng tôi khi chưa được phép.',
+                        ],
+                    },
+                    {
+                        title: 'Tuyên bố miễn trừ trách nhiệm',
+                        paragraphs: [
+                            'Dịch vụ được cung cấp "nguyên trạng". Chúng tôi không cam kết dịch vụ hoạt động không gián đoạn hoặc không lỗi, và không chịu trách nhiệm với thiệt hại phát sinh từ việc bạn chạy truy vấn (đặc biệt là các truy vấn thay đổi dữ liệu) trên hệ thống của mình.',
+                            'Bạn nên luôn kiểm tra cẩn thận các truy vấn hủy dữ liệu và sao lưu trước khi thao tác với database production.',
+                        ],
+                    },
+                    {
+                        title: 'Giới hạn trách nhiệm pháp lý',
+                        paragraphs: [
+                            'Trong mọi trường hợp, tổng trách nhiệm của chúng tôi không vượt quá số tiền bạn đã thanh toán cho dịch vụ trong 12 tháng gần nhất. Chúng tôi không chịu trách nhiệm với thiệt hại gián tiếp, mất dữ liệu kinh doanh hoặc mất lợi nhuận.',
+                        ],
+                    },
+                    {
                         title: 'Tạm ngưng hoặc chấm dứt',
                         paragraphs: [
                             'Chúng tôi có thể giới hạn hoặc tạm ngưng tài khoản nếu phát hiện hành vi lạm dụng, vi phạm bảo mật hoặc sử dụng sản phẩm theo cách có nguy cơ ảnh hưởng đến người dùng khác hoặc hệ thống.',
+                            'Bạn có thể xóa tài khoản bất cứ lúc nào trong cài đặt. Khi tài khoản bị xóa, dữ liệu cá nhân và workspace của bạn sẽ bị gỡ theo chính sách lưu giữ.',
                         ],
                     },
                 ],
@@ -203,6 +262,30 @@ const getLegalDocument = (lang: 'vi' | 'en', key: LegalDocKey): LegalDocument =>
                         ],
                     },
                     {
+                        title: 'Your database credentials',
+                        paragraphs: [
+                            'Passwords, SSH private keys, and AI provider API keys you provide are encrypted with AES-256-GCM before storage and are decrypted only for the moment a connection is established at your request.',
+                            'We never display these secrets again after they are saved, never write them to logs, and never share them with third parties. Deleting a connection permanently deletes its credentials.',
+                        ],
+                    },
+                    {
+                        title: 'Third-party services',
+                        paragraphs: [
+                            'Data Explorer runs on cloud infrastructure and relies on a small set of support services. These parties only receive the minimum data needed to perform their function:',
+                        ],
+                        bullets: [
+                            'AI providers (OpenRouter, Google, Groq, ...) only receive schema metadata and prompts you deliberately send; row values are not included unless you paste them into a chat yourself.',
+                            'An email delivery service used for verification codes and account notifications.',
+                            'Hosting and CDN infrastructure that serves the application.',
+                        ],
+                    },
+                    {
+                        title: 'Cookies and local storage',
+                        paragraphs: [
+                            'We use a single encrypted httpOnly cookie to keep you signed in, plus localStorage for interface state (open tabs, theme, language). We do not use advertising or third-party tracking cookies.',
+                        ],
+                    },
+                    {
                         title: 'Retention and security',
                         paragraphs: [
                             'We use authentication controls, permission boundaries, and application-level guardrails to reduce unauthorized access. Data is kept only as long as reasonably required to operate the service and support legitimate product workflows.',
@@ -212,6 +295,13 @@ const getLegalDocument = (lang: 'vi' | 'en', key: LegalDocKey): LegalDocument =>
                         title: 'Your choices',
                         paragraphs: [
                             'You can request access to, correction of, or deletion of your account data through supported product flows or through the legal contact channel.',
+                            'You can export or delete all of your connections, saved queries, and workspaces at any time directly in the product — no need to contact us.',
+                        ],
+                    },
+                    {
+                        title: 'Changes to this policy',
+                        paragraphs: [
+                            'If we make material changes to this policy, we will notify you by email or in-app notice before the change takes effect. The effective date at the top of this document always reflects the latest version.',
                         ],
                     },
                 ],
@@ -248,9 +338,37 @@ const getLegalDocument = (lang: 'vi' | 'en', key: LegalDocKey): LegalDocument =>
                         ],
                     },
                     {
+                        title: 'Billing and plans',
+                        paragraphs: [
+                            'Paid plans (if any) are billed for the cycle you choose at signup. Fees already paid for the current cycle are non-refundable upon mid-cycle cancellation, but your plan remains active until the end of that cycle.',
+                            'You can cancel renewal at any time from account settings. Failed payments may result in your account being downgraded to the free plan.',
+                        ],
+                    },
+                    {
+                        title: 'Intellectual property',
+                        paragraphs: [
+                            'You retain full ownership of your data: connections, queries, dashboards, schemas, and everything else you create in your workspace.',
+                            'Data Explorer retains all rights to the software, interface, branding, and product improvements. You may not copy, reverse engineer, or build derivative products from our code without permission.',
+                        ],
+                    },
+                    {
+                        title: 'Disclaimers',
+                        paragraphs: [
+                            'The service is provided "as is". We do not promise uninterrupted or error-free operation and are not liable for damage arising from queries you run (especially data-modifying queries) against your own systems.',
+                            'Always double-check destructive queries and back up your data before operating on production databases.',
+                        ],
+                    },
+                    {
+                        title: 'Limitation of liability',
+                        paragraphs: [
+                            'To the maximum extent permitted by law, our total liability will not exceed the amount you paid for the service in the preceding 12 months. We are not liable for indirect damages, loss of business data, or lost profits.',
+                        ],
+                    },
+                    {
                         title: 'Suspension or termination',
                         paragraphs: [
                             'We may limit or suspend access if an account is abusive, violates security expectations, or uses the product in a way that creates risk for other users or the service itself.',
+                            'You can delete your account at any time from settings. When an account is deleted, your personal data and workspaces are removed according to our retention policy.',
                         ],
                     },
                 ],
