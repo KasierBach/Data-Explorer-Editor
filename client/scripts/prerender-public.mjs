@@ -41,7 +41,7 @@ export function renderPage(source, route, metadata) {
   const title = escapeAttribute(metadata.title);
   const description = escapeAttribute(metadata.description);
   const staticContent = [
-    '<main data-static-content>',
+    '<main data-static-content hidden>',
     `    <h1>${title}</h1>`,
     `    <p>${description}</p>`,
     '  </main>',

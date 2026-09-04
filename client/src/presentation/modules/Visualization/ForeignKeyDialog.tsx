@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -17,7 +17,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/presentation/components/ui/select";
-import { Check, Link, AlertTriangle } from 'lucide-react';
+import { ArrowRight, AlertTriangle, Check, Link, ShieldCheck } from 'lucide-react';
 import { useAppStore } from '@/core/services/store';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 
@@ -59,6 +59,13 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
     const [onDelete, setOnDelete] = useState<ReferentialAction>('NO ACTION');
     const [onUpdate, setOnUpdate] = useState<ReferentialAction>('NO ACTION');
 
+    useEffect(() => {
+        if (!isOpen) return;
+        setConstraintName('');
+        setOnDelete('NO ACTION');
+        setOnUpdate('NO ACTION');
+    }, [isOpen, sourceTable, sourceColumn, targetTable, targetColumn]);
+
     const defaultConstraintName = useMemo(
         () => `FK_${sourceTable}_${targetTable}`,
         [sourceTable, targetTable],
@@ -79,62 +86,67 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto bg-card/95 backdrop-blur-xl border-white/10 shadow-2xl sm:max-w-[600px]">
-                <DialogHeader>
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500">
+            <DialogContent className="max-w-[calc(100vw-1rem)] max-h-[calc(100dvh-1rem)] overflow-y-auto border-white/10 bg-card/95 p-0 shadow-2xl backdrop-blur-xl sm:max-w-[680px]">
+                <DialogHeader className="border-b border-white/5 px-5 pb-5 pt-6 sm:px-7">
+                    <div className="flex items-start gap-3">
+                        <div className="rounded-xl bg-blue-500/10 p-3 text-blue-400 ring-1 ring-blue-400/20">
                             <Link className="h-5 w-5" />
                         </div>
-                        <DialogTitle className="text-xl">{text.title}</DialogTitle>
+                        <div className="min-w-0 space-y-1">
+                            <DialogTitle className="text-lg sm:text-xl">{text.title}</DialogTitle>
+                            <DialogDescription className="text-xs leading-relaxed sm:text-sm">
+                                {text.description(sourceTable, targetTable)}
+                            </DialogDescription>
+                        </div>
                     </div>
-                    <DialogDescription>
-                        {text.description(sourceTable, targetTable)}
-                    </DialogDescription>
                 </DialogHeader>
 
-                <div className="grid gap-6 py-4">
+                <div className="grid gap-5 px-5 py-5 sm:gap-6 sm:px-7">
                     <div className="grid gap-2">
-                        <Label htmlFor="constraintName" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{text.constraintName}</Label>
+                        <Label htmlFor="constraintName" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{text.constraintName}</Label>
                         <Input
                             id="constraintName"
-                            value={constraintName || defaultConstraintName}
+                            value={constraintName}
+                            placeholder={defaultConstraintName}
                             onChange={(e) => setConstraintName(e.target.value)}
-                            className="font-mono text-sm bg-muted/30"
+                            className="h-11 bg-muted/30 font-mono text-sm"
                         />
+                        <p className="text-[11px] text-muted-foreground/60">{defaultConstraintName}</p>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 p-4 rounded-xl bg-muted/20 border border-white/5 sm:grid-cols-2 sm:gap-8">
-                        <div className="space-y-4">
+                    <div className="rounded-2xl border border-white/10 bg-muted/15 p-4 sm:p-5">
+                        <div className="mb-4 flex items-center justify-between gap-3">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{text.relationship}</span>
+                            <ArrowRight className="h-4 w-4 text-muted-foreground/50" />
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
+                        <div className="space-y-3 rounded-xl border border-blue-400/15 bg-blue-500/[0.04] p-3">
                             <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
                                 <span>{text.childTable}</span>
                             </div>
-                            <div className="p-3 bg-background/50 rounded-lg border border-white/5">
+                            <div className="rounded-lg border border-white/5 bg-background/50 p-3">
                                 <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{text.table}</div>
                                 <div className="font-bold text-sm truncate" title={sourceTable}>{sourceTable}</div>
                             </div>
-                            <div className="p-3 bg-background/50 rounded-lg border border-white/5">
+                            <div className="rounded-lg border border-white/5 bg-background/50 p-3">
                                 <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{text.column}</div>
                                 <div className="font-mono text-sm truncate" title={sourceColumn}>{sourceColumn}</div>
                             </div>
                         </div>
 
-                        <div className="space-y-4 relative">
-                            <div className="absolute top-1/2 -left-4 -translate-y-1/2 -translate-x-1/2 z-10 hidden flex-col items-center justify-center text-muted-foreground/30 sm:flex">
-                                <div className="w-8 h-px bg-current"></div>
-                                <div className="text-[10px] font-black uppercase bg-card px-1">{text.refs}</div>
-                            </div>
-
+                        <div className="space-y-3 rounded-xl border border-amber-400/15 bg-amber-500/[0.04] p-3">
                             <div className="flex items-center gap-2 text-sm font-semibold text-amber-500">
                                 <span>{text.parentTable}</span>
                             </div>
-                            <div className="p-3 bg-background/50 rounded-lg border border-white/5">
+                            <div className="rounded-lg border border-white/5 bg-background/50 p-3">
                                 <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{text.table}</div>
                                 <div className="font-bold text-sm truncate" title={targetTable}>{targetTable}</div>
                             </div>
-                            <div className="p-3 bg-background/50 rounded-lg border border-white/5">
+                            <div className="rounded-lg border border-white/5 bg-background/50 p-3">
                                 <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{text.column}</div>
                                 <div className="font-mono text-sm truncate" title={targetColumn}>{targetColumn}</div>
                             </div>
+                        </div>
                         </div>
                     </div>
 
@@ -142,7 +154,7 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                         <div className="space-y-2">
                             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{text.onDelete}</Label>
                             <Select value={onDelete} onValueChange={(v) => setOnDelete(v as ReferentialAction)}>
-                                <SelectTrigger className="bg-muted/30">
+                                <SelectTrigger className="h-11 bg-muted/30">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -156,7 +168,7 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                         <div className="space-y-2">
                             <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{text.onUpdate}</Label>
                             <Select value={onUpdate} onValueChange={(v) => setOnUpdate(v as ReferentialAction)}>
-                                <SelectTrigger className="bg-muted/30">
+                                <SelectTrigger className="h-11 bg-muted/30">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -169,17 +181,21 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                         </div>
                     </div>
 
-                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex items-start gap-3">
+                    <div className="flex items-start gap-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] p-3.5">
                         <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
-                        <div className="text-xs text-yellow-200/80 leading-relaxed">
+                        <div className="text-xs leading-relaxed text-amber-100/75">
                             {text.warning}
                         </div>
                     </div>
                 </div>
 
-                <DialogFooter>
+                <DialogFooter className="border-t border-white/5 px-5 py-4 sm:px-7">
+                    <div className="mr-auto hidden items-center gap-2 text-[11px] text-muted-foreground/60 sm:flex">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        <span>{text.schemaChange}</span>
+                    </div>
                     <Button variant="ghost" onClick={onClose}>{text.cancel}</Button>
-                    <Button onClick={handleConfirm} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+                    <Button onClick={handleConfirm} className="gap-2 bg-blue-600 text-white hover:bg-blue-700">
                         <Check className="w-4 h-4" />
                         {text.createRelationship}
                     </Button>

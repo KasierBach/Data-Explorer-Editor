@@ -62,7 +62,7 @@ export function NoSqlShell() {
     });
 
     React.useEffect(() => {
-        if (!leftPanel.isDragging && sidebarWidth !== leftPanel.width && sidebarWidth > 0) {
+        if (!leftPanel.isDragging && sidebarWidth !== leftPanel.width && sidebarWidth >= 250) {
             leftPanel.setWidth(sidebarWidth);
         }
     }, [leftPanel, sidebarWidth]);

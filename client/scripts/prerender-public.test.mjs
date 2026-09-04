@@ -8,6 +8,6 @@ test('renders route-specific crawl and social metadata', () => {
   assert.match(result, /<title>Docs<\/title>/);
   assert.match(result, /canonical.*\/docs/);
   assert.match(result, /og:title.*Docs/);
-  assert.match(result, /<main data-static-content>[\s\S]*<h1>Docs<\/h1>/);
+  assert.match(result, /<main data-static-content hidden>[\s\S]*<h1>Docs<\/h1>/);
   assert.match(result, /seo-hydrate\.js/);
 });

@@ -1,6 +1,6 @@
 import { memo, useState, useMemo } from 'react';
 import { Handle, Position, NodeResizer } from '@xyflow/react';
-import { Table, Hash, Key, ChevronDown, ChevronRight, X, Settings, Link as LinkIcon, Info, Database, Layers } from 'lucide-react';
+import { Table, Hash, Key, ChevronDown, ChevronRight, X, Link as LinkIcon, Info, Database, Layers } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface TableNodeData {
@@ -37,12 +37,6 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
     const shouldShowAll = data.detailLevel !== 'name';
     const [showIndices, setShowIndices] = useState(false);
     
-    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, column: string } | null>(null);
-
-    const showContextMenu = (e: React.MouseEvent, columnName: string) => {
-        setContextMenu({ x: e.clientX, y: e.clientY, column: columnName });
-    };
-
     const handleRemove = (e: React.MouseEvent) => {
         e.stopPropagation();
         data.onRemove?.(data.id);
@@ -51,13 +45,17 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
     const isPerf = data.performanceMode;
 
     return (
-        <div className={cn("group relative h-full", isPerf ? "will-change-transform" : "")}>
+        <div
+            className="group relative h-full"
+            // Keep layout/style containment, but allow resize grips to paint beyond the node edge.
+            style={{ contain: 'layout style', willChange: 'transform' }}
+        >
             <NodeResizer 
                 minWidth={300} 
                 minHeight={150} 
-                isVisible={selected} 
-                lineClassName="border-blue-500/50" 
-                handleClassName="h-3 w-3 bg-white border-2 border-blue-500 rounded-full"
+                isVisible={true}
+                lineClassName="border-blue-500/70"
+                handleClassName="h-3 w-3 rounded-full border-2 border-blue-500 bg-white opacity-90 shadow-[0_0_0_2px_rgba(59,130,246,0.15)]"
             />
             
             {/* Glow effect on hover (Disabled in Performance Mode) */}
@@ -69,7 +67,7 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
                 "border rounded-3xl h-full flex flex-col ring-1 ring-white/5 relative z-10",
                 isPerf 
                     ? "bg-card/80 backdrop-blur-md transition-none" 
-                    : "bg-zinc-950 border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.4)] transition-all duration-500",
+                    : "bg-zinc-950 border-white/10 shadow-[0_12px_30px_-15px_rgba(0,0,0,0.4)] transition-colors duration-150",
                 selected ? "border-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.2)]" : "group-hover:border-blue-500/30"
             )}>
                 {/* Header */}
@@ -164,13 +162,13 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
                             <div
                                 key={col.name}
                                 className={cn(
-                                    "group/row flex items-center justify-between px-5 py-3 hover:bg-white/5 transition-all duration-300 relative border-b border-white/5 last:border-0",
+                                    "group/row flex items-center justify-between px-5 py-3 hover:bg-white/5 transition-colors duration-150 relative border-b border-white/5 last:border-0",
                                     col.isPrimaryKey && "bg-blue-500/5"
                                 )}
-                                style={{ paddingLeft: `${1.25 + nestLevel * 1}rem` }}
-                                onContextMenu={(e) => {
-                                    e.preventDefault();
-                                    showContextMenu(e, col.name);
+                                style={{
+                                    paddingLeft: `${1.25 + nestLevel * 1}rem`,
+                                    contentVisibility: 'auto',
+                                    containIntrinsicSize: '42px',
                                 }}
                             >
                                 <div className="flex items-center gap-3 relative z-10 w-full">
@@ -179,7 +177,7 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
                                             type="target"
                                             position={Position.Left}
                                             id={col.name}
-                                            className="!w-2 !h-2 !-left-1 !bg-blue-500 !border-0 !opacity-0 group-hover/row:!opacity-100 transition-opacity z-[100]"
+                                            className="!w-2 !h-2 !-left-1 !bg-blue-500 !border-0 !opacity-40 group-hover/row:!opacity-100 transition-opacity z-[100]"
                                         />
                                         {col.isPrimaryKey ? (
                                             <Key className="w-3.5 h-3.5 text-amber-500 drop-shadow-[0_0_5px_rgba(245,158,11,0.5)]" />
@@ -197,7 +195,7 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
                                             )}>
                                                 {isArrayNode && !displayName.includes('[]') ? displayName + ' []' : displayName}
                                             </span>
-                                            <span className="text-[9px] font-medium text-muted-foreground/40 uppercase tracking-widest">{col.type}</span>
+                                            <span className="max-w-[58%] shrink-0 whitespace-normal break-words text-right text-[9px] font-medium leading-tight text-muted-foreground/50 uppercase tracking-widest" title={col.type}>{col.type}</span>
                                         </div>
                                         {col.comment && (
                                             <p className="text-[9px] text-muted-foreground/30 truncate mt-0.5" title={col.comment}>
@@ -209,7 +207,7 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
                                         type="source"
                                         position={Position.Right}
                                         id={col.name}
-                                        className="!w-2 !h-2 !-right-1 !bg-blue-500 !border-0 !opacity-0 group-hover/row:!opacity-100 transition-opacity z-[100]"
+                                        className="!w-2 !h-2 !-right-1 !bg-blue-500 !border-0 !opacity-40 group-hover/row:!opacity-100 transition-opacity z-[100]"
                                     />
                                 </div>
                                 <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 opacity-0 group-hover/row:opacity-100 transition-opacity" />
@@ -223,42 +221,21 @@ const TableNode = ({ data, selected }: { data: TableNodeData, selected?: boolean
                     </div>
                 )}
 
-                {/* Footer Info */}
                 {!data.isCollapsed && data.detailLevel === 'all' && (
-                     <div className="p-3 bg-muted/5 border-t border-white/5 flex items-center justify-center gap-4 shrink-0">
-                         <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">
-                             <Database className="w-2.5 h-2.5" />
-                             Persistent
-                         </div>
-                         <div className="w-1 h-1 rounded-full bg-white/10" />
-                         <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">
-                             <Info className="w-2.5 h-2.5" />
-                             Informative
-                         </div>
-                     </div>
-                )}
-            </div>
-            
-            {/* Custom Context Menu Overlay */}
-            {contextMenu && (
-                <div 
-                    className="fixed inset-0 z-[110]" 
-                    onClick={() => setContextMenu(null)}
-                    onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
-                >
-                    <div 
-                        className="absolute bg-zinc-900/95 backdrop-blur-2xl border border-white/10 p-1.5 rounded-2xl shadow-2xl min-w-[200px]"
-                        style={{ top: contextMenu.y, left: contextMenu.x }}
-                    >
-                        <div className="px-3 py-2 text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] border-b border-white/5 mb-1">
-                            {contextMenu.column}
+                    <div className="p-3 bg-muted/5 border-t border-white/5 flex items-center justify-center gap-4 shrink-0">
+                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+                            <Database className="w-2.5 h-2.5" />
+                            Persistent
                         </div>
-                        <button className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-muted-foreground hover:bg-white/10 hover:text-white rounded-xl transition-all">
-                            <Settings className="w-3.5 h-3.5" /> Toggle visibility
-                        </button>
+                        <div className="w-1 h-1 rounded-full bg-white/10" />
+                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+                            <Info className="w-2.5 h-2.5" />
+                            Informative
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
+
+            </div>
         </div>
     );
 };

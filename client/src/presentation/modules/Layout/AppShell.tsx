@@ -110,7 +110,7 @@ export function AppShell() {
 
     // Sync external sidebar width changes (e.g. from store reset)
     React.useEffect(() => {
-        if (!leftPanel.isDragging && sidebarWidth !== leftPanel.width && sidebarWidth > 0) {
+        if (!leftPanel.isDragging && sidebarWidth !== leftPanel.width && sidebarWidth >= 250) {
             leftPanel.setWidth(sidebarWidth);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps

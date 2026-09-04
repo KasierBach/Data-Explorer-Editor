@@ -352,7 +352,13 @@ export class MysqlStrategy implements IDatabaseStrategy {
         const refCols = op.refColumns
           .map((c) => this.quoteIdentifier(c))
           .join(', ');
-        return `ALTER TABLE ${quotedTable} ADD CONSTRAINT ${this.quoteIdentifier(op.name)} FOREIGN KEY (${fkCols}) REFERENCES ${this.quoteIdentifier(op.refTable)} (${refCols})`;
+        const actions = [
+          op.onDelete ? `ON DELETE ${op.onDelete}` : '',
+          op.onUpdate ? `ON UPDATE ${op.onUpdate}` : '',
+        ]
+          .filter(Boolean)
+          .join(' ');
+        return `ALTER TABLE ${quotedTable} ADD CONSTRAINT ${this.quoteIdentifier(op.name)} FOREIGN KEY (${fkCols}) REFERENCES ${this.quoteIdentifier(op.refTable)} (${refCols})${actions ? ` ${actions}` : ''}`;
       }
       case 'drop_fk':
         return `ALTER TABLE ${quotedTable} DROP FOREIGN KEY ${this.quoteIdentifier(op.name)}`;

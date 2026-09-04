@@ -13,6 +13,7 @@ import {
     type ReactFlowInstance,
     BackgroundVariant,
 } from '@xyflow/react';
+import { Database, GitGraph, Loader2 } from 'lucide-react';
 import TableNode from '../../TableNode';
 import { ForeignKeyDialog, type ForeignKeyData } from '../../ForeignKeyDialog';
 
@@ -48,6 +49,7 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
 }) => {
     const reactFlowRef = useRef<HTMLDivElement | null>(null);
     const flowInstanceRef = useRef<ReactFlowInstance | null>(null);
+    const renderVisibleOnly = nodes.length > 30 || edges.length > 60;
 
     // Re-fit the viewport whenever the toolbar requests it (fitViewSignal bump).
     useEffect(() => {
@@ -57,9 +59,23 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
     return (
         <div className="flex-1 relative">
             {isLoading && (
-                <div className="absolute top-0 left-0 w-full z-50 overflow-hidden">
-                    <div className="h-0.5 bg-primary/20 w-full relative">
-                        <div className="absolute top-0 left-0 h-full bg-primary animate-pulse w-1/3" />
+                <div className="absolute right-4 top-3 z-50 w-[min(420px,calc(100%-2rem))] overflow-hidden rounded-xl border border-primary/20 bg-card/90 shadow-lg backdrop-blur-md sm:right-6">
+                    <div className="flex items-center justify-between gap-3 px-3 py-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" />
+                            <span className="truncate text-[11px] font-semibold text-foreground/80">
+                                {lang === 'vi'
+                                    ? (nodes.length > 0 ? 'Đang hoàn thiện metadata ERD...' : 'Đang khám phá cấu trúc database...')
+                                    : (nodes.length > 0 ? 'Finishing ERD metadata...' : 'Exploring database structure...')}
+                            </span>
+                        </div>
+                        <span className="hidden shrink-0 items-center gap-1.5 text-[10px] text-muted-foreground sm:flex">
+                            <Database className="h-3 w-3" />
+                            {nodes.length > 0 ? `${nodes.length} ${lang === 'vi' ? 'bảng' : 'tables'}` : (lang === 'vi' ? 'Đang kết nối' : 'Connecting')}
+                        </span>
+                    </div>
+                    <div className="h-1 overflow-hidden bg-primary/10">
+                        <div className="h-full w-1/3 animate-[erd-progress_1.2s_ease-in-out_infinite] rounded-full bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.8)]" />
                     </div>
                 </div>
             )}
@@ -79,6 +95,7 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
                 connectionLineType={ConnectionLineType.SmoothStep}
                 connectionLineStyle={{ stroke: 'hsl(var(--primary))', strokeWidth: 2, strokeDasharray: '5,5' }}
                 fitView
+                onlyRenderVisibleElements={renderVisibleOnly}
                 minZoom={0.05}
                 maxZoom={2}
                 colorMode="system"
@@ -106,6 +123,22 @@ export const ERDCanvas: React.FC<ERDCanvasProps> = ({
                 )}
                 {toolbar}
             </ReactFlow>
+
+            {!isLoading && nodes.length === 0 && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-6 text-center">
+                    <div className="flex max-w-sm flex-col items-center gap-3 text-muted-foreground">
+                        <GitGraph className="h-14 w-14 text-primary/35" />
+                        <div className="space-y-1">
+                            <p className="text-sm font-semibold text-foreground/80">
+                                {lang === 'vi' ? 'Chưa có bảng trên sơ đồ' : 'No tables on the diagram'}
+                            </p>
+                            <p className="text-xs text-muted-foreground/70">
+                                {lang === 'vi' ? 'Chọn bảng từ thanh bên để bắt đầu dựng ERD.' : 'Select tables from the sidebar to start building the ERD.'}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {hoverPosition && (
                 <div

@@ -227,21 +227,21 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
             const crawl = async (parentId: string | null) => {
                 try {
                     const entries = await adapter.getHierarchy(parentId) as ErdHierarchyNode[];
-                    for (const entry of entries) {
+                    await Promise.all(entries.map(async (entry) => {
                         if (entry.type === 'table' || entry.type === 'view' || entry.type === 'collection') {
                             results.push(entry);
-                            continue;
+                            return;
                         }
                         if (entry.type === 'database') {
                             if (!selectedDatabase || entry.name === selectedDatabase || entry.id.includes(`db:${selectedDatabase}`)) {
                                 await crawl(entry.id);
                             }
-                            continue;
+                            return;
                         }
                         if (entry.type === 'schema' || entry.type === 'folder') {
                             await crawl(entry.id);
                         }
-                    }
+                    }));
                 } catch (error) {
                     console.error(`[ERD] Failed to crawl ${parentId || 'root'}`, error);
                 }
@@ -295,18 +295,48 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
             const tablesArray = Array.from(visibleTableNames);
             const chunkSize = 2;
+            const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-            for (let index = 0; index < tablesArray.length; index += chunkSize) {
-                const chunk = tablesArray.slice(index, index + chunkSize);
+            // Reuse metadata already fetched by a previous selection so adding
+            // one table does not refetch every visible table and trip the
+            // server rate limit.
+            const cached = queryClient.getQueriesData<Record<string, TableMetadata>>({
+                queryKey: ['erd-columns-v2', connectionId],
+            });
+            for (const [, data] of cached) {
+                if (!data) continue;
+                for (const [name, metadata] of Object.entries(data)) {
+                    if (visibleTableNames.has(name) && !results[name]) {
+                        results[name] = metadata;
+                    }
+                }
+            }
+            const toFetch = tablesArray.filter((name) => !results[name]);
+
+            const fetchWithRetry = async (name: string, nodeId: string, attempt = 0): Promise<void> => {
+                try {
+                    results[name] = await adapter.getMetadata(nodeId);
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    const isRateLimit = message.includes('429') || message.toLowerCase().includes('too many requests');
+                    if (isRateLimit && attempt < 3) {
+                        await sleep(500 * (attempt + 1));
+                        return fetchWithRetry(name, nodeId, attempt + 1);
+                    }
+                    console.error(`[ERD] Failed to fetch metadata for ${name}`, error);
+                }
+            };
+
+            for (let index = 0; index < toFetch.length; index += chunkSize) {
+                const chunk = toFetch.slice(index, index + chunkSize);
                 await Promise.all(chunk.map(async (name) => {
                     const nodeId = nameToIdMap.get(name);
                     if (!nodeId) return;
-                    try {
-                        results[name] = await adapter.getMetadata(nodeId);
-                    } catch (error) {
-                        console.error(`[ERD] Failed to fetch metadata for ${name}`, error);
-                    }
+                    await fetchWithRetry(name, nodeId);
                 }));
+                if (index + chunkSize < toFetch.length) {
+                    await sleep(150);
+                }
             }
 
             return results;
@@ -319,14 +349,14 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
     const filteredHierarchy = useMemo(() => {
         if (!hierarchy || !Array.isArray(hierarchy)) return [];
-        
+
         let filtered = [...hierarchy];
 
         // 1. Schema Filter
         if (schemaFilter && schemaFilter !== 'all') {
             const schemaPrefix = `schema:${schemaFilter}`;
-            filtered = filtered.filter((entry) => 
-                entry.id?.includes(schemaPrefix) || 
+            filtered = filtered.filter((entry) =>
+                entry.id?.includes(schemaPrefix) ||
                 getNodeSchema(entry) === schemaFilter
             );
         }
@@ -552,10 +582,12 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
 
             toast.success(text.relationshipCreated);
             setEdges((currentEdges) => addEdge({
-                source: data.sourceTable,
-                target: data.targetTable,
-                sourceHandle: data.sourceColumn,
-                targetHandle: data.targetColumn,
+                // Keep optimistic edges aligned with the database relationship mapping:
+                // parent/reference table -> child/foreign-key table.
+                source: data.targetTable,
+                target: data.sourceTable,
+                sourceHandle: data.targetColumn,
+                targetHandle: data.sourceColumn,
                 animated: true,
                 type: ConnectionLineType.SmoothStep,
                 style: { stroke: 'hsl(var(--primary))', strokeWidth: 2, strokeDasharray: '5,5' },
@@ -671,6 +703,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                         indices: metadata.indices,
                         rowCount: metadata.rowCount,
                         onRemoveConstraint: handleRemoveConstraint,
+                        onRemove: toggleTable,
                         isCollapsed,
                         onToggleCollapse: () => handleToggleCollapse(name),
                         detailLevel,
@@ -716,6 +749,8 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
         visibleTableNames,
     ]);
 
+    const shouldAnimateEdges = isEdgeAnimated && !performanceMode && visibleTableNames.size <= 30 && (relationships?.length ?? 0) <= 60;
+
     useEffect(() => {
         setEdges((currentEdges) => currentEdges.map((edge) => {
             const isHovered = edge.id === hoveredEdgeId;
@@ -732,7 +767,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 ...edge,
                 type: edgeRouting,
                 label: '',
-                animated: isEdgeAnimated,
+                animated: shouldAnimateEdges,
                 ...(edgeRouting === 'smoothstep' ? { pathOptions: { borderRadius: 40 } } : {}),
             };
 
@@ -752,7 +787,7 @@ export const useERDLogic = (tabId: string, connectionId: string, databaseProp?: 
                 zIndex: 1,
             };
         }));
-    }, [edgeRouting, hoveredEdgeId, isEdgeAnimated, performanceMode, setEdges]);
+    }, [edgeRouting, hoveredEdgeId, performanceMode, setEdges, shouldAnimateEdges]);
 
     const handleExportPNG = useCallback(() => {
         import('html-to-image').then(({ toPng }) => {

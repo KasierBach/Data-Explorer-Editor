@@ -352,3 +352,9 @@
 .scroll-touch {
   -webkit-overflow-scrolling: touch;
 }
+
+@keyframes erd-progress {
+  0% { transform: translateX(-120%); }
+  50% { transform: translateX(180%); }
+  100% { transform: translateX(360%); }
+}

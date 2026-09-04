@@ -186,6 +186,14 @@ export class AddForeignKeyOperation {
     message: SQL_IDENTIFIER_MESSAGE,
   })
   refColumns!: string[];
+
+  @IsOptional()
+  @IsIn(['NO ACTION', 'CASCADE', 'SET NULL', 'RESTRICT'])
+  onDelete?: 'NO ACTION' | 'CASCADE' | 'SET NULL' | 'RESTRICT';
+
+  @IsOptional()
+  @IsIn(['NO ACTION', 'CASCADE', 'SET NULL', 'RESTRICT'])
+  onUpdate?: 'NO ACTION' | 'CASCADE' | 'SET NULL' | 'RESTRICT';
 }
 
 export class DropForeignKeyOperation {

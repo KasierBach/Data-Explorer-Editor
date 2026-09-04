@@ -62,13 +62,14 @@ export const applyAutoLayout = (
         if (!connectedNodeIds.has(node.id)) return node;
 
         const positionedNode = dagreGraph.node(node.id);
+        const nodeHeight = buildNodeHeight(node);
         const x = positionedNode.x - (NODE_WIDTH / 2);
-        const y = positionedNode.y - 25;
+        const y = positionedNode.y - (nodeHeight / 2);
 
         minX = Math.min(minX, x);
         maxX = Math.max(maxX, x + NODE_WIDTH);
         minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y + 100);
+        maxY = Math.max(maxY, y + nodeHeight);
 
         return {
             ...node,
@@ -84,6 +85,10 @@ export const applyAutoLayout = (
     const startX = direction === 'LR' ? (maxX === -Infinity ? 0 : maxX + 200) : (minX === Infinity ? 0 : minX);
     const startY = direction === 'LR' ? (minY === Infinity ? 0 : minY) : (maxY === -Infinity ? 0 : maxY + 200);
     const columns = direction === 'LR' ? 3 : 5;
+    const standaloneRowHeight = Math.max(
+        180,
+        ...standaloneNodes.map((node) => buildNodeHeight(node) + 40),
+    );
 
     standaloneNodes.forEach((node, index) => {
         const row = Math.floor(index / columns);
@@ -95,7 +100,7 @@ export const applyAutoLayout = (
             ...laidOutNodes[targetIndex],
             position: {
                 x: startX + (column * 350),
-                y: startY + (row * 150),
+                y: startY + (row * standaloneRowHeight),
             },
         };
     });

@@ -314,7 +314,15 @@ export class MssqlStrategy implements IDatabaseStrategy {
       case 'add_fk': {
         const fkCols = op.columns.map((c: string) => `[${c}]`).join(', ');
         const refCols = op.refColumns.map((c: string) => `[${c}]`).join(', ');
-        return `ALTER TABLE ${quotedTable} ADD CONSTRAINT ${op.name} FOREIGN KEY (${fkCols}) REFERENCES [${op.refTable}] (${refCols})`;
+        const normalizeAction = (action?: string) =>
+          action === 'RESTRICT' ? 'NO ACTION' : action;
+        const actions = [
+          op.onDelete ? `ON DELETE ${normalizeAction(op.onDelete)}` : '',
+          op.onUpdate ? `ON UPDATE ${normalizeAction(op.onUpdate)}` : '',
+        ]
+          .filter(Boolean)
+          .join(' ');
+        return `ALTER TABLE ${quotedTable} ADD CONSTRAINT ${op.name} FOREIGN KEY (${fkCols}) REFERENCES [${op.refTable}] (${refCols})${actions ? ` ${actions}` : ''}`;
       }
       case 'drop_fk':
         return `ALTER TABLE ${quotedTable} DROP CONSTRAINT [${op.name}]`;

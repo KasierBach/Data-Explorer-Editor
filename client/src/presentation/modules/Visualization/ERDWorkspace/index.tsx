@@ -114,6 +114,7 @@ export const ERDWorkspace: React.FC<ERDWorkspaceProps> = ({ tabId, connectionId,
                         setBackgroundVariant={actions.setBackgroundVariant}
                         isEdgeAnimated={state.isEdgeAnimated}
                         setIsEdgeAnimated={actions.setIsEdgeAnimated}
+                        edgeAnimationLimited={state.performanceMode || state.visibleTableNames.size > 30 || state.edges.length > 60}
                         isToolbarCollapsed={state.isToolbarCollapsed}
                         setIsToolbarCollapsed={actions.setIsToolbarCollapsed}
                         currentWorkspaceName={state.currentWorkspaceName}

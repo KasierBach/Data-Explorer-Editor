@@ -46,6 +46,7 @@ interface ERDToolbarProps {
     setBackgroundVariant: (v: BackgroundVariant) => void;
     isEdgeAnimated: boolean;
     setIsEdgeAnimated: (v: boolean) => void;
+    edgeAnimationLimited?: boolean;
     isToolbarCollapsed: boolean;
     setIsToolbarCollapsed: (v: boolean) => void;
     currentWorkspaceName?: string | null;
@@ -77,6 +78,7 @@ export const ERDToolbar: React.FC<ERDToolbarProps> = ({
     setBackgroundVariant,
     isEdgeAnimated,
     setIsEdgeAnimated,
+    edgeAnimationLimited = false,
     isToolbarCollapsed,
     setIsToolbarCollapsed,
     currentWorkspaceName,
@@ -230,10 +232,12 @@ export const ERDToolbar: React.FC<ERDToolbarProps> = ({
                                             : t(lang, 'Chi tiết cao (Đồ họa sắc nét)', 'High Fidelity (Crisp Detail)')}
                                     </div>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => setIsEdgeAnimated(!isEdgeAnimated)} className={isEdgeAnimated ? 'bg-primary/10 text-primary font-bold' : ''}>
+                                <DropdownMenuItem onClick={() => setIsEdgeAnimated(!isEdgeAnimated)} className={edgeAnimationLimited ? 'opacity-70' : (isEdgeAnimated ? 'bg-primary/10 text-primary font-bold' : '')}>
                                     <div className="flex items-center gap-2">
                                         <div className={`h-2 w-2 rounded-full ${isEdgeAnimated ? 'bg-green-400 animate-pulse' : 'bg-muted-foreground'}`} />
-                                        {isEdgeAnimated ? t(lang, 'Hiệu ứng data flow', 'Data flow animation') : t(lang, 'Bật data flow', 'Enable flow animation')}
+                                        {edgeAnimationLimited
+                                            ? t(lang, 'Tắt hiệu ứng khi sơ đồ lớn', 'Animation limited for large diagrams')
+                                            : isEdgeAnimated ? t(lang, 'Hiệu ứng data flow', 'Data flow animation') : t(lang, 'Bật data flow', 'Enable flow animation')}
                                     </div>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />

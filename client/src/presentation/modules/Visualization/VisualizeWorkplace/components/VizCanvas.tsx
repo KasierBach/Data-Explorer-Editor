@@ -103,9 +103,12 @@ export const VizCanvas: React.FC<VizCanvasProps> = ({
         );
 
         if (!chartData || chartData.length === 0) return (
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-10 gap-6">
-                <BarChart3 className="h-28 w-28" />
-                <p className="font-black text-lg uppercase tracking-[0.3em]">{isNoSql ? 'Select Data & Fetch' : 'Select Data & Run'}</p>
+            <div className="h-full flex flex-col items-center justify-center gap-4 px-6 text-center text-muted-foreground">
+                <BarChart3 className="h-16 w-16 text-emerald-500/35" />
+                <div className="space-y-1">
+                    <p className="font-semibold text-sm text-foreground/80">{isNoSql ? 'Select a collection and fetch data' : 'Select a table and run a query'}</p>
+                    <p className="text-xs text-muted-foreground/70">{isNoSql ? 'Your chart will appear here once documents are loaded.' : 'Your chart will appear here once query results are loaded.'}</p>
+                </div>
             </div>
         );
 
