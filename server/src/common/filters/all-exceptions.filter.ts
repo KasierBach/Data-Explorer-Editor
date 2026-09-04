@@ -60,7 +60,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: httpStatus,
       timestamp: new Date().toISOString(),
       path: request.url,
-      message: Array.isArray(message) ? message[0] : message,
+      message: Array.isArray(message)
+        ? message.filter((item) => typeof item === 'string').join('; ')
+        : message,
       ...Object.fromEntries(
         Object.entries(extraDetails).filter(([, value]) => value !== undefined),
       ),

@@ -53,9 +53,13 @@ class ApiService {
 
   private async buildApiError(response: Response) {
     const errorData = await response.json().catch(() => ({})) as Record<string, unknown>;
-    const error = new ApiError(
-      typeof errorData.message === 'string' ? errorData.message : `API Error: ${response.status} ${response.statusText}`,
-    );
+    const rawMessage = errorData.message;
+    const messageText = Array.isArray(rawMessage)
+      ? rawMessage.filter((item): item is string => typeof item === 'string').join('; ')
+      : typeof rawMessage === 'string'
+        ? rawMessage
+        : `API Error: ${response.status} ${response.statusText}`;
+    const error = new ApiError(messageText);
     error.statusCode = typeof errorData.statusCode === 'number' ? errorData.statusCode : response.status;
     error.reason = typeof errorData.reason === 'string' ? errorData.reason : undefined;
     error.action = typeof errorData.action === 'string' ? errorData.action : undefined;

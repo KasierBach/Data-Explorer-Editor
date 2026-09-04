@@ -12,6 +12,30 @@
     content="A unified workspace for PostgreSQL, MySQL, SQL Server, and MongoDB with AI-assisted querying, schema exploration, ERD tools, and team-aware access controls." />
 
   <!-- Dynamic meta tags are managed by react-helmet-async in SEO component -->
+
+  <!-- Paint the theme background before any bundle loads to avoid a white flash on refresh. -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('vite-ui-theme');
+        var theme = stored === 'light' || stored === 'dark' ? stored : 'system';
+        var dark = theme === 'dark' ||
+          (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.add(dark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+  <style>
+    html {
+      background-color: #0a0a0f;
+    }
+
+    html.light {
+      background-color: #f8fafc;
+    }
+  </style>
 </head>
 
 <body>

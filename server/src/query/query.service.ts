@@ -521,22 +521,27 @@ export class QueryService {
       );
 
       let result: QueryResult;
+      const timeoutMs = this.getQueryTimeoutMs();
       try {
-        if (isMultiStatement) {
-          // Run all statements atomically: if any statement fails, all changes
-          // are rolled back instead of leaving the database half-committed.
-          result = await strategy.runStatementsInTransaction(
-            pool,
-            executableStatements,
-            { limit, offset },
-          );
-          result.countStatus ??= 'skipped';
-        } else {
-          result = await strategy.executeQuery(pool, finalSql, {
+        const runQuery = async (): Promise<QueryResult> => {
+          if (isMultiStatement) {
+            // Run all statements atomically: if any statement fails, all changes
+            // are rolled back instead of leaving the database half-committed.
+            const multi = await strategy.runStatementsInTransaction(
+              pool,
+              executableStatements,
+              { limit, offset },
+            );
+            multi.countStatus ??= 'skipped';
+            return multi;
+          }
+          return strategy.executeQuery(pool, finalSql, {
             limit,
             offset,
           });
-        }
+        };
+
+        result = await this.withQueryTimeout(runQuery(), queryId, timeoutMs);
       } finally {
         this.activeQueries.delete(queryId);
       }
@@ -617,6 +622,48 @@ export class QueryService {
           rootCause,
         },
       });
+    }
+  }
+
+  /** Query execution deadline (QUERY_TIMEOUT_MS, 60s default, 10min max). */
+  private getQueryTimeoutMs(): number {
+    const raw = Number(process.env.QUERY_TIMEOUT_MS || 60_000);
+    if (!Number.isFinite(raw) || raw <= 0) return 60_000;
+    return Math.min(raw, 600_000);
+  }
+
+  /** Cancels the query via its registered handle when the deadline hits. */
+  private async withQueryTimeout<T>(
+    promise: Promise<T>,
+    queryId: string,
+    timeoutMs: number,
+  ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            void (async () => {
+              const entry = this.activeQueries.get(queryId);
+              if (entry) {
+                try {
+                  await entry.cancel();
+                } catch {
+                  // Best-effort cancel.
+                }
+              }
+              reject(
+                new BadRequestException(
+                  `Query exceeded the maximum execution time of ${Math.round(timeoutMs / 1000)}s and was cancelled. Add a LIMIT or narrow the query.`,
+                ),
+              );
+            })();
+          }, timeoutMs);
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
