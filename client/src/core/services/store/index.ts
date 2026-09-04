@@ -42,6 +42,15 @@ export const useAppStore = create<AppState>()(
                 if (persisted.expandedNodes && !Array.isArray(persisted.expandedNodes)) {
                     persisted.expandedNodes = [];
                 }
+                if (Array.isArray(persisted.connections)) {
+                    persisted.connections = persisted.connections.map((c) => {
+                        const safeConnection = { ...c };
+                        delete safeConnection.password;
+                        delete safeConnection.sshPrivateKey;
+                        delete safeConnection.sshPassphrase;
+                        return safeConnection;
+                    });
+                }
                 if ((persisted as { nosqlViewMode?: string }).nosqlViewMode === 'charts') {
                     persisted.nosqlViewMode = 'grid';
                 }
@@ -76,6 +85,8 @@ export const useAppStore = create<AppState>()(
                 connections: state.connections.map(c => {
                     const safeConnection = { ...c };
                     delete safeConnection.password;
+                    delete safeConnection.sshPrivateKey;
+                    delete safeConnection.sshPassphrase;
                     return safeConnection;
                 }),
                 activeConnectionId: state.activeConnectionId,
