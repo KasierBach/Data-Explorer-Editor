@@ -3,6 +3,7 @@ import {
   NotFoundException,
   OnModuleDestroy,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { CreateConnectionDto } from './dto/create-connection.dto';
@@ -601,18 +602,15 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   async getPool(id: string, databaseOverride?: string, userId?: string) {
-    let connection: any;
     if (!userId) {
-      // if userId isn't provided (e.g from legacy code), fallback to system fetch
-      const sysConnection = await this.prisma.connection.findUnique({
-        where: { id },
-      });
-      if (!sysConnection)
-        throw new NotFoundException(`Connection ${id} not found`);
-      connection = sysConnection;
-    } else {
-      connection = await this.findRawOne(id, userId);
+      // Every caller must be authenticated so ownership is enforced; a
+      // system-wide fetch here would let unauthenticated code paths reach
+      // any connection by id.
+      throw new ForbiddenException(
+        'An authenticated user is required to access a connection pool.',
+      );
     }
+    const connection = await this.findRawOne(id, userId);
     const poolKey = `${id}:${databaseOverride || connection.database}`;
 
     if (this.pools.has(poolKey)) {
