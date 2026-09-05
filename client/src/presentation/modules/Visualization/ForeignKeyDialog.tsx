@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -59,12 +59,16 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
     const [onDelete, setOnDelete] = useState<ReferentialAction>('NO ACTION');
     const [onUpdate, setOnUpdate] = useState<ReferentialAction>('NO ACTION');
 
-    useEffect(() => {
-        if (!isOpen) return;
+    // Render-time reset: when the dialog targets a different column pair,
+    // discard stale form state before rendering instead of via an effect.
+    const [lastKey, setLastKey] = useState('');
+    const resetKey = `${sourceTable}.${sourceColumn}->${targetTable}.${targetColumn}`;
+    if (isOpen && lastKey !== resetKey) {
+        setLastKey(resetKey);
         setConstraintName('');
         setOnDelete('NO ACTION');
         setOnUpdate('NO ACTION');
-    }, [isOpen, sourceTable, sourceColumn, targetTable, targetColumn]);
+    }
 
     const defaultConstraintName = useMemo(
         () => `FK_${sourceTable}_${targetTable}`,
@@ -120,33 +124,33 @@ export const ForeignKeyDialog: React.FC<ForeignKeyDialogProps> = ({
                             <ArrowRight className="h-4 w-4 text-muted-foreground/50" />
                         </div>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5">
-                        <div className="space-y-3 rounded-xl border border-blue-400/15 bg-blue-500/[0.04] p-3">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
-                                <span>{text.childTable}</span>
+                            <div className="space-y-3 rounded-xl border border-blue-400/15 bg-blue-500/[0.04] p-3">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-blue-400">
+                                    <span>{text.childTable}</span>
+                                </div>
+                                <div className="rounded-lg border border-white/5 bg-background/50 p-3">
+                                    <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{text.table}</div>
+                                    <div className="font-bold text-sm truncate" title={sourceTable}>{sourceTable}</div>
+                                </div>
+                                <div className="rounded-lg border border-white/5 bg-background/50 p-3">
+                                    <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{text.column}</div>
+                                    <div className="font-mono text-sm truncate" title={sourceColumn}>{sourceColumn}</div>
+                                </div>
                             </div>
-                            <div className="rounded-lg border border-white/5 bg-background/50 p-3">
-                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{text.table}</div>
-                                <div className="font-bold text-sm truncate" title={sourceTable}>{sourceTable}</div>
-                            </div>
-                            <div className="rounded-lg border border-white/5 bg-background/50 p-3">
-                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{text.column}</div>
-                                <div className="font-mono text-sm truncate" title={sourceColumn}>{sourceColumn}</div>
-                            </div>
-                        </div>
 
-                        <div className="space-y-3 rounded-xl border border-amber-400/15 bg-amber-500/[0.04] p-3">
-                            <div className="flex items-center gap-2 text-sm font-semibold text-amber-500">
-                                <span>{text.parentTable}</span>
+                            <div className="space-y-3 rounded-xl border border-amber-400/15 bg-amber-500/[0.04] p-3">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-amber-500">
+                                    <span>{text.parentTable}</span>
+                                </div>
+                                <div className="rounded-lg border border-white/5 bg-background/50 p-3">
+                                    <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{text.table}</div>
+                                    <div className="font-bold text-sm truncate" title={targetTable}>{targetTable}</div>
+                                </div>
+                                <div className="rounded-lg border border-white/5 bg-background/50 p-3">
+                                    <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{text.column}</div>
+                                    <div className="font-mono text-sm truncate" title={targetColumn}>{targetColumn}</div>
+                                </div>
                             </div>
-                            <div className="rounded-lg border border-white/5 bg-background/50 p-3">
-                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{text.table}</div>
-                                <div className="font-bold text-sm truncate" title={targetTable}>{targetTable}</div>
-                            </div>
-                            <div className="rounded-lg border border-white/5 bg-background/50 p-3">
-                                <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wider">{text.column}</div>
-                                <div className="font-mono text-sm truncate" title={targetColumn}>{targetColumn}</div>
-                            </div>
-                        </div>
                         </div>
                     </div>
 
