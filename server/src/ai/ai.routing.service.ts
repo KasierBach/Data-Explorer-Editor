@@ -1,4 +1,4 @@
-﻿import { Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AI_CONSTANTS } from './ai.constants';
 import {
@@ -290,19 +290,36 @@ export class AiRoutingService {
       }
     }
 
-    const geminiPlans = geminiAvailable
+    const disabledSet = new Set(
+      Array.isArray(params.disabledProviders)
+        ? params.disabledProviders.map((p) => p.toLowerCase().trim())
+        : [],
+    );
+    const fallbackSetting = (params.fallbackProvider || 'auto')
+      .toLowerCase()
+      .trim();
+    const effectiveGeminiAvailable =
+      geminiAvailable && !disabledSet.has('gemini');
+
+    const filteredLowCostPlans = lowCostPlans.filter(
+      (p) => !disabledSet.has(p.provider.toLowerCase()),
+    );
+
+    const geminiPlans = effectiveGeminiAvailable
       ? (requestedPlan?.provider === 'gemini'
           ? [requestedPlan.model, ...this.getGeminiModelList()]
           : this.getGeminiModelList(requestedPlan ? undefined : params.model)
         ).map((model) => ({ provider: 'gemini' as const, model }))
       : [];
 
-    const cerebrasPlans = lowCostPlans.filter((p) => p.provider === 'cerebras');
-    const groqPlans = lowCostPlans.filter((p) => p.provider === 'groq');
+    const cerebrasPlans = filteredLowCostPlans.filter(
+      (p) => p.provider === 'cerebras',
+    );
+    const groqPlans = filteredLowCostPlans.filter((p) => p.provider === 'groq');
     const openRouterDefaultPlans =
       requestedPlan?.provider === 'openrouter'
         ? []
-        : lowCostPlans.filter((p) => p.provider === 'openrouter');
+        : filteredLowCostPlans.filter((p) => p.provider === 'openrouter');
 
     const routeDecision = this.detectPromptNeeds(
       params.prompt,
@@ -326,9 +343,41 @@ export class AiRoutingService {
     };
     const pushAll = (plans: ProviderPlan[]) => plans.forEach(push);
 
+    const getSpecificFallbackPlans = (): ProviderPlan[] | null => {
+      if (fallbackSetting === 'none') {
+        return [];
+      }
+      if (fallbackSetting === 'gemini') {
+        return geminiPlans;
+      }
+      if (fallbackSetting === 'groq') {
+        return groqPlans;
+      }
+      if (fallbackSetting === 'cerebras') {
+        return cerebrasPlans;
+      }
+      if (fallbackSetting === 'openrouter') {
+        return filteredLowCostPlans.filter((p) => p.provider === 'openrouter');
+      }
+      if (fallbackSetting === 'beeknoee') {
+        if (disabledSet.has('beeknoee')) return [];
+        const beeknoeePlan = this.getBeeknoeePlan();
+        return beeknoeePlan ? [beeknoeePlan] : [];
+      }
+      return null;
+    };
+
+    const specificFallbackPlans = getSpecificFallbackPlans();
+
     if (routingMode === 'gemini-only') {
       pushAll(geminiPlans);
-      if (orderedPlans.length === 0) pushAll(lowCostPlans);
+      if (orderedPlans.length === 0 && fallbackSetting !== 'none') {
+        if (specificFallbackPlans) {
+          pushAll(specificFallbackPlans);
+        } else {
+          pushAll(filteredLowCostPlans);
+        }
+      }
     } else if (requestedPlan) {
       push(requestedPlan);
 
@@ -353,16 +402,56 @@ export class AiRoutingService {
         };
       }
 
-      if (
-        routeDecision.needsLiveSearch ||
-        routeDecision.preferGemini ||
-        routingMode === 'best'
-      ) {
+      if (fallbackSetting === 'none') {
+        // Fallback disabled - only use the requested plan
+      } else if (specificFallbackPlans) {
+        pushAll(specificFallbackPlans);
+      } else {
+        // Auto fallback (respecting disabled providers)
+        if (
+          routeDecision.needsLiveSearch ||
+          routeDecision.preferGemini ||
+          routingMode === 'best'
+        ) {
+          pushAll(geminiPlans);
+        }
+
+        pushAll(filteredLowCostPlans);
         pushAll(geminiPlans);
       }
-
-      pushAll(lowCostPlans);
-      pushAll(geminiPlans);
+    } else if (fallbackSetting === 'none') {
+      const primaryCandidate =
+        routingMode === 'best' ||
+        params.image ||
+        routeDecision.preferGemini
+          ? openRouterDefaultPlans[0] ||
+            groqPlans[0] ||
+            geminiPlans[0] ||
+            cerebrasPlans[0]
+          : openRouterDefaultPlans[0] ||
+            groqPlans[0] ||
+            geminiPlans[0] ||
+            cerebrasPlans[0];
+      if (primaryCandidate) push(primaryCandidate);
+    } else if (specificFallbackPlans) {
+      const candidates =
+        routingMode === 'best' ||
+        params.image ||
+        routeDecision.preferGemini
+          ? [
+              ...openRouterDefaultPlans,
+              ...groqPlans,
+              ...geminiPlans,
+              ...cerebrasPlans,
+            ]
+          : [
+              ...openRouterDefaultPlans,
+              ...groqPlans,
+              ...geminiPlans,
+              ...cerebrasPlans,
+            ];
+      if (candidates[0]) push(candidates[0]);
+      pushAll(specificFallbackPlans);
     } else if (
       routingMode === 'best' ||
       params.image ||

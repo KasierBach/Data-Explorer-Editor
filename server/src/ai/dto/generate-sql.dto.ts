@@ -129,4 +129,13 @@ export class GenerateSqlDto {
   @ValidateNested()
   @Type(() => AiProviderOverrideDto)
   providerOverride?: AiProviderOverrideDto;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  disabledProviders?: string[];
+
+  @IsOptional()
+  @IsString()
+  fallbackProvider?: string;
 }

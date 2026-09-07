@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { Sparkles, Loader2, Wand2, Info, X, Database } from "lucide-react";
 import { Button } from "@/presentation/components/ui/button";
 import { Textarea } from "@/presentation/components/ui/textarea";
@@ -200,6 +200,8 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
         mode: "fast",
         routingMode: aiRoutingMode,
         providerOverride: resolvedNoSql.providerOverride,
+        disabledProviders: preferences.disabledProviders,
+        fallbackProvider: preferences.fallbackProvider,
       });
 
       const generatedCommand = result.sql?.trim() || "";

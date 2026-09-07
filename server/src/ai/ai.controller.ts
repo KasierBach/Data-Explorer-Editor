@@ -1,4 +1,4 @@
-﻿import {
+import {
   BadRequestException,
   Controller,
   Get,
@@ -99,6 +99,8 @@ export class AiController {
       routingMode,
       history,
       providerOverride,
+      disabledProviders,
+      fallbackProvider,
     } = body;
 
     const { connection, schemaContext } =
@@ -132,6 +134,8 @@ export class AiController {
           req.user.id,
           providerOverride,
         ),
+        disabledProviders,
+        fallbackProvider,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -160,6 +164,8 @@ export class AiController {
       routingMode,
       history,
       providerOverride,
+      disabledProviders,
+      fallbackProvider,
     } = body;
 
     res.setHeader('Content-Type', 'text/event-stream');
@@ -201,6 +207,8 @@ export class AiController {
           req.user.id,
           providerOverride,
         ),
+        disabledProviders,
+        fallbackProvider,
       });
 
       for await (const event of stream) {
@@ -350,6 +358,8 @@ export class AiController {
       mode,
       routingMode,
       providerOverride,
+      disabledProviders,
+      fallbackProvider,
     } = body;
 
     const { connection, schemaContext } =
@@ -379,6 +389,8 @@ export class AiController {
           req.user.id,
           providerOverride,
         ),
+        disabledProviders,
+        fallbackProvider,
       });
 
       await this.auditService.log({

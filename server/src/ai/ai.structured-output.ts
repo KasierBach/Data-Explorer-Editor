@@ -1,6 +1,6 @@
 import type { AiResponseFormat } from './ai.types';
 
-const OPENAI_RECOMMENDATION_SCHEMA = {
+const GEMINI_RECOMMENDATION_SCHEMA = {
   type: 'object',
   description:
     'A grounded follow-up suggestion that the UI can display separately.',
@@ -47,7 +47,7 @@ const OPENAI_RECOMMENDATION_SCHEMA = {
   required: ['type', 'title', 'summary'],
 } as const;
 
-const OPENAI_STRUCTURED_RESPONSE_SCHEMA = {
+const GEMINI_STRUCTURED_RESPONSE_SCHEMA = {
   type: 'object',
   description:
     'Structured Data Explorer AI response for chat, SQL, MongoDB, or Redis generation.',
@@ -80,11 +80,98 @@ const OPENAI_STRUCTURED_RESPONSE_SCHEMA = {
       type: 'array',
       description:
         'Optional grounded follow-up suggestions. Include at most three specific items.',
-      items: OPENAI_RECOMMENDATION_SCHEMA,
+      items: GEMINI_RECOMMENDATION_SCHEMA,
       maxItems: 3,
     },
   },
   required: ['message'],
+} as const;
+
+const OPENAI_RECOMMENDATION_SCHEMA = {
+  type: 'object',
+  description:
+    'A grounded follow-up suggestion that the UI can display separately.',
+  additionalProperties: false,
+  properties: {
+    type: {
+      type: 'string',
+      description:
+        'Recommendation type. Use query_fix, index_suggestion, schema_suggestion, or chart_suggestion.',
+      enum: [
+        'query_fix',
+        'index_suggestion',
+        'schema_suggestion',
+        'chart_suggestion',
+      ],
+    },
+    title: {
+      type: 'string',
+      description: 'Short action-oriented label for the suggestion.',
+    },
+    summary: {
+      type: 'string',
+      description: 'Concise explanation of why this suggestion matters.',
+    },
+    sql: {
+      type: ['string', 'null'],
+      description:
+        'Optional executable SQL, MongoDB payload JSON, or Redis command.',
+    },
+    chartType: {
+      type: ['string', 'null'],
+      description:
+        'Optional chart type if this suggestion is about visualization.',
+    },
+    fields: {
+      type: ['array', 'null'],
+      description: 'Optional field names relevant to the suggestion.',
+      items: {
+        type: 'string',
+      },
+      maxItems: 6,
+    },
+  },
+  required: ['type', 'title', 'summary', 'sql', 'chartType', 'fields'],
+} as const;
+
+const OPENAI_STRUCTURED_RESPONSE_SCHEMA = {
+  type: 'object',
+  description:
+    'Structured Data Explorer AI response for chat, SQL, MongoDB, or Redis generation.',
+  additionalProperties: false,
+  properties: {
+    message: {
+      type: 'string',
+      description:
+        'Primary user-facing answer in markdown. Keep it concise and truthful.',
+    },
+    sql: {
+      type: ['string', 'null'],
+      description:
+        'Executable SQL query, MongoDB payload JSON string, or Redis command string.',
+    },
+    explanation: {
+      type: ['string', 'null'],
+      description:
+        'Short explanation of the generated command, assumptions, or safety notes.',
+    },
+    sources: {
+      type: ['array', 'null'],
+      description:
+        'Optional http or https URLs used for live external research. Omit when no live sources were used.',
+      items: {
+        type: 'string',
+      },
+    },
+    recommendations: {
+      type: ['array', 'null'],
+      description:
+        'Optional grounded follow-up suggestions. Include at most three specific items.',
+      items: OPENAI_RECOMMENDATION_SCHEMA,
+      maxItems: 3,
+    },
+  },
+  required: ['message', 'sql', 'explanation', 'sources', 'recommendations'],
 } as const;
 
 export function buildOpenAiStructuredResponseFormat(
@@ -113,6 +200,6 @@ export function buildGeminiStructuredGenerationConfig(
 
   return {
     responseMimeType: 'application/json',
-    responseJsonSchema: OPENAI_STRUCTURED_RESPONSE_SCHEMA,
+    responseJsonSchema: GEMINI_STRUCTURED_RESPONSE_SCHEMA,
   } as const;
 }

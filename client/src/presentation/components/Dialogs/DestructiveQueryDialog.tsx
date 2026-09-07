@@ -352,6 +352,8 @@ export function DestructiveQueryDialog() {
                 mode: isHighSeverity ? 'planning' : 'fast',
                 routingMode: aiRoutingMode,
                 providerOverride: resolvedExplain.providerOverride,
+                disabledProviders: preferences.disabledProviders,
+                fallbackProvider: preferences.fallbackProvider,
             });
 
             setAiExplanation(result.message?.trim() || result.explanation?.trim() || t.aiFallback);

@@ -91,6 +91,8 @@ export interface ChatParams {
   routingMode?: AiRoutingMode;
   history?: ChatHistoryMessage[];
   providerOverride?: AiProviderOverride;
+  disabledProviders?: string[];
+  fallbackProvider?: string;
 }
 
 export interface ChatResult {

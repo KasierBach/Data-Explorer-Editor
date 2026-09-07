@@ -85,6 +85,8 @@ export interface GenerateSqlParams {
     routingMode?: string;
     history?: AiHistoryMessage[];
     providerOverride?: AiProviderOverrideConfig;
+    disabledProviders?: string[];
+    fallbackProvider?: string;
 }
 
 export interface IDatabaseAdapter {

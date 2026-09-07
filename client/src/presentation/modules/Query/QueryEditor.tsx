@@ -401,6 +401,8 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
                 mode: 'planning',
                 routingMode: aiRoutingMode,
                 providerOverride: resolvedExplain.providerOverride,
+                disabledProviders: preferences.disabledProviders,
+                fallbackProvider: preferences.fallbackProvider,
             });
 
             const explanationText = result.message?.trim() || result.explanation?.trim() || null;

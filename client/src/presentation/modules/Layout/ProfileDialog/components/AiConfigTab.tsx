@@ -15,6 +15,7 @@ import {
     Search,
     Trash2,
     X,
+    LifeBuoy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiService } from '@/core/services/api.service';
@@ -30,6 +31,13 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Switch } from '@/presentation/components/ui/switch';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/presentation/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/presentation/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/presentation/components/ui/tooltip';
 import { getAssistantModelCatalog, BUILT_IN_PROVIDERS } from '@/presentation/modules/Query/assistantModelCatalog';
@@ -692,6 +700,60 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
         );
     };
 
+    const handleFallbackProviderChange = (value: string) => {
+        updateAiPreferences((current) => ({
+            ...current,
+            fallbackProvider: value,
+        }));
+        toast.success(
+            isVi
+                ? 'Đã cập nhật provider dự phòng.'
+                : 'Fallback provider updated.'
+        );
+    };
+
+    const fallbackOptions = [
+        {
+            id: 'auto',
+            label: isVi ? 'Tự động thông minh (Khuyên dùng)' : 'Smart Auto (Recommended)',
+            desc: isVi
+                ? 'Tự động thử các provider khả dụng khi model chính lỗi (loại trừ các provider đã tắt)'
+                : 'Automatically try available providers on failure (excluding disabled providers)',
+        },
+        {
+            id: 'none',
+            label: isVi ? 'Tắt dự phòng (Chỉ dùng model đã chọn)' : 'Disable Fallback (Strict)',
+            desc: isVi
+                ? 'Báo lỗi ngay nếu model đã chọn thất bại, không tự ý chuyển sang model khác'
+                : 'Fail immediately if the selected model fails, without trying other providers',
+        },
+        {
+            id: 'groq',
+            label: 'Groq (Fast & Free)',
+            desc: isVi ? 'Dự phòng siêu tốc với Groq' : 'Ultra-fast fallback with Groq',
+        },
+        {
+            id: 'cerebras',
+            label: 'Cerebras',
+            desc: isVi ? 'Dự phòng với Cerebras' : 'Fallback to Cerebras',
+        },
+        {
+            id: 'openrouter',
+            label: 'OpenRouter',
+            desc: isVi ? 'Dự phòng với OpenRouter' : 'Fallback to OpenRouter',
+        },
+        {
+            id: 'gemini',
+            label: 'Google Gemini',
+            desc: isVi ? 'Dự phòng với Google Gemini' : 'Fallback to Google Gemini',
+        },
+        {
+            id: 'beeknoee',
+            label: 'Beeknoee',
+            desc: isVi ? 'Dự phòng với Beeknoee' : 'Fallback to Beeknoee',
+        },
+    ];
+
     const renderModelSelect = (value: string, onChange: (value: string) => void, includeInherit: boolean) => (
         <SearchableModelSelect
             value={value}
@@ -859,6 +921,53 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                             </div>
                         );
                     })}
+                </div>
+            </section>
+
+            {/* Fallback Provider Strategy Section */}
+            <section className="overflow-hidden rounded-2xl border border-border/60 bg-card/40">
+                <div className="flex flex-col gap-3 border-b border-border/50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 space-y-1">
+                        <div className="flex items-center gap-2">
+                            <LifeBuoy className="h-5 w-5 text-amber-400" />
+                            <h3 className="text-base font-semibold tracking-tight">
+                                {isVi ? 'Cơ chế dự phòng (AI Fallback Provider)' : 'AI Fallback Provider'}
+                            </h3>
+                        </div>
+                        <p className="max-w-2xl text-xs text-muted-foreground">
+                            {isVi
+                                ? 'Khi model chính bị lỗi (hết quota, rate limit hoặc mất kết nối), hệ thống sẽ chuyển hướng sang provider dự phòng được cấu hình tại đây. Các provider bị tắt ở trên sẽ không bao giờ được dùng làm dự phòng.'
+                                : 'When your selected model fails (quota exhausted, rate limited, or network timeout), the request routes to your configured fallback provider. Disabled providers above will never be used.'}
+                        </p>
+                    </div>
+                    <div className="w-full sm:w-72 shrink-0">
+                        <Select
+                            value={preferences.fallbackProvider || 'auto'}
+                            onValueChange={handleFallbackProviderChange}
+                        >
+                            <SelectTrigger className="w-full bg-background/80">
+                                <SelectValue placeholder={isVi ? 'Chọn provider dự phòng' : 'Select fallback provider'} />
+                            </SelectTrigger>
+                            <SelectContent className="z-[250] min-w-[18rem]">
+                                {fallbackOptions.map((opt) => {
+                                    const isOptDisabled = (preferences.disabledProviders || []).includes(opt.id);
+                                    return (
+                                        <SelectItem
+                                            key={opt.id}
+                                            value={opt.id}
+                                            disabled={isOptDisabled}
+                                        >
+                                            <div className="flex flex-col py-0.5">
+                                                <span className={cn("font-medium", isOptDisabled && "line-through opacity-50")}>
+                                                    {opt.label} {isOptDisabled && `(${isVi ? 'Đã tắt' : 'Disabled'})`}
+                                                </span>
+                                            </div>
+                                        </SelectItem>
+                                    );
+                                })}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
             </section>
 

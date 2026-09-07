@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Sparkles, Loader2, Wand2, Calculator, Info, X, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
 import { Textarea } from '@/presentation/components/ui/textarea';
@@ -47,6 +47,8 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                 mode: 'fast',
                 routingMode: aiRoutingMode,
                 providerOverride: resolvedSql.providerOverride,
+                disabledProviders: preferences.disabledProviders,
+                fallbackProvider: preferences.fallbackProvider,
             });
 
             const generatedSql = result.sql?.trim() || '';

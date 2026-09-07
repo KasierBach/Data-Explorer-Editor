@@ -38,6 +38,7 @@ describe("aiPreferences", () => {
     expect(readAiPreferences()).toEqual({
       enabled: true,
       disabledProviders: [],
+      fallbackProvider: "auto",
       assistantModel: undefined,
       explainModel: INHERIT_ASSISTANT_MODEL,
       sqlModel: INHERIT_ASSISTANT_MODEL,
@@ -45,6 +46,18 @@ describe("aiPreferences", () => {
       autocompleteModel: INHERIT_ASSISTANT_MODEL,
       customProviders: [],
     });
+  });
+
+  it("persists and sanitizes custom fallbackProvider setting", () => {
+    writeAiPreferences({
+      fallbackProvider: "groq",
+    });
+    expect(readAiPreferences().fallbackProvider).toBe("groq");
+
+    writeAiPreferences({
+      fallbackProvider: "none",
+    });
+    expect(readAiPreferences().fallbackProvider).toBe("none");
   });
 
   it("keeps non-TokenRouter custom providers and resolves them normally", () => {

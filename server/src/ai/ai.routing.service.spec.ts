@@ -1,4 +1,4 @@
-﻿import { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { AiRoutingService } from './ai.routing.service';
 
 function createConfig(
@@ -302,4 +302,58 @@ describe('AiRoutingService', () => {
       'PDF analysis requires a configured Gemini or OpenRouter provider.',
     );
   });
+
+  it('excludes disabled providers from the fallback chain even when gemini is available', () => {
+    const service = new AiRoutingService(createConfig());
+    const result = service.buildPlanChain(
+      {
+        prompt: 'SELECT * FROM users JOIN orders ON users.id = orders.user_id',
+        model: 'groq:openai/gpt-oss-120b',
+        disabledProviders: ['gemini'],
+      },
+      true,
+    );
+
+    expect(result.plans[0]).toEqual(
+      expect.objectContaining({ provider: 'groq' }),
+    );
+    expect(result.plans.some((p) => p.provider === 'gemini')).toBe(false);
+  });
+
+  it('does not add fallback plans when fallbackProvider is set to none', () => {
+    const service = new AiRoutingService(createConfig());
+    const result = service.buildPlanChain(
+      {
+        prompt: 'SELECT * FROM users',
+        model: 'groq:openai/gpt-oss-120b',
+        fallbackProvider: 'none',
+      },
+      true,
+    );
+
+    expect(result.plans).toHaveLength(1);
+    expect(result.plans[0]).toEqual(
+      expect.objectContaining({ provider: 'groq' }),
+    );
+  });
+
+  it('routes fallback only to specified fallbackProvider', () => {
+    const service = new AiRoutingService(createConfig());
+    const result = service.buildPlanChain(
+      {
+        prompt: 'SELECT * FROM users',
+        model: 'groq:openai/gpt-oss-120b',
+        fallbackProvider: 'cerebras',
+      },
+      true,
+    );
+
+    expect(result.plans[0]).toEqual(
+      expect.objectContaining({ provider: 'groq' }),
+    );
+    const fallbacks = result.plans.slice(1);
+    expect(fallbacks.length).toBeGreaterThan(0);
+    expect(fallbacks.every((p) => p.provider === 'cerebras')).toBe(true);
+  });
 });
+

@@ -95,6 +95,8 @@ export class AiService {
     mode?: AiChatMode;
     routingMode?: AiRoutingMode;
     providerOverride?: ChatParams['providerOverride'];
+    disabledProviders?: string[];
+    fallbackProvider?: string;
   }): Promise<
     Pick<ChatResult, 'provider' | 'model' | 'routingMode'> & {
       sql: string;
@@ -109,6 +111,8 @@ export class AiService {
       mode = 'fast',
       routingMode,
       providerOverride,
+      disabledProviders,
+      fallbackProvider,
     } = params;
 
     let result = await this.chatService.chat({
@@ -119,6 +123,8 @@ export class AiService {
       databaseType,
       routingMode,
       providerOverride,
+      disabledProviders,
+      fallbackProvider,
     });
 
     let sql = this.normalizeGeneratedCommand(result.sql, databaseType, query);
@@ -136,6 +142,8 @@ export class AiService {
           databaseType,
           routingMode,
           providerOverride,
+          disabledProviders,
+          fallbackProvider,
         });
         const repairedSql = this.normalizeGeneratedCommand(
           repairResult.sql,

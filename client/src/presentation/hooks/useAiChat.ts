@@ -668,6 +668,8 @@ export function useAiChat() {
                 routingMode: aiRoutingMode,
                 providerOverride: resolvedAssistant.providerOverride,
                 history: history.length > 0 ? history : undefined,
+                disabledProviders: preferences.disabledProviders,
+                fallbackProvider: preferences.fallbackProvider,
             }, { signal: controller.signal });
 
             if (!response.ok) {

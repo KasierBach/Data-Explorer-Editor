@@ -45,6 +45,7 @@ export interface ClientAiProviderOverride {
 export interface AiPreferences {
   enabled?: boolean;
   disabledProviders?: string[];
+  fallbackProvider?: string;
   assistantModel?: string;
   explainModel: string;
   sqlModel: string;
@@ -56,6 +57,7 @@ export interface AiPreferences {
 const DEFAULT_AI_PREFERENCES: AiPreferences = {
   enabled: true,
   disabledProviders: [],
+  fallbackProvider: 'auto',
   assistantModel: undefined,
   explainModel: INHERIT_ASSISTANT_MODEL,
   sqlModel: INHERIT_ASSISTANT_MODEL,
@@ -148,6 +150,10 @@ function sanitizePreferences(value: unknown): AiPreferences {
     disabledProviders: Array.isArray(input.disabledProviders)
       ? input.disabledProviders.filter((p): p is string => typeof p === "string")
       : [],
+    fallbackProvider:
+      typeof input.fallbackProvider === "string" && input.fallbackProvider.trim()
+        ? input.fallbackProvider.trim()
+        : "auto",
     assistantModel: sanitizeModelSelection(
       input.assistantModel,
       undefined,
@@ -262,7 +268,7 @@ export function readAiPreferences(): AiPreferences {
   }
 }
 
-export function writeAiPreferences(next: AiPreferences) {
+export function writeAiPreferences(next: Partial<AiPreferences>) {
   if (typeof window === "undefined") return;
 
   const sanitized = sanitizePreferences(next);
