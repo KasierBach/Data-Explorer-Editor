@@ -407,6 +407,7 @@ export class AiController {
           routingMode: result.routingMode,
           customProvider: Boolean(providerOverride),
           latencyMs: Date.now() - startedAt,
+          usage: result.usage ?? null,
         },
       });
 

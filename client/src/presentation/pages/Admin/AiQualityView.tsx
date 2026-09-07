@@ -1,11 +1,17 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, Clock3, MessageSquareText, Sparkles } from 'lucide-react';
+import { Activity, Clock3, Coins, MessageSquareText, Sparkles } from 'lucide-react';
 import { adminService } from '@/core/services/AdminService';
 import { useAppStore } from '@/core/services/store';
 import { Button } from '@/presentation/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/presentation/components/ui/card';
 import { LoadingState } from '@/presentation/components/shared/LoadingState';
+
+function formatTokens(value: number): string {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+    if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+    return String(value);
+}
 
 export function AiQualityView() {
     const lang = useAppStore((state) => state.lang);
@@ -24,6 +30,11 @@ export function AiQualityView() {
         { label: vi ? 'Tỉ lệ thành công' : 'Success rate', value: `${data.successRate}%`, icon: Activity },
         { label: vi ? 'Độ trễ trung bình' : 'Average latency', value: `${data.averageLatencyMs} ms`, icon: Clock3 },
         { label: vi ? 'Feedback tích cực' : 'Positive feedback', value: `${data.feedback.up}/${data.feedback.total}`, icon: MessageSquareText },
+        {
+            label: vi ? 'Token tiêu thụ' : 'Tokens consumed',
+            value: data.tokens ? formatTokens(data.tokens.totalTokens) : '—',
+            icon: Coins,
+        },
     ];
 
     return (
@@ -42,7 +53,7 @@ export function AiQualityView() {
                 </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 {cards.map(({ label, value, icon: Icon }) => (
                     <Card key={label}>
                         <CardContent className="flex items-center justify-between p-4">
@@ -63,6 +74,31 @@ export function AiQualityView() {
                     {data.models.length === 0 && <div className="py-8 text-center text-sm text-muted-foreground">{vi ? 'Chưa có lượt tạo SQL trong kỳ.' : 'No SQL generations in this period.'}</div>}
                 </CardContent>
             </Card>
+
+            {data.tokens && data.tokens.trackedRequests > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-sm">
+                            {vi ? 'Token usage' : 'Token usage'} · {data.tokens.trackedRequests}{' '}
+                            {vi ? 'yêu cầu được theo dõi' : 'tracked requests'}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-xl border border-border/50 bg-background/60 p-4">
+                            <div className="text-xs text-muted-foreground">{vi ? 'Prompt tokens' : 'Prompt tokens'}</div>
+                            <div className="mt-1 text-2xl font-bold tabular-nums">{formatTokens(data.tokens.promptTokens)}</div>
+                        </div>
+                        <div className="rounded-xl border border-border/50 bg-background/60 p-4">
+                            <div className="text-xs text-muted-foreground">{vi ? 'Output tokens' : 'Output tokens'}</div>
+                            <div className="mt-1 text-2xl font-bold tabular-nums">{formatTokens(data.tokens.completionTokens)}</div>
+                        </div>
+                        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                            <div className="text-xs text-amber-500/80">{vi ? 'Tổng token' : 'Total tokens'}</div>
+                            <div className="mt-1 text-2xl font-bold tabular-nums text-amber-500">{formatTokens(data.tokens.totalTokens)}</div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 }

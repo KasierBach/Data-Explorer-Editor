@@ -31,6 +31,13 @@ export interface AuditLogEntry {
     user?: AdminUserIdentity | null;
 }
 
+export interface AiTokenUsage {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    trackedRequests: number;
+}
+
 export interface AiQualityMetrics {
     days: number;
     generations: number;
@@ -40,7 +47,16 @@ export interface AiQualityMetrics {
     averageLatencyMs: number;
     p95LatencyMs: number;
     feedback: { up: number; down: number; total: number };
+    tokens: AiTokenUsage;
     models: Array<{ model: string; success: number; failed: number; total: number }>;
+}
+
+export interface AiMyUsage {
+    days: number;
+    generations: number;
+    success: number;
+    failed: number;
+    tokens: AiTokenUsage;
 }
 
 interface MessageResponse {
@@ -86,6 +102,10 @@ class AdminService {
 
     async getAiQualityMetrics(days: number = 30): Promise<AiQualityMetrics> {
         return await apiService.get<AiQualityMetrics>(`/admin/ai-quality?days=${days}`);
+    }
+
+    async getMyAiUsage(days: number = 30): Promise<AiMyUsage> {
+        return await apiService.get<AiMyUsage>(`/ai-quality/my-usage?days=${days}`);
     }
 }
 

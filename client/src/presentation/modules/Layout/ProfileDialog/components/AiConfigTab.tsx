@@ -28,6 +28,7 @@ import {
     type CustomAiProvider,
 } from '@/core/services/aiPreferences';
 import { useAppStore } from '@/core/services/store';
+import { AiUsageCard } from '@/presentation/components/shared/AiUsageCard';
 import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
@@ -356,97 +357,97 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
 
     const labels = isVi
         ? {
-              aiTitle: t('tabs.ai'),
-              aiSubtitle:
-                  'Thiết lập model và provider riêng cho từng vai trò AI trong ứng dụng. AI Assistant sẽ cập nhật ngay sau khi bạn đổi model mặc định.',
-              customProviders: 'Provider tùy chỉnh',
-              providerName: 'Tên provider',
-              providerBaseUrl: 'Base URL',
-              providerApiKey: 'API Key',
-              providerModel: 'Model mặc định',
-              providerType: 'OpenAI-compatible',
-              addProvider: 'Lưu provider',
-              saveProvider: 'Lưu chỉnh sửa',
-              cancelEdit: 'Hủy',
-              editProvider: 'Sửa',
-              loadModels: 'Tải model',
-              modelPlaceholder: 'Chọn hoặc nhập model',
-              searchLoadedModels: 'Search models...',
-              noLoadedModelMatch: 'Không tìm thấy model phù hợp.',
-              assistantRole: 'AI Assistant',
-              explainRole: 'Explain',
-              sqlRole: 'AI SQL',
-              nosqlRole: 'AI NoSQL',
-              autocompleteRole: 'Autocomplete',
-              roleModelPlaceholder: 'Chọn model',
-              searchRoleModels: 'Search models...',
-              noRoleModelMatch: 'Không tìm thấy model phù hợp.',
-              inheritAssistant: 'Dùng model của Assistant',
-              remove: 'Xóa',
-              providerAdded: 'Đã thêm provider AI tùy chỉnh.',
-              providerUpdated: 'Đã cập nhật provider AI tùy chỉnh.',
-              providerRemoved: 'Đã xóa provider AI tùy chỉnh.',
-              providerInvalid: 'Điền đủ tên, base URL và model trước khi lưu provider.',
-              providerBaseUrlRequired: 'Nhập Base URL trước khi tải danh sách model.',
-              providerModelsEmpty: 'Provider không trả về model nào.',
-              providerModelsLoaded: (count: number) => `Đã tải ${count} model. Mở dropdown để tìm nhanh hoặc nhập model thủ công.`,
-              providerModelsFailed: 'Không thể tải danh sách model từ provider.',
-              providerBackendUnavailable: 'Không gọi được backend AI. Hãy đảm bảo server đang chạy rồi thử lại.',
-              providerEnabled: 'Đang hoạt động',
-              providerDisabled: 'Tạm tắt',
-          }
+            aiTitle: t('tabs.ai'),
+            aiSubtitle:
+                'Thiết lập model và provider riêng cho từng vai trò AI trong ứng dụng. AI Assistant sẽ cập nhật ngay sau khi bạn đổi model mặc định.',
+            customProviders: 'Provider tùy chỉnh',
+            providerName: 'Tên provider',
+            providerBaseUrl: 'Base URL',
+            providerApiKey: 'API Key',
+            providerModel: 'Model mặc định',
+            providerType: 'OpenAI-compatible',
+            addProvider: 'Lưu provider',
+            saveProvider: 'Lưu chỉnh sửa',
+            cancelEdit: 'Hủy',
+            editProvider: 'Sửa',
+            loadModels: 'Tải model',
+            modelPlaceholder: 'Chọn hoặc nhập model',
+            searchLoadedModels: 'Search models...',
+            noLoadedModelMatch: 'Không tìm thấy model phù hợp.',
+            assistantRole: 'AI Assistant',
+            explainRole: 'Explain',
+            sqlRole: 'AI SQL',
+            nosqlRole: 'AI NoSQL',
+            autocompleteRole: 'Autocomplete',
+            roleModelPlaceholder: 'Chọn model',
+            searchRoleModels: 'Search models...',
+            noRoleModelMatch: 'Không tìm thấy model phù hợp.',
+            inheritAssistant: 'Dùng model của Assistant',
+            remove: 'Xóa',
+            providerAdded: 'Đã thêm provider AI tùy chỉnh.',
+            providerUpdated: 'Đã cập nhật provider AI tùy chỉnh.',
+            providerRemoved: 'Đã xóa provider AI tùy chỉnh.',
+            providerInvalid: 'Điền đủ tên, base URL và model trước khi lưu provider.',
+            providerBaseUrlRequired: 'Nhập Base URL trước khi tải danh sách model.',
+            providerModelsEmpty: 'Provider không trả về model nào.',
+            providerModelsLoaded: (count: number) => `Đã tải ${count} model. Mở dropdown để tìm nhanh hoặc nhập model thủ công.`,
+            providerModelsFailed: 'Không thể tải danh sách model từ provider.',
+            providerBackendUnavailable: 'Không gọi được backend AI. Hãy đảm bảo server đang chạy rồi thử lại.',
+            providerEnabled: 'Đang hoạt động',
+            providerDisabled: 'Tạm tắt',
+        }
         : {
-              aiTitle: t('tabs.ai'),
-              aiSubtitle:
-                  'Choose a dedicated model and provider for each AI role in the app. The AI Assistant updates immediately after you change its default model.',
-              customProviders: 'Custom providers',
-              providerName: 'Provider name',
-              providerBaseUrl: 'Base URL',
-              providerApiKey: 'API key',
-              providerModel: 'Default model',
-              providerType: 'OpenAI-compatible',
-              addProvider: 'Save provider',
-              saveProvider: 'Save changes',
-              cancelEdit: 'Cancel',
-              editProvider: 'Edit',
-              loadModels: 'Load models',
-              modelPlaceholder: 'Pick or type a model',
-              searchLoadedModels: 'Search models...',
-              noLoadedModelMatch: 'No models found.',
-              assistantRole: 'AI Assistant',
-              explainRole: 'Explain',
-              sqlRole: 'AI SQL',
-              nosqlRole: 'AI NoSQL',
-              autocompleteRole: 'Autocomplete',
-              roleModelPlaceholder: 'Choose a model',
-              searchRoleModels: 'Search models...',
-              noRoleModelMatch: 'No models found.',
-              inheritAssistant: 'Use Assistant model',
-              remove: 'Remove',
-              providerAdded: 'Custom AI provider added.',
-              providerUpdated: 'Custom AI provider updated.',
-              providerRemoved: 'Custom AI provider removed.',
-              providerInvalid: 'Fill in the provider name, base URL, and model before saving.',
-              providerBaseUrlRequired: 'Enter the Base URL before loading models.',
-              providerModelsEmpty: 'The provider returned no models.',
-              providerModelsLoaded: (count: number) => `Loaded ${count} models. Open the dropdown to search fast, or type a custom model.`,
-              providerModelsFailed: 'Failed to load models from the provider.',
-              providerBackendUnavailable: 'Cannot reach the AI backend. Make sure the server is running, then try again.',
-              providerEnabled: 'Active',
-              providerDisabled: 'Disabled',
-          };
+            aiTitle: t('tabs.ai'),
+            aiSubtitle:
+                'Choose a dedicated model and provider for each AI role in the app. The AI Assistant updates immediately after you change its default model.',
+            customProviders: 'Custom providers',
+            providerName: 'Provider name',
+            providerBaseUrl: 'Base URL',
+            providerApiKey: 'API key',
+            providerModel: 'Default model',
+            providerType: 'OpenAI-compatible',
+            addProvider: 'Save provider',
+            saveProvider: 'Save changes',
+            cancelEdit: 'Cancel',
+            editProvider: 'Edit',
+            loadModels: 'Load models',
+            modelPlaceholder: 'Pick or type a model',
+            searchLoadedModels: 'Search models...',
+            noLoadedModelMatch: 'No models found.',
+            assistantRole: 'AI Assistant',
+            explainRole: 'Explain',
+            sqlRole: 'AI SQL',
+            nosqlRole: 'AI NoSQL',
+            autocompleteRole: 'Autocomplete',
+            roleModelPlaceholder: 'Choose a model',
+            searchRoleModels: 'Search models...',
+            noRoleModelMatch: 'No models found.',
+            inheritAssistant: 'Use Assistant model',
+            remove: 'Remove',
+            providerAdded: 'Custom AI provider added.',
+            providerUpdated: 'Custom AI provider updated.',
+            providerRemoved: 'Custom AI provider removed.',
+            providerInvalid: 'Fill in the provider name, base URL, and model before saving.',
+            providerBaseUrlRequired: 'Enter the Base URL before loading models.',
+            providerModelsEmpty: 'The provider returned no models.',
+            providerModelsLoaded: (count: number) => `Loaded ${count} models. Open the dropdown to search fast, or type a custom model.`,
+            providerModelsFailed: 'Failed to load models from the provider.',
+            providerBackendUnavailable: 'Cannot reach the AI backend. Make sure the server is running, then try again.',
+            providerEnabled: 'Active',
+            providerDisabled: 'Disabled',
+        };
 
     const providerModelGroups = useMemo<SearchableGroup[]>(
         () =>
             providerModels.length > 0
                 ? [
-                      {
-                          options: providerModels.map((model) => ({
-                              value: model,
-                              label: model,
-                          })),
-                      },
-                  ]
+                    {
+                        options: providerModels.map((model) => ({
+                            value: model,
+                            label: model,
+                        })),
+                    },
+                ]
                 : [],
         [providerModels],
     );
@@ -466,16 +467,16 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
     const getRoleModelGroups = (includeInherit: boolean): SearchableGroup[] =>
         includeInherit
             ? [
-                  {
-                      options: [
-                          {
-                              value: INHERIT_ASSISTANT_MODEL,
-                              label: labels.inheritAssistant,
-                          },
-                      ],
-                  },
-                  ...baseRoleModelGroups,
-              ]
+                {
+                    options: [
+                        {
+                            value: INHERIT_ASSISTANT_MODEL,
+                            label: labels.inheritAssistant,
+                        },
+                    ],
+                },
+                ...baseRoleModelGroups,
+            ]
             : baseRoleModelGroups;
 
     const resetProviderForm = () => {
@@ -572,13 +573,13 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
             const response = existing?.serverManaged
                 ? await apiService.post<ProviderTestResult>(`/ai/providers/${existing.id}/test`, {})
                 : await apiService.post<ProviderTestResult>('/ai/providers/test', {
-                      name: providerForm.name.trim() || 'Custom provider',
-                      type: 'openai-compatible',
-                      baseUrl,
-                      apiKey: providerForm.apiKey.trim(),
-                      model: providerForm.model.trim(),
-                      models: providerModels,
-                  });
+                    name: providerForm.name.trim() || 'Custom provider',
+                    type: 'openai-compatible',
+                    baseUrl,
+                    apiKey: providerForm.apiKey.trim(),
+                    model: providerForm.model.trim(),
+                    models: providerModels,
+                });
             const models = Array.isArray(response.models) ? response.models : [];
             setProviderModels(models);
             setIsProviderModelPickerOpen(false);
@@ -597,13 +598,13 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                         customProviders: current.customProviders.map((provider) =>
                             provider.id === existing.id
                                 ? {
-                                      ...provider,
-                                      models,
-                                      lastStatus: 'healthy',
-                                      lastError: null,
-                                      lastLatencyMs: response.latencyMs,
-                                      lastTestedAt: new Date().toISOString(),
-                                  }
+                                    ...provider,
+                                    models,
+                                    lastStatus: 'healthy',
+                                    lastError: null,
+                                    lastLatencyMs: response.latencyMs,
+                                    lastTestedAt: new Date().toISOString(),
+                                }
                                 : provider,
                         ),
                     }));
@@ -780,6 +781,8 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                 <p className="text-sm text-muted-foreground">{labels.aiSubtitle}</p>
             </div>
             <div className="h-px w-full bg-border/50" />
+
+            <AiUsageCard scope="me" />
 
             {/* Master AI Enable/Disable Switch Card */}
             <div className="flex items-center justify-between gap-4 rounded-2xl border border-border/60 bg-gradient-to-r from-violet-500/10 via-card/50 to-blue-500/10 p-5">
@@ -1111,7 +1114,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                             onChange={(event) => updateProviderFormField('apiKey', event.target.value)}
                             placeholder={
                                 editingProviderId &&
-                                preferences.customProviders.find((provider) => provider.id === editingProviderId)?.apiKeyConfigured
+                                    preferences.customProviders.find((provider) => provider.id === editingProviderId)?.apiKeyConfigured
                                     ? '•••••••• (configured)'
                                     : 'sk-...'
                             }
@@ -1264,8 +1267,8 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                                         ? 'Kết nối tốt'
                                                         : 'Healthy'
                                                     : isVi
-                                                      ? 'Lỗi kết nối'
-                                                      : 'Failed'}
+                                                        ? 'Lỗi kết nối'
+                                                        : 'Failed'}
                                             </span>
                                         )}
                                     </div>

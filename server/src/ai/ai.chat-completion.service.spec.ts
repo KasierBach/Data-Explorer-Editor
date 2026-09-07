@@ -28,11 +28,17 @@ describe('AiChatCompletionService streaming fallback', () => {
         ],
       }),
     };
+    const circuitBreaker = {
+      isOpen: jest.fn().mockReturnValue(false),
+      recordSuccess: jest.fn(),
+      recordFailure: jest.fn(),
+    };
     const service = new AiChatCompletionService(
       {} as never,
       {} as never,
       providerRunner as never,
       routingService as never,
+      circuitBreaker as never,
     );
 
     const events: StreamEvent[] = [];

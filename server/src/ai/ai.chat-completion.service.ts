@@ -4,6 +4,7 @@ import type { Cache } from 'cache-manager';
 import { AiPromptBuilderService } from './ai.prompt-builder.service';
 import { AiProviderRunnerService } from './ai.provider-runner.service';
 import { AiRoutingService } from './ai.routing.service';
+import { AiCircuitBreakerService } from './ai.circuit-breaker.service';
 import type { ChatParams, ChatResult, StreamEvent } from './ai.types';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class AiChatCompletionService {
     private readonly promptBuilder: AiPromptBuilderService,
     private readonly providerRunner: AiProviderRunnerService,
     private readonly routingService: AiRoutingService,
+    private readonly circuitBreaker: AiCircuitBreakerService,
   ) {}
 
   async chat(params: ChatParams): Promise<ChatResult> {
@@ -26,24 +28,35 @@ export class AiChatCompletionService {
     let lastError: Error | null = null;
 
     for (const plan of plans) {
+      if (this.circuitBreaker.isOpen(plan.provider, plan.model)) {
+        this.logger.warn(
+          `[AiChatService] Skipping ${plan.provider}/${plan.model}: circuit open`,
+        );
+        continue;
+      }
       try {
         if (plan.provider === 'gemini') {
-          return await this.providerRunner.runGemini(
+          const result = await this.providerRunner.runGemini(
             plan,
             params,
             routingMode,
             routeDecision,
           );
+          this.circuitBreaker.recordSuccess(plan.provider, plan.model);
+          return result;
         }
 
-        return await this.providerRunner.runOpenAiCompatible(
+        const result = await this.providerRunner.runOpenAiCompatible(
           plan,
           params,
           routingMode,
           routeDecision,
         );
+        this.circuitBreaker.recordSuccess(plan.provider, plan.model);
+        return result;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        this.circuitBreaker.recordFailure(plan.provider, plan.model);
         this.logger.warn(
           `[AiChatService] Provider ${plan.provider}/${plan.model} failed: ${lastError.message}`,
         );
@@ -65,6 +78,12 @@ export class AiChatCompletionService {
     let emittedChunk = false;
 
     for (const plan of plans) {
+      if (this.circuitBreaker.isOpen(plan.provider, plan.model)) {
+        this.logger.warn(
+          `[AiChatService:Stream] Skipping ${plan.provider}/${plan.model}: circuit open`,
+        );
+        continue;
+      }
       try {
         const stream =
           plan.provider === 'gemini'
@@ -85,9 +104,11 @@ export class AiChatCompletionService {
           if (event.type === 'chunk') emittedChunk = true;
           yield event;
         }
+        this.circuitBreaker.recordSuccess(plan.provider, plan.model);
         return;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        this.circuitBreaker.recordFailure(plan.provider, plan.model);
         this.logger.warn(
           `[AiChatService:Stream] Provider ${plan.provider}/${plan.model} failed: ${lastError.message}`,
         );

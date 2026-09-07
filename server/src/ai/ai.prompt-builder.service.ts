@@ -50,7 +50,7 @@ export class AiPromptBuilderService {
     const modeSection =
       mode === 'fast' ? Prompts.MODE_FAST : Prompts.MODE_PLANNING;
     const dbContextSection = hasDbContext
-      ? `# ACTIVE DATABASE CONTEXT\n\n**Engine**: ${databaseType}\n\n${schemaContext}`
+      ? `# ACTIVE DATABASE CONTEXT\n\n**Engine**: ${databaseType}\n\n<untrusted_db_context>\n${schemaContext}\n</untrusted_db_context>`
       : `# DATABASE CONTEXT\n\nNo database schema is currently loaded.`;
     const capabilitySection = this.buildCapabilitySection(capabilities);
     const responseSection =

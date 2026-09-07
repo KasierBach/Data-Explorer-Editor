@@ -17,6 +17,7 @@ import type {
   ProviderPlan,
   RouteDecision,
   StreamEvent,
+  TokenUsage,
 } from './ai.types';
 import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
 import { normalizeProviderBaseUrl } from './ai-url.util';
@@ -450,6 +451,50 @@ export class AiProviderRunnerService {
       : AI_CONSTANTS.MAX_OUTPUT_TOKENS;
   }
 
+  private extractOpenAiUsage(payload: unknown): TokenUsage | undefined {
+    if (!payload || typeof payload !== 'object') return undefined;
+    const usage = (payload as { usage?: unknown }).usage;
+    if (!usage || typeof usage !== 'object') return undefined;
+
+    const raw = usage as {
+      prompt_tokens?: unknown;
+      completion_tokens?: unknown;
+      total_tokens?: unknown;
+    };
+    const promptTokens =
+      typeof raw.prompt_tokens === 'number' ? raw.prompt_tokens : 0;
+    const completionTokens =
+      typeof raw.completion_tokens === 'number' ? raw.completion_tokens : 0;
+    const totalTokens =
+      typeof raw.total_tokens === 'number'
+        ? raw.total_tokens
+        : promptTokens + completionTokens;
+    if (promptTokens + completionTokens + totalTokens === 0) return undefined;
+
+    return { promptTokens, completionTokens, totalTokens };
+  }
+
+  private extractGeminiUsage(
+    response: GenerateContentResponse,
+  ): TokenUsage | undefined {
+    const usage = response.usageMetadata as
+      | {
+          promptTokenCount?: number;
+          candidatesTokenCount?: number;
+          totalTokenCount?: number;
+        }
+      | undefined;
+    if (!usage) return undefined;
+
+    const promptTokens = usage.promptTokenCount ?? 0;
+    const completionTokens = usage.candidatesTokenCount ?? 0;
+    const totalTokens =
+      usage.totalTokenCount ?? promptTokens + completionTokens;
+    if (promptTokens + completionTokens + totalTokens === 0) return undefined;
+
+    return { promptTokens, completionTokens, totalTokens };
+  }
+
   private extractOpenAiSources(payload: unknown): string[] {
     if (!payload || typeof payload !== 'object') return [];
 
@@ -741,6 +786,7 @@ export class AiProviderRunnerService {
       providerLabel: plan.displayName || 'gemini',
       model: plan.model,
       routingMode,
+      usage: this.extractGeminiUsage(result),
     };
   }
 
@@ -865,6 +911,7 @@ export class AiProviderRunnerService {
         providerLabel: plan.displayName || plan.provider,
         model: modelToUse,
         routingMode,
+        usage: this.extractOpenAiUsage(result),
       };
     } finally {
       requestTimeout.clear();

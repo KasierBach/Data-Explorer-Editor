@@ -7,6 +7,11 @@ type AiAuditDetails = {
   model?: string | null;
   latencyMs?: number;
   rating?: 'up' | 'down';
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  } | null;
 };
 
 @Injectable()
@@ -64,6 +69,9 @@ export class AiQualityService {
     latencies.sort((a, b) => a - b);
     const generations = success + failed;
     const feedback = feedbackUp + feedbackDown;
+    const tokens = this.sumTokenUsage(
+      logs.map((log) => this.parseDetails(log.details)),
+    );
     return {
       days,
       generations,
@@ -81,6 +89,7 @@ export class AiQualityService {
         ? latencies[Math.ceil(latencies.length * 0.95) - 1]
         : 0,
       feedback: { up: feedbackUp, down: feedbackDown, total: feedback },
+      tokens,
       models: [...models.entries()]
         .map(([model, values]) => ({
           model,
@@ -88,6 +97,61 @@ export class AiQualityService {
           total: values.success + values.failed,
         }))
         .sort((a, b) => b.total - a.total),
+    };
+  }
+
+  /** Token usage for the requesting user only (no admin role needed). */
+  async getUserUsage(userId: string, days: number, now = new Date()) {
+    const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const logs = await this.prisma.auditLog.findMany({
+      where: {
+        userId,
+        action: {
+          in: [
+            AuditAction.AI_SQL_GENERATED,
+            AuditAction.AI_SQL_GENERATION_FAILED,
+          ],
+        },
+        createdAt: { gte: since },
+      },
+      select: { action: true, details: true },
+    });
+
+    const tokens = this.sumTokenUsage(
+      logs.map((log) => this.parseDetails(log.details)),
+    );
+    const success = logs.filter(
+      (log) => log.action === String(AuditAction.AI_SQL_GENERATED),
+    ).length;
+
+    return {
+      days,
+      generations: logs.length,
+      success,
+      failed: logs.length - success,
+      tokens,
+    };
+  }
+
+  private sumTokenUsage(detailsList: AiAuditDetails[]) {
+    let promptTokens = 0;
+    let completionTokens = 0;
+    let totalTokens = 0;
+    let trackedRequests = 0;
+
+    for (const details of detailsList) {
+      if (!details.usage) continue;
+      trackedRequests += 1;
+      promptTokens += details.usage.promptTokens ?? 0;
+      completionTokens += details.usage.completionTokens ?? 0;
+      totalTokens += details.usage.totalTokens ?? 0;
+    }
+
+    return {
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      trackedRequests,
     };
   }
 

@@ -16,6 +16,7 @@ import { AiConnectionService } from './ai.connection-service';
 import { AuditModule } from '../audit/audit.module';
 import { AiProviderConnectionController } from './ai-provider-connection.controller';
 import { AiProviderConnectionService } from './ai-provider-connection.service';
+import { AiCircuitBreakerService } from './ai.circuit-breaker.service';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -39,6 +40,7 @@ const isProd = process.env.NODE_ENV === 'production';
     AiAutocompleteService,
     AiConnectionService,
     AiProviderConnectionService,
+    AiCircuitBreakerService,
   ],
   exports: [
     AiService,

@@ -98,7 +98,7 @@ export class AiService {
     disabledProviders?: string[];
     fallbackProvider?: string;
   }): Promise<
-    Pick<ChatResult, 'provider' | 'model' | 'routingMode'> & {
+    Pick<ChatResult, 'provider' | 'model' | 'routingMode' | 'usage'> & {
       sql: string;
       explanation: string;
     }
@@ -172,6 +172,7 @@ export class AiService {
       provider: result.provider,
       model: result.model,
       routingMode: result.routingMode,
+      usage: result.usage,
     };
   }
 

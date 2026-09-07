@@ -95,6 +95,12 @@ export interface ChatParams {
   fallbackProvider?: string;
 }
 
+export interface TokenUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 export interface ChatResult {
   message: string;
   sql?: string;
@@ -105,6 +111,7 @@ export interface ChatResult {
   providerLabel?: string;
   model: string;
   routingMode: AiRoutingMode;
+  usage?: TokenUsage;
 }
 
 export interface ProviderPlan {
