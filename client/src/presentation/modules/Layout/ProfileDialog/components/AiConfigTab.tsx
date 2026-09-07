@@ -3,6 +3,7 @@ import {
     Bot,
     Boxes,
     Check,
+    ChevronDown,
     ChevronsUpDown,
     CircleAlert,
     Database,
@@ -31,13 +32,6 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { Switch } from '@/presentation/components/ui/switch';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/presentation/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/presentation/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/presentation/components/ui/tooltip';
 import { getAssistantModelCatalog, BUILT_IN_PROVIDERS } from '@/presentation/modules/Query/assistantModelCatalog';
@@ -328,6 +322,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
     const [providerModels, setProviderModels] = useState<string[]>([]);
     const [isLoadingProviderModels, setIsLoadingProviderModels] = useState(false);
     const [isSavingProvider, setIsSavingProvider] = useState(false);
+    const [fallbackDropdownOpen, setFallbackDropdownOpen] = useState(false);
     const isVi = lang === 'vi';
     const assistantSelection = preferences.assistantModel || aiModel;
     const modelGroups = useMemo(() => getAssistantModelCatalog(preferences.customProviders, preferences.disabledProviders), [preferences.customProviders, preferences.disabledProviders]);
@@ -940,33 +935,63 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                 : 'When your selected model fails (quota exhausted, rate limited, or network timeout), the request routes to your configured fallback provider. Disabled providers above will never be used.'}
                         </p>
                     </div>
-                    <div className="w-full sm:w-72 shrink-0">
-                        <Select
-                            value={preferences.fallbackProvider || 'auto'}
-                            onValueChange={handleFallbackProviderChange}
-                        >
-                            <SelectTrigger className="w-full bg-background/80">
-                                <SelectValue placeholder={isVi ? 'Chọn provider dự phòng' : 'Select fallback provider'} />
-                            </SelectTrigger>
-                            <SelectContent className="z-[250] min-w-[18rem]">
-                                {fallbackOptions.map((opt) => {
-                                    const isOptDisabled = (preferences.disabledProviders || []).includes(opt.id);
-                                    return (
-                                        <SelectItem
-                                            key={opt.id}
-                                            value={opt.id}
-                                            disabled={isOptDisabled}
-                                        >
-                                            <div className="flex flex-col py-0.5">
-                                                <span className={cn("font-medium", isOptDisabled && "line-through opacity-50")}>
-                                                    {opt.label} {isOptDisabled && `(${isVi ? 'Đã tắt' : 'Disabled'})`}
-                                                </span>
-                                            </div>
-                                        </SelectItem>
-                                    );
-                                })}
-                            </SelectContent>
-                        </Select>
+                    <div className="w-full sm:w-80 shrink-0">
+                        <Popover open={fallbackDropdownOpen} onOpenChange={setFallbackDropdownOpen}>
+                            <PopoverTrigger asChild>
+                                <button
+                                    type="button"
+                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background/80 px-3 py-2 text-sm shadow-sm outline-none transition-colors hover:border-ring/60 focus-visible:ring-1 focus-visible:ring-ring"
+                                >
+                                    <span className="truncate text-left font-medium">
+                                        {(fallbackOptions.find((opt) => opt.id === (preferences.fallbackProvider || 'auto')) || fallbackOptions[0]).label}
+                                    </span>
+                                    <ChevronDown className={cn("ml-2 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200", fallbackDropdownOpen && "rotate-180")} />
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                align="end"
+                                side="bottom"
+                                sideOffset={6}
+                                className="z-[250] w-80 overflow-hidden rounded-xl border border-border/70 bg-popover p-1.5 shadow-2xl backdrop-blur"
+                            >
+                                <div className="max-h-72 overflow-y-auto space-y-1 pr-0.5">
+                                    {fallbackOptions.map((opt) => {
+                                        const isOptDisabled = (preferences.disabledProviders || []).includes(opt.id);
+                                        const isSelected = (preferences.fallbackProvider || 'auto') === opt.id;
+                                        return (
+                                            <button
+                                                key={opt.id}
+                                                type="button"
+                                                disabled={isOptDisabled}
+                                                onClick={() => {
+                                                    handleFallbackProviderChange(opt.id);
+                                                    setFallbackDropdownOpen(false);
+                                                }}
+                                                className={cn(
+                                                    "flex w-full items-start justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
+                                                    isSelected
+                                                        ? "bg-primary/10 text-primary font-medium"
+                                                        : "hover:bg-muted/70 text-foreground",
+                                                    isOptDisabled && "cursor-not-allowed opacity-40"
+                                                )}
+                                            >
+                                                <div className="flex flex-col min-w-0 flex-1">
+                                                    <span className={cn("text-xs font-semibold", isSelected ? "text-primary" : "text-foreground", isOptDisabled && "line-through")}>
+                                                        {opt.label} {isOptDisabled && `(${isVi ? 'Đã tắt' : 'Disabled'})`}
+                                                    </span>
+                                                    {opt.desc && (
+                                                        <span className="mt-0.5 text-[11px] text-muted-foreground leading-tight">
+                                                            {opt.desc}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {isSelected && <Check className="h-4 w-4 shrink-0 text-primary mt-0.5" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 </div>
             </section>
