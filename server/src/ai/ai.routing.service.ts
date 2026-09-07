@@ -421,9 +421,7 @@ export class AiRoutingService {
       }
     } else if (fallbackSetting === 'none') {
       const primaryCandidate =
-        routingMode === 'best' ||
-        params.image ||
-        routeDecision.preferGemini
+        routingMode === 'best' || params.image || routeDecision.preferGemini
           ? openRouterDefaultPlans[0] ||
             groqPlans[0] ||
             geminiPlans[0] ||
@@ -435,9 +433,7 @@ export class AiRoutingService {
       if (primaryCandidate) push(primaryCandidate);
     } else if (specificFallbackPlans) {
       const candidates =
-        routingMode === 'best' ||
-        params.image ||
-        routeDecision.preferGemini
+        routingMode === 'best' || params.image || routeDecision.preferGemini
           ? [
               ...openRouterDefaultPlans,
               ...groqPlans,

@@ -745,7 +745,7 @@ export function useAiChat() {
             pendingUpdateRef.current = null;
             abortControllerRef.current = null;
         }
-    }, [addAiMessage, updateAiMessage, processSseLine, activeDatabase, aiMode, aiRoutingMode, activeConnection?.type, resolvedAssistant.model, resolvedAssistant.providerOverride, registerModelError, store, text]);
+    }, [addAiMessage, updateAiMessage, processSseLine, activeDatabase, aiMode, aiRoutingMode, activeConnection?.type, resolvedAssistant.model, resolvedAssistant.providerOverride, preferences.disabledProviders, preferences.fallbackProvider, registerModelError, store, text]);
 
     const handleStop = useCallback(() => {
         if (abortControllerRef.current) {
