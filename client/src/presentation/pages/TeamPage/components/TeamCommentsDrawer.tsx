@@ -8,15 +8,30 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/presentation/components/ui/dialog';
-import { Loader2, MessageSquare, Reply, CheckCircle2, RotateCcw } from 'lucide-react';
+import { Input } from '@/presentation/components/ui/input';
+import {
+  Loader2,
+  MessageSquare,
+  Reply,
+  CheckCircle2,
+  RotateCcw,
+  Pencil,
+  Trash2,
+  FileText,
+} from 'lucide-react';
 import {
   CollaborationService,
   type CollaborationThread,
+  type CollaborationReply,
   type CollaborationResourceType,
 } from '@/core/services/CollaborationService';
+import { OrganizationService } from '@/core/services/OrganizationService';
 import { useAppStore } from '@/core/services/store';
 import { getTeamText } from '../teamI18n';
+import { CommentReactionBar } from './CommentReactionBar';
+import { CommentComposer, type ComposerMember } from './CommentComposer';
 import { toast } from 'sonner';
+
 
 interface TeamCommentsDrawerProps {
   open: boolean;
@@ -27,6 +42,10 @@ interface TeamCommentsDrawerProps {
   resourceName: string | null;
 }
 
+function isImage(dataUrl: string): boolean {
+  return /^data:image\//.test(dataUrl);
+}
+
 export function TeamCommentsDrawer({
   open,
   onOpenChange,
@@ -35,7 +54,7 @@ export function TeamCommentsDrawer({
   resourceId,
   resourceName,
 }: TeamCommentsDrawerProps) {
-  const { lang } = useAppStore();
+  const { lang, user } = useAppStore();
   const text = getTeamText(lang);
   const [threads, setThreads] = useState<CollaborationThread[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,6 +62,11 @@ export function TeamCommentsDrawer({
   const [body, setBody] = useState('');
   const [replyBodies, setReplyBodies] = useState<Record<string, string>>({});
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState('');
+
+  const currentUserId = user?.id ?? '';
 
   const title = useMemo(() => {
     return text.commentsTitle(resourceName);
@@ -84,7 +108,40 @@ export function TeamCommentsDrawer({
     setBody('');
     setReplyBodies({});
     setReplyingTo(null);
+    setAttachments([]);
+    setEditingCommentId(null);
+    setEditBody('');
   }, [open, resourceType, resourceId]);
+
+  const [composerMembers, setComposerMembers] = useState<ComposerMember[]>([]);
+
+  useEffect(() => {
+    if (!open || !organizationId) return;
+    let mounted = true;
+    void (async () => {
+      try {
+        const members = await OrganizationService.getMembers(organizationId);
+        if (mounted) {
+          setComposerMembers(
+            members
+              .filter((member) => member.user?.email)
+              .map((member) => ({
+                userId: member.user.id,
+                email: member.user.email,
+                firstName: member.user.firstName ?? null,
+                lastName: member.user.lastName ?? null,
+                avatarUrl: member.user.avatarUrl ?? null,
+              })),
+          );
+        }
+      } catch {
+        // Mention autocomplete is best-effort; comments still work without it.
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [open, organizationId]);
 
   const submitRootComment = async () => {
     if (!organizationId || !resourceType || !resourceId || !body.trim()) return;
@@ -92,9 +149,11 @@ export function TeamCommentsDrawer({
     try {
       await CollaborationService.createComment(organizationId, resourceType, resourceId, {
         body: body.trim(),
+        ...(attachments.length > 0 ? { attachments } : {}),
       });
       await reloadThreads();
       setBody('');
+      setAttachments([]);
     } catch (error) {
       console.error('[TeamCommentsDrawer] Failed to post comment', error);
       toast.error(text.failedPostComment);
@@ -138,6 +197,54 @@ export function TeamCommentsDrawer({
     }
   };
 
+  const toggleReaction = async (commentId: string, emoji: string) => {
+    if (!organizationId) return;
+    try {
+      await CollaborationService.toggleReaction(organizationId, commentId, emoji);
+      await reloadThreads();
+    } catch (error) {
+      console.error('[TeamCommentsDrawer] Failed to toggle reaction', error);
+      toast.error(lang === 'vi' ? 'Không thể thả biểu tượng cảm xúc.' : 'Could not toggle the reaction.');
+    }
+  };
+
+  const startEditing = (commentId: string, currentBody: string) => {
+    setEditingCommentId(commentId);
+    setEditBody(currentBody);
+  };
+
+  const saveEdit = async () => {
+    if (!organizationId || !editingCommentId || !editBody.trim()) return;
+    setSubmitting(true);
+    try {
+      await CollaborationService.editComment(organizationId, editingCommentId, editBody.trim());
+      await reloadThreads();
+      setEditingCommentId(null);
+      setEditBody('');
+    } catch (error) {
+      console.error('[TeamCommentsDrawer] Failed to edit comment', error);
+      toast.error(lang === 'vi' ? 'Không thể sửa bình luận.' : 'Could not edit the comment.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const deleteComment = async (commentId: string) => {
+    if (!organizationId) return;
+    if (!window.confirm(lang === 'vi' ? 'Xóa bình luận này?' : 'Delete this comment?')) return;
+    setSubmitting(true);
+    try {
+      await CollaborationService.deleteComment(organizationId, commentId);
+      await reloadThreads();
+    } catch (error) {
+      console.error('[TeamCommentsDrawer] Failed to delete comment', error);
+      toast.error(lang === 'vi' ? 'Không thể xóa bình luận.' : 'Could not delete the comment.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+
   async function reloadThreads() {
     if (!open || !organizationId || !resourceType || !resourceId) {
       setThreads([]);
@@ -147,6 +254,110 @@ export function TeamCommentsDrawer({
     const data = await CollaborationService.getResourceComments(organizationId, resourceType, resourceId);
     setThreads(Array.isArray(data) ? data : []);
   }
+
+  const renderAttachments = (items?: string[]) => {
+    if (!items || items.length === 0) return null;
+    return (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {items.map((item, index) =>
+          isImage(item) ? (
+            <a key={index} href={item} target="_blank" rel="noreferrer" className="block">
+              <img
+                src={item}
+                alt={`attachment-${index}`}
+                className="h-20 max-w-[160px] rounded-md border object-cover"
+              />
+            </a>
+          ) : (
+            <a
+              key={index}
+              href={item}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              {lang === 'vi' ? 'Xem file đính kèm' : 'View attachment'}
+            </a>
+          ),
+        )}
+      </div>
+    );
+  };
+
+  const renderCommentActions = (
+    record: CollaborationThread | CollaborationReply,
+    isReply: boolean,
+  ) => {
+    if (record.deleted) return null;
+    const isAuthor = record.author.id === currentUserId;
+    return (
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <CommentReactionBar
+          reactions={record.reactions ?? []}
+          currentUserId={currentUserId}
+          disabled={submitting}
+          onToggle={(emoji) => void toggleReaction(record.commentId, emoji)}
+        />
+        {isAuthor && (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[11px]"
+              disabled={submitting}
+              onClick={() => startEditing(record.commentId, record.body)}
+            >
+              <Pencil className="mr-1 h-3 w-3" />
+              {lang === 'vi' ? 'Sửa' : 'Edit'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[11px] text-red-500 hover:text-red-600"
+              disabled={submitting}
+              onClick={() => void deleteComment(record.commentId)}
+            >
+              <Trash2 className="mr-1 h-3 w-3" />
+              {lang === 'vi' ? 'Xóa' : 'Delete'}
+            </Button>
+          </>
+        )}
+        {!isReply && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[11px]"
+            onClick={() => setReplyingTo((current) => (current === record.threadId ? null : record.threadId))}
+          >
+            <Reply className="mr-1 h-3 w-3" />
+            {text.reply}
+          </Button>
+        )}
+      </div>
+    );
+  };
+
+  const renderEditBox = () => (
+    <div className="mt-2 space-y-2 rounded-md border bg-background p-2">
+      <Input
+        value={editBody}
+        onChange={(e) => setEditBody(e.target.value)}
+        className="text-sm"
+      />
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={() => setEditingCommentId(null)}>
+          {text.cancel}
+        </Button>
+        <Button type="button" size="sm" disabled={submitting || !editBody.trim()} onClick={() => void saveEdit()}>
+          {lang === 'vi' ? 'Lưu' : 'Save'}
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -184,6 +395,11 @@ export function TeamCommentsDrawer({
                       </div>
                       <div className="text-[11px] text-muted-foreground">
                         {new Date(thread.createdAt).toLocaleString()}
+                        {thread.editedAt && (
+                          <span className="ml-1 italic">
+                            ({lang === 'vi' ? 'đã sửa' : 'edited'})
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -208,7 +424,16 @@ export function TeamCommentsDrawer({
                     </div>
                   </div>
 
-                  <p className="whitespace-pre-wrap text-sm text-foreground/90">{thread.body}</p>
+                  {thread.deleted ? (
+                    <p className="text-sm italic text-muted-foreground">
+                      {lang === 'vi' ? 'Bình luận đã bị xóa.' : 'This comment was deleted.'}
+                    </p>
+                  ) : editingCommentId === thread.commentId ? (
+                    renderEditBox()
+                  ) : (
+                    <p className="whitespace-pre-wrap text-sm text-foreground/90">{thread.body}</p>
+                  )}
+                  {!thread.deleted && renderAttachments(thread.attachments)}
 
                   {thread.mentions.length > 0 && (
                     <div className="flex flex-wrap gap-2">
@@ -223,6 +448,8 @@ export function TeamCommentsDrawer({
                     </div>
                   )}
 
+                  {renderCommentActions(thread, false)}
+
                   {thread.replies.length > 0 && (
                     <div className="space-y-2 border-l border-border/60 pl-4">
                       {thread.replies.map((reply) => (
@@ -234,52 +461,49 @@ export function TeamCommentsDrawer({
                           </div>
                           <div className="text-[10px] text-muted-foreground">
                             {new Date(reply.createdAt).toLocaleString()}
+                            {reply.editedAt && (
+                              <span className="ml-1 italic">
+                                ({lang === 'vi' ? 'đã sửa' : 'edited'})
+                              </span>
+                            )}
                           </div>
-                          <p className="mt-1 whitespace-pre-wrap text-sm">{reply.body}</p>
+                          {reply.deleted ? (
+                            <p className="mt-1 text-sm italic text-muted-foreground">
+                              {lang === 'vi' ? 'Bình luận đã bị xóa.' : 'This comment was deleted.'}
+                            </p>
+                          ) : editingCommentId === reply.commentId ? (
+                            renderEditBox()
+                          ) : (
+                            <p className="mt-1 whitespace-pre-wrap text-sm">{reply.body}</p>
+                          )}
+                          {!reply.deleted && renderAttachments(reply.attachments)}
+                          {renderCommentActions(reply, true)}
                         </div>
                       ))}
                     </div>
                   )}
 
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => setReplyingTo((current) => current === thread.threadId ? null : thread.threadId)}
-                    >
-                      <Reply className="mr-1 h-3 w-3" />
-                      {text.reply}
-                    </Button>
-                  </div>
-
                   {replyingTo === thread.threadId && (
-                    <div className="space-y-2 rounded-md border bg-background p-3">
-                      <textarea
-                        className="min-h-[84px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none"
-                        placeholder={text.commentReplyPlaceholder}
+                    <div className="rounded-md border bg-background p-3">
+                      <CommentComposer
                         value={replyBodies[thread.threadId] ?? ''}
-                        onChange={(e) =>
+                        onChange={(next) =>
                           setReplyBodies((prev) => ({
                             ...prev,
-                            [thread.threadId]: e.target.value,
+                            [thread.threadId]: next,
                           }))
                         }
+                        members={composerMembers}
+                        attachments={[]}
+                        onAttachmentsChange={() => undefined}
+                        placeholder={text.commentReplyPlaceholder}
+                        minRows={3}
+                        disabled={submitting}
+                        submitLabel={text.reply}
+                        cancelLabel={text.cancel}
+                        onSubmit={() => void submitReply(thread.threadId)}
+                        onCancel={() => setReplyingTo(null)}
                       />
-                      <div className="flex justify-end gap-2">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setReplyingTo(null)}>
-                          {text.cancel}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => submitReply(thread.threadId)}
-                          disabled={submitting}
-                        >
-                          {text.reply}
-                        </Button>
-                      </div>
                     </div>
                   )}
                 </div>
@@ -287,12 +511,18 @@ export function TeamCommentsDrawer({
             )}
           </div>
 
-          <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
-            <textarea
-              className="min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none"
-              placeholder={text.commentPlaceholder}
+          <div className="rounded-lg border bg-muted/20 p-3">
+            <CommentComposer
               value={body}
-              onChange={(e) => setBody(e.target.value)}
+              onChange={setBody}
+              members={composerMembers}
+              attachments={attachments}
+              onAttachmentsChange={setAttachments}
+              placeholder={text.commentPlaceholder}
+              minRows={4}
+              disabled={submitting}
+              submitLabel={submitting ? text.commentSubmitting : text.commentSubmit}
+              onSubmit={() => void submitRootComment()}
             />
           </div>
         </div>
@@ -305,7 +535,7 @@ export function TeamCommentsDrawer({
             {submitting ? text.commentSubmitting : text.commentSubmit}
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </DialogContent >
+    </Dialog >
   );
 }

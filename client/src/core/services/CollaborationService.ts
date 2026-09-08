@@ -11,6 +11,13 @@ export interface CollaborationParticipant {
   avatarUrl?: string | null;
 }
 
+export interface CollaborationReactionGroup {
+  emoji: string;
+  count: number;
+  userIds: string[];
+  users: CollaborationParticipant[];
+}
+
 export interface CollaborationReply {
   commentId: string;
   threadId: string;
@@ -20,6 +27,10 @@ export interface CollaborationReply {
   mentions: CollaborationParticipant[];
   createdAt: string;
   updatedAt: string;
+  editedAt: string | null;
+  deleted: boolean;
+  attachments?: string[];
+  reactions?: CollaborationReactionGroup[];
 }
 
 export interface CollaborationThread {
@@ -34,9 +45,13 @@ export interface CollaborationThread {
   mentions: CollaborationParticipant[];
   createdAt: string;
   updatedAt: string;
+  editedAt: string | null;
+  deleted: boolean;
   resolvedAt: string | null;
   resolvedBy: CollaborationParticipant | null;
   replies: CollaborationReply[];
+  attachments?: string[];
+  reactions?: CollaborationReactionGroup[];
 }
 
 export interface CollaborationActivityLog {
@@ -52,6 +67,7 @@ export interface CollaborationActivityLog {
 export interface CreateCommentPayload {
   body: string;
   parentCommentId?: string;
+  attachments?: string[];
 }
 
 export class CollaborationService {
@@ -101,6 +117,37 @@ export class CollaborationService {
     return apiService.post<CollaborationThread>(
       `/collaboration/organizations/${organizationId}/comments/${commentId}/resolve`,
       {},
+    );
+  }
+
+  static async toggleReaction(
+    organizationId: string,
+    commentId: string,
+    emoji: string,
+  ): Promise<CollaborationReactionGroup[]> {
+    return apiService.post<CollaborationReactionGroup[]>(
+      `/collaboration/organizations/${organizationId}/comments/${commentId}/reactions`,
+      { emoji },
+    );
+  }
+
+  static async editComment(
+    organizationId: string,
+    commentId: string,
+    body: string,
+  ): Promise<CollaborationThread> {
+    return apiService.request<CollaborationThread>(
+      `/collaboration/organizations/${organizationId}/comments/${commentId}`,
+      { method: 'PATCH', body: JSON.stringify({ body }) },
+    );
+  }
+
+  static async deleteComment(
+    organizationId: string,
+    commentId: string,
+  ): Promise<void> {
+    await apiService.delete<void>(
+      `/collaboration/organizations/${organizationId}/comments/${commentId}`,
     );
   }
 }
