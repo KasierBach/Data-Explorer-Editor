@@ -1,7 +1,7 @@
 import { IsString, MaxLength } from 'class-validator';
 
-export class UpdateCommentDto {
+export class ToggleReactionDto {
   @IsString()
-  @MaxLength(2000)
-  body: string;
+  @MaxLength(32)
+  emoji: string;
 }

@@ -149,6 +149,7 @@ model User {
   payments              Payment[]
   billingSubscription   BillingSubscription?
   aiProviderConnections AiProviderConnection[]
+  commentReactions      CommentReaction[]
 }
 
 model AiProviderConnection {
@@ -464,4 +465,19 @@ model OrganizationResource {
   @@index([organizationId])
   @@index([resourceType, resourceId])
   @@index([teamspaceId])
+}
+
+// Emoji reactions on team comments. Comments live in the audit log, but
+// reactions are mutable (toggle on/off), so they need their own table.
+model CommentReaction {
+  id        String   @id @default(uuid())
+  commentId String
+  userId    String
+  emoji     String   @db.VarChar(32)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId, emoji])
+  @@index([commentId])
 }

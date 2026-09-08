@@ -1,9 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseEnumPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -13,6 +17,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CollaborationService } from './collaboration.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { ListActivityDto } from './dto/list-activity.dto';
+import { ToggleReactionDto } from './dto/toggle-reaction.dto';
+import { UpdateCommentDto } from './dto/update-comment.dto';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
 
@@ -94,6 +100,50 @@ export class CollaborationController {
     @Param('commentId') commentId: string,
   ) {
     return this.collaborationService.resolveComment(
+      organizationId,
+      req.user.id,
+      commentId,
+    );
+  }
+
+  @Post('organizations/:organizationId/comments/:commentId/reactions')
+  toggleReaction(
+    @Req() req: AuthenticatedRequest,
+    @Param('organizationId') organizationId: string,
+    @Param('commentId') commentId: string,
+    @Body() dto: ToggleReactionDto,
+  ) {
+    return this.collaborationService.toggleReaction(
+      organizationId,
+      req.user.id,
+      commentId,
+      dto.emoji,
+    );
+  }
+
+  @Patch('organizations/:organizationId/comments/:commentId')
+  editComment(
+    @Req() req: AuthenticatedRequest,
+    @Param('organizationId') organizationId: string,
+    @Param('commentId') commentId: string,
+    @Body() dto: UpdateCommentDto,
+  ) {
+    return this.collaborationService.editComment(
+      organizationId,
+      req.user.id,
+      commentId,
+      dto,
+    );
+  }
+
+  @Delete('organizations/:organizationId/comments/:commentId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteComment(
+    @Req() req: AuthenticatedRequest,
+    @Param('organizationId') organizationId: string,
+    @Param('commentId') commentId: string,
+  ) {
+    await this.collaborationService.deleteComment(
       organizationId,
       req.user.id,
       commentId,

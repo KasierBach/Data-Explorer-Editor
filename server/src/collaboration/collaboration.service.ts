@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -10,9 +11,14 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../permissions/services/permissions.service';
 import { Permission } from '../permissions/enums/permission.enum';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
-import { CreateCommentDto } from './dto/create-comment.dto';
+import {
+  CreateCommentDto,
+  MAX_COMMENT_ATTACHMENTS_BYTES,
+} from './dto/create-comment.dto';
+import { UpdateCommentDto } from './dto/update-comment.dto';
 import {
   CommentParticipant,
+  CommentReactionGroup,
   CommentReply,
   CommentThread,
 } from './entities/comment.entity';
@@ -25,12 +31,15 @@ type CommentDetails = {
   resourceId: string;
   body: string;
   mentions?: string[];
+  attachments?: string[];
 };
 
 const COMMENT_ACTIONS = [
   AuditAction.TEAM_COMMENT_CREATE,
   AuditAction.TEAM_COMMENT_REPLY,
   AuditAction.TEAM_COMMENT_RESOLVE,
+  AuditAction.TEAM_COMMENT_EDIT,
+  AuditAction.TEAM_COMMENT_DELETE,
 ];
 
 @Injectable()
@@ -94,6 +103,7 @@ export class CollaborationService {
     );
 
     const body = this.normalizeBody(dto.body);
+    const attachments = this.validateAttachments(dto.attachments);
     const commentId = randomUUID();
     const threadId = dto.parentCommentId?.trim() || commentId;
     const parentCommentId = dto.parentCommentId?.trim() || null;
@@ -114,6 +124,7 @@ export class CollaborationService {
         resourceId,
         body,
         mentions: mentions.map((mention) => mention.id),
+        ...(attachments ? { attachments } : {}),
       },
     });
 
@@ -156,6 +167,188 @@ export class CollaborationService {
         parentCommentId: commentId,
       },
     );
+  }
+
+  /** Toggles an emoji reaction on a comment; returns the active reactions. */
+  async toggleReaction(
+    organizationId: string,
+    userId: string,
+    commentId: string,
+    emoji: string,
+  ) {
+    await this.ensureMemberAccess(organizationId, userId);
+    const normalized = emoji.trim().slice(0, 32);
+    if (!normalized) throw new BadRequestException('Emoji is required');
+
+    const existing = await this.prisma.commentReaction.findUnique({
+      where: {
+        commentId_userId_emoji: {
+          commentId,
+          userId,
+          emoji: normalized,
+        },
+      },
+    });
+
+    if (existing) {
+      await this.prisma.commentReaction.delete({ where: { id: existing.id } });
+    } else {
+      await this.prisma.commentReaction.create({
+        data: { commentId, userId, emoji: normalized },
+      });
+    }
+
+    return this.listReactions(commentId);
+  }
+
+  async listReactions(commentId: string) {
+    const reactions = await this.prisma.commentReaction.findMany({
+      where: { commentId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const byEmoji = new Map<
+      string,
+      {
+        emoji: string;
+        count: number;
+        userIds: string[];
+        users: CommentParticipant[];
+      }
+    >();
+    for (const reaction of reactions) {
+      const entry = byEmoji.get(reaction.emoji) ?? {
+        emoji: reaction.emoji,
+        count: 0,
+        userIds: [],
+        users: [],
+      };
+      entry.count += 1;
+      entry.userIds.push(reaction.userId);
+      entry.users.push(this.normalizeParticipant(reaction.user));
+      byEmoji.set(reaction.emoji, entry);
+    }
+    return Array.from(byEmoji.values());
+  }
+
+  /** Edits a comment body; only the original author may edit. */
+  async editComment(
+    organizationId: string,
+    userId: string,
+    commentId: string,
+    dto: UpdateCommentDto,
+  ) {
+    const thread = await this.findCommentThreadByCommentId(
+      organizationId,
+      commentId,
+    );
+    const isAuthor = await this.isCommentAuthor(
+      organizationId,
+      commentId,
+      userId,
+    );
+    if (!isAuthor) {
+      throw new ForbiddenException('Only the author can edit this comment');
+    }
+
+    const body = this.normalizeBody(dto.body);
+    await this.audit.log({
+      action: AuditAction.TEAM_COMMENT_EDIT,
+      userId,
+      organizationId,
+      details: {
+        commentId,
+        threadId: thread.threadId,
+        resourceType: thread.resourceType,
+        resourceId: thread.resourceId,
+        body,
+      },
+    });
+
+    return this.findCommentThreadInResource(
+      organizationId,
+      thread.resourceType,
+      thread.resourceId,
+      thread.threadId,
+    );
+  }
+
+  /** Soft-deletes a comment; the author or an org admin may delete. */
+  async deleteComment(
+    organizationId: string,
+    userId: string,
+    commentId: string,
+  ) {
+    const thread = await this.findCommentThreadByCommentId(
+      organizationId,
+      commentId,
+    );
+
+    const isAuthor = await this.isCommentAuthor(
+      organizationId,
+      commentId,
+      userId,
+    );
+    if (!isAuthor) {
+      const member = await this.prisma.organizationMember.findUnique({
+        where: { organizationId_userId: { organizationId, userId } },
+        select: { role: true },
+      });
+      const isAdmin = member?.role === 'OWNER' || member?.role === 'ADMIN';
+      if (!isAdmin) {
+        throw new ForbiddenException(
+          'Only the author or an organization admin can delete this comment',
+        );
+      }
+    }
+
+    await this.audit.log({
+      action: AuditAction.TEAM_COMMENT_DELETE,
+      userId,
+      organizationId,
+      details: {
+        commentId,
+        threadId: thread.threadId,
+        resourceType: thread.resourceType,
+        resourceId: thread.resourceId,
+      },
+    });
+
+    await this.prisma.commentReaction.deleteMany({ where: { commentId } });
+  }
+
+  private async isCommentAuthor(
+    organizationId: string,
+    commentId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const log = await this.prisma.auditLog.findFirst({
+      where: {
+        organizationId,
+        action: {
+          in: [
+            String(AuditAction.TEAM_COMMENT_CREATE),
+            String(AuditAction.TEAM_COMMENT_REPLY),
+          ],
+        },
+        details: { contains: `"commentId":"${commentId}"` },
+      },
+      select: { userId: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return log?.userId === userId;
   }
 
   async resolveComment(
@@ -226,6 +419,42 @@ export class CollaborationService {
     }
 
     return value.slice(0, 2000);
+  }
+
+  /**
+   * Validates attachment data URLs: whitelist of MIME types, max 3 items,
+   * 2MB total. Returns the normalized list or null when there are none.
+   */
+  private validateAttachments(attachments?: string[]): string[] | null {
+    if (!attachments || attachments.length === 0) return null;
+
+    const allowed = new Set([
+      'image/png',
+      'image/jpeg',
+      'image/gif',
+      'image/webp',
+      'application/pdf',
+      'text/plain',
+    ]);
+    let totalBytes = 0;
+
+    for (const item of attachments) {
+      const match = /^data:([^;,]+)[;,]/.exec(item);
+      const mime = match?.[1]?.toLowerCase();
+      if (!mime || !allowed.has(mime)) {
+        throw new BadRequestException(
+          `Attachment type "${mime ?? 'unknown'}" is not allowed. Allowed: images, PDF, plain text.`,
+        );
+      }
+      totalBytes += item.length;
+      if (totalBytes > MAX_COMMENT_ATTACHMENTS_BYTES) {
+        throw new BadRequestException(
+          'Attachments exceed the 2MB total size limit.',
+        );
+      }
+    }
+
+    return attachments;
   }
 
   private parseDetails(details: string | null): CommentDetails | null {
@@ -464,12 +693,46 @@ export class CollaborationService {
         details.mentions ?? [],
       );
 
+      const findCommentTarget = (
+        commentId: string,
+      ): { thread: CommentThread; reply?: CommentReply } | null => {
+        const thread = threads.get(details.threadId);
+        if (!thread) return null;
+        if (thread.commentId === commentId) return { thread };
+        const reply = thread.replies.find(
+          (item) => item.commentId === commentId,
+        );
+        return reply ? { thread, reply } : null;
+      };
+
       if (log.action === String(AuditAction.TEAM_COMMENT_RESOLVE)) {
         const thread = threads.get(details.threadId);
         if (thread) {
           thread.resolvedAt = log.createdAt.toISOString();
           thread.resolvedBy = author;
           thread.updatedAt = log.createdAt.toISOString();
+        }
+        continue;
+      }
+
+      if (log.action === String(AuditAction.TEAM_COMMENT_EDIT)) {
+        const target = findCommentTarget(details.commentId);
+        if (target) {
+          const record = target.reply ?? target.thread;
+          record.body = details.body;
+          record.editedAt = log.createdAt.toISOString();
+          record.updatedAt = log.createdAt.toISOString();
+        }
+        continue;
+      }
+
+      if (log.action === String(AuditAction.TEAM_COMMENT_DELETE)) {
+        const target = findCommentTarget(details.commentId);
+        if (target) {
+          const record = target.reply ?? target.thread;
+          record.deleted = true;
+          record.body = '';
+          record.updatedAt = log.createdAt.toISOString();
         }
         continue;
       }
@@ -484,6 +747,9 @@ export class CollaborationService {
           mentions,
           createdAt: log.createdAt.toISOString(),
           updatedAt: log.createdAt.toISOString(),
+          editedAt: null,
+          deleted: false,
+          ...(details.attachments ? { attachments: details.attachments } : {}),
         };
 
         const thread = threads.get(details.threadId);
@@ -506,11 +772,16 @@ export class CollaborationService {
         mentions,
         createdAt: log.createdAt.toISOString(),
         updatedAt: log.createdAt.toISOString(),
+        editedAt: null,
+        deleted: false,
         resolvedAt: null,
         resolvedBy: null,
         replies: [],
+        ...(details.attachments ? { attachments: details.attachments } : {}),
       });
     }
+
+    await this.attachReactions(Array.from(threads.values()));
 
     return Array.from(threads.values())
       .map((thread) => ({
@@ -520,6 +791,64 @@ export class CollaborationService {
         ),
       }))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  /** Loads reaction groups from CommentReaction for every visible comment. */
+  private async attachReactions(threads: CommentThread[]) {
+    const commentIds = threads.flatMap((thread) => [
+      thread.commentId,
+      ...thread.replies.map((reply) => reply.commentId),
+    ]);
+    if (commentIds.length === 0) return;
+
+    const reactions = await this.prisma.commentReaction.findMany({
+      where: { commentId: { in: commentIds } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    const grouped = new Map<string, Map<string, CommentReactionGroup>>();
+    for (const reaction of reactions) {
+      const byEmoji =
+        grouped.get(reaction.commentId) ??
+        new Map<string, CommentReactionGroup>();
+      const entry =
+        byEmoji.get(reaction.emoji) ??
+        ({
+          emoji: reaction.emoji,
+          count: 0,
+          userIds: [],
+          users: [],
+        } as CommentReactionGroup);
+      entry.count += 1;
+      entry.userIds.push(reaction.userId);
+      entry.users.push(this.normalizeParticipant(reaction.user));
+      byEmoji.set(reaction.emoji, entry);
+      grouped.set(reaction.commentId, byEmoji);
+    }
+
+    for (const thread of threads) {
+      const threadReactions = grouped.get(thread.commentId);
+      if (threadReactions) {
+        thread.reactions = Array.from(threadReactions.values());
+      }
+      for (const reply of thread.replies) {
+        const replyReactions = grouped.get(reply.commentId);
+        if (replyReactions) {
+          reply.reactions = Array.from(replyReactions.values());
+        }
+      }
+    }
   }
 
   private async findCommentThreadInResource(

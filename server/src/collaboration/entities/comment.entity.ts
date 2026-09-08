@@ -9,6 +9,13 @@ export interface CommentParticipant {
   avatarUrl?: string | null;
 }
 
+export interface CommentReactionGroup {
+  emoji: string;
+  count: number;
+  userIds: string[];
+  users: CommentParticipant[];
+}
+
 export interface CommentReply {
   commentId: string;
   threadId: string;
@@ -18,6 +25,10 @@ export interface CommentReply {
   mentions: CommentParticipant[];
   createdAt: string;
   updatedAt: string;
+  editedAt: string | null;
+  deleted: boolean;
+  attachments?: string[];
+  reactions?: CommentReactionGroup[];
 }
 
 export interface CommentThread {
@@ -32,7 +43,11 @@ export interface CommentThread {
   mentions: CommentParticipant[];
   createdAt: string;
   updatedAt: string;
+  editedAt: string | null;
+  deleted: boolean;
   resolvedAt: string | null;
   resolvedBy: CommentParticipant | null;
   replies: CommentReply[];
+  attachments?: string[];
+  reactions?: CommentReactionGroup[];
 }
