@@ -180,6 +180,7 @@ export function TeamCommentsDrawer({
                 email: member.user.email,
                 firstName: member.user.firstName ?? null,
                 lastName: member.user.lastName ?? null,
+                username: member.user.username ?? null,
                 avatarUrl: member.user.avatarUrl ?? null,
               })),
           );

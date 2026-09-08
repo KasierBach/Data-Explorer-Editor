@@ -161,6 +161,7 @@ export interface OrganizationMemberEntity {
   user: {
     id: string;
     email: string;
+    username?: string | null;
     firstName?: string;
     lastName?: string;
     avatarUrl?: string;

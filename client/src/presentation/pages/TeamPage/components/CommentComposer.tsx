@@ -7,9 +7,15 @@ import { useAppStore } from '@/core/services/store';
 export interface ComposerMember {
     userId: string;
     email: string;
+    username?: string | null;
     firstName?: string | null;
     lastName?: string | null;
     avatarUrl?: string | null;
+}
+
+/** Best short handle for @-mentions: username, then first name, then email. */
+export function mentionHandle(member: ComposerMember): string {
+    return member.username || member.firstName || member.email;
 }
 
 const QUICK_EMOJIS = [
@@ -99,11 +105,12 @@ export function CommentComposer({
         const caret = textareaRef.current.selectionStart ?? value.length;
         const before = value.slice(0, mentionStart);
         const after = value.slice(caret);
-        const next = `${before}@${member.email} ${after}`;
+        const handle = mentionHandle(member);
+        const next = `${before}@${handle} ${after}`;
         setMentionQuery(null);
         onChange(next);
         requestAnimationFrame(() => {
-            const pos = before.length + member.email.length + 2;
+            const pos = before.length + handle.length + 2;
             textareaRef.current?.focus();
             textareaRef.current?.setSelectionRange(pos, pos);
         });
