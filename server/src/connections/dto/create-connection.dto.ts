@@ -5,6 +5,8 @@ import {
   IsIn,
   IsNotEmpty,
   IsBoolean,
+  IsArray,
+  IsObject,
   ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -171,4 +173,20 @@ export class CreateConnectionDto {
   @IsOptional()
   @IsIn(['development', 'staging', 'production', 'none'])
   environment?: 'development' | 'staging' | 'production' | 'none';
+
+  /** Whitelist of database names team members may access (null/empty = all). */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allowedDatabases?: string[];
+
+  /** Per-org-role query access: 'blocked' | 'readonly' | 'full'. */
+  @IsOptional()
+  @IsObject()
+  roleQueryModes?: {
+    OWNER?: 'blocked' | 'readonly' | 'full';
+    ADMIN?: 'blocked' | 'readonly' | 'full';
+    MEMBER?: 'blocked' | 'readonly' | 'full';
+    VIEWER?: 'blocked' | 'readonly' | 'full';
+  };
 }

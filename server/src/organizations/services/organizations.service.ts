@@ -403,6 +403,107 @@ export class OrganizationsService {
     });
   }
 
+  /** A member leaves the organization on their own. Owners must transfer first. */
+  async leaveOrganization(organizationId: string, userId: string) {
+    const member = await this.repository.findMember(organizationId, userId);
+    if (!member) throw new NotFoundException('You are not a member');
+
+    if (member.role === (OrganizationRole.OWNER as string)) {
+      const members = await this.repository.findMembers(organizationId);
+      const otherOwners = members.filter(
+        (candidate) =>
+          candidate.userId !== userId &&
+          candidate.role === (OrganizationRole.OWNER as string),
+      );
+      if (otherOwners.length === 0) {
+        throw new ForbiddenException(
+          'The last owner cannot leave. Transfer ownership to another member first.',
+        );
+      }
+    }
+
+    await this.repository.removeMember(organizationId, userId);
+
+    await this.audit.log({
+      action: AuditAction.TEAM_MEMBER_REMOVE,
+      userId,
+      organizationId,
+      details: { targetUserId: userId, self: true },
+    });
+  }
+
+  /** Transfers ownership to another member; the caller becomes an ADMIN. */
+  async transferOwnership(
+    organizationId: string,
+    ownerId: string,
+    targetUserId: string,
+  ) {
+    await this.ensureOwnerAccess(organizationId, ownerId);
+    if (ownerId === targetUserId)
+      throw new ForbiddenException('You are already the owner');
+
+    const targetMember = await this.repository.findMember(
+      organizationId,
+      targetUserId,
+    );
+    if (!targetMember)
+      throw new NotFoundException('Target user is not a member');
+
+    await this.prisma.$transaction([
+      this.prisma.organizationMember.update({
+        where: {
+          organizationId_userId: { organizationId, userId: targetUserId },
+        },
+        data: { role: OrganizationRole.OWNER },
+      }),
+      this.prisma.organizationMember.update({
+        where: {
+          organizationId_userId: { organizationId, userId: ownerId },
+        },
+        data: { role: OrganizationRole.ADMIN },
+      }),
+    ]);
+
+    await this.audit.log({
+      action: AuditAction.TEAM_MEMBER_ROLE_CHANGE,
+      userId: ownerId,
+      organizationId,
+      details: { targetUserId, newRole: 'OWNER', transferredOwnership: true },
+    });
+  }
+
+  /** Revokes a pending invitation before it is accepted. */
+  async revokeInvitation(
+    organizationId: string,
+    revokerId: string,
+    invitationId: string,
+  ) {
+    await this.ensureOwnerOrAdminAccess(organizationId, revokerId);
+
+    const invitation = await this.prisma.organizationInvitation.findUnique({
+      where: { id: invitationId },
+    });
+    if (!invitation || invitation.organizationId !== organizationId) {
+      throw new NotFoundException('Invitation not found');
+    }
+    if (invitation.acceptedAt) {
+      throw new ConflictException('Invitation was already accepted');
+    }
+
+    await this.prisma.organizationInvitation.delete({
+      where: { id: invitation.id },
+    });
+
+    await this.audit.log({
+      action: AuditAction.TEAM_MEMBER_INVITE,
+      userId: revokerId,
+      organizationId,
+      details: { memberEmail: invitation.email, status: 'invitation-revoked' },
+    });
+
+    return { id: invitation.id };
+  }
+
   async listMembers(organizationId: string, userId: string) {
     await this.ensureMemberAccess(organizationId, userId);
     return this.repository.findMembers(organizationId);

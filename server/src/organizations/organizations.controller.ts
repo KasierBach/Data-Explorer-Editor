@@ -136,6 +136,45 @@ export class OrganizationsController {
     );
   }
 
+  @Delete(':id/members/me')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async leaveOrganization(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') organizationId: string,
+  ) {
+    await this.organizationsService.leaveOrganization(
+      organizationId,
+      req.user.id,
+    );
+  }
+
+  @Post(':id/transfer-ownership')
+  async transferOwnership(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') organizationId: string,
+    @Body() body: { targetUserId: string },
+  ) {
+    return this.organizationsService.transferOwnership(
+      organizationId,
+      req.user.id,
+      body.targetUserId,
+    );
+  }
+
+  @Delete(':id/invitations/:invitationId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async revokeInvitation(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') organizationId: string,
+    @Param('invitationId') invitationId: string,
+  ) {
+    await this.organizationsService.revokeInvitation(
+      organizationId,
+      req.user.id,
+      invitationId,
+    );
+  }
+
   @Get(':id/members')
   async listMembers(
     @Req() req: AuthenticatedRequest,

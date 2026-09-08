@@ -34,6 +34,18 @@ export class PermissionsService {
     }
   }
 
+  /** Returns the user's organization role, or null for non-members. */
+  async getMemberRole(
+    userId: string,
+    organizationId: string,
+  ): Promise<OrganizationRole | null> {
+    const member = await this.prisma.organizationMember.findUnique({
+      where: { organizationId_userId: { organizationId, userId } },
+      select: { role: true },
+    });
+    return (member?.role as OrganizationRole) ?? null;
+  }
+
   async checkPermission(
     userId: string,
     resourceType: ResourceType,

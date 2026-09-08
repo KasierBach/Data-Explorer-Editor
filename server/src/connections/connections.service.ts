@@ -342,6 +342,13 @@ export class ConnectionsService implements OnModuleDestroy {
       'host',
     );
 
+    // Safe defaults: production connections shared with a team start locked
+    // down — read-only, no schema changes, and members limited to read-only
+    // queries. Owners can relax these explicitly after reviewing.
+    const isProduction =
+      (createConnectionDto.environment || 'none') === 'production';
+    const isTeamProduction = isProduction && !!teamOrganizationId;
+
     const connection = await this.prisma.connection.create({
       data: {
         ...rest,
@@ -351,16 +358,26 @@ export class ConnectionsService implements OnModuleDestroy {
         sshPrivateKey: encryptedSshPrivateKey,
         sshPassphrase: encryptedSshPassphrase,
         userId,
-        readOnly: createConnectionDto.readOnly ?? false,
+        readOnly: createConnectionDto.readOnly ?? isTeamProduction,
         allowSchemaChanges: createConnectionDto.readOnly
           ? false
-          : (createConnectionDto.allowSchemaChanges ?? true),
+          : (createConnectionDto.allowSchemaChanges ?? !isTeamProduction),
         allowImportExport: createConnectionDto.readOnly
           ? false
-          : (createConnectionDto.allowImportExport ?? true),
+          : (createConnectionDto.allowImportExport ?? !isTeamProduction),
         allowQueryExecution: createConnectionDto.allowQueryExecution ?? true,
         environment: createConnectionDto.environment || 'none',
         ...(teamOrganizationId ? { organizationId: teamOrganizationId } : {}),
+        ...(isTeamProduction
+          ? {
+              roleQueryModes: {
+                OWNER: 'full',
+                ADMIN: 'full',
+                MEMBER: 'readonly',
+                VIEWER: 'readonly',
+              },
+            }
+          : {}),
       } as any,
     });
     const safeConnection = this.sanitizeConnection(connection);
@@ -716,12 +733,23 @@ export class ConnectionsService implements OnModuleDestroy {
       ...(updateConnectionDto.environment !== undefined
         ? { environment: updateConnectionDto.environment || 'none' }
         : {}),
+      ...(updateConnectionDto.allowedDatabases !== undefined
+        ? {
+            allowedDatabases:
+              updateConnectionDto.allowedDatabases.length > 0
+                ? updateConnectionDto.allowedDatabases
+                : null,
+          }
+        : {}),
+      ...(updateConnectionDto.roleQueryModes !== undefined
+        ? { roleQueryModes: updateConnectionDto.roleQueryModes }
+        : {}),
       ...(hasOrganizationId ? { organizationId: nextOrganizationId } : {}),
     };
 
     const updatedConnection = await this.prisma.connection.update({
       where: { id },
-      data: dataToUpdate,
+      data: dataToUpdate as any,
     });
 
     if (

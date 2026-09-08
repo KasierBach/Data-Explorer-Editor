@@ -58,6 +58,12 @@ model Connection {
   sshPassphrase String?
   environment   String?   @default("none")
 
+  // Team access restrictions (null = unrestricted):
+  // - allowedDatabases: whitelist of database names members may access
+  // - roleQueryModes: per-org-role query access ('blocked' | 'readonly' | 'full')
+  allowedDatabases Json?
+  roleQueryModes   Json?
+
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 

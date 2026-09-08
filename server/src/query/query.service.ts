@@ -37,6 +37,7 @@ import type { QueryResult } from '../database-strategies';
 import { PermissionsService } from '../permissions/services/permissions.service';
 import { Permission } from '../permissions/enums/permission.enum';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
+import { assertTeamConnectionAccess } from '../permissions/utils/team-connection-access.util';
 
 interface ActiveQueryEntry {
   queryId: string;
@@ -321,6 +322,24 @@ export class QueryService {
     database?: string,
     confirmed?: boolean,
   ) {
+    // 0. Team restrictions: database whitelist + per-role query modes.
+    if (connection.organizationId) {
+      const role = await this.permissionsService.getMemberRole(
+        userId,
+        connection.organizationId,
+      );
+      const isMongo =
+        connection.type === 'mongodb' || connection.type === 'mongodb+srv';
+      const isReadOnlySql = isMongo
+        ? isMongoActionAllowedOnReadOnly(getMongoActionFromPayload(sql))
+        : isSqlAllowedOnReadOnly(sql);
+      assertTeamConnectionAccess(
+        connection,
+        { userId, role },
+        { database, sql, isReadOnlySql },
+      );
+    }
+
     // 1. Check if query execution is enabled at all
     if (!connection.allowQueryExecution) {
       await this.blockOperation(userId, {

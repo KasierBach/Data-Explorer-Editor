@@ -274,6 +274,18 @@ export class OrganizationService {
     await apiService.delete<void>(`/organizations/${id}/members/${userId}`);
   }
 
+  static async leaveOrganization(id: string): Promise<void> {
+    await apiService.delete<void>(`/organizations/${id}/members/me`);
+  }
+
+  static async transferOwnership(id: string, targetUserId: string): Promise<void> {
+    await apiService.post<void>(`/organizations/${id}/transfer-ownership`, { targetUserId });
+  }
+
+  static async revokeInvitation(id: string, invitationId: string): Promise<void> {
+    await apiService.delete<void>(`/organizations/${id}/invitations/${invitationId}`);
+  }
+
   static async getTeamConnections(id: string): Promise<TeamConnectionEntity[]> {
     return apiService.get<TeamConnectionEntity[]>(`/organizations/${id}/connections`);
   }

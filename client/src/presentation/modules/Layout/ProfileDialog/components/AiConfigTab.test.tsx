@@ -55,6 +55,12 @@ vi.mock("@/core/services/aiPreferences", async () => {
   };
 });
 
+// The usage card fetches via react-query and is not part of these form
+// tests; stub it so the tests do not need a QueryClientProvider wrapper.
+vi.mock("@/presentation/components/shared/AiUsageCard", () => ({
+  AiUsageCard: () => null,
+}));
+
 describe("filterSearchableGroups", () => {
   it("filters model groups case-insensitively by label or value", () => {
     expect(
