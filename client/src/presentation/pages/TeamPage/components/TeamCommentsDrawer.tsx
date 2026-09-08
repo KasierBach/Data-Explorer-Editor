@@ -24,11 +24,13 @@ import {
   type CollaborationThread,
   type CollaborationReply,
   type CollaborationResourceType,
+  type CollaborationReactionGroup,
 } from '@/core/services/CollaborationService';
 import { OrganizationService } from '@/core/services/OrganizationService';
 import { useAppStore } from '@/core/services/store';
 import { getTeamText } from '../teamI18n';
 import { CommentReactionBar } from './CommentReactionBar';
+import { MentionText } from './MentionText';
 import { CommentComposer, type ComposerMember } from './CommentComposer';
 import { toast } from 'sonner';
 
@@ -44,6 +46,54 @@ interface TeamCommentsDrawerProps {
 
 function isImage(dataUrl: string): boolean {
   return /^data:image\//.test(dataUrl);
+}
+
+function findReactionGroups(
+  threads: CollaborationThread[],
+  commentId: string,
+): CollaborationReactionGroup[] {
+  for (const thread of threads) {
+    if (thread.commentId === commentId) return thread.reactions ?? [];
+    const reply = thread.replies.find((item) => item.commentId === commentId);
+    if (reply) return reply.reactions ?? [];
+  }
+  return [];
+}
+
+/** Flips the current user's reaction optimistically, without a server round-trip. */
+function computeOptimisticGroups(
+  groups: CollaborationReactionGroup[],
+  userId: string,
+  emoji: string,
+): CollaborationReactionGroup[] {
+  const existing = groups.find((group) => group.emoji === emoji);
+  if (existing && existing.userIds.includes(userId)) {
+    // Remove my reaction.
+    const userIds = existing.userIds.filter((id) => id !== userId);
+    if (userIds.length === 0) {
+      return groups.filter((group) => group.emoji !== emoji);
+    }
+    return groups.map((group) =>
+      group.emoji === emoji
+        ? {
+          ...group,
+          userIds,
+          count: userIds.length,
+          users: group.users.filter((user) => user.id !== userId),
+        }
+        : group,
+    );
+  }
+
+  // Add my reaction.
+  if (existing) {
+    return groups.map((group) =>
+      group.emoji === emoji
+        ? { ...group, count: group.count + 1, userIds: [...group.userIds, userId] }
+        : group,
+    );
+  }
+  return [...groups, { emoji, count: 1, userIds: [userId], users: [] }];
 }
 
 export function TeamCommentsDrawer({
@@ -197,13 +247,48 @@ export function TeamCommentsDrawer({
     }
   };
 
+  const applyReactionGroups = (
+    commentId: string,
+    groups: CollaborationReactionGroup[],
+  ) => {
+    setThreads((prev) =>
+      prev.map((thread) => {
+        if (thread.commentId === commentId) {
+          return { ...thread, reactions: groups };
+        }
+        const reply = thread.replies.find((item) => item.commentId === commentId);
+        if (reply) {
+          return {
+            ...thread,
+            replies: thread.replies.map((item) =>
+              item.commentId === commentId ? { ...item, reactions: groups } : item,
+            ),
+          };
+        }
+        return thread;
+      }),
+    );
+  };
+
   const toggleReaction = async (commentId: string, emoji: string) => {
     if (!organizationId) return;
+
+    // Optimistic update: flip this user's reaction immediately so the UI
+    // feels instant, then reconcile with the server's authoritative groups.
+    const snapshot = threads;
+    const optimistic = computeOptimisticGroups(
+      findReactionGroups(threads, commentId),
+      currentUserId,
+      emoji,
+    );
+    applyReactionGroups(commentId, optimistic);
+
     try {
-      await CollaborationService.toggleReaction(organizationId, commentId, emoji);
-      await reloadThreads();
+      const groups = await CollaborationService.toggleReaction(organizationId, commentId, emoji);
+      applyReactionGroups(commentId, groups);
     } catch (error) {
       console.error('[TeamCommentsDrawer] Failed to toggle reaction', error);
+      setThreads(snapshot);
       toast.error(lang === 'vi' ? 'Không thể thả biểu tượng cảm xúc.' : 'Could not toggle the reaction.');
     }
   };
@@ -431,7 +516,9 @@ export function TeamCommentsDrawer({
                   ) : editingCommentId === thread.commentId ? (
                     renderEditBox()
                   ) : (
-                    <p className="whitespace-pre-wrap text-sm text-foreground/90">{thread.body}</p>
+                    <p className="whitespace-pre-wrap text-sm text-foreground/90">
+                      <MentionText body={thread.body} members={composerMembers} />
+                    </p>
                   )}
                   {!thread.deleted && renderAttachments(thread.attachments)}
 
@@ -474,7 +561,9 @@ export function TeamCommentsDrawer({
                           ) : editingCommentId === reply.commentId ? (
                             renderEditBox()
                           ) : (
-                            <p className="mt-1 whitespace-pre-wrap text-sm">{reply.body}</p>
+                            <p className="mt-1 whitespace-pre-wrap text-sm">
+                              <MentionText body={reply.body} members={composerMembers} />
+                            </p>
                           )}
                           {!reply.deleted && renderAttachments(reply.attachments)}
                           {renderCommentActions(reply, true)}

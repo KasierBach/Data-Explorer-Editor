@@ -594,6 +594,59 @@ export class CollaborationService {
     return user;
   }
 
+  /** Batch-loads participants by user id in a single query. */
+  private async loadParticipants(
+    userIds: string[],
+  ): Promise<Map<string, CommentParticipant>> {
+    const map = new Map<string, CommentParticipant>();
+    if (userIds.length === 0) return map;
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        username: true,
+        avatarUrl: true,
+      },
+    });
+    for (const user of users) {
+      map.set(user.id, user);
+    }
+    return map;
+  }
+
+  /** Batch-loads mention participants (org members only) in a single query. */
+  private async loadMentionParticipants(
+    organizationId: string,
+    userIds: string[],
+  ): Promise<Map<string, CommentParticipant>> {
+    const map = new Map<string, CommentParticipant>();
+    if (userIds.length === 0) return map;
+
+    const members = await this.prisma.organizationMember.findMany({
+      where: { organizationId, userId: { in: userIds } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            username: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+    for (const member of members) {
+      map.set(member.userId, this.normalizeParticipant(member.user));
+    }
+    return map;
+  }
+
   private async loadResourceSnapshot(
     resourceType: ResourceType,
     resourceId: string,
@@ -666,12 +719,24 @@ export class CollaborationService {
   ) {
     const threads = new Map<string, CommentThread>();
 
+    // Batch-prefetch every author and mention in one pass each, instead of
+    // one query per log entry (N+1) — this is the main read hot path.
+    type ParsedLog = {
+      log: {
+        action: string;
+        userId?: string | null;
+        createdAt: Date;
+        details: string | null;
+        user?: CommentParticipant | null;
+      };
+      details: CommentDetails;
+    };
+    const parsedLogs: ParsedLog[] = [];
+    const authorIds = new Set<string>();
+    const mentionIds = new Set<string>();
     for (const log of logs) {
       const details = this.parseDetails(log.details);
-      if (!details) {
-        continue;
-      }
-
+      if (!details) continue;
       if (
         resourceType &&
         resourceId &&
@@ -680,18 +745,29 @@ export class CollaborationService {
       ) {
         continue;
       }
+      if (!log.user && !log.userId) continue;
 
-      if (!log.user && !log.userId) {
+      if (!log.user && log.userId) authorIds.add(log.userId);
+      for (const mentionId of details.mentions ?? []) {
+        mentionIds.add(mentionId);
+      }
+      parsedLogs.push({ log, details });
+    }
+
+    const [authorMap, mentionMap] = await Promise.all([
+      this.loadParticipants(Array.from(authorIds)),
+      this.loadMentionParticipants(organizationId, Array.from(mentionIds)),
+    ]);
+
+    for (const { log, details } of parsedLogs) {
+      const authorSnapshot = log.user ?? authorMap.get(log.userId as string);
+      if (!authorSnapshot) {
         continue;
       }
-
-      const author = this.normalizeParticipant(
-        log.user ?? (await this.loadUserSnapshot(log.userId as string)),
-      );
-      const mentions = await this.resolveMentionSnapshots(
-        organizationId,
-        details.mentions ?? [],
-      );
+      const author = this.normalizeParticipant(authorSnapshot);
+      const mentions = (details.mentions ?? [])
+        .map((mentionId) => mentionMap.get(mentionId))
+        .filter((mention): mention is CommentParticipant => !!mention);
 
       const findCommentTarget = (
         commentId: string,
