@@ -119,13 +119,13 @@ jobs:
           vuln-type: os,library
           severity: HIGH,CRITICAL
       - name: Generate SBOM (server)
-        uses: anchore/sbom-action@v0.24.2
+        uses: anchore/sbom-action@v0.24.3
         with:
           image: ${{ env.IMAGE_PREFIX }}/server:${{ github.sha }}
           artifact-name: sbom-server-${{ github.sha }}.spdx.json
           format: spdx-json
       - name: Generate SBOM (client)
-        uses: anchore/sbom-action@v0.24.2
+        uses: anchore/sbom-action@v0.24.3
         with:
           image: ${{ env.IMAGE_PREFIX }}/client:${{ github.sha }}
           artifact-name: sbom-client-${{ github.sha }}.spdx.json
