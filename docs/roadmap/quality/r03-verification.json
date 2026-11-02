@@ -1,0 +1,551 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-23",
+  "timezone": "Asia/Saigon",
+  "package": "R03",
+  "status": "VERIFIED_LOCAL",
+  "baseHead": "3d7ec60845ddc2a07284c2873d9d3727acd30744",
+  "tree": "uncommitted working tree on codex/roadmap-r00, inherits R00/R01/R02",
+  "productionSourceChanged": true,
+  "contract": "Classify the full SQL batch before pool acquisition. Confirmation never grants WRITE. Run classified SQL reads with native read-only on PostgreSQL/MySQL/SQLite, including counts/table windows; reject unsupported lexical forms; inspect supported Mongo pipelines and use Redis command semantics.",
+  "checks": [
+    {
+      "id": "server-unit",
+      "command": "cd server; node node_modules/jest/bin/jest.js --runInBand --json",
+      "exitCode": 0,
+      "passed": 640,
+      "failed": 0,
+      "skipped": 0,
+      "suites": 85,
+      "evidence": "output/roadmap-r03/server-unit-final.json"
+    },
+    {
+      "id": "client-unit",
+      "command": "cd client; node node_modules/vitest/vitest.mjs run --reporter=default --reporter=json",
+      "exitCode": 0,
+      "passed": 146,
+      "failed": 0,
+      "skipped": 0,
+      "suites": 47,
+      "evidence": "output/roadmap-r03/client-unit-final.json",
+      "priorFailure": "1/146 timed out in AiConfigTab at unchanged 5000ms. Focused 7/7 passed (affected case 1385ms), then full unchanged suite passed. No client source/test/config was changed to obtain this pass."
+    },
+    {
+      "id": "api",
+      "command": "cd server; node node_modules/jest/bin/jest.js --config jest-e2e.json --runInBand --detectOpenHandles --json",
+      "explicitEnvironment": {
+        "E2E_DATABASE_URL": "loopback PostgreSQL data_explorer_e2e",
+        "E2E_REDIS_URL": "loopback Redis DB 15"
+      },
+      "exitCode": 0,
+      "passed": 60,
+      "failed": 0,
+      "skipped": 0,
+      "suites": 5,
+      "r03Tests": 19,
+      "inheritedTests": 41,
+      "evidence": "output/roadmap-r03/api-final.json"
+    },
+    {
+      "id": "environment-guards",
+      "command": "cd server; node --test test/e2e-environment.test.cjs",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "evidence": "output/roadmap-r03/environment-final.log"
+    },
+    {
+      "id": "browser",
+      "command": "cd client; node node_modules/@playwright/test/cli.js test e2e/authenticated-workspace.spec.ts --project=chromium --project=firefox --reporter=list,json",
+      "exitCode": 0,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "timeoutMs": 60000,
+      "retries": 0,
+      "workers": 1,
+      "api": "strict mocks",
+      "durationsSeconds": {
+        "chromium": 20.1,
+        "firefox": 31.3
+      },
+      "evidence": "output/roadmap-r03/browser-final.json",
+      "priorFailures": "Initial Chromium timeout with Firefox pass; subsequent serial run timed out on both at different steps. Final pass followed teardown of the four owned DB containers. Logs preserved; resource pressure is a hypothesis, not proven sole cause."
+    },
+    {
+      "id": "server-typecheck",
+      "command": "cd server; node node_modules/typescript/bin/tsc --noEmit --incremental false",
+      "exitCode": 0,
+      "includesSpecs": true,
+      "evidence": "output/roadmap-r03/typecheck-final.log"
+    },
+    {
+      "id": "server-build",
+      "command": "cd server; npm run build",
+      "exitCode": 0,
+      "evidence": "output/roadmap-r03/server-build-final.log"
+    },
+    {
+      "id": "client-build",
+      "command": "cd client; npm run build",
+      "exitCode": 0,
+      "includes": [
+        "TypeScript project build",
+        "Vite production build",
+        "bundle budget",
+        "public prerender"
+      ],
+      "evidence": "output/roadmap-r03/client-build-final.log"
+    },
+    {
+      "id": "server-lint",
+      "command": "installed ESLint, explicit 15 R03 server TypeScript paths listed by files in this manifest",
+      "exitCode": 0,
+      "files": 15,
+      "evidence": "output/roadmap-r03/server-lint-final.log",
+      "priorFailure": "Removed an unnecessary type cast in the new scanner test; kept the assertion and reran final full unit/typecheck/lint."
+    },
+    {
+      "id": "client-lint",
+      "command": "cd client; node node_modules/eslint/bin/eslint.js e2e/authenticated-workspace.spec.ts",
+      "exitCode": 0,
+      "evidence": "output/roadmap-r03/client-lint-final.log"
+    }
+  ],
+  "redEvidence": [
+    {
+      "file": "guard-red.json",
+      "failed": 21,
+      "passed": 4,
+      "kind": "product lexical regression"
+    },
+    {
+      "file": "policy-red.json",
+      "failed": 9,
+      "passed": 1,
+      "kind": "product routing regression"
+    },
+    {
+      "file": "review-red.json",
+      "failed": 8,
+      "passed": 63,
+      "kind": "native classified-read flag, MySQL hash comment/whitespace, count options"
+    },
+    {
+      "file": "mariadb-red.json",
+      "failed": 5,
+      "passed": 47,
+      "kind": "MySQL-family alias regression"
+    },
+    {
+      "file": "http-red.json",
+      "failed": 2,
+      "passed": 9,
+      "kind": "one real MySQL SELECT side-effect bypass plus one harness status expectation"
+    },
+    {
+      "file": "api-fixture-import-red.json",
+      "failed": 4,
+      "passed": 55,
+      "kind": "fixture enum import, not product"
+    },
+    {
+      "file": "native-red.json",
+      "kind": "Initial SQLite reentrant-UDF busy error was not valid native-bypass evidence. Final test uses DELETE RETURNING and writable control."
+    }
+  ],
+  "runtime": {
+    "node": "v22.15.0",
+    "fixtureImages": [
+      "postgres:16-alpine",
+      "mysql:8.4",
+      "mongo:7",
+      "redis:7-alpine"
+    ],
+    "sqlite": "real in-memory better-sqlite3",
+    "mariadb": "alias routing tested against MySQL 8.4; no standalone MariaDB server"
+  },
+  "graph": {
+    "indexRefreshExit": 0,
+    "nodes": 6925,
+    "edges": 18443,
+    "flows": 274,
+    "indexFreshness": "refreshed during work, before final small source edits",
+    "interfaceImpact": {
+      "risk": "HIGH",
+      "directReferencesLowerBound": 22,
+      "implementations": 7,
+      "warnedBeforeEdit": true
+    },
+    "scannerImpact": {
+      "risk": "LOW",
+      "direct": 4
+    },
+    "detectChanges": {
+      "scope": "all",
+      "risk": "CRITICAL",
+      "trackedFiles": 36,
+      "symbols": 84,
+      "affectedProcesses": 23,
+      "scopeIncludes": "combined uncommitted R00/R01/R02/R03; new untracked files need explicit manifest review",
+      "runtimeProof": false
+    }
+  },
+  "review": {
+    "independent": true,
+    "initialFindings": [
+      "READ-without-WRITE on writable connection lacks native read-only",
+      "MySQL hash comments bypass confirmation analysis"
+    ],
+    "reReviewFinding": "MariaDB alias must share MySQL lexical policy",
+    "preExisting": true,
+    "criticalFound": false,
+    "parentImplementedAndRegressionTested": true,
+    "independentFinalAliasClosure": false,
+    "reviewerDidNotRun": [
+      "full unit",
+      "HTTP",
+      "browser"
+    ],
+    "remainingScope": "No certification of whole repo or unrelated R00/R01/R02 changes"
+  },
+  "cleanup": {
+    "fixturePostcheck": {
+      "postgresUsers": 0,
+      "postgresConnections": 0,
+      "postgresOrganizations": 0,
+      "postgresR03Tables": 0,
+      "postgresR03Functions": 0,
+      "postgresOtherSessions": 0,
+      "mysqlTables": 0,
+      "mysqlFunctions": 0,
+      "mongoR03Databases": 0,
+      "redisR03Keys": 0,
+      "redisOnlyPostcheckClient": true
+    },
+    "composeOwnershipVerified": true,
+    "containersAfter": 0,
+    "listenersAfter": 0,
+    "ports": [
+      15432,
+      16379,
+      17017,
+      13306
+    ],
+    "globalPrune": false,
+    "blockedCleanup": {
+      "path": "server/output/roadmap-r03",
+      "state": "empty directory retained",
+      "reason": "automatic policy blocked removal; no bypass attempted"
+    }
+  },
+  "protectedWorkingFiles": {
+    "baseline": "snapshot before R03",
+    "unchanged": 33,
+    "expectedChanged": [
+      "client/e2e/authenticated-workspace.spec.ts",
+      "server/src/query/query.service.spec.ts",
+      "server/src/query/query.service.ts"
+    ],
+    "unexpectedChanged": []
+  },
+  "coverageMeasured": false,
+  "limitations": [
+    "Counts are not line/branch/function or user-workflow coverage.",
+    "Browser uses strict mock APIs, not browser-to-real-backend full stack; no new mobile/WebKit/full-page accessibility gate.",
+    "No standalone MariaDB runtime or native isolation proof for MSSQL/ClickHouse/all extensions and dialect modes.",
+    "Bounded lexical scanner is not a full SQL parser; unsupported forms now return explicit client errors.",
+    "Read-classified SELECT side effects are intentionally denied; PostgreSQL/MySQL read transactions add round trips that were not benchmarked.",
+    "Earlier browser and client timeouts remain evidence of environment sensitivity/flakiness; no budget, retry, skip, assertion or coverage weakening.",
+    "No remote CI, full dependency/container audit or production release gate.",
+    "R04 and later roadmap work remain open; local R03 verification does not close Gate A."
+  ],
+  "committed": false,
+  "pushed": false,
+  "deployed": false,
+  "rawEvidenceDirectory": "output/roadmap-r03 (ignored local logs; portable checks and hashes retained in this manifest)",
+  "files": [
+    {
+      "path": "server/src/query/query-guard.util.ts",
+      "sha256": "5ec66a60afa3e87558245a6e6a2975b2e9770cfea513e5cf6f63d52e9addec26"
+    },
+    {
+      "path": "server/src/query/query.service.ts",
+      "sha256": "7edcf323caa5bfd7a69df8d47f0e7b2130f1e39b31eda4f813eaa1b500f5c986"
+    },
+    {
+      "path": "server/src/database-strategies/database-strategy.interface.ts",
+      "sha256": "0406ea17d2601961b7c453cc94eda2db1e9e90a0fbd013ee95af05e5fc2f32ff"
+    },
+    {
+      "path": "server/src/database-strategies/postgres.strategy.ts",
+      "sha256": "cc4fc431ea672d73184f5a035e51e2f2016ad30b34fba36f05dd5926a2ce93d6"
+    },
+    {
+      "path": "server/src/database-strategies/mysql.strategy.ts",
+      "sha256": "53d3fdf9256e7fd325d363e37a8a4431c9228f8e26af212c603129858b1cf9b9"
+    },
+    {
+      "path": "server/src/database-strategies/sqlite.strategy.ts",
+      "sha256": "2bff3416659ead0308074f5a88e0a95485b7a5cabae84ba9dd973256670ecce8"
+    },
+    {
+      "path": "server/src/database-strategies/redis.strategy.ts",
+      "sha256": "f0a095e7d3042c759837b665230191961ae731a28d4a5a8bbff0f4d5d9c0cd16"
+    },
+    {
+      "path": "server/src/query/query-guard.r03.spec.ts",
+      "sha256": "f9985ba397787ed727f9dfb03cdfc74ec6b261ed7027478da695192110364069"
+    },
+    {
+      "path": "server/src/query/query-policy.r03.spec.ts",
+      "sha256": "2d9f5f45d2d90554f79ac819a5cf423d8ee61f409f8072b7f9de70cdcf7f1e48"
+    },
+    {
+      "path": "server/src/query/read-only-strategy.r03.spec.ts",
+      "sha256": "2de9bd2db3cabf3adf8844b11f9d5dc8ac35732810cb3ca16802dc84630b66d1"
+    },
+    {
+      "path": "server/src/query/query-guard.attack-vectors.spec.ts",
+      "sha256": "bb218e84b45c44e3842b4f58d67028dad16c056f14669a4daf85058feccc6959"
+    },
+    {
+      "path": "server/src/query/pentest.adversarial.spec.ts",
+      "sha256": "42f98dc4e3fd456cdefd297b882e67af040f077d9a1a1987836f69883298d076"
+    },
+    {
+      "path": "server/src/query/security-fuzz.spec.ts",
+      "sha256": "72c24da2428d419f56bf2f6d8b04c025c9bcda910aa85ceb5bda281bf2d9ec93"
+    },
+    {
+      "path": "server/src/query/query.service.spec.ts",
+      "sha256": "6b4ad4461454a4113cd39c07ff9427d64c1681a1f7a256f8bc8b6f570aa3e61b"
+    },
+    {
+      "path": "server/test/query-policy-r03.e2e-spec.ts",
+      "sha256": "665b05082f867e11fc09945f64888eab663b2ff606920611779e417e98d11944"
+    },
+    {
+      "path": "server/test/compose.r03.yml",
+      "sha256": "89894ae42ee703527aa5102d3987aef4b0eb40c713fe18d8f69ba3caae883541"
+    },
+    {
+      "path": "client/e2e/authenticated-workspace.spec.ts",
+      "sha256": "b974931650a72b962c49f3532312f9e62071462ec2bcf29ec631151b8b84b202"
+    }
+  ],
+  "generatedIndexMetadata": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "c7ad53baae174ba3a184e0aa93f8f621a6b9d38b9404a04a052ae4f63424bac8"
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "c7ad53baae174ba3a184e0aa93f8f621a6b9d38b9404a04a052ae4f63424bac8"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "docs/roadmap/ROADMAP.md",
+      "sha256": "4ce56732a69d3f4347038a82314babecce60d13bc6443fe210f3544ce9344339"
+    },
+    {
+      "path": "docs/roadmap/ROADMAP-PROGRESS.md",
+      "sha256": "dcc6de948a0bf97adbbeba4a4fb0fcf3c3d486c62fce4b55e7dbd6e766148ae9"
+    },
+    {
+      "path": "docs/roadmap/quality/README.md",
+      "sha256": "4d0b3ea82232d08644bc73b9f0a2d31b413624a9df2a3a8a2584129098e64159"
+    },
+    {
+      "path": "docs/roadmap/quality/R03-REPORT.md",
+      "sha256": "fb1859be9ab1ca2e6c7ca5edaccea254411ed58981c2cb5b634890f6f798e1f1"
+    }
+  ],
+  "rawEvidence": [
+    {
+      "path": "output/roadmap-r03/server-unit-final.json",
+      "sha256": "013a6e16e912d6069c31ec8657336e03f38462891836c8b1b3cbe713258874e4"
+    },
+    {
+      "path": "output/roadmap-r03/client-unit-final.json",
+      "sha256": "858579d45e2c94d3db6d1773df6d10d66309dbff688e00df5881c519a38e5b34"
+    },
+    {
+      "path": "output/roadmap-r03/api-final.json",
+      "sha256": "446bc567ebd85fa497bd816682f6e33ead27e10b91105e71d0587b324a656bb3"
+    },
+    {
+      "path": "output/roadmap-r03/browser-final.json",
+      "sha256": "6181438c8f3ad744c71a8947b62ae37e475c7628c35aa196bd46879657078194"
+    },
+    {
+      "path": "output/roadmap-r03/environment-final.log",
+      "sha256": "580a940dc22bc947148847ab8382108446cda9b8121fd12e07abd92eff80b497"
+    },
+    {
+      "path": "output/roadmap-r03/server-checks-final.json",
+      "sha256": "b493bcb4ef3372371187f99278da059ef9914b4e82c34ed8dfab2bebdc1bfc46"
+    },
+    {
+      "path": "output/roadmap-r03/client-checks-final.json",
+      "sha256": "4d9ac6329a156341de48fa83630a0d59ed906dc0dc93ba7919654f96bbd0c70e"
+    },
+    {
+      "path": "output/roadmap-r03/server-build-final.log",
+      "sha256": "bb3c95080676f33f9db54f252d5a315050eaff6acd2f32d8852840ac0fb8d077"
+    },
+    {
+      "path": "output/roadmap-r03/client-build-final.log",
+      "sha256": "f72c11481d353d30a326e603d4e14f869977c31791dc869194a9a37306766eaf"
+    },
+    {
+      "path": "output/roadmap-r03/server-lint-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "output/roadmap-r03/client-lint-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "output/roadmap-r03/typecheck-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "output/roadmap-r03/guard-red.json",
+      "sha256": "d5e43b87b5a85ffa1375004771feebc988dea02c547ca2df95806dd0b142fd86"
+    },
+    {
+      "path": "output/roadmap-r03/policy-red.json",
+      "sha256": "362c139c5c70ee88980096308420f3fe91e177e9e5bc1dced8e832be1c103673"
+    },
+    {
+      "path": "output/roadmap-r03/review-red.json",
+      "sha256": "5399e33d3548294bbec20843781c1e6d843d884d3c9d4c69d45cbcbe87767e6d"
+    },
+    {
+      "path": "output/roadmap-r03/mariadb-red.json",
+      "sha256": "42de1bcd7ae87c28665a1d27c6b33a5aee3cc2f0769783bc98836dbaf3a23a10"
+    },
+    {
+      "path": "output/roadmap-r03/http-red.json",
+      "sha256": "231dcefaf58e88da077b69654c01c4a7d67045dc6fa866583eeec843740cc10d"
+    },
+    {
+      "path": "output/roadmap-r03/api-fixture-import-red.json",
+      "sha256": "b764f8c7176d21014d534ea3cdb185c41e535ca98e1778de594c5da88a330fbc"
+    },
+    {
+      "path": "output/roadmap-r03/native-red.json",
+      "sha256": "4e41fdd63cc18147d4514ad226e84904f911f2e2c65f5e09aafc35267b4a5470"
+    },
+    {
+      "path": "output/roadmap-r03/client-unit-initial-red.json",
+      "sha256": "312048f4df51ca4c832b4e416fe9a69bd2e3bdc2284ab97e55bda8f026582aff"
+    },
+    {
+      "path": "output/roadmap-r03/client-aiconfig-diagnostic.json",
+      "sha256": "14c06560fcd9584e772b5295f08a6df662e6ba0973ac1a988937c7e8cdc14142"
+    },
+    {
+      "path": "output/roadmap-r03/browser.log",
+      "sha256": "cb62831d3eed82f7184f468e67153c9598a327cbe45d0780cd4c76222260d38a"
+    },
+    {
+      "path": "output/roadmap-r03/browser-serial.log",
+      "sha256": "64577485df8e800833dde449387cd265007b28f39a90d318a1cc9d2ac9e7ce80"
+    },
+    {
+      "path": "output/roadmap-r03/fixture-postcheck.json",
+      "sha256": "f584282709281bc2eb33cd5c9f980c758386198fb5472e33cf9dd8db20f84757"
+    },
+    {
+      "path": "output/roadmap-r03/fixture-down-proof.json",
+      "sha256": "ddfbfae7c95ef30863f81c76367a9c9070c2eb0bb2ae5a93ad6986c39751c9fb"
+    },
+    {
+      "path": "output/roadmap-r03/protected-files-check.json",
+      "sha256": "8c2c44211ed8eb00918e026b003e1ec750806c41edffb221fb8f4db29a45361a"
+    },
+    {
+      "path": "output/roadmap-r03/gitnexus-refresh.log",
+      "sha256": "d8e5e085f1ac84a5f622bcf259a5d2a558bb4314366f4eb3942728d492291d69"
+    }
+  ],
+  "documentationChecks": {
+    "jsonParsed": true,
+    "gitDiffCheckExit": 0,
+    "canonicalR02DocumentationRowsRefreshed": 3,
+    "sourceAndArtifactHashRows": 23,
+    "localMarkdownFiles": 7,
+    "localLinksAndAnchors": 165,
+    "checkedHashRows": 50,
+    "manifestsParsed": 4,
+    "hashMismatches": []
+  },
+  "documentationUpdates": [
+    {
+      "date": "2026-10-23",
+      "reason": "R04 completed locally with explicit containment; refresh canonical documentation hashes only. Historical source/test evidence remains unchanged.",
+      "files": [
+        {
+          "path": "docs/roadmap/ROADMAP.md",
+          "previousSha256": "f788146b43ae319685d7bf98cc692973ae8b7eb4bef060348722065392adabbb",
+          "sha256": "29e1854d1f1d319087d031c4197dc17012230bd41db7b1f5017dce53156a886e"
+        },
+        {
+          "path": "docs/roadmap/ROADMAP-PROGRESS.md",
+          "previousSha256": "de4ae6247f674118b056310cff969cb5ed532ba5384a5fe7798c36ddd6ebe2b8",
+          "sha256": "82b3351cbe2fd4e7abb622b986f739ab51b25a8442a71ce92c59be7a180b901b"
+        },
+        {
+          "path": "docs/roadmap/quality/README.md",
+          "previousSha256": "1f4a954fd8e2e855cb1179e19f7bef4deb78c5893eabe3d9d20cd9c81c71e043",
+          "sha256": "bd88fc4859781e23a54fac27042f6752b712530dba3fb428caf59fbc93f224e5"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-23",
+      "reason": "R05 local verification complete; refresh canonical documentation artifact hashes only, preserve historical source/test snapshots.",
+      "files": [
+        {
+          "path": "docs/roadmap/ROADMAP.md",
+          "previousSha256": "29e1854d1f1d319087d031c4197dc17012230bd41db7b1f5017dce53156a886e",
+          "sha256": "71c67690d229078cc70f6724581a4b7217e122a90e25cad00ed9a4abb7872644"
+        },
+        {
+          "path": "docs/roadmap/ROADMAP-PROGRESS.md",
+          "previousSha256": "82b3351cbe2fd4e7abb622b986f739ab51b25a8442a71ce92c59be7a180b901b",
+          "sha256": "b372a0d70dfcbb56863b8ed079813a9ef97e5aeef77d2b21a555a9018043d448"
+        },
+        {
+          "path": "docs/roadmap/quality/README.md",
+          "previousSha256": "bd88fc4859781e23a54fac27042f6752b712530dba3fb428caf59fbc93f224e5",
+          "sha256": "9e4fc69bb635c6686ddacfca9b8c6bffa4cadbf21d8730b6e6b689e134b13b44"
+        }
+      ]
+    },
+    {
+      "date": "2026-10-24",
+      "reason": "R06 local verification complete with explicit Minor/rulings. Refresh canonical documentation artifact hashes only; preserve historical source/test snapshots.",
+      "files": [
+        {
+          "path": "docs/roadmap/ROADMAP.md",
+          "previousSha256": "71c67690d229078cc70f6724581a4b7217e122a90e25cad00ed9a4abb7872644",
+          "sha256": "4ce56732a69d3f4347038a82314babecce60d13bc6443fe210f3544ce9344339"
+        },
+        {
+          "path": "docs/roadmap/ROADMAP-PROGRESS.md",
+          "previousSha256": "b372a0d70dfcbb56863b8ed079813a9ef97e5aeef77d2b21a555a9018043d448",
+          "sha256": "dcc6de948a0bf97adbbeba4a4fb0fcf3c3d486c62fce4b55e7dbd6e766148ae9"
+        },
+        {
+          "path": "docs/roadmap/quality/README.md",
+          "previousSha256": "9e4fc69bb635c6686ddacfca9b8c6bffa4cadbf21d8730b6e6b689e134b13b44",
+          "sha256": "4d0b3ea82232d08644bc73b9f0a2d31b413624a9df2a3a8a2584129098e64159"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-22",
+  "timezone": "Asia/Saigon",
+  "package": "R00",
+  "status": "VERIFIED_LOCAL",
+  "baseHead": "3d7ec60845ddc2a07284c2873d9d3727acd30744",
+  "tree": "uncommitted working tree on codex/roadmap-r00",
+  "productionSourceChanged": false,
+  "files": [
+    {
+      "path": "client/e2e/auth-flows.spec.ts",
+      "sha256": "882ad2fd50e14edde9e8838bbfb1d924a577c2222f7c596fba4f48e41f5d8723"
+    },
+    {
+      "path": "client/e2e/authenticated-workspace.spec.ts",
+      "sha256": "49ef75e456348b5f8186ab6dc43f94569cea35ba0dfd2464fc4c56cd7bd23623"
+    },
+    {
+      "path": "client/e2e/support/authenticated-api.ts",
+      "sha256": "d170e15377b356636be453e4c5e1658c9d4eb350c1cbc0c5c62246f82a5fe47a"
+    },
+    {
+      "path": "client/e2e/support/auxiliary-api.ts",
+      "sha256": "174ac62fda5429cae500e46c139ff0c5e7adb11f2137b91fe30f0658b396f10d"
+    },
+    {
+      "path": "client/e2e/api-fixture-contract.spec.ts",
+      "sha256": "f2462d7c176344be65011f913624d2decea3a1be145b9680204ced52c66b0983"
+    },
+    {
+      "path": "client/playwright.config.ts",
+      "sha256": "455d6d26dc2b778206ba6d1d11d36ec774a8a45ae817579b9b9e540ab041b016"
+    },
+    {
+      "path": "server/jest-e2e.json",
+      "sha256": "2a675e1a8ddf42a78b787f2fdd6c2446ffe2ed348f4556a7efeeebfa710c53e9"
+    },
+    {
+      "path": "server/package.json",
+      "sha256": "2c18dc6dc34dcf8ca3178a425dec04682ed340e770ebba206184481560cdecc2"
+    },
+    {
+      "path": "server/test/app.e2e-spec.ts",
+      "sha256": "780775caf173a5d1aae5130f2f92739621d9c3ad78336ab64e8fdbb7f0658c21"
+    },
+    {
+      "path": "server/test/auth-security.e2e-spec.ts",
+      "sha256": "4c437f101464e7d5185a6d660244030ccab433ad50a596034e5af67792dc1153"
+    },
+    {
+      "path": "server/test/e2e-app.ts",
+      "sha256": "d8901ab0d6c5f84d02a683dd923cdebecde543d9eeb786c065dc17b8704620b4"
+    },
+    {
+      "path": "server/test/e2e-environment.cjs",
+      "sha256": "f916f256283fcc6e1ad88d5714f3cfd173c1fce102548e74115a30ca6e856818"
+    },
+    {
+      "path": "server/test/e2e-environment.test.cjs",
+      "sha256": "1eb1bfb98af254dc668f80a7ff993ae242f7cfaec89fb98ebc4886717aa784df"
+    },
+    {
+      "path": "server/test/setup-env.cjs",
+      "sha256": "49b91812599d1ae49a8857b953c22c279067084770ad5895760b406084db5f39"
+    },
+    {
+      "path": "server/test/compose.e2e.yml",
+      "sha256": "9586d1d533e2fcea25db8393f83b7667524014bc5badde8c593d2fa36e947350"
+    },
+    {
+      "path": "docs/roadmap/quality/audit-baseline-2026-10-20.json",
+      "sha256": "039754fe63866155b9b985157781379f62fcb7c38de346e1d64ac45fee4a8e8d",
+      "originalPath": "quality/audit-baseline-2026-10-20.json"
+    }
+  ],
+  "checks": [
+    {
+      "scope": "server environment guard and full-stack API",
+      "command": "npm run test:e2e -- --detectOpenHandles",
+      "cwd": "server",
+      "result": "2 Node guard tests + 23 API tests passed",
+      "exitCode": 0,
+      "logSha256": "31abb28b30921953c623d05054c320d573587aee6f61b634c2886dbb31a69a14",
+      "localLog": "output/r00-server-verified-gate.log"
+    },
+    {
+      "scope": "browser HTTP mock scenarios and fixture contract",
+      "command": "npm run test:e2e",
+      "cwd": "client",
+      "result": "58 passed",
+      "exitCode": 0,
+      "logSha256": "dfe1363f22ecf2a2dea467f75264509132b290e802a0b3807f3aa5cb4050e89e",
+      "localLog": "output/r00-browser-verified-gate.log"
+    },
+    {
+      "scope": "client unit",
+      "command": "npm run test:ci",
+      "cwd": "client",
+      "result": "142 tests / 46 files passed on rerun",
+      "exitCode": 0,
+      "logSha256": "4f0a9ab07a38f5b7a704e353605e1c0d34e7711c1bcbd289e14c965880fea645",
+      "localLog": "output/r00-client-unit-final.log"
+    },
+    {
+      "scope": "server typecheck including e2e",
+      "command": "tsc --noEmit --incremental false",
+      "cwd": "server",
+      "result": "pass",
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "localLog": "output/r00-server-types.log"
+    },
+    {
+      "scope": "client e2e TypeScript",
+      "command": "tsc --noEmit --module esnext --moduleResolution bundler --target es2022 --strict --esModuleInterop --skipLibCheck e2e/api-fixture-contract.spec.ts e2e/support/auxiliary-api.ts e2e/support/authenticated-api.ts e2e/auth-flows.spec.ts e2e/authenticated-workspace.spec.ts playwright.config.ts",
+      "cwd": "client",
+      "result": "pass",
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "localLog": "output/r00-client-types.log"
+    },
+    {
+      "scope": "server focused lint",
+      "command": "eslint test/e2e-app.ts test/auth-security.e2e-spec.ts test/app.e2e-spec.ts",
+      "cwd": "server",
+      "result": "pass",
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "localLog": "output/r00-server-final-lint.log"
+    },
+    {
+      "scope": "client focused lint",
+      "command": "eslint e2e/support/auxiliary-api.ts e2e/support/authenticated-api.ts e2e/api-fixture-contract.spec.ts e2e/auth-flows.spec.ts e2e/authenticated-workspace.spec.ts playwright.config.ts",
+      "cwd": "client",
+      "result": "pass",
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "localLog": "output/r00-client-final-lint.log"
+    },
+    {
+      "scope": "server unit",
+      "command": "jest --runInBand",
+      "cwd": "server",
+      "result": "563 tests / 82 suites passed",
+      "exitCode": 0,
+      "evidence": "Process exit 0 was returned by exec session 61651; original log retained locally at output/r00-server-unit.log."
+    }
+  ],
+  "negativeChecks": [
+    {
+      "case": "Old security tests return without assertions",
+      "result": "RED: both failed expect.hasAssertions",
+      "localLog": "output/r00-security-red.log"
+    },
+    {
+      "case": "Unknown browser API returns empty success",
+      "result": "RED before strict handler; passes after fix"
+    },
+    {
+      "case": "No explicit E2E endpoint variables",
+      "result": "Rejected before boot with exit 1 / 0 tests",
+      "localLog": "output/r00-server-gate.log"
+    }
+  ],
+  "teardown": {
+    "fixtureUsersRemaining": 0,
+    "fixtureConnectionsRemaining": 0,
+    "postgresAppSessionsRemaining": 0,
+    "redisAppClientsRemaining": 0
+  },
+  "review": {
+    "independent": "not completed: reviewer model usage limit",
+    "selfReview": "completed",
+    "deferred": [
+      "A01 login error locale account-enumeration triage",
+      "A02 cache legacy store wiring / multi-replica Redis lifecycle"
+    ]
+  },
+  "gitnexus": {
+    "incrementalRefresh": "failed: file_fts inconsistent",
+    "fullRebuild": "pass, exit 0; 6824 nodes, 18114 edges, 274 flows",
+    "finalDetectChanges": "LOW; 8 tracked files, 5 symbols, 0 affected production flows; untracked files reviewed separately",
+    "exactMockAuthApiImpact": "LOW; 1 caller in auth-flows.spec.ts; 0 processes"
+  },
+  "limitations": [
+    "No remote CI/release/container/dependency gate run",
+    "No coverage remeasurement",
+    "Browser suite mocks API; not full-stack browser evidence",
+    "Initial client unit run: 141 pass / 1 timeout; unchanged command rerun passed 142",
+    "R01-R14 not implemented; historical audit FAIL cases remain open",
+    "Original full reports/logs are local ignored artifacts; portable bundle is summary only"
+  ],
+  "documentationRelocation": {
+    "date": "2026-10-22",
+    "directory": "docs/roadmap",
+    "reason": "User requested consolidating Markdown documentation",
+    "sourceAndTestBytesChanged": false,
+    "historicalResultsReRun": false,
+    "pathBase": "Repository root",
+    "note": "originalPath and originalSha256 preserve pre-relocation evidence when paths or documentation links changed."
+  }
+}

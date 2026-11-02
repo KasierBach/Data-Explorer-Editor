@@ -1,0 +1,832 @@
+{
+  "schemaVersion": 1,
+  "package": "R08",
+  "status": "VERIFIED_LOCAL",
+  "date": "2026-10-25",
+  "timezone": "Asia/Saigon",
+  "generatedUtc": "2026-10-25T04:52:29.914Z",
+  "baseHead": "3d7ec60845ddc2a07284c2873d9d3727acd30744",
+  "branch": "codex/roadmap-r00",
+  "tree": "Uncommitted R00-R08 working tree. HEAD alone does not contain tested changes. No commit/push/deploy.",
+  "gateStatus": "Product checks passed; dependency audits remain BASELINE_FAIL. Not release-ready.",
+  "runtime": {
+    "node": "v22.15.0",
+    "npm": "11.7.0",
+    "powershell": "7.6.5"
+  },
+  "contract": "Original tuple identity and unique generation ownership; raw numeric count only is cached. Scoped invalidation after native mutation/DDL/import/seed/migration/refresh. Authorization before cache access. Partial writes retain real native outcome and failure; cache/progress errors never replay committed imports.",
+  "acceptance": [
+    {
+      "id": "F6-M09",
+      "status": "VERIFIED_LOCAL",
+      "proof": "Native PG literals and quoted identifiers retain case and correct counts; case-sensitive DB names remain isolated. Unit preserves whitespace, types and tuple boundaries."
+    },
+    {
+      "id": "F7-M10",
+      "status": "VERIFIED_LOCAL",
+      "proof": "Warm count/metadata/AI/NoSQL reflect successful writes, DDL, import, seed, refresh and migration; PG rollback and Mongo/MySQL partial errors match real DB state."
+    },
+    {
+      "id": "authorization-lifecycle-error",
+      "status": "VERIFIED_LOCAL",
+      "proof": "Warm/cold/revoked/outsider requests enforce current policy; R01-R07 native regressions pass. Native Mongo/MySQL errors survive failed refresh; cache errors never replay committed migration batches."
+    }
+  ],
+  "checks": [
+    {
+      "id": "server-prisma",
+      "command": "npm.cmd run prisma:generate",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T04:36:20.6662939Z",
+      "finishedUtc": "2026-10-25T04:36:25.2038809Z",
+      "evidence": "output/roadmap-r08/server-prisma.log",
+      "status": "PASS"
+    },
+    {
+      "id": "server-lint",
+      "command": "npm.cmd run lint",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T04:36:25.2344612Z",
+      "finishedUtc": "2026-10-25T04:36:52.9307262Z",
+      "evidence": "output/roadmap-r08/server-lint.log",
+      "status": "PASS"
+    },
+    {
+      "id": "server-unit",
+      "command": "npm.cmd run test:ci -- --json --outputFile=../output/roadmap-r08/server-unit.json",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T04:36:52.9359573Z",
+      "finishedUtc": "2026-10-25T04:37:27.2899123Z",
+      "evidence": "output/roadmap-r08/server-unit.log",
+      "status": "PASS"
+    },
+    {
+      "id": "server-build",
+      "command": "npm.cmd run build",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T04:37:27.2935862Z",
+      "finishedUtc": "2026-10-25T04:37:44.8633378Z",
+      "evidence": "output/roadmap-r08/server-build.log",
+      "status": "PASS"
+    },
+    {
+      "id": "api-native",
+      "command": "npm.cmd run test:e2e -- --detectOpenHandles --json --outputFile=../output/roadmap-r08/api-native.json",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T04:37:44.8659464Z",
+      "finishedUtc": "2026-10-25T04:39:18.6305434Z",
+      "evidence": "output/roadmap-r08/api-native.log",
+      "status": "PASS"
+    },
+    {
+      "id": "server-audit",
+      "command": "node ../.github/scripts/npm-audit.mjs",
+      "exitCode": 1,
+      "startedUtc": "2026-10-25T04:39:18.6336969Z",
+      "finishedUtc": "2026-10-25T04:39:21.1082640Z",
+      "evidence": "output/roadmap-r08/server-audit.log",
+      "status": "BASELINE_FAIL"
+    },
+    {
+      "id": "client-lint",
+      "command": "node node_modules/eslint/bin/eslint.js .",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T04:18:00.1117290Z",
+      "finishedUtc": "2026-10-25T04:18:40.0311748Z",
+      "evidence": "output/roadmap-r08/client-lint.log",
+      "status": "PASS"
+    },
+    {
+      "id": "client-unit",
+      "command": "node node_modules/vitest/vitest.mjs run --reporter=json --outputFile=../output/roadmap-r08/client-unit.json",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T04:18:40.0638754Z",
+      "finishedUtc": "2026-10-25T04:19:43.7499616Z",
+      "evidence": "output/roadmap-r08/client-unit.log",
+      "status": "PASS"
+    },
+    {
+      "id": "client-prerender",
+      "command": "node --test scripts/prerender-public.test.mjs",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T04:19:43.7605968Z",
+      "finishedUtc": "2026-10-25T04:19:43.9100155Z",
+      "evidence": "output/roadmap-r08/client-prerender.log",
+      "status": "PASS"
+    },
+    {
+      "id": "ci-scripts",
+      "command": "node --test ../.github/scripts/deploy-render.test.mjs ../.github/scripts/npm-audit.test.mjs",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T04:19:43.9132957Z",
+      "finishedUtc": "2026-10-25T04:19:44.0812459Z",
+      "evidence": "output/roadmap-r08/ci-scripts.log",
+      "status": "PASS"
+    },
+    {
+      "id": "client-build",
+      "command": "npm.cmd run build",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T04:19:44.0836550Z",
+      "finishedUtc": "2026-10-25T04:21:12.0045352Z",
+      "evidence": "output/roadmap-r08/client-build.log",
+      "status": "PASS"
+    },
+    {
+      "id": "client-audit",
+      "command": "node ../.github/scripts/npm-audit.mjs",
+      "exitCode": 1,
+      "startedUtc": "2026-10-25T04:21:12.0119014Z",
+      "finishedUtc": "2026-10-25T04:21:21.4715620Z",
+      "evidence": "output/roadmap-r08/client-audit.log",
+      "status": "BASELINE_FAIL"
+    },
+    {
+      "id": "browser-full",
+      "command": "node node_modules/@playwright/test/cli.js test --reporter=json",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T04:21:21.4746819Z",
+      "finishedUtc": "2026-10-25T04:26:17.0633911Z",
+      "evidence": "output/roadmap-r08/browser-full.log",
+      "status": "PASS"
+    }
+  ],
+  "testTotals": {
+    "serverUnit": {
+      "passed": 711,
+      "failed": 0,
+      "skipped": 0,
+      "files": 94
+    },
+    "clientUnit": {
+      "passed": 158,
+      "failed": 0,
+      "skipped": 0,
+      "files": 49
+    },
+    "api": {
+      "passed": 138,
+      "failed": 0,
+      "skipped": 0,
+      "files": 14,
+      "r08NativeSubset": 16,
+      "environmentGuards": 2
+    },
+    "browser": {
+      "passed": 82,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "scope": "Original HTTP mock projects/config; not browser-to-real-backend"
+    },
+    "prerender": 1,
+    "ciScripts": 8
+  },
+  "audit": {
+    "status": "BASELINE_FAIL",
+    "clientAllowlist": "GHSA-QWWW-VCR4-C8H2",
+    "serverAllowlist": "GHSA-GGR8-5VV4-36MX",
+    "clientEvidence": "output/roadmap-r08/client-audit.log",
+    "serverEvidence": "output/roadmap-r08/server-audit.log",
+    "packageHashes": [
+      {
+        "path": "client/package.json",
+        "sha256": "cef5f0fa42624cd2bc2bf55cd3842fe62ffda21be718c65c173de79fe6be3b76",
+        "unchangedDuringR08": true
+      },
+      {
+        "path": "client/package-lock.json",
+        "sha256": "ed5944daa7bbd5c3b8790f56ba252345930eafcc25b5d9f827433b24d49c6e8f",
+        "unchangedDuringR08": true
+      },
+      {
+        "path": "server/package.json",
+        "sha256": "2c18dc6dc34dcf8ca3178a425dec04682ed340e770ebba206184481560cdecc2",
+        "unchangedDuringR08": true
+      },
+      {
+        "path": "server/package-lock.json",
+        "sha256": "1d7bb81dca10caac1277d972e17de2ff9fde438ec567703bc22b2f74c34c19a8",
+        "unchangedDuringR08": true
+      }
+    ]
+  },
+  "review": {
+    "kind": "Author self-review in separate pass; no independent review authorized",
+    "scope": {
+      "trackedBaselineRecovered": [
+        "server/src/common/freshness/freshness.service.ts",
+        "server/src/query/query.service.ts",
+        "server/src/query/query.service.spec.ts",
+        "server/src/metadata/metadata.service.ts",
+        "server/src/ai/ai.schema-context.service.ts",
+        "server/src/nosql/nosql.service.ts",
+        "server/src/nosql/nosql.service.spec.ts",
+        "server/src/migration/migration.service.ts",
+        "server/src/migration/migration.service.spec.ts",
+        "server/src/database-strategies/mysql.strategy.ts",
+        "server/src/database-strategies/clickhouse.strategy.ts",
+        "server/src/database-strategies/mssql.strategy.ts",
+        "server/src/database-strategies/sqlite.strategy.ts",
+        "server/src/database-strategies/mongodb.strategy.ts",
+        "server/src/database-strategies/database-strategy.interface.ts",
+        "server/scripts/benchmarks/migration-benchmark.mjs"
+      ],
+      "preexistingUntrackedWithoutFrozenBytes": [
+        "server/src/query/query-lifecycle.r07.spec.ts",
+        "server/src/query/query-policy.r03.spec.ts",
+        "server/src/migration/migration-lifecycle.r05.spec.ts",
+        "server/test/fixtures/migration-r05-worker-child.cjs",
+        "server/src/query/query-row-policy.r04.spec.ts",
+        "server/test/connection-policy.e2e-spec.ts"
+      ]
+    },
+    "trackedR08Diff": "output/roadmap-r08/r08-tracked-only.diff",
+    "gitnexus": {
+      "index": {
+        "nodes": 7329,
+        "edges": 19354,
+        "clusters": 429,
+        "flows": 269,
+        "exitCode": 0
+      },
+      "compareMainAndAll": {
+        "risk": "CRITICAL",
+        "trackedFiles": 63,
+        "symbols": 284,
+        "flows": 48,
+        "scope": "Combined R00-R08; not isolated R08 risk"
+      },
+      "evidence": "output/roadmap-r08/gitnexus-completion-detect.json"
+    },
+    "openCriticalOrImportantWithinR08": 0,
+    "initialFailuresPreserved": [
+      "initial-full-gate",
+      "ip-isolated-gate"
+    ],
+    "rulings": "See R08-REPORT.md: connection metadata scope, conservative MySQL refresh, lifecycle-only R05 mocks, real loopback isolation and case-local owner cache warm without reducing authorization assertions."
+  },
+  "protection": {
+    "baselineFiles": 812,
+    "changedAllowedPaths": [
+      "docs/roadmap/ROADMAP-PROGRESS.md",
+      "docs/roadmap/ROADMAP.md",
+      "docs/roadmap/quality/README.md",
+      "server/src/migration/migration-lifecycle.r05.spec.ts",
+      "server/src/query/query-lifecycle.r07.spec.ts",
+      "server/src/query/query-policy.r03.spec.ts",
+      "server/src/query/query-row-policy.r04.spec.ts",
+      "server/test/connection-policy.e2e-spec.ts",
+      "server/test/fixtures/migration-r05-worker-child.cjs",
+      "server/scripts/benchmarks/migration-benchmark.mjs",
+      "server/src/ai/ai.schema-context.service.ts",
+      "server/src/common/freshness/freshness.service.ts",
+      "server/src/database-strategies/clickhouse.strategy.ts",
+      "server/src/database-strategies/database-strategy.interface.ts",
+      "server/src/database-strategies/mongodb.strategy.ts",
+      "server/src/database-strategies/mssql.strategy.ts",
+      "server/src/database-strategies/mysql.strategy.ts",
+      "server/src/database-strategies/sqlite.strategy.ts",
+      "server/src/metadata/metadata.service.ts",
+      "server/src/migration/migration.service.spec.ts",
+      "server/src/migration/migration.service.ts",
+      "server/src/nosql/nosql.service.spec.ts",
+      "server/src/nosql/nosql.service.ts",
+      "server/src/query/query.service.spec.ts",
+      "server/src/query/query.service.ts"
+    ],
+    "newAllowedPaths": [
+      "docs/roadmap/quality/R08-REPORT.md",
+      "server/src/common/freshness/freshness.r08.spec.ts",
+      "server/src/database-strategies/cache-partial.r08.spec.ts",
+      "server/src/query/query-freshness.r08.spec.ts",
+      "server/test/cache-freshness-r08.e2e-spec.ts",
+      "server/test/cache-partial-r08.e2e-spec.ts",
+      "docs/roadmap/quality/r08-verification.json"
+    ],
+    "unexpectedChanges": [],
+    "deletedProtectedPaths": [],
+    "sourcesFrozenAndMatched": 27,
+    "preexistingUntrackedWithoutRecoverableBaselineBytes": 6
+  },
+  "sourceHashes": [
+    {
+      "path": "server/src/common/freshness/freshness.service.ts",
+      "sha256": "33fba6a846b6e32ef44cde3c590525dda6f4294274a7c99049d1c2b12835d44e"
+    },
+    {
+      "path": "server/src/common/freshness/freshness.r08.spec.ts",
+      "sha256": "be3e9120674a561ea99e79ac69a1e5b882533b57fa9a37afc81342c9095618c7"
+    },
+    {
+      "path": "server/src/query/query.service.ts",
+      "sha256": "cb3abe57ec346ec877ba0aa0d9c2d21cd74e6ed99339ecb80c9076125e2e37db"
+    },
+    {
+      "path": "server/src/query/query-freshness.r08.spec.ts",
+      "sha256": "c656e7276c22c4ee9c0d54206fd6b4f6edd955f29f6ac808964072c31a19991e"
+    },
+    {
+      "path": "server/src/query/query.service.spec.ts",
+      "sha256": "fce4ab7f8e4fbbc1db5a9c42c69b6f0d57a97b6b82f87e906e84189ad3092adb"
+    },
+    {
+      "path": "server/src/query/query-lifecycle.r07.spec.ts",
+      "sha256": "68f8edcfc1109404117d533e92deb03e69e6e2faebda561d7a6dd1054bab3af7"
+    },
+    {
+      "path": "server/src/query/query-policy.r03.spec.ts",
+      "sha256": "3ffd16b970c3bc2319e6103285225f7e48859c3ecd7e72c84b56c2813db34569"
+    },
+    {
+      "path": "server/src/metadata/metadata.service.ts",
+      "sha256": "6dc1866e77da5f8918c0f464bd9046471f9b9e60630d2588c106b8688cd46dfd"
+    },
+    {
+      "path": "server/src/ai/ai.schema-context.service.ts",
+      "sha256": "f3d5ad9ae2fa7804e1994f75865a6f7a6744bb85fba3a0a644f1ee8dea25712f"
+    },
+    {
+      "path": "server/src/nosql/nosql.service.ts",
+      "sha256": "04a440523aa6d19a6a1a61e573c7754b443470ad5560cd0b5781a21178674d55"
+    },
+    {
+      "path": "server/src/nosql/nosql.service.spec.ts",
+      "sha256": "0833348ca928e066079fcd04a7656c8bd5c24327a02013890d5e2abeba94222d"
+    },
+    {
+      "path": "server/src/migration/migration.service.ts",
+      "sha256": "ae3562d96cde0fd0abba36a40af213ab12f6842c314b9a4fa3b3a9f64104f5e5"
+    },
+    {
+      "path": "server/src/migration/migration.service.spec.ts",
+      "sha256": "2cf4e143d74c15cf7cdeb7be31fb921334e3c5cdaa2ee5faad1ed778e97d292e"
+    },
+    {
+      "path": "server/src/migration/migration-lifecycle.r05.spec.ts",
+      "sha256": "040e57bcc68dde02cb8326e8b00ce025b1aacf57c851dacff94ff562fc871924"
+    },
+    {
+      "path": "server/src/database-strategies/mysql.strategy.ts",
+      "sha256": "819018ad4d59c9271ab012e005842407e29187047b89ecdd71fb20c37e5b8cd8"
+    },
+    {
+      "path": "server/src/database-strategies/clickhouse.strategy.ts",
+      "sha256": "d0f13d714e88b2a15911190d6023f52f19c2a8dfcb9fb44ef0c97eacd53d94a9"
+    },
+    {
+      "path": "server/src/database-strategies/mssql.strategy.ts",
+      "sha256": "939d1197e995c915706f18a7b78f821ac5baf1532a97f81f664508c2a8420136"
+    },
+    {
+      "path": "server/src/database-strategies/sqlite.strategy.ts",
+      "sha256": "f24ce3e6bcd2ab4e7004b11a103108e1ed30aa984afed8c917cb1d493363677c"
+    },
+    {
+      "path": "server/src/database-strategies/mongodb.strategy.ts",
+      "sha256": "19f6ae7cae92d7f5b177c3261f800597b463600f63009089aaa3836ee89d6a85"
+    },
+    {
+      "path": "server/src/database-strategies/database-strategy.interface.ts",
+      "sha256": "8b46e6f233fe9575b97f1c686339e6fc710944d96eb505d1796638c33bc41255"
+    },
+    {
+      "path": "server/src/database-strategies/cache-partial.r08.spec.ts",
+      "sha256": "1038d0676957cc6601d6e482f0d1ef6d2ea693c2e687acc980d58b2f73b02edf"
+    },
+    {
+      "path": "server/test/cache-freshness-r08.e2e-spec.ts",
+      "sha256": "7d1d75f53e089727e19c61fe9287fd60c41c8eab6e1872369959d5b7c8ed498c"
+    },
+    {
+      "path": "server/test/cache-partial-r08.e2e-spec.ts",
+      "sha256": "44f29fa7b03dc81fd247b9370b16e1dda5375778712b9486a9c65e4cbfb9837d"
+    },
+    {
+      "path": "server/test/fixtures/migration-r05-worker-child.cjs",
+      "sha256": "eab06fec372c197606017a82b9db3b27908e40a21d88ae261c04639b27e88f0b"
+    },
+    {
+      "path": "server/scripts/benchmarks/migration-benchmark.mjs",
+      "sha256": "b2f602a462e1cf4146c23782a2140f8e5d524fcbfc6725b06dde3a22fce3e377"
+    },
+    {
+      "path": "server/src/query/query-row-policy.r04.spec.ts",
+      "sha256": "f4ad84e92eb4c41bddb3c656e6ed6544f729bba52ec4fe4b9665ccbcec65a177"
+    },
+    {
+      "path": "server/test/connection-policy.e2e-spec.ts",
+      "sha256": "1f36a6d773f01c7ef7ddcc38a82e7174ab06c477a245d37eee45baa6c5130aba"
+    }
+  ],
+  "documentHashes": [
+    {
+      "path": "docs/roadmap/ROADMAP.md",
+      "sha256": "27366e1cb8e3b6942935cc8072638ca5e0437fbf4940a5c4c58cba0214d40b8d"
+    },
+    {
+      "path": "docs/roadmap/ROADMAP-PROGRESS.md",
+      "sha256": "c6261e1079acc2b54fa8bc40ad65587769787428a2f4f8728e12a62d199da3ff"
+    },
+    {
+      "path": "docs/roadmap/quality/README.md",
+      "sha256": "a01015bcd7ca4e0fc0a73479605a3c212a506c3fa12e356a552613f1f031f2a5"
+    },
+    {
+      "path": "docs/roadmap/quality/R08-REPORT.md",
+      "sha256": "e5df410ac7dc88bb1ef49fcf9e272f2c72ed8435a5094b0fb318f6dbb2b8661e"
+    }
+  ],
+  "evidenceHashes": [
+    {
+      "path": "output/roadmap-r08/api-native.json",
+      "sha256": "6a9a072c9b0c521accadf864f19a4c8feb6118b97c564c25bf9ebbe68a8da278"
+    },
+    {
+      "path": "output/roadmap-r08/api-native.log",
+      "sha256": "803a8434e897902cdf92d1a034b4fac2af6c081a15facd2599098fd3152b3a63"
+    },
+    {
+      "path": "output/roadmap-r08/assemble-manifest.cjs",
+      "sha256": "83cfd36109efcf66b9fedf8e0ea9071bb2c8895c550340137cc0b6ad5db970ba"
+    },
+    {
+      "path": "output/roadmap-r08/browser-full.json",
+      "sha256": "8027c0f9a888e324c19a898bb2405a2a7471df1673218d4025c7a756c353bc35"
+    },
+    {
+      "path": "output/roadmap-r08/browser-full.log",
+      "sha256": "4b3dfd9b1b1626cf23a7f2ad86f6f4e234f5b708120407755f4a1311427ad08f"
+    },
+    {
+      "path": "output/roadmap-r08/ci-scripts.log",
+      "sha256": "143a118b0dd460dd432a0cd5db5e969bdcd64865073cc1eabb513305cbf588fa"
+    },
+    {
+      "path": "output/roadmap-r08/cleanup-down.log",
+      "sha256": "dda9a2df69a669874ae29a5312ac48ef487744d9224a60e3cf658ca6af56698d"
+    },
+    {
+      "path": "output/roadmap-r08/cleanup-final.json",
+      "sha256": "b366aa424ef467c5f3a91e3693afd73b3cd279ec6411396de162d758aa7ff7de"
+    },
+    {
+      "path": "output/roadmap-r08/cleanup-native.json",
+      "sha256": "49c148a57314b550052ddc559125a9ade88dc387588202cc81409865262c3303"
+    },
+    {
+      "path": "output/roadmap-r08/cleanup-ownership.log",
+      "sha256": "c942f7cd190f272f848f2d44ef1a60c64b5e718eb00736488234a3a43280409d"
+    },
+    {
+      "path": "output/roadmap-r08/client-audit.log",
+      "sha256": "562ecba4f8bfdc73bed20e29310e0b29ae7dfbfe6b5fa0241ad39bfdbcf2b912"
+    },
+    {
+      "path": "output/roadmap-r08/client-build.log",
+      "sha256": "85454223e29e7f7db46f8586fc3fecfd6af27fe80fe525ab7e55f70e5517ae14"
+    },
+    {
+      "path": "output/roadmap-r08/client-checks.json",
+      "sha256": "681b614e837263a8d460bf6c08feaeadc4afe3c3b8b21ff54a4921c56bf24ebd"
+    },
+    {
+      "path": "output/roadmap-r08/client-lint.log",
+      "sha256": "2ab8d52f750f8cec805cf7b28c56717514201503e95d7515d5b57072f49da736"
+    },
+    {
+      "path": "output/roadmap-r08/client-prerender.log",
+      "sha256": "9763d2b626869d0b26ce82dd320522542bc8e49b907c65da4560b7ec010cccf4"
+    },
+    {
+      "path": "output/roadmap-r08/client-unit.json",
+      "sha256": "3fbc1a57e69c12f664cbd097266506100efa3ba10ed2fbf58a17831af0a41a52"
+    },
+    {
+      "path": "output/roadmap-r08/client-unit.log",
+      "sha256": "5d6cd017735f9e6709972532dc5757918853dec8aa9c1bf7fb242d0b6b0498fe"
+    },
+    {
+      "path": "output/roadmap-r08/fixture-migrate.log",
+      "sha256": "89760ad09ca3e04798ccd123dc8366f7e6398466aab51396dd26636255ba433f"
+    },
+    {
+      "path": "output/roadmap-r08/fixture-up.log",
+      "sha256": "17d3cab062c288d479d34e20f31010241acf23c729d552923b89d690d1972dda"
+    },
+    {
+      "path": "output/roadmap-r08/format-final.log",
+      "sha256": "c59723cf985334aa95c9239ff566532be861a755440463557f834670eff97bf4"
+    },
+    {
+      "path": "output/roadmap-r08/format-review.log",
+      "sha256": "95b2a4cbe43dcce1927f1b47163b4ffe2c1c49adeab81eafb5203d3e606015c9"
+    },
+    {
+      "path": "output/roadmap-r08/format.log",
+      "sha256": "c79f924ef750a1cfd1f1daed108432f4ad4a83d1fa7b7b6bafa6832055d5a155"
+    },
+    {
+      "path": "output/roadmap-r08/git-diff-check-final.log",
+      "sha256": "852e7a58e31ac02e39ac1abb361c5c2b6f4652e28bf3d513f37074165f212926"
+    },
+    {
+      "path": "output/roadmap-r08/git-diff-check.log",
+      "sha256": "852e7a58e31ac02e39ac1abb361c5c2b6f4652e28bf3d513f37074165f212926"
+    },
+    {
+      "path": "output/roadmap-r08/gitnexus-completion-detect.json",
+      "sha256": "4460cfceacfe5c330f8479f24a2958ae813715f246893c5efcfa4262d91012a7"
+    },
+    {
+      "path": "output/roadmap-r08/gitnexus-detect.json",
+      "sha256": "93b3c3becae7dc4a06b0cac6c499dde875e391b92b97185ce8cb46d38f0f8423"
+    },
+    {
+      "path": "output/roadmap-r08/gitnexus-impacts.json",
+      "sha256": "8ebee1753d472dbd553428af4de586280b7fad8cf24e1b77e71412eacad4c0c4"
+    },
+    {
+      "path": "output/roadmap-r08/green-focused-final.log",
+      "sha256": "9d3c0cd3cadda8f5f5d0351d7cff9988cb122e578529c618fdc52e6f60064834"
+    },
+    {
+      "path": "output/roadmap-r08/green-focused-last.log",
+      "sha256": "afc614480aa9fc3e4967b58f6beb089e513117732e333cfd45cd9c73c3a5ff9d"
+    },
+    {
+      "path": "output/roadmap-r08/green-focused.log",
+      "sha256": "4f80ef6b19527a86fd23b9a66c711736fa8336242a2391f8d57c590639a5d3c2"
+    },
+    {
+      "path": "output/roadmap-r08/green-full-fixture-repair.log",
+      "sha256": "8f0d8a890e1f13ca36a4ed36971d37803c0f117b08040b7320f5f7ab6caac8a1"
+    },
+    {
+      "path": "output/roadmap-r08/green-mysql-partial.log",
+      "sha256": "7251df093e83b29b0278b59b8cca61523c842c15925bddd84c8d0d444d06dfbe"
+    },
+    {
+      "path": "output/roadmap-r08/green-native-expanded.log",
+      "sha256": "a605553d42d651d91485fc7df7bd7567dd1c582025c2264f210f017ed9a98a76"
+    },
+    {
+      "path": "output/roadmap-r08/green-native-final.log",
+      "sha256": "98ffa78da9ffba5ec19e33f57a32363728a2ae98d446805f04e1f78c3cea0b6f"
+    },
+    {
+      "path": "output/roadmap-r08/green-native.log",
+      "sha256": "eee3223c5373d18f46839e646d7bd0baf8f705a1ffea7c221670020832deabce"
+    },
+    {
+      "path": "output/roadmap-r08/green-review.log",
+      "sha256": "e3be523cb00cddb6622f44d2242efe546204e0eafa70990d841f775e1ecac233"
+    },
+    {
+      "path": "output/roadmap-r08/index-completion.log",
+      "sha256": "7c318493a6f062d6030eb5209cbe6c9ca83a98e0328012c4a97665f4923159b4"
+    },
+    {
+      "path": "output/roadmap-r08/index-final.log",
+      "sha256": "40968d6405bcfc63d65597ed79e68af7cb2e8081a011ded3bd63fb8d9e26c433"
+    },
+    {
+      "path": "output/roadmap-r08/index-review.log",
+      "sha256": "0b6c52504fa21b298ccff2cb9abd2bf9c071b4609ca9e00525a908075bb02847"
+    },
+    {
+      "path": "output/roadmap-r08/index-start.log",
+      "sha256": "577300c2524d131c6d36cedca3623b86459328df08f5ef86d354ba0097abc4c1"
+    },
+    {
+      "path": "output/roadmap-r08/lint-fixture-repair.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "output/roadmap-r08/lint-style-repair.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "output/roadmap-r08/loopback-ip-proof.log",
+      "sha256": "10ab40333dd7dad6f31dfbbc2bd3bb42e5ee3f9b2b7d7d404862793512b3e3f4"
+    },
+    {
+      "path": "output/roadmap-r08/make-review.cjs",
+      "sha256": "85632541969dae0178d079ba56676052a60a3f949a130028817adcb7e07bbc37"
+    },
+    {
+      "path": "output/roadmap-r08/new-paths.json",
+      "sha256": "82186afd92d80b96d986f7b31749108bd651cbebc0ae483dc0aa724afb4f0e3c"
+    },
+    {
+      "path": "output/roadmap-r08/preexisting-status.txt",
+      "sha256": "cc86b0fc022db3659139914a3f9df2c1ecf433a51f40aceaaf14e9c015b4a163"
+    },
+    {
+      "path": "output/roadmap-r08/preexisting.diff",
+      "sha256": "615500fda772bd94f820dd1b6bcd669353a5e1757ef056c464bf3e6c0f0abcc2"
+    },
+    {
+      "path": "output/roadmap-r08/protection-baseline.json",
+      "sha256": "d35260b3f5c8907e2caba036f9f22f6abba38cd3ff226bf86aeaf7db1e4cb50b"
+    },
+    {
+      "path": "output/roadmap-r08/protection-current.json",
+      "sha256": "ad222d962c3367c1e96b8eb86d048cff5c37f07481af4a942f4856dd31c89a9c"
+    },
+    {
+      "path": "output/roadmap-r08/protection-final.json",
+      "sha256": "6353daa831a6821f32258b089f8537108d92fd62b39162420d25216d88a8c745"
+    },
+    {
+      "path": "output/roadmap-r08/r08-tracked-only.diff",
+      "sha256": "6703135f0ac118430d69f67b216507fd1420ffee4574f23581bb5e12d03197d4"
+    },
+    {
+      "path": "output/roadmap-r08/red-mysql-partial.log",
+      "sha256": "929996ccc4c0a5784725206c17817bb7bc9e304e3224432d1478dda7095a1ab0"
+    },
+    {
+      "path": "output/roadmap-r08/red-native.log",
+      "sha256": "acae0dfa717a4cb3536aef9fee0283a0fd147bcf58ee4e92e787cff41f8dfbbd"
+    },
+    {
+      "path": "output/roadmap-r08/red-review-cache-errors.log",
+      "sha256": "acd350a9ea94e133033ba3e1a28846a2a2fdb119ce8238075cb66f5a205ed740"
+    },
+    {
+      "path": "output/roadmap-r08/red-review-mongo-cache-error.log",
+      "sha256": "f1c32d111d6c1dd4b1bbfa387e4d18c2beb2d323a482fc5511070c9f842979aa"
+    },
+    {
+      "path": "output/roadmap-r08/red-review-mongo-confirmed.log",
+      "sha256": "f71b48d39305c00a1af411ab12191722b3d282d3b8e67420ef8043577faf5acf"
+    },
+    {
+      "path": "output/roadmap-r08/red-review-retry.log",
+      "sha256": "bc3f2982a632c910765ab3134ffda878026680abb4a3d9967d9c3e2d85e9b870"
+    },
+    {
+      "path": "output/roadmap-r08/red-seed-partial-confirmed.log",
+      "sha256": "909a3eb22c7e27c5d250c1f53fd10ac4b4d91db9bb71b7b93d2080f287f56be9"
+    },
+    {
+      "path": "output/roadmap-r08/red-seed-partial.log",
+      "sha256": "af99b72926961ee060643124bd4c80f2f667ef056f62dc736705102c04a56c68"
+    },
+    {
+      "path": "output/roadmap-r08/red-unit.log",
+      "sha256": "7dad1a12db2e2e4937945879d911511ed2cd7cc9eabee8bf4169f28a80d3164e"
+    },
+    {
+      "path": "output/roadmap-r08/review-scope.json",
+      "sha256": "8db08555794e510fcdd594ff2fbba3a925fdeb56bdda88d2593159bd9a8d4ca8"
+    },
+    {
+      "path": "output/roadmap-r08/run-client.ps1",
+      "sha256": "2aa8ffcd7b313b4ae553f3b2aac3bceb1e130cc45987e0fcb680a1e734f0fd50"
+    },
+    {
+      "path": "output/roadmap-r08/run-server.ps1",
+      "sha256": "ceceb3f70a715250d258d5aa484b25f7e5ca7957fad749f053c343dd8fc94677"
+    },
+    {
+      "path": "output/roadmap-r08/server-audit.log",
+      "sha256": "b1de6e22b69da65af7eef2d0a901ba710c4f2dfa0576b31953bdff2f02f6a3db"
+    },
+    {
+      "path": "output/roadmap-r08/server-build.log",
+      "sha256": "bb3c95080676f33f9db54f252d5a315050eaff6acd2f32d8852840ac0fb8d077"
+    },
+    {
+      "path": "output/roadmap-r08/server-checks.json",
+      "sha256": "ef32fbad5e140081543895cf3b9865f38eb354334beb85002f6550ab796d67fa"
+    },
+    {
+      "path": "output/roadmap-r08/server-lint-initial-fail.log",
+      "sha256": "74fdd41e4d42cad6c645244d32a881331544ef8102850fbe36d6822dc099f883"
+    },
+    {
+      "path": "output/roadmap-r08/server-lint.log",
+      "sha256": "f8c1c5b45bf89735e92e31953bcb606b150e212ef810009fa16750203a8e52c8"
+    },
+    {
+      "path": "output/roadmap-r08/server-prisma.log",
+      "sha256": "b7fe1c11f1d1ae8bf9b49355c5783668b9a89cb16472aa8274dd4a05f3d77c91"
+    },
+    {
+      "path": "output/roadmap-r08/server-unit.json",
+      "sha256": "f0d75792ebf6e52ee141c6c4dfbcd27179460984ee7982b348c6f3a88f067866"
+    },
+    {
+      "path": "output/roadmap-r08/server-unit.log",
+      "sha256": "4a84e35bdd845b70c9ae1407d6fb7bfc0c38b67a01f014a2d10523bf0bc515c9"
+    },
+    {
+      "path": "output/roadmap-r08/source-freeze.json",
+      "sha256": "bdb71ef5cb8755c67058289d3d14f71818dacfdd12fd896e64c52582f5fcec48"
+    },
+    {
+      "path": "output/roadmap-r08/warm-fixture-mcp.json",
+      "sha256": "56b84400ba0c1ad18550483542a6691bd2e80dfdea9fe064127378af47fea9e4"
+    },
+    {
+      "path": "output/roadmap-r08/initial-full-gate/api-native.json",
+      "sha256": "8063928f07898db7c8e9ecf6819c38d6fe7cddcbe3592ea6c2e4f5933b7d812a"
+    },
+    {
+      "path": "output/roadmap-r08/initial-full-gate/api-native.log",
+      "sha256": "0230f4d5dadced233246afa2728a40eeb77c1f40e42deff1129e79e83eae5369"
+    },
+    {
+      "path": "output/roadmap-r08/initial-full-gate/server-audit.log",
+      "sha256": "b1de6e22b69da65af7eef2d0a901ba710c4f2dfa0576b31953bdff2f02f6a3db"
+    },
+    {
+      "path": "output/roadmap-r08/initial-full-gate/server-build.log",
+      "sha256": "bb3c95080676f33f9db54f252d5a315050eaff6acd2f32d8852840ac0fb8d077"
+    },
+    {
+      "path": "output/roadmap-r08/initial-full-gate/server-checks.json",
+      "sha256": "dfa9eae59b18f0160413932c11bacff8af2242629e536d30303dcfd630ab4334"
+    },
+    {
+      "path": "output/roadmap-r08/initial-full-gate/server-lint.log",
+      "sha256": "74fdd41e4d42cad6c645244d32a881331544ef8102850fbe36d6822dc099f883"
+    },
+    {
+      "path": "output/roadmap-r08/initial-full-gate/server-prisma.log",
+      "sha256": "94fa79fe0c9c8f38399311f3abf3b9fae7b56c704b93e6b04abdc62f2fc0729f"
+    },
+    {
+      "path": "output/roadmap-r08/initial-full-gate/server-unit.json",
+      "sha256": "0a809350241d51acedbcb789211f9890356d9df44cb3da72047d380324e6059a"
+    },
+    {
+      "path": "output/roadmap-r08/initial-full-gate/server-unit.log",
+      "sha256": "7f21d8ffada941d1ac9ed68b33249a14fd5c6d59fdd10e08bf4974f76f385d1b"
+    },
+    {
+      "path": "output/roadmap-r08/initial-full-gate/source-freeze.json",
+      "sha256": "f84f87542b8ffd483846257363c6bcf6be3ea5295567f117ad5673aabd2a1351"
+    },
+    {
+      "path": "output/roadmap-r08/ip-isolated-gate/api-native.json",
+      "sha256": "2f9dcfb5e8ac08e98de5ad73963bc471387ec6474631c6288bcb1e74d3e203c5"
+    },
+    {
+      "path": "output/roadmap-r08/ip-isolated-gate/api-native.log",
+      "sha256": "9050b3d168a34844e0725d183f9879b84dddec1f6f7f08a97d5f357f8a03133f"
+    },
+    {
+      "path": "output/roadmap-r08/ip-isolated-gate/server-audit.log",
+      "sha256": "b1de6e22b69da65af7eef2d0a901ba710c4f2dfa0576b31953bdff2f02f6a3db"
+    },
+    {
+      "path": "output/roadmap-r08/ip-isolated-gate/server-build.log",
+      "sha256": "bb3c95080676f33f9db54f252d5a315050eaff6acd2f32d8852840ac0fb8d077"
+    },
+    {
+      "path": "output/roadmap-r08/ip-isolated-gate/server-checks.json",
+      "sha256": "4581f1dd85c0f101d2e7982ef976a358416b54b1400df004fbec94c103971531"
+    },
+    {
+      "path": "output/roadmap-r08/ip-isolated-gate/server-lint.log",
+      "sha256": "f8c1c5b45bf89735e92e31953bcb606b150e212ef810009fa16750203a8e52c8"
+    },
+    {
+      "path": "output/roadmap-r08/ip-isolated-gate/server-prisma.log",
+      "sha256": "f832ae602f4bd8182d43bf23ccd6938415e2eb6d6756c4fdc940bb2f321183bb"
+    },
+    {
+      "path": "output/roadmap-r08/ip-isolated-gate/server-unit.json",
+      "sha256": "f728e9395cd108ad8cc9b50ecf1657335356f1ee6f7891972b9ad5adc488a2cd"
+    },
+    {
+      "path": "output/roadmap-r08/ip-isolated-gate/server-unit.log",
+      "sha256": "73049d1d496a70fe9fc59985842ce511a858b7ce3a98c77a7d11d009457ff59c"
+    },
+    {
+      "path": "output/roadmap-r08/ip-isolated-gate/source-freeze.json",
+      "sha256": "7dc06eb2d49a3977249d0d4cadb58fdcb862fd113aa7ccfb5438c061c910e5ca"
+    }
+  ],
+  "cleanup": {
+    "nativeEvidence": "output/roadmap-r08/cleanup-native.json",
+    "ownershipEvidence": "output/roadmap-r08/cleanup-ownership.log",
+    "finalEvidence": "output/roadmap-r08/cleanup-final.json",
+    "composeDownExit": 0,
+    "containers": [],
+    "networks": [],
+    "listeners": []
+  },
+  "limits": [
+    "No independent review, coverage rerun, remote CI, image scan or CodeQL in R08.",
+    "Native SQL Server and ClickHouse not certified; driver tests only. SQLite in process, PG16/Mongo7/MySQL8.4 on local fixtures.",
+    "No remote/SSH/partition/multi-replica/load or process kill between commit and notification certification. Legacy cache-manager store wiring remains R10/R14; local tests do not prove cross-replica Redis caching.",
+    "Cache outage may require scoped refresh after recovery; durable invalidation/outbox belongs R14. External writes require refresh or TTL.",
+    "Dependency audits block release/push; inherited client CommentComposer lint warning remains."
+  ],
+  "nextPackage": "R09",
+  "rollback": "Revert only R08 patch with R00-R07 dependencies preserved; older builds need scoped refresh or old TTL expiry. Do not reset the working tree."
+}

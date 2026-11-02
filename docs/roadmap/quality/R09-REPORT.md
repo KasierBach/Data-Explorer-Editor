@@ -1,0 +1,44 @@
+# R09 — Comment persistence độc lập audit retention
+
+Status: VERIFIED_LOCAL. Plan: [ROADMAP.md](../ROADMAP.md), M11/F9. Branch `codex/roadmap-r00`, HEAD `3d7ec60845ddc2a07284c2873d9d3727acd30744`; giữ R00–R08 chưa commit và `.zcode/`. Goal R09 nghiệm thu theo [manifest](r09-verification.json); không git reset/stash/commit/push/deploy. Bước tiếp: R10.
+
+## Scope và quyết định
+
+Scope: CollaborationService, Prisma schema/migration, reaction references, fixtures/tests, rollback/backup và canonical docs. API/commentId/threadId/mention/attachment shape giữ nguyên. Client caller dùng reloadThreads sau mutation; không cần đổi UI nếu contract giữ được. AuditService và permission primitives được tái dùng; không tạo chat feature mới.
+
+Ruling: dùng bảng CommentEvent riêng làm nguồn state comment duy nhất, tái dùng event-to-thread builder sẵn có. Audit chỉ là activity history; không fallback đọc audit sau cutover. Khóa ngoại theo organization/resource hỗ trợ cleanup và reaction cascade. Account deletion bỏ identity qua SetNull; shared content dùng participant ẩn danh, resource/org deletion xóa dữ liệu thuộc resource đó.
+
+Ruling: backfill legacy audit theo batch/checkpoint, unique legacy event identity và deterministic order; giữ số examined/copied/skipped và orphan inventory. Sự kiện đã bị retention xóa không thể phục hồi từ DB hiện tại. Trước migration cần backup app DB, maintenance window và dừng writer phiên bản cũ; chỉ chạy migration trong fixture đã xác minh ở lượt này. Không áp production migration/deploy.
+
+Impact trước edit: listResourceComments/read/find helpers, create/reply/edit/delete/resolve/reaction/author và buildCommentThreads LOW; 1–4 callers, chủ yếu controller/helper, 0 recognized flows. Prisma schema file LOW/0 graph callers, không coi đó là bằng chứng DB ít rủi ro. FK/DDL và account/resource deletion phải kiểm native. Codegraph/GitNexus/Semble được dùng; MCP đã được cấp lại trước edit, không cài/nâng integration toàn máy.
+
+## Ledger
+
+- Input: F9 lấy500 comment events đầu organization rồi lọc resource; audit retention365 ngày xóa cả nội dung. Baseline protection819 files, evidence `output/roadmap-r09/`.
+- Pre-flight: R01/R02 permission và backup contracts đang VERIFIED_LOCAL. R00–R08 native gates là dependencies; không sửa các implementation đó để làm xanh R09.
+- RED gốc:2fail/exit1, target create404 sau501 other-resource events và thread mất sau retention. Native core GREEN2/2/exit0 sau durable storage.
+- Regression native:15/15/exit0; backfill cuối3/3/exit0 sau bổ sung stale edit sau soft-delete. Core gồm remount app sau retention, nested reply/root canonical, author edit/admin delete, revoked policy/membership cùng JWT, COMMENT revoked nhưng READ còn, missing/wrong-org references, account/resource/org deletion, audit outage/durable rollback và concurrent reaction/delete.
+- Legacy fixture:8examined/6copied/2skipped,1orphan reply/1orphan reaction được kiểm kê. Sáu events sống qua retention; audit0. Backup app DB thử restore vào scratch thành công với8audit/2reactions/0CommentEvent. Đã cleanup cohort theo org/user sở hữu, cascade events/reactions/resources; không xóa orphan để làm migration xanh.
+- Maintained backfill corpus cuối14events:7copied/7skipped, chỉ1complete thread; duplicate replay0copied/14skipped, không mất reaction hợp lệ. Checkpoint/event cùng rollback, restart giữ checkpoint, watermark từ chối late old writer, NULL/0/501 budget bị reject, new FK/resource binding enforce. Không phụ thuộc script/IDs trong output.
+- Các failure được giữ: enum lint; READ fixture uppercase sai; NULL budget error; reaction legacy trên deleted reply; simultaneous toggle unique race500. Một lượt hook timeout khi test processes chạy chồng được giữ và chạy tuần tự lại, không đổi budget. Race sửa bằng durable-row transaction lock phối hợp toggle/DELETE; deleted reader bỏ reaction/stale edit.
+- Source freeze5paths không đổi trong full gates: server711/711 (94suites), client158/158, API153/153 (16suites), guards2/2, browser82/82 không failed/skipped/flaky. Prisma/lint/build hai phía, prerender1/1 vàCI scripts8/8 exit0. Audit server/client exit1 BASELINE_FAIL, đúng allowlists CI; dependency manifests/lockfiles không đổi. Không dùng focused pass thay full gate.
+- Cleanup:0 User/Connection/Organization/Payment/Subscription/CommentEvent/Reaction,0 PG/MySQL app sessions,0 native temp DB/function/table, Mongo DB và Redis active/wait0. Migration checksum DB khớp file cuối. Down riêng4ownedcontainers/network exit0;0fixture/browser listener/test process. Baseline819files chỉ đổi schema/service thuộc R09 và3canonical docs; freeze5sources và hash evidence trong manifest.
+- Final index7372nodes/19519edges/431clusters/269flows, pure index mode giữ AGENTS/CLAUDE/skills nguyên trạng. detect all/compare main:CRITICAL65files/305symbols/48flows của diff cộng dồn R00–R09, đã cảnh báo; scope R09 đối soát riêng source/protection hashes, không coi graph là isolated risk R09. diff check exit0; không commit/push/deploy.
+
+## Self-review trên scope R09
+
+Áp dụng ponytail-review tuần tự: đúng → an toàn → chịu tải → test → tốc độ → tinh gọn. Đã đọc production diff, migration, controller/DTO, permission/audit contracts, native fixtures và caller TeamCommentsDrawer qua Semble. Codegraph bổ sung caller/source; GitNexus impact được chạy trước symbol edits. Helper lookup sau index mới MEDIUM/6callers, recordCommentEvent LOW/4, attachReactions LOW/1, buildCommentThreads LOW/2, toggleReaction LOW/1;0 recognized flows không chứng minh không có runtime callers. SQL/new test files ngoài graph là UNKNOWN, kiểm bằng native DB/test discovery.
+
+Findings đã sửa và có repro: authorization trước full-thread read, nested root references, reaction unique race/deletion race, legacy deleted payload/reactions và invalid NULL batch. Sau focused/full checks và cleanup cuối chưa tìm thêm Critical/Important trong phạm vi đã kiểm. Verdict: đạt local scope. Chưa review độc lập; không phải release verdict.
+
+OOP/SOLID: giữ controller→service→Prisma và PermissionsService/AuditService; một writer private tập trung event transaction, không dựng repository abstraction mới. YAGNI/KISS/DRY: tái dùng builder/attachment validator/permission defaults/native E2E helper và Prisma; không đổi UI/API, không thêm dependency, runtime importer/dual-source/pagination/snapshot. Source of truth mới là durable events, audit chỉ activity. C01/C02/C05: narrow JSON, validate resource/org và current permissions; typed Prisma transaction, không trả thành công cho durable failure. C03/C04: real row locks và rollback/cleanup; C06: scoped deny trước state read; C07/C08/C10: regressions, hashes/diff, version6.19.3 docs và rollout guide. C09 không tuyên bố capacity/load optimization.
+
+Nesting: writer/toggle transaction giữ guards và mutation trong cùng transaction. Builder kế thừa event-loop→event-type→target checks; deleted guard thêm một nhánh ở độ sâu4. Đã cân nhắc flatten/tách helper; giữ event/target context tại chỗ để parser/replay lỗi không làm mất thread khác và tránh tách một helper chỉ để đổi số tầng. SQL backfill giữ bounded loop, validation guards và checkpoint update ở transaction caller; initial DDL/replay atomic được nói rõ. Không claim code cũ toàn repo tuân thủ depth2.
+
+Context7: query pin `/prisma/orm/6.19.3`, đối chiếu optional SetNull và DB-trigger interactive transaction errors. Front-End Checklist review đoạn edit/reload caller:0provable static issues/52heuristics, có follow-up accessible-notifications guidance; không thay rendered/accessibility certification. User yêu cầu nhiều MCP theo vai trò được đáp ứng bằng GitNexus/Codegraph/Semble/Context7/Front-End Checklist, không coi số tool là gate.
+
+Migration/backup/rollback và orphan reconciliation: [R09-MIGRATION.md](R09-MIGRATION.md). Initial corpus proof và maintained function proof có phạm vi riêng;7copied events không phải7 recovered threads. Account shared content dùng deleted-user, owned resource xóa theo cascade hiện có. Reaction FK NOT VALID giữ legacy orphan nhưng enforce insert/update mới; validate sau reconciliation, không âm thầm xóa dữ liệu.
+
+## Giới hạn hiện tại
+
+Implementation, full local product checks và teardown đã kiểm trên frozen source. Self-review tuần tự; chưa independent review. Dependency audits đã refresh và vẫn BASELINE_FAIL trên lockfile không đổi thuộc R10; không suy local checks thành release gate. Chưa production migration/deploy, remote CI/coverage/full browser→real backend hoặc capacity/large corpus certification. Event đã bị retention xóa không thể phục hồi từ DB hiện tại; per-resource full replay/initial migration transaction có giới hạn tải cần đo trước production. Notification path giữ contract hiện có; lỗi notification sau durable commit không rollback content, chưa inject notification outage hoặc concurrent permission/account/resource deletion. Local race evidence chỉ covers toggle/soft-delete, không capacity guarantee.

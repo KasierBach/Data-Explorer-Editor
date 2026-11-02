@@ -1,0 +1,410 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-01T16:57:56.4465169+07:00",
+  "status": "VERIFIED_LOCAL",
+  "scope": "R00 A01/R06 residual closure and R00-R14 report-limit audit; not complete release certification",
+  "repository": {
+    "root": "D:\\Data Explorer",
+    "branch": "codex/roadmap-r00",
+    "head": "3d7ec60845ddc2a07284c2873d9d3727acd30744",
+    "committed": false,
+    "pushed": false,
+    "deployed": false
+  },
+  "sourceBinding": {
+    "keyFileSha256": {
+      "server/package-lock.json": "a071506020cbd5faae11c95a361afd7fc59a3296d1da98573ab418bc63064035",
+      "server/test/auth-security.e2e-spec.ts": "dfcf8ca184e38cf86a6c76bd0bd5d16969ee8ed8b9a0a866004c621fdc4d11fc",
+      "server/src/auth/auth.service.ts": "b8715f75b3d8d23703b67370eaec43508834277f0cecac9bb7c0bd7d8c1db4b0",
+      "server/src/auth/auth.service.spec.ts": "f002c3e0765488500becb37dc8bcb7f85d7764c1265255109eaf1de3009d8b79",
+      "server/test/billing-r06.e2e-spec.ts": "1619245df9d702b2b006225d578b98c882c8fa16cefe10a29a4c43423e3a0d67",
+      "server/src/billing/billing.service.ts": "516c2c0b02d4dbd349aace9ff1ba156c7c2c2158ed9fc1223b522d458c40b5e1",
+      "server/src/billing/billing.service.spec.ts": "5d9937b52e75145f73f53e7b7df3ea3218a585dc20a8c92f53317ef4653b4efb",
+      "client/package-lock.json": "5db9e20dd9d95ca4e9aa61ea7b30a55cb81cabcc51874306e7e38b085e8daa48"
+    },
+    "cleanExport": {
+      "path": "output/residual-gap-20261101/checkout",
+      "copiedSourceFiles": 863,
+      "comparedApplicationFiles": 789,
+      "aggregateSha256": "e1ba9d3ee52a4dd705978702334d9c287ce52e08a5dc52e9b9187f9e2e25bcab",
+      "hashAlgorithm": "SHA256 over UTF8 sorted path:sha256 lines joined by LF, no final newline",
+      "serverEnvCopied": false,
+      "dependencyMode": "existing node_modules junctions; no fresh npm ci"
+    }
+  },
+  "fixes": {
+    "A01": {
+      "status": "VERIFIED_LOCAL",
+      "unitRed": {
+        "failed": 4,
+        "passed": 4,
+        "log": "output/residual-gap-20261101/auth-unit-expanded-red.log"
+      },
+      "nativeRed": {
+        "failed": 1,
+        "passed": 9,
+        "log": "output/residual-gap-20261101/auth-native-red.log"
+      },
+      "unitGreen": 8,
+      "focusedNativeGreen": 22
+    },
+    "R06": {
+      "status": "VERIFIED_LOCAL",
+      "realNativeRed": {
+        "failed": 1,
+        "passed": 11,
+        "log": "output/residual-gap-20261101/billing-native-real-red.log"
+      },
+      "focusedNativeGreen": 22,
+      "behavior": "Unlock and await existing allSettled in finally, preserving the lock-observation error when rollback/release succeeds. Rollback-query failure remains a documented test-harness limit. New regression restores both spies even if its real worker rejects."
+    }
+  },
+  "gates": {
+    "serverUnitCoverage": {
+      "exitCode": 0,
+      "passed": 781,
+      "failed": 0,
+      "skipped": 0,
+      "suites": 97,
+      "coverage": {
+        "lines": {
+          "total": 9187,
+          "covered": 5134,
+          "skipped": 0,
+          "pct": 55.88
+        },
+        "statements": {
+          "total": 9921,
+          "covered": 5462,
+          "skipped": 0,
+          "pct": 55.05
+        },
+        "functions": {
+          "total": 1761,
+          "covered": 883,
+          "skipped": 0,
+          "pct": 50.14
+        },
+        "branches": {
+          "total": 7050,
+          "covered": 3344,
+          "skipped": 0,
+          "pct": 47.43
+        },
+        "branchesTrue": {
+          "total": 0,
+          "covered": 0,
+          "skipped": 0,
+          "pct": 100
+        }
+      },
+      "log": "output/residual-gap-20261101/server-coverage-final.log",
+      "exitFile": "output/residual-gap-20261101/server-coverage-review-exit.txt"
+    },
+    "serverNative": {
+      "exitCode": 0,
+      "passed": 186,
+      "failed": 0,
+      "skipped": 0,
+      "suites": 20,
+      "environmentGuards": 2,
+      "detectOpenHandles": true,
+      "forceExit": false,
+      "command": "node node_modules/jest/bin/jest.js --config jest-e2e.json --runInBand --detectOpenHandles --json --outputFile=D:/Data Explorer/output/residual-gap-20261101/native-direct-results.json",
+      "log": "output/residual-gap-20261101/native-direct-final.log",
+      "json": "output/residual-gap-20261101/native-direct-results.json",
+      "exitFile": "output/residual-gap-20261101/native-direct-exit.txt",
+      "environmentGuardExitFile": "output/residual-gap-20261101/environment-guards-review-exit.txt"
+    },
+    "serverTypecheck": {
+      "exitCode": 0,
+      "log": "output/residual-gap-20261101/server-typecheck-review-final.log",
+      "exitFile": "output/residual-gap-20261101/server-typecheck-review-exit.txt"
+    },
+    "serverLint": {
+      "exitCode": 0,
+      "log": "output/residual-gap-20261101/server-lint-review-final.log",
+      "exitFile": "output/residual-gap-20261101/server-lint-review-exit.txt"
+    },
+    "serverBuild": {
+      "exitCode": 0,
+      "log": "output/residual-gap-20261101/server-build.log",
+      "exitFile": "output/residual-gap-20261101/server-build-review-exit.txt"
+    },
+    "cleanExportServerBuild": {
+      "exitCode": 0,
+      "log": "output/residual-gap-20261101/server-clean-build.log",
+      "exitFile": "output/residual-gap-20261101/server-clean-build-review-exit.txt"
+    },
+    "dependencyAudits": {
+      "clientExitCode": 0,
+      "serverExitCode": 0,
+      "clientAllowlist": "GHSA-QWWW-VCR4-C8H2",
+      "serverAllowlist": "GHSA-GGR8-5VV4-36MX",
+      "clientExitFile": "output/residual-gap-20261101/client-audit-review-exit.txt",
+      "serverExitFile": "output/residual-gap-20261101/server-audit-review-exit.txt"
+    },
+    "helperTests": {
+      "exitCode": 0,
+      "passed": 13,
+      "log": "output/residual-gap-20261101/helper-tests.log",
+      "exitFile": "output/residual-gap-20261101/helper-tests-review-exit.txt"
+    },
+    "browser": {
+      "status": "PASSED",
+      "exitCode": 0,
+      "passed": 230,
+      "failed": 0,
+      "projects": ["chromium", "firefox", "mobile-chrome", "mobile-webkit"],
+      "retries": 0,
+      "log": "output/residual-gap-20261101/browser-final-restart.log",
+      "exitFile": "output/residual-gap-20261101/browser-exit.txt",
+      "evidenceNote": "PowerShell npm resolved to npm.ps1 and treated the requested reporter flag as npm config; default Playwright reporter still executed the complete configured four-project suite. CLI log and exit file are execution evidence; browser-list.json is discovery evidence only."
+    },
+    "fullStack": {
+      "status": "PASSED",
+      "exitCode": 0,
+      "passed": 3,
+      "failed": 0,
+      "cleanExport": true,
+      "log": "output/residual-gap-20261101/full-stack-final.log",
+      "exitFile": "output/residual-gap-20261101/full-stack-exit.txt",
+      "evidenceNote": "PowerShell npm resolved to npm.ps1 and treated the requested reporter flag as npm config; default Playwright reporter executed the complete configured full-stack suite. CLI log and exit file are execution evidence."
+    }
+  },
+  "gitnexus": {
+    "index": "up-to-date at baseline HEAD",
+    "loginImpact": {
+      "risk": "LOW",
+      "directCallers": 2,
+      "recognizedProcesses": 0,
+      "modules": 1
+    },
+    "concurrentCreditsImpact": {
+      "risk": "LOW",
+      "directCallers": 1,
+      "recognizedProcesses": 0
+    },
+    "note": "Cumulative R00-R14 dirty-tree risk; dynamic dispatch and unindexed tests have separate review limits"
+  },
+  "audit": {
+    "method": "Review report limitations and current boundary sources/tests; not a new exhaustive whole-repository security audit",
+    "reports": [
+      {
+        "package": "R00",
+        "status": "VERIFIED_LOCAL",
+        "closed": [
+          "A01 this follow-up",
+          "A02 by R10"
+        ],
+        "remaining": "Provider-specific password-login guidance can disclose the social sign-in provider; product/security decision plus provider/release certification remain"
+      },
+      {
+        "package": "R01",
+        "status": "VERIFIED_LOCAL",
+        "closed": [
+          "R02 resource backup later",
+          "R03 read-only later",
+          "AI error contract by R10"
+        ],
+        "remaining": "Every native engine/database selection, provider export, replicas"
+      },
+      {
+        "package": "R02",
+        "status": "VERIFIED_LOCAL",
+        "closed": [
+          "Later full browser/coverage/integration gates"
+        ],
+        "remaining": "Production/remote/multi-engine backup and release certification"
+      },
+      {
+        "package": "R03",
+        "status": "VERIFIED_LOCAL",
+        "remaining": "Guard has a supported syntax subset; DB least privilege and full native engine/remote/load certification remain"
+      },
+      {
+        "package": "R04",
+        "status": "VERIFIED_LOCAL",
+        "contained": [
+          "Unsafe typed non-SQL row mutation"
+        ],
+        "remaining": "No optimistic content concurrency or multi-row all-or-nothing; native aliases/triggers/UDF/schema races not fully certified"
+      },
+      {
+        "package": "R05",
+        "status": "VERIFIED_LOCAL",
+        "contained": [
+          "Unsafe replay"
+        ],
+        "remaining": "BLOCKED_PRODUCT_CONTRACT partial/resume/rollback; NOT_VERIFIED_SCALE worker lock loss, queues, cross-process SSE; native transfer not certified on every engine"
+      },
+      {
+        "package": "R06",
+        "status": "VERIFIED_LOCAL",
+        "closed": [
+          "Minor observation-failure drain this follow-up"
+        ],
+        "remaining": "Provider/checkout outage/protocol/capacity; R13 refund/cancel/stacking and lifecycle decisions"
+      },
+      {
+        "package": "R07",
+        "status": "VERIFIED_LOCAL",
+        "closed": [
+          "Persisted-query remount by 25/10"
+        ],
+        "remaining": "Process-local ownership, native remote/SSH/proxy cancellation, all engines/load not certified; cancel can follow partial writes"
+      },
+      {
+        "package": "R08",
+        "status": "VERIFIED_LOCAL",
+        "closed": [
+          "Dependency/cache wiring gates by R10"
+        ],
+        "remaining": "No durable invalidation outbox for process kill; external writes need refresh/TTL; outages/replicas/load/engines not certified"
+      },
+      {
+        "package": "R09",
+        "status": "VERIFIED_LOCAL",
+        "closed": [
+          "Later dependency/coverage/browser/full-stack gates"
+        ],
+        "remaining": "Deleted retained history cannot be reconstructed; production backfill/large corpus/notification outage/concurrent deletion not certified"
+      },
+      {
+        "package": "R10",
+        "status": "VERIFIED_LOCAL",
+        "closed": [
+          "Local dependency/container/Trivy/SBOM and test-source typecheck later"
+        ],
+        "remaining": "NOT_RUN_EXTERNAL provider/Azure; NOT_VERIFIED_RELEASE remote Actions/SHA/publication/deploy"
+      },
+      {
+        "package": "R11",
+        "status": "VERIFIED_LOCAL",
+        "remaining": "NOT_VERIFIED_MANUAL actual zoom; NOT_VERIFIED_RELEASE"
+      },
+      {
+        "package": "R12",
+        "status": "VERIFIED_LOCAL",
+        "remaining": "NOT_VERIFIED_MANUAL actual zoom/screen reader; external 2FA/passkey is a separate contract/security package"
+      },
+      {
+        "package": "R13",
+        "status": "BLOCKED_PRODUCT_DECISION",
+        "remaining": "Deferred entitlement matrix, boundaries, lifecycle/stacking/provider sandbox"
+      },
+      {
+        "package": "R14",
+        "status": "BLOCKED_PRODUCT_CONTRACT",
+        "contained": [
+          "Typed non-SQL row mutation",
+          "Unsafe migration replay"
+        ],
+        "remaining": "CSV NULL, typed Mongo writes, Redis writes/TTL/scan stability, migration semantics; scale/provider/manual/release"
+      }
+    ],
+    "closedLater": [
+      {
+        "item": "A02 legacy cache",
+        "by": "R10 stores/native lifecycle",
+        "evidence": "server/src/app.module.ts:94"
+      },
+      {
+        "item": "AI context 500/null",
+        "by": "R10 regular/stream exception preservation",
+        "evidence": "server/src/ai/ai.connection-service.spec.ts:31"
+      },
+      {
+        "item": "R07 remount",
+        "by": "25/10 explicit runtime Run eligibility",
+        "evidence": "client/src/presentation/modules/Query/QueryEditor.tsx:248"
+      }
+    ],
+    "r00ToR12": "VERIFIED_LOCAL only within report scope; A01 and R06 Minor CLOSED in this follow-up",
+    "r13": "BLOCKED_PRODUCT_DECISION_DEFERRED",
+    "r14": "BLOCKED_PRODUCT_CONTRACT",
+    "contained": [
+      "Non-SQL typed row update/delete rejected before dispatch",
+      "Migration replay rejected without resume/idempotency contract"
+    ],
+    "productContracts": [
+      "Free/Pro quotas, reset timezone, over-quota data, lifecycle, and whether to retain the current duration-stacking behavior",
+      "CSV NULL versus empty-string representation",
+      "Typed Mongo identity and subtype-preserving writes",
+      "Redis overwrite/type conversion/TTL-copy; scan stability under mutation",
+      "Migration partial/resume/idempotency/rollback"
+    ],
+    "notVerifiedExternal": [
+      "Provider sandbox OAuth/email/payment/LLM",
+      "SSH/proxy/remote routing/full native certification of every supported engine"
+    ],
+    "notVerifiedManual": [
+      "Actual browser zoom",
+      "Screen reader",
+      "External 2FA/passkey enrollment/recovery"
+    ],
+    "notVerifiedScale": [
+      "Multiple replicas/shared caps/worker ownership",
+      "Load/large corpus/pool exhaustion",
+      "R04 optimistic concurrency and multi-row all-or-nothing are not promised",
+      "R09 notification outage/concurrent lifecycle deletion; deleted historical events cannot be recovered"
+    ],
+    "release": "NOT_VERIFIED_RELEASE: remote Actions, remote committed SHA, publication/deployment"
+  },
+  "history": [
+    "Initial synthetic webhook returned void; full test-source typecheck caught TS2345. Changed to delayed real signed webhook wrapper, no any cast/exclusion.",
+    "Initial full native 186/186 superseded after test spy-restoration correction. It emitted a one-second Jest exit warning and eventually exited 0; final native rerun passed 186/186 and exited 0.",
+    "First browser attempt stopped at 17 cases without final JSON or exit evidence, session no longer available. Not counted as pass; full original suite restarted.",
+    "Prior-chat workspace E2E Jest PID33780 created 2026-11-01 10:50:57 retained an idle Redis client. Verified workspace/config/in-band arguments and stopped only that process; Redis then had only the inspecting redis-cli.",
+    "PowerShell resolved npm to D:/Users/npm.ps1, so flags after -- were parsed as npm config. Earlier npm native runs did not actually apply detectOpenHandles/outputFile and are superseded by the direct Node Jest run. Browser/full-stack default configured suites remain valid; no requested execution JSON exists for those runs."
+  ],
+  "review": {
+    "status": "COMPLETED_WITH_DOCUMENTED_LIMITS",
+    "completedAt": "2026-11-01T17:42:38.6862917+07:00",
+    "preliminary": "Locale/provider/audit/throttle and drain ordering reviewed; new spy-restoration issue corrected before the authoritative direct native rerun. Independent binding and cleanup verification passed.",
+    "final": "Fresh source/document review added independent exit artifacts and corrected current GitNexus counts. No production source was changed: provider guidance disclosure, approval of the current duration-stacking behavior, and rollback-query failure in the test helper remain explicit limits.",
+    "focusedAuthBillingUnit": {
+      "exitCode": 0,
+      "passed": 13,
+      "failed": 0,
+      "suites": 2,
+      "exitFile": "output/residual-gap-20261101/focused-auth-billing-review-exit.txt"
+    },
+    "rateLimitObserved": true
+  },
+  "cleanup": {
+    "nativeRowsBeforeFullStack": {
+      "users": 0,
+      "connections": 0,
+      "payments": 0,
+      "subscriptions": 0
+    },
+    "legacyJestStopped": 33780,
+    "ownedDockerFinal": {
+      "containers": 0,
+      "networks": 0,
+      "hostVolumeNamesBefore": 19,
+      "hostVolumeNamesAfter": 19,
+      "differences": 0
+    },
+    "retainedCleanExport": "output/residual-gap-20261101/checkout",
+    "protectedHistoricalR14KeyFiles": 17,
+    "protectedZcodeFiles": 2,
+    "independentEvidence": "output/residual-gap-20261101/independent-binding-cleanup-verification.json"
+  },
+  "checks": {
+    "productionBsontypeMatches": 0,
+    "focusedKeyPatternScan": "One expected PEM banner placeholder with ellipsis at ConnectionDialog.tsx:775, no key material in that literal; narrow pattern check",
+    "diffCheckExitCode": 0,
+    "diffCheckExitFile": "output/residual-gap-20261101/diff-check-review-exit.txt",
+    "applicationSourceIntegrity": {
+      "originalMatched": 789,
+      "exportMatched": 789,
+      "mismatches": 0,
+      "exportServerEnvPresent": false,
+      "zcodeMatched": 2,
+      "historicalR14SourceHashesMatched": 17,
+      "dependencyMode": "existing node_modules junctions; no fresh npm ci"
+    }
+  }
+}

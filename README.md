@@ -18,6 +18,8 @@
 
 Current documentation focus reflects the **v1.6.7** workspace: production-grade CockroachDB and MariaDB engines with a shared TLS contract, adversarial security testing, a hardened web platform (PWA, security.txt), query cancellation with an Active Queries panel, and configurable AI roles with custom OpenAI-compatible providers.
 
+Project improvement work: [Documentation index](docs/README.md), [Roadmap](docs/roadmap/ROADMAP.md), [implementation progress](docs/roadmap/ROADMAP-PROGRESS.md), and [verification reports and reproduction guide](docs/roadmap/quality/README.md).
+
 ---
 
 ## Key Features

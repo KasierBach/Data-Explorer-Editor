@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "package": "R10-R14-resume",
+  "date": "2026-10-27",
+  "timezone": "Asia/Saigon",
+  "baseHead": "3d7ec60845ddc2a07284c2873d9d3727acd30744",
+  "branch": "codex/roadmap-r00",
+  "tree": "Uncommitted R00-R14 tree; no reset/stash/commit/push/deploy. .zcode retained.",
+  "status": {
+    "R10": "VERIFIED_LOCAL",
+    "R11": "VERIFIED_LOCAL",
+    "R12": "VERIFIED_LOCAL",
+    "R13": "BLOCKED_PRODUCT_DECISION",
+    "R14": "DOING_BOUNDED"
+  },
+  "cleanExport": {
+    "path": "output/roadmap-final-clean-20261026/checkout",
+    "sourceFiles": 843,
+    "integrityDiff": [],
+    "secretsCopied": false
+  },
+  "checks": [
+    { "id": "server-unit", "count": 758, "exitCode": 0, "evidence": "output/roadmap-final-clean-20261026/server-unit-generated.log" },
+    { "id": "server-coverage", "count": 758, "exitCode": 0, "lines": 55.53, "branches": 46.94, "evidence": "output/roadmap-final-clean-20261026/server-coverage-generated.log" },
+    { "id": "server-native", "count": 162, "exitCode": 0, "evidence": "output/roadmap-final-clean-20261026/server-native-owned.log" },
+    { "id": "client-coverage", "count": 165, "exitCode": 0, "lines": 18.27, "branches": 11.37, "evidence": "output/roadmap-final-clean-20261026/client-coverage-last.log" },
+    { "id": "browser", "count": 208, "exitCode": 0, "evidence": "output/roadmap-final-clean-20261026/client-browser-localized-final.log" },
+    { "id": "full-stack", "count": 2, "exitCode": 0, "evidence": "output/roadmap-final-clean-20261026/full-stack-localized-final.log" },
+    { "id": "client-audit-ci-allowlist", "exitCode": 0, "evidence": "output/roadmap-final-clean-20261026/client-audit-postcov.log" },
+    { "id": "server-audit-ci-allowlist", "exitCode": 0, "evidence": "output/roadmap-final-clean-20261026/server-audit-generated.log" },
+    { "id": "client-build", "exitCode": 0, "evidence": "output/roadmap-final-clean-20261026/client-build-postcov.log" },
+    { "id": "server-build", "exitCode": 0, "evidence": "output/roadmap-final-clean-20261026/server-build-generated.log" }
+  ],
+  "r11": {
+    "matrixCases": 56,
+    "widths": [360, 390, 412, 768, 1024, 1280, 1440],
+    "locales": ["en", "vi"],
+    "themes": ["light", "dark"],
+    "timerStates": [false, true],
+    "timerVisibilityContract": "active sessions show the timer above 480px; narrow mobile chrome omits it",
+    "evidence": "output/roadmap-final-clean-20261026/r11-localized-final-results.json"
+  },
+  "r12": {
+    "axeCriticalSerious": 0,
+    "states": ["profile-dialog", "connection-dialog", "authenticated-query-light", "authenticated-query-dark"],
+    "localizedUi": ["theme-controls", "ai-toolbar", "ai-input", "render-time-welcome"],
+    "evidence": ["output/roadmap-final-clean-20261026/localized-results.json", "output/roadmap-final-clean-20261026/client-browser-localized-final.log"],
+    "manualZoom": "NOT_RUN"
+  },
+  "r13": {
+    "decision": "docs/roadmap/quality/R13-DECISION.md",
+    "unsupportedBenefitCopyRemoved": true,
+    "serverFeatureEnforcement": "BLOCKED"
+  },
+  "r14": {
+    "csvUtf8QuoteNewline": "VERIFIED_LOCAL",
+    "csvNullVsEmpty": "BLOCKED_CONTRACT",
+    "mongoObjectIdDateDecimal128Read": "VERIFIED_LOCAL",
+    "mongoTypedMutation": "CONTAINED_BLOCKED_CONTRACT",
+    "externalProviders": "NOT_RUN",
+    "multiReplica": "NOT_RUN_SCALE"
+  },
+  "changeDetection": {
+    "scope": "compare",
+    "baseRef": "main",
+    "files": 103,
+    "symbols": 362,
+    "affectedProcesses": 66,
+    "risk": "critical",
+    "exitCode": 0,
+    "evidence": "output/roadmap-final-clean-20261026/gitnexus-final-detect.log",
+    "interpretation": "Cumulative R00-R14 integration blast radius; not a new runtime test failure."
+  },
+  "cleanup": {
+    "composeProject": "data-explorer-final-20261026",
+    "containersRemaining": 0,
+    "networksRemaining": 0,
+    "fixtureListenersRemaining": 0,
+    "testProcessesRemaining": 0
+  },
+  "notRun": ["remote GitHub Actions", "container image build/Trivy/SBOM", "deploy", "external bank/OAuth/email/LLM sandboxes", "manual zoom/screen-reader", "multi-replica scale"]
+}

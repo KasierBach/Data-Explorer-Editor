@@ -1,0 +1,437 @@
+{
+  "schemaVersion": 1,
+  "package": "R09",
+  "status": "VERIFIED_LOCAL",
+  "date": "2026-10-25",
+  "timezone": "Asia/Saigon",
+  "generatedUtc": "2026-10-25T09:48:34.557Z",
+  "baseHead": "3d7ec60845ddc2a07284c2873d9d3727acd30744",
+  "branch": "codex/roadmap-r00",
+  "tree": "Uncommitted R00-R09 tree; HEAD alone does not contain tested changes. No git reset/stash/commit/push/deploy.",
+  "gateStatus": "Product local checks PASS; unchanged dependency audits BASELINE_FAIL under roadmap8.3. Not a release gate.",
+  "contract": "CommentEvent is the sole state source; audit retention cannot remove comments. Stable comment/thread/reaction references, current permissions, anonymous deleted authors and resource/org cascades. Bounded idempotent legacy replay with checkpoint/watermark.",
+  "checks": [
+    {
+      "id": "server-prisma",
+      "command": "npm.cmd run prisma:generate",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T05:43:18.1865847Z",
+      "finishedUtc": "2026-10-25T05:43:30.2883078Z",
+      "evidence": "output/roadmap-r09/server-prisma.log",
+      "status": "PASS"
+    },
+    {
+      "id": "server-lint",
+      "command": "npm.cmd run lint",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T05:43:30.3360939Z",
+      "finishedUtc": "2026-10-25T05:44:04.6674747Z",
+      "evidence": "output/roadmap-r09/server-lint.log",
+      "status": "PASS"
+    },
+    {
+      "id": "server-unit",
+      "command": "npm.cmd run test:ci -- --json --outputFile=../output/roadmap-r09/server-unit.json",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T05:44:04.6739744Z",
+      "finishedUtc": "2026-10-25T05:45:47.2689460Z",
+      "evidence": "output/roadmap-r09/server-unit.log",
+      "status": "PASS"
+    },
+    {
+      "id": "server-build",
+      "command": "npm.cmd run build",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T05:45:47.2732620Z",
+      "finishedUtc": "2026-10-25T05:46:26.1234856Z",
+      "evidence": "output/roadmap-r09/server-build.log",
+      "status": "PASS"
+    },
+    {
+      "id": "api-native",
+      "command": "npm.cmd run test:e2e -- --detectOpenHandles --json --outputFile=../output/roadmap-r09/api-native.json",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T05:46:26.1396125Z",
+      "finishedUtc": "2026-10-25T05:48:29.1555435Z",
+      "evidence": "output/roadmap-r09/api-native.log",
+      "status": "PASS"
+    },
+    {
+      "id": "server-audit",
+      "command": "node ../.github/scripts/npm-audit.mjs",
+      "exitCode": 1,
+      "startedUtc": "2026-10-25T05:48:29.1592690Z",
+      "finishedUtc": "2026-10-25T05:48:34.0749561Z",
+      "evidence": "output/roadmap-r09/server-audit.log",
+      "status": "BASELINE_FAIL"
+    },
+    {
+      "id": "client-lint",
+      "command": "node node_modules/eslint/bin/eslint.js .",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T05:57:22.2593163Z",
+      "finishedUtc": "2026-10-25T05:58:36.3678146Z",
+      "evidence": "output/roadmap-r09/client-lint.log",
+      "status": "PASS"
+    },
+    {
+      "id": "client-unit",
+      "command": "node node_modules/vitest/vitest.mjs run --reporter=json --outputFile=../output/roadmap-r09/client-unit.json",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T05:58:36.4182576Z",
+      "finishedUtc": "2026-10-25T05:59:45.3280764Z",
+      "evidence": "output/roadmap-r09/client-unit.log",
+      "status": "PASS"
+    },
+    {
+      "id": "client-prerender",
+      "command": "node --test scripts/prerender-public.test.mjs",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T05:59:45.3699630Z",
+      "finishedUtc": "2026-10-25T05:59:45.9012196Z",
+      "evidence": "output/roadmap-r09/client-prerender.log",
+      "status": "PASS"
+    },
+    {
+      "id": "ci-scripts",
+      "command": "node --test ../.github/scripts/deploy-render.test.mjs ../.github/scripts/npm-audit.test.mjs",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T05:59:45.9045940Z",
+      "finishedUtc": "2026-10-25T05:59:46.6388502Z",
+      "evidence": "output/roadmap-r09/ci-scripts.log",
+      "status": "PASS"
+    },
+    {
+      "id": "client-build",
+      "command": "npm.cmd run build",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T05:59:46.6546390Z",
+      "finishedUtc": "2026-10-25T06:01:13.5734115Z",
+      "evidence": "output/roadmap-r09/client-build.log",
+      "status": "PASS"
+    },
+    {
+      "id": "client-audit",
+      "command": "node ../.github/scripts/npm-audit.mjs",
+      "exitCode": 1,
+      "startedUtc": "2026-10-25T06:01:13.5953189Z",
+      "finishedUtc": "2026-10-25T06:01:20.5307148Z",
+      "evidence": "output/roadmap-r09/client-audit.log",
+      "status": "BASELINE_FAIL"
+    },
+    {
+      "id": "browser-full",
+      "command": "node node_modules/@playwright/test/cli.js test --reporter=json",
+      "exitCode": 0,
+      "startedUtc": "2026-10-25T06:01:20.5339656Z",
+      "finishedUtc": "2026-10-25T06:06:07.5272086Z",
+      "evidence": "output/roadmap-r09/browser-full.log",
+      "status": "PASS"
+    }
+  ],
+  "counts": {
+    "serverUnit": 711,
+    "clientUnit": 158,
+    "api": 153,
+    "r09NativeSubset": 15,
+    "environmentGuards": 2,
+    "browser": 82,
+    "prerender": 1,
+    "ciScripts": 8
+  },
+  "r09Tests": [
+    {
+      "test": "R09 legacy comment migration on the guarded disposable application database rejects invalid batch budgets, including NULL, without scanning or changing the checkpoint",
+      "status": "passed"
+    },
+    {
+      "test": "R09 legacy comment migration on the guarded disposable application database commits each batch with its checkpoint, survives rollback/restart, and recovers only complete threads",
+      "status": "passed"
+    },
+    {
+      "test": "R09 legacy comment migration on the guarded disposable application database enforces foreign keys and resource binding for new rows while exposing legacy orphan inventory",
+      "status": "passed"
+    },
+    {
+      "test": "R09 durable comments with real PostgreSQL and HTTP permissions returns the target comment and latest edit beyond 500 other-resource comment events",
+      "status": "passed"
+    },
+    {
+      "test": "R09 durable comments with real PostgreSQL and HTTP permissions keeps the thread, edited reply, mention, reaction and resolution after audit retention cleanup",
+      "status": "passed"
+    },
+    {
+      "test": "R09 durable comments with real PostgreSQL and HTTP permissions keeps nested replies in the root thread and rejects a parent from another resource",
+      "status": "passed"
+    },
+    {
+      "test": "R09 durable comments with real PostgreSQL and HTTP permissions keeps author-only editing and author/admin deletion, clearing deleted payloads and reactions",
+      "status": "passed"
+    },
+    {
+      "test": "R09 durable comments with real PostgreSQL and HTTP permissions denies read and every mutation after revoked resource policy with the same JWT",
+      "status": "passed"
+    },
+    {
+      "test": "R09 durable comments with real PostgreSQL and HTTP permissions denies read and every mutation after revoked membership with the same JWT",
+      "status": "passed"
+    },
+    {
+      "test": "R09 durable comments with real PostgreSQL and HTTP permissions permits READ after COMMENT revocation but denies edit, reply, delete and reaction",
+      "status": "passed"
+    },
+    {
+      "test": "R09 durable comments with real PostgreSQL and HTTP permissions rejects missing comments and wrong-organization references without inserting reactions or replies",
+      "status": "passed"
+    },
+    {
+      "test": "R09 durable comments with real PostgreSQL and HTTP permissions commits durable state when the audit table rejects writes and rolls back durable failure with no audit success",
+      "status": "passed"
+    },
+    {
+      "test": "R09 durable comments with real PostgreSQL and HTTP permissions serializes simultaneous toggles and leaves no reaction on a concurrently deleted comment",
+      "status": "passed"
+    },
+    {
+      "test": "R09 durable comments with real PostgreSQL and HTTP permissions preserves shared comments anonymously after author deletion and cascades owned resources",
+      "status": "passed"
+    },
+    {
+      "test": "R09 durable comments with real PostgreSQL and HTTP permissions binds all four resource kinds and cascades comments/reactions on resource or organization deletion",
+      "status": "passed"
+    }
+  ],
+  "sourceFreeze": [
+    {
+      "path": "server/prisma/schema.prisma",
+      "sha256": "598b84b4ebce61f5fc0587494408965b317432ce342f90d9332d87129e9c27e2"
+    },
+    {
+      "path": "server/src/collaboration/collaboration.service.ts",
+      "sha256": "99e5ab2523e52822008d905e6cfad4322798d4f336672816878ddb210e62d8e3"
+    },
+    {
+      "path": "server/prisma/migrations/20261025000000_durable_comment_events/migration.sql",
+      "sha256": "1a615e8dc2f5b985db2962369fa1dfa0e177c2e2c98706cccb1c044ffe2a0fac"
+    },
+    {
+      "path": "server/test/comment-persistence-r09.e2e-spec.ts",
+      "sha256": "3b587d1cafcc3e4949251162f16de2450fd184043a92d8bf1e9bf8d3a6005466"
+    },
+    {
+      "path": "server/test/comment-backfill-r09.e2e-spec.ts",
+      "sha256": "ee70decf255ae53f82f3acd375d0cb2486aa6f51f3491f54aa045382f0241117"
+    }
+  ],
+  "protection": {
+    "baselineFiles": 819,
+    "unchangedFiles": 814,
+    "expectedChanges": [
+      {
+        "path": "docs/roadmap/ROADMAP-PROGRESS.md",
+        "before": "c6261e1079acc2b54fa8bc40ad65587769787428a2f4f8728e12a62d199da3ff",
+        "after": "e93219dbc27f78ed373f070a8ab6e91ba5d768f7de51e09b4e881d4ba8e9cd01"
+      },
+      {
+        "path": "docs/roadmap/ROADMAP.md",
+        "before": "27366e1cb8e3b6942935cc8072638ca5e0437fbf4940a5c4c58cba0214d40b8d",
+        "after": "e7e9d40a405483f08b93f972f7bcfc4e09ad60af99aef0cb32471eed50d9f5a5"
+      },
+      {
+        "path": "docs/roadmap/quality/README.md",
+        "before": "a01015bcd7ca4e0fc0a73479605a3c212a506c3fa12e356a552613f1f031f2a5",
+        "after": "4948626fb099ab49331c071b2af0050b03aeb2690486f750e34a0669764f8440"
+      },
+      {
+        "path": "server/prisma/schema.prisma",
+        "before": "4b07a75a973f6033c1b4c29d1af5ccace4758a3a41b72de0d020a70b93858007",
+        "after": "598b84b4ebce61f5fc0587494408965b317432ce342f90d9332d87129e9c27e2"
+      },
+      {
+        "path": "server/src/collaboration/collaboration.service.ts",
+        "before": "9e533c17e7519550aff7156ca9eadeec4760d572d656d94bd55cdfe4603e3725",
+        "after": "99e5ab2523e52822008d905e6cfad4322798d4f336672816878ddb210e62d8e3"
+      }
+    ],
+    "unexpectedChanges": []
+  },
+  "migration": {
+    "path": "server/prisma/migrations/20261025000000_durable_comment_events/migration.sql",
+    "sha256": "1a615e8dc2f5b985db2962369fa1dfa0e177c2e2c98706cccb1c044ffe2a0fac",
+    "initialFixture": {
+      "examined": 8,
+      "copiedEvents": 6,
+      "skippedEvents": 2,
+      "completeThreads": 1,
+      "orphanReplies": 1,
+      "orphanReactions": 1
+    },
+    "maintainedCorpus": {
+      "examined": 14,
+      "copiedEvents": 7,
+      "skippedEvents": 7,
+      "completeThreads": 1,
+      "duplicateReplayCopied": 0
+    },
+    "backupSha256": "18c242f1bdf8b8bb96e3503ddf3ee81fab74c3e5af311860c5e85f115d101dda",
+    "guide": "docs/roadmap/quality/R09-MIGRATION.md",
+    "productionRun": false,
+    "initialAtomic": true,
+    "legacyOrphanForeignKey": "NOT VALID if preexisting orphans remain; new writes still enforced; reconcile then validate"
+  },
+  "review": {
+    "kind": "sequential self-review",
+    "independent": false,
+    "criticalOrImportantOpenInVerifiedScope": 0,
+    "source": "docs/roadmap/quality/R09-REPORT.md",
+    "loadAssumption": "Local fixture clients and one bounded legacy corpus; no production capacity guarantee"
+  },
+  "audit": {
+    "clientAllowlist": "GHSA-QWWW-VCR4-C8H2",
+    "serverAllowlist": "GHSA-GGR8-5VV4-36MX",
+    "dependenciesChanged": false,
+    "status": "BASELINE_FAIL",
+    "nextPackage": "R10"
+  },
+  "cleanup": {
+    "native": "output/roadmap-r09/cleanup-native.json",
+    "ownership": "output/roadmap-r09/cleanup-ownership.json",
+    "final": {
+      "composeDownExit": 0,
+      "containers": [],
+      "networks": [],
+      "listeners": []
+    }
+  },
+  "evidence": [
+    {
+      "path": "output/roadmap-r09/protection-baseline.json",
+      "sha256": "6e8541b59edb5007fd25c86770637ed55b1cc3becf8d5b067be32c90bc2fc333"
+    },
+    {
+      "path": "output/roadmap-r09/source-freeze.json",
+      "sha256": "6621c427e2666c6d8b1bbccdb40ee6d1a446c9c84d722632862320514d952ac9"
+    },
+    {
+      "path": "output/roadmap-r09/red-native.log",
+      "sha256": "bf5711f88cf25af298da73814b4022fdebf4137184b3070cbed3705a8e8e755d"
+    },
+    {
+      "path": "output/roadmap-r09/green-core-native.log",
+      "sha256": "75cb05ac064abb1cd7347c72a2efe216e9808dabcb89f7efaf63914e7e2670a1"
+    },
+    {
+      "path": "output/roadmap-r09/red-backfill-deletion-corrected-fixture.log",
+      "sha256": "29be0ad172fe648957e7d54875002dee6cd51b3cf2a937cc8a8591390fa724d7"
+    },
+    {
+      "path": "output/roadmap-r09/red-reaction-race.log",
+      "sha256": "e2f1ae8973d67b6dba4aa5fb0f4b87477434aab82c9990c7be9e825d9e0a6bcc"
+    },
+    {
+      "path": "output/roadmap-r09/green-final-focused.log",
+      "sha256": "9057113341b89d8ee72cf2fcaefffa2c8cab0fa4d4149e03d7bb46f74b6140af"
+    },
+    {
+      "path": "output/roadmap-r09/green-backfill-final.log",
+      "sha256": "d456c6602fd1b50deefb3ec931d3d5d4a7e0dddb0cca0f8817d62544fafff6d2"
+    },
+    {
+      "path": "output/roadmap-r09/migration-native-proof.log",
+      "sha256": "0ca0f5bab85eefb89e86e3528ba4ed104b9bc5824b376cf63b31d305ae213216"
+    },
+    {
+      "path": "output/roadmap-r09/pre-migration-fixture.sql",
+      "sha256": "18c242f1bdf8b8bb96e3503ddf3ee81fab74c3e5af311860c5e85f115d101dda"
+    },
+    {
+      "path": "output/roadmap-r09/backup-restore.log",
+      "sha256": "482037a25a70dc02d967707f8f736346d9bf672b15c4cdcd4b4ea634896a8213"
+    },
+    {
+      "path": "output/roadmap-r09/legacy-cleanup.log",
+      "sha256": "697e10eabc207ecd75ecfc78ea20c27030a3dddfd8abe2c23adab1b67ad59b21"
+    },
+    {
+      "path": "output/roadmap-r09/final-fixture-migration.log",
+      "sha256": "c1e1a86535b9763dba92e389e9c77a9fd3b3b1c285e85dd4c92647158bb67c52"
+    },
+    {
+      "path": "output/roadmap-r09/server-checks.json",
+      "sha256": "d45f526854c45259e00b95c25e0eae6a999cd0e6e592bfcc9346b4e4fa7dd2c0"
+    },
+    {
+      "path": "output/roadmap-r09/client-checks.json",
+      "sha256": "11c3e267f7a36dd16451f6923a49b49843cd1230e449c45bbcc84f07bbf4cccd"
+    },
+    {
+      "path": "output/roadmap-r09/server-unit.json",
+      "sha256": "fae4943b0ae02295ccc9be5e996f11cac7068e6a76a5f77befb3ce26a2aa5d9d"
+    },
+    {
+      "path": "output/roadmap-r09/client-unit.json",
+      "sha256": "b0520bb50605ba7c4f5bad4768b261552a2c0309bd9c28409e645155b7cfa403"
+    },
+    {
+      "path": "output/roadmap-r09/api-native.json",
+      "sha256": "f880a9de57e58b0c9d3ffe9137b723f802b2dc6652c2415c00a019e43ea3f866"
+    },
+    {
+      "path": "output/roadmap-r09/browser-full.json",
+      "sha256": "290b24cbe5fbf08dbb874bd922f7d2045bd79778624fbee251ad6d2ce27fdec7"
+    },
+    {
+      "path": "output/roadmap-r09/server-audit.log",
+      "sha256": "b1de6e22b69da65af7eef2d0a901ba710c4f2dfa0576b31953bdff2f02f6a3db"
+    },
+    {
+      "path": "output/roadmap-r09/client-audit.log",
+      "sha256": "562ecba4f8bfdc73bed20e29310e0b29ae7dfbfe6b5fa0241ad39bfdbcf2b912"
+    },
+    {
+      "path": "output/roadmap-r09/cleanup-native.json",
+      "sha256": "d7fcf75998507b19d29604cee1b44cc2fb208f07d288aa90b1cf7b3ac6400ef7"
+    },
+    {
+      "path": "output/roadmap-r09/cleanup-ownership.json",
+      "sha256": "bdb8bf97d04ff0b5fc18e5875226fbb5a65ae232ddd5cbf18738504d33bde94c"
+    },
+    {
+      "path": "output/roadmap-r09/cleanup-final.json",
+      "sha256": "b366aa424ef467c5f3a91e3693afd73b3cd279ec6411396de162d758aa7ff7de"
+    },
+    {
+      "path": "output/roadmap-r09/index-final.log",
+      "sha256": "a99a73b232c6486648780277e3504d7ec4292789855d18cf464a50b292b13d48"
+    },
+    {
+      "path": "output/roadmap-r09/detect-all.json",
+      "sha256": "af1aaead76ee19cd6f9116bfb46049fe467f447db1a1f9c743154c7547c573b2"
+    },
+    {
+      "path": "output/roadmap-r09/detect-compare-main.json",
+      "sha256": "7146cb8efc476c4d4be5702071e6a68f1560bc0860aa90c65e69b218a1e0fd32"
+    },
+    {
+      "path": "output/roadmap-r09/tools-supplement.json",
+      "sha256": "5bb510afad0ed3c4a8719b110a6669b077a6fd78ff7ea16d91d099a5edb6415d"
+    },
+    {
+      "path": "docs/roadmap/quality/R09-REPORT.md",
+      "sha256": "a64686f545afc9b6eb156d421dc9f8a6fedc5e7915ed8f7ac67785b0ccfd505b"
+    },
+    {
+      "path": "docs/roadmap/quality/R09-MIGRATION.md",
+      "sha256": "34cd9cc61ce35958dd583a9a7289bfdf70b0e46d0995a34057087a1c5dc7415f"
+    }
+  ],
+  "limits": [
+    "No independent review, remote CI or new coverage measurement.",
+    "Browser suite uses mock API, not a browser-to-real-backend workflow.",
+    "No production backup/migration/deploy or large-corpus/high-contention capacity proof.",
+    "Audit events already removed by retention are not recovered; orphan replies/reactions require inventory and reconciliation.",
+    "Per-resource replay remains unpaged; initial migration is a single transaction.",
+    "Dependency audits remain blocked on unchanged lockfiles; not release-ready."
+  ],
+  "next": "R10"
+}

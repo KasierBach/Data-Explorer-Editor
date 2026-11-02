@@ -1,0 +1,447 @@
+{
+  "schemaVersion": 1,
+  "kind": "historical-audit-summary",
+  "testedAt": "2026-10-20",
+  "reportFinalizedAt": "2026-10-22",
+  "head": "3d7ec60845ddc2a07284c2873d9d3727acd30744",
+  "summary": {
+    "total": 63,
+    "passed": 51,
+    "failed": 12
+  },
+  "scope": "Selected local audit cases; not total product workflow coverage; external bank/LLM/mail delivery not verified",
+  "findings": [
+    {
+      "id": "B3-01",
+      "priority": "P1",
+      "title": "PostgreSQL migration stream crashes API process",
+      "cases": [
+        "M02"
+      ],
+      "kind": "new"
+    },
+    {
+      "id": "B3-02",
+      "priority": "P1",
+      "title": "Numeric-looking text primary key updates a different row",
+      "cases": [
+        "G01"
+      ],
+      "kind": "new"
+    },
+    {
+      "id": "B3-03",
+      "priority": "P1",
+      "title": "Composite primary key update changes multiple rows",
+      "cases": [
+        "G02"
+      ],
+      "kind": "new"
+    },
+    {
+      "id": "B3-04",
+      "priority": "P1",
+      "title": "Concurrent distinct paid orders lose subscription days",
+      "cases": [
+        "B07"
+      ],
+      "kind": "new"
+    },
+    {
+      "id": "B3-05",
+      "priority": "P0",
+      "title": "Organization backup bypasses per-resource read policy",
+      "cases": [
+        "E08"
+      ],
+      "kind": "new"
+    },
+    {
+      "id": "B3-06",
+      "priority": "P2",
+      "title": "Invalid SQL is classified as internal server error",
+      "cases": [
+        "S04"
+      ],
+      "kind": "new"
+    },
+    {
+      "id": "F1",
+      "priority": "P0",
+      "title": "Cached metadata/schema returned before authorization",
+      "cases": [
+        "K01",
+        "K02"
+      ],
+      "kind": "evidence-upgrade"
+    },
+    {
+      "id": "F2",
+      "priority": "P0",
+      "title": "Role/database policy bypass through row and table-window APIs",
+      "cases": [
+        "T03",
+        "T05"
+      ],
+      "kind": "evidence-upgrade"
+    },
+    {
+      "id": "F3",
+      "priority": "P0",
+      "title": "Read-only SQL string-comment bypass performs real deletion",
+      "cases": [
+        "S09"
+      ],
+      "kind": "evidence-upgrade"
+    },
+    {
+      "id": "F5",
+      "priority": "P1",
+      "title": "Cancel returns false while target PG statement finishes normally",
+      "cases": [
+        "X01"
+      ],
+      "kind": "evidence-upgrade"
+    }
+  ],
+  "cases": [
+    {
+      "id": "A01",
+      "name": "unauthenticated query and non-admin access denied",
+      "status": "PASS"
+    },
+    {
+      "id": "A02",
+      "name": "tampered access-token signature rejected (assertions execute)",
+      "status": "PASS"
+    },
+    {
+      "id": "C01",
+      "name": "create PG/MySQL/Mongo/Redis/SQLite connections and test real drivers",
+      "status": "PASS"
+    },
+    {
+      "id": "C02",
+      "name": "connection read/update/delete owned by another user denied",
+      "status": "PASS"
+    },
+    {
+      "id": "C03",
+      "name": "connection list redacts credential fields",
+      "status": "PASS"
+    },
+    {
+      "id": "S01",
+      "name": "PG SELECT preserves Unicode/null/JSON and limit-offset",
+      "status": "PASS"
+    },
+    {
+      "id": "S02",
+      "name": "MySQL and SQLite SELECT use actual drivers",
+      "status": "PASS"
+    },
+    {
+      "id": "S03",
+      "name": "PG table-window sorting/offset/count",
+      "status": "PASS"
+    },
+    {
+      "id": "S04",
+      "name": "SQL parse error returns client error without changing data",
+      "status": "FAIL"
+    },
+    {
+      "id": "S05",
+      "name": "destructive query requires confirmation and leaves target unchanged",
+      "status": "PASS"
+    },
+    {
+      "id": "S06",
+      "name": "confirmed destructive query changes only synthetic target",
+      "status": "PASS"
+    },
+    {
+      "id": "S07",
+      "name": "multi-statement transaction rollback on PG real database",
+      "status": "PASS"
+    },
+    {
+      "id": "S08",
+      "name": "read-only normal write blocked",
+      "status": "PASS"
+    },
+    {
+      "id": "S09",
+      "name": "read-only guard blocks string-comment bypass against real PG",
+      "status": "FAIL"
+    },
+    {
+      "id": "D01",
+      "name": "insert/update/delete row persist Unicode and null correctly",
+      "status": "PASS"
+    },
+    {
+      "id": "D02",
+      "name": "constraint violation returns error and preserves row",
+      "status": "PASS"
+    },
+    {
+      "id": "D03",
+      "name": "bulk import constraint failure is atomic",
+      "status": "PASS"
+    },
+    {
+      "id": "N01",
+      "name": "Mongo find/aggregate real data",
+      "status": "PASS"
+    },
+    {
+      "id": "N02",
+      "name": "Redis GET reads synthetic key and SET raw command is rejected",
+      "status": "PASS"
+    },
+    {
+      "id": "T01",
+      "name": "organization invite requires intended account and accepts matching account",
+      "status": "PASS"
+    },
+    {
+      "id": "T02",
+      "name": "team connection restrictive query mode blocks raw SQL",
+      "status": "PASS"
+    },
+    {
+      "id": "T03",
+      "name": "team readonly query mode also blocks row insertion",
+      "status": "FAIL"
+    },
+    {
+      "id": "T04",
+      "name": "allowedDatabases restriction applies to raw SQL",
+      "status": "PASS"
+    },
+    {
+      "id": "T05",
+      "name": "allowedDatabases restriction applies to table-window",
+      "status": "FAIL"
+    },
+    {
+      "id": "T06",
+      "name": "private connection query ownership denied to unrelated account",
+      "status": "PASS"
+    },
+    {
+      "id": "K01",
+      "name": "metadata cache warm does not leak to unrelated account",
+      "status": "FAIL"
+    },
+    {
+      "id": "K02",
+      "name": "Mongo schema sample cache warm does not leak to unrelated account",
+      "status": "FAIL"
+    },
+    {
+      "id": "R01",
+      "name": "saved query create/rename/read authorization/delete",
+      "status": "PASS"
+    },
+    {
+      "id": "R02",
+      "name": "dashboard create/add widget/rename/reload and ownership",
+      "status": "PASS"
+    },
+    {
+      "id": "R03",
+      "name": "ERD workspace create/update/reload and ownership",
+      "status": "PASS"
+    },
+    {
+      "id": "R04",
+      "name": "workspace saved query share/member comment and unrelated denial",
+      "status": "PASS"
+    },
+    {
+      "id": "R05",
+      "name": "comment reply/reaction/resolve on real persisted events",
+      "status": "PASS"
+    },
+    {
+      "id": "R06",
+      "name": "resource presence sees two participants and clears leave",
+      "status": "PASS"
+    },
+    {
+      "id": "M01",
+      "name": "migration preview runs real PG metadata checks",
+      "status": "PASS"
+    },
+    {
+      "id": "M02",
+      "name": "migration queue executes and copies five rows",
+      "status": "FAIL"
+    },
+    {
+      "id": "M03",
+      "name": "migration job progress ticket ownership",
+      "status": "PASS"
+    },
+    {
+      "id": "T07",
+      "name": "member removed while logged in loses resource access",
+      "status": "PASS"
+    },
+    {
+      "id": "B01",
+      "name": "billing plans visible and foreign payment status denied",
+      "status": "PASS"
+    },
+    {
+      "id": "P01",
+      "name": "profile settings persist across fetch",
+      "status": "PASS"
+    },
+    {
+      "id": "X01",
+      "name": "cancel long PG query stops actual statement before completion",
+      "status": "FAIL"
+    },
+    {
+      "id": "A03",
+      "name": "refresh rotates cookie and logout invalidates refresh",
+      "status": "PASS"
+    },
+    {
+      "id": "Z01",
+      "name": "delete private artifacts and confirm absent",
+      "status": "PASS"
+    },
+    {
+      "id": "E01",
+      "name": "register enforces legal acceptance and sends generated verification to mock mail",
+      "status": "PASS"
+    },
+    {
+      "id": "E02",
+      "name": "email verification rejects wrong and expired OTP",
+      "status": "PASS"
+    },
+    {
+      "id": "E03",
+      "name": "valid email verification creates real session and OTP replay denied",
+      "status": "PASS"
+    },
+    {
+      "id": "E04",
+      "name": "forgot/reset password with generated OTP rejects replay and invalidates old refresh",
+      "status": "PASS"
+    },
+    {
+      "id": "E05",
+      "name": "new password authenticates; onboarding and legal persist",
+      "status": "PASS"
+    },
+    {
+      "id": "E06",
+      "name": "saved-query ownership checked on implemented list/update/delete routes",
+      "status": "PASS"
+    },
+    {
+      "id": "E07",
+      "name": "resource policy hides restricted saved SQL from viewer normal list",
+      "status": "PASS"
+    },
+    {
+      "id": "E08",
+      "name": "organization backup respects resource policy and hides restricted SQL",
+      "status": "FAIL"
+    },
+    {
+      "id": "E09",
+      "name": "organization backup restores artifacts without credentials",
+      "status": "PASS"
+    },
+    {
+      "id": "E10",
+      "name": "custom AI local provider generates SQL without automatic execution",
+      "status": "PASS"
+    },
+    {
+      "id": "E11",
+      "name": "AI context for unrelated connection denied before provider invocation",
+      "status": "PASS"
+    },
+    {
+      "id": "E12",
+      "name": "AI malformed request rejected before provider invocation",
+      "status": "PASS"
+    },
+    {
+      "id": "E13",
+      "name": "delete disposable newly registered account invalidates refresh",
+      "status": "PASS"
+    },
+    {
+      "id": "B02",
+      "name": "create checkout persists pending payment using real provider formatter",
+      "status": "PASS"
+    },
+    {
+      "id": "B03",
+      "name": "invalid signature and valid-signature wrong amount rejected",
+      "status": "PASS"
+    },
+    {
+      "id": "B04",
+      "name": "paid webhook activates exactly 30 days",
+      "status": "PASS"
+    },
+    {
+      "id": "B05",
+      "name": "duplicate paid and delayed failed callbacks do not extend or revoke paid plan",
+      "status": "PASS"
+    },
+    {
+      "id": "B06",
+      "name": "concurrent duplicate callbacks for same payment activate once",
+      "status": "PASS"
+    },
+    {
+      "id": "B07",
+      "name": "four distinct paid orders arriving concurrently all extend subscription",
+      "status": "FAIL"
+    },
+    {
+      "id": "G01",
+      "status": "FAIL",
+      "name": "Numeric-looking text primary key updates a different row"
+    },
+    {
+      "id": "G02",
+      "status": "FAIL",
+      "name": "Composite primary key update changes multiple rows"
+    }
+  ],
+  "sourceDocuments": [
+    {
+      "file": "BAO_CAO_DANH_GIA_PROJECT.md",
+      "sha256": "30285b1713883aeae54f05de97cc3ac7d5f9517a031ceeb7274327b495264d03"
+    },
+    {
+      "file": "BAO_CAO_WORKFLOW_COVERAGE_UI_UX.md",
+      "sha256": "38ac01438e167516f9f358ca4a49c2ab7ed5ce6a96925cafd8b6976880f0a01a"
+    },
+    {
+      "file": "BAO_CAO_BO_SUNG_HOAN_TAT_AUDIT.md",
+      "sha256": "fc543f11bb11cb5aebf94f41a2d26e13a66c22f500cc39100eada33d6875c16d"
+    },
+    {
+      "file": "GOI_GHEP_BAO_CAO.md",
+      "sha256": "6366f7d549acd0bafe78526233ff3ea16981cbd8de8518b2587499c3a3a9d38f"
+    }
+  ],
+  "limitations": [
+    "Summary only; original full reports and logs are local ignored output artifacts.",
+    "Historical FAIL results remain FAIL after remediation; use maintained test suites for regression.",
+    "Not a percentage of total user-workflow coverage."
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "package": "R14-bson-discriminator-hardening",
+  "verifiedOn": "2026-11-01",
+  "timezone": "Asia/Saigon",
+  "status": "VERIFIED_LOCAL",
+  "roadmapStatus": "DOING_BOUNDED",
+  "baseHead": "3d7ec60845ddc2a07284c2873d9d3727acd30744",
+  "branch": "codex/roadmap-r00",
+  "report": "docs/roadmap/quality/R14-BSON-DISCRIMINATOR-ADDENDUM.md",
+  "constraints": {
+    "resetStashCommitPushPublishDeploy": "NOT_PERFORMED",
+    "dependencyOrLockfileChanges": false,
+    "timeoutRetryAssertionCoverageRelaxations": false,
+    "writeEntitlementOrMigrationPolicyChanges": false,
+    "historicalEvidenceRewritten": false
+  },
+  "scope": {
+    "production": [
+      "server/src/database-strategies/mongodb.strategy.ts"
+    ],
+    "maintainedTests": [
+      "server/src/tests/database-strategies/mongodb.strategy.spec.ts",
+      "server/test/nosql-read-types-r14.e2e-spec.ts"
+    ],
+    "sourceSha256": {
+      "server/src/database-strategies/mongodb.strategy.ts": "5fd5424b791faa03cebcbe6a32881ed7258308aa50bcfd10146d2d74d09cafc6",
+      "server/src/tests/database-strategies/mongodb.strategy.spec.ts": "fc307912ad38b840bb6a0cc0bb51575fb3dcc49d300ca7ce5e5f72a917e085b4",
+      "server/test/nosql-read-types-r14.e2e-spec.ts": "ba85aa3d4c1d8c5a7bec8f447ddd9721e6964fb785eb0b22f312ac930d3efee9",
+      "server/package.json": "44bd6db14660c6bb0684e42918b8986a614062edce2a260bd3182ed13c9193e2",
+      "server/package-lock.json": "a071506020cbd5faae11c95a361afd7fc59a3296d1da98573ab418bc63064035"
+    }
+  },
+  "impact": {
+    "serializerAndInferType": {
+      "risk": "LOW",
+      "direct": 0,
+      "recognizedFlows": 0
+    },
+    "getColumns": {
+      "risk": "LOW",
+      "direct": 2,
+      "upstreamSymbols": 4,
+      "modules": 2,
+      "recognizedFlows": 1
+    },
+    "finalCumulative": {
+      "scope": "all and compare main",
+      "files": 110,
+      "symbols": 380,
+      "affectedFlows": 132,
+      "risk": "critical",
+      "qualification": "Cumulative preserved R00-R14 integration blast radius; not a focused runtime failure."
+    }
+  },
+  "reproduction": {
+    "unitRed": {
+      "tests": 15,
+      "passed": 14,
+      "failed": 1,
+      "failure": "Ordinary document with _bsontype ObjectId serialized as [object Object]."
+    },
+    "nativeFixtureSyntaxFailure": {
+      "status": "HARNESS_FAILURE",
+      "testsPassedBeforeFailure": 20,
+      "cause": "$arrayToObject fixture passed multiple arguments instead of one array argument."
+    },
+    "reviewFindings": [
+      "Native MongoDB RegExp serialized to an empty object.",
+      "MinKey and MaxKey lost identity as empty objects.",
+      "instanceof BSONValue did not support compatible package copies/realms."
+    ],
+    "initialParallelFullNative": {
+      "testBodiesPassed": 184,
+      "suitesPassed": 19,
+      "suitesFailed": 1,
+      "exitCode": 1,
+      "failure": "R04 afterAll exceeded unchanged 120000 ms hook timeout while coverage ran concurrently.",
+      "sourceOrBudgetChangedAfter": false,
+      "usedAsFinalGate": false
+    }
+  },
+  "readContract": {
+    "ordinaryBsonLookingDocument": "Preserved recursively; string _bsontype alone is not trusted.",
+    "bsonRecognition": "Global BSON type and version brands for compatible BSON major 7 values.",
+    "nativeRegExp": "{ pattern, options }",
+    "minKey": "{ $minKey: 1 }",
+    "maxKey": "{ $maxKey: 1 }",
+    "existingObjectIdDecimalLongBinaryTimestamp": "Historical R14 read contract preserved."
+  },
+  "verification": {
+    "focusedUnit": {
+      "tests": 18,
+      "passed": 18,
+      "suites": 1,
+      "exitCode": 0
+    },
+    "focusedNative": {
+      "tests": 21,
+      "passed": 21,
+      "suites": 1,
+      "environmentGuards": 2,
+      "detectOpenHandles": true,
+      "exitCode": 0
+    },
+    "serverUnitCoverage": {
+      "tests": 776,
+      "passed": 776,
+      "suites": 97,
+      "exitCode": 0,
+      "lines": 55.74,
+      "branches": 47.36,
+      "functions": 50.02,
+      "statements": 54.92,
+      "scopeOrThresholdChanged": false
+    },
+    "finalFullNativeSequential": {
+      "tests": 184,
+      "passed": 184,
+      "failed": 0,
+      "pending": 0,
+      "suites": 20,
+      "environmentGuards": 2,
+      "detectOpenHandles": true,
+      "forceExit": false,
+      "exitCode": 0
+    },
+    "typecheck": {
+      "diagnostics": 0,
+      "exitCode": 0
+    },
+    "serverLint": {
+      "exitCode": 0
+    },
+    "productionBuild": {
+      "exitCode": 0
+    },
+    "serverAudit": {
+      "exitCode": 0,
+      "ciAllowlist": "GHSA-GGR8-5VV4-36MX",
+      "allowlistChanged": false
+    },
+    "prismaHelper": {
+      "tests": 4,
+      "passed": 4,
+      "exitCode": 0
+    },
+    "independentFocusedReview": {
+      "initialFindings": 3,
+      "remainingFindings": 0,
+      "residualLimitations": [
+        "BSON recognition is pinned to major version 7.",
+        "Foreign-realm JavaScript RegExp objects remain unsupported; normal driver output is same-realm.",
+        "Cross-package branding is verified synthetically rather than with a second installed package."
+      ]
+    },
+    "clientBrowserFullStackContainers": "NOT_RERUN: backend-only normalization/test addendum; earlier results remain tied to their original snapshots.",
+    "remoteGitHubActions": "NOT_RUN"
+  },
+  "cleanup": {
+    "ownedComposeProjects": [
+      "data-explorer-r14-continue",
+      "data-explorer-r14-continue-full",
+      "data-explorer-r14-bson-final",
+      "data-explorer-r14-bson-brand",
+      "data-explorer-r14-bson-full-final",
+      "data-explorer-r14-bson-full-sequential"
+    ],
+    "onlyLoopbackPorts": true,
+    "ephemeralTmpfs": true,
+    "containersRemaining": 0,
+    "networksRemaining": 0,
+    "finalVolumeCount": 19,
+    "globalDockerPrunePerformed": false
+  },
+  "review": {
+    "type": "INDEPENDENT_FOCUSED_REVIEW_PLUS_SELF_REVIEW",
+    "remainingFindings": 0,
+    "historicalFailuresRetained": true
+  },
+  "limitations": [
+    "CSV NULL versus empty-string contract remains undecided.",
+    "Typed Mongo mutations and subtype-preserving writes remain outside this read contract.",
+    "Safe migration resume and partial rollback semantics remain undecided.",
+    "Redis writes and TTL-copy workflow contract remain undecided.",
+    "Multi-replica ownership/caps require measured need and approved error budget.",
+    "Provider sandboxes, remote GitHub Actions, real zoom and screen-reader acceptance remain unverified.",
+    "R13 approved entitlement/quota/billing lifecycle matrix is still required."
+  ],
+  "roadmap": {
+    "R10": "VERIFIED_LOCAL",
+    "R11": "VERIFIED_LOCAL",
+    "R12": "VERIFIED_LOCAL",
+    "R13": "BLOCKED_PRODUCT_DECISION",
+    "R14": "DOING_BOUNDED",
+    "release": "NOT_VERIFIED"
+  }
+}

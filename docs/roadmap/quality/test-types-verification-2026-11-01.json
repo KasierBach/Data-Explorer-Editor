@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "package": "R10-full-test-source-types",
+  "startedOn": "2026-10-31",
+  "verifiedOn": "2026-11-01",
+  "timezone": "Asia/Saigon",
+  "status": "VERIFIED_LOCAL",
+  "baseHead": "3d7ec60845ddc2a07284c2873d9d3727acd30744",
+  "branch": "codex/roadmap-r00",
+  "evidenceRoot": "output/roadmap-r10-test-types-20261031",
+  "report": "docs/roadmap/quality/R10-TEST-TYPES-REPORT.md",
+  "constraints": {
+    "resetStashCommitPushPublishDeploy": "NOT_PERFORMED",
+    "productionTypeScriptChanged": false,
+    "compilerStrictnessChanged": false,
+    "testRootsOrDiscoveryChanged": false,
+    "dependencyOrLockfileChanges": false,
+    "timeoutRetryAssertionCoverageRelaxations": false,
+    "productPolicyChanges": false,
+    "zcodePreserved": true,
+    "historicalEvidencePreserved": true
+  },
+  "scope": {
+    "tests": [
+      "server/src/ai/ai.controller.spec.ts",
+      "server/src/migration/migration-lifecycle.r05.spec.ts",
+      "server/test/cache-freshness-r08.e2e-spec.ts",
+      "server/test/cache-lifecycle-r10.e2e-spec.ts",
+      "server/test/comment-persistence-r09.e2e-spec.ts"
+    ],
+    "gateConfig": ["server/package.json", ".github/workflows/ci.yml"],
+    "gateDocumentation": ["server/README.md", "docs/operations/ci-cd.md", "docs/roadmap/ROADMAP.md"],
+    "before": "output/roadmap-r10-test-types-20261031/before.json",
+    "preEditTestSources": "output/roadmap-r10-test-types-20261031/before-sources",
+    "scopeReview": "output/roadmap-r10-test-types-20261031/self-review-scope.json"
+  },
+  "impact": {
+    "testFiles": "LOW, no recognized external callers",
+    "migrationSetup": { "risk": "LOW", "direct": 1, "recognizedFlows": 0 },
+    "package": { "risk": "LOW", "direct": 1, "upstreamSymbols": 13 },
+    "ciFile": "UNKNOWN_NOT_INDEXED; direct syntax/order and executing-gate checks used",
+    "qualification": "Indexed references are lower bounds and do not replace fixture/runtime validation.",
+    "evidence": [
+      "output/roadmap-r10-test-types-20261031/impact-ai-controller-test.json",
+      "output/roadmap-r10-test-types-20261031/impact-migration-test-setup.json",
+      "output/roadmap-r10-test-types-20261031/impact-cache-freshness-test.json",
+      "output/roadmap-r10-test-types-20261031/impact-cache-lifecycle-test.json",
+      "output/roadmap-r10-test-types-20261031/impact-comment-test.json",
+      "output/roadmap-r10-test-types-20261031/impact-ci-types-gate.json",
+      "output/roadmap-r10-test-types-20261031/impact-server-package.json"
+    ]
+  },
+  "reproduction": {
+    "fullCompilerBefore": { "diagnostics": 7, "exitCode": 2, "evidence": "output/roadmap-r10-test-types-20261031/full-test-types-red.log" },
+    "affectedUnitBaseline": { "tests": 22, "suites": 2, "exitCode": 0, "evidence": "output/roadmap-r10-test-types-20261031/affected-unit-baseline.log" },
+    "affectedNativeBaseline": { "tests": 27, "suites": 3, "exitCode": 0, "evidence": "output/roadmap-r10-test-types-20261031/affected-native-baseline.log" },
+    "negativeControl": {
+      "restoredOldDiagnostics": 7,
+      "currentDiagnostics": 0,
+      "workingTreeRevertedForControl": false,
+      "method": "CompilerHost read overlays of five captured old test files, followed by real current sources, using the same full roots and options.",
+      "expectCallsBefore": 165,
+      "expectCallsAfter": 165,
+      "assertionCountsUnchanged": true,
+      "evidence": "output/roadmap-r10-test-types-20261031/type-gate-negative-control.json"
+    },
+    "annotationEquivalence": {
+      "files": ["server/src/migration/migration-lifecycle.r05.spec.ts", "server/test/cache-lifecycle-r10.e2e-spec.ts", "server/test/comment-persistence-r09.e2e-spec.ts"],
+      "emittedSyntaxTreesEqual": true,
+      "rawKeyvOutputEqual": false,
+      "qualification": "Keyv wraps a property chain; raw/printer checks remain failed historical observations. Final comparison checks node kinds, identifiers, literals and ordered children while ignoring positions/trivia. SSE mock construction and jobId guard have intentional runtime changes validated separately.",
+      "evidence": "output/roadmap-r10-test-types-20261031/type-annotation-syntax-tree-proof.json"
+    }
+  },
+  "verification": {
+    "typecheck": {
+      "script": "tsc --noEmit --incremental false --project tsconfig.json",
+      "npmCommand": "npm run typecheck",
+      "diagnostics": 0,
+      "exitCode": 0,
+      "includesUnitAndE2eSources": true,
+      "ciAfterPrismaGeneration": true,
+      "finalVerifiedAfterProductionBuild": true,
+      "evidence": ["output/roadmap-r10-test-types-20261031/full-test-types-green.log", "output/roadmap-r10-test-types-20261031/typecheck-after-build-final-result.json", "output/roadmap-r10-test-types-20261031/compiler-and-contract-preservation.json"]
+    },
+    "affectedUnitAfter": { "tests": 22, "suites": 2, "exitCode": 0, "evidence": "output/roadmap-r10-test-types-20261031/affected-unit-green.log" },
+    "serverUnitCoverage": { "tests": 772, "suites": 97, "exitCode": 0, "lines": 55.69, "branches": 47.28, "functions": 49.97, "statements": 54.87, "sourceScopeAndThresholdsUnchanged": true, "evidence": ["output/roadmap-r10-test-types-20261031/server-coverage-final.log", "output/roadmap-r10-test-types-20261031/server-coverage-summary-final.json"] },
+    "initialFullNative": {
+      "tests": 183,
+      "passed": 181,
+      "failed": 2,
+      "exitCode": 1,
+      "failures": ["R09 author/admin mutation test exceeded the unchanged 5000 ms budget", "R09 resource-policy revocation request ECONNRESET"],
+      "cause": "NOT_ESTABLISHED; compiler negative control/index refresh overlapped part of the run but timing alone does not prove causation.",
+      "evidence": ["output/roadmap-r10-test-types-20261031/native-full-final.json", "output/roadmap-r10-test-types-20261031/server-native-final.log"]
+    },
+    "r09Isolated": { "tests": 12, "suites": 1, "exitCode": 0, "timeoutOrAssertionsChanged": false, "evidence": "output/roadmap-r10-test-types-20261031/r09-isolated.json" },
+    "finalFullNative": { "tests": 183, "passed": 183, "failed": 0, "pending": 0, "suites": 20, "environmentGuards": 2, "exitCode": 0, "detectOpenHandles": true, "forceExit": false, "qualification": "Complete native run performed sequentially without compiler/index work in parallel; no source/budget change after initial native failure. Does not establish elimination of timing sensitivity/flakiness.", "evidence": ["output/roadmap-r10-test-types-20261031/native-full-isolated.json", "output/roadmap-r10-test-types-20261031/native-full-isolated.log"] },
+    "serverLint": { "exitCode": 0, "evidence": "output/roadmap-r10-test-types-20261031/server-lint-final.log" },
+    "productionBuild": { "exitCode": 0, "evidence": "output/roadmap-r10-test-types-20261031/production-build-final.log" },
+    "serverAudit": { "exitCode": 0, "ciAllowlist": "GHSA-GGR8-5VV4-36MX", "allowlistChanged": false, "evidence": "output/roadmap-r10-test-types-20261031/server-audit-final.log" },
+    "prismaHelper": { "tests": 4, "exitCode": 0, "evidence": "output/roadmap-r10-test-types-20261031/prisma-helper-final.log" },
+    "ciActionlint": { "exitCode": 0, "existingImageIdPinned": true, "networkDisabled": true, "imagePulled": false, "scope": ".github/workflows/ci.yml", "evidence": "output/roadmap-r10-test-types-20261031/ci-typecheck-actionlint-result.json" },
+    "gateExecutionRecords": ["output/roadmap-r10-test-types-20261031/initial-green-results.json", "output/roadmap-r10-test-types-20261031/backend-final-gates.json", "output/roadmap-r10-test-types-20261031/isolated-final-gates.json"],
+    "clientBrowserFullStackContainers": "NOT_RERUN: no production/client/dependency changes; historical runs remain qualified to their original snapshots.",
+    "remoteGitHubActions": "NOT_RUN"
+  },
+  "cleanup": {
+    "project": "data-explorer-test-types-20261031",
+    "existingImagesPinned": true,
+    "pullNever": true,
+    "onlyLoopbackPorts": true,
+    "fixtureTmpfs": true,
+    "persistentMounts": 0,
+    "containersRemaining": 0,
+    "networksRemaining": 0,
+    "originalVolumeCount": 19,
+    "finalVolumeCount": 19,
+    "originalVolumesMissing": [],
+    "newVolumes": [],
+    "preexistingContainerChanges": [],
+    "originalImageTagChanges": [],
+    "syntheticCoreRowsRemaining": 0,
+    "globalPrunePerformed": false,
+    "evidence": ["output/roadmap-r10-test-types-20261031/docker-before.json", "output/roadmap-r10-test-types-20261031/docker-owned-inspection.json", "output/roadmap-r10-test-types-20261031/docker-cleanup-final.json", "output/roadmap-r10-test-types-20261031/fixture-config-proof.json"]
+  },
+  "review": {
+    "type": "SELF_REVIEW",
+    "independentReview": "NOT_COMPLETED",
+    "noNewLibraryOrMockFramework": true,
+    "productionAndCompilerContractsPreserved": true,
+    "historicalRedEvidenceRetained": true,
+    "R09FlakinessEliminated": "NOT_CLAIMED"
+  },
+  "changeDetection": {
+    "scope": "compare",
+    "baseRef": "main",
+    "files": 110,
+    "symbols": 378,
+    "affectedFlows": 132,
+    "risk": "critical",
+    "exitCode": 0,
+    "qualification": "Cumulative preserved R00-R14 integration blast radius; graph warnings do not replace runtime gates.",
+    "evidence": "output/roadmap-r10-test-types-20261031/gitnexus-final-detect.log"
+  },
+  "roadmap": { "R10": "VERIFIED_LOCAL", "R13": "BLOCKED_PRODUCT_DECISION", "R14": "DOING_BOUNDED", "fullTestSourceTypecheckBlocker": "CLOSED_LOCAL_AND_GUARDED_IN_CI_CONFIG", "release": "NOT_VERIFIED" }
+}
