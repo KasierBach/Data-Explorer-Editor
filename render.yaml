@@ -7,7 +7,7 @@ services:
     rootDir: server
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    dockerCommand: /bin/sh -c 'npx prisma migrate deploy && exec node dist/src/main.js'
+    dockerCommand: /bin/sh -c 'node node_modules/prisma/build/index.js migrate deploy && exec node dist/src/main.js'
     autoDeployTrigger: "off"
     healthCheckPath: /api/health/ready
     maxShutdownDelaySeconds: 60
