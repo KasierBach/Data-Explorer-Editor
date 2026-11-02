@@ -212,6 +212,7 @@ describe('R06 native PostgreSQL entitlement and signed local-provider webhooks',
   async function concurrentCredits(payments: Payment[]) {
     const held = await admin.connect();
     let pending: Promise<PromiseSettledResult<unknown>[]> | undefined;
+    let primaryError: Error | undefined;
     try {
       await held.query('BEGIN');
       await held.query('SELECT id FROM "User" WHERE id=$1 FOR UPDATE', [
@@ -228,13 +229,127 @@ describe('R06 native PostgreSQL entitlement and signed local-provider webhooks',
         ),
       );
       await waitForBlocked(payments.length);
-    } finally {
+    } catch (error) {
+      primaryError =
+        error instanceof Error
+          ? error
+          : new Error('Concurrent credit observation failed', { cause: error });
+    }
+    let cleanupError: Error | undefined;
+    try {
       await held.query('ROLLBACK');
-      held.release();
+    } catch (error) {
+      cleanupError =
+        error instanceof Error
+          ? error
+          : new Error('Concurrent credit rollback failed', { cause: error });
+    }
+    try {
+      held.release(cleanupError);
+    } catch (error) {
+      cleanupError ??=
+        error instanceof Error
+          ? error
+          : new Error('Concurrent credit release failed', { cause: error });
     }
     const results = await pending;
+    if (primaryError !== undefined) throw primaryError;
+    if (cleanupError !== undefined) throw cleanupError;
+    if (results === undefined)
+      throw new Error('Concurrent webhook work was not started');
     expect(results.every((result) => result.status === 'fulfilled')).toBe(true);
   }
+
+  it('drains started webhooks before reporting a lock-observation failure', async () => {
+    const payment = await seedPayment();
+    const observationError = new Error('Synthetic lock-observation failure');
+    const observer = jest
+      .spyOn(admin, 'query')
+      .mockRejectedValueOnce(observationError);
+    let webhookSettled = false;
+    let webhookWork:
+      | ReturnType<BillingService['handleProviderWebhook']>
+      | undefined;
+    const handleWebhook = services[0].handleProviderWebhook.bind(services[0]);
+    const webhook = jest
+      .spyOn(services[0], 'handleProviderWebhook')
+      .mockImplementationOnce((provider, payload) => {
+        webhookWork = new Promise<void>((resolve) => setTimeout(resolve, 50))
+          .then(() => handleWebhook(provider, payload))
+          .finally(() => {
+            webhookSettled = true;
+          });
+        return webhookWork;
+      });
+    try {
+      await expect(concurrentCredits([payment])).rejects.toBe(observationError);
+      expect(webhookSettled).toBe(true);
+      expect(
+        (
+          await clients[0].payment.findUniqueOrThrow({
+            where: { id: payment.id },
+          })
+        ).status,
+      ).toBe('paid');
+    } finally {
+      try {
+        await webhookWork;
+      } finally {
+        webhook.mockRestore();
+        observer.mockRestore();
+      }
+    }
+  });
+
+  it('drains started webhooks and preserves observation failure when rollback and release also fail', async () => {
+    const payment = await seedPayment();
+    const observationError = new Error('Synthetic lock-observation failure');
+    const rollbackError = new Error('Synthetic rollback failure');
+    const releaseError = new Error('Synthetic release failure');
+    const release = jest.fn(() => {
+      throw releaseError;
+    });
+    const held = {
+      query: jest
+        .fn()
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({})
+        .mockRejectedValueOnce(rollbackError),
+      release,
+    } as unknown as PoolClient;
+    const connect = jest.spyOn(admin, 'connect').mockResolvedValueOnce(held);
+    const observer = jest
+      .spyOn(admin, 'query')
+      .mockRejectedValueOnce(observationError);
+    let webhookSettled = false;
+    let webhookWork:
+      | ReturnType<BillingService['handleProviderWebhook']>
+      | undefined;
+    const handleWebhook = services[0].handleProviderWebhook.bind(services[0]);
+    const webhook = jest
+      .spyOn(services[0], 'handleProviderWebhook')
+      .mockImplementationOnce((provider, payload) => {
+        webhookWork = new Promise<void>((resolve) => setTimeout(resolve, 50))
+          .then(() => handleWebhook(provider, payload))
+          .finally(() => {
+            webhookSettled = true;
+          });
+        return webhookWork;
+      });
+    try {
+      await expect(concurrentCredits([payment])).rejects.toBe(observationError);
+      expect(webhookSettled).toBe(true);
+      expect(release).toHaveBeenCalledWith(rollbackError);
+    } finally {
+      try {
+        await webhookWork;
+      } finally {
+        webhook.mockRestore();
+        observer.mockRestore();
+        connect.mockRestore();
+      }
+    }
+  });
 
   async function expectEntitlement(
     days: number,
