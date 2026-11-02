@@ -42,7 +42,7 @@ services:
       context: ./server
       dockerfile: Dockerfile
     container_name: data-explorer-migrate
-    entrypoint: ["npx", "prisma", "migrate", "deploy"]
+    entrypoint: ["node", "node_modules/prisma/build/index.js", "migrate", "deploy"]
     environment:
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-change-me-local}@db:5432/data_explorer
     depends_on:
