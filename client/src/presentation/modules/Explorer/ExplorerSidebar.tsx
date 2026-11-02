@@ -197,13 +197,13 @@ export const ExplorerSidebar: React.FC = memo(() => {
                         <h2 className="font-bold text-[10px] uppercase tracking-[0.2em] text-muted-foreground/80">{text.title}</h2>
                     </div>
                     <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={handleSyncIndex} disabled={isSyncing}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" aria-label={text.syncIndex} onClick={handleSyncIndex} disabled={isSyncing}>
                             <Globe className={cn("h-3.5 w-3.5 text-muted-foreground/70", isSyncing && "animate-spin")} />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={handleRefresh}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" aria-label={text.refresh} onClick={handleRefresh}>
                             <RefreshCw className="h-3.5 w-3.5 text-muted-foreground/70" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setCreateDatabaseDialogOpen(true)} disabled={!!schemaChangesDisabled}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg" aria-label={text.createDatabase} onClick={() => setCreateDatabaseDialogOpen(true)} disabled={!!schemaChangesDisabled}>
                             <Plus className="h-3.5 w-3.5" />
                         </Button>
                     </div>
@@ -226,6 +226,7 @@ export const ExplorerSidebar: React.FC = memo(() => {
                         </div>
                         <Button
                             variant="ghost" size="icon" 
+                            aria-label={explorerSearchMode === 'global' ? text.useLocalSearch : text.useGlobalSearch}
                             className={cn("h-9 w-9 rounded-xl border transition-all", explorerSearchMode === 'global' ? "bg-blue-500/10 border-blue-500/30 text-blue-500" : "bg-muted/40 border-transparent text-muted-foreground/70")}
                             onClick={() => setExplorerSearchMode(explorerSearchMode === 'local' ? 'global' : 'local')}
                         >

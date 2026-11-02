@@ -155,7 +155,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={activeConnection ? "Hỏi bất cứ điều gì..." : "Kết nối database trước..."}
+                    placeholder={activeConnection ? chatText.connectedPlaceholder : chatText.disconnectedPlaceholder}
                     disabled={isLoading || !activeConnection}
                     className="w-full bg-transparent border-none px-4 pt-4 pb-2 text-base md:text-sm resize-none focus:outline-none min-h-[58px] max-h-[250px] placeholder:text-muted-foreground/50 leading-relaxed scrollbar-none"
                     rows={1}
@@ -173,6 +173,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 rounded-lg text-muted-foreground hover:text-violet-400 hover:bg-violet-500/10 transition-colors shrink-0"
+                                    aria-label={chatText.attachContextTitle}
                                     title={chatText.attachContextTitle}
                                 >
                                     <Plus className="w-4 h-4" />
@@ -221,7 +222,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                         {/* Routing Selector */}
                         <DropdownMenu open={showRoutingMenu} onOpenChange={setShowRoutingMenu}>
                             <DropdownMenuTrigger asChild>
-                                <button className="flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-muted/50 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-all shrink-0 active:scale-95 group" title="Routing Mode">
+                                <button aria-label={chatText.routingMode} className="flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-muted/50 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-all shrink-0 active:scale-95 group" title={chatText.routingMode}>
                                     <span className="opacity-60 group-hover:opacity-100 transition-opacity">
                                         {aiRoutingMode === 'auto' ? <Sparkles className="w-3.5 h-3.5" /> : <ChevronUp className="w-3 h-3" />}
                                     </span>
@@ -229,7 +230,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent side="top" align="start" className="w-[18rem] bg-[#1a1a1a]/95 backdrop-blur-xl border border-white/5 rounded-2xl shadow-3xl p-1.5 z-[110]">
-                                <DropdownMenuLabel className="px-3 py-2 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Routing Mode</DropdownMenuLabel>
+                                <DropdownMenuLabel className="px-3 py-2 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">{chatText.routingMode}</DropdownMenuLabel>
                                 {ROUTING_MODES.map(m => (
                                     <DropdownMenuItem
                                         key={m.id}
@@ -246,7 +247,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                         {/* Mode Selector */}
                         <DropdownMenu open={showModeMenu} onOpenChange={setShowModeMenu}>
                             <DropdownMenuTrigger asChild>
-                                <button className="flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-muted/50 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-all shrink-0 active:scale-95 group" title="Conversation Mode">
+                                <button aria-label={chatText.conversationMode} className="flex items-center gap-1 px-1.5 py-1 rounded-lg hover:bg-muted/50 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-all shrink-0 active:scale-95 group" title={chatText.conversationMode}>
                                     <span className="opacity-60 group-hover:opacity-100 transition-opacity">
                                         <Brain className="w-3.5 h-3.5" />
                                     </span>
@@ -271,7 +272,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                         {/* Model Selector */}
                         <DropdownMenu open={showModelMenu} onOpenChange={setShowModelMenu}>
                             <DropdownMenuTrigger asChild>
-                                <button className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-muted/50 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-all min-w-0 flex-1 overflow-hidden group">
+                                <button aria-label={chatText.model} className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-muted/50 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-all min-w-0 flex-1 overflow-hidden group">
                                     <div className="shrink-0 transition-transform group-hover:scale-110 duration-300">
                                         {getModelIcon(aiModel)}
                                     </div>
@@ -340,6 +341,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                 size="icon"
                                 className="h-8 w-8 rounded-full bg-red-500 hover:bg-red-600 shrink-0 text-white shadow-lg shadow-red-500/20 focus:ring-red-500/30 animate-pulse border-none"
                                 onClick={handleStop}
+                                aria-label={chatText.stopResponse}
                             >
                                 <Square className="w-3 h-3 fill-white stroke-none" />
                             </Button>
@@ -354,6 +356,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                 )}
                                 onClick={handleSend}
                                 disabled={(!input.trim() && attachments.length === 0) || !activeConnection || selectedModelBlocked}
+                                aria-label={chatText.sendMessage}
                             >
                                 <Send className={cn("w-3.5 h-3.5 ml-0.5 transition-transform", input.trim() && "translate-x-0.5 -translate-y-px")} />
                             </Button>

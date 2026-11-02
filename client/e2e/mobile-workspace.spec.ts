@@ -26,6 +26,7 @@ test.beforeEach(async ({ page }) => {
 
 test('mobile SQL shell exposes touch-safe workspace controls and AI input', async ({ page }) => {
   await seedPersistedWorkspace(page, {
+    lang: 'en',
     activeConnectionId: 'connection-e2e',
     activeDatabase: 'analytics',
     isSidebarOpen: false,
@@ -55,6 +56,24 @@ test('mobile SQL shell exposes touch-safe workspace controls and AI input', asyn
   const inputFontSize = await aiInput.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
   expect(inputFontSize).toBeGreaterThanOrEqual(16);
   await expectNoDocumentOverflow(page);
+});
+
+test('mobile workspace controls use the active Vietnamese language', async ({ page }) => {
+  await seedPersistedWorkspace(page, {
+    lang: 'vi',
+    activeConnectionId: 'connection-e2e',
+    activeDatabase: 'analytics',
+    isSidebarOpen: false,
+    isAiPanelOpen: false,
+    isResultPanelOpen: false,
+    isDesktopModeOnMobile: false,
+  });
+
+  await page.goto('/sql-explorer');
+  await expect(page.getByRole('button', { name: 'Khám phá', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Kết quả', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Bật chế độ máy tính', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'AI', exact: true })).toBeVisible();
 });
 
 test('mobile NoSQL shell restores collection context and renders query results', async ({ page }) => {

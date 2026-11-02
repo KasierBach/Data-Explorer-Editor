@@ -132,42 +132,43 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">{t('first_name_label')}</label>
-                        <Input value={firstName} onChange={e => setFirstName(e.target.value)} placeholder={t('labels.firstNamePlaceholder')} />
+                        <label htmlFor="profile-firstName" className="text-sm font-medium">{t('first_name_label')}</label>
+                        <Input id="profile-firstName" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder={t('labels.firstNamePlaceholder')} />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">{t('last_name_label')}</label>
-                        <Input value={lastName} onChange={e => setLastName(e.target.value)} placeholder={t('labels.lastNamePlaceholder')} />
+                        <label htmlFor="profile-lastName" className="text-sm font-medium">{t('last_name_label')}</label>
+                        <Input id="profile-lastName" value={lastName} onChange={e => setLastName(e.target.value)} placeholder={t('labels.lastNamePlaceholder')} />
                     </div>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">{t('username_label')}</label>
-                        <Input value={username} onChange={e => setUsername(e.target.value)} placeholder="johndoe" />
+                        <label htmlFor="profile-username" className="text-sm font-medium">{t('username_label')}</label>
+                        <Input id="profile-username" value={username} onChange={e => setUsername(e.target.value)} placeholder="johndoe" />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">{t('job_role_label')}</label>
-                        <Input value={jobRole} onChange={e => setJobRole(e.target.value)} placeholder={t('labels.jobRolePlaceholder')} />
+                        <label htmlFor="profile-jobRole" className="text-sm font-medium">{t('job_role_label')}</label>
+                        <Input id="profile-jobRole" value={jobRole} onChange={e => setJobRole(e.target.value)} placeholder={t('labels.jobRolePlaceholder')} />
                     </div>
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                        <label className="text-sm font-medium">{t('phone_number_label')}</label>
-                        <Input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="+84 123 456 789" />
+                        <label htmlFor="profile-phoneNumber" className="text-sm font-medium">{t('phone_number_label')}</label>
+                        <Input id="profile-phoneNumber" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="+84 123 456 789" />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">{t('address_label')}</label>
-                        <Input value={address} onChange={e => setAddress(e.target.value)} placeholder={t('labels.addressPlaceholder')} />
+                        <label htmlFor="profile-address" className="text-sm font-medium">{t('address_label')}</label>
+                        <Input id="profile-address" value={address} onChange={e => setAddress(e.target.value)} placeholder={t('labels.addressPlaceholder')} />
                     </div>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-sm font-medium">{t('email_label')}</label>
-                    <Input value={email} onChange={e => setEmail(e.target.value)} placeholder="your.email@example.com" />
-                    <p className="text-[11px] text-muted-foreground">{t('email_hint')}</p>
+                    <label htmlFor="profile-email" className="text-sm font-medium">{t('email_label')}</label>
+                    <Input aria-describedby="profile-email-hint" id="profile-email" value={email} onChange={e => setEmail(e.target.value)} placeholder="your.email@example.com" />
+                    <p id="profile-email-hint" className="text-[11px] text-muted-foreground">{t('email_hint')}</p>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-sm font-medium">{t('bio_label')}</label>
+                    <label htmlFor="profile-bio" className="text-sm font-medium">{t('bio_label')}</label>
                     <textarea
+                        id="profile-bio"
                         value={bio}
                         onChange={e => setBio(e.target.value)}
                         className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"

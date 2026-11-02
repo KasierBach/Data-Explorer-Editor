@@ -15,7 +15,6 @@ interface SecurityTabProps {
     };
     actions: {
         handleChangePassword: () => void;
-        handleFeatureNotImplemented: (feature: string) => void;
     };
 }
 
@@ -35,20 +34,20 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({
                 <h4 className="font-medium text-sm">{t('change_password_title')}</h4>
                 <div className="space-y-3">
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">{t('current_password_label')}</label>
-                        <Input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
+                        <label htmlFor="security-currentPassword" className="text-xs font-medium text-muted-foreground">{t('current_password_label')}</label>
+                        <Input id="security-currentPassword" autoComplete="current-password" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">{t('new_password_label')}</label>
-                        <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                        <label htmlFor="security-newPassword" className="text-xs font-medium text-muted-foreground">{t('new_password_label')}</label>
+                        <Input id="security-newPassword" autoComplete="new-password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-xs font-medium text-muted-foreground">{t('confirm_password_label')}</label>
-                        <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+                        <label htmlFor="security-confirmPassword" className="text-xs font-medium text-muted-foreground">{t('confirm_password_label')}</label>
+                        <Input id="security-confirmPassword" autoComplete="new-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
                     </div>
                     {user?.provider !== 'local' && (
                         <p className="text-[10px] text-amber-500 font-medium">
-                            Note: Social login accounts might not have a password set.
+                            {t('social_password_note')}
                         </p>
                     )}
                     <Button className="mt-2" onClick={actions.handleChangePassword} disabled={isLoading || !currentPassword || !newPassword}>
@@ -66,10 +65,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({
                             <Shield className="w-5 h-5 text-muted-foreground" />
                         </div>
                         <div>
-                            <p className="font-medium text-sm">{t('status_disabled')}</p>
+                            <p className="font-medium text-sm">{t('two_factor_unavailable')}</p>
                         </div>
                     </div>
-                    <Button variant="outline" onClick={() => actions.handleFeatureNotImplemented('2FA Configuration')}>{t('enable_two_factor')}</Button>
                 </div>
             </div>
         </div>

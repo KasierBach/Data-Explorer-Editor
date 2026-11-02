@@ -1,7 +1,9 @@
 import React from 'react';
 import { PanelLeftClose, PanelLeftOpen, Sparkles, MonitorSmartphone, Rows3 } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
+import { useAppStore } from '@/core/services/store';
 import { cn } from '@/lib/utils';
+import { getLayoutText } from './layoutI18n';
 
 interface MobileWorkspaceBarProps {
     sidebarOpen: boolean;
@@ -24,6 +26,8 @@ export const MobileWorkspaceBar: React.FC<MobileWorkspaceBarProps> = ({
     onToggleResults,
     resultsOpen,
 }) => {
+    const text = getLayoutText(useAppStore((state) => state.lang));
+
     return (
         <div className="h-14 border-t bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/85 px-2 flex items-center justify-between gap-2 shrink-0">
             <Button
@@ -33,7 +37,7 @@ export const MobileWorkspaceBar: React.FC<MobileWorkspaceBarProps> = ({
                 onClick={onToggleSidebar}
             >
                 {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
-                {sidebarOpen ? 'Hide' : 'Explorer'}
+                {sidebarOpen ? text.hideExplorer : text.explorer}
             </Button>
 
             {onToggleResults && (
@@ -44,7 +48,7 @@ export const MobileWorkspaceBar: React.FC<MobileWorkspaceBarProps> = ({
                     onClick={onToggleResults}
                 >
                     <Rows3 className="w-4 h-4" />
-                    {resultsOpen ? 'Hide' : 'Results'}
+                    {resultsOpen ? text.hideResults : text.results}
                 </Button>
             )}
 
@@ -53,11 +57,11 @@ export const MobileWorkspaceBar: React.FC<MobileWorkspaceBarProps> = ({
                 size="sm"
                 className={cn("h-11 min-w-11 gap-1.5 text-xs", onToggleResults ? "px-2" : "flex-1")}
                 onClick={onToggleDesktopMode}
-                aria-label={desktopModeOnMobile ? 'Turn off desktop mode' : 'Turn on desktop mode'}
+                aria-label={desktopModeOnMobile ? text.turnOffDesktopMode : text.turnOnDesktopMode}
                 aria-pressed={desktopModeOnMobile}
             >
                 <MonitorSmartphone className="w-4 h-4" />
-                {!onToggleResults && 'Desktop'}
+                {!onToggleResults && text.desktop}
             </Button>
 
             <Button
@@ -67,7 +71,7 @@ export const MobileWorkspaceBar: React.FC<MobileWorkspaceBarProps> = ({
                 onClick={onToggleAi}
             >
                 <Sparkles className="w-4 h-4" />
-                {aiOpen ? 'Hide' : 'AI'}
+                {aiOpen ? text.hideAi : text.ai}
             </Button>
         </div>
     );

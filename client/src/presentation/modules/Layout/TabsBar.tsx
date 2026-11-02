@@ -107,6 +107,7 @@ export const TabsBar: React.FC = () => {
                                 "p-1 hover:bg-muted rounded-md text-muted-foreground transition-all active:scale-95 ml-1",
                                 activeTabId === tab.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                             )}
+                            aria-label={`${lang === 'vi' ? 'Đóng' : 'Close'} ${getLayoutTabTitle(tab, lang)}`}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 closeTab(tab.id);
@@ -120,7 +121,7 @@ export const TabsBar: React.FC = () => {
 
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-full w-10 border-l rounded-none hover:bg-muted/50 transition-colors">
+                    <Button variant="ghost" size="icon" aria-label={lang === 'vi' ? 'Danh sách tab' : 'Tab list'} className="h-full w-10 border-l rounded-none hover:bg-muted/50 transition-colors">
                         <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     </Button>
                 </DropdownMenuTrigger>

@@ -14,7 +14,8 @@ export function csvDocument(columns: string[], rows: unknown[][]): string {
 
 export async function parseCsv(data: ArrayBuffer): Promise<Record<string, unknown>[]> {
     const XLSX = await import('xlsx');
-    const workbook = XLSX.read(data, { type: 'array' });
+    const text = new TextDecoder('utf-8').decode(data);
+    const workbook = XLSX.read(text, { type: 'string' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     return sheet ? XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' }) : [];
 }

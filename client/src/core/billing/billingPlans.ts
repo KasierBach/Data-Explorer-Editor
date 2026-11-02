@@ -30,8 +30,8 @@ export const billingPlans: BillingPlan[] = [
         cadence: '30 days',
         amountVnd: '149,000 VND',
         displayAmountUsd: '~$5.99',
-        description: 'A flexible Pro pass for heavier database work.',
-        features: ['Advanced AI workflows', 'Cloud database workflows', 'Priority workspace features'],
+        description: 'A 30-day Pro access period. Feature entitlements are pending product approval.',
+        features: ['30 days of Pro status', 'Activation after verified provider webhook', 'Feature matrix pending approval'],
     },
     {
         code: 'pro_yearly',
@@ -39,8 +39,8 @@ export const billingPlans: BillingPlan[] = [
         cadence: '365 days',
         amountVnd: '1,490,000 VND',
         displayAmountUsd: '~$59.99',
-        description: 'Best value for daily use across the year.',
-        features: ['Everything in monthly Pro', 'Two months included', 'Longer access window'],
+        description: 'A 365-day Pro access period. Feature entitlements are pending product approval.',
+        features: ['365 days of Pro status', 'Activation after verified provider webhook', 'Feature matrix pending approval'],
     },
 ];
 

@@ -26,8 +26,8 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ lang, addToRevea
             }
 
             return plan.code === 'pro_monthly'
-                ? { ...plan, name: 'Pro th\u00e1ng', cadence: '30 ng\u00e0y', description: 'G\u00f3i Pro linh ho\u1ea1t cho c\u00f4ng vi\u1ec7c database chuy\u00ean s\u00e2u.', features: ['Quy tr\u00ecnh AI n\u00e2ng cao', 'Lu\u1ed3ng database cloud', 'T\u00ednh n\u0103ng workspace \u01b0u ti\u00ean'] }
-                : { ...plan, name: 'Pro n\u0103m', cadence: '365 ng\u00e0y', description: 'Gi\u00e1 tr\u1ecb t\u1ed1t nh\u1ea5t cho nhu c\u1ea7u d\u00f9ng h\u1eb1ng ng\u00e0y.', features: ['M\u1ecdi quy\u1ec1n l\u1ee3i Pro th\u00e1ng', 'T\u1eb7ng th\u00eam hai th\u00e1ng', 'Th\u1eddi h\u1ea1n truy c\u1eadp d\u00e0i h\u01a1n'] };
+                ? { ...plan, name: 'Pro th\u00e1ng', cadence: '30 ng\u00e0y', description: 'Quy\u1ec1n truy c\u1eadp Pro trong 30 ng\u00e0y; ma tr\u1eadn t\u00ednh n\u0103ng \u0111ang ch\u1edd ph\u00ea duy\u1ec7t.', features: ['Tr\u1ea1ng th\u00e1i Pro trong 30 ng\u00e0y', 'K\u00edch ho\u1ea1t sau webhook \u0111\u00e3 x\u00e1c minh', 'Ma tr\u1eadn t\u00ednh n\u0103ng ch\u1edd ph\u00ea duy\u1ec7t'] }
+                : { ...plan, name: 'Pro n\u0103m', cadence: '365 ng\u00e0y', description: 'Quy\u1ec1n truy c\u1eadp Pro trong 365 ng\u00e0y; ma tr\u1eadn t\u00ednh n\u0103ng \u0111ang ch\u1edd ph\u00ea duy\u1ec7t.', features: ['Tr\u1ea1ng th\u00e1i Pro trong 365 ng\u00e0y', 'K\u00edch ho\u1ea1t sau webhook \u0111\u00e3 x\u00e1c minh', 'Ma tr\u1eadn t\u00ednh n\u0103ng ch\u1edd ph\u00ea duy\u1ec7t'] };
         })
         : billingPlans;
 

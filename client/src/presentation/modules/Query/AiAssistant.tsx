@@ -156,20 +156,20 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                         onCheckedChange={(checked) => {
                             updateAiPreferences((current) => ({ ...current, enabled: checked }));
                         }}
-                        title={preferences.enabled !== false ? 'AI đang Bật (Click để Tắt)' : 'AI đang Tắt (Click để Bật)'}
+                        title={preferences.enabled !== false ? text.aiAssistant.enabledTitle : text.aiAssistant.disabledTitle}
                     />
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400 font-medium">
                         {ROUTING_MODES.find(m => m.id === aiRoutingMode)?.label || 'Auto'}
                     </span>
                 </div>
                 <div className="flex items-center gap-0.5">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-violet-500/10" onClick={() => { createAiChat(); setShowHistory(false); }} title={text.aiAssistant.newConversation}>
+                    <Button variant="ghost" size="icon" aria-label={text.aiAssistant.newConversation} className="h-6 w-6 hover:bg-violet-500/10" onClick={() => { createAiChat(); setShowHistory(false); }} title={text.aiAssistant.newConversation}>
                         <Plus className="w-3.5 h-3.5 text-violet-400" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted/50" onClick={() => setShowHistory(true)} title={text.aiAssistant.chatHistory}>
+                    <Button variant="ghost" size="icon" aria-label={text.aiAssistant.chatHistory} className="h-6 w-6 hover:bg-muted/50" onClick={() => setShowHistory(true)} title={text.aiAssistant.chatHistory}>
                         <Clock className="w-3.5 h-3.5" />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose}>
+                    <Button variant="ghost" size="icon" aria-label={text.aiAssistant.close} className="h-6 w-6" onClick={onClose}>
                         <X className="w-3 h-3" />
                     </Button>
                 </div>

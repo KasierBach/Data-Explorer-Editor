@@ -484,16 +484,16 @@ export const ConnectionDialog: React.FC = () => {
                                     <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Chọn Database Engine' : 'Database Engine'}</Label>
                                     <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                                         {([
-                                            { value: 'postgres', label: 'PostgreSQL', icon: <SiPostgresql className="w-5 h-5" />, accent: 'text-sky-500', accentBg: 'bg-sky-500/10 border-sky-500/40' },
+                                            { value: 'postgres', label: 'PostgreSQL', icon: <SiPostgresql aria-hidden="true" className="w-5 h-5" />, accent: 'text-sky-500', accentBg: 'bg-sky-500/10 border-sky-500/40' },
                                             { value: 'cockroach', label: 'CockroachDB', icon: <Server className="w-5 h-5" />, accent: 'text-indigo-500', accentBg: 'bg-indigo-500/10 border-indigo-500/40' },
-                                            { value: 'mysql', label: 'MySQL', icon: <SiMysql className="w-5 h-5" />, accent: 'text-orange-500', accentBg: 'bg-orange-500/10 border-orange-500/40' },
-                                            { value: 'mariadb', label: 'MariaDB', icon: <SiMariadb className="w-5 h-5" />, accent: 'text-amber-500', accentBg: 'bg-amber-500/10 border-amber-500/40' },
-                                            { value: 'mssql', label: 'SQL Server', icon: <DiMsqlServer className="w-5 h-5" />, accent: 'text-red-500', accentBg: 'bg-red-500/10 border-red-500/40' },
-                                            { value: 'clickhouse', label: 'ClickHouse', icon: <SiClickhouse className="w-5 h-5" />, accent: 'text-yellow-500', accentBg: 'bg-yellow-500/10 border-yellow-500/40' },
-                                            { value: 'sqlite', label: 'SQLite', icon: <SiSqlite className="w-5 h-5" />, accent: 'text-slate-400', accentBg: 'bg-slate-400/10 border-slate-400/40' },
-                                            { value: 'mongodb', label: 'MongoDB', icon: <SiMongodb className="w-5 h-5" />, accent: 'text-green-500', accentBg: 'bg-green-500/10 border-green-500/40' },
-                                            { value: 'mongodb+srv', label: 'Atlas (SRV)', icon: <SiMongodb className="w-5 h-5" />, accent: 'text-emerald-500', accentBg: 'bg-emerald-500/10 border-emerald-500/40' },
-                                            { value: 'redis', label: 'Redis', icon: <SiRedis className="w-5 h-5" />, accent: 'text-red-500', accentBg: 'bg-red-500/10 border-red-500/40' },
+                                            { value: 'mysql', label: 'MySQL', icon: <SiMysql aria-hidden="true" className="w-5 h-5" />, accent: 'text-orange-500', accentBg: 'bg-orange-500/10 border-orange-500/40' },
+                                            { value: 'mariadb', label: 'MariaDB', icon: <SiMariadb aria-hidden="true" className="w-5 h-5" />, accent: 'text-amber-500', accentBg: 'bg-amber-500/10 border-amber-500/40' },
+                                            { value: 'mssql', label: 'SQL Server', icon: <DiMsqlServer aria-hidden="true" className="w-5 h-5" />, accent: 'text-red-500', accentBg: 'bg-red-500/10 border-red-500/40' },
+                                            { value: 'clickhouse', label: 'ClickHouse', icon: <SiClickhouse aria-hidden="true" className="w-5 h-5" />, accent: 'text-yellow-500', accentBg: 'bg-yellow-500/10 border-yellow-500/40' },
+                                            { value: 'sqlite', label: 'SQLite', icon: <SiSqlite aria-hidden="true" className="w-5 h-5" />, accent: 'text-slate-400', accentBg: 'bg-slate-400/10 border-slate-400/40' },
+                                            { value: 'mongodb', label: 'MongoDB', icon: <SiMongodb aria-hidden="true" className="w-5 h-5" />, accent: 'text-green-500', accentBg: 'bg-green-500/10 border-green-500/40' },
+                                            { value: 'mongodb+srv', label: 'Atlas (SRV)', icon: <SiMongodb aria-hidden="true" className="w-5 h-5" />, accent: 'text-emerald-500', accentBg: 'bg-emerald-500/10 border-emerald-500/40' },
+                                            { value: 'redis', label: 'Redis', icon: <SiRedis aria-hidden="true" className="w-5 h-5" />, accent: 'text-red-500', accentBg: 'bg-red-500/10 border-red-500/40' },
                                         ] as const).map((engine) => {
                                             const isActive = type === engine.value;
                                             return (
@@ -529,13 +529,13 @@ export const ConnectionDialog: React.FC = () => {
                                 </div>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                     <div className="col-span-2 space-y-1">
-                                        <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Tên hiển thị' : 'Display Name'}</Label>
-                                        <Input value={name} onChange={e => { setName(e.target.value); setError(null); }} placeholder="e.g. Production DB" className="h-9 text-xs" />
+                                        <Label htmlFor="display-name" className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Tên hiển thị' : 'Display Name'}</Label>
+                                        <Input id="display-name" value={name} onChange={e => { setName(e.target.value); setError(null); }} placeholder="e.g. Production DB" className="h-9 text-xs" />
                                     </div>
                                     <div className="col-span-1 space-y-1">
                                         <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t ? 'Môi trường' : 'Environment'}</Label>
                                         <Select value={environment} onValueChange={(v: 'development' | 'staging' | 'production' | 'none') => setEnvironment(v)}>
-                                            <SelectTrigger className="h-9 text-xs">
+                                            <SelectTrigger aria-label={t ? 'Môi trường' : 'Environment'} className="h-9 text-xs">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -577,21 +577,21 @@ export const ConnectionDialog: React.FC = () => {
                                         <div className={`grid gap-3 ${type === 'mongodb+srv' ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-3'}`}>
                                             <div className={type === 'mongodb+srv' ? '' : 'col-span-2'}>
                                                 <div className="space-y-1">
-                                                    <Label className="text-[10px] text-muted-foreground">{isMongoType ? 'Hostname / Cluster' : 'Host'}</Label>
-                                                    <Input value={host} onChange={e => { setHost(e.target.value); setError(null); }} placeholder={isMongoType ? 'cluster0.xxxxx.mongodb.net' : 'localhost'} className="h-9 font-mono text-xs" />
+                                                    <Label htmlFor="connection-host" className="text-[10px] text-muted-foreground">{isMongoType ? 'Hostname / Cluster' : 'Host'}</Label>
+                                                    <Input id="connection-host" value={host} onChange={e => { setHost(e.target.value); setError(null); }} placeholder={isMongoType ? 'cluster0.xxxxx.mongodb.net' : 'localhost'} className="h-9 font-mono text-xs" />
                                                 </div>
                                             </div>
                                             {type !== 'mongodb+srv' && (
                                                 <div className="col-span-1 space-y-1">
-                                                    <Label className="text-[10px] text-muted-foreground">Port</Label>
-                                                    <Input value={port} onChange={e => { setPort(e.target.value); setError(null); }} className="h-9 font-mono text-xs" />
+                                                    <Label htmlFor="connection-port" className="text-[10px] text-muted-foreground">Port</Label>
+                                                    <Input id="connection-port" value={port} onChange={e => { setPort(e.target.value); setError(null); }} className="h-9 font-mono text-xs" />
                                                 </div>
                                             )}
                                         </div>
                                         {isMongoType && (
                                             <div className="space-y-1">
-                                                <Label className="text-[10px] text-muted-foreground">{t ? 'Database (Tùy chọn)' : 'Database (Optional)'}</Label>
-                                                <Input value={database} onChange={e => { setDatabase(e.target.value); setError(null); }} placeholder="mydb" className="h-9 font-mono text-xs" />
+                                                <Label htmlFor="connection-database" className="text-[10px] text-muted-foreground">{t ? 'Database (Tùy chọn)' : 'Database (Optional)'}</Label>
+                                                <Input id="connection-database" value={database} onChange={e => { setDatabase(e.target.value); setError(null); }} placeholder="mydb" className="h-9 font-mono text-xs" />
                                             </div>
                                         )}
                                     </div>
@@ -601,8 +601,8 @@ export const ConnectionDialog: React.FC = () => {
                                     <div className="space-y-2.5">
                                         <div className="flex items-center gap-1.5 text-xs font-medium"><Database className="w-3.5 h-3.5 text-muted-foreground" /> {t ? 'Đường dẫn file' : 'File Path'}</div>
                                         <div className="space-y-1">
-                                            <Label className="text-[10px] text-muted-foreground">{t ? 'Đường dẫn SQLite' : 'SQLite File Path'}</Label>
-                                            <Input value={database} onChange={e => { setDatabase(e.target.value); setError(null); }} placeholder="/path/to/database.sqlite or :memory:" className="h-9 font-mono text-xs" />
+                                            <Label htmlFor="connection-database" className="text-[10px] text-muted-foreground">{t ? 'Đường dẫn SQLite' : 'SQLite File Path'}</Label>
+                                            <Input id="connection-database" value={database} onChange={e => { setDatabase(e.target.value); setError(null); }} placeholder="/path/to/database.sqlite or :memory:" className="h-9 font-mono text-xs" />
                                         </div>
                                     </div>
                                 )}
@@ -615,13 +615,14 @@ export const ConnectionDialog: React.FC = () => {
                                         <div className="flex items-center gap-1.5 text-xs font-medium"><Lock className="w-3.5 h-3.5 text-muted-foreground" /> {t ? 'Xác thực' : 'Authentication'}</div>
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                             <div className="space-y-1">
-                                                <Label className="text-[10px] text-muted-foreground">{t ? 'Tên đăng nhập' : 'Username'}</Label>
-                                                <Input value={username} onChange={e => setUsername(e.target.value)} className="h-9 text-xs" />
+                                                <Label htmlFor="connection-username" className="text-[10px] text-muted-foreground">{t ? 'Tên đăng nhập' : 'Username'}</Label>
+                                                <Input id="connection-username" value={username} onChange={e => setUsername(e.target.value)} className="h-9 text-xs" />
                                             </div>
                                             <div className="space-y-1">
-                                                <Label className="text-[10px] text-muted-foreground">{t ? 'Mật khẩu' : 'Password'}</Label>
+                                                <Label htmlFor="connection-password" className="text-[10px] text-muted-foreground">{t ? 'Mật khẩu' : 'Password'}</Label>
                                                 <div className="relative">
                                                     <Input
+                                                        id="connection-password"
                                                         type={showPassword ? 'text' : 'password'}
                                                         value={password}
                                                         onChange={e => setPassword(e.target.value)}
@@ -642,8 +643,8 @@ export const ConnectionDialog: React.FC = () => {
                                         </div>
                                         {!isMongoType && (
                                             <div className="space-y-1">
-                                                <Label className="text-[10px] text-muted-foreground">Database</Label>
-                                                <Input value={database} onChange={e => { setDatabase(e.target.value); setError(null); }} placeholder="mydatabase" className="h-9 font-mono text-xs" />
+                                                <Label htmlFor="connection-database" className="text-[10px] text-muted-foreground">Database</Label>
+                                                <Input id="connection-database" value={database} onChange={e => { setDatabase(e.target.value); setError(null); }} placeholder="mydatabase" className="h-9 font-mono text-xs" />
                                             </div>
                                         )}
                                         {(type === 'redis' || type === 'mysql' || type === 'mariadb') && (
@@ -697,6 +698,7 @@ export const ConnectionDialog: React.FC = () => {
                                             </label>
                                             <button
                                                 type="button"
+                                                aria-label={useSshTunnel ? (t ? 'Thu gọn cài đặt SSH' : 'Collapse SSH settings') : (t ? 'Mở rộng cài đặt SSH' : 'Expand SSH settings')}
                                                 onClick={() => setUseSshTunnel(!useSshTunnel)}
                                                 className="text-muted-foreground hover:text-foreground"
                                             >
@@ -713,8 +715,9 @@ export const ConnectionDialog: React.FC = () => {
                                                 </p>
                                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                                     <div className="col-span-2 space-y-1">
-                                                        <Label className="text-[10px] text-muted-foreground">{t ? 'SSH Host / IP' : 'SSH Host / IP'}</Label>
+                                                        <Label htmlFor="ssh-host" className="text-[10px] text-muted-foreground">{t ? 'SSH Host / IP' : 'SSH Host / IP'}</Label>
                                                         <Input
+                                                            id="ssh-host"
                                                             value={sshHost}
                                                             onChange={e => { setSshHost(e.target.value); setError(null); }}
                                                             placeholder="bastion.example.com"
@@ -722,8 +725,9 @@ export const ConnectionDialog: React.FC = () => {
                                                         />
                                                     </div>
                                                     <div className="col-span-1 space-y-1">
-                                                        <Label className="text-[10px] text-muted-foreground">SSH Port</Label>
+                                                        <Label htmlFor="ssh-port" className="text-[10px] text-muted-foreground">SSH Port</Label>
                                                         <Input
+                                                            id="ssh-port"
                                                             value={sshPort}
                                                             onChange={e => { setSshPort(e.target.value); setError(null); }}
                                                             placeholder="22"
@@ -734,8 +738,9 @@ export const ConnectionDialog: React.FC = () => {
 
                                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                                     <div className="space-y-1">
-                                                        <Label className="text-[10px] text-muted-foreground">{t ? 'SSH Username' : 'SSH Username'}</Label>
+                                                        <Label htmlFor="ssh-username" className="text-[10px] text-muted-foreground">{t ? 'SSH Username' : 'SSH Username'}</Label>
                                                         <Input
+                                                            id="ssh-username"
                                                             value={sshUsername}
                                                             onChange={e => { setSshUsername(e.target.value); setError(null); }}
                                                             placeholder="ubuntu or ec2-user"
@@ -759,11 +764,12 @@ export const ConnectionDialog: React.FC = () => {
                                                 {sshAuthType === 'key' ? (
                                                     <div className="space-y-3">
                                                         <div className="space-y-1">
-                                                            <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                            <Label htmlFor="ssh-private-key" className="text-[10px] text-muted-foreground flex items-center gap-1">
                                                                 <KeyRound className="w-3 h-3 text-violet-500" />
                                                                 {t ? 'Nội dung Private Key (OpenSSH format)' : 'Private Key Content (OpenSSH format)'}
                                                             </Label>
                                                             <textarea
+                                                                id="ssh-private-key"
                                                                 value={sshPrivateKey}
                                                                 onChange={e => setSshPrivateKey(e.target.value)}
                                                                 placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"
@@ -771,9 +777,10 @@ export const ConnectionDialog: React.FC = () => {
                                                             />
                                                         </div>
                                                         <div className="space-y-1">
-                                                            <Label className="text-[10px] text-muted-foreground">{t ? 'Passphrase khóa (nếu có)' : 'Key Passphrase (optional)'}</Label>
+                                                            <Label htmlFor="ssh-passphrase" className="text-[10px] text-muted-foreground">{t ? 'Passphrase khóa (nếu có)' : 'Key Passphrase (optional)'}</Label>
                                                             <div className="relative">
                                                                 <Input
+                                                                    id="ssh-passphrase"
                                                                     type={showSshPassphrase ? 'text' : 'password'}
                                                                     value={sshPassphrase}
                                                                     onChange={e => setSshPassphrase(e.target.value)}
@@ -793,9 +800,10 @@ export const ConnectionDialog: React.FC = () => {
                                                     </div>
                                                 ) : (
                                                     <div className="space-y-1">
-                                                        <Label className="text-[10px] text-muted-foreground">{t ? 'SSH Password' : 'SSH Password'}</Label>
+                                                        <Label htmlFor="ssh-password" className="text-[10px] text-muted-foreground">{t ? 'SSH Password' : 'SSH Password'}</Label>
                                                         <div className="relative">
                                                             <Input
+                                                                id="ssh-password"
                                                                 type={showSshPassphrase ? 'text' : 'password'}
                                                                 value={sshPassphrase}
                                                                 onChange={e => setSshPassphrase(e.target.value)}

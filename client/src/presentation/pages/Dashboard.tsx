@@ -154,7 +154,7 @@ export const Dashboard: React.FC = () => {
 
                 {/* Quick Actions */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
-                    <div className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer" onClick={() => openQueryTab()}>
+                    <button type="button" className="group relative overflow-hidden rounded-xl border bg-card text-left text-card-foreground shadow transition-all hover:shadow-md" onClick={() => openQueryTab()}>
                         <div className="p-4 md:p-6 flex flex-col gap-3 md:gap-4">
                             <div className="p-2 md:p-3 w-fit rounded-lg bg-blue-100 text-blue-600">
                                 <FileText className="h-6 w-6" />
@@ -166,9 +166,9 @@ export const Dashboard: React.FC = () => {
                                 </p>
                             </div>
                         </div>
-                    </div>
+                    </button>
 
-                    <div className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer" onClick={() => openConnectionDialog()}>
+                    <button type="button" className="group relative overflow-hidden rounded-xl border bg-card text-left text-card-foreground shadow transition-all hover:shadow-md" onClick={() => openConnectionDialog()}>
                         <div className="p-4 md:p-6 flex flex-col gap-3 md:gap-4">
                             <div className="p-2 md:p-3 w-fit rounded-lg bg-green-100 text-green-600">
                                 <Plus className="h-6 w-6" />
@@ -180,9 +180,9 @@ export const Dashboard: React.FC = () => {
                                 </p>
                             </div>
                         </div>
-                    </div>
+                    </button>
 
-                    <div className="group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer" onClick={() => setSidebarOpen(true)}>
+                    <button type="button" className="group relative overflow-hidden rounded-xl border bg-card text-left text-card-foreground shadow transition-all hover:shadow-md" onClick={() => setSidebarOpen(true)}>
                         <div className="p-4 md:p-6 flex flex-col gap-3 md:gap-4">
                             <div className="p-2 md:p-3 w-fit rounded-lg bg-orange-100 text-orange-600">
                                 <Search className="h-6 w-6" />
@@ -194,9 +194,11 @@ export const Dashboard: React.FC = () => {
                                 </p>
                             </div>
                         </div>
-                    </div>
+                    </button>
 
-                    <div
+                    <button
+                        type="button"
+                        disabled={!activeConnectionId}
                         className={`group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer ${!activeConnectionId ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
                         onClick={() => activeConnectionId && setView('insights')}
                     >
@@ -216,7 +218,7 @@ export const Dashboard: React.FC = () => {
                                 {text.selectConnectionFirst}
                             </div>
                         )}
-                    </div>
+                    </button>
                 </div>
 
                 {/* Recent Connections & Stats */}
@@ -246,23 +248,25 @@ export const Dashboard: React.FC = () => {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2 shrink-0 ml-2">
-                                                <Button variant="outline" size="sm" className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-xs" onClick={() => { setActiveConnectionId(conn.id); setSidebarOpen(true); }}>
+                                                <Button variant="outline" size="sm" className="opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 transition-opacity text-xs" onClick={() => { setActiveConnectionId(conn.id); setSidebarOpen(true); }}>
                                                     {text.connect}
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 h-8 w-8"
+                                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 h-8 w-8"
                                                     onClick={(e) => { e.stopPropagation(); openConnectionDialog(conn.id); }}
-                                                    title={lang === 'vi' ? 'Chỉnh sửa kết nối' : 'Edit Connection'}
+                                                    aria-label={text.editConnection}
+                                                    title={text.editConnection}
                                                 >
                                                     <Pencil className="w-4 h-4" />
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-600 hover:bg-blue-500/10 h-8 w-8"
+                                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 transition-opacity text-blue-500 hover:text-blue-600 hover:bg-blue-500/10 h-8 w-8"
                                                     onClick={(e) => openShareDialog(e, conn.id)}
+                                                    aria-label={`${text.shareWithTeam}: ${conn.name}`}
                                                     title={text.shareWithTeam}
                                                 >
                                                     <Share2 className="w-4 h-4" />
@@ -270,8 +274,10 @@ export const Dashboard: React.FC = () => {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8 w-8"
+                                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100 transition-opacity text-red-500 hover:text-red-600 hover:bg-red-500/10 h-8 w-8"
                                                     onClick={(e) => handleDelete(e, conn.id)}
+                                                    aria-label={`${text.deleteConnection}: ${conn.name}`}
+                                                    title={text.deleteConnection}
                                                     disabled={isDeleting === conn.id}
                                                 >
                                                     {isDeleting === conn.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash className="w-4 h-4" />}

@@ -7,6 +7,9 @@ import {
 import { AppModule } from '../src/app.module';
 import { TransformInterceptor } from '../src/common/interceptors/transform.interceptor';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
+import { ThrottlerStorage } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import { createHash, randomUUID } from 'node:crypto';
 
 export async function createE2eApp(): Promise<INestApplication> {
   const moduleFixture = await Test.createTestingModule({ imports: [AppModule] })
@@ -25,6 +28,17 @@ export async function createE2eApp(): Promise<INestApplication> {
   app.useGlobalFilters(new AllExceptionsFilter());
   try {
     await app.init();
+    const storage = app.get<ThrottlerStorageRedisService>(ThrottlerStorage);
+    const increment = storage.increment.bind(storage);
+    const namespace = randomUUID();
+    storage.increment = (key, ttl, limit, blockDuration, throttlerName) =>
+      increment(
+        createHash('sha256').update(namespace).update(key).digest('hex'),
+        ttl,
+        limit,
+        blockDuration,
+        throttlerName,
+      );
     return app;
   } catch (error) {
     await closeE2eApp(app);

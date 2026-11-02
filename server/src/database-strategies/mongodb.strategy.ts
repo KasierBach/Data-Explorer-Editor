@@ -32,6 +32,7 @@ const inferType = (value: unknown): string => {
 const serializeMongoValue = (value: any): any => {
   if (value === null || value === undefined) return value;
   if (value?._bsontype === 'ObjectId') return value.toString();
+  if (value?._bsontype === 'Decimal128') return value.toString();
   if (Array.isArray(value)) return value.map(serializeMongoValue);
   if (value instanceof Date) return value;
   if (typeof value === 'object') {

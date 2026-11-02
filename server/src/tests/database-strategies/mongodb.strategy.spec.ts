@@ -257,6 +257,30 @@ describe('MongoDbStrategy', () => {
       ]);
     });
 
+    it('preserves dates and serializes Decimal128 values without precision loss', async () => {
+      const createdAt = new Date('2026-10-26T12:34:56.789Z');
+      const decimal = {
+        _bsontype: 'Decimal128',
+        toString: () => '12345678901234567890.12345678901234',
+      };
+      mockCollection.toArray.mockResolvedValue([
+        { createdAt, amount: decimal, nested: { amount: decimal } },
+      ]);
+
+      const result = await strategy.executeQuery(
+        mockClient,
+        JSON.stringify({ action: 'find', collection: 'test_col' }),
+      );
+
+      expect(result.rows).toEqual([
+        {
+          createdAt,
+          amount: '12345678901234567890.12345678901234',
+          nested: { amount: '12345678901234567890.12345678901234' },
+        },
+      ]);
+    });
+
     it('should throw an error for invalid JSON payload', async () => {
       await expect(
         strategy.executeQuery(mockClient, 'INVALID JSON'),

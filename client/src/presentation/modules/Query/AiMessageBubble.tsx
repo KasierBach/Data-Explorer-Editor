@@ -44,6 +44,9 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';
     const text = getWorkspaceText(lang).aiMessageBubble;
+    const messageContent = msg.id === 'welcome'
+        ? getWorkspaceText(lang).aiAssistant.welcome
+        : msg.content;
     const userContent = getVisibleUserContent(msg);
     const imageAttachments = msg.attachments?.filter((attachment) => attachment.type === 'image' && attachment.preview) || [];
     const fileAttachments = msg.attachments?.filter((attachment) => attachment.type !== 'image') || [];
@@ -185,7 +188,7 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                             )}
                         </div>
                     ) : (
-                        <AiMarkdownContent content={msg.content} />
+                        <AiMarkdownContent content={messageContent} />
                     )}
 
                     {msg.sql && (
@@ -273,7 +276,7 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                             <Pencil className="w-3.5 h-3.5" />
                         </Button>
                     )}
-                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => handleCopy(msg.role === 'user' ? userContent : msg.content)} title={text.copyMessage} aria-label={text.copyMessage}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => handleCopy(msg.role === 'user' ? userContent : messageContent)} title={text.copyMessage} aria-label={text.copyMessage}>
                         <Copy className="w-3.5 h-3.5" />
                     </Button>
                     {msg.role === 'ai' && !msg.error && onRegenerate && (

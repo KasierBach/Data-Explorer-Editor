@@ -112,13 +112,15 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
 
                 <div className="space-y-4">
                     {error && (
-                        <div className="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                        <div id="save-query-error" role="alert" className="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-400">
                             {error}
                         </div>
                     )}
                     <div className="space-y-1.5">
-                        <Label>{text.saveQuery.displayName}</Label>
+                        <Label htmlFor="save-query-name">{text.saveQuery.displayName}</Label>
                         <Input
+                            id="save-query-name"
+                            aria-describedby={error ? 'save-query-error' : undefined}
                             value={form.name}
                             onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                             placeholder={text.saveQuery.namePlaceholder}
@@ -127,12 +129,12 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label>{text.saveQuery.visibility}</Label>
+                            <Label htmlFor="save-query-visibility">{text.saveQuery.visibility}</Label>
                             <Select
                                 value={form.visibility}
                                 onValueChange={handleVisibilityChange}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger id="save-query-visibility" aria-label={text.saveQuery.visibility}>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -147,12 +149,12 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                         <div className="space-y-1.5">
                             {form.visibility === 'workspace' && canShareToWorkspace ? (
                                 <>
-                                    <Label>{text.saveQuery.workspaceTeam}</Label>
+                                    <Label htmlFor="save-query-workspace">{text.saveQuery.workspaceTeam}</Label>
                                     <Select
                                         value={form.organizationId}
                                         onValueChange={(value) => setForm((prev) => ({ ...prev, organizationId: value }))}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger id="save-query-workspace" aria-label={text.saveQuery.workspaceTeam}>
                                             <SelectValue placeholder={text.saveQuery.chooseWorkspace} />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -166,8 +168,9 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                                 </>
                             ) : (
                                 <>
-                                    <Label>{text.saveQuery.folderGroup}</Label>
+                                    <Label htmlFor="save-query-folder">{text.saveQuery.folderGroup}</Label>
                                     <Input
+                                        id="save-query-folder"
                                         value={form.folderId}
                                         onChange={(e) => setForm((prev) => ({ ...prev, folderId: e.target.value }))}
                                         placeholder={text.saveQuery.folderPlaceholder}
@@ -179,8 +182,9 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
 
                     {form.visibility === 'workspace' && canShareToWorkspace && (
                         <div className="space-y-1.5">
-                            <Label>{text.saveQuery.folderGroup}</Label>
+                            <Label htmlFor="save-query-folder">{text.saveQuery.folderGroup}</Label>
                             <Input
+                                id="save-query-folder"
                                 value={form.folderId}
                                 onChange={(e) => setForm((prev) => ({ ...prev, folderId: e.target.value }))}
                                 placeholder={text.saveQuery.folderPlaceholder}
@@ -189,8 +193,9 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                     )}
 
                     <div className="space-y-1.5">
-                        <Label>{text.saveQuery.tags}</Label>
+                        <Label htmlFor="save-query-tags">{text.saveQuery.tags}</Label>
                         <Input
+                            id="save-query-tags"
                             value={form.tags}
                             onChange={(e) => setForm((prev) => ({ ...prev, tags: e.target.value }))}
                             placeholder={text.saveQuery.tagsPlaceholder}
@@ -198,8 +203,9 @@ export const SaveQueryDialog: React.FC<SaveQueryDialogProps> = ({
                     </div>
 
                     <div className="space-y-1.5">
-                        <Label>{text.saveQuery.details}</Label>
+                        <Label htmlFor="save-query-description">{text.saveQuery.details}</Label>
                         <textarea
+                            id="save-query-description"
                             className="w-full min-h-[110px] rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                             value={form.description}
                             onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}

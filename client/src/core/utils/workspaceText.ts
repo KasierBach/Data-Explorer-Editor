@@ -2,6 +2,11 @@ import { normalizeAppLang, type AppLang } from './i18n';
 
 const workspaceText = {
     vi: {
+        themeToggle: {
+            light: 'Sáng',
+            dark: 'Tối',
+            system: 'Hệ thống',
+        },
         aiQuery: {
             autoInsertSkipped: 'Kết quả AI có thao tác ghi, đổi cấu trúc hoặc quá dài. Hãy review trước khi chèn vào editor.',
             autoInsertWarning: 'SQL do AI tạo cần được review trước khi chèn.',
@@ -68,6 +73,10 @@ const workspaceText = {
             generateCommand: (commandLabel: string) => `Sinh ${commandLabel}`,
         },
         aiAssistant: {
+            close: 'Đóng trợ lý AI',
+            enabledTitle: 'AI đang bật (bấm để tắt)',
+            disabledTitle: 'AI đang tắt (bấm để bật)',
+            welcome: 'Xin chào! Tôi là AI Assistant — bạn có thể hỏi về SQL, lập trình hoặc kiến thức chung. Khi cần truy vấn database, tôi sẽ tạo câu lệnh dựa trên schema bạn được phép truy cập.',
             newConversation: 'Cuộc trò chuyện mới',
             chatHistory: 'Lịch sử chat',
             noDatabaseTitle: 'Chưa kết nối database',
@@ -258,6 +267,8 @@ const workspaceText = {
             selectConnectionFirst: 'Chọn một kết nối trước',
             recentConnections: 'Kết nối gần đây',
             connect: 'Kết nối',
+            editConnection: 'Chỉnh sửa kết nối',
+            deleteConnection: 'Xóa kết nối',
             shareWithTeam: 'Chia sẻ với Team',
             noConnections: 'Chưa có kết nối nào. Hãy tạo một cái để bắt đầu.',
             quickStats: 'Thống kê nhanh',
@@ -346,6 +357,11 @@ const workspaceText = {
             chartStudio: 'Studio trực quan',
         },
         explorerSidebar: {
+            createDatabase: 'Tạo cơ sở dữ liệu',
+            refresh: 'Tải lại trình duyệt',
+            syncIndex: 'Đồng bộ chỉ mục',
+            useGlobalSearch: 'Dùng tìm kiếm toàn cục',
+            useLocalSearch: 'Dùng tìm kiếm cục bộ',
             syncFailed: 'Đồng bộ thất bại',
             refreshingHierarchy: 'Đang làm mới dữ liệu...',
             refreshed: 'Đã cập nhật',
@@ -675,6 +691,13 @@ const workspaceText = {
             timeLocale: 'vi-VN',
         },
         aiChatInput: {
+            connectedPlaceholder: 'Hỏi về SQL, lập trình hoặc database...',
+            disconnectedPlaceholder: 'Hãy kết nối database trước...',
+            routingMode: 'Chế độ định tuyến',
+            conversationMode: 'Chế độ hội thoại',
+            model: 'Mô hình',
+            stopResponse: 'Dừng phản hồi',
+            sendMessage: 'Gửi tin nhắn',
             attachContextTitle: 'Đính kèm context',
             attachMenuLabel: 'Đính kèm',
             fileImage: 'Tệp / Hình ảnh',
@@ -930,6 +953,11 @@ const workspaceText = {
         },
     },
     en: {
+        themeToggle: {
+            light: 'Light',
+            dark: 'Dark',
+            system: 'System',
+        },
         aiQuery: {
             autoInsertSkipped: 'The AI result writes data, changes schema, or is unusually long. Review it before inserting it into the editor.',
             autoInsertWarning: 'AI-generated SQL requires review before insertion.',
@@ -996,6 +1024,10 @@ const workspaceText = {
             generateCommand: (commandLabel: string) => `Generate ${commandLabel}`,
         },
         aiAssistant: {
+            close: 'Close AI assistant',
+            enabledTitle: 'AI is on (click to turn off)',
+            disabledTitle: 'AI is off (click to turn on)',
+            welcome: 'Hello! I am your AI Assistant. Ask about SQL, coding, or general topics. When you need a database query, I will generate it from the schema you are allowed to access.',
             newConversation: 'New conversation',
             chatHistory: 'Chat history',
             noDatabaseTitle: 'No database connected',
@@ -1186,6 +1218,8 @@ const workspaceText = {
             selectConnectionFirst: 'Select a connection first',
             recentConnections: 'Recent Connections',
             connect: 'Connect',
+            editConnection: 'Edit Connection',
+            deleteConnection: 'Delete connection',
             shareWithTeam: 'Share with Team',
             noConnections: 'No connections yet. Create one to get started.',
             quickStats: 'Quick Stats',
@@ -1274,6 +1308,11 @@ const workspaceText = {
             chartStudio: 'Chart Studio',
         },
         explorerSidebar: {
+            createDatabase: 'Create database',
+            refresh: 'Refresh Explorer',
+            syncIndex: 'Sync index',
+            useGlobalSearch: 'Use global search',
+            useLocalSearch: 'Use local search',
             syncFailed: 'Sync failed',
             refreshingHierarchy: 'Refreshing hierarchy...',
             refreshed: 'Refreshed',
@@ -1603,6 +1642,13 @@ const workspaceText = {
             timeLocale: 'en-US',
         },
         aiChatInput: {
+            connectedPlaceholder: 'Ask about SQL, coding, or your database...',
+            disconnectedPlaceholder: 'Connect a database first...',
+            routingMode: 'Routing mode',
+            conversationMode: 'Conversation mode',
+            model: 'Model',
+            stopResponse: 'Stop response',
+            sendMessage: 'Send message',
             attachContextTitle: 'Attach context',
             attachMenuLabel: 'Attach',
             fileImage: 'File / Image',

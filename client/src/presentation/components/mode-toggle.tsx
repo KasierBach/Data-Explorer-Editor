@@ -2,19 +2,12 @@ import { Moon, Sun, Laptop } from "lucide-react"
 
 import { Button } from "@/presentation/components/ui/button"
 import { useTheme } from "@/presentation/components/theme-provider"
-import { toast } from "sonner"
+import { useAppStore } from "@/core/services/store"
+import { getWorkspaceText } from "@/core/utils/workspaceText"
 
 export function ModeToggle() {
     const { theme, setTheme } = useTheme()
-
-    const handleThemeChange = (newTheme: "light" | "dark" | "system") => {
-        setTheme(newTheme);
-        const labels = { light: 'Sáng', dark: 'Tối', system: 'Hệ thống' };
-        toast.info(`Giao diện: ${labels[newTheme]}`, { 
-            duration: 1500,
-            icon: newTheme === 'light' ? <Sun className="h-4 w-4" /> : newTheme === 'dark' ? <Moon className="h-4 w-4" /> : <Laptop className="h-4 w-4" />
-        });
-    };
+    const text = getWorkspaceText(useAppStore((state) => state.lang)).themeToggle
 
     return (
         <div className="flex items-center gap-1 border rounded-md p-0.5 bg-background">
@@ -22,28 +15,28 @@ export function ModeToggle() {
                 variant={theme === 'light' ? 'secondary' : 'ghost'}
                 size="icon"
                 className="h-7 w-7"
-                onClick={() => handleThemeChange("light")}
+                onClick={() => setTheme("light")}
             >
                 <Sun className="h-4 w-4" />
-                <span className="sr-only">Light</span>
+                <span className="sr-only">{text.light}</span>
             </Button>
             <Button
                 variant={theme === 'dark' ? 'secondary' : 'ghost'}
                 size="icon"
                 className="h-7 w-7"
-                onClick={() => handleThemeChange("dark")}
+                onClick={() => setTheme("dark")}
             >
                 <Moon className="h-4 w-4" />
-                <span className="sr-only">Dark</span>
+                <span className="sr-only">{text.dark}</span>
             </Button>
             <Button
                 variant={theme === 'system' ? 'secondary' : 'ghost'}
                 size="icon"
                 className="h-7 w-7"
-                onClick={() => handleThemeChange("system")}
+                onClick={() => setTheme("system")}
             >
                 <Laptop className="h-4 w-4" />
-                <span className="sr-only">System</span>
+                <span className="sr-only">{text.system}</span>
             </Button>
         </div>
     )

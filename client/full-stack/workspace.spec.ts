@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 
@@ -24,9 +24,34 @@ async function login(page: Page, email: string) {
   await page.goto('/login');
   await page.getByLabel(/^Email$/).fill(email);
   await page.getByLabel(/^(Password|Mật khẩu)$/).fill(password);
+  const loginResponse = page.waitForResponse(response => response.url() === `${api}/auth/login` && response.request().method() === 'POST');
   await page.getByRole('button', { name: /^(Sign in with email|Đăng nhập bằng Email)$/ }).click();
+  const response = await loginResponse;
+  expect(response.status()).toBe(200);
+  const payload: { data?: { access_token?: string }; access_token?: string } = await response.json();
+  const token = payload.data?.access_token ?? payload.access_token;
+  if (typeof token !== 'string' || !token) throw new Error('UI login did not return an access token');
   await expect(page).toHaveURL(/sql-explorer/);
   await page.getByRole('button', { name: 'EN', exact: true }).click();
+  return token;
+}
+
+async function tabTo(page: Page, target: Locator) {
+  for (let index = 0; index < 120; index += 1) {
+    if (await target.evaluate(element => element === document.activeElement)) return;
+    const backwards = await target.evaluate(element => {
+      const active = document.activeElement;
+      return Boolean(active && active.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_PRECEDING);
+    });
+    await page.keyboard.press(backwards ? 'Shift+Tab' : 'Tab');
+  }
+  await expect(target).toBeFocused();
+}
+
+async function typeField(page: Page, field: Locator, value: string) {
+  await tabTo(page, field);
+  await page.keyboard.press('Control+A');
+  await page.keyboard.insertText(value);
 }
 
 async function replaceSql(page: Page, sql: string) {
@@ -100,11 +125,84 @@ test('real login, connection, query save/reload and destructive cancel/confirm',
   expect((await database.query(`SELECT * FROM "${queryTable}"`)).rows).toEqual([]);
 });
 
+test('real keyboard login, connection, query save and Profile round-trip', async ({ page }) => {
+  await page.goto('/login');
+  const emailField = page.getByLabel(/^Email$/);
+  await expect(emailField).toBeVisible();
+  await typeField(page, emailField, emails[0]);
+  await typeField(page, page.getByLabel(/^(Password|Mật khẩu)$/), password);
+  await tabTo(page, page.getByRole('button', { name: /^(Sign in with email|Đăng nhập bằng Email)$/ }));
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/sql-explorer/);
+  await tabTo(page, page.getByRole('button', { name: 'EN', exact: true }));
+  await page.keyboard.press('Enter');
+
+  const keyboardConnectionName = `${connectionName}-keyboard`;
+  await tabTo(page, page.getByRole('button', { name: /New Connection Connect to a new/ }));
+  await page.keyboard.press('Enter');
+  const connectionDialog = page.getByRole('dialog');
+  await expect(connectionDialog).toBeVisible();
+  await typeField(page, connectionDialog.getByLabel('Display Name', { exact: true }), keyboardConnectionName);
+  await typeField(page, connectionDialog.getByRole('textbox', { name: 'Host', exact: true }), '127.0.0.1');
+  await typeField(page, connectionDialog.getByRole('textbox', { name: 'Port', exact: true }), '15432');
+  await typeField(page, connectionDialog.getByRole('textbox', { name: 'Username', exact: true }), 'e2e');
+  await typeField(page, connectionDialog.getByLabel('Password', { exact: true }), 'e2e-local-only');
+  await typeField(page, connectionDialog.getByRole('textbox', { name: 'Database', exact: true }), 'data_explorer_e2e');
+  await tabTo(page, connectionDialog.getByRole('button', { name: 'Save & Connect', exact: true }));
+  const connectionCreated = page.waitForResponse(response => response.url() === `${api}/connections` && response.request().method() === 'POST');
+  await page.keyboard.press('Enter');
+  expect((await connectionCreated).status()).toBe(201);
+  await expect(connectionDialog).not.toBeVisible();
+  const instance = page.getByRole('combobox', { name: 'Select Instance', exact: true });
+  await tabTo(page, instance);
+  await page.keyboard.press('Enter');
+  const option = page.getByRole('option', { name: new RegExp(`^${keyboardConnectionName}`) });
+  await expect(option).toBeVisible();
+  for (let index = 0; index < 20; index += 1) {
+    if (await option.evaluate(element => element === document.activeElement)) break;
+    await page.keyboard.press('ArrowDown');
+  }
+  await expect(option).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(instance).toContainText(keyboardConnectionName);
+
+  await page.keyboard.press('Control+KeyN');
+  await expect(page.getByRole('button', { name: 'Execute', exact: true })).toBeVisible();
+  const editor = page.getByRole('textbox', { name: 'Editor content', exact: true });
+  const sql = 'SELECT 42 AS keyboard_value';
+  await typeField(page, editor, sql);
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByText('42', { exact: true })).toBeVisible();
+  await page.keyboard.press('Control+KeyS');
+  const saveDialog = page.getByRole('dialog');
+  await expect(saveDialog).toBeVisible();
+  const keyboardSavedName = `${savedName}-keyboard`;
+  await typeField(page, saveDialog.getByLabel('Display name', { exact: true }), keyboardSavedName);
+  await tabTo(page, saveDialog.getByRole('button', { name: 'Save query', exact: true }));
+  const querySaved = page.waitForResponse(response => response.url() === `${api}/saved-queries` && response.request().method() === 'POST');
+  await page.keyboard.press('Enter');
+  expect((await querySaved).status()).toBe(201);
+  await expect(saveDialog).not.toBeVisible();
+  expect(await prisma.savedQuery.findMany({ where: { name: keyboardSavedName }, select: { sql: true } })).toEqual([{ sql }]);
+
+  await editor.press('Escape');
+  await editor.press('Control+KeyM');
+  await tabTo(page, page.getByRole('button', { name: 'Profile', exact: true }));
+  await page.keyboard.press('Enter');
+  await tabTo(page, page.getByRole('menuitem', { name: /^Profile/ }));
+  await page.keyboard.press('Enter');
+  const profileDialog = page.getByRole('dialog');
+  await expect(profileDialog.getByLabel('Email Address', { exact: true })).toHaveValue(emails[0]);
+  await tabTo(page, profileDialog.getByRole('button', { name: 'Security', exact: true }));
+  await page.keyboard.press('Enter');
+  await expect(profileDialog.getByText('Not supported yet', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(profileDialog).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Profile', exact: true })).toBeFocused();
+});
+
 test('real typed row mutation and another user cannot read or write the private connection', async ({ page, browser }) => {
-  await login(page, emails[0]);
-  const response = await page.request.post(`${api}/auth/login`, { data: { email: emails[0], password } });
-  expect(response.status()).toBe(200);
-  const token = (await response.json()).data.access_token;
+  const token = await login(page, emails[0]);
   const connection = await page.request.post(`${api}/connections`, {
     headers: { Authorization: `Bearer ${token}`, 'x-requested-with': 'XMLHttpRequest' },
     data: { name: `${connectionName}-rows`, type: 'postgres', host: '127.0.0.1', port: 15432,
@@ -129,10 +227,8 @@ test('real typed row mutation and another user cannot read or write the private 
   const otherContext = await browser.newContext();
   try {
     const other = await otherContext.newPage();
-    await login(other, emails[1]);
+    const otherToken = await login(other, emails[1]);
     await expect(other.getByText(`${connectionName}-rows`, { exact: true })).toHaveCount(0);
-    const otherLogin = await other.request.post(`${api}/auth/login`, { data: { email: emails[1], password } });
-    const otherToken = (await otherLogin.json()).data.access_token;
     const headers = { Authorization: `Bearer ${otherToken}`, 'x-requested-with': 'XMLHttpRequest' };
     const deniedRead = await other.request.post(`${api}/query`, { headers, data: { connectionId, sql: `SELECT * FROM "${rowTable}"` } });
     expect([403, 404]).toContain(deniedRead.status());

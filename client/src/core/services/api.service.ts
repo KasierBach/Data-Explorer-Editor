@@ -13,11 +13,15 @@ export class ApiError extends Error {
 class ApiService {
   private baseUrl = API_BASE_URL;
   private refreshPromise: Promise<boolean> | null = null;
+  private refreshContext: { version: number; token: string | null; userKey: string | null } | null = null;
+  private sessionVersion = 0;
   private isLoggingOut = false;
 
   beginLogout() {
+    this.sessionVersion += 1;
     this.isLoggingOut = true;
     this.refreshPromise = null;
+    this.refreshContext = null;
   }
 
   endLogout() {
@@ -73,13 +77,33 @@ class ApiService {
       return false;
     }
 
-    if (this.refreshPromise) {
+    const state = useAppStore.getState();
+    const context = {
+      version: this.sessionVersion,
+      token: state.accessToken,
+      userKey: state.user?.id || state.user?.email || null,
+    };
+    if (
+      this.refreshPromise
+      && this.refreshContext?.version === context.version
+      && this.refreshContext.token === context.token
+      && this.refreshContext.userKey === context.userKey
+    ) {
       return this.refreshPromise;
     }
 
-    this.refreshPromise = (async () => {
+    this.refreshContext = context;
+    const ownsSession = () => {
+      const current = useAppStore.getState();
+      return !this.isLoggingOut
+        && this.sessionVersion === context.version
+        && this.refreshContext === context
+        && current.accessToken === context.token
+        && (current.user?.id || current.user?.email || null) === context.userKey;
+    };
+    this.refreshPromise = Promise.resolve().then(async () => {
       try {
-        if (this.isLoggingOut) {
+        if (!ownsSession()) {
           return false;
         }
 
@@ -94,6 +118,9 @@ class ApiService {
           body: JSON.stringify({}),
         });
 
+        if (!ownsSession()) {
+          return false;
+        }
         if (!response.ok) {
           useAppStore.getState().logout({ preserveWorkspace: true });
           return false;
@@ -105,6 +132,9 @@ class ApiService {
           user?: AuthUser;
         }>(response);
 
+        if (!ownsSession()) {
+          return false;
+        }
         if (!data?.access_token || !data.user) {
           useAppStore.getState().logout({ preserveWorkspace: true });
           return false;
@@ -113,12 +143,17 @@ class ApiService {
         useAppStore.getState().restoreSession(data.access_token, data.user, data.accessTokenExpiresAt ?? null);
         return true;
       } catch {
-        useAppStore.getState().logout({ preserveWorkspace: true });
+        if (ownsSession()) {
+          useAppStore.getState().logout({ preserveWorkspace: true });
+        }
         return false;
       } finally {
-        this.refreshPromise = null;
+        if (this.refreshContext === context) {
+          this.refreshPromise = null;
+          this.refreshContext = null;
+        }
       }
-    })();
+    });
 
     return this.refreshPromise;
   }
@@ -132,14 +167,27 @@ class ApiService {
       throw new ApiError('Logout in progress');
     }
 
+    const sessionVersion = this.sessionVersion;
+    const requestState = useAppStore.getState();
+    const userKey = requestState.user?.id || requestState.user?.email || null;
+    const token = new Headers(options.headers).get('Authorization');
+    const ownsSession = () => {
+      const current = useAppStore.getState();
+      return !this.isLoggingOut
+        && this.sessionVersion === sessionVersion
+        && (current.user?.id || current.user?.email || null) === userKey;
+    };
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       credentials: 'include',
       ...options,
     });
 
-    if (response.status === 401 && allowRefresh && endpoint !== '/auth/refresh' && endpoint !== '/auth/login') {
-      const refreshed = await this.tryRefreshSession();
-      if (refreshed) {
+    if (response.status === 401 && allowRefresh && endpoint !== '/auth/refresh' && endpoint !== '/auth/login' && ownsSession()) {
+      const currentToken = useAppStore.getState().accessToken;
+      const refreshed = currentToken && token !== `Bearer ${currentToken}`
+        ? true
+        : await this.tryRefreshSession();
+      if (refreshed && ownsSession()) {
         return this.requestInternal<T>(
           endpoint,
           {
@@ -155,13 +203,19 @@ class ApiService {
     }
 
     if (!response.ok) {
-      if (response.status === 401) {
+      if (response.status === 401 && ownsSession() && token === new Headers(this.getHeaders()).get('Authorization')) {
         useAppStore.getState().logout({ preserveWorkspace: true });
       }
       throw await this.buildApiError(response);
     }
 
-    return this.parseResponse<T>(response);
+    const data = await this.parseResponse<T>(response);
+    if (endpoint !== '/auth/logout' && !ownsSession()) {
+      const error = new ApiError('Session changed during request');
+      error.reason = 'SESSION_CHANGED';
+      throw error;
+    }
+    return data;
   }
 
   async get<T>(endpoint: string, headers: Record<string, string> = {}, allowRefresh = true): Promise<T> {

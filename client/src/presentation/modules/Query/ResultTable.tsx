@@ -135,7 +135,7 @@ export const ResultTable: React.FC<ResultTableProps> = ({
 
     return (
         <div className="w-full h-full flex flex-col overflow-hidden bg-background">
-            <div className="flex-1 w-full overflow-auto scrollbar-thin scrollbar-thumb-muted-foreground/20">
+            <div tabIndex={0} role="region" aria-label={copy.result} className="flex-1 w-full overflow-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
                 <table className="w-full text-xs text-left border-collapse min-w-full">
                     <thead className="bg-muted/50 sticky top-0 z-10 shadow-sm">
                         {table.getHeaderGroups().map(headerGroup => (

@@ -25,7 +25,7 @@ const getDbBranding = (type?: string) => {
                 bg: 'bg-sky-500/10',
                 bgHover: 'group-hover:bg-sky-500/20',
                 label: 'PG',
-                icon: <SiPostgresql className="w-3.5 h-3.5" />,
+                icon: <SiPostgresql aria-hidden="true" className="w-3.5 h-3.5" />,
             };
         case 'cockroach':
             return {
@@ -41,7 +41,7 @@ const getDbBranding = (type?: string) => {
                 bg: 'bg-orange-500/10',
                 bgHover: 'group-hover:bg-orange-500/20',
                 label: 'MY',
-                icon: <SiMysql className="w-4 h-4" />,
+                icon: <SiMysql aria-hidden="true" className="w-4 h-4" />,
             };
         case 'mariadb':
             return {
@@ -49,7 +49,7 @@ const getDbBranding = (type?: string) => {
                 bg: 'bg-amber-500/10',
                 bgHover: 'group-hover:bg-amber-500/20',
                 label: 'MA',
-                icon: <SiMysql className="w-4 h-4" />,
+                icon: <SiMysql aria-hidden="true" className="w-4 h-4" />,
             };
         case 'mssql':
             return {
@@ -57,7 +57,7 @@ const getDbBranding = (type?: string) => {
                 bg: 'bg-red-500/10',
                 bgHover: 'group-hover:bg-red-500/20',
                 label: 'MS',
-                icon: <DiMsqlServer className="w-4 h-4 scale-150" />,
+                icon: <DiMsqlServer aria-hidden="true" className="w-4 h-4 scale-150" />,
             };
         case 'clickhouse':
             return {
@@ -65,7 +65,7 @@ const getDbBranding = (type?: string) => {
                 bg: 'bg-yellow-500/10',
                 bgHover: 'group-hover:bg-yellow-500/20',
                 label: 'CH',
-                icon: <SiClickhouse className="w-3.5 h-3.5" />,
+                icon: <SiClickhouse aria-hidden="true" className="w-3.5 h-3.5" />,
             };
         case 'mongodb':
         case 'mongodb+srv':
@@ -74,7 +74,7 @@ const getDbBranding = (type?: string) => {
                 bg: 'bg-green-500/10',
                 bgHover: 'group-hover:bg-green-500/20',
                 label: 'MONGO',
-                icon: <SiMongodb className="w-3.5 h-3.5" />,
+                icon: <SiMongodb aria-hidden="true" className="w-3.5 h-3.5" />,
             };
         case 'redis':
             return {
@@ -82,7 +82,7 @@ const getDbBranding = (type?: string) => {
                 bg: 'bg-red-500/10',
                 bgHover: 'group-hover:bg-red-500/20',
                 label: 'REDIS',
-                icon: <SiRedis className="w-3.5 h-3.5" />,
+                icon: <SiRedis aria-hidden="true" className="w-3.5 h-3.5" />,
             };
         default:
             return {
@@ -235,7 +235,7 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
         <div className="px-0">
             <div className="space-y-2">
                 <Select value={currentConnectionId || ''} onValueChange={handleConnectionChange}>
-                    <SelectTrigger className="w-full h-10 bg-muted/30 border-none ring-1 ring-border/50 hover:ring-blue-500/30 transition-all rounded-xl shadow-inner group">
+                    <SelectTrigger aria-label={text.selectInstance} className="w-full h-10 bg-muted/30 border-none ring-1 ring-border/50 hover:ring-blue-500/30 transition-all rounded-xl shadow-inner group">
                         <div className="flex items-center gap-2.5 truncate">
                             <div className={`w-6 h-6 rounded-lg ${activeBranding.bg} flex items-center justify-center shrink-0 ${activeBranding.bgHover} transition-colors ${activeBranding.color}`}>
                                 {activeBranding.icon}
@@ -341,8 +341,9 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
                             })}
                         </SelectGroup>
                         <div className="p-2 border-t border-border/10 mt-2 bg-muted/10">
-                            <div
-                                className="flex items-center gap-3 px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-blue-500/10 hover:text-blue-600 transition-all cursor-pointer text-muted-foreground/70"
+                            <button
+                                type="button"
+                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground/70 transition-all hover:bg-blue-500/10 hover:text-blue-600"
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     openConnectionDialog();
@@ -350,7 +351,7 @@ export function ConnectionSelector({ filter }: ConnectionSelectorProps) {
                             >
                                 <PlusCircle className="w-4 h-4" />
                                 <span>{text.provisionServer}</span>
-                            </div>
+                            </button>
                         </div>
 
                     </SelectContent>

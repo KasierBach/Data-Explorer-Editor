@@ -20,6 +20,7 @@ import type { AuthUser } from '@/core/services/store/slices/authSlice';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 interface NavUserSectionProps {
+    profileTriggerRef: React.RefObject<HTMLButtonElement | null>;
     user: AuthUser | null;
     logout: () => void;
     isAiPanelOpen: boolean;
@@ -35,7 +36,7 @@ interface NavUserSectionProps {
 }
 
 export const NavUserSection: React.FC<NavUserSectionProps> = ({
-    user, logout, isAiPanelOpen, toggleAiPanel, isMobile, isSmallMobile, 
+    profileTriggerRef, user, logout, isAiPanelOpen, toggleAiPanel, isMobile, isSmallMobile,
     isDesktopModeOnMobile, toggleDesktopModeOnMobile, lang, setActiveProfileTab, setIsProfileOpen, navigate
 }) => {
     const text = getWorkspaceText(lang).navUserSection;
@@ -54,6 +55,7 @@ export const NavUserSection: React.FC<NavUserSectionProps> = ({
                     isAiPanelOpen ? 'text-violet-500 bg-violet-500/10' : 'text-muted-foreground hover:text-violet-500'
                 )}
                 onClick={toggleAiPanel}
+                aria-label={text.aiAssistantTitle}
                 title={text.aiAssistantTitle}
             >
                 <Sparkles className="w-4 h-4" />
@@ -67,6 +69,7 @@ export const NavUserSection: React.FC<NavUserSectionProps> = ({
                         variant="ghost" 
                         size="icon" 
                         className="h-8 w-8"
+                        aria-label={text.settings}
                         onClick={() => { setActiveProfileTab('advanced'); setIsProfileOpen(true); }}
                     >
                         <Settings className="w-4 h-4 text-muted-foreground" />
@@ -75,7 +78,7 @@ export const NavUserSection: React.FC<NavUserSectionProps> = ({
             )}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 overflow-hidden bg-muted hover:bg-muted/80 border border-border/50 transition-all shrink-0 ml-1">
+                    <Button ref={profileTriggerRef} aria-label={text.profile} variant="ghost" className="relative h-9 w-9 rounded-full p-0 overflow-hidden bg-muted hover:bg-muted/80 border border-border/50 transition-all shrink-0 ml-1">
                         {user?.avatarUrl ? (
                             <>
                                 <img 

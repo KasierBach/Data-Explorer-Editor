@@ -14,6 +14,21 @@ describe('csv serialization', () => {
             .toBe('name,"value,raw"\r\nAda,"line\nnext"');
     });
 
+    it('round-trips Unicode, quotes and multiline values while documenting the empty/null collision', async () => {
+        const csv = csvDocument(
+            ['name', 'note', 'empty', 'missing'],
+            [['Nguyễn 🧪', 'quoted "value"\nnext line', '', null]],
+        );
+        const data = new TextEncoder().encode(csv).buffer;
+
+        await expect(parseCsv(data)).resolves.toEqual([{
+            name: 'Nguyễn 🧪',
+            note: 'quoted "value"\nnext line',
+            empty: '',
+            missing: '',
+        }]);
+    });
+
     it('parses quoted CSV fields without splitting embedded commas', async () => {
         const csv = 'name,note\r\nAda,"one,two"';
         const data = new TextEncoder().encode(csv).buffer;

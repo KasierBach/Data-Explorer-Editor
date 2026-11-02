@@ -7,6 +7,15 @@ interface LayoutTabTitleInput {
 
 export function getLayoutText(lang: AppLang | string | null | undefined) {
   return {
+    ai: pickLocalizedText(lang, 'AI', 'AI'),
+    desktop: pickLocalizedText(lang, 'Máy tính', 'Desktop'),
+    explorer: pickLocalizedText(lang, 'Khám phá', 'Explorer'),
+    hideAi: pickLocalizedText(lang, 'Ẩn AI', 'Hide AI'),
+    hideExplorer: pickLocalizedText(lang, 'Ẩn khám phá', 'Hide Explorer'),
+    hideResults: pickLocalizedText(lang, 'Ẩn kết quả', 'Hide Results'),
+    results: pickLocalizedText(lang, 'Kết quả', 'Results'),
+    turnOffDesktopMode: pickLocalizedText(lang, 'Tắt chế độ máy tính', 'Turn off desktop mode'),
+    turnOnDesktopMode: pickLocalizedText(lang, 'Bật chế độ máy tính', 'Turn on desktop mode'),
     ready: pickLocalizedText(lang, 'Sẵn sàng', 'Ready'),
     isolatedNoSqlWorkspace: pickLocalizedText(lang, 'Không gian NoSQL độc lập', 'Isolated NoSQL Workspace'),
     newQuery: pickLocalizedText(lang, 'Truy vấn mới', 'New Query'),
