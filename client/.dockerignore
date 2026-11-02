@@ -1,7 +1,11 @@
 node_modules
 dist
 coverage
-npm-debug.log
+playwright-report
+playwright-full-stack-report
+test-results
+test-results-full-stack
+*.log
 .git
 .gitignore
 .env

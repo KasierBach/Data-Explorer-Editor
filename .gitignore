@@ -4,7 +4,7 @@ dist/
 .env.local
 .DS_Store
 *.log
-package-lock.json
+*.tsbuildinfo
 build/
 coverage/
 .temp/
@@ -17,12 +17,18 @@ agent/
 superpower/
 superpowers/
 mobile-audit/
-/docs/
+/docs/*
+!/docs/README.md
+!/docs/roadmap/
+/docs/archive/local-notes/
 /plans/phase-1-implementation-plan.md
 /plans/team-collaboration-analysis.md
 output/
 plan/
 /tmp/
+/test-results/
+/.zcode/
+/CODEX-HANDOFF.md
 .playwright-cli/
 PROJECT_EXPLANATION.md
 yeucau.md
@@ -30,3 +36,6 @@ yeucau.md
 /plans/
 .vercel
 .env*
+!/.env.example
+!/client/.env.example
+!/server/.env.example
