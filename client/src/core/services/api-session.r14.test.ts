@@ -67,6 +67,50 @@ describe('R14 session refresh ownership', () => {
     vi.unstubAllGlobals();
   });
 
+  it('invalidates stale success after automatic logout and same-user login', async () => {
+    const staleRead = deferred<Response>();
+    fixture.fetch.mockImplementation((url: string) => {
+      if (url.endsWith('/expire')) return Promise.resolve(response(401, { message: 'expired' }));
+      if (url.endsWith('/auth/refresh')) return Promise.resolve(response(401, { message: 'refresh failed' }));
+      return staleRead.promise;
+    });
+
+    const pending = apiService.get('/private-data').catch(error => error);
+    await expect(apiService.get('/expire').catch(error => error)).resolves.toBeInstanceOf(Error);
+    fixture.state.accessToken = 'same-user-new-token';
+    fixture.state.user = { id: 'user-a', email: 'a@example.test' };
+    staleRead.resolve(response(200, { privateValue: 'old-session' }));
+
+    const error = await pending;
+    expect(error).toBeInstanceOf(Error);
+    expect((error as { reason?: string }).reason).toBe('SESSION_CHANGED');
+    expect(fixture.state.accessToken).toBe('same-user-new-token');
+  });
+
+  it('does not replay an old write into a same-user replacement session', async () => {
+    const staleWrite = deferred<Response>();
+    let writeCalls = 0;
+    fixture.fetch.mockImplementation((url: string) => {
+      if (url.endsWith('/query/row')) {
+        writeCalls += 1;
+        return staleWrite.promise;
+      }
+      if (url.endsWith('/expire')) return Promise.resolve(response(401, { message: 'expired' }));
+      if (url.endsWith('/auth/refresh')) return Promise.resolve(response(401, { message: 'refresh failed' }));
+      return Promise.resolve(response(500, {}));
+    });
+
+    const pending = apiService.patch('/query/row', { note: 'old' }).catch(error => error);
+    await expect(apiService.get('/expire').catch(error => error)).resolves.toBeInstanceOf(Error);
+    fixture.state.accessToken = 'same-user-new-token';
+    fixture.state.user = { id: 'user-a', email: 'a@example.test' };
+    staleWrite.resolve(response(401, { message: 'old token expired' }));
+
+    await expect(pending).resolves.toBeInstanceOf(Error);
+    expect(writeCalls).toBe(1);
+    expect(fixture.state.accessToken).toBe('same-user-new-token');
+  });
+
   it('shares one refresh across concurrent expired-token reads', async () => {
     const refresh = deferred<Response>();
     fixture.fetch.mockImplementation((url: string, options: RequestInit) => {

@@ -17,11 +17,20 @@ class ApiService {
   private sessionVersion = 0;
   private isLoggingOut = false;
 
-  beginLogout() {
+  private invalidateSession() {
     this.sessionVersion += 1;
-    this.isLoggingOut = true;
     this.refreshPromise = null;
     this.refreshContext = null;
+  }
+
+  private logoutInvalidSession() {
+    this.invalidateSession();
+    useAppStore.getState().logout({ preserveWorkspace: true });
+  }
+
+  beginLogout() {
+    this.invalidateSession();
+    this.isLoggingOut = true;
   }
 
   endLogout() {
@@ -122,7 +131,7 @@ class ApiService {
           return false;
         }
         if (!response.ok) {
-          useAppStore.getState().logout({ preserveWorkspace: true });
+          this.logoutInvalidSession();
           return false;
         }
 
@@ -136,7 +145,7 @@ class ApiService {
           return false;
         }
         if (!data?.access_token || !data.user) {
-          useAppStore.getState().logout({ preserveWorkspace: true });
+          this.logoutInvalidSession();
           return false;
         }
 
@@ -144,7 +153,7 @@ class ApiService {
         return true;
       } catch {
         if (ownsSession()) {
-          useAppStore.getState().logout({ preserveWorkspace: true });
+          this.logoutInvalidSession();
         }
         return false;
       } finally {
