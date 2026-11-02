@@ -56,6 +56,11 @@ for (const width of [320, 640]) {
         await tabTo(page, page.getByRole('button', { name: 'NoSQL', exact: true }));
         await page.keyboard.press('Enter');
         await expect(page).toHaveURL(/\/nosql-explorer$/);
+        await expect(page.getByRole('heading', {
+          name: lang === 'vi' ? 'Kết nối NoSQL gần đây' : 'Recent NoSQL Connections',
+          exact: true,
+        })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'NoSQL', exact: true })).toHaveAttribute('aria-pressed', 'true');
         await tabTo(page, page.getByRole('button', { name: 'SQL', exact: true }));
         await page.keyboard.press('Enter');
         await expect(page).toHaveURL(/\/sql-explorer$/);

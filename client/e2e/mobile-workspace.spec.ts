@@ -70,7 +70,9 @@ test('mobile workspace controls use the active Vietnamese language', async ({ pa
   });
 
   await page.goto('/sql-explorer');
-  await expect(page.getByRole('button', { name: 'Khám phá', exact: true })).toBeVisible();
+  const explorerButton = page.getByRole('button', { name: 'Khám phá', exact: true });
+  await explorerButton.waitFor({ state: 'visible', timeout: 5_000 });
+  await expect(explorerButton).toBeVisible();
   await expect(page.getByRole('button', { name: 'Kết quả', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Bật chế độ máy tính', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'AI', exact: true })).toBeVisible();

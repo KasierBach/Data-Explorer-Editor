@@ -22,6 +22,7 @@ for (const width of [360, 390, 412, 768, 1024, 1280, 1440]) {
           await page.goto('/sql-explorer');
           const sql = page.getByRole('button', { name: 'SQL', exact: true });
           const noSql = page.getByRole('button', { name: 'NoSQL', exact: true });
+          await sql.waitFor({ state: 'visible', timeout: 5_000 });
           await expect(sql).toBeVisible();
           const header = sql.locator('xpath=ancestor::*[@data-testid="workspace-header"]');
           await expect(header).toBeVisible();
@@ -43,6 +44,7 @@ for (const width of [360, 390, 412, 768, 1024, 1280, 1440]) {
           await expectHeaderGeometry();
           await noSql.click();
           await expect(page).toHaveURL(/\/nosql-explorer$/);
+          await expect(noSql).toHaveAttribute('aria-pressed', 'true');
           await expectHeaderGeometry();
           await page.getByRole('button', { name: 'SQL', exact: true }).click();
           await expect(page).toHaveURL(/\/sql-explorer$/);
