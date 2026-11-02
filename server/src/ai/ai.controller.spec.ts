@@ -101,16 +101,12 @@ describe('AiController', () => {
     connectionServiceMock.getConnectionContextForStream.mockRejectedValueOnce(
       error,
     );
-    const res = {
-      setHeader: jest.fn(),
-      flushHeaders: jest.fn(),
-      write: jest.fn(),
-      end: jest.fn(),
-    };
+    const res =
+      jest.createMockFromModule<typeof import('express')>('express').response;
     await expect(
       controller.generateSqlStream(
         { connectionId: 'conn-1', prompt: 'show tables' },
-        res as Parameters<AiController['generateSqlStream']>[1],
+        res,
         { user: { id: 'user-1' } } as Parameters<
           AiController['generateSqlStream']
         >[2],

@@ -42,6 +42,7 @@ The local API default is `http://localhost:3001/api`.
 | `npm run start:dev`  | Start the NestJS server in watch mode         |
 | `npm run start:prod` | Run the compiled production server            |
 | `npm run build`      | Run Prisma generate safely, then build NestJS |
+| `npm run typecheck`  | Check all TypeScript, including unit/E2E tests; generate Prisma first |
 | `npm run lint`       | Lint server TypeScript files                  |
 | `npm run test`       | Run Jest unit tests                           |
 

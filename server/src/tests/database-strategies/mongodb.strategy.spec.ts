@@ -1,8 +1,10 @@
 import { MongoDbStrategy } from '../../database-strategies/mongodb.strategy';
-import { MongoClient, ObjectId } from 'mongodb';
+import { BSON, Decimal128, MongoClient, ObjectId } from 'mongodb';
 
 jest.mock('mongodb', () => {
+  const actual = jest.requireActual<typeof import('mongodb')>('mongodb');
   return {
+    ...actual,
     MongoClient: jest.fn().mockImplementation(() => ({
       connect: jest.fn(),
       close: jest.fn(),
@@ -242,7 +244,7 @@ describe('MongoDbStrategy', () => {
     });
 
     it('serializes nested ObjectIds in returned documents', async () => {
-      const objectId = { _bsontype: 'ObjectId', toString: () => 'nested-id' };
+      const objectId = new BSON.ObjectId('0123456789abcdef01234567');
       mockCollection.toArray.mockResolvedValue([
         { _id: objectId, nested: { ref: objectId }, refs: [objectId] },
       ]);
@@ -253,16 +255,100 @@ describe('MongoDbStrategy', () => {
       );
 
       expect(result.rows).toEqual([
-        { _id: 'nested-id', nested: { ref: 'nested-id' }, refs: ['nested-id'] },
+        {
+          _id: '0123456789abcdef01234567',
+          nested: { ref: '0123456789abcdef01234567' },
+          refs: ['0123456789abcdef01234567'],
+        },
+      ]);
+    });
+
+    it('keeps ordinary documents with a BSON-looking discriminator intact', async () => {
+      const ordinary = {
+        _bsontype: 'ObjectId',
+        label: 'literal document',
+        nested: { enabled: true },
+      };
+      mockCollection.toArray.mockResolvedValue([
+        {
+          impostor: ordinary,
+          native: new BSON.ObjectId('0123456789abcdef01234567'),
+        },
+      ]);
+
+      const result = await strategy.executeQuery(
+        mockClient,
+        JSON.stringify({ action: 'find', collection: 'test_col' }),
+      );
+
+      expect(result.rows).toEqual([
+        {
+          impostor: ordinary,
+          native: '0123456789abcdef01234567',
+        },
+      ]);
+    });
+
+    it('recognizes compatible BSON brands across package copies without trusting string fields', async () => {
+      const brandedObjectId = Object.create(null) as Record<symbol, unknown> & {
+        toString: () => string;
+      };
+      Object.defineProperties(brandedObjectId, {
+        [Symbol.for('@@mdb.bson.version')]: { value: 7 },
+        [BSON.bsonType]: { value: 'ObjectId' },
+      });
+      brandedObjectId.toString = () => '0123456789abcdef01234567';
+      mockCollection.toArray.mockResolvedValue([{ ref: brandedObjectId }]);
+
+      const result = await strategy.executeQuery(
+        mockClient,
+        JSON.stringify({ action: 'find', collection: 'test_col' }),
+      );
+
+      expect(result.rows).toEqual([{ ref: '0123456789abcdef01234567' }]);
+    });
+
+    it('preserves BSON subtypes without native JSON as structured values', async () => {
+      mockCollection.toArray.mockResolvedValue([
+        {
+          bsonMatcher: new BSON.BSONRegExp('^abc$', 'i'),
+          nativeMatcher: /^xyz$/m,
+        },
+      ]);
+
+      const result = await strategy.executeQuery(
+        mockClient,
+        JSON.stringify({ action: 'find', collection: 'test_col' }),
+      );
+
+      expect(result.rows).toEqual([
+        {
+          bsonMatcher: { pattern: '^abc$', options: 'i' },
+          nativeMatcher: { pattern: '^xyz$', options: 'm' },
+        },
+      ]);
+    });
+
+    it('preserves BSON sentinel identity when no native JSON method exists', async () => {
+      mockCollection.toArray.mockResolvedValue([
+        { minimum: new BSON.MinKey(), maximum: new BSON.MaxKey() },
+      ]);
+
+      const result = await strategy.executeQuery(
+        mockClient,
+        JSON.stringify({ action: 'find', collection: 'test_col' }),
+      );
+
+      expect(result.rows).toEqual([
+        { minimum: { $minKey: 1 }, maximum: { $maxKey: 1 } },
       ]);
     });
 
     it('preserves dates and serializes Decimal128 values without precision loss', async () => {
       const createdAt = new Date('2026-10-26T12:34:56.789Z');
-      const decimal = {
-        _bsontype: 'Decimal128',
-        toString: () => '12345678901234567890.12345678901234',
-      };
+      const decimal = Decimal128.fromString(
+        '12345678901234567890.12345678901234',
+      );
       mockCollection.toArray.mockResolvedValue([
         { createdAt, amount: decimal, nested: { amount: decimal } },
       ]);
@@ -285,6 +371,32 @@ describe('MongoDbStrategy', () => {
       await expect(
         strategy.executeQuery(mockClient, 'INVALID JSON'),
       ).rejects.toThrow();
+    });
+  });
+
+  describe('getSampleRows', () => {
+    it('keeps ordinary BSON-looking documents intact while serializing native values', async () => {
+      const ordinary = { _bsontype: 'ObjectId', label: 'literal document' };
+      mockCollection.toArray.mockResolvedValue([
+        {
+          impostor: ordinary,
+          native: new BSON.ObjectId('0123456789abcdef01234567'),
+        },
+      ]);
+
+      const result = await strategy.getSampleRows(
+        mockClient,
+        'public',
+        'test_col',
+        5,
+      );
+
+      expect(result).toEqual([
+        {
+          impostor: ordinary,
+          native: '0123456789abcdef01234567',
+        },
+      ]);
     });
   });
 

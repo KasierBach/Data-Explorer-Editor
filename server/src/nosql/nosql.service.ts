@@ -123,8 +123,6 @@ export class NoSqlService {
         if (doc[key] === null) type = 'null';
         else if (Array.isArray(doc[key])) type = 'array';
         else if (doc[key] instanceof Date) type = 'date';
-        else if (type === 'object' && doc[key]._bsontype)
-          type = doc[key]._bsontype.toLowerCase();
 
         meta.types[type] = (meta.types[type] || 0) + 1;
 

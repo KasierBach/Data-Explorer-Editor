@@ -21,7 +21,8 @@ describe('R10 Redis cache wiring and lifecycle', () => {
       .filter(Boolean)
       .map(
         (app) =>
-          app.get<Cache>(CACHE_MANAGER).stores[0].opts.store as KeyvRedis,
+          app.get<Cache>(CACHE_MANAGER).stores[0].opts
+            .store as KeyvRedis<unknown>,
       );
     try {
       const keys = await redis.keys(`*${key}*`);

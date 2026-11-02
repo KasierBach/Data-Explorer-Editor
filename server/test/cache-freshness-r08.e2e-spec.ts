@@ -148,7 +148,7 @@ describe('R08 native cache identity, invalidation and authorization', () => {
     await mongo.db(mongoDb).collection('items').deleteMany({});
     await mongo
       .db(mongoDb)
-      .collection('items')
+      .collection<{ _id: number; name?: string; later?: string }>('items')
       .insertMany([
         { _id: 1, name: 'first' },
         { _id: 2, later: 'second' },
@@ -490,6 +490,8 @@ describe('R08 native cache identity, invalidation and authorization', () => {
       expect(await count()).toBe(0);
       expect((await start()).status).toBe('completed');
       expect(await count()).toBe(1);
+      if (!jobId)
+        throw new Error('Completed migration fixture did not retain its jobId');
       await (await queue.getJob(jobId))?.remove();
       jobId = undefined;
       await pg.query(

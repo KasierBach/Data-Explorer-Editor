@@ -73,7 +73,7 @@ describe('R09 durable comments with real PostgreSQL and HTTP permissions', () =>
         },
       })
     ).id;
-    const resources = [];
+    const resources: string[] = [];
     for (const name of ['first', 'target'])
       resources.push(
         (

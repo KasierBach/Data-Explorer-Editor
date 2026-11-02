@@ -1,4 +1,4 @@
-import { MongoClient, ObjectId } from 'mongodb';
+import { BSON, MongoClient, ObjectId } from 'mongodb';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   IDatabaseStrategy,
@@ -17,25 +17,75 @@ import {
   validateNoSqlPayload,
 } from '../common/utils/nosql-sanitizer.util';
 
+const BSON_VERSION = 7;
+const BSON_VERSION_SYMBOL = Symbol.for('@@mdb.bson.version');
+
+type BrandedBsonValue = Record<string | symbol, unknown> & {
+  [BSON_VERSION_SYMBOL]: number;
+  [BSON.bsonType]: BSON.BSONTypeTag;
+};
+
+const isBsonValue = (value: unknown): value is BrandedBsonValue =>
+  typeof value === 'object' &&
+  value !== null &&
+  (value as Record<symbol, unknown>)[BSON_VERSION_SYMBOL] === BSON_VERSION &&
+  typeof (value as Record<symbol, unknown>)[BSON.bsonType] === 'string';
+
 const inferType = (value: unknown): string => {
   if (value === null) return 'null';
   if (Array.isArray(value)) return 'array';
   if (value instanceof Date) return 'date';
-  if (typeof value === 'object') {
-    if ((value as { _bsontype?: string })._bsontype === 'ObjectId')
-      return 'objectId';
-    return 'object';
+  if (value instanceof RegExp) return 'regexp';
+  if (isBsonValue(value)) {
+    const bsonType = value[BSON.bsonType];
+    if (bsonType === 'ObjectId') return 'objectId';
+    return bsonType.toLowerCase();
   }
+  if (typeof value === 'object') return 'object';
   return typeof value;
 };
 
-const serializeMongoValue = (value: any): any => {
+const serializeMongoValue = (value: unknown): unknown => {
   if (value === null || value === undefined) return value;
-  if (value?._bsontype === 'ObjectId') return value.toString();
-  if (value?._bsontype === 'Decimal128') return value.toString();
+  if (typeof value === 'bigint') return value.toString();
   if (Array.isArray(value)) return value.map(serializeMongoValue);
   if (value instanceof Date) return value;
+  if (value instanceof RegExp) {
+    return { pattern: value.source, options: value.flags };
+  }
   if (typeof value === 'object') {
+    if (isBsonValue(value)) {
+      const bsonType = value[BSON.bsonType];
+      const bson = value as BrandedBsonValue & {
+        toBigInt?: () => bigint;
+        toJSON?: () => unknown;
+        toString: () => string;
+      };
+      if (
+        (bsonType === 'ObjectId' || bsonType === 'Decimal128') &&
+        typeof bson.toString === 'function'
+      ) {
+        return bson.toString();
+      }
+      if (bsonType === 'Long' && typeof bson.toBigInt === 'function') {
+        const integer = bson.toBigInt();
+        return integer >= BigInt(Number.MIN_SAFE_INTEGER) &&
+          integer <= BigInt(Number.MAX_SAFE_INTEGER)
+          ? Number(integer)
+          : integer.toString();
+      }
+      if (typeof bson.toJSON === 'function') {
+        return serializeMongoValue(bson.toJSON());
+      }
+      if (bsonType === 'MinKey') return { $minKey: 1 };
+      if (bsonType === 'MaxKey') return { $maxKey: 1 };
+      return Object.fromEntries(
+        Object.entries(bson).map(([key, nested]) => [
+          key,
+          serializeMongoValue(nested),
+        ]),
+      );
+    }
     return Object.fromEntries(
       Object.entries(value).map(([key, nested]) => [
         key,
@@ -552,7 +602,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         typeof value === 'object' &&
         !Array.isArray(value) &&
         !(value instanceof Date) &&
-        value._bsontype !== 'ObjectId'
+        !(value instanceof RegExp)
       ) {
         for (const key of Object.keys(value)) {
           if (colsMap.size >= MAX_COLUMNS) break;
@@ -560,8 +610,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         }
       } else if (type === 'array' && Array.isArray(value) && value.length > 0) {
         const firstObj = value.find(
-          (item: any) =>
-            item && typeof item === 'object' && !Array.isArray(item),
+          (item: unknown) => item !== null && inferType(item) === 'object',
         );
         if (firstObj) {
           for (const key of Object.keys(firstObj)) {
@@ -829,8 +878,9 @@ export class MongoDbStrategy implements IDatabaseStrategy {
     return rows.map((row) => {
       const cleanRow = { ...row };
       for (const key of Object.keys(cleanRow)) {
-        if (cleanRow[key]?._bsontype === 'ObjectId') {
-          cleanRow[key] = cleanRow[key].toString();
+        const value = cleanRow[key];
+        if (isBsonValue(value) && value[BSON.bsonType] === 'ObjectId') {
+          cleanRow[key] = serializeMongoValue(value);
         }
       }
       return cleanRow;

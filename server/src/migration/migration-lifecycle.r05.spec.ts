@@ -7,6 +7,7 @@ import type { DatabaseStrategyFactory } from '../database-strategies/strategy.fa
 import type { Job, Queue } from 'bullmq';
 import { MigrationController } from './migration.controller';
 import type { TokenService } from '../auth/token.service';
+import type { IDatabaseStrategy } from '../database-strategies/database-strategy.interface';
 
 function setup() {
   const dto = {
@@ -41,7 +42,10 @@ function setup() {
     createPool: jest.fn(async () => targetPool),
     closePool: jest.fn(async () => {}),
     getFullMetadata: jest.fn(async () => ({ columns, indices: [] })),
-    importData: jest.fn(async () => ({ success: true, rowCount: 2 })),
+    importData: jest.fn<
+      ReturnType<IDatabaseStrategy['importData']>,
+      Parameters<IDatabaseStrategy['importData']>
+    >(async () => ({ success: true, rowCount: 2 })),
   };
   const connections = {
     getDecryptedConnection: jest.fn(async (id: string) => ({

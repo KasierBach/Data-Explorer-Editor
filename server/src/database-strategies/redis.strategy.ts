@@ -112,16 +112,36 @@ export class RedisStrategy implements IDatabaseStrategy {
 
     // SCAN-based browsing with pagination.
     if (command === 'SCAN' || command === 'KEYS') {
-      const pattern = args.find((a) => a.includes('*')) ?? '*';
-      const keys = await this.scanKeys(client, pattern, limit + offset);
+      if (
+        !Number.isSafeInteger(limit) ||
+        limit < 1 ||
+        !Number.isSafeInteger(offset) ||
+        offset < 0 ||
+        !Number.isSafeInteger(limit + offset + 1)
+      ) {
+        throw new BadRequestException('Invalid Redis key page bounds.');
+      }
+      const scan = this.parseKeyScan(command, args);
+      const { keys, totalCount } = await this.scanKeys(
+        client,
+        scan.pattern,
+        limit + offset + 1,
+        scan,
+      );
       const page = keys.slice(offset, offset + limit);
+      const hasNextPage = keys.length > offset + limit;
       return {
         rows: page.map((key) => ({ key })),
         columns: ['key'],
         rowCount: page.length,
-        totalCount: keys.length,
-        hasNextPage: offset + limit < keys.length,
-        countStatus: 'available',
+        ...(totalCount !== undefined ? { totalCount } : {}),
+        hasNextPage,
+        truncated: hasNextPage || undefined,
+        countStatus: totalCount !== undefined ? 'available' : 'unavailable',
+        appliedLimit: limit,
+        appliedOffset: offset,
+        limitSource:
+          options?.limit !== undefined ? 'requested' : 'protective_default',
       };
     }
 
@@ -265,7 +285,7 @@ export class RedisStrategy implements IDatabaseStrategy {
 
   async getTables(pool: unknown, schema: string): Promise<TreeNodeResult[]> {
     const client = pool as Redis;
-    const keys = await this.scanKeys(client, '*', MAX_SCAN_COUNT);
+    const { keys } = await this.scanKeys(client, '*', MAX_SCAN_COUNT);
     return keys.map((key) => ({
       id: `${schema}:${key}`,
       name: key,
@@ -442,26 +462,73 @@ export class RedisStrategy implements IDatabaseStrategy {
     return JSON.stringify(value);
   }
 
+  private parseKeyScan(command: string, args: string[]) {
+    if (command === 'KEYS') {
+      if (args.length !== 1) {
+        throw new BadRequestException('KEYS requires exactly one pattern.');
+      }
+      return { pattern: args[0], cursor: '0', count: 100, type: undefined };
+    }
+    const cursor = args[0];
+    if (!cursor || !/^\d+$/.test(cursor) || (args.length - 1) % 2 !== 0) {
+      throw new BadRequestException(
+        'SCAN requires a cursor and valid option pairs.',
+      );
+    }
+    let pattern = '*';
+    let count = 100;
+    let type: string | undefined;
+    for (let index = 1; index < args.length; index += 2) {
+      const option = args[index].toUpperCase();
+      const value = args[index + 1];
+      if (option === 'MATCH') {
+        pattern = value;
+      } else if (
+        option === 'COUNT' &&
+        /^\d+$/.test(value) &&
+        Number.isSafeInteger(Number(value)) &&
+        Number(value) > 0
+      ) {
+        count = Math.min(Number(value), MAX_SCAN_COUNT);
+      } else if (option === 'TYPE') {
+        type = value;
+      } else {
+        throw new BadRequestException(
+          'Invalid SCAN option; use MATCH, positive COUNT or TYPE.',
+        );
+      }
+    }
+    return { pattern, cursor, count, type };
+  }
+
   /** SCAN a pattern without blocking the server (never use KEYS in prod). */
   private async scanKeys(
     client: Redis,
     pattern: string,
     max: number,
-  ): Promise<string[]> {
-    const keys: string[] = [];
-    let cursor = '0';
+    options: { cursor?: string; count?: number; type?: string } = {},
+  ): Promise<{ keys: string[]; totalCount?: number }> {
+    const keys = new Set<string>();
+    let cursor = options.cursor ?? '0';
+    const fromStart = /^0+$/.test(cursor);
+    const scanArgs: ['MATCH', string, 'COUNT', number] = [
+      'MATCH',
+      pattern,
+      'COUNT',
+      options.count ?? 100,
+    ];
     do {
-      const [next, batch] = await client.scan(
-        cursor,
-        'MATCH',
-        pattern,
-        'COUNT',
-        100,
-      );
+      const [next, batch] =
+        options.type === undefined
+          ? await client.scan(cursor, ...scanArgs)
+          : await client.scan(cursor, ...scanArgs, 'TYPE', options.type);
       cursor = next;
-      keys.push(...batch);
-    } while (cursor !== '0' && keys.length < max);
-    return keys.slice(0, max);
+      for (const key of batch) keys.add(key);
+    } while (cursor !== '0' && keys.size < max);
+    return {
+      keys: [...keys].slice(0, max),
+      ...(fromStart && cursor === '0' ? { totalCount: keys.size } : {}),
+    };
   }
 
   private async readKeyValue(

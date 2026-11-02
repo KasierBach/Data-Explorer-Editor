@@ -140,4 +140,29 @@ describe('NoSqlService security', () => {
       }),
     );
   });
+
+  it('treats an ordinary object with a BSON-looking field as an object', async () => {
+    const strategy = {
+      executeQuery: jest.fn().mockResolvedValue({
+        rows: [{ impostor: { _bsontype: 'ObjectId', label: 'literal' } }],
+      }),
+    };
+    redisMock.get.mockResolvedValueOnce(null);
+    connectionsMock.getPool.mockResolvedValueOnce({});
+    strategyFactoryMock.getStrategy.mockReturnValue(strategy);
+
+    const result = await service.analyzeSchema({
+      connectionId: 'conn-1',
+      database: 'analytics',
+      collection: 'events',
+      userId: 'user-1',
+    });
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        name: 'impostor',
+        types: { object: 1 },
+      }),
+    ]);
+  });
 });
