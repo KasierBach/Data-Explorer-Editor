@@ -1,5 +1,6 @@
 export class Connection {
   id: string;
+  userId: string;
   name: string;
   type:
     | 'postgres'
@@ -31,6 +32,8 @@ export class Connection {
   lastConnectionLatencyMs?: number | null;
   createdAt: Date;
   organizationId?: string | null;
+  allowedDatabases?: unknown;
+  roleQueryModes?: unknown;
   sshHost?: string | null;
   sshPort?: number;
   sshUsername?: string | null;

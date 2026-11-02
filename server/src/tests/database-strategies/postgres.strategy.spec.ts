@@ -1,5 +1,6 @@
 import { PostgresStrategy } from '../../database-strategies/postgres.strategy';
 import { Pool } from 'pg';
+import { EventEmitter } from 'node:events';
 
 // These specs assert verified TLS; the default env accepts self-signed certs.
 process.env.ALLOW_INSECURE_DATABASE_TLS = 'false';
@@ -22,10 +23,10 @@ describe('PostgresStrategy', () => {
 
   beforeEach(() => {
     strategy = new PostgresStrategy();
-    mockClient = {
+    mockClient = Object.assign(new EventEmitter(), {
       query: jest.fn(),
       release: jest.fn(),
-    };
+    });
     mockPool = new Pool();
     mockPool.connect.mockResolvedValue(mockClient);
     (Pool as unknown as jest.Mock).mockClear();
@@ -137,7 +138,7 @@ describe('PostgresStrategy', () => {
 
     it('escapes delimiter characters in table and column identifiers', async () => {
       const quote = String.fromCharCode(34);
-      mockPool.query.mockResolvedValue({ rowCount: 1 });
+      mockClient.query.mockResolvedValue({ rowCount: 1 });
 
       await strategy.updateRow(mockPool, {
         schema: 'public',
@@ -147,7 +148,7 @@ describe('PostgresStrategy', () => {
         updates: { ['display' + quote + 'name']: 'Ada' },
       });
 
-      expect(mockPool.query).toHaveBeenCalledWith(
+      expect(mockClient.query).toHaveBeenCalledWith(
         'UPDATE ' +
           quote +
           'public' +
@@ -166,14 +167,14 @@ describe('PostgresStrategy', () => {
           quote +
           'name' +
           quote +
-          ' = $1 WHERE ' +
+          ' = $1 WHERE (' +
           quote +
           'id' +
           quote +
           quote +
           ' OR 1=1 --' +
           quote +
-          ' = $2',
+          ' = $2)',
         ['Ada', 1],
       );
     });

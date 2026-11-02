@@ -1,15 +1,13 @@
-import { Test } from '@nestjs/testing';
 import Database from 'better-sqlite3';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import * as bcrypt from 'bcryptjs';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 
-import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { TransformInterceptor } from '../src/common/interceptors/transform.interceptor';
+import { createE2eApp, closeE2eApp } from './e2e-app';
 
 /**
  * End-to-end tests that boot the full AppModule against real infrastructure:
@@ -22,7 +20,7 @@ import { TransformInterceptor } from '../src/common/interceptors/transform.inter
  * rollback), and saved queries.
  */
 
-describe('App (e2e)', () => {
+describe('App (full-stack e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let accessToken: string;
@@ -37,21 +35,7 @@ describe('App (e2e)', () => {
   const csrfHeader = { 'x-requested-with': 'XMLHttpRequest' };
 
   beforeAll(async () => {
-    const moduleFixture = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-        forbidNonWhitelisted: true,
-      }),
-    );
-    app.useGlobalInterceptors(new TransformInterceptor());
-    await app.init();
+    app = await createE2eApp();
 
     prisma = app.get(PrismaService);
 
@@ -87,21 +71,18 @@ describe('App (e2e)', () => {
 
   afterAll(async () => {
     try {
-      if (connectionId) {
+      if (prisma && connectionId) {
         await prisma.connection.deleteMany({ where: { id: connectionId } });
       }
-      await prisma.user.deleteMany({ where: { email: testEmail } });
-    } catch {
-      // best-effort cleanup
-    }
-    try {
-      if (sqliteDbPath && fs.existsSync(sqliteDbPath)) {
-        fs.unlinkSync(sqliteDbPath);
+      if (prisma) await prisma.user.deleteMany({ where: { email: testEmail } });
+    } finally {
+      try {
+        if (app) await closeE2eApp(app);
+      } finally {
+        if (sqliteDbPath && fs.existsSync(sqliteDbPath))
+          fs.unlinkSync(sqliteDbPath);
       }
-    } catch {
-      // best-effort cleanup
     }
-    await app.close();
   }, 120_000);
 
   // ─── Health ───

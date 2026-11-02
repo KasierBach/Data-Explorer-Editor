@@ -168,12 +168,6 @@ export class AiController {
       fallbackProvider,
     } = body;
 
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders();
-
     const ctx = await this.connectionService.getConnectionContextForStream(
       connectionId,
       database,
@@ -182,14 +176,11 @@ export class AiController {
         this.aiService.gatherSchemaContext(pool, strategy, db, connId, prompt),
     );
 
-    if (!ctx) {
-      res.write(
-        `data: ${JSON.stringify({ type: 'error', text: 'Connection not found' })}\n\n`,
-      );
-      res.write('data: [DONE]\n\n');
-      res.end();
-      return;
-    }
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
 
     try {
       const stream = this.aiService.chatStream({

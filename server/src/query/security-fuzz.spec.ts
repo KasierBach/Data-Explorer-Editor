@@ -110,12 +110,11 @@ describe('Property-based fuzzing — SQL guard', () => {
       fc.property(
         readKeyword,
         writeKeyword,
-        // Filler must not contain comment markers or semicolons: a "--"
-        // filler would comment out the write statement (making it safe),
-        // which is correct behavior, not a bypass.
-        fc.string({ maxLength: 50 }).filter((s) => !/[;]|--|\/\*|\*\//.test(s)),
+        fc.string({ maxLength: 50 }),
         (read, write, filler) => {
-          const sql = `${read} ${filler}; ${write} ${filler}`;
+          // Keep arbitrary data inside a closed literal, so the generated write is executable code.
+          const literal = `'${filler.replace(/'/g, "''")}'`;
+          const sql = `${read} ${literal}; ${write} ${literal}`;
           expect(isSqlAllowedOnReadOnly(sql)).toBe(false);
         },
       ),
@@ -123,36 +122,41 @@ describe('Property-based fuzzing — SQL guard', () => {
     );
   });
 
-  // Invariant 4: normalizeSql output never contains a complete block
-  // comment pair — comments are always stripped, so hidden keywords
-  // cannot survive normalization. (A stray "*/" without an opener is
-  // inert garbage, not a comment.)
-  it('normalizeSql always strips complete block comments', () => {
+  it('normalizeSql removes actual comments while preserving quoted data, or explicitly rejects unsupported quoting', () => {
     fc.assert(
       fc.property(
         fc.string({ maxLength: 80 }),
         fc.string({ maxLength: 80 }),
         (before, after) => {
-          const commented = `${before}/*${after}*/${after}`;
-          const normalized = normalizeSql(commented);
-          expect(normalized).not.toMatch(/\/\*[\s\S]*?\*\//);
+          const plain = `SELECT '${before.replace(/'/g, "''")}' '${after.replace(/'/g, "''")}'`;
+          const commented = plain.replace(
+            'SELECT ',
+            'SELECT /* actual comment */ ',
+          );
+          try {
+            expect(normalizeSql(commented)).toBe(
+              plain.replace(/\s+/g, ' ').trim(),
+            );
+          } catch (error) {
+            expect(error).toBeInstanceOf(RangeError);
+            expect(isSqlAllowedOnReadOnly(commented)).toBe(false);
+          }
         },
       ),
       { numRuns: 500 },
     );
   });
 
-  // Invariant 5: splitSqlStatements never produces empty statements and
-  // never throws for arbitrary input.
-  it('splitSqlStatements is total and produces no empty statements', () => {
+  it('splitSqlStatements produces nonempty statements or an explicit fail-closed syntax error', () => {
     fc.assert(
       fc.property(fc.string({ maxLength: 300 }), (input) => {
-        let statements: string[];
-        expect(() => {
-          statements = splitSqlStatements(input);
-        }).not.toThrow();
-        for (const statement of statements!) {
-          expect(statement.trim().length).toBeGreaterThan(0);
+        try {
+          for (const statement of splitSqlStatements(input)) {
+            expect(statement.trim().length).toBeGreaterThan(0);
+          }
+        } catch (error) {
+          expect(error).toBeInstanceOf(RangeError);
+          expect(isSqlAllowedOnReadOnly(input)).toBe(false);
         }
       }),
       { numRuns: 500 },
@@ -169,7 +173,12 @@ describe('Property-based fuzzing — SQL guard', () => {
           'a'.repeat(fillerLen) +
           '*/'.repeat(nestCount);
         const start = Date.now();
-        normalizeSql(payload);
+        try {
+          normalizeSql(payload);
+        } catch (error) {
+          expect(error).toBeInstanceOf(RangeError);
+          expect(isSqlAllowedOnReadOnly(payload)).toBe(false);
+        }
         expect(Date.now() - start).toBeLessThan(500);
       }),
       { numRuns: 200 },

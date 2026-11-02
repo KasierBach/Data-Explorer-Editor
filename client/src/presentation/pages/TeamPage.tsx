@@ -255,7 +255,7 @@ export function TeamPage() {
   }, [selectedOrgId]);
 
   async function handleExportBackup() {
-    if (!selectedOrg) return;
+    if (!selectedOrg || !canManage) return;
 
     setBackupLoading(true);
     try {
@@ -272,7 +272,7 @@ export function TeamPage() {
   }
 
   async function handleRestoreBackup() {
-    if (!selectedOrg || !backupJson.trim()) return;
+    if (!selectedOrg || !canManage || !backupJson.trim()) return;
 
     setBackupRestoring(true);
     setBackupSummary(null);
@@ -817,7 +817,7 @@ export function TeamPage() {
                     </div>
                   )}
 
-                  {activeTab === 'backups' && (
+                  {activeTab === 'backups' && (canManage ? (
                     <div className="overflow-hidden rounded-lg border">
                       <div className="grid gap-4 p-4 lg:grid-cols-[1fr_1.2fr]">
                         <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
@@ -833,7 +833,7 @@ export function TeamPage() {
                             <li>{text.backupRestoreDetails}</li>
                             <li>{text.backupReviewWarning}</li>
                           </ul>
-                          <Button type="button" onClick={handleExportBackup} disabled={backupLoading}>
+                          <Button type="button" className="min-h-11" onClick={handleExportBackup} disabled={backupLoading}>
                             {backupLoading ? text.exporting : text.exportBackupButton}
                           </Button>
                         </div>
@@ -847,16 +847,17 @@ export function TeamPage() {
                             {text.restoreBackupDescription}
                           </p>
                           <Textarea
+                            aria-label={text.restoreBackup}
                             value={backupJson}
                             onChange={(event) => setBackupJson(event.target.value)}
                             placeholder={text.backupJsonPlaceholder}
                             className="min-h-56 font-mono text-xs"
                           />
                           <div className="flex flex-wrap items-center gap-2">
-                            <Button type="button" variant="outline" onClick={() => setBackupJson('')} disabled={!backupJson}>
+                            <Button type="button" className="min-h-11" variant="outline" onClick={() => setBackupJson('')} disabled={!backupJson}>
                               {text.clear}
                             </Button>
-                            <Button type="button" onClick={handleRestoreBackup} disabled={!backupJson.trim() || backupRestoring}>
+                            <Button type="button" className="min-h-11" onClick={handleRestoreBackup} disabled={!backupJson.trim() || backupRestoring}>
                               {backupRestoring ? text.restoring : text.restoreBackupButton}
                             </Button>
                           </div>
@@ -878,7 +879,9 @@ export function TeamPage() {
                         </div>
                       </div>
                     </div>
-                  )}
+                  ) : (
+                    <p className="rounded-lg border p-4 text-sm text-muted-foreground">{text.backupAccessRequired}</p>
+                  ))}
 
                   {activeTab === 'activity' && (
                     <div className="overflow-hidden rounded-lg border">

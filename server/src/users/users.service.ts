@@ -62,26 +62,32 @@ export class UsersService {
       user.planExpiresAt &&
       user.planExpiresAt <= new Date()
     ) {
-      const [expiredUser] = await this.prisma.$transaction([
-        this.prisma.user.update({
-          where: { id },
+      const now = new Date();
+      return this.prisma.$transaction(async (tx) => {
+        // Recheck expiry after acquiring the row lock; a payment may have renewed it meanwhile.
+        await tx.user.updateMany({
+          where: { id, plan: 'pro', planExpiresAt: { lte: now } },
           data: {
             plan: 'free',
             billingDate: null,
             subscriptionStatus: 'expired',
           },
-          select: USER_PROFILE_SELECT,
-        }),
-        this.prisma.billingSubscription.updateMany({
+        });
+        await tx.billingSubscription.updateMany({
           where: {
             userId: id,
             status: 'active',
-            expiresAt: { lte: new Date() },
+            expiresAt: { lte: now },
           },
           data: { status: 'expired' },
-        }),
-      ]);
-      return expiredUser;
+        });
+        const currentUser = await tx.user.findUnique({
+          where: { id },
+          select: USER_PROFILE_SELECT,
+        });
+        if (!currentUser) throw new NotFoundException('User not found');
+        return currentUser;
+      });
     }
 
     return user;

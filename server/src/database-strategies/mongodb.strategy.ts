@@ -10,6 +10,7 @@ import {
   DatabaseMetrics,
   UpdateRowParams,
   InsertRowParams,
+  QueryExecutionOptions,
 } from './database-strategy.interface';
 import {
   sanitizeNoSql,
@@ -774,7 +775,10 @@ export class MongoDbStrategy implements IDatabaseStrategy {
     return [];
   }
 
-  async seedData(client: MongoClient): Promise<QueryResult> {
+  async seedData(
+    client: MongoClient,
+    options?: QueryExecutionOptions,
+  ): Promise<QueryResult> {
     const db = client.db();
     const usersCol = db.collection('users');
     const productsCol = db.collection('products');
@@ -794,6 +798,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
           created_at: new Date(),
         },
       ]);
+      await options?.onMutation?.();
     }
 
     const existingProducts = await productsCol.countDocuments();
@@ -803,6 +808,7 @@ export class MongoDbStrategy implements IDatabaseStrategy {
         { name: 'Mouse', price: 25.5, stock: 100 },
         { name: 'Keyboard', price: 50.0, stock: 50 },
       ]);
+      await options?.onMutation?.();
     }
 
     return {

@@ -17,6 +17,7 @@ import { StartMigrationDto } from './dto/start-migration.dto';
 import { getErrorMessage } from '../common/utils/error.util';
 import { MigrationComparisonService } from './migration-comparison.service';
 import { Permission } from '../permissions/enums/permission.enum';
+import { FreshnessService } from '../common/freshness/freshness.service';
 import {
   isRetryableMigrationBatchError,
   planMigrationBatchSizing,
@@ -27,7 +28,6 @@ import {
   type MigrationStage,
   type MigrationJob,
   type StoredMigrationJob,
-  type MigrationProgress,
   type MigrationStream,
   type ResolvedMigrationContext,
   type MigrationColumnDiff,
@@ -54,6 +54,7 @@ export class MigrationService {
     private dbStrategiesFactory: DatabaseStrategyFactory,
     private comparisonService: MigrationComparisonService,
     @InjectQueue('migration') private migrationQueue: Queue,
+    private readonly freshnessService: FreshnessService,
   ) {}
 
   async onModuleInit() {
@@ -97,17 +98,20 @@ export class MigrationService {
     const job = await this.assertJobOwnership(jobId, userId);
 
     const state = await job.getState();
-    const progress = job.progress as MigrationProgress | undefined;
+    const progress = job.progress as Partial<MigrationJob> | undefined;
 
     return {
       id: job.id!,
-      status: this.mapBullStatus(state),
+      status:
+        state === 'active' && progress?.status
+          ? progress.status
+          : this.mapBullStatus(state),
       stage:
         progress?.stage ||
         (state === 'waiting' || state === 'delayed' ? 'queued' : 'streaming'),
       processedRows: progress?.processedRows || 0,
       batchesProcessed: progress?.batchesProcessed || 0,
-      error: job.failedReason,
+      error: job.failedReason || progress?.error,
     };
   }
 
@@ -163,12 +167,12 @@ export class MigrationService {
   }
 
   private async failJob(jobId: string, error: string) {
-    const job = await this.migrationQueue.getJob(jobId);
-    if (job) await job.moveToFailed(new Error(error), 'token-if-needed');
+    await this.updateJob(jobId, { status: 'failed', stage: 'failed', error });
   }
 
-  /** No-op: BullMQ handles completion via worker return value automatically. */
-  private async completeJob(_jobId: string) {}
+  private async completeJob(jobId: string) {
+    await this.markStage(jobId, 'completed', 'completed');
+  }
 
   private buildMigrationConnectionConfig(
     conn: MigrationConnection,
@@ -236,86 +240,97 @@ export class MigrationService {
     const targetStrategy = this.dbStrategiesFactory.getStrategy(
       targetConn.type,
     );
-    const sourcePool = await sourceStrategy.createPool(
-      this.buildMigrationConnectionConfig(sourceConn),
-    );
-    const targetPool = await targetStrategy.createPool(
-      this.buildMigrationConnectionConfig(targetConn),
-    );
-
-    if (jobId) {
-      await this.markStage(jobId, 'preflight');
-    }
-
-    const sourceSchema = this.comparisonService.normalizeSchemaName(
-      sourceConn.type,
-      dto.sourceSchema,
-    );
-    const targetSchema = this.comparisonService.normalizeSchemaName(
-      targetConn.type,
-      dto.targetSchema,
-    );
-    const sourceTable = this.comparisonService.normalizeTableName(
-      dto.sourceTable,
-    );
-    const targetTable = this.comparisonService.normalizeTableName(
-      dto.targetTable,
-    );
-
-    const sourceMetadata = await sourceStrategy.getFullMetadata(
-      sourcePool,
-      sourceSchema,
-      sourceTable,
-      sourceConn.database || undefined,
-    );
-
-    if (!sourceMetadata?.columns || sourceMetadata.columns.length === 0) {
-      throw new Error(
-        'Source table or collection could not be validated. Check schema, table name, and permissions.',
-      );
-    }
-
-    const targetMetadata = await targetStrategy
-      .getFullMetadata(
-        targetPool,
-        targetSchema,
-        targetTable,
-        targetConn.database || undefined,
-      )
-      .catch((error) => {
-        if (strict) {
-          throw error;
-        }
-
-        this.logger.warn(
-          `Migration preview target metadata unavailable: ${getErrorMessage(error)}`,
-        );
-        return {
-          columns: [],
-          indices: [],
-          rowCount: undefined,
-        } as FullTableMetadata;
-      });
-
-    if (strict) {
-      this.comparisonService.validateTargetCompatibility(
-        sourceConn,
-        targetConn,
-        sourceMetadata,
-        targetMetadata,
-      );
-    }
-
-    return {
-      sourceConn,
-      targetConn,
+    const partialContext: Partial<ResolvedMigrationContext> = {
       sourceStrategy,
       targetStrategy,
-      sourcePool,
-      targetPool,
-      sourceMetadata,
-      targetMetadata,
     };
+    try {
+      const sourcePool = await sourceStrategy.createPool(
+        this.buildMigrationConnectionConfig(sourceConn),
+      );
+      partialContext.sourcePool = sourcePool;
+      const targetPool = await targetStrategy.createPool(
+        this.buildMigrationConnectionConfig(targetConn),
+      );
+      partialContext.targetPool = targetPool;
+
+      if (jobId) {
+        await this.markStage(jobId, 'preflight');
+      }
+
+      const sourceSchema = this.comparisonService.normalizeSchemaName(
+        sourceConn.type,
+        dto.sourceSchema,
+      );
+      const targetSchema = this.comparisonService.normalizeSchemaName(
+        targetConn.type,
+        dto.targetSchema,
+      );
+      const sourceTable = this.comparisonService.normalizeTableName(
+        dto.sourceTable,
+      );
+      const targetTable = this.comparisonService.normalizeTableName(
+        dto.targetTable,
+      );
+
+      const sourceMetadata = await sourceStrategy.getFullMetadata(
+        sourcePool,
+        sourceSchema,
+        sourceTable,
+        sourceConn.database || undefined,
+      );
+
+      if (!sourceMetadata?.columns || sourceMetadata.columns.length === 0) {
+        throw new Error(
+          'Source table or collection could not be validated. Check schema, table name, and permissions.',
+        );
+      }
+
+      const targetMetadata = await targetStrategy
+        .getFullMetadata(
+          targetPool,
+          targetSchema,
+          targetTable,
+          targetConn.database || undefined,
+        )
+        .catch((error) => {
+          if (strict) {
+            throw error;
+          }
+
+          this.logger.warn(
+            `Migration preview target metadata unavailable: ${getErrorMessage(error)}`,
+          );
+          return {
+            columns: [],
+            indices: [],
+            rowCount: undefined,
+          } as FullTableMetadata;
+        });
+
+      if (strict) {
+        this.comparisonService.validateTargetCompatibility(
+          sourceConn,
+          targetConn,
+          sourceMetadata,
+          targetMetadata,
+        );
+      }
+
+      return {
+        sourceConn,
+        targetConn,
+        sourceStrategy,
+        targetStrategy,
+        sourcePool,
+        targetPool,
+        sourceMetadata,
+        targetMetadata,
+      };
+    } catch (error) {
+      await this.closeResources(partialContext);
+      throw error;
+    }
   }
 
   async previewMigration(
@@ -357,6 +372,16 @@ export class MigrationService {
     let context: Partial<ResolvedMigrationContext> | undefined;
 
     try {
+      const job = await this.assertJobOwnership(jobId, userId);
+      const previousProgress = job.progress as
+        | Partial<MigrationJob>
+        | undefined;
+      // shortcut: transfer has no resume checkpoint; a stalled/retried job must never append twice.
+      if (previousProgress?.stage && previousProgress.stage !== 'queued') {
+        throw new Error(
+          'Interrupted migrations cannot be restarted safely. Inspect the target before starting a new transfer.',
+        );
+      }
       context = await this.resolveMigrationContext(userId, dto, {
         jobId,
         strict: true,
@@ -381,7 +406,7 @@ export class MigrationService {
       let currentBatchSize = batchPlan.recommendedBatchSize;
       let batchPlanHydrated = false;
       let buffer: Record<string, unknown>[] = [];
-      let isPaused = false;
+      let failed = false;
 
       const hydrateBatchPlan = (sampleRow: Record<string, unknown>) => {
         if (batchPlanHydrated) return;
@@ -407,35 +432,29 @@ export class MigrationService {
           let attemptSize = Math.min(currentBatchSize, remainingRows.length);
 
           while (true) {
+            if (failed) return;
             const batch = remainingRows.slice(0, attemptSize);
-
+            let imported: { success: boolean; rowCount: number };
             try {
-              await context!.targetStrategy!.importData(context!.targetPool, {
-                schema: this.comparisonService.normalizeSchemaName(
-                  context!.targetConn!.type,
-                  dto.targetSchema,
-                ),
-                table: this.comparisonService.normalizeTableName(
-                  dto.targetTable,
-                ),
-                data: batch,
-              });
-
-              await this.updateJob(jobId, (job) => {
-                job.processedRows += batch.length;
-                job.batchesProcessed += 1;
-              });
-
-              this.logger.verbose(
-                `Migration ${jobId}: flushed ${batch.length} rows (batch size ${attemptSize})`,
+              imported = await context!.targetStrategy!.importData(
+                context!.targetPool,
+                {
+                  schema: this.comparisonService.normalizeSchemaName(
+                    context!.targetConn!.type,
+                    dto.targetSchema,
+                  ),
+                  table: this.comparisonService.normalizeTableName(
+                    dto.targetTable,
+                  ),
+                  data: batch,
+                },
               );
-              currentBatchSize = Math.max(
-                batchPlan.minimumBatchSize,
-                attemptSize,
-              );
-              cursor += batch.length;
-              break;
             } catch (error) {
+              await this.freshnessService.invalidatePartialWrite(
+                error,
+                dto.targetConnectionId,
+                context!.targetConn!.database,
+              );
               if (
                 !isRetryableMigrationBatchError(error) ||
                 attemptSize <= batchPlan.minimumBatchSize
@@ -454,7 +473,41 @@ export class MigrationService {
 
               attemptSize = reducedBatchSize;
               currentBatchSize = reducedBatchSize;
+              continue;
             }
+            if (
+              Number.isInteger(imported.rowCount) &&
+              imported.rowCount > 0 &&
+              imported.rowCount <= batch.length
+            ) {
+              await this.updateJob(jobId, (job) => {
+                job.processedRows += imported.rowCount;
+                job.batchesProcessed += 1;
+              });
+            }
+            if (imported.rowCount > 0) {
+              await this.freshnessService.invalidateConnection(
+                dto.targetConnectionId,
+                context!.targetConn!.database,
+              );
+            }
+            if (
+              imported.success === false ||
+              imported.rowCount !== batch.length
+            ) {
+              throw new Error(
+                `Target imported ${imported.rowCount} of ${batch.length} rows. Inspect the target before starting another transfer.`,
+              );
+            }
+            this.logger.verbose(
+              `Migration ${jobId}: flushed ${batch.length} rows (batch size ${attemptSize})`,
+            );
+            currentBatchSize = Math.max(
+              batchPlan.minimumBatchSize,
+              attemptSize,
+            );
+            cursor += batch.length;
+            break;
           }
         }
       };
@@ -464,88 +517,69 @@ export class MigrationService {
         buffer.push(chunk);
         if (buffer.length < currentBatchSize) return;
 
-        if (typeof stream.pause === 'function' && !isPaused) {
-          isPaused = true;
-          stream.pause();
-        }
-
-        try {
-          await flushBuffer();
-        } catch (error) {
-          if (error instanceof Error) {
-            stream.emit('error', error);
-          }
-          return;
-        }
-
-        if (typeof stream.resume === 'function' && isPaused) {
-          isPaused = false;
-          stream.resume();
-        }
-      };
-
-      const handleTerminalFailure = async (error: unknown) => {
-        this.logger.error(`Stream error in migration ${jobId}`, error);
-        const message =
-          error instanceof Error ? error.message : 'Migration stream failed.';
-        await this.failJob(jobId, message);
+        await flushBuffer();
       };
 
       if (typeof stream.on === 'function') {
         const eventStream = stream as any;
-        await new Promise<void>((resolve) => {
+        await new Promise<void>((resolve, reject) => {
           let processing = Promise.resolve();
           let settled = false;
+          let ended = false;
 
-          const finish = () => {
+          const finish = (error?: Error) => {
             if (settled) return;
             settled = true;
             cleanup();
-            resolve();
-          };
-
-          const enqueueChunk = (chunk: Record<string, unknown>) => {
-            processing = processing.then(() => handleChunk(chunk));
-            processing.catch((error) => {
-              void handleTerminalFailure(error);
-            });
-          };
-
-          const handleEnd = async () => {
-            const currentJob = await this.migrationQueue.getJob(jobId);
-            if (!currentJob) {
-              finish();
-              return;
-            }
-
-            const state = await currentJob.getState();
-            if (state === 'failed') {
-              finish();
-              return;
-            }
-
-            try {
-              await processing;
-              await flushBuffer();
-              const finalizedProgress = currentJob.progress as
-                | MigrationProgress
-                | undefined;
-              this.logger.log(
-                `Migration ${jobId}: completed (${finalizedProgress?.processedRows || 0} rows)`,
-              );
-              await this.completeJob(jobId);
-            } catch (error) {
-              await handleTerminalFailure(error);
-            } finally {
-              finish();
-            }
+            if (error) reject(error);
+            else resolve();
           };
 
           const handleError = (error: unknown) => {
-            void (async () => {
-              await handleTerminalFailure(error);
-              finish();
-            })();
+            if (failed || settled) return;
+            failed = true;
+            eventStream.pause?.();
+            eventStream.destroy?.();
+            // Drain the in-flight write before pools close; queued chunks never start after failure.
+            void processing
+              .catch(() => {})
+              .then(() =>
+                finish(
+                  error instanceof Error
+                    ? error
+                    : new Error(
+                        typeof error === 'string'
+                          ? error
+                          : 'Migration pipeline failed.',
+                      ),
+                ),
+              );
+          };
+
+          const enqueueChunk = (chunk: Record<string, unknown>) => {
+            eventStream.pause?.();
+            processing = processing.then(() =>
+              failed ? undefined : handleChunk(chunk),
+            );
+            void processing.then(() => {
+              if (!failed && !ended) eventStream.resume?.();
+            }, handleError);
+          };
+
+          const handleEnd = () => {
+            ended = true;
+            processing = processing.then(() =>
+              failed ? undefined : flushBuffer(),
+            );
+            void processing.then(() => {
+              if (!failed) finish();
+            }, handleError);
+          };
+          const handleClose = () => {
+            if (!ended)
+              handleError(
+                new Error('Migration source stream closed before end.'),
+              );
           };
 
           const cleanup = () => {
@@ -565,42 +599,30 @@ export class MigrationService {
               'error',
               handleError as (...args: unknown[]) => void,
             );
+            eventStream.removeListener('close', handleClose);
           };
 
-          stream.on('data', enqueueChunk as (...args: unknown[]) => void);
-          stream.on('row', enqueueChunk as (...args: unknown[]) => void);
-          stream.on('end', handleEnd as (...args: unknown[]) => void);
           stream.on('error', handleError as (...args: unknown[]) => void);
+          stream.on('close', handleClose);
+          stream.on('end', handleEnd as (...args: unknown[]) => void);
+          stream.on('row', enqueueChunk as (...args: unknown[]) => void);
+          stream.on('data', enqueueChunk as (...args: unknown[]) => void);
+          if (eventStream.destroyed && !eventStream.readableEnded)
+            handleClose();
         });
       } else {
         for await (const chunk of stream) {
-          const currentJob = await this.migrationQueue.getJob(jobId);
-          if (!currentJob) break;
-          const state = await currentJob.getState();
-          if (state === 'failed') break;
           await handleChunk(chunk);
         }
-
-        const currentJob = await this.migrationQueue.getJob(jobId);
-        if (currentJob) {
-          const state = await currentJob.getState();
-          if (state !== 'failed') {
-            await flushBuffer();
-            const finalizedProgress = currentJob.progress as
-              | MigrationProgress
-              | undefined;
-            this.logger.log(
-              `Migration ${jobId}: completed (${finalizedProgress?.processedRows || 0} rows)`,
-            );
-            await this.completeJob(jobId);
-          }
-        }
+        await flushBuffer();
       }
+      await this.completeJob(jobId);
     } catch (error) {
       this.logger.error(`Migration ${jobId} PIPELINE EXCEPTION`, error);
       const message =
         error instanceof Error ? error.message : 'Migration pipeline failed.';
       await this.failJob(jobId, message);
+      throw error instanceof Error ? error : new Error(message);
     } finally {
       await this.closeResources(context);
     }

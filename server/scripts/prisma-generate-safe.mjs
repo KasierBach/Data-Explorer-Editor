@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, rmSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
@@ -33,7 +33,7 @@ function shouldGenerateClient() {
   }
 
   try {
-    return statSync(schemaPath).mtimeMs > statSync(clientMarker).mtimeMs;
+    return !readFileSync(schemaPath).equals(readFileSync(join(clientDir, 'schema.prisma')));
   } catch {
     return true;
   }
@@ -46,7 +46,7 @@ if (!shouldGenerateClient()) {
   process.exit(0);
 }
 
-const result = spawnSync(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['prisma', 'generate'], {
+const result = spawnSync(process.execPath, [join(repoRoot, 'node_modules', 'prisma', 'build', 'index.js'), 'generate'], {
   cwd: repoRoot,
   stdio: 'pipe',
   encoding: 'utf8',
@@ -66,8 +66,8 @@ if (result.status === 0) {
 }
 
 const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
-if (output.includes('EPERM') && existsSync(clientMarker)) {
-  console.warn('[prisma-generate-safe] prisma generate hit EPERM, but an existing Prisma client is present. Continuing build.');
+if (output.includes('EPERM') && !shouldGenerateClient()) {
+  console.warn('[prisma-generate-safe] prisma generate hit EPERM, but the existing Prisma client matches the schema. Continuing build.');
   process.exit(0);
 }
 

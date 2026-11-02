@@ -34,10 +34,14 @@ describe('ConnectionsService security', () => {
     ensureResourcePolicy: jest.fn(),
     removeResourcePolicy: jest.fn(),
   };
-  const permissionsMock = { ensurePermission: jest.fn() };
+  const permissionsMock = {
+    ensurePermission: jest.fn(),
+    getMemberRole: jest.fn(),
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    permissionsMock.getMemberRole.mockResolvedValue('MEMBER');
     service = new (ConnectionsService as any)(
       prismaMock,
       strategyFactoryMock as any,
@@ -46,6 +50,26 @@ describe('ConnectionsService security', () => {
       organizationsMock as any,
       permissionsMock,
     );
+  });
+
+  it('rejects a forbidden database even when its pool is warm', async () => {
+    prismaMock.connection.findFirst.mockResolvedValue({
+      id: 'conn',
+      userId: 'owner',
+      organizationId: 'org',
+      database: 'allowed',
+      type: 'postgres',
+      allowedDatabases: ['allowed'],
+    });
+    (service as any).pools.set('conn:private', {
+      pool: {},
+      lastAccessed: Date.now(),
+    });
+    await expect(
+      service.getPool('conn', 'private', 'member'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(strategyMock.createPool).not.toHaveBeenCalled();
+    (service as any).pools.clear();
   });
 
   afterEach(() => {

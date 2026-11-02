@@ -212,6 +212,7 @@ async function runScenario({ label, rowCount, variant }) {
     strategyFactory,
     new MigrationComparisonService(),
     queueState.queue,
+    { invalidateConnection: async () => {}, invalidatePartialWrite: async () => {} },
   );
   service.logger = {
     log() {},

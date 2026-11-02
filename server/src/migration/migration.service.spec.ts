@@ -6,6 +6,7 @@ import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory
 import { getQueueToken } from '@nestjs/bullmq';
 import { PassThrough } from 'stream';
 import { MigrationComparisonService } from './migration-comparison.service';
+import { FreshnessService } from '../common/freshness/freshness.service';
 
 // Mock uuid to avoid ESM import issues in Jest
 let uuidCounter = 0;
@@ -24,7 +25,10 @@ describe('MigrationService', () => {
     createPool: jest.fn().mockResolvedValue('mock-pool'),
     closePool: jest.fn().mockResolvedValue(undefined),
     exportStream: jest.fn(),
-    importData: jest.fn().mockResolvedValue({ success: true, rowCount: 0 }),
+    importData: jest.fn().mockImplementation(async (_pool, params) => ({
+      success: true,
+      rowCount: params.data.length,
+    })),
     getFullMetadata: jest.fn().mockResolvedValue({
       columns: [
         {
@@ -62,10 +66,13 @@ describe('MigrationService', () => {
   };
 
   const startPipeline = async (jobId: string, dto = baseDto) => {
-    await service.runMigrationPipeline('user-1', jobId, dto);
     const job = mockJobs.get(jobId);
-    if (job && !job.failedReason) {
+    try {
+      await service.runMigrationPipeline('user-1', jobId, dto);
       job.getState = jest.fn().mockResolvedValue('completed');
+    } catch (error) {
+      job.failedReason = error instanceof Error ? error.message : String(error);
+      job.getState = jest.fn().mockResolvedValue('failed');
     }
   };
 
@@ -126,6 +133,13 @@ describe('MigrationService', () => {
         { provide: ConnectionsService, useValue: mockConnectionsService },
         { provide: DatabaseStrategyFactory, useValue: mockStrategyFactory },
         MigrationComparisonService,
+        {
+          provide: FreshnessService,
+          useValue: {
+            invalidateConnection: jest.fn(),
+            invalidatePartialWrite: jest.fn(),
+          },
+        },
         { provide: getQueueToken('migration'), useValue: mockMigrationQueue },
       ],
     }).compile();
@@ -536,8 +550,16 @@ describe('MigrationService', () => {
 
     mockTargetConn.type = 'mssql';
     targetStrategy.importData
-      .mockRejectedValueOnce(new Error('Request timeout while writing batch'))
-      .mockResolvedValue({ success: true, rowCount: 125 });
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Too many parameters. Maximum is 2100.'), {
+          code: 'EREQUEST',
+          number: 8003,
+        }),
+      )
+      .mockImplementation(async (_pool, params) => ({
+        success: true,
+        rowCount: params.data.length,
+      }));
 
     const stream = new PassThrough({ objectMode: true });
     sourceStrategy.exportStream.mockResolvedValue(stream);

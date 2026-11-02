@@ -1,13 +1,10 @@
-import {
-  Injectable,
-  BadRequestException,
-  InternalServerErrorException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 import type { IDatabaseStrategy } from '../database-strategies/database-strategy.interface';
 
 import type { Connection } from '../connections/entities/connection.entity';
+import { queryDatabaseException } from '../query/query-error.util';
 
 export interface ConnectionContext {
   connection: Connection;
@@ -36,38 +33,31 @@ export class AiConnectionService {
     userId: string,
     gatherSchemaContext: SchemaContextGatherer,
   ): Promise<ConnectionContext> {
-    let connection: Connection;
+    const connection = await this.connectionsService.findOne(
+      connectionId,
+      userId,
+    );
     try {
-      connection = await this.connectionsService.findOne(connectionId, userId);
-    } catch {
-      throw new BadRequestException(
-        `Connection "${connectionId}" not found. Please re-select your connection.`,
-      );
-    }
-
-    let pool: unknown;
-    try {
-      pool = await this.connectionsService.getPool(
+      const pool = await this.connectionsService.getPool(
         connectionId,
         database,
         userId,
       );
+      const strategy = this.strategyFactory.getStrategy(connection.type);
+      const schemaContext = await gatherSchemaContext(
+        pool,
+        strategy,
+        database,
+        connectionId,
+      );
+      return { connection, pool, strategy, schemaContext };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new InternalServerErrorException(
-        `Cannot connect to database: ${message}`,
+      throw queryDatabaseException(
+        error,
+        connection.type,
+        'Cannot load database context.',
       );
     }
-
-    const strategy = this.strategyFactory.getStrategy(connection.type);
-    const schemaContext = await gatherSchemaContext(
-      pool,
-      strategy,
-      database,
-      connectionId,
-    );
-
-    return { connection, pool, strategy, schemaContext };
   }
 
   async getConnectionContextForStream(
@@ -75,33 +65,12 @@ export class AiConnectionService {
     database: string | undefined,
     userId: string,
     gatherSchemaContext: SchemaContextGatherer,
-  ): Promise<ConnectionContext | null> {
-    let connection: Connection;
-    try {
-      connection = await this.connectionsService.findOne(connectionId, userId);
-    } catch {
-      return null;
-    }
-
-    let pool: unknown;
-    try {
-      pool = await this.connectionsService.getPool(
-        connectionId,
-        database,
-        userId,
-      );
-    } catch {
-      return null;
-    }
-
-    const strategy = this.strategyFactory.getStrategy(connection.type);
-    const schemaContext = await gatherSchemaContext(
-      pool,
-      strategy,
-      database,
+  ): Promise<ConnectionContext> {
+    return this.getConnectionContext(
       connectionId,
+      database,
+      userId,
+      gatherSchemaContext,
     );
-
-    return { connection, pool, strategy, schemaContext };
   }
 }

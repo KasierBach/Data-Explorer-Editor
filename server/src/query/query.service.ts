@@ -2,9 +2,9 @@ import {
   Injectable,
   BadRequestException,
   ForbiddenException,
-  InternalServerErrorException,
   Logger,
   Inject,
+  HttpException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -23,21 +23,29 @@ import { FreshnessService } from '../common/freshness/freshness.service';
 import {
   analyzeSqlConfirmation,
   getMongoActionFromPayload,
-  isMongoActionAllowedOnReadOnly,
+  isMongoPayloadAllowedOnReadOnly,
   isSqlAllowedOnReadOnly,
   splitSqlStatements,
   MAX_SQL_STATEMENTS,
 } from './query-guard.util';
-import {
-  getErrorMessage,
-  isForbiddenException,
-} from '../common/utils/error.util';
+import { getErrorMessage } from '../common/utils/error.util';
 import { SqlUtil } from '../utils/sql.util';
 import type { QueryResult } from '../database-strategies';
 import { PermissionsService } from '../permissions/services/permissions.service';
 import { Permission } from '../permissions/enums/permission.enum';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
-import { assertTeamConnectionAccess } from '../permissions/utils/team-connection-access.util';
+import {
+  assertTeamConnectionAccess,
+  parseRoleQueryModes,
+} from '../permissions/utils/team-connection-access.util';
+import { REDIS_READ_COMMANDS } from '../database-strategies/redis.strategy';
+import {
+  assertPrimaryKeyIdentities,
+  validateRowIdentities,
+} from '../database-strategies/row-identity.util';
+import type { RowIdentity } from '../database-strategies/database-strategy.interface';
+import type { QueryExecutionHandle } from '../database-strategies/database-strategy.interface';
+import { queryDatabaseException } from './query-error.util';
 
 interface ActiveQueryEntry {
   queryId: string;
@@ -82,8 +90,8 @@ export class QueryService {
 
     return this.freshnessService.buildKey(
       'query',
-      [connectionId, database || 'default'],
-      [sql.trim().toLowerCase(), ...optionParts],
+      [connectionId, database ?? null],
+      [sql, ...optionParts],
     );
   }
 
@@ -91,15 +99,7 @@ export class QueryService {
     connectionId: string,
     database?: string,
   ): Promise<void> {
-    await this.freshnessService.bump('query', [
-      connectionId,
-      database || 'default',
-    ]);
-    await this.freshnessService.bump('metadata', [connectionId]);
-    await this.freshnessService.bump('ai-schema', [
-      connectionId,
-      database || 'default',
-    ]);
+    await this.freshnessService.invalidateConnection(connectionId, database);
     this.logger.debug(`Freshness bumped for connection ${connectionId}`);
   }
 
@@ -160,16 +160,29 @@ export class QueryService {
 
   private async resolveQueryCount(
     strategy: {
-      executeQuery: (pool: unknown, sql: string) => Promise<QueryResult>;
+      executeQuery: (
+        pool: unknown,
+        sql: string,
+        options?: { readOnly?: boolean },
+      ) => Promise<QueryResult>;
     },
     pool: unknown,
     countSql: string,
     cacheKey: string,
+    readOnly = false,
+    onExecution?: (execution: QueryExecutionHandle) => void,
   ): Promise<number | undefined> {
     const cachedCount = await this.cacheManager.get<number>(cacheKey);
     if (typeof cachedCount === 'number') return cachedCount;
 
-    const countResult = await strategy.executeQuery(pool, countSql);
+    const options = {
+      ...(readOnly ? { readOnly: true } : {}),
+      ...(onExecution ? { onExecution } : {}),
+    };
+    const countResult =
+      readOnly || onExecution
+        ? await strategy.executeQuery(pool, countSql, options)
+        : await strategy.executeQuery(pool, countSql);
     const count = this.extractCountValue(countResult);
     if (count !== undefined) {
       await this.cacheManager.set(cacheKey, count, this.QUERY_CACHE_TTL_MS);
@@ -208,7 +221,11 @@ export class QueryService {
 
   private async resolveTableCount(
     strategy: {
-      executeQuery: (pool: unknown, sql: string) => Promise<QueryResult>;
+      executeQuery: (
+        pool: unknown,
+        sql: string,
+        options: { readOnly: boolean },
+      ) => Promise<QueryResult>;
     },
     pool: unknown,
     quotedTable: string,
@@ -220,6 +237,7 @@ export class QueryService {
     const countResult = await strategy.executeQuery(
       pool,
       `SELECT COUNT(*) AS total FROM ${quotedTable}`,
+      { readOnly: true },
     );
 
     const count = this.extractCountValue(countResult);
@@ -276,6 +294,26 @@ export class QueryService {
       Permission.WRITE,
     );
 
+    if (connection.organizationId) {
+      const role = await this.permissionsService.getMemberRole(
+        userId,
+        connection.organizationId,
+      );
+      assertTeamConnectionAccess(
+        connection,
+        { userId, role },
+        {
+          database:
+            typeof extra?.database === 'string'
+              ? extra.database
+              : typeof extra?.databaseName === 'string'
+                ? extra.databaseName
+                : connection.database,
+          isReadOnlySql: false,
+        },
+      );
+    }
+
     const reasonMap = {
       allowQueryExecution: 'QUERY_EXECUTION_DISABLED',
       allowSchemaChanges: 'SCHEMA_CHANGES_DISABLED',
@@ -322,22 +360,41 @@ export class QueryService {
     database?: string,
     confirmed?: boolean,
   ) {
+    const isMongo =
+      connection.type === 'mongodb' || connection.type === 'mongodb+srv';
+    const isRedis = connection.type === 'redis';
+    if (!isMongo && !isRedis) {
+      try {
+        splitSqlStatements(sql, connection.type);
+      } catch (error) {
+        if (error instanceof RangeError)
+          throw new BadRequestException(error.message);
+        throw error;
+      }
+    }
+    const isReadOnlyQuery = isMongo
+      ? isMongoPayloadAllowedOnReadOnly(sql)
+      : isRedis
+        ? REDIS_READ_COMMANDS.has(sql.trim().split(/\s+/, 1)[0].toUpperCase())
+        : isSqlAllowedOnReadOnly(sql, connection.type);
+    // A read-classified SELECT can still invoke a mutating stored function.
+    let readOnly =
+      Boolean(connection.readOnly) || (!isMongo && !isRedis && isReadOnlyQuery);
     // 0. Team restrictions: database whitelist + per-role query modes.
     if (connection.organizationId) {
       const role = await this.permissionsService.getMemberRole(
         userId,
         connection.organizationId,
       );
-      const isMongo =
-        connection.type === 'mongodb' || connection.type === 'mongodb+srv';
-      const isReadOnlySql = isMongo
-        ? isMongoActionAllowedOnReadOnly(getMongoActionFromPayload(sql))
-        : isSqlAllowedOnReadOnly(sql);
       assertTeamConnectionAccess(
         connection,
         { userId, role },
-        { database, sql, isReadOnlySql },
+        { database, sql, isReadOnlySql: isReadOnlyQuery },
       );
+      if (connection.userId !== userId && role) {
+        readOnly ||=
+          parseRoleQueryModes(connection.roleQueryModes)?.[role] === 'readonly';
+      }
     }
 
     // 1. Check if query execution is enabled at all
@@ -352,9 +409,11 @@ export class QueryService {
     }
 
     // 2. MongoDB read-only check
-    if (connection.type === 'mongodb' || connection.type === 'mongodb+srv') {
-      const action = getMongoActionFromPayload(sql);
-      if (!isMongoActionAllowedOnReadOnly(action)) {
+    if (isMongo || isRedis) {
+      const action = isMongo
+        ? getMongoActionFromPayload(sql)
+        : sql.trim().split(/\s+/, 1)[0];
+      if (!isReadOnlyQuery) {
         await this.permissionsService.ensurePermission(
           userId,
           ResourceType.CONNECTION,
@@ -362,7 +421,7 @@ export class QueryService {
           Permission.WRITE,
         );
       }
-      if (connection.readOnly && !isMongoActionAllowedOnReadOnly(action)) {
+      if (connection.readOnly && !isReadOnlyQuery) {
         await this.blockOperation(userId, {
           connectionId: connection.id,
           database,
@@ -370,14 +429,22 @@ export class QueryService {
           reason: 'READ_ONLY_CONNECTION',
           message:
             'This connection is read-only. Only read operations are allowed.',
-          extra: { mongoAction: action },
+          extra: { databaseAction: action },
         });
       }
-      return;
+      if (
+        (isMongo && action === 'aggregate' && !isReadOnlyQuery) ||
+        (isRedis && !isReadOnlyQuery)
+      ) {
+        throw new BadRequestException(
+          'Unsupported or unsafe query for this database command endpoint.',
+        );
+      }
+      return readOnly;
     }
 
     // 3. Read-only connection: block all non-read queries
-    if (!isSqlAllowedOnReadOnly(sql)) {
+    if (!isReadOnlyQuery) {
       await this.permissionsService.ensurePermission(
         userId,
         ResourceType.CONNECTION,
@@ -385,7 +452,7 @@ export class QueryService {
         Permission.WRITE,
       );
     }
-    if (connection.readOnly && !isSqlAllowedOnReadOnly(sql)) {
+    if (connection.readOnly && !isReadOnlyQuery) {
       await this.blockOperation(userId, {
         connectionId: connection.id,
         database,
@@ -400,7 +467,7 @@ export class QueryService {
     if (!connection.readOnly) {
       let analysis;
       try {
-        analysis = analyzeSqlConfirmation(sql);
+        analysis = analyzeSqlConfirmation(sql, connection.type);
       } catch (error) {
         if (error instanceof RangeError) {
           throw new BadRequestException(error.message);
@@ -478,9 +545,16 @@ export class QueryService {
         });
       }
     }
+    return readOnly;
   }
 
-  async executeQuery(createQueryDto: CreateQueryDto, userId: string) {
+  async executeQuery(
+    createQueryDto: CreateQueryDto,
+    userId: string,
+    signal?: AbortSignal,
+  ) {
+    if (signal?.aborted)
+      throw new BadRequestException('Query request was aborted.');
     const {
       connectionId,
       sql,
@@ -494,7 +568,7 @@ export class QueryService {
       connectionId,
       userId,
     );
-    await this.assertQueryAllowed(
+    const readOnly = await this.assertQueryAllowed(
       connection,
       sql,
       userId,
@@ -512,9 +586,11 @@ export class QueryService {
       const strategy = this.strategyFactory.getStrategy(connection.type);
 
       const statements =
-        connection.type === 'mongodb' || connection.type === 'mongodb+srv'
+        connection.type === 'mongodb' ||
+        connection.type === 'mongodb+srv' ||
+        connection.type === 'redis'
           ? [sql]
-          : splitSqlStatements(sql);
+          : splitSqlStatements(sql, connection.type);
       const executableStatements = statements.length > 0 ? statements : [sql];
       if (executableStatements.length > MAX_SQL_STATEMENTS) {
         throw new BadRequestException(
@@ -530,26 +606,53 @@ export class QueryService {
 
       // Register the in-flight query so the user can cancel it.
       const queryId = randomUUID();
-      this.registerActiveQuery(
-        queryId,
-        userId,
-        connectionId,
-        sql,
-        strategy,
-        pool,
-      );
+      let execution: QueryExecutionHandle | undefined;
+      let cancelRequested = false;
+      const cancel = async () => {
+        cancelRequested = true;
+        return execution ? strategy.cancelActiveQuery(execution) : false;
+      };
+      this.registerActiveQuery(queryId, userId, connectionId, sql, cancel);
 
       let result: QueryResult;
+      const onExecution = (handle: QueryExecutionHandle) => {
+        execution = handle;
+        if (cancelRequested) {
+          void cancel().catch((error) =>
+            this.logger.warn(getErrorMessage(error)),
+          );
+        }
+      };
       const timeoutMs = this.getQueryTimeoutMs();
+      const disconnected = () => {
+        void cancel().catch((error) =>
+          this.logger.warn(getErrorMessage(error)),
+        );
+      };
+      signal?.addEventListener('abort', disconnected, { once: true });
+      if (signal?.aborted) disconnected();
       try {
         const runQuery = async (): Promise<QueryResult> => {
           if (isMultiStatement) {
-            // Run all statements atomically: if any statement fails, all changes
-            // are rolled back instead of leaving the database half-committed.
+            // The strategy reports partial commits on engines with non-atomic DDL/batches.
             const multi = await strategy.runStatementsInTransaction(
               pool,
               executableStatements,
-              { limit, offset },
+              {
+                limit,
+                offset,
+                ...(readOnly ? { readOnly: true } : {}),
+                onExecution,
+                ...(!readOnly
+                  ? {
+                      onMutation: () =>
+                        this.invalidateQueryCache(
+                          connectionId,
+                          database || connection.database,
+                        ),
+                    }
+                  : {}),
+              },
             );
             multi.countStatus ??= 'skipped';
             return multi;
@@ -557,50 +660,81 @@ export class QueryService {
           return strategy.executeQuery(pool, finalSql, {
             limit,
             offset,
+            ...(readOnly ? { readOnly: true } : {}),
+            onExecution,
           });
         };
 
-        result = await this.withQueryTimeout(runQuery(), queryId, timeoutMs);
-      } finally {
-        this.activeQueries.delete(queryId);
-      }
-      result = this.applyRawQueryMetadata(result, finalSql, { limit, offset });
-
-      if (!isMultiStatement && includeTotalCount === true) {
-        const countSql = this.buildQueryCountSql(finalSql);
-        if (countSql) {
-          try {
-            const countCacheKey = await this.getQueryCacheKey(
-              connectionId,
-              `result-count:${countSql}`,
-              database || connection.database,
-            );
-            const totalCount = await this.resolveQueryCount(
-              strategy,
-              pool,
-              countSql,
-              countCacheKey,
-            );
-            if (totalCount !== undefined) {
-              result.totalCount = totalCount;
-              result.countStatus = 'available';
-            } else {
-              result.countStatus = 'unavailable';
-            }
-          } catch (countError) {
-            result.countStatus = 'unavailable';
-            this.logger.warn(
-              'Failed to fetch query result count:',
-              countError instanceof Error
-                ? countError.message
-                : String(countError),
+        const completeQuery = async () => {
+          const nativeResult = await runQuery();
+          let isReadQuery = readOnly;
+          if (
+            connection.type === 'mongodb' ||
+            connection.type === 'mongodb+srv'
+          ) {
+            isReadQuery = isMongoPayloadAllowedOnReadOnly(sql);
+          }
+          if (connection.type === 'redis') {
+            isReadQuery = REDIS_READ_COMMANDS.has(
+              sql.trim().split(/\s+/, 1)[0].toUpperCase(),
             );
           }
-        } else {
-          result.countStatus = 'skipped';
-        }
-      } else {
-        result.countStatus = 'skipped';
+          if (!isReadQuery)
+            await this.invalidateQueryCache(
+              connectionId,
+              database || connection.database,
+            );
+          const queryResult = this.applyRawQueryMetadata(
+            nativeResult,
+            finalSql,
+            { limit, offset },
+          );
+          if (!isMultiStatement && includeTotalCount === true) {
+            const countSql = this.buildQueryCountSql(finalSql);
+            if (countSql) {
+              try {
+                const countCacheKey = await this.getQueryCacheKey(
+                  connectionId,
+                  `result-count:${countSql}`,
+                  database || connection.database,
+                );
+                const totalCount = await this.resolveQueryCount(
+                  strategy,
+                  pool,
+                  countSql,
+                  countCacheKey,
+                  readOnly,
+                  onExecution,
+                );
+                if (totalCount !== undefined) {
+                  queryResult.totalCount = totalCount;
+                  queryResult.countStatus = 'available';
+                } else {
+                  queryResult.countStatus = 'unavailable';
+                }
+              } catch (countError) {
+                queryResult.countStatus = 'unavailable';
+                this.logger.warn(
+                  'Failed to fetch query result count:',
+                  getErrorMessage(countError),
+                );
+              }
+            } else {
+              queryResult.countStatus = 'skipped';
+            }
+          } else {
+            queryResult.countStatus = 'skipped';
+          }
+          return queryResult;
+        };
+        result = await this.withQueryTimeout(
+          completeQuery(),
+          queryId,
+          timeoutMs,
+        );
+      } finally {
+        signal?.removeEventListener('abort', disconnected);
+        this.activeQueries.delete(queryId);
       }
       // Expose the wall-clock execution time to the client so the results
       // panel and query history can display it.
@@ -622,18 +756,41 @@ export class QueryService {
 
       return result;
     } catch (error) {
-      if (isForbiddenException(error) || error instanceof BadRequestException)
-        throw error;
+      await this.freshnessService.invalidatePartialWrite(
+        error,
+        connectionId,
+        database || connection.database,
+      );
+      if (error instanceof HttpException) throw error;
+
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? String(error.code)
+          : '';
+      if (
+        readOnly &&
+        (code === '25006' ||
+          code === 'ER_CANT_EXECUTE_IN_READ_ONLY_TRANSACTION' ||
+          code.startsWith('SQLITE_READONLY'))
+      ) {
+        await this.blockOperation(userId, {
+          connectionId,
+          database: database || connection.database,
+          action: 'execute_query',
+          reason: 'READ_ONLY_CONNECTION',
+          message:
+            'This connection is read-only. The database rejected a write operation.',
+        });
+      }
 
       const resolvedDatabase = database || connection.database || null;
       const rootCause = getErrorMessage(error);
 
       this.logger.error('Query Service Error Details:', rootCause);
-      throw new InternalServerErrorException({
+      throw queryDatabaseException(error, connection.type, {
         message: resolvedDatabase
           ? `Query execution failed on database "${resolvedDatabase}": ${rootCause}`
           : `Query execution failed: ${rootCause}`,
-        reason: 'QUERY_EXECUTION_FAILED',
         details: {
           connectionId,
           connectionType: connection.type,
@@ -657,32 +814,28 @@ export class QueryService {
     queryId: string,
     timeoutMs: number,
   ): Promise<T> {
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
+    const timeoutError = () =>
+      new BadRequestException(
+        `Query exceeded the maximum execution time of ${Math.round(timeoutMs / 1000)}s. Cancellation was requested; inspect the database and any writes before retrying.`,
+      );
+    const timer = setTimeout(() => {
+      timedOut = true;
+      const entry = this.activeQueries.get(queryId);
+      if (entry)
+        void entry
+          .cancel()
+          .catch((error) => this.logger.warn(getErrorMessage(error)));
+    }, timeoutMs);
     try {
-      return await Promise.race([
-        promise,
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(() => {
-            void (async () => {
-              const entry = this.activeQueries.get(queryId);
-              if (entry) {
-                try {
-                  await entry.cancel();
-                } catch {
-                  // Best-effort cancel.
-                }
-              }
-              reject(
-                new BadRequestException(
-                  `Query exceeded the maximum execution time of ${Math.round(timeoutMs / 1000)}s and was cancelled. Add a LIMIT or narrow the query.`,
-                ),
-              );
-            })();
-          }, timeoutMs);
-        }),
-      ]);
+      const result = await promise;
+      if (timedOut) throw timeoutError();
+      return result;
+    } catch (error) {
+      if (timedOut) throw timeoutError();
+      throw error;
     } finally {
-      if (timer) clearTimeout(timer);
+      clearTimeout(timer);
     }
   }
 
@@ -692,8 +845,7 @@ export class QueryService {
     userId: string,
     connectionId: string,
     sql: string,
-    strategy: { cancelActiveQuery: (execution: unknown) => Promise<boolean> },
-    pool: unknown,
+    cancel: () => Promise<boolean>,
   ): void {
     // Enforce a per-user cap on concurrent queries.
     const userActive = [...this.activeQueries.values()].filter(
@@ -710,7 +862,7 @@ export class QueryService {
       connectionId,
       sql: sql.length > 200 ? `${sql.slice(0, 200)}...` : sql,
       startedAt: Date.now(),
-      cancel: () => strategy.cancelActiveQuery(pool),
+      cancel,
     });
   }
 
@@ -840,6 +992,7 @@ export class QueryService {
       const result = await strategy.executeQuery(pool, baseSql, {
         limit: normalizedLimit,
         offset: normalizedOffset,
+        readOnly: true,
       });
 
       const response: QueryResult = {
@@ -897,25 +1050,93 @@ export class QueryService {
 
       return response;
     } catch (error) {
-      if (isForbiddenException(error)) throw error;
-
       this.logger.error('Table Window Error Details:', getErrorMessage(error));
-      throw new InternalServerErrorException(
+      throw queryDatabaseException(
+        error,
+        connection.type,
         'Table browsing failed. Please verify the selected table and connection permissions.',
       );
     }
   }
 
-  async updateRow(updateRowDto: UpdateRowDto, userId: string) {
-    const {
-      connectionId,
-      database,
+  private async prepareRowMutation(
+    connection: Connection,
+    userId: string,
+    target: {
+      connectionId: string;
+      database?: string;
+      schema: string;
+      table: string;
+      pkColumn: string;
+    },
+    identities: RowIdentity[],
+    legacyValues: unknown[],
+  ) {
+    if (
+      ![
+        'postgres',
+        'cockroach',
+        'mysql',
+        'mariadb',
+        'sqlite',
+        'mssql',
+      ].includes(connection.type)
+    ) {
+      throw new BadRequestException(
+        'Row editing is unavailable for this database until a unique, typed row identity can be verified.',
+      );
+    }
+    validateRowIdentities(identities);
+    if (
+      !Array.isArray(legacyValues) ||
+      legacyValues.length !== identities.length ||
+      identities.some(
+        (identity, index) =>
+          identity[0].column !== target.pkColumn ||
+          identity[0].value !== legacyValues[index],
+      )
+    ) {
+      throw new BadRequestException(
+        'Legacy key fields must match the supplied row identities.',
+      );
+    }
+    if (
+      connection.type === 'sqlite' &&
+      target.schema &&
+      !['main', 'public'].includes(target.schema)
+    ) {
+      throw new BadRequestException(
+        'Row editing supports only the main SQLite schema.',
+      );
+    }
+    const schema =
+      connection.type === 'sqlite'
+        ? 'main'
+        : target.schema ||
+          (['mysql', 'mariadb'].includes(connection.type)
+            ? target.database || connection.database || ''
+            : connection.type === 'mssql'
+              ? 'dbo'
+              : 'public');
+    const pool = await this.connectionsService.getPool(
+      target.connectionId,
+      target.database || connection.database,
+      userId,
+    );
+    const strategy = this.strategyFactory.getStrategy(connection.type);
+    const columns = await strategy.getColumns(
+      pool,
       schema,
-      table,
-      pkColumn,
-      pkValue,
-      updates,
-    } = updateRowDto;
+      target.table,
+      target.database || connection.database,
+    );
+    assertPrimaryKeyIdentities(identities, columns);
+    return { pool, strategy, schema, columns };
+  }
+
+  async updateRow(updateRowDto: UpdateRowDto, userId: string) {
+    const { connectionId, database, table, pkColumn, pkValue, updates } =
+      updateRowDto;
     const connection = await this.connectionsService.findOne(
       connectionId,
       userId,
@@ -925,7 +1146,7 @@ export class QueryService {
       userId,
       'update_row',
       'allowQueryExecution',
-      { table },
+      { table, database: database || connection.database },
     );
 
     const updateCols = Object.keys(updates);
@@ -933,18 +1154,46 @@ export class QueryService {
       return { success: true, message: 'No changes' };
 
     try {
-      const pool = await this.connectionsService.getPool(
-        connectionId,
-        database || connection.database,
+      const identities = [
+        updateRowDto.identity ?? [{ column: pkColumn, value: pkValue }],
+      ];
+      const {
+        pool,
+        strategy,
+        schema: resolvedSchema,
+        columns,
+      } = await this.prepareRowMutation(
+        connection,
         userId,
+        updateRowDto,
+        identities,
+        [pkValue],
       );
-      const strategy = this.strategyFactory.getStrategy(connection.type);
+      if (
+        updateCols.some(
+          (name) => !columns.some((column) => column.name === name),
+        )
+      ) {
+        throw new BadRequestException(
+          'Update columns must exactly match verified table metadata.',
+        );
+      }
+      if (
+        updateCols.some((name) =>
+          columns.some((column) => column.isPrimaryKey && column.name === name),
+        )
+      ) {
+        throw new BadRequestException(
+          'Changing primary-key columns through row editing is not supported.',
+        );
+      }
       const result = await strategy.updateRow(pool, {
-        schema,
+        schema: resolvedSchema,
         table,
         pkColumn,
         pkValue,
         updates,
+        identity: identities[0],
       });
       await this.invalidateQueryCache(
         connectionId,
@@ -952,8 +1201,11 @@ export class QueryService {
       );
       return result;
     } catch (error) {
+      if (error instanceof HttpException) throw error;
       this.logger.error('Update Row Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(
+      throw queryDatabaseException(
+        error,
+        connection.type,
         `Update failed: ${getErrorMessage(error)}`,
       );
     }
@@ -970,7 +1222,7 @@ export class QueryService {
       userId,
       'insert_row',
       'allowQueryExecution',
-      { table },
+      { table, database: database || connection.database },
     );
 
     try {
@@ -987,16 +1239,18 @@ export class QueryService {
       );
       return result;
     } catch (error) {
+      if (error instanceof HttpException) throw error;
       this.logger.error('Insert Row Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(
+      throw queryDatabaseException(
+        error,
+        connection.type,
         `Insert failed: ${getErrorMessage(error)}`,
       );
     }
   }
 
   async deleteRows(deleteRowsDto: DeleteRowsDto, userId: string) {
-    const { connectionId, database, schema, table, pkColumn, pkValues } =
-      deleteRowsDto;
+    const { connectionId, database, table, pkColumn, pkValues } = deleteRowsDto;
     const connection = await this.connectionsService.findOne(
       connectionId,
       userId,
@@ -1006,21 +1260,36 @@ export class QueryService {
       userId,
       'delete_rows',
       'allowQueryExecution',
-      { table, rowCount: pkValues.length },
+      {
+        table,
+        rowCount: Array.isArray(pkValues) ? pkValues.length : 0,
+        database: database || connection.database,
+      },
     );
 
     try {
-      const pool = await this.connectionsService.getPool(
-        connectionId,
-        database || connection.database,
+      if (!Array.isArray(pkValues))
+        throw new BadRequestException('Select a valid set of row identities.');
+      const identities =
+        deleteRowsDto.identities ??
+        pkValues.map((value) => [{ column: pkColumn, value }]);
+      const {
+        pool,
+        strategy,
+        schema: resolvedSchema,
+      } = await this.prepareRowMutation(
+        connection,
         userId,
+        deleteRowsDto,
+        identities,
+        pkValues,
       );
-      const strategy = this.strategyFactory.getStrategy(connection.type);
       const result = await strategy.deleteRows(pool, {
-        schema,
+        schema: resolvedSchema,
         table,
         pkColumn,
         pkValues,
+        identities,
       });
       await this.invalidateQueryCache(
         connectionId,
@@ -1028,8 +1297,11 @@ export class QueryService {
       );
       return result;
     } catch (error) {
+      if (error instanceof HttpException) throw error;
       this.logger.error('Delete Rows Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(
+      throw queryDatabaseException(
+        error,
+        connection.type,
         `Delete failed: ${getErrorMessage(error)}`,
       );
     }
@@ -1053,6 +1325,7 @@ export class QueryService {
       'update_schema',
       'allowSchemaChanges',
       {
+        database: database || connection.database,
         table,
         operations: operations.map((op) => op.type),
       },
@@ -1077,10 +1350,6 @@ export class QueryService {
           ),
         );
       }
-      await this.invalidateQueryCache(
-        connectionId,
-        database || connection.database,
-      );
       await this.auditService.log({
         action: AuditAction.DB_SCHEMA_CHANGE,
         userId,
@@ -1096,9 +1365,11 @@ export class QueryService {
 
       return { success: true, results };
     } catch (error) {
-      if (isForbiddenException(error)) throw error;
+      if (error instanceof HttpException) throw error;
       this.logger.error('Update Schema Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(
+      throw queryDatabaseException(
+        error,
+        connection.type,
         `Schema update failed: ${getErrorMessage(error)}`,
       );
     }
@@ -1123,15 +1394,28 @@ export class QueryService {
         userId,
       );
       const strategy = this.strategyFactory.getStrategy(connection.type);
-      const result = await strategy.seedData(pool);
+      const result = await strategy.seedData(pool, {
+        onMutation: () =>
+          this.invalidateQueryCache(
+            connectionId,
+            connection.database || undefined,
+          ),
+      });
       await this.invalidateQueryCache(
         connectionId,
         connection.database || undefined,
       );
       return result;
     } catch (error) {
+      await this.freshnessService.invalidatePartialWrite(
+        error,
+        connectionId,
+        connection.database,
+      );
       this.logger.error('Seed Data Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(
+      throw queryDatabaseException(
+        error,
+        connection.type,
         `Seed data failed: ${getErrorMessage(error)}`,
       );
     }
@@ -1176,7 +1460,9 @@ export class QueryService {
       };
     } catch (error) {
       this.logger.error('Create Database Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(
+      throw queryDatabaseException(
+        error,
+        connection.type,
         `Failed to create database: ${getErrorMessage(error)}`,
       );
     }
@@ -1225,10 +1511,10 @@ export class QueryService {
       );
       const strategy = this.strategyFactory.getStrategy(connection.type);
       await strategy.dropDatabase(pool, databaseName);
+      await this.invalidateQueryCache(connectionId, databaseName);
 
       const droppedPoolKey = `${connectionId}:${databaseName}`;
       await this.connectionsService.removePool(droppedPoolKey, userId);
-      await this.invalidateQueryCache(connectionId, databaseName);
 
       return {
         success: true,
@@ -1236,7 +1522,9 @@ export class QueryService {
       };
     } catch (error) {
       this.logger.error('Drop Database Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(
+      throw queryDatabaseException(
+        error,
+        connection.type,
         `Failed to drop database: ${getErrorMessage(error)}`,
       );
     }
@@ -1294,8 +1582,15 @@ export class QueryService {
 
       return result;
     } catch (error) {
+      await this.freshnessService.invalidatePartialWrite(
+        error,
+        connectionId,
+        connection.database,
+      );
       this.logger.error('Import Data Error:', getErrorMessage(error));
-      throw new InternalServerErrorException(
+      throw queryDatabaseException(
+        error,
+        connection.type,
         `Import failed: ${getErrorMessage(error)}`,
       );
     }

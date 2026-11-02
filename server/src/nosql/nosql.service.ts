@@ -1,7 +1,9 @@
 ﻿import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
+import { ForbiddenException } from '@nestjs/common';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
+import { FreshnessService } from '../common/freshness/freshness.service';
 
 @Injectable()
 export class NoSqlService {
@@ -13,14 +15,20 @@ export class NoSqlService {
     private readonly redisService: RedisService,
     private readonly connectionsService: ConnectionsService,
     private readonly strategyFactory: DatabaseStrategyFactory,
+    private readonly freshnessService: FreshnessService,
   ) {}
 
   private getSchemaCacheKey(
     connectionId: string,
     database: string,
     collection: string,
+    sampleSize: number,
   ) {
-    return `nosql_schema:${connectionId}:${database}:${collection}`;
+    return this.freshnessService.buildKey(
+      'nosql-schema',
+      [connectionId, database],
+      [collection, sampleSize],
+    );
   }
 
   async analyzeSchema(params: {
@@ -39,11 +47,30 @@ export class NoSqlService {
       userId,
       refresh = false,
     } = params;
+    const connection = await this.connectionsService.authorizeAccess(
+      connectionId,
+      userId,
+      database,
+    );
+    if (connection.allowQueryExecution === false)
+      throw new ForbiddenException(
+        'Schema sampling is disabled for this connection.',
+      );
     const normalizedSampleSize = Math.min(
       Math.max(sampleSize, 1),
       this.MAX_SCHEMA_SAMPLE_SIZE,
     );
-    const cacheKey = this.getSchemaCacheKey(connectionId, database, collection);
+    if (refresh)
+      await this.freshnessService.bump('nosql-schema', [
+        connectionId,
+        database,
+      ]);
+    const cacheKey = await this.getSchemaCacheKey(
+      connectionId,
+      database,
+      collection,
+      normalizedSampleSize,
+    );
 
     if (refresh) {
       await this.redisService.del(cacheKey);
@@ -132,7 +159,6 @@ export class NoSqlService {
     userId: string,
   ) {
     await this.connectionsService.getPool(connectionId, database, userId);
-    const cacheKey = this.getSchemaCacheKey(connectionId, database, collection);
-    await this.redisService.del(cacheKey);
+    await this.freshnessService.bump('nosql-schema', [connectionId, database]);
   }
 }

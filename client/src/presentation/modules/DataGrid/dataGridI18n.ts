@@ -2,6 +2,10 @@ import { pickLocalizedText, type AppLang } from '@/core/utils/i18n';
 
 export function getDataGridText(lang: AppLang) {
   return {
+    rowIdentityUnavailable: pickLocalizedText(lang, 'Không thể sửa/xóa: thiếu khóa chính đầy đủ hoặc có giá trị khóa không an toàn. Bạn vẫn có thể xem dữ liệu.', 'Editing and deleting are unavailable: a complete, safe primary key is required. You can still browse the data.'),
+    unsupportedRowEditing: pickLocalizedText(lang, 'Chưa hỗ trợ sửa/xóa hàng an toàn cho loại database này. Bạn vẫn có thể xem dữ liệu.', 'Safe row editing is unavailable for this database. You can still browse the data.'),
+    invalidRowIdentity: pickLocalizedText(lang, 'Định danh hàng không còn hợp lệ. Hãy tải lại bảng và chọn lại hàng.', 'The row identity is no longer valid. Refresh the table and select the row again.'),
+    rowMutationConflict: pickLocalizedText(lang, 'Số hàng thay đổi không khớp. Hãy tải lại bảng để kiểm tra.', 'The affected row count did not match. Refresh the table to review the result.'),
     active: pickLocalizedText(lang, 'Đang chọn', 'Active'),
     actions: pickLocalizedText(lang, 'Hành động', 'Actions'),
     addColumn: pickLocalizedText(lang, 'Thêm cột', 'Add Column'),

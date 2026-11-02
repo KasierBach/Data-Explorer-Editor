@@ -71,7 +71,7 @@ interface DataGridRowProps {
     row: Row<RowData>;
     editing: ReturnType<typeof useDataGridEditing>;
     inspectValueHint: string;
-    pkField: string | null | undefined;
+    selectRowLabel: string;
     metadata: TableMetadata | undefined;
     handleOpenCellInspector: (val: DatabaseValue, col: string, type: string, rowId: string) => void;
     copyRowAsSQL: (row: RowData, cols: TableColumn[], schema: string, table: string, dialect: 'postgres' | 'mysql' | 'mssql') => void;
@@ -86,7 +86,7 @@ const DataGridRow = React.memo(({
     row,
     editing,
     inspectValueHint,
-    pkField,
+    selectRowLabel,
     metadata,
     handleOpenCellInspector,
     copyRowAsSQL,
@@ -96,7 +96,8 @@ const DataGridRow = React.memo(({
     matchedCellKeys,
     activeCellKey,
 }: DataGridRowProps) => {
-    const pkValue = pkField ? String(row.original[pkField]) : row.id;
+    const identityKey = editing.getRowKey(row.original);
+    const pkValue = identityKey ?? `uneditable:${row.id}`;
     const isSelected = editing.selectedRows.has(pkValue);
 
     return (
@@ -128,11 +129,6 @@ const DataGridRow = React.memo(({
                     )}
                     data-cell-key={cellKey}
                     style={{ width: cell.column.getSize() }}
-                    onClick={
-                        cellIdx === 0
-                            ? () => editing.toggleRowSelection(pkValue)
-                            : undefined
-                    }
                     onDoubleClick={
                         cellIdx > 0 && !editing.isEditMode
                             ? () => handleOpenCellInspector(
@@ -146,9 +142,12 @@ const DataGridRow = React.memo(({
                     title={cellIdx > 0 ? inspectValueHint : undefined}
                 >
                     {cellIdx === 0 ? (
-                        <span className={`cursor-pointer ${isSelected ? 'text-blue-500 font-bold' : ''}`}>
+                        <button type="button" aria-label={selectRowLabel} aria-pressed={isSelected}
+                            disabled={editing.isSaving || !identityKey || !!editing.mutationDisabledReason}
+                            onClick={()=>editing.toggleRowSelection(pkValue)}
+                            className={`w-full min-h-7 disabled:cursor-default ${isSelected ? 'text-blue-500 font-bold' : ''}`}>
                             {isSelected ? '☑' : ''} {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </span>
+                        </button>
                     ) : (
                         <div className="overflow-hidden text-ellipsis w-full">
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -219,7 +218,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
     // Custom hooks - data & editing logic
     const {
         metadata, queryResult, isLoadingMeta, isLoadingData, isFetchingData,
-        refetch, dbName, schema, cleanTableName, dialect, pkField,
+        refetch, dbName, schema, cleanTableName, dialect,
     } = useDataGridData({ tableId, tabId, enabled: isActive, includeTotalCount, sortBy, sortOrder });
     const tableName = cleanTableName || tableId;
     const exactTotalCount = queryResult?.countStatus === 'available' ? queryResult.totalCount : undefined;
@@ -237,9 +236,10 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
         : Math.min(16, Math.max(8, Math.ceil(pagination.pageSize / 100)));
 
     const editing = useDataGridEditing({
-        tableId, metadata, dbName, schema, cleanTableName, pkField, refetch,
+        tableId, metadata, dbName, schema, cleanTableName, rows: queryResult?.rows ?? [], refetch,
     });
-    const { handleCellChange, isEditMode, pendingChanges } = editing;
+    const { handleCellChange, isEditMode, pendingChanges, getRowKey, isSaving } = editing;
+    const rowEditsDisabled = dataEditsDisabled || !!editing.mutationDisabledReason;
     const defaultColumnOrder = useMemo(
         () => ['__row_number', ...(metadata?.columns?.map((column) => column.name) ?? [])],
         [metadata?.columns],
@@ -484,13 +484,16 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
             cell: info => {
                 const val = info.getValue();
                 const colName = col.name;
-                const rowId = pkField ? String(info.row.original[pkField]) : info.row.id;
+                const identityKey = getRowKey(info.row.original);
+                const rowId = identityKey ?? `uneditable:${info.row.id}`;
                 const isEdited = pendingChanges[rowId] && colName in pendingChanges[rowId];
                 const displayVal = isEdited ? pendingChanges[rowId][colName] : val;
 
-                if (isEditMode && !col.isPrimaryKey) {
+                if (isEditMode && !col.isPrimaryKey && identityKey && !rowEditsDisabled) {
                     return (
                         <input
+                            aria-label={`${colName}, row ${info.row.index + 1}`}
+                            disabled={isSaving}
                             className={`w-full bg-transparent border-none outline-none focus:ring-1 focus:ring-primary rounded px-1 -mx-1 py-0.5 h-6 ${isEdited ? 'text-blue-500 font-bold bg-blue-500/5' : ''}`}
                             value={displayVal === null ? '' : String(displayVal)}
                             onChange={(e) => handleCellChange(rowId, colName, e.target.value)}
@@ -527,7 +530,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
         });
 
         return [rowNumCol, ...dataCols];
-    }, [metadata, handleCellChange, isEditMode, pagination.pageIndex, pagination.pageSize, pendingChanges, pkField]);
+    }, [metadata, handleCellChange, isEditMode, pagination.pageIndex, pagination.pageSize, pendingChanges, getRowKey, rowEditsDisabled, isSaving]);
     const orderedMetadataColumns = useMemo(() => {
         if (!metadata?.columns) return [];
 
@@ -620,19 +623,19 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
     const bulkSearchButtonLabel = editing.isEditMode ? text.findReplace : text.find;
     const pageReplaceTargets = useMemo<BulkReplaceTargetRow[]>(
         () => rows.map((row, rowIndex) => ({
-            rowId: pkField ? String(row.original[pkField]) : row.id,
+            rowId: getRowKey(row.original) ?? `uneditable:${row.id}`,
             rowIndex,
             values: row.original,
         })),
-        [pkField, rows],
+        [getRowKey, rows],
     );
     const filteredReplaceTargets = useMemo<BulkReplaceTargetRow[]>(
         () => table.getFilteredRowModel().rows.map((row, rowIndex) => ({
-            rowId: pkField ? String(row.original[pkField]) : row.id,
+            rowId: getRowKey(row.original) ?? `uneditable:${row.id}`,
             rowIndex,
             values: row.original,
         })),
-        [table, pkField],
+        [table, getRowKey],
     );
     const selectedReplaceTargets = useMemo<BulkReplaceTargetRow[]>(
         () => pageReplaceTargets.filter((row) => editing.selectedRows.has(row.rowId)),
@@ -780,7 +783,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
                                 variant={editing.isEditMode ? "secondary" : "ghost"}
                                 size="sm"
                                 onClick={editing.toggleEditMode}
-                                disabled={dataEditsDisabled}
+                                disabled={editing.isSaving || rowEditsDisabled}
                                 className={cn(
                                     "h-7 px-2 text-[11px] gap-1.5 shrink-0",
                                     editing.isEditMode && "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
@@ -807,7 +810,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
                                     variant="default"
                                     size="sm"
                                     onClick={editing.handleSaveData}
-                                    disabled={editing.isSaving || dataEditsDisabled}
+                                    disabled={editing.isSaving || rowEditsDisabled}
                                     className="h-7 px-3 text-[11px] bg-green-600 hover:bg-green-700 text-white shrink-0"
                                 >
                                     {editing.isSaving ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : null}
@@ -852,7 +855,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
                                             <ArrowRightLeft className="w-3 h-3" /> {text.transfer}
                                         </DropdownMenuItem>
                                         {editing.selectedRows.size > 0 && (
-                                            <DropdownMenuItem onClick={editing.handleDeleteRows} disabled={editing.isSaving || dataEditsDisabled} className="gap-2 text-xs text-red-500 focus:text-red-500">
+                                            <DropdownMenuItem onClick={editing.handleDeleteRows} disabled={editing.isSaving || rowEditsDisabled} className="gap-2 text-xs text-red-500 focus:text-red-500">
                                                 <Trash2 className="w-3 h-3" /> {text.delete(editing.selectedRows.size)}
                                             </DropdownMenuItem>
                                         )}
@@ -884,7 +887,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
                                 variant={editing.isEditMode ? "secondary" : "ghost"}
                                 size="sm"
                                 onClick={editing.toggleEditMode}
-                                disabled={dataEditsDisabled}
+                                disabled={editing.isSaving || rowEditsDisabled}
                                 className={`h-6 px-2 text-[11px] gap-1.5 rounded-sm ${editing.isEditMode ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' : ''}`}
                             >
                                 {editing.isEditMode ? text.cancelEdit : text.editData}
@@ -903,7 +906,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
                         )}
 
                         {Object.keys(editing.pendingChanges).length > 0 && (
-                            <Button variant="default" size="sm" onClick={editing.handleSaveData} disabled={editing.isSaving || dataEditsDisabled} className="h-6 px-3 text-[11px] bg-green-600 hover:bg-green-700 text-white ml-2">
+                            <Button variant="default" size="sm" onClick={editing.handleSaveData} disabled={editing.isSaving || rowEditsDisabled} className="h-6 px-3 text-[11px] bg-green-600 hover:bg-green-700 text-white ml-2">
                                 {editing.isSaving ? <RefreshCw className="w-3 h-3 animate-spin mr-1" /> : null}
                                 {text.saveChanges} ({Object.keys(editing.pendingChanges).length})
                             </Button>
@@ -949,7 +952,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
                         </Button>
 
                         {editing.selectedRows.size > 0 && (
-                            <Button variant="ghost" size="sm" onClick={editing.handleDeleteRows} disabled={editing.isSaving || dataEditsDisabled} className="h-7 text-[11px] gap-1 px-2 text-red-500 hover:text-red-600 hover:bg-red-500/10">
+                            <Button variant="ghost" size="sm" onClick={editing.handleDeleteRows} disabled={editing.isSaving || rowEditsDisabled} className="h-7 text-[11px] gap-1 px-2 text-red-500 hover:text-red-600 hover:bg-red-500/10">
                                 <Trash2 className="w-3 h-3" /> {text.delete(editing.selectedRows.size)}
                             </Button>
                         )}
@@ -1023,6 +1026,12 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
                                 schemaChangesDisabled ? text.schemaChangesDisabled : null,
                                 importExportDisabled ? text.importExportDisabled : null,
                             ].filter((value): value is string => Boolean(value)))}
+                </div>
+            )}
+
+            {metadata && editing.mutationDisabledReason && (
+                <div role="status" className="mx-2 mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+                    {editing.mutationDisabledReason}
                 </div>
             )}
 
@@ -1167,7 +1176,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
                                                     row={row}
                                                     editing={editing}
                                                     inspectValueHint={text.inspectValueHint}
-                                                    pkField={pkField}
+                                                    selectRowLabel={`${lang === 'vi' ? 'Chọn hàng' : 'Select row'} ${pagination.pageIndex * pagination.pageSize + row.index + 1}`}
                                                     metadata={metadata}
                                                     handleOpenCellInspector={handleOpenCellInspector}
                                                     copyRowAsSQL={copyRowAsSQL}
@@ -1299,7 +1308,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ tableId, tabId, isActive }) 
             <BulkReplaceDialog
                 open={isBulkReplaceOpen}
                 onOpenChange={setIsBulkReplaceOpen}
-                allowReplace={editing.isEditMode && !dataEditsDisabled}
+                allowReplace={editing.isEditMode && !rowEditsDisabled && !editing.isSaving}
                 columns={metadata?.columns || []}
                 pageTargets={pageReplaceTargets}
                 filteredTargets={filteredReplaceTargets}

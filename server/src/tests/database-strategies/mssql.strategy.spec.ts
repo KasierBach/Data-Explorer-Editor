@@ -13,6 +13,8 @@ jest.mock('mssql', () => {
       request: jest.fn(),
     })),
     config: {},
+    Transaction: jest.fn(),
+    Request: jest.fn(),
     NVarChar: 'NVarChar',
   };
 });
@@ -30,6 +32,14 @@ describe('MssqlStrategy', () => {
     };
     mockPool = new (mssql.ConnectionPool as any)();
     mockPool.request.mockReturnValue(mockRequest);
+    (mssql.Transaction as unknown as jest.Mock).mockImplementation(() => ({
+      begin: jest.fn(),
+      commit: jest.fn(),
+      rollback: jest.fn(),
+    }));
+    (mssql.Request as unknown as jest.Mock).mockImplementation(
+      () => mockRequest,
+    );
   });
 
   afterEach(() => {
@@ -76,7 +86,7 @@ describe('MssqlStrategy', () => {
       });
 
       expect(mockRequest.query).toHaveBeenCalledWith(
-        'UPDATE [dbo].[users]]; DROP TABLE audit; --] SET [display]]name] = @p0 WHERE [id]] OR 1=1 --] = @pk',
+        'UPDATE [dbo].[users]]; DROP TABLE audit; --] SET [display]]name] = @p0 WHERE ([id]] OR 1=1 --] = @p1)',
       );
     });
 

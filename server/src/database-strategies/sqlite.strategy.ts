@@ -16,6 +16,26 @@ import { SchemaOperation } from '../query/dto/schema-operations.types';
 import { Injectable } from '@nestjs/common';
 import Database from 'better-sqlite3';
 import { SqlUtil } from '../utils/sql.util';
+import { splitSqlStatements } from '../query/query-guard.util';
+import { assertAffectedRows, buildRowPredicate } from './row-identity.util';
+
+function losslessSqliteRows(
+  rows: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  return rows.map((row) =>
+    Object.fromEntries(
+      Object.entries(row).map(([column, value]) => [
+        column,
+        typeof value === 'bigint'
+          ? value >= BigInt(Number.MIN_SAFE_INTEGER) &&
+            value <= BigInt(Number.MAX_SAFE_INTEGER)
+            ? Number(value)
+            : value.toString()
+          : value,
+      ]),
+    ),
+  );
+}
 
 @Injectable()
 export class SqliteStrategy implements IDatabaseStrategy {
@@ -32,15 +52,22 @@ export class SqliteStrategy implements IDatabaseStrategy {
     return `"${name.replace(/"/g, '""')}"`;
   }
 
-  quoteTable(_schema: string | undefined, table: string): string {
-    return this.quoteIdentifier(table);
+  quoteTable(schema: string | undefined, table: string): string {
+    const namespace = !schema || schema === 'public' ? 'main' : schema;
+    return `${this.quoteIdentifier(namespace)}.${this.quoteIdentifier(table)}`;
   }
 
   async executeQuery(
     pool: Database.Database,
     sql: string,
-    options?: { limit?: number; offset?: number },
+    options?: { limit?: number; offset?: number; readOnly?: boolean },
   ): Promise<QueryResult> {
+    if (options?.readOnly) {
+      return this.runStatementsInTransaction(pool, [sql], {
+        ...options,
+        limit: options.limit ?? 50000,
+      });
+    }
     let safeSql = sql;
     if (options?.limit !== undefined) {
       safeSql =
@@ -56,7 +83,12 @@ export class SqliteStrategy implements IDatabaseStrategy {
       safeSql = SqlUtil.injectLimit(sql, 50000);
     }
 
-    const rows = pool.prepare(safeSql).all() as Record<string, unknown>[];
+    const rows = losslessSqliteRows(
+      pool.prepare(safeSql).safeIntegers(true).all() as Record<
+        string,
+        unknown
+      >[],
+    );
 
     const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
     return { rows: rows.slice(0, 50000), columns, rowCount: rows.length };
@@ -70,7 +102,7 @@ export class SqliteStrategy implements IDatabaseStrategy {
   async runStatementsInTransaction(
     pool: Database.Database,
     statements: string[],
-    options?: { limit?: number; offset?: number },
+    options?: { limit?: number; offset?: number; readOnly?: boolean },
   ): Promise<QueryResult> {
     let result: QueryResult = { rows: [], columns: [], countStatus: 'skipped' };
     const runAll = pool.transaction(() => {
@@ -91,7 +123,9 @@ export class SqliteStrategy implements IDatabaseStrategy {
         const stmt = pool.prepare(safeSql);
         if (stmt.reader) {
           // SELECT-like statements return rows via .all().
-          const rows = stmt.all() as Record<string, unknown>[];
+          const rows = losslessSqliteRows(
+            stmt.safeIntegers(true).all() as Record<string, unknown>[],
+          );
           if (isLast) {
             const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
             result = {
@@ -114,26 +148,42 @@ export class SqliteStrategy implements IDatabaseStrategy {
         }
       }
     });
-    // better-sqlite3 throws on failure, which rolls back automatically.
-    runAll();
-    return result;
+    const previousQueryOnly = options?.readOnly
+      ? pool.pragma('query_only', { simple: true })
+      : undefined;
+    try {
+      if (options?.readOnly) pool.pragma('query_only = ON');
+      // This transaction runs synchronously; no other request can observe the temporary mode.
+      runAll();
+      return result;
+    } finally {
+      if (options?.readOnly) {
+        pool.pragma(previousQueryOnly ? 'query_only = ON' : 'query_only = OFF');
+      }
+    }
   }
 
   async updateRow(
     pool: Database.Database,
     params: UpdateRowParams,
   ): Promise<{ success: boolean; rowCount: number }> {
-    const { table, pkColumn, pkValue, updates } = params;
+    const { schema, table, pkColumn, pkValue, updates } = params;
     const cols = Object.keys(updates);
     if (cols.length === 0) return { success: false, rowCount: 0 };
 
     const setClause = cols
       .map((c) => `${this.quoteIdentifier(c)} = ?`)
       .join(', ');
-    const sql = `UPDATE ${this.quoteIdentifier(table)} SET ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = ?`;
-    const values = [...cols.map((c) => updates[c]), pkValue];
+    const predicate = buildRowPredicate(
+      [params.identity ?? [{ column: pkColumn, value: pkValue }]],
+      (column) => this.quoteIdentifier(column),
+      () => '?',
+      cols.length,
+    );
+    const sql = `UPDATE ${this.quoteTable(schema, table)} SET ${setClause} WHERE ${predicate.sql}`;
+    const values = [...cols.map((c) => updates[c]), ...predicate.values];
 
-    return this.runChange(pool, sql, values);
+    return this.runChange(pool, sql, values, 1);
   }
 
   async insertRow(
@@ -157,21 +207,34 @@ export class SqliteStrategy implements IDatabaseStrategy {
     pool: Database.Database,
     params: DeleteRowsParams,
   ): Promise<{ success: boolean; rowCount: number }> {
-    const { table, pkColumn, pkValues } = params;
+    const { schema, table, pkColumn, pkValues } = params;
     if (pkValues.length === 0) return { success: true, rowCount: 0 };
 
-    const placeholders = pkValues.map(() => '?').join(', ');
-    const sql = `DELETE FROM ${this.quoteIdentifier(table)} WHERE ${this.quoteIdentifier(pkColumn)} IN (${placeholders})`;
-    return this.runChange(pool, sql, pkValues);
+    const identities =
+      params.identities ??
+      pkValues.map((value) => [{ column: pkColumn, value }]);
+    const predicate = buildRowPredicate(
+      identities,
+      (column) => this.quoteIdentifier(column),
+      () => '?',
+    );
+    const sql = `DELETE FROM ${this.quoteTable(schema, table)} WHERE ${predicate.sql}`;
+    return this.runChange(pool, sql, predicate.values, identities.length);
   }
 
   private async runChange(
     pool: Database.Database,
     sql: string,
     values: unknown[],
+    expectedRows?: number,
   ): Promise<{ success: boolean; rowCount: number }> {
-    const result = pool.prepare(sql).run(...values);
-    return { success: true, rowCount: result.changes };
+    const run = () => {
+      const result = pool.prepare(sql).run(...values);
+      if (expectedRows !== undefined)
+        assertAffectedRows(result.changes, expectedRows);
+      return { success: true, rowCount: result.changes };
+    };
+    return expectedRows === undefined ? run() : pool.transaction(run)();
   }
 
   async importData(
@@ -296,15 +359,16 @@ export class SqliteStrategy implements IDatabaseStrategy {
     _schema: string,
     table: string,
   ): Promise<ColumnInfo[]> {
-    const sql = `PRAGMA table_info(${this.quoteIdentifier(table)})`;
+    const namespace = !_schema || _schema === 'public' ? 'main' : _schema;
+    const sql = `PRAGMA ${this.quoteIdentifier(namespace)}.table_info(${this.quoteIdentifier(table)})`;
     const rows = pool.prepare(sql).all() as any[];
     return rows.map((r) => ({
       name: r.name,
       type: r.type,
       isNullable: r.notnull === 0,
       defaultValue: r.dflt_value,
-      isPrimaryKey: r.pk === 1,
-      pkConstraintName: r.pk === 1 ? 'PRIMARY' : null,
+      isPrimaryKey: r.pk > 0,
+      pkConstraintName: r.pk > 0 ? 'PRIMARY' : null,
     }));
   }
 
@@ -426,7 +490,10 @@ export class SqliteStrategy implements IDatabaseStrategy {
       INSERT OR IGNORE INTO users (name, email) VALUES ('Alice', 'alice@example.com'), ('Bob', 'bob@example.com');
       INSERT OR IGNORE INTO products (name, price, stock) VALUES ('Laptop', 999.99, 10);
     `;
-    return this.executeQuery(pool, sql);
+    return this.runStatementsInTransaction(
+      pool,
+      splitSqlStatements(sql, 'sqlite'),
+    );
   }
 
   async getSampleRows(

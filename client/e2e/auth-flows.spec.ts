@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { fulfillAuxiliaryApi } from './support/auxiliary-api';
 
 const apiHeaders = {
     'access-control-allow-credentials': 'true',
@@ -49,17 +50,17 @@ async function mockAuthApi(page: Page) {
             return;
         }
 
-        if (pathname === '/api/auth/refresh') {
+        if (pathname === '/api/auth/refresh' && request.method() === 'POST') {
             await fulfillJson(route, { message: 'Session expired' }, 401);
             return;
         }
 
-        if (pathname === '/api/notifications/stream-ticket') {
+        if (pathname === '/api/notifications/stream-ticket' && request.method() === 'POST') {
             await fulfillJson(route, { ticket: 'e2e-ticket' });
             return;
         }
 
-        if (pathname === '/api/notifications/stream') {
+        if (pathname === '/api/notifications/stream' && request.method() === 'GET') {
             await route.fulfill({
                 status: 200,
                 contentType: 'text/event-stream',
@@ -69,7 +70,7 @@ async function mockAuthApi(page: Page) {
             return;
         }
 
-        await fulfillJson(route, []);
+        await fulfillAuxiliaryApi(route);
     });
 }
 

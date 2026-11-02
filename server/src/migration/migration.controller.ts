@@ -73,6 +73,11 @@ export class MigrationController {
         .getPublicJob(jobId, payload.sub)
         .then((initialJob) => {
           observer.next({ data: initialJob });
+          if (
+            initialJob.status === 'completed' ||
+            initialJob.status === 'failed'
+          )
+            observer.complete();
         })
         .catch((error) => {
           observer.error(error);

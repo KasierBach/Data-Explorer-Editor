@@ -65,6 +65,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
 
     async executeQuery(sql: string, context?: QueryExecutionContext): Promise<QueryResult> {
         if (!this.connectionId) throw new Error('Not connected');
+        context?.signal?.throwIfAborted();
 
         const body: {
             connectionId: string;
@@ -88,7 +89,11 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         }
 
         try {
-            return await apiService.post<QueryResult>('/query', body);
+            return await apiService.request<QueryResult>('/query', {
+                method: 'POST',
+                body: JSON.stringify(body),
+                signal: context?.signal,
+            });
         } catch (error) {
             // Intercept the destructive SQL confirmation flow
             if (error instanceof ApiError && error.reason === 'DESTRUCTIVE_REQUIRES_CONFIRMATION') {
@@ -140,6 +145,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         table: string;
         pkColumn: string;
         pkValue: DatabaseValue;
+        identity?: import('../domain/database-adapter.interface').RowIdentity;
         updates: RowData;
     }): Promise<MutationResult> {
         if (!this.connectionId) throw new Error('Not connected');
@@ -170,6 +176,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
         table: string;
         pkColumn: string;
         pkValues: DatabaseValue[];
+        identities?: import('../domain/database-adapter.interface').RowIdentity[];
     }): Promise<MutationResult> {
         if (!this.connectionId) throw new Error('Not connected');
 

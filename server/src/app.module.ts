@@ -6,7 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { BullModule } from '@nestjs/bullmq';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
-import { redisStore } from 'cache-manager-redis-yet';
+import { createKeyv } from '@keyv/redis';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -95,14 +95,20 @@ import { AiQualityModule } from './ai-quality/ai-quality.module';
       isGlobal: true,
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => {
-        const store = await redisStore({
-          url:
+      useFactory: (configService: ConfigService) => ({
+        stores: [
+          createKeyv(
             configService.get<string>('REDIS_URL') || 'redis://localhost:6379',
-          ttl: 60000,
-        });
-        return { store };
-      },
+            {
+              namespace: 'data-explorer-cache',
+              throwOnConnectError: true,
+              throwOnErrors: true,
+              connectionTimeout: 5000,
+            },
+          ),
+        ],
+        ttl: 60000,
+      }),
     }),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],

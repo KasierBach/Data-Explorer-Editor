@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test';
+import { fulfillAuxiliaryApi } from './auxiliary-api';
 
 const apiHeaders = {
   'access-control-allow-credentials': 'true',
@@ -25,7 +26,7 @@ export async function seedPersistedWorkspace(page: Page, state: Record<string, u
   }, state);
 }
 
-export async function mockAuthenticatedApi(page: Page) {
+export async function mockAuthenticatedApi(page: Pick<Page, 'route'>) {
   await page.route('http://localhost:3001/api/**', async (route) => {
     const request = route.request();
     const { pathname } = new URL(request.url());
@@ -35,7 +36,7 @@ export async function mockAuthenticatedApi(page: Page) {
       return;
     }
 
-    if (pathname === '/api/auth/refresh') {
+    if (pathname === '/api/auth/refresh' && request.method() === 'POST') {
       await fulfillJson(route, {
         access_token: 'e2e-access-token',
         accessTokenExpiresAt: 4_102_444_800,
@@ -144,7 +145,7 @@ export async function mockAuthenticatedApi(page: Page) {
       return;
     }
 
-    if (pathname.endsWith('/health-check')) {
+    if (request.method() === 'POST' && /^\/api\/connections\/(connection-e2e|mongo-e2e)\/health-check$/.test(pathname)) {
       await fulfillJson(route, {
         status: 'healthy',
         checkedAt: '2026-07-23T00:00:00.000Z',
@@ -154,12 +155,12 @@ export async function mockAuthenticatedApi(page: Page) {
       return;
     }
 
-    if (pathname === '/api/notifications/stream-ticket') {
+    if (pathname === '/api/notifications/stream-ticket' && request.method() === 'POST') {
       await fulfillJson(route, { ticket: 'e2e-ticket' });
       return;
     }
 
-    if (pathname === '/api/notifications/stream') {
+    if (pathname === '/api/notifications/stream' && request.method() === 'GET') {
       await route.fulfill({
         status: 200,
         contentType: 'text/event-stream',
@@ -169,6 +170,6 @@ export async function mockAuthenticatedApi(page: Page) {
       return;
     }
 
-    await fulfillJson(route, []);
+    await fulfillAuxiliaryApi(route);
   });
 }

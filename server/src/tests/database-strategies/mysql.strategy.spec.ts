@@ -1,5 +1,6 @@
 import { MysqlStrategy } from '../../database-strategies/mysql.strategy';
 import * as mysql from 'mysql2/promise';
+import { EventEmitter } from 'node:events';
 
 // These specs assert verified TLS; the default env accepts self-signed certs.
 process.env.ALLOW_INSECURE_DATABASE_TLS = 'false';
@@ -14,11 +15,18 @@ describe('MysqlStrategy', () => {
 
   beforeEach(() => {
     strategy = new MysqlStrategy();
-    mockPool = {
-      query: jest.fn(),
+    mockPool = Object.assign(new EventEmitter(), {
+      query: jest.fn().mockResolvedValue([[{ ENGINE: 'InnoDB' }]]),
       execute: jest.fn(),
       end: jest.fn(),
-    };
+      getConnection: jest.fn(),
+      beginTransaction: jest.fn(),
+      commit: jest.fn(),
+      rollback: jest.fn(),
+      release: jest.fn(),
+      destroy: jest.fn(),
+    });
+    mockPool.getConnection.mockResolvedValue(mockPool);
     (mysql.createPool as jest.Mock).mockReturnValue(mockPool);
   });
 
@@ -189,14 +197,14 @@ describe('MysqlStrategy', () => {
           quote +
           'name' +
           quote +
-          ' = ? WHERE ' +
+          ' = ? WHERE (' +
           quote +
           'id' +
           quote +
           quote +
           ' OR 1=1 --' +
           quote +
-          ' = ?',
+          ' = ?)',
         ['Ada', 1],
       );
     });

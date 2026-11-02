@@ -1,5 +1,6 @@
 import { OrganizationBackupService } from './organization-backup.service';
 import { ResourceType } from '../../permissions/enums/resource-type.enum';
+import { ForbiddenException } from '@nestjs/common';
 
 describe('OrganizationBackupService', () => {
   let service: OrganizationBackupService;
@@ -56,106 +57,142 @@ describe('OrganizationBackupService', () => {
     );
   });
 
-  it('exports a backup package with teamspaces and artifacts', async () => {
-    prismaMock.organization.findUnique.mockResolvedValue({
-      id: 'org-1',
-      name: 'Org One',
-      slug: 'org-one',
-      logoUrl: null,
-      settings: { theme: 'dark' },
-    });
-    prismaMock.teamspace.findMany.mockResolvedValue([
-      {
-        id: 'teamspace-1',
-        name: 'Core',
-        slug: 'core',
-        description: 'Primary space',
-        createdBy: 'user-1',
-        createdAt: new Date('2026-05-01T00:00:00Z'),
-        updatedAt: new Date('2026-05-02T00:00:00Z'),
-      },
-    ]);
-    prismaMock.organizationResource.findMany.mockResolvedValue([
-      {
-        resourceType: ResourceType.QUERY,
-        resourceId: 'query-1',
-        permissions: { READ: ['read'] },
-        teamspaceId: 'teamspace-1',
-      },
-    ]);
-    prismaMock.savedQuery.findMany.mockResolvedValue([
-      {
-        id: 'query-1',
-        name: 'Quarterly review',
-        sql: 'select 1',
-        database: 'analytics',
-        connectionId: 'conn-1',
-        visibility: 'team',
-        folderId: 'folder-1',
-        tags: ['finance'],
-        description: 'backup',
-        createdAt: new Date('2026-05-01T00:00:00Z'),
-        updatedAt: new Date('2026-05-02T00:00:00Z'),
-      },
-    ]);
-    prismaMock.dashboard.findMany.mockResolvedValue([
-      {
-        id: 'dashboard-1',
-        name: 'Ops Board',
-        description: 'status',
-        visibility: 'workspace',
-        connectionId: 'conn-1',
-        database: 'analytics',
-        createdAt: new Date('2026-05-01T00:00:00Z'),
-        updatedAt: new Date('2026-05-02T00:00:00Z'),
-        widgets: [
-          {
-            id: 'widget-1',
-            title: 'Latency',
-            chartType: 'line',
-            queryText: 'select 1',
-            connectionId: 'conn-1',
-            database: 'analytics',
-            columns: ['latency'],
-            xAxis: 'minute',
-            yAxis: ['p95'],
-            orderIndex: 0,
-            config: {},
-            dataSnapshot: [],
-            createdAt: new Date('2026-05-01T00:00:00Z'),
-            updatedAt: new Date('2026-05-02T00:00:00Z'),
-          },
-        ],
-      },
-    ]);
-    prismaMock.erdWorkspace.findMany.mockResolvedValue([
-      {
-        id: 'erd-1',
-        name: 'Schema',
-        notes: 'layout',
-        connectionId: 'conn-1',
-        database: 'analytics',
-        layout: { nodes: [] },
-        createdAt: new Date('2026-05-01T00:00:00Z'),
-        updatedAt: new Date('2026-05-02T00:00:00Z'),
-      },
-    ]);
+  it.each(['MEMBER', 'VIEWER', null])(
+    'denies export before artifact reads for role %s',
+    async (role) => {
+      prismaMock.organization.findUnique.mockResolvedValue({
+        id: 'org-1',
+        name: 'Org',
+        slug: 'org',
+      });
+      for (const model of [
+        'teamspace',
+        'organizationResource',
+        'savedQuery',
+        'dashboard',
+        'erdWorkspace',
+      ]) {
+        prismaMock[model].findMany.mockResolvedValue([]);
+      }
+      prismaMock.organizationMember.findUnique.mockResolvedValue(
+        role ? { role } : null,
+      );
+      await expect(
+        service.exportOrganizationBackup('org-1', 'user-1'),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(prismaMock.organization.findUnique).not.toHaveBeenCalled();
+      expect(prismaMock.savedQuery.findMany).not.toHaveBeenCalled();
+      expect(prismaMock.dashboard.findMany).not.toHaveBeenCalled();
+      expect(prismaMock.erdWorkspace.findMany).not.toHaveBeenCalled();
+      expect(prismaMock.organizationResource.findMany).not.toHaveBeenCalled();
+      expect(auditMock.log).not.toHaveBeenCalled();
+    },
+  );
 
-    const backup = await service.exportOrganizationBackup('org-1', 'user-1');
+  it.each(['OWNER', 'ADMIN'])(
+    'exports a backup for %s with teamspaces and artifacts',
+    async (role) => {
+      prismaMock.organizationMember.findUnique.mockResolvedValue({ role });
+      prismaMock.organization.findUnique.mockResolvedValue({
+        id: 'org-1',
+        name: 'Org One',
+        slug: 'org-one',
+        logoUrl: null,
+        settings: { theme: 'dark' },
+      });
+      prismaMock.teamspace.findMany.mockResolvedValue([
+        {
+          id: 'teamspace-1',
+          name: 'Core',
+          slug: 'core',
+          description: 'Primary space',
+          createdBy: 'user-1',
+          createdAt: new Date('2026-05-01T00:00:00Z'),
+          updatedAt: new Date('2026-05-02T00:00:00Z'),
+        },
+      ]);
+      prismaMock.organizationResource.findMany.mockResolvedValue([
+        {
+          resourceType: ResourceType.QUERY,
+          resourceId: 'query-1',
+          permissions: { READ: ['read'] },
+          teamspaceId: 'teamspace-1',
+        },
+      ]);
+      prismaMock.savedQuery.findMany.mockResolvedValue([
+        {
+          id: 'query-1',
+          name: 'Quarterly review',
+          sql: 'select 1',
+          database: 'analytics',
+          connectionId: 'conn-1',
+          visibility: 'team',
+          folderId: 'folder-1',
+          tags: ['finance'],
+          description: 'backup',
+          createdAt: new Date('2026-05-01T00:00:00Z'),
+          updatedAt: new Date('2026-05-02T00:00:00Z'),
+        },
+      ]);
+      prismaMock.dashboard.findMany.mockResolvedValue([
+        {
+          id: 'dashboard-1',
+          name: 'Ops Board',
+          description: 'status',
+          visibility: 'workspace',
+          connectionId: 'conn-1',
+          database: 'analytics',
+          createdAt: new Date('2026-05-01T00:00:00Z'),
+          updatedAt: new Date('2026-05-02T00:00:00Z'),
+          widgets: [
+            {
+              id: 'widget-1',
+              title: 'Latency',
+              chartType: 'line',
+              queryText: 'select 1',
+              connectionId: 'conn-1',
+              database: 'analytics',
+              columns: ['latency'],
+              xAxis: 'minute',
+              yAxis: ['p95'],
+              orderIndex: 0,
+              config: {},
+              dataSnapshot: [],
+              createdAt: new Date('2026-05-01T00:00:00Z'),
+              updatedAt: new Date('2026-05-02T00:00:00Z'),
+            },
+          ],
+        },
+      ]);
+      prismaMock.erdWorkspace.findMany.mockResolvedValue([
+        {
+          id: 'erd-1',
+          name: 'Schema',
+          notes: 'layout',
+          connectionId: 'conn-1',
+          database: 'analytics',
+          layout: { nodes: [] },
+          createdAt: new Date('2026-05-01T00:00:00Z'),
+          updatedAt: new Date('2026-05-02T00:00:00Z'),
+        },
+      ]);
 
-    expect(backup.version).toBe(1);
-    expect(backup.teamspaces).toHaveLength(1);
-    expect(backup.savedQueries).toHaveLength(1);
-    expect(backup.dashboards).toHaveLength(1);
-    expect(backup.erdWorkspaces).toHaveLength(1);
-    expect(backup.resourcePolicies).toHaveLength(1);
-    expect(auditMock.log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: expect.any(String),
-        organizationId: 'org-1',
-      }),
-    );
-  });
+      const backup = await service.exportOrganizationBackup('org-1', 'user-1');
+
+      expect(backup.version).toBe(1);
+      expect(backup.teamspaces).toHaveLength(1);
+      expect(backup.savedQueries).toHaveLength(1);
+      expect(backup.dashboards).toHaveLength(1);
+      expect(backup.erdWorkspaces).toHaveLength(1);
+      expect(backup.resourcePolicies).toHaveLength(1);
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: expect.any(String),
+          organizationId: 'org-1',
+        }),
+      );
+    },
+  );
 
   it('restores a backup package and reattaches policies', async () => {
     prismaMock.organization.findUnique.mockResolvedValue({

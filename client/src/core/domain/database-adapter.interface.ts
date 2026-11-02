@@ -5,7 +5,10 @@ export interface DatabaseConnectionConfig {
     type?: string;
 }
 
+export type RowIdentity = Array<{ column: string; value: string | number | boolean }>;
+
 export interface QueryExecutionContext {
+    signal?: AbortSignal;
     database?: string;
     limit?: number;
     offset?: number;
@@ -102,6 +105,7 @@ export interface IDatabaseAdapter {
         table: string;
         pkColumn: string;
         pkValue: DatabaseValue;
+        identity?: RowIdentity;
         updates: RowData;
     }): Promise<MutationResult>;
     insertRow(params: { database?: string; schema: string; table: string; data: RowData }): Promise<MutationResult>;
@@ -111,6 +115,7 @@ export interface IDatabaseAdapter {
         table: string;
         pkColumn: string;
         pkValues: DatabaseValue[];
+        identities?: RowIdentity[];
     }): Promise<MutationResult>;
     updateSchema(params: { database?: string; schema: string; table: string; operations: SchemaOperation[] }): Promise<MutationResult>;
     getMetrics(database?: string): Promise<DatabaseMetrics>;

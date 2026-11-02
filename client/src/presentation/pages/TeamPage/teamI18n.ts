@@ -10,6 +10,7 @@ export function getTeamText(lang: AppLang) {
     allGood: pickLocalizedText(lang, 'Ổn định', 'Healthy'),
     actions: pickLocalizedText(lang, 'Hành động', 'Actions'),
     backups: pickLocalizedText(lang, 'Sao lưu', 'Backups'),
+    backupAccessRequired: pickLocalizedText(lang, 'Chỉ chủ sở hữu và quản trị viên được xuất hoặc khôi phục bản sao lưu toàn bộ tổ chức.', 'Only owners and admins can export or restore a full organization backup.'),
     backupExported: pickLocalizedText(lang, 'Đã xuất gói sao lưu', 'Backup exported'),
     backupJsonInvalid: pickLocalizedText(lang, 'Backup JSON không hợp lệ', 'Backup JSON is invalid'),
     backupRestoreDetails: pickLocalizedText(lang, 'Khôi phục sẽ tạo lại tài nguyên và gắn lại metadata team.', 'Restore recreates resources and reattaches team metadata.'),

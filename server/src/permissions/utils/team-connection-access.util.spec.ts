@@ -61,6 +61,24 @@ describe('parseRoleQueryModes', () => {
 });
 
 describe('assertTeamConnectionAccess', () => {
+  it('fails closed when a non-owner loses membership between permission checks', () => {
+    expect(() =>
+      assertTeamConnectionAccess(
+        makeConnection(),
+        { userId: MEMBER_ID, role: null },
+        { database: 'analytics' },
+      ),
+    ).toThrow(ForbiddenException);
+  });
+  it('blocks structured writes without a raw SQL string for readonly members', () => {
+    expect(() =>
+      assertTeamConnectionAccess(
+        makeConnection({ roleQueryModes: { MEMBER: 'readonly' } }),
+        { userId: MEMBER_ID, role: OrganizationRole.MEMBER },
+        { isReadOnlySql: false },
+      ),
+    ).toThrow(ForbiddenException);
+  });
   it('always grants the connection owner', () => {
     expect(() =>
       assertTeamConnectionAccess(

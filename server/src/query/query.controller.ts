@@ -40,11 +40,25 @@ export class QueryController {
 
   @Post()
   @Throttle({ default: { limit: 45, ttl: 60000 } })
-  executeQuery(
+  async executeQuery(
     @Body() createQueryDto: CreateQueryDto,
     @Req() req: RequestWithUser,
   ) {
-    return this.queryService.executeQuery(createQueryDto, req.user.id);
+    const abort = new AbortController();
+    const response = req.res;
+    const disconnected = () => {
+      if (!response?.writableEnded) abort.abort();
+    };
+    response?.once('close', disconnected);
+    try {
+      return await this.queryService.executeQuery(
+        createQueryDto,
+        req.user.id,
+        abort.signal,
+      );
+    } finally {
+      response?.removeListener('close', disconnected);
+    }
   }
 
   @Get('active')

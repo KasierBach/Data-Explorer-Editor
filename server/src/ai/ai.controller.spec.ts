@@ -96,6 +96,31 @@ describe('AiController', () => {
     expect(JSON.stringify(result)).not.toContain('-key');
   });
 
+  it('rejects a denied connection before sending SSE headers or calling an AI provider', async () => {
+    const error = new Error('fixture denied');
+    connectionServiceMock.getConnectionContextForStream.mockRejectedValueOnce(
+      error,
+    );
+    const res = {
+      setHeader: jest.fn(),
+      flushHeaders: jest.fn(),
+      write: jest.fn(),
+      end: jest.fn(),
+    };
+    await expect(
+      controller.generateSqlStream(
+        { connectionId: 'conn-1', prompt: 'show tables' },
+        res as Parameters<AiController['generateSqlStream']>[1],
+        { user: { id: 'user-1' } } as Parameters<
+          AiController['generateSqlStream']
+        >[2],
+      ),
+    ).rejects.toBe(error);
+    expect(res.flushHeaders).not.toHaveBeenCalled();
+    expect(res.write).not.toHaveBeenCalled();
+    expect(aiServiceMock.chatStream).not.toHaveBeenCalled();
+  });
+
   it('passes history into chatStream for streaming requests', async () => {
     const history = [{ role: 'user', content: 'Show tables' }];
     const streamEvent = {

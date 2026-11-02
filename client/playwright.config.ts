@@ -16,11 +16,12 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   webServer: {
+    env: { VITE_API_URL: 'http://localhost:3001/api' },
     command: isCi
       ? 'npm run build && npm run preview -- --host 127.0.0.1 --port 4173'
       : 'npm run dev -- --host 127.0.0.1 --port 4173',
     url: 'http://127.0.0.1:4173',
-    reuseExistingServer: !isCi,
+    reuseExistingServer: false,
     timeout: 180_000,
   },
   projects: [

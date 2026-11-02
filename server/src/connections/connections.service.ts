@@ -19,6 +19,7 @@ import { ResourceType } from '../permissions/enums/resource-type.enum';
 import { Permission } from '../permissions/enums/permission.enum';
 import { PermissionsService } from '../permissions/services/permissions.service';
 import { getErrorMessage } from '../common/utils/error.util';
+import { assertTeamConnectionAccess } from '../permissions/utils/team-connection-access.util';
 
 @Injectable()
 export class ConnectionsService implements OnModuleDestroy {
@@ -618,6 +619,27 @@ export class ConnectionsService implements OnModuleDestroy {
     }
   }
 
+  /** Internal authorization context; never return its credential fields from a controller. */
+  async authorizeAccess(id: string, userId: string, database?: string | null) {
+    const connection = await this.findRawOne(id, userId);
+    if (connection.organizationId && connection.userId !== userId) {
+      const role = await this.permissionsService.getMemberRole(
+        userId,
+        connection.organizationId,
+      );
+      assertTeamConnectionAccess(
+        connection,
+        { userId, role },
+        // null is metadata enumeration only; getPool never passes it.
+        {
+          database:
+            database === null ? undefined : database || connection.database,
+        },
+      );
+    }
+    return connection;
+  }
+
   async getPool(id: string, databaseOverride?: string, userId?: string) {
     if (!userId) {
       // Every caller must be authenticated so ownership is enforced; a
@@ -627,7 +649,7 @@ export class ConnectionsService implements OnModuleDestroy {
         'An authenticated user is required to access a connection pool.',
       );
     }
-    const connection = await this.findRawOne(id, userId);
+    const connection = await this.authorizeAccess(id, userId, databaseOverride);
     const poolKey = `${id}:${databaseOverride || connection.database}`;
 
     if (this.pools.has(poolKey)) {

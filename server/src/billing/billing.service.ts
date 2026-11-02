@@ -128,6 +128,10 @@ export class BillingService {
       throw new NotFoundException('Payment not found');
     }
 
+    if (payment.provider !== provider.name) {
+      throw new BadRequestException('Payment provider does not match checkout');
+    }
+
     if (verified.amountVnd !== payment.amountVnd) {
       throw new BadRequestException('Payment amount does not match checkout');
     }
@@ -158,6 +162,8 @@ export class BillingService {
 
     const now = verified.paidAt ?? new Date();
     const activation = await this.prisma.$transaction(async (tx) => {
+      // The user exists before the first subscription; serialize every credit for that user.
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${payment.userId} FOR UPDATE`;
       const claimed = await tx.payment.updateMany({
         where: { id: payment.id, status: { not: 'paid' } },
         data: {

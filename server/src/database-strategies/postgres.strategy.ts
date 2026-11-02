@@ -11,16 +11,23 @@ import type {
   ConnectionConfig,
   FullTableMetadata,
   IndexInfo,
+  QueryExecutionOptions,
 } from './database-strategy.interface';
 import { SchemaOperation } from '../query/dto/schema-operations.types';
 import { Injectable, Logger } from '@nestjs/common';
-import { Pool } from 'pg';
+import { Pool, Client } from 'pg';
+import QueryStream from 'pg-query-stream';
 import { SqlUtil } from '../utils/sql.util';
+import { assertAffectedRows, buildRowPredicate } from './row-identity.util';
 import {
   allowInsecureDatabaseTls,
   isLocalDatabaseHost,
 } from '../common/utils/database-network.util';
 import { SUPABASE_ROOT_2021_CA } from '../common/constants/supabase-ca.constant';
+import {
+  createQueryExecution,
+  cancelQueryExecution,
+} from './query-execution.util';
 
 const SUPABASE_POOLER_HOST_SUFFIX = '.pooler.supabase.com';
 const DEFAULT_POSTGRES_PORT = 5432;
@@ -89,11 +96,78 @@ export class PostgresStrategy implements IDatabaseStrategy {
 
   // ─── Query Operations ───
 
+  private async openQueryExecution(
+    pool: Pool,
+    options?: QueryExecutionOptions,
+  ) {
+    const client = await pool.connect();
+    let released = false;
+    let clientError: Error | undefined;
+    const handleError = (error: Error) => {
+      clientError = error;
+    };
+    client.on('error', handleError);
+    const release = (error = clientError) => {
+      if (released) return;
+      released = true;
+      client.removeListener('error', handleError);
+      client.release(error);
+    };
+    const execution = createQueryExecution(async (isActive) => {
+      const control = new Client(pool.options);
+      try {
+        await control.connect();
+        if (!isActive()) return false;
+        const result = await control.query<{ cancelled: boolean }>(
+          'SELECT pg_cancel_backend($1) AS cancelled',
+          [client.processID],
+        );
+        return result.rows[0]?.cancelled === true;
+      } catch {
+        // A failed control connection does not prove the source statement stopped.
+        return false;
+      } finally {
+        await control.end();
+      }
+    });
+    const cancelTimedOutQuery = async () => {
+      // pg's read timeout rejects before ReadyForQuery; retain the lease until the wire drains.
+      const drained = new Promise<void>((resolve) => {
+        const done = () => {
+          client.removeListener('drain', done);
+          client.removeListener('error', done);
+          client.removeListener('end', done);
+          resolve();
+        };
+        client.once('drain', done);
+        client.once('error', done);
+        client.once('end', done);
+        if (clientError) done();
+      });
+      await execution.cancel();
+      await drained;
+    };
+    try {
+      options?.onExecution?.(execution);
+      return { client, execution, release, cancelTimedOutQuery };
+    } catch (error) {
+      await execution.finish();
+      release();
+      throw error;
+    }
+  }
+
   async executeQuery(
     pool: Pool,
     sql: string,
-    options?: { limit?: number; offset?: number },
+    options?: QueryExecutionOptions,
   ): Promise<QueryResult> {
+    if (options?.readOnly) {
+      return this.runStatementsInTransaction(pool, [sql], {
+        ...options,
+        limit: options.limit ?? 50000,
+      });
+    }
     let safeSql = sql;
     if (options?.limit !== undefined) {
       if (options?.offset !== undefined) {
@@ -110,8 +184,10 @@ export class PostgresStrategy implements IDatabaseStrategy {
       safeSql = SqlUtil.injectLimit(sql, 50000);
     }
 
-    const client = await pool.connect();
+    const { client, execution, release, cancelTimedOutQuery } =
+      await this.openQueryExecution(pool, options);
     try {
+      execution.assertRunning();
       const result = await client.query(safeSql);
       const queryResult = Array.isArray(result)
         ? result[result.length - 1]
@@ -123,38 +199,39 @@ export class PostgresStrategy implements IDatabaseStrategy {
           : [],
         rowCount: queryResult.rowCount,
       };
+    } catch (error) {
+      if (error instanceof Error && error.message === 'Query read timeout') {
+        await cancelTimedOutQuery();
+        release(error);
+      }
+      throw error;
     } finally {
-      client.release();
+      await execution.finish();
+      release();
     }
   }
 
   async cancelActiveQuery(execution: unknown): Promise<boolean> {
-    // Postgres: cancel via pg_cancel_backend on the backend PID.
-    const client = execution as import('pg').PoolClient;
-    if (!client || typeof client.query !== 'function') return false;
-    const pidResult = await client.query<{ pid: number | null }>(
-      'SELECT pg_backend_pid() AS pid',
-    );
-    const pid = pidResult.rows?.[0]?.pid;
-    if (!pid) return false;
-    await client.query('SELECT pg_cancel_backend($1)', [pid]);
-    return true;
+    return cancelQueryExecution(execution);
   }
 
   async runStatementsInTransaction(
     pool: Pool,
     statements: string[],
-    options?: { limit?: number; offset?: number },
+    options?: QueryExecutionOptions,
   ): Promise<QueryResult> {
-    const client = await pool.connect();
+    const { client, execution, release, cancelTimedOutQuery } =
+      await this.openQueryExecution(pool, options);
     try {
-      await client.query('BEGIN');
+      execution.assertRunning();
+      await client.query(options?.readOnly ? 'BEGIN READ ONLY' : 'BEGIN');
       let result: QueryResult = {
         rows: [],
         columns: [],
         countStatus: 'skipped',
       };
       for (const statement of statements) {
+        execution.assertRunning();
         const isLast = statement === statements[statements.length - 1];
         let safeSql = statement;
         if (isLast && options?.limit !== undefined) {
@@ -180,17 +257,30 @@ export class PostgresStrategy implements IDatabaseStrategy {
           };
         }
       }
+      execution.assertRunning();
       await client.query('COMMIT');
       return result;
     } catch (error) {
-      try {
-        await client.query('ROLLBACK');
-      } catch {
-        // Connection will be discarded by the pool on release if broken.
+      if (error instanceof Error && error.message === 'Query read timeout') {
+        await cancelTimedOutQuery();
+        await execution.finish();
+        release(error);
+      } else {
+        await execution.finish();
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          release(
+            rollbackError instanceof Error
+              ? rollbackError
+              : new Error(String(rollbackError)),
+          );
+        }
       }
       throw error;
     } finally {
-      client.release();
+      await execution.finish();
+      release();
     }
   }
 
@@ -204,11 +294,19 @@ export class PostgresStrategy implements IDatabaseStrategy {
     const setClause = updateCols
       .map((col, i) => `${this.quoteIdentifier(col)} = $${i + 1}`)
       .join(', ');
-    const sql = `UPDATE ${quotedTable} SET ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = $${updateCols.length + 1}`;
-    const values = [...updateCols.map((c) => updates[c]), pkValue];
-
-    const res = await pool.query(sql, values);
-    return { success: true, rowCount: res.rowCount };
+    const predicate = buildRowPredicate(
+      [params.identity ?? [{ column: pkColumn, value: pkValue }]],
+      (column) => this.quoteIdentifier(column),
+      (position) => `$${position}`,
+      updateCols.length,
+    );
+    const sql = `UPDATE ${quotedTable} SET ${setClause} WHERE ${predicate.sql}`;
+    return this.runRowMutation(
+      pool,
+      sql,
+      [...updateCols.map((c) => updates[c]), ...predicate.values],
+      1,
+    );
   }
 
   async insertRow(
@@ -237,11 +335,48 @@ export class PostgresStrategy implements IDatabaseStrategy {
     if (pkValues.length === 0) return { success: true, rowCount: 0 };
 
     const quotedTable = this.quoteTable(schema, table);
-    const placeholders = pkValues.map((_, i) => `$${i + 1}`).join(', ');
-    const sql = `DELETE FROM ${quotedTable} WHERE ${this.quoteIdentifier(pkColumn)} IN (${placeholders})`;
+    const identities =
+      params.identities ??
+      pkValues.map((value) => [{ column: pkColumn, value }]);
+    const predicate = buildRowPredicate(
+      identities,
+      (column) => this.quoteIdentifier(column),
+      (position) => `$${position}`,
+    );
+    return this.runRowMutation(
+      pool,
+      `DELETE FROM ${quotedTable} WHERE ${predicate.sql}`,
+      predicate.values,
+      identities.length,
+    );
+  }
 
-    const res = await pool.query(sql, pkValues);
-    return { success: true, rowCount: res.rowCount };
+  private async runRowMutation(
+    pool: Pool,
+    sql: string,
+    values: unknown[],
+    expectedRows: number,
+  ): Promise<{ success: boolean; rowCount: number }> {
+    const client = await pool.connect();
+    let rollbackFailed = false;
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(sql, values);
+      assertAffectedRows(result.rowCount, expectedRows);
+      await client.query('COMMIT');
+      return { success: true, rowCount: expectedRows };
+    } catch (error) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        rollbackFailed = true;
+      }
+      throw error;
+    } finally {
+      client.release(
+        rollbackFailed ? new Error('Row mutation rollback failed') : undefined,
+      );
+    }
   }
 
   async importData(
@@ -303,51 +438,51 @@ export class PostgresStrategy implements IDatabaseStrategy {
     schema: string,
     table: string,
   ): Promise<unknown> {
-    // Dynamic import because pg-query-stream might only be used here
-    const queryStreamModule = await import('pg-query-stream');
-    const QueryStream = queryStreamModule.default ?? queryStreamModule;
-
     const quotedTable = this.quoteTable(schema, table);
     const query = new QueryStream(`SELECT * FROM ${quotedTable}`, undefined, {
       batchSize: 2000,
     });
 
     const client = await pool.connect();
-    let releasePromise: Promise<void> | null = null;
-    let previousTimeout = '30s';
-
-    // Restore the session-scoped timeout before returning the client.
-    const safeRelease = () => {
-      if (!releasePromise) {
-        releasePromise = (async () => {
-          try {
-            await client.query('SELECT set_config($1, $2, false)', [
-              'statement_timeout',
-              previousTimeout,
-            ]);
-          } catch {
-            // A broken connection will be discarded by the pool on release.
-          } finally {
-            client.release();
-          }
-        })();
-      }
-      return releasePromise;
+    let released = false;
+    let finishDestroy: ((error?: Error | null) => void) | undefined;
+    const destroyCursor = query._destroy.bind(query);
+    // A failed connection cannot acknowledge cursor.close; discard it without waiting for ReadyForQuery.
+    query._destroy = (error, callback: (error?: Error | null) => void) => {
+      let finished = false;
+      const finish = (cause?: Error | null) => {
+        if (finished) return;
+        finished = true;
+        finishDestroy = undefined;
+        callback(cause);
+      };
+      finishDestroy = finish;
+      if (error) finish(error);
+      else destroyCursor(error, finish);
     };
-
+    const handleClientError = (error: Error) => {
+      query.destroy(error);
+      finishDestroy?.(error);
+    };
+    const safeRelease = (error?: Error) => {
+      if (released) return;
+      released = true;
+      client.removeListener('error', handleClientError);
+      client.release(error);
+    };
+    client.on('error', handleClientError);
+    // pg's query_timeout wrapper requires a callback even for Submittable streams.
+    query.callback = (error?: Error) => {
+      if (!error) return;
+      query.destroy(error);
+    };
+    query.once('error', safeRelease);
+    query.once('close', () => safeRelease());
     try {
-      const timeoutResult = await client.query('SHOW statement_timeout');
-      previousTimeout =
-        timeoutResult.rows?.[0]?.statement_timeout || previousTimeout;
-      await client.query('SET statement_timeout = 0');
-
-      const stream = client.query(query);
-      stream.on('end', () => void safeRelease());
-      stream.on('error', () => void safeRelease());
-      stream.on('close', () => void safeRelease());
-      return stream;
+      // Keep both configured server and client deadlines; never disable statement_timeout.
+      return client.query(query);
     } catch (error) {
-      await safeRelease();
+      safeRelease(error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }

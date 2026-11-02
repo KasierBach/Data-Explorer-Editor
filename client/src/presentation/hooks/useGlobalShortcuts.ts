@@ -88,7 +88,6 @@ export function useGlobalShortcuts() {
             if (activeTab && activeTab.type === 'query') {
                 e.preventDefault();
                 e.stopPropagation();
-                e.stopImmediatePropagation();
             }
         }
     }, [openQueryTab, openTab, closeAllTabs, toggleResultPanel, toggleSidebar, toggleAiPanel]);

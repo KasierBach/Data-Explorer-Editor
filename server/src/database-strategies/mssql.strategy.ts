@@ -10,16 +10,22 @@ import type {
   DeleteRowsParams,
   ConnectionConfig,
   FullTableMetadata,
+  QueryExecutionOptions,
 } from './database-strategy.interface';
 import { SchemaOperation } from '../query/dto/schema-operations.types';
 import { Injectable, Logger } from '@nestjs/common';
 import { PassThrough } from 'stream';
 import * as mssql from 'mssql';
 import { SqlUtil } from '../utils/sql.util';
+import { assertAffectedRows, buildRowPredicate } from './row-identity.util';
 import {
   allowInsecureDatabaseTls,
   isLocalDatabaseHost,
 } from '../common/utils/database-network.util';
+import {
+  createQueryExecution,
+  cancelQueryExecution,
+} from './query-execution.util';
 
 @Injectable()
 export class MssqlStrategy implements IDatabaseStrategy {
@@ -80,7 +86,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
   async executeQuery(
     pool: mssql.ConnectionPool,
     sql: string,
-    options?: { limit?: number; offset?: number },
+    options?: QueryExecutionOptions,
   ): Promise<QueryResult> {
     let safeSql = sql;
     if (options?.limit !== undefined) {
@@ -97,31 +103,47 @@ export class MssqlStrategy implements IDatabaseStrategy {
       safeSql = SqlUtil.injectTop(sql, 50000);
     }
 
-    const result = await pool.request().query(safeSql);
-    return {
-      rows: result.recordset ? result.recordset.slice(0, 50000) : [],
-      columns: result.recordset?.columns
-        ? Object.keys(result.recordset.columns)
-        : [],
-      rowCount: result.rowsAffected?.[0] ?? 0,
-    };
+    const request = pool.request();
+    const execution = createQueryExecution(async (isActive) => {
+      if (!isActive()) return false;
+      request.cancel();
+      return true;
+    });
+    try {
+      options?.onExecution?.(execution);
+      execution.assertRunning();
+      const result = await request.query(safeSql);
+      return {
+        rows: result.recordset ? result.recordset.slice(0, 50000) : [],
+        columns: result.recordset?.columns
+          ? Object.keys(result.recordset.columns)
+          : [],
+        rowCount: result.rowsAffected?.[0] ?? 0,
+      };
+    } finally {
+      await execution.finish();
+    }
   }
 
   async cancelActiveQuery(execution: unknown): Promise<boolean> {
-    // SQL Server: cancel via request.cancel() if available.
-    const request = execution as { cancel?: () => void } | null;
-    if (!request || typeof request.cancel !== 'function') return false;
-    request.cancel();
-    return true;
+    return cancelQueryExecution(execution);
   }
 
   async runStatementsInTransaction(
     pool: mssql.ConnectionPool,
     statements: string[],
-    options?: { limit?: number; offset?: number },
+    options?: QueryExecutionOptions,
   ): Promise<QueryResult> {
     const transaction = new mssql.Transaction(pool);
+    let request: mssql.Request;
+    const execution = createQueryExecution(async (isActive) => {
+      if (!isActive() || !request) return false;
+      request.cancel();
+      return true;
+    });
     try {
+      options?.onExecution?.(execution);
+      execution.assertRunning();
       await transaction.begin();
       let result: QueryResult = {
         rows: [],
@@ -129,6 +151,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
         countStatus: 'skipped',
       };
       for (const statement of statements) {
+        execution.assertRunning();
         const isLast = statement === statements[statements.length - 1];
         let safeSql = statement;
         if (isLast && options?.limit !== undefined) {
@@ -142,7 +165,8 @@ export class MssqlStrategy implements IDatabaseStrategy {
                 )
               : SqlUtil.injectTop(statement, options.limit);
         }
-        const raw = await transaction.request().query(safeSql);
+        request = transaction.request();
+        const raw = await request.query(safeSql);
         if (isLast) {
           result = {
             rows: raw.recordset ? raw.recordset.slice(0, 50000) : [],
@@ -153,15 +177,19 @@ export class MssqlStrategy implements IDatabaseStrategy {
           };
         }
       }
+      execution.assertRunning();
       await transaction.commit();
       return result;
     } catch (error) {
+      await execution.finish();
       try {
         await transaction.rollback();
       } catch {
         // Connection will be discarded by the pool if broken.
       }
       throw error;
+    } finally {
+      await execution.finish();
     }
   }
 
@@ -175,14 +203,19 @@ export class MssqlStrategy implements IDatabaseStrategy {
     const setClause = updateCols
       .map((col, i) => `${this.quoteIdentifier(col)} = @p${i}`)
       .join(', ');
-    const sql = `UPDATE ${quotedTable} SET ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = @pk`;
-
-    const request = pool.request();
-    updateCols.forEach((col, i) => request.input(`p${i}`, updates[col]));
-    request.input('pk', pkValue);
-
-    const result = await request.query(sql);
-    return { success: true, rowCount: result.rowsAffected?.[0] ?? 0 };
+    const predicate = buildRowPredicate(
+      [params.identity ?? [{ column: pkColumn, value: pkValue }]],
+      (column) => this.quoteIdentifier(column),
+      (position) => `@p${position - 1}`,
+      updateCols.length,
+    );
+    const sql = `UPDATE ${quotedTable} SET ${setClause} WHERE ${predicate.sql}`;
+    return this.runRowMutation(
+      pool,
+      sql,
+      [...updateCols.map((column) => updates[column]), ...predicate.values],
+      1,
+    );
   }
 
   async insertRow(
@@ -213,14 +246,45 @@ export class MssqlStrategy implements IDatabaseStrategy {
     if (pkValues.length === 0) return { success: true, rowCount: 0 };
 
     const quotedTable = this.quoteTable(schema, table);
-    const placeholders = pkValues.map((_, i) => `@pk${i}`).join(', ');
-    const sql = `DELETE FROM ${quotedTable} WHERE ${this.quoteIdentifier(pkColumn)} IN (${placeholders})`;
+    const identities =
+      params.identities ??
+      pkValues.map((value) => [{ column: pkColumn, value }]);
+    const predicate = buildRowPredicate(
+      identities,
+      (column) => this.quoteIdentifier(column),
+      (position) => `@p${position - 1}`,
+    );
+    return this.runRowMutation(
+      pool,
+      `DELETE FROM ${quotedTable} WHERE ${predicate.sql}`,
+      predicate.values,
+      identities.length,
+    );
+  }
 
-    const request = pool.request();
-    pkValues.forEach((v, i) => request.input(`pk${i}`, v));
-
-    const result = await request.query(sql);
-    return { success: true, rowCount: result.rowsAffected?.[0] ?? 0 };
+  private async runRowMutation(
+    pool: mssql.ConnectionPool,
+    sql: string,
+    values: unknown[],
+    expectedRows: number,
+  ): Promise<{ success: boolean; rowCount: number }> {
+    const transaction = new mssql.Transaction(pool);
+    await transaction.begin();
+    try {
+      const request = new mssql.Request(transaction);
+      values.forEach((value, index) => request.input(`p${index}`, value));
+      const result = await request.query(sql);
+      assertAffectedRows(result.rowsAffected?.[0], expectedRows);
+      await transaction.commit();
+      return { success: true, rowCount: expectedRows };
+    } catch (error) {
+      try {
+        await transaction.rollback();
+      } catch {
+        /* Driver may already have aborted the transaction. */
+      }
+      throw error;
+    }
   }
 
   async importData(
@@ -472,13 +536,16 @@ export class MssqlStrategy implements IDatabaseStrategy {
     const sql = `
             SELECT 
                 c.COLUMN_NAME, c.DATA_TYPE, c.IS_NULLABLE, c.COLUMN_DEFAULT,
-                kc.name as pk_constraint_name
+                pk.CONSTRAINT_NAME as pk_constraint_name
             FROM INFORMATION_SCHEMA.COLUMNS c
-            LEFT JOIN sys.tables t ON t.name = c.TABLE_NAME AND SCHEMA_NAME(t.schema_id) = c.TABLE_SCHEMA
-            LEFT JOIN sys.indexes i ON i.object_id = t.object_id AND i.is_primary_key = 1
-            LEFT JOIN sys.index_columns ic ON ic.object_id = t.object_id AND ic.index_id = i.index_id
-            LEFT JOIN sys.columns sc ON sc.object_id = t.object_id AND sc.column_id = ic.column_id AND sc.name = c.COLUMN_NAME
-            LEFT JOIN sys.key_constraints kc ON kc.parent_object_id = t.object_id AND kc.unique_index_id = i.index_id AND kc.type = 'PK'
+            LEFT JOIN (
+                SELECT k.TABLE_SCHEMA,k.TABLE_NAME,k.COLUMN_NAME,k.CONSTRAINT_NAME
+                FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE k
+                JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS t
+                  ON t.CONSTRAINT_NAME=k.CONSTRAINT_NAME AND t.CONSTRAINT_SCHEMA=k.CONSTRAINT_SCHEMA
+                 AND t.TABLE_NAME=k.TABLE_NAME AND t.TABLE_SCHEMA=k.TABLE_SCHEMA
+                WHERE t.CONSTRAINT_TYPE='PRIMARY KEY'
+            ) pk ON pk.TABLE_SCHEMA=c.TABLE_SCHEMA AND pk.TABLE_NAME=c.TABLE_NAME AND pk.COLUMN_NAME=c.COLUMN_NAME
             WHERE c.TABLE_NAME = @table AND c.TABLE_SCHEMA = @schema
             ORDER BY c.ORDINAL_POSITION
         `;
@@ -716,7 +783,7 @@ export class MssqlStrategy implements IDatabaseStrategy {
                 stock INT
             );
         `;
-    return this.executeQuery(pool, sql);
+    return this.runStatementsInTransaction(pool, [sql]);
   }
 
   async getSampleRows(

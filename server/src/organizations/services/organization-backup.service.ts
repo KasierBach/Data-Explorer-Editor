@@ -132,7 +132,7 @@ export class OrganizationBackupService {
     organizationId: string,
     userId: string,
   ): Promise<OrganizationBackupPackage> {
-    await this.ensureMemberAccess(organizationId, userId);
+    await this.ensureOwnerOrAdminAccess(organizationId, userId);
 
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
@@ -549,13 +549,6 @@ export class OrganizationBackupService {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '');
-  }
-
-  private async ensureMemberAccess(organizationId: string, userId: string) {
-    const member = await this.repository.findMember(organizationId, userId);
-    if (!member) {
-      throw new ForbiddenException('You are not a member');
-    }
   }
 
   private async ensureOwnerOrAdminAccess(

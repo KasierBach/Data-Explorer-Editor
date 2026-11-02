@@ -1,4 +1,10 @@
-﻿const SQL_READ_ONLY_PREFIXES = [
+import { validateMongoExecutablePayload } from '../ai/mongo-payload-validator';
+import {
+  sanitizeNoSql,
+  validateNoSqlPayload,
+} from '../common/utils/nosql-sanitizer.util';
+
+const SQL_READ_ONLY_PREFIXES = [
   'SELECT',
   'WITH',
   'SHOW',
@@ -31,6 +37,12 @@ const SQL_WRITE_KEYWORDS = [
   'RESTORE',
   'USE',
   'KILL',
+  'INTO',
+  'VACUUM',
+  'COPY',
+  'LOAD',
+  'DO',
+  'SET',
 ];
 
 const MONGO_READ_ONLY_ACTIONS = new Set(['find', 'aggregate', 'count']);
@@ -51,26 +63,35 @@ interface SqlObjectInfo {
 }
 
 export function normalizeSql(sql: string): string {
-  return sql
-    .replace(/\/\*(?:[^*]|\*(?!\/))*\*\//g, ' ')
-    .replace(/--[^\r\n]*/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return scanSql(sql)
+    .map((statement) => statement.normalized)
+    .join('; ');
 }
 
-export function isSqlAllowedOnReadOnly(sql: string): boolean {
-  const normalized = normalizeSql(sql).toUpperCase();
-  if (!normalized) return true;
-
-  if (
-    SQL_WRITE_KEYWORDS.some((kw) =>
-      new RegExp(`\\b${kw}\\b`, 'i').test(normalized),
-    )
-  ) {
+export function isSqlAllowedOnReadOnly(sql: string, dialect?: string): boolean {
+  try {
+    return scanSql(sql, dialect).every(({ code }) => {
+      const normalized = code.toUpperCase();
+      if (
+        SQL_WRITE_KEYWORDS.some((kw) =>
+          new RegExp(`\\b${kw}\\b`).test(normalized),
+        )
+      ) {
+        return false;
+      }
+      if (/^PRAGMA\b/.test(normalized)) {
+        return /^PRAGMA\s+(?:\w+\.)?(?:(?:TABLE_INFO|TABLE_XINFO|INDEX_LIST|INDEX_INFO|INDEX_XINFO|FOREIGN_KEY_LIST)\s*\([^()=;]*\)|DATABASE_LIST|COMPILE_OPTIONS|USER_VERSION|FOREIGN_KEYS)\s*$/.test(
+          normalized,
+        );
+      }
+      return SQL_READ_ONLY_PREFIXES.some((prefix) =>
+        new RegExp(`^${prefix}\\b`).test(normalized),
+      );
+    });
+  } catch {
+    // Unsupported lexical forms fail closed; callers must never infer permission from a parse failure.
     return false;
   }
-
-  return SQL_READ_ONLY_PREFIXES.some((prefix) => normalized.startsWith(prefix));
 }
 
 export function isLikelyDestructiveSql(sql: string): boolean {
@@ -81,98 +102,137 @@ export function containsMultipleStatements(sql: string): boolean {
   return splitSqlStatements(sql).length > 1;
 }
 
-function appendSqlStatement(statements: string[], sql: string) {
-  if (!normalizeSql(sql)) return;
-  if (statements.length >= MAX_SQL_STATEMENTS) {
-    throw new RangeError(
-      `SQL query exceeds the maximum of ${MAX_SQL_STATEMENTS} statements.`,
-    );
-  }
-
-  statements.push(sql.trim());
+interface ScannedSqlStatement {
+  sql: string;
+  normalized: string;
+  code: string;
+  objectCode: string;
 }
 
-export function splitSqlStatements(sql: string): string[] {
+function scanSql(sql: string, dialect?: string): ScannedSqlStatement[] {
   if (sql.length > MAX_SQL_LENGTH) {
     throw new RangeError(
       `SQL query exceeds the maximum length of ${MAX_SQL_LENGTH} characters.`,
     );
   }
 
-  const statements: string[] = [];
-  let current = '';
-  let insideSingle = false;
-  let insideDouble = false;
-  let insideLineComment = false;
-  let insideBlockComment = false;
+  if (sql.includes('\0'))
+    throw new RangeError('SQL contains a null character.');
+  const statements: ScannedSqlStatement[] = [];
+  const mysqlDialect = dialect === 'mysql' || dialect === 'mariadb';
+  const dollarQuote = /\$(?:[A-Za-z_][A-Za-z_0-9]*)?\$/y;
+  let start = 0;
+  let normalized: string[] = [];
+  let code: string[] = [];
+  let objectCode: string[] = [];
+  const append = (end: number) => {
+    const executable = code.join('').replace(/\s+/g, ' ').trim();
+    if (!executable) return;
+    if (statements.length >= MAX_SQL_STATEMENTS) {
+      throw new RangeError(
+        `SQL query exceeds the maximum of ${MAX_SQL_STATEMENTS} statements.`,
+      );
+    }
+    statements.push({
+      sql: sql.slice(start, end).trim(),
+      normalized: normalized.join('').replace(/\s+/g, ' ').trim(),
+      code: executable,
+      objectCode: objectCode.join('').replace(/\s+/g, ' ').trim(),
+    });
+  };
 
-  for (let i = 0; i < MAX_SQL_LENGTH; i++) {
-    if (i >= sql.length) break;
+  for (let i = 0; i < sql.length; i++) {
     const ch = sql[i];
-    const next = i < sql.length - 1 ? sql[i + 1] : '';
-    const prev = i > 0 ? sql[i - 1] : '';
-
-    if (insideLineComment) {
-      current += ch;
-      if (ch === '\n') {
-        insideLineComment = false;
+    const next = sql[i + 1];
+    if (ch === '#' && mysqlDialect) {
+      throw new RangeError(
+        'MySQL hash comments are unsupported; use -- followed by ASCII whitespace.',
+      );
+    }
+    if (ch === '-' && next === '-') {
+      const commentWhitespace = mysqlDialect ? /[\t\n\v\f\r ]/ : /\s/;
+      if (sql[i + 2] && !commentWhitespace.test(sql[i + 2])) {
+        throw new RangeError(
+          'Unsupported SQL line comment; add whitespace after --.',
+        );
       }
+      while (i + 1 < sql.length && !/[\r\n]/.test(sql[i + 1])) i++;
+      normalized.push(' ');
+      code.push(' ');
+      objectCode.push(' ');
       continue;
     }
-
-    if (insideBlockComment) {
-      current += ch;
-      if (ch === '*' && next === '/') {
-        current += next;
-        i += 1;
-        insideBlockComment = false;
+    if (ch === '/' && next === '*') {
+      const end = sql.indexOf('*/', i + 2);
+      const nested = sql.indexOf('/*', i + 2);
+      if (
+        end < 0 ||
+        (nested >= 0 && nested < end) ||
+        /^\/\*(?:!|M!)/i.test(sql.slice(i, i + 5))
+      ) {
+        throw new RangeError(
+          'Unsupported SQL comment; use a complete, non-executable, non-nested comment.',
+        );
       }
+      i = end + 1;
+      normalized.push(' ');
+      code.push(' ');
+      objectCode.push(' ');
       continue;
     }
-
-    if (!insideSingle && !insideDouble) {
-      if (ch === '-' && next === '-') {
-        current += ch + next;
-        i += 1;
-        insideLineComment = true;
-        continue;
+    dollarQuote.lastIndex = i;
+    const dollar = ch === '$' ? dollarQuote.exec(sql)?.[0] : undefined;
+    const quoteEnd = ch === '[' ? ']' : ch;
+    if (dollar || ch === "'" || ch === '"' || ch === '`' || ch === '[') {
+      const quoteStart = i;
+      if (dollar) {
+        if (dialect && dialect !== 'postgres') {
+          throw new RangeError(
+            'Dollar-quoted SQL is supported only for PostgreSQL.',
+          );
+        }
+        const end = sql.indexOf(dollar, i + dollar.length);
+        if (end < 0) throw new RangeError('Unterminated SQL dollar quote.');
+        i = end + dollar.length - 1;
+      } else {
+        i++;
+        for (; i < sql.length; i++) {
+          if (sql[i] === '\\') {
+            throw new RangeError(
+              'Backslash SQL quoting is unsupported; use standard doubled quotes.',
+            );
+          }
+          if (sql[i] !== quoteEnd) continue;
+          if (sql[i + 1] !== quoteEnd) break;
+          i++;
+        }
+        if (i >= sql.length) throw new RangeError('Unterminated SQL quote.');
       }
-
-      if (ch === '/' && next === '*') {
-        current += ch + next;
-        i += 1;
-        insideBlockComment = true;
-        continue;
-      }
+      normalized.push(sql.slice(quoteStart, i + 1));
+      code.push(' ? ');
+      objectCode.push(
+        dollar || ch === "'" ? ' ? ' : sql.slice(quoteStart, i + 1),
+      );
+      continue;
     }
-
-    if (ch === "'" && !insideDouble) {
-      if (insideSingle && next === "'") {
-        current += ch + next;
-        i += 1;
-        continue;
-      }
-      if (prev !== '\\') insideSingle = !insideSingle;
-      current += ch;
-    } else if (ch === '"' && !insideSingle) {
-      if (insideDouble && next === '"') {
-        current += ch + next;
-        i += 1;
-        continue;
-      }
-      if (prev !== '\\') insideDouble = !insideDouble;
-      current += ch;
-    } else if (ch === ';' && !insideSingle && !insideDouble) {
-      appendSqlStatement(statements, current);
-      current = '';
-    } else {
-      current += ch;
+    if (ch === ';') {
+      append(i);
+      start = i + 1;
+      normalized = [];
+      code = [];
+      objectCode = [];
+      continue;
     }
+    normalized.push(ch);
+    code.push(ch);
+    objectCode.push(ch);
   }
-
-  appendSqlStatement(statements, current);
-
+  append(sql.length);
   return statements;
+}
+
+export function splitSqlStatements(sql: string, dialect?: string): string[] {
+  return scanSql(sql, dialect).map((statement) => statement.sql);
 }
 
 export interface DestructiveAnalysis {
@@ -285,8 +345,15 @@ function extractObjectInfo(normalized: string): SqlObjectInfo {
       pattern.objectType ||
       cleanIdentifier(match[pattern.objectTypeGroup || 0]);
     const objectType = rawObjectType ? rawObjectType.toUpperCase() : null;
+    const rawObject = match[pattern.objectGroup];
+    const objectStart = (match.index ?? 0) + match[0].lastIndexOf(rawObject);
+    const quotedObject = normalized
+      .slice(objectStart)
+      .match(
+        /^(?:"(?:[^"]|"")*"|`(?:[^`]|``)*`|\[(?:[^\]]|\]\])*\])(?:\.(?:"(?:[^"]|"")*"|`(?:[^`]|``)*`|\[(?:[^\]]|\]\])*\]|[\w$]+))*/,
+      );
     return {
-      affectedObject: cleanIdentifier(match[pattern.objectGroup]),
+      affectedObject: cleanIdentifier(quotedObject?.[0] ?? rawObject),
       objectType,
       impactScope:
         pattern.impactScope || getImpactScopeForObjectType(objectType),
@@ -399,8 +466,12 @@ function createWarningAnalysis(params: {
   };
 }
 
-function analyzeAlterSql(sql: string, normalized: string): DestructiveAnalysis {
-  const info = extractObjectInfo(normalized);
+function analyzeAlterSql(
+  sql: string,
+  normalized: string,
+  objectSql = normalized,
+): DestructiveAnalysis {
+  const info = extractObjectInfo(objectSql);
 
   if (/\bALTER\s+TABLE\b/i.test(normalized)) {
     if (/\bADD\s+(?:COLUMN|CONSTRAINT)\b/i.test(normalized)) {
@@ -440,7 +511,9 @@ function analyzeAlterSql(sql: string, normalized: string): DestructiveAnalysis {
 }
 
 export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
-  const normalized = normalizeSql(sql);
+  const scanned = scanSql(sql);
+  const normalized = scanned.map((statement) => statement.code).join('; ');
+  const objectSql = scanned.map((statement) => statement.objectCode).join('; ');
 
   if (!normalized) {
     return createSafeAnalysis(false);
@@ -457,7 +530,7 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
         operation: 'CREATE OR REPLACE',
         severity: 'medium',
         reason: 'schema_contract_change',
-        info: extractObjectInfo(normalized),
+        info: extractObjectInfo(objectSql),
       });
     }
 
@@ -474,7 +547,7 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
       operation: 'UPDATE',
       severity: 'high',
       reason: 'unbounded_row_mutation',
-      info: extractObjectInfo(normalized),
+      info: extractObjectInfo(objectSql),
     });
   }
 
@@ -488,12 +561,12 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
       operation: 'DELETE',
       severity: 'high',
       reason: 'unbounded_row_mutation',
-      info: extractObjectInfo(normalized),
+      info: extractObjectInfo(objectSql),
     });
   }
 
   if (startsWithKeyword(normalized, 'DROP')) {
-    const info = extractObjectInfo(normalized);
+    const info = extractObjectInfo(objectSql);
     const severity = info.objectType === 'INDEX' ? 'medium' : 'high';
     return createWarningAnalysis({
       sql,
@@ -513,12 +586,12 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
       operation: 'TRUNCATE',
       severity: 'high',
       reason: 'destructive_schema_change',
-      info: extractObjectInfo(normalized),
+      info: extractObjectInfo(objectSql),
     });
   }
 
   if (startsWithKeyword(normalized, 'ALTER')) {
-    return analyzeAlterSql(sql, normalized);
+    return analyzeAlterSql(sql, normalized, objectSql);
   }
 
   if (startsWithKeyword(normalized, 'RENAME')) {
@@ -527,7 +600,7 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
       operation: 'RENAME',
       severity: 'medium',
       reason: 'schema_contract_change',
-      info: extractObjectInfo(normalized),
+      info: extractObjectInfo(objectSql),
     });
   }
 
@@ -537,7 +610,7 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
       operation: 'MERGE',
       severity: 'medium',
       reason: 'opaque_execution',
-      info: extractObjectInfo(normalized),
+      info: extractObjectInfo(objectSql),
     });
   }
 
@@ -551,7 +624,7 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
       operation: startsWithKeyword(normalized, 'CALL') ? 'CALL' : 'EXECUTE',
       severity: 'medium',
       reason: 'opaque_execution',
-      info: extractObjectInfo(normalized),
+      info: extractObjectInfo(objectSql),
     });
   }
 
@@ -570,7 +643,7 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
         operation === 'ATTACH'
           ? 'schema_contract_change'
           : 'destructive_schema_change',
-      info: extractObjectInfo(normalized),
+      info: extractObjectInfo(objectSql),
     });
   }
 
@@ -593,14 +666,23 @@ export function analyzeDestructiveSql(sql: string): DestructiveAnalysis {
       new RegExp(`\\b${kw}\\b`, 'i').test(normalized),
     )
   ) {
-    return createSafeAnalysis(true);
+    return createWarningAnalysis({
+      sql,
+      operation: 'WRITE',
+      severity: 'high',
+      reason: 'opaque_execution',
+      info: extractObjectInfo(objectSql),
+    });
   }
 
   return createSafeAnalysis(false);
 }
 
-export function analyzeSqlConfirmation(sql: string): DestructiveAnalysis {
-  const statements = splitSqlStatements(sql);
+export function analyzeSqlConfirmation(
+  sql: string,
+  dialect?: string,
+): DestructiveAnalysis {
+  const statements = splitSqlStatements(sql, dialect);
   const executableStatements = statements.length > 0 ? statements : [sql];
   const analyses = executableStatements.map((statement) =>
     analyzeDestructiveSql(statement),
@@ -647,4 +729,47 @@ export function getMongoActionFromPayload(
 export function isMongoActionAllowedOnReadOnly(action: string | null): boolean {
   if (!action) return false;
   return MONGO_READ_ONLY_ACTIONS.has(action);
+}
+
+function isReadOnlyMongoPipeline(pipeline: unknown): boolean {
+  if (!Array.isArray(pipeline)) return false;
+  if (pipeline.length === 0) return true;
+  if (
+    validateMongoExecutablePayload({
+      action: 'aggregate',
+      collection: 'validation',
+      pipeline,
+    }).length
+  )
+    return false;
+  return pipeline.every((stage: Record<string, unknown>) => {
+    const lookup = stage.$lookup as Record<string, unknown> | undefined;
+    if (
+      lookup?.pipeline !== undefined &&
+      !isReadOnlyMongoPipeline(lookup.pipeline)
+    )
+      return false;
+    const facet = stage.$facet as Record<string, unknown> | undefined;
+    return !facet || Object.values(facet).every(isReadOnlyMongoPipeline);
+  });
+}
+
+export function isMongoPayloadAllowedOnReadOnly(
+  payloadString: string,
+): boolean {
+  try {
+    const payload = JSON.parse(payloadString) as Record<string, unknown>;
+    validateNoSqlPayload(payload);
+    sanitizeNoSql(payload);
+    if (
+      !isMongoActionAllowedOnReadOnly(getMongoActionFromPayload(payloadString))
+    )
+      return false;
+    return (
+      payload.action !== 'aggregate' ||
+      isReadOnlyMongoPipeline(payload.pipeline)
+    );
+  } catch {
+    return false;
+  }
 }

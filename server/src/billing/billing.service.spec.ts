@@ -72,6 +72,7 @@ describe('BillingService', () => {
         }),
       },
       $transaction: jest.fn((callback) => callback(prisma)),
+      $queryRaw: jest.fn().mockResolvedValue([{ id: 'user_1' }]),
     };
 
     return prisma as unknown as PrismaService;

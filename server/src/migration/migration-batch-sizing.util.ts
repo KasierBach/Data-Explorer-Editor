@@ -117,7 +117,10 @@ export function isRetryableMigrationBatchError(error: unknown) {
         ? error
         : 'Unknown error';
 
-  return /(timeout|timed out|packet|payload|too many|too large|memory|exhausted|parameter|2100|socket hang up|econnreset|request)/i.test(
-    message,
+  // Retry only known pre-execution parameter rejections; timeout/disconnect may follow a committed write.
+  const detail = error as { code?: string; number?: number } | null;
+  return (
+    (detail?.code === 'EREQUEST' && detail.number === 8003) ||
+    (detail?.code === 'SQLITE_ERROR' && /too many SQL variables/i.test(message))
   );
 }

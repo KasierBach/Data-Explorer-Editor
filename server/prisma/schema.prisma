@@ -73,6 +73,8 @@ model Connection {
   @@unique([name, userId])
   @@index([userId, createdAt])
   @@index([organizationId])
+  commentEvents CommentEvent[]
+
 }
 
 model User {
@@ -150,6 +152,7 @@ model User {
   billingSubscription   BillingSubscription?
   aiProviderConnections AiProviderConnection[]
   commentReactions      CommentReaction[]
+  commentEvents         CommentEvent[]
 }
 
 model AiProviderConnection {
@@ -288,6 +291,8 @@ model SavedQuery {
   @@index([userId, updatedAt])
   @@index([visibility, updatedAt])
   @@index([organizationId])
+  commentEvents CommentEvent[]
+
 }
 
 model Dashboard {
@@ -310,6 +315,8 @@ model Dashboard {
   @@index([userId, updatedAt])
   @@index([visibility, updatedAt])
   @@index([organizationId])
+  commentEvents CommentEvent[]
+
 }
 
 model DashboardWidget {
@@ -353,6 +360,8 @@ model ErdWorkspace {
   @@index([userId, updatedAt])
   @@index([connectionId, updatedAt])
   @@index([organizationId])
+  commentEvents CommentEvent[]
+
 }
 
 // â”€â”€â”€ Organization / Team Collaboration â”€â”€â”€
@@ -391,6 +400,8 @@ model Organization {
   savedQueries  SavedQuery[]
   dashboards    Dashboard[]
   erdWorkspaces ErdWorkspace[]
+  commentEvents CommentEvent[]
+
 }
 
 model Teamspace {
@@ -467,8 +478,49 @@ model OrganizationResource {
   @@index([teamspaceId])
 }
 
-// Emoji reactions on team comments. Comments live in the audit log, but
-// reactions are mutable (toggle on/off), so they need their own table.
+// Reactions reference the durable create/reply event whose id is the commentId.
+model CommentEvent {
+  id            String       @id @default(uuid())
+  sequence      BigInt       @unique @default(autoincrement())
+  legacyAuditId String?      @unique
+  action        String
+  commentId     String
+  threadId      String
+  resourceType  ResourceType
+  resourceId    String
+  details       String
+  createdAt     DateTime     @default(now())
+  userId        String?
+  user          User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connectionId  String?
+  connection    Connection?  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  queryId       String?
+  query         SavedQuery?  @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  dashboardId   String?
+  dashboard     Dashboard?   @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  erdId         String?
+  erd           ErdWorkspace? @relation(fields: [erdId], references: [id], onDelete: Cascade)
+  reactions     CommentReaction[]
+
+  @@index([organizationId, resourceType, resourceId, sequence])
+  @@index([organizationId, threadId, sequence])
+}
+
+model CommentBackfill {
+  id            String    @id
+  lastCreatedAt DateTime?
+  lastAuditId   String?
+  throughCreatedAt DateTime?
+  throughAuditId   String?
+  examined      Int       @default(0)
+  copied        Int       @default(0)
+  skipped       Int       @default(0)
+  completed     Boolean   @default(false)
+  updatedAt     DateTime  @default(now()) @updatedAt
+}
+
 model CommentReaction {
   id        String   @id @default(uuid())
   commentId String
@@ -476,6 +528,7 @@ model CommentReaction {
   emoji     String   @db.VarChar(32)
   createdAt DateTime @default(now())
 
+  comment CommentEvent @relation(fields: [commentId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([commentId, userId, emoji])

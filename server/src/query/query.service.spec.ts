@@ -27,9 +27,10 @@ describe('QueryService', () => {
       (schema: string, table: string) => `${schema}.${table}`,
     ),
     quoteIdentifier: jest.fn((col: string) => `"${col}"`),
-    getColumns: jest
-      .fn()
-      .mockResolvedValue([{ name: 'id', isPrimaryKey: true }]),
+    getColumns: jest.fn().mockResolvedValue([
+      { name: 'id', type: 'integer', isPrimaryKey: true },
+      { name: 'name', type: 'text', isPrimaryKey: false },
+    ]),
     buildAlterTableSql: jest.fn(),
     seedData: jest.fn(),
     createDatabase: jest.fn(),
@@ -45,6 +46,8 @@ describe('QueryService', () => {
   const freshnessService = {
     buildKey: jest.fn(),
     bump: jest.fn(),
+    invalidateConnection: jest.fn(),
+    invalidatePartialWrite: jest.fn(),
   };
   const cacheManager = {
     get: jest.fn(),
@@ -52,6 +55,7 @@ describe('QueryService', () => {
   };
   const permissionsService = {
     ensurePermission: jest.fn(),
+    getMemberRole: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -70,6 +74,61 @@ describe('QueryService', () => {
     }).compile();
 
     service = module.get(QueryService);
+  });
+
+  it('denies an empty schema operation against a forbidden database before any cache invalidation', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      userId: 'owner',
+      organizationId: 'org',
+      type: 'postgres',
+      database: 'main',
+      allowedDatabases: ['main'],
+      roleQueryModes: { MEMBER: 'full' },
+      allowSchemaChanges: true,
+      readOnly: false,
+    });
+    permissionsService.getMemberRole.mockResolvedValue('MEMBER');
+    await expect(
+      service.updateSchema(
+        {
+          connectionId: 'conn-1',
+          database: 'private',
+          schema: 'public',
+          table: 'items',
+          operations: [],
+        },
+        'member',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(strategyFactory.getStrategy).not.toHaveBeenCalled();
+    expect(freshnessService.bump).not.toHaveBeenCalled();
+  });
+
+  it('denies structured row insertion for a readonly team role before any driver call', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      userId: 'owner',
+      organizationId: 'org',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      roleQueryModes: { MEMBER: 'readonly' },
+    });
+    permissionsService.getMemberRole.mockResolvedValue('MEMBER');
+    await expect(
+      service.insertRow(
+        {
+          connectionId: 'conn-1',
+          table: 'items',
+          data: { name: 'forbidden' },
+        } as any,
+        'member',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(connectionsService.getPool).not.toHaveBeenCalled();
+    expect(strategy.insertRow).not.toHaveBeenCalled();
   });
 
   it('requires write permission before executing mutating SQL', async () => {
@@ -165,15 +224,10 @@ describe('QueryService', () => {
       'user-1',
     );
 
-    expect(freshnessService.bump).toHaveBeenCalledWith('query', [
+    expect(freshnessService.invalidateConnection).toHaveBeenCalledWith(
       'conn-1',
       'main',
-    ]);
-    expect(freshnessService.bump).toHaveBeenCalledWith('metadata', ['conn-1']);
-    expect(freshnessService.bump).toHaveBeenCalledWith('ai-schema', [
-      'conn-1',
-      'main',
-    ]);
+    );
   });
 
   it('skips total-count side query when caller disables it', async () => {
@@ -237,7 +291,12 @@ describe('QueryService', () => {
     expect(strategy.runStatementsInTransaction).toHaveBeenCalledWith(
       {},
       ["SELECT 'hello; world' AS sample", 'SELECT * FROM users'],
-      { limit: 10, offset: 5 },
+      {
+        limit: 10,
+        offset: 5,
+        readOnly: true,
+        onExecution: expect.any(Function),
+      },
     );
     expect(strategy.executeQuery).not.toHaveBeenCalled();
     expect(cacheManager.get).not.toHaveBeenCalled();
@@ -325,12 +384,13 @@ describe('QueryService', () => {
       1,
       {},
       'SELECT * FROM public.users ORDER BY "id" ASC',
-      { limit: 25, offset: 50 },
+      { limit: 25, offset: 50, readOnly: true },
     );
     expect(strategy.executeQuery).toHaveBeenNthCalledWith(
       2,
       {},
       'SELECT COUNT(*) AS total FROM public.users',
+      { readOnly: true },
     );
     expect(result).toEqual(
       expect.objectContaining({
@@ -654,12 +714,18 @@ describe('QueryService', () => {
       1,
       {},
       'SELECT * FROM users ORDER BY id',
-      { limit: 100, offset: 0 },
+      {
+        limit: 100,
+        offset: 0,
+        readOnly: true,
+        onExecution: expect.any(Function),
+      },
     );
     expect(strategy.executeQuery).toHaveBeenNthCalledWith(
       2,
       {},
       'SELECT COUNT(*) AS total FROM (SELECT * FROM users ORDER BY id) AS _query_count',
+      { readOnly: true, onExecution: expect.any(Function) },
     );
     expect(cacheManager.set).toHaveBeenCalledWith(
       'freshness:query:count',

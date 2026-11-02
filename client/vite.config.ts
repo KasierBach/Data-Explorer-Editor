@@ -60,5 +60,12 @@ export default defineConfig({
     // The default "threads" pool breaks module resolution on Windows when the
     // project path contains spaces (e.g. "Data Explorer"); vmThreads is immune.
     pool: 'vmThreads',
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{js,jsx,ts,tsx}'],
+      exclude: ['**/*.{test,spec}.{js,jsx,ts,tsx}', '**/*.d.ts', 'src/test/**'],
+      reporter: ['text', 'json-summary', 'json', 'lcov', 'html'],
+      thresholds: { lines: 18.08, branches: 11.07, functions: 14.88, statements: 17.17 },
+    },
   },
 })

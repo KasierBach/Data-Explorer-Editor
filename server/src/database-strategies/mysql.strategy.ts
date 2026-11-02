@@ -10,16 +10,26 @@ import type {
   ConnectionConfig,
   InsertRowParams,
   FullTableMetadata,
+  QueryExecutionOptions,
 } from './database-strategy.interface';
 import { SchemaOperation } from '../query/dto/schema-operations.types';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import * as mysql from 'mysql2/promise';
 import { Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { SqlUtil } from '../utils/sql.util';
 import {
+  isSqlAllowedOnReadOnly,
+  splitSqlStatements,
+} from '../query/query-guard.util';
+import { assertAffectedRows, buildRowPredicate } from './row-identity.util';
+import {
   allowInsecureDatabaseTls,
   isLocalDatabaseHost,
 } from '../common/utils/database-network.util';
+import {
+  createQueryExecution,
+  cancelQueryExecution,
+} from './query-execution.util';
 
 @Injectable()
 export class MysqlStrategy implements IDatabaseStrategy {
@@ -50,6 +60,8 @@ export class MysqlStrategy implements IDatabaseStrategy {
       connectionLimit: 20,
       queueLimit: 0,
       multipleStatements: false,
+      supportBigNumbers: true,
+      bigNumberStrings: true,
       connectTimeout: timeoutMs,
       ssl: isLocalhost
         ? undefined
@@ -78,11 +90,82 @@ export class MysqlStrategy implements IDatabaseStrategy {
       : this.quoteIdentifier(table);
   }
 
+  private async openQueryExecution(
+    pool: Pool,
+    options?: QueryExecutionOptions,
+  ) {
+    const connection = await pool.getConnection();
+    let released = false;
+    let broken = false;
+    const handleError = () => {
+      broken = true;
+    };
+    connection.on('error', handleError);
+    const release = (discard = false) => {
+      if (released) return;
+      released = true;
+      connection.removeListener('error', handleError);
+      if (discard || broken) connection.destroy();
+      else connection.release();
+    };
+    const execution = createQueryExecution(async (isActive) => {
+      let control: mysql.Connection | undefined;
+      try {
+        const {
+          host,
+          port,
+          user,
+          password,
+          database,
+          ssl,
+          connectTimeout,
+          socketPath,
+        } = connection.config;
+        control = await mysql.createConnection({
+          host,
+          port,
+          user,
+          password,
+          database,
+          ssl,
+          connectTimeout,
+          socketPath,
+        });
+        if (!isActive()) return false;
+        if (
+          !Number.isSafeInteger(connection.threadId) ||
+          connection.threadId <= 0
+        )
+          throw new Error('Invalid MySQL execution thread.');
+        await control.query(`KILL QUERY ${connection.threadId}`);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        await control?.end();
+      }
+    });
+    try {
+      options?.onExecution?.(execution);
+      return { connection, execution, release };
+    } catch (error) {
+      await execution.finish();
+      release();
+      throw error;
+    }
+  }
+
   async executeQuery(
     pool: Pool,
     sql: string,
-    options?: { limit?: number; offset?: number },
+    options?: QueryExecutionOptions,
   ): Promise<QueryResult> {
+    if (options?.readOnly) {
+      return this.runStatementsInTransaction(pool, [sql], {
+        ...options,
+        limit: options.limit ?? 50000,
+      });
+    }
     let safeSql = sql;
     if (options?.limit !== undefined) {
       if (options?.offset !== undefined) {
@@ -102,63 +185,81 @@ export class MysqlStrategy implements IDatabaseStrategy {
     const queryTimeout =
       (pool as Pool & { __statementTimeout?: number }).__statementTimeout ??
       30000;
-    const [result, fields] = await pool.query({
-      sql: safeSql,
-      timeout: queryTimeout,
-    });
+    const { connection, execution, release } = await this.openQueryExecution(
+      pool,
+      options,
+    );
+    try {
+      execution.assertRunning();
+      const [result, fields] = await connection.query({
+        sql: safeSql,
+        timeout: queryTimeout,
+      });
 
-    const rows: Record<string, unknown>[] = Array.isArray(result)
-      ? (result as RowDataPacket[]).map((r) => r as Record<string, unknown>)
-      : [];
-    const actualFields = Array.isArray(fields) ? fields : [];
+      const rows: Record<string, unknown>[] = Array.isArray(result)
+        ? (result as RowDataPacket[]).map((r) => r as Record<string, unknown>)
+        : [];
+      const actualFields = Array.isArray(fields) ? fields : [];
 
-    return {
-      rows: rows.slice(0, 50000),
-      columns: actualFields.map((f) => f.name),
-      rowCount:
-        !Array.isArray(result) &&
-        (result as ResultSetHeader).affectedRows !== undefined
-          ? (result as ResultSetHeader).affectedRows
-          : undefined,
-    };
+      return {
+        rows: rows.slice(0, 50000),
+        columns: actualFields.map((f) => f.name),
+        rowCount:
+          !Array.isArray(result) &&
+          (result as ResultSetHeader).affectedRows !== undefined
+            ? (result as ResultSetHeader).affectedRows
+            : undefined,
+      };
+    } catch (error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'PROTOCOL_SEQUENCE_TIMEOUT'
+      ) {
+        await execution.cancel();
+        // The timeout callback precedes wire completion; ping queues behind the source command.
+        await connection.ping().catch(() => {});
+        release(true);
+      }
+      throw error;
+    } finally {
+      await execution.finish();
+      release();
+    }
   }
 
   async cancelActiveQuery(execution: unknown): Promise<boolean> {
-    // MySQL: kill the query running on the given connection thread.
-    const connection = execution as {
-      threadId?: number;
-      query?: (opts: { sql: string }) => Promise<unknown>;
-    } | null;
-    if (
-      !connection ||
-      typeof connection.threadId !== 'number' ||
-      typeof connection.query !== 'function'
-    ) {
-      return false;
-    }
-    await connection.query({
-      sql: `KILL QUERY ${connection.threadId}`,
-    });
-    return true;
+    return cancelQueryExecution(execution);
   }
 
   async runStatementsInTransaction(
     pool: Pool,
     statements: string[],
-    options?: { limit?: number; offset?: number },
+    options?: QueryExecutionOptions,
   ): Promise<QueryResult> {
     const queryTimeout =
       (pool as Pool & { __statementTimeout?: number }).__statementTimeout ??
       30000;
-    const connection = await pool.getConnection();
+    const { connection, execution, release } = await this.openQueryExecution(
+      pool,
+      options,
+    );
+    let completedWrite = false;
     try {
-      await connection.beginTransaction();
+      execution.assertRunning();
+      if (options?.readOnly) {
+        await connection.query('START TRANSACTION READ ONLY');
+      } else {
+        await connection.beginTransaction();
+      }
       let result: QueryResult = {
         rows: [],
         columns: [],
         countStatus: 'skipped',
       };
       for (const statement of statements) {
+        execution.assertRunning();
         const isLast = statement === statements[statements.length - 1];
         let safeSql = statement;
         if (isLast && options?.limit !== undefined) {
@@ -176,6 +277,14 @@ export class MysqlStrategy implements IDatabaseStrategy {
           sql: safeSql,
           timeout: queryTimeout,
         });
+        if (!isSqlAllowedOnReadOnly(statement, 'mysql')) completedWrite = true;
+        if (
+          completedWrite &&
+          !Array.isArray(rows) &&
+          ((rows as ResultSetHeader).serverStatus & 1) === 0
+        ) {
+          await options?.onMutation?.();
+        }
         if (isLast) {
           const rowList: Record<string, unknown>[] = Array.isArray(rows)
             ? (rows as RowDataPacket[]).map((r) => r as Record<string, unknown>)
@@ -192,17 +301,42 @@ export class MysqlStrategy implements IDatabaseStrategy {
           };
         }
       }
+      execution.assertRunning();
       await connection.commit();
       return result;
     } catch (error) {
-      try {
-        await connection.rollback();
-      } catch {
-        // Connection will be discarded by the pool on release if broken.
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'PROTOCOL_SEQUENCE_TIMEOUT'
+      ) {
+        await execution.cancel();
+        await connection.ping().catch(() => {});
+        await execution.finish();
+        release(true);
+      } else {
+        await execution.finish();
+        try {
+          await connection.rollback();
+        } catch {
+          release(true);
+        }
+      }
+      // A failed DDL may already have committed an earlier write before rollback.
+      if (completedWrite) {
+        try {
+          await options?.onMutation?.();
+        } catch {
+          this.logger.error(
+            'Cache refresh failed after a partial MySQL batch.',
+          );
+        }
       }
       throw error;
     } finally {
-      connection.release();
+      await execution.finish();
+      release();
     }
   }
 
@@ -218,14 +352,21 @@ export class MysqlStrategy implements IDatabaseStrategy {
     const setClause = updateCols
       .map((col) => `${this.quoteIdentifier(col)} = ?`)
       .join(', ');
-    const sql = `UPDATE ${this.quoteTable(schema, table)} SET ${setClause} WHERE ${this.quoteIdentifier(pkColumn)} = ?`;
-    const values = [...updateCols.map((c) => updates[c]), pkValue];
-
-    const [result] = await pool.execute<ResultSetHeader>(
-      sql,
-      values as never[],
+    const predicate = buildRowPredicate(
+      [params.identity ?? [{ column: pkColumn, value: pkValue }]],
+      (column) => this.quoteIdentifier(column),
+      () => '?',
+      updateCols.length,
     );
-    return { success: true, rowCount: result.affectedRows };
+    const sql = `UPDATE ${this.quoteTable(schema, table)} SET ${setClause} WHERE ${predicate.sql}`;
+    return this.runRowMutation(
+      pool,
+      schema,
+      table,
+      sql,
+      [...updateCols.map((c) => updates[c]), ...predicate.values],
+      1,
+    );
   }
 
   async insertRow(
@@ -257,14 +398,70 @@ export class MysqlStrategy implements IDatabaseStrategy {
     if (pkValues.length === 0) return { success: true, rowCount: 0 };
 
     const quotedTable = this.quoteTable(schema, table);
-    const placeholders = pkValues.map(() => `?`).join(', ');
-    const sql = `DELETE FROM ${quotedTable} WHERE ${this.quoteIdentifier(pkColumn)} IN (${placeholders})`;
-
-    const [result] = await pool.execute<ResultSetHeader>(
-      sql,
-      pkValues as never[],
+    const identities =
+      params.identities ??
+      pkValues.map((value) => [{ column: pkColumn, value }]);
+    const predicate = buildRowPredicate(
+      identities,
+      (column) => this.quoteIdentifier(column),
+      () => '?',
     );
-    return { success: true, rowCount: result.affectedRows };
+    return this.runRowMutation(
+      pool,
+      schema,
+      table,
+      `DELETE FROM ${quotedTable} WHERE ${predicate.sql}`,
+      predicate.values,
+      identities.length,
+    );
+  }
+
+  private async runRowMutation(
+    pool: Pool,
+    schema: string,
+    table: string,
+    sql: string,
+    values: unknown[],
+    expectedRows: number,
+  ): Promise<{ success: boolean; rowCount: number }> {
+    const connection = await pool.getConnection();
+    let rollbackFailed = false;
+    try {
+      await connection.beginTransaction();
+      // Hold the target's metadata lock so its engine cannot change before the write.
+      await connection.query(
+        `SELECT 1 FROM ${this.quoteTable(schema, table)} LIMIT 0`,
+      );
+      const [engines] = await connection.query<RowDataPacket[]>(
+        "SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA = COALESCE(NULLIF(?, ''), DATABASE()) AND TABLE_NAME = ?",
+        [schema, table],
+      );
+      if (
+        engines.length !== 1 ||
+        engines[0].ENGINE?.toLowerCase() !== 'innodb'
+      ) {
+        throw new BadRequestException(
+          'Row editing requires an InnoDB table with rollback support.',
+        );
+      }
+      const [result] = await connection.execute<ResultSetHeader>(
+        sql,
+        values as never[],
+      );
+      assertAffectedRows(result.affectedRows, expectedRows);
+      await connection.commit();
+      return { success: true, rowCount: expectedRows };
+    } catch (error) {
+      try {
+        await connection.rollback();
+      } catch {
+        rollbackFailed = true;
+      }
+      throw error;
+    } finally {
+      if (rollbackFailed) connection.destroy();
+      else connection.release();
+    }
   }
 
   async importData(
@@ -679,7 +876,10 @@ export class MysqlStrategy implements IDatabaseStrategy {
     return [];
   }
 
-  async seedData(pool: Pool): Promise<QueryResult> {
+  async seedData(
+    pool: Pool,
+    options?: QueryExecutionOptions,
+  ): Promise<QueryResult> {
     const sql = `
             CREATE TABLE IF NOT EXISTS users (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -712,7 +912,11 @@ export class MysqlStrategy implements IDatabaseStrategy {
             (1, 1025.49),
             (2, 25.50);
         `;
-    return this.executeQuery(pool, sql);
+    return this.runStatementsInTransaction(
+      pool,
+      splitSqlStatements(sql, 'mysql'),
+      options,
+    );
   }
 
   async getSampleRows(

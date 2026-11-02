@@ -1,4 +1,14 @@
-import { IsString, IsNotEmpty, IsObject, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsDefined,
+  IsArray,
+  ArrayMinSize,
+  ArrayMaxSize,
+} from 'class-validator';
+import type { RowIdentity } from '../../database-strategies/database-strategy.interface';
 
 export class UpdateRowDto {
   @IsString()
@@ -21,8 +31,14 @@ export class UpdateRowDto {
   @IsNotEmpty()
   pkColumn: string;
 
-  @IsNotEmpty()
+  @IsDefined()
   pkValue: any;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(16)
+  identity?: RowIdentity;
 
   @IsObject()
   updates: Record<string, any>;

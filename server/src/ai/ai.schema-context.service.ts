@@ -114,7 +114,7 @@ export class AiSchemaContextService {
     connectionId?: string,
     searchTerm = '',
   ): Promise<string> {
-    const scope = [connectionId, database || 'default'];
+    const scope = [connectionId, database ?? null];
     const relevanceKey = tokenize(searchTerm).join('|') || 'default';
     const inventoryCacheKey = connectionId
       ? await this.freshnessService.buildKey('ai-schema', scope, [
@@ -261,7 +261,7 @@ export class AiSchemaContextService {
   async clearCache(connectionId: string, database?: string) {
     await this.freshnessService.bump('ai-schema', [
       connectionId,
-      database || 'default',
+      database ?? null,
     ]);
   }
 

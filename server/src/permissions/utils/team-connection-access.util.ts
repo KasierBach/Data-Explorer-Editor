@@ -30,7 +30,7 @@ function parseRoleQueryModes(
 }
 
 export interface ConnectionTeamRestrictions {
-  allowedDatabases?: string[] | null;
+  allowedDatabases?: unknown;
   roleQueryModes?: unknown;
   /** Connection owner — restrictions never apply to the owner. */
   userId: string;
@@ -59,7 +59,11 @@ export function assertTeamConnectionAccess(
   options: { database?: string | null; sql?: string; isReadOnlySql?: boolean },
 ): void {
   if (connection.userId === requester.userId) return;
-  if (!requester.role) return;
+  if (!requester.role) {
+    if (connection.organizationId)
+      throw new ForbiddenException('Organization membership is required.');
+    return;
+  }
 
   const database = normalizeDatabaseName(options.database);
   if (database) {
@@ -80,7 +84,7 @@ export function assertTeamConnectionAccess(
       'Your role does not have query access to this connection.',
     );
   }
-  if (mode === 'readonly' && options.sql && options.isReadOnlySql === false) {
+  if (mode === 'readonly' && options.isReadOnlySql === false) {
     throw new ForbiddenException(
       'Your role has read-only access to this connection; data-modifying queries are not allowed.',
     );

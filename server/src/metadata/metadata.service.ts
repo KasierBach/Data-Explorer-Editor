@@ -5,6 +5,7 @@ import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 import type { IDatabaseStrategy } from '../database-strategies/database-strategy.interface';
 import { FreshnessService } from '../common/freshness/freshness.service';
+import { parseAllowedDatabases } from '../permissions/utils/team-connection-access.util';
 
 interface ConnectionContext {
   connection: any;
@@ -82,12 +83,36 @@ export class MetadataService {
       throw new BadRequestException('parentId must be a string or null');
     }
     const normalizedParentId = typeof parentId === 'string' ? parentId : null;
+    const connection = await this.connectionsService.authorizeAccess(
+      connectionId,
+      userId,
+      this.parseNodeId(normalizedParentId || '').dbName ||
+        database ||
+        (normalizedParentId ? undefined : null),
+    );
+    const allowed =
+      connection.userId === userId
+        ? null
+        : parseAllowedDatabases(connection.allowedDatabases);
+    if (
+      !normalizedParentId &&
+      !database &&
+      connection.showAllDatabases &&
+      allowed
+    ) {
+      return allowed.map((name) => ({
+        id: `db:${name}`,
+        name,
+        type: 'database',
+        hasChildren: true,
+      }));
+    }
     const cacheKey = await this.getCacheKey(
       'hierarchy',
       connectionId,
-      `${normalizedParentId || 'root'}:${database || ''}`,
+      JSON.stringify([normalizedParentId, database ?? null]),
     );
-    return this.withCache(
+    const nodes = await this.withCache(
       cacheKey,
       () =>
         this._getHierarchyUncached(
@@ -98,6 +123,11 @@ export class MetadataService {
         ),
       3600000,
     );
+    return allowed
+      ? nodes.filter(
+          (node) => node.type !== 'database' || allowed.includes(node.name),
+        )
+      : nodes;
   }
 
   private async _getHierarchyUncached(
@@ -290,8 +320,18 @@ export class MetadataService {
   }
 
   async getDatabases(connectionId: string, userId: string) {
+    const connection = await this.connectionsService.authorizeAccess(
+      connectionId,
+      userId,
+      null,
+    );
+    const allowed =
+      connection.userId === userId
+        ? null
+        : parseAllowedDatabases(connection.allowedDatabases);
+    if (allowed) return allowed;
     const cacheKey = await this.getCacheKey('databases', connectionId);
-    return this.withCache(
+    const databases = await this.withCache(
       cacheKey,
       async () => {
         const { pool, strategy } = await this.getConnectionContext(
@@ -303,6 +343,7 @@ export class MetadataService {
       },
       3600000,
     );
+    return databases;
   }
 
   async getRelationships(
@@ -310,10 +351,15 @@ export class MetadataService {
     userId: string,
     database?: string,
   ) {
+    await this.connectionsService.authorizeAccess(
+      connectionId,
+      userId,
+      database,
+    );
     const cacheKey = await this.getCacheKey(
       'relationships',
       connectionId,
-      database || 'default',
+      JSON.stringify([database ?? null]),
     );
     return this.withCache(
       cacheKey,
@@ -330,6 +376,11 @@ export class MetadataService {
   }
 
   async getColumns(connectionId: string, tableId: string, userId: string) {
+    await this.connectionsService.authorizeAccess(
+      connectionId,
+      userId,
+      this.parseNodeId(tableId).dbName,
+    );
     const cacheKey = await this.getCacheKey('columns', connectionId, tableId);
     return this.withCache(
       cacheKey,
@@ -337,6 +388,7 @@ export class MetadataService {
         const { connection, strategy } = await this.getConnectionContext(
           connectionId,
           userId,
+          this.parseNodeId(tableId).dbName,
         );
         const parsed = this.parseNodeId(tableId);
         const schema =
@@ -358,10 +410,15 @@ export class MetadataService {
     userId: string,
     database?: string,
   ) {
+    await this.connectionsService.authorizeAccess(
+      connectionId,
+      userId,
+      database,
+    );
     const cacheKey = await this.getCacheKey(
       'metrics',
       connectionId,
-      database || 'default',
+      JSON.stringify([database ?? null]),
     );
     return this.withCache(
       cacheKey,
@@ -378,6 +435,11 @@ export class MetadataService {
   }
 
   async getFullMetadata(connectionId: string, tableId: string, userId: string) {
+    await this.connectionsService.authorizeAccess(
+      connectionId,
+      userId,
+      this.parseNodeId(tableId).dbName,
+    );
     const cacheKey = await this.getCacheKey('fullmeta', connectionId, tableId);
     return this.withCache(
       cacheKey,
@@ -385,6 +447,7 @@ export class MetadataService {
         const { connection, strategy } = await this.getConnectionContext(
           connectionId,
           userId,
+          this.parseNodeId(tableId).dbName,
         );
         const parsed = this.parseNodeId(tableId);
         const schema =
@@ -402,17 +465,15 @@ export class MetadataService {
   }
 
   async refresh(connectionId: string, userId: string, database?: string) {
-    await this.connectionsService.findOne(connectionId, userId);
-    await this.freshnessService.bump('hierarchy', [connectionId]);
-    await this.freshnessService.bump('databases', [connectionId]);
-    await this.freshnessService.bump('relationships', [connectionId]);
-    await this.freshnessService.bump('columns', [connectionId]);
-    await this.freshnessService.bump('metrics', [connectionId]);
-    await this.freshnessService.bump('fullmeta', [connectionId]);
-    await this.freshnessService.bump('ai-schema', [
+    const connection = await this.connectionsService.authorizeAccess(
       connectionId,
-      database || 'default',
-    ]);
+      userId,
+      database,
+    );
+    await this.freshnessService.invalidateConnection(
+      connectionId,
+      database || connection.database,
+    );
     return { success: true };
   }
 }

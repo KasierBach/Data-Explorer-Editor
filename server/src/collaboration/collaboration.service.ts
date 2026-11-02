@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditAction, AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -26,21 +27,13 @@ import {
 type CommentDetails = {
   commentId: string;
   threadId: string;
-  parentCommentId: string | null;
+  parentCommentId?: string | null;
   resourceType: ResourceType;
   resourceId: string;
-  body: string;
+  body?: string;
   mentions?: string[];
   attachments?: string[];
 };
-
-const COMMENT_ACTIONS = [
-  AuditAction.TEAM_COMMENT_CREATE,
-  AuditAction.TEAM_COMMENT_REPLY,
-  AuditAction.TEAM_COMMENT_RESOLVE,
-  AuditAction.TEAM_COMMENT_EDIT,
-  AuditAction.TEAM_COMMENT_DELETE,
-];
 
 @Injectable()
 export class CollaborationService {
@@ -73,10 +66,14 @@ export class CollaborationService {
       Permission.READ,
     );
 
-    const logs = await this.audit.findOrganizationLogs(organizationId, {
-      limit: 500,
-      order: 'asc',
-      actions: COMMENT_ACTIONS,
+    await this.ensureResourceOrganization(
+      organizationId,
+      resourceType,
+      resourceId,
+    );
+    const logs = await this.prisma.commentEvent.findMany({
+      where: { organizationId, resourceType, resourceId },
+      orderBy: { sequence: 'asc' },
     });
 
     return this.buildCommentThreads(
@@ -105,12 +102,29 @@ export class CollaborationService {
     const body = this.normalizeBody(dto.body);
     const attachments = this.validateAttachments(dto.attachments);
     const commentId = randomUUID();
-    const threadId = dto.parentCommentId?.trim() || commentId;
     const parentCommentId = dto.parentCommentId?.trim() || null;
+    const parent = parentCommentId
+      ? await this.findCommentThreadByCommentId(
+          organizationId,
+          parentCommentId,
+          userId,
+        )
+      : null;
+    if (
+      parent &&
+      (parent.resourceType !== resourceType || parent.resourceId !== resourceId)
+    ) {
+      throw new BadRequestException('Reply parent belongs to another resource');
+    }
+    const threadId = parent?.threadId ?? commentId;
     const mentions = await this.resolveMentions(organizationId, body);
-    const resource = await this.loadResourceSnapshot(resourceType, resourceId);
+    const resource = await this.ensureResourceOrganization(
+      organizationId,
+      resourceType,
+      resourceId,
+    );
 
-    await this.audit.log({
+    await this.recordCommentEvent({
       action: parentCommentId
         ? AuditAction.TEAM_COMMENT_REPLY
         : AuditAction.TEAM_COMMENT_CREATE,
@@ -153,9 +167,11 @@ export class CollaborationService {
     commentId: string,
     dto: CreateCommentDto,
   ) {
+    await this.ensureMemberAccess(organizationId, userId);
     const thread = await this.findCommentThreadByCommentId(
       organizationId,
       commentId,
+      userId,
     );
     return this.createComment(
       organizationId,
@@ -177,26 +193,65 @@ export class CollaborationService {
     emoji: string,
   ) {
     await this.ensureMemberAccess(organizationId, userId);
+    const thread = await this.findCommentThreadByCommentId(
+      organizationId,
+      commentId,
+      userId,
+    );
+    await this.permissions.ensurePermission(
+      userId,
+      thread.resourceType,
+      thread.resourceId,
+      Permission.COMMENT,
+    );
+    await this.ensureResourceOrganization(
+      organizationId,
+      thread.resourceType,
+      thread.resourceId,
+    );
+    const target =
+      thread.commentId === commentId
+        ? thread
+        : thread.replies.find((reply) => reply.commentId === commentId);
+    if (!target || target.deleted)
+      throw new BadRequestException(
+        'Deleted comments cannot receive reactions',
+      );
     const normalized = emoji.trim().slice(0, 32);
     if (!normalized) throw new BadRequestException('Emoji is required');
 
-    const existing = await this.prisma.commentReaction.findUnique({
-      where: {
-        commentId_userId_emoji: {
+    await this.prisma.$transaction(async (tx) => {
+      // Serialize toggles with soft-delete on the durable creation row.
+      await tx.$queryRaw`SELECT id FROM "CommentEvent" WHERE id = ${commentId} FOR UPDATE`;
+      const deleted = await tx.commentEvent.findFirst({
+        where: {
+          organizationId,
           commentId,
-          userId,
-          emoji: normalized,
+          action: AuditAction.TEAM_COMMENT_DELETE,
         },
-      },
-    });
-
-    if (existing) {
-      await this.prisma.commentReaction.delete({ where: { id: existing.id } });
-    } else {
-      await this.prisma.commentReaction.create({
-        data: { commentId, userId, emoji: normalized },
+        select: { id: true },
       });
-    }
+      if (deleted)
+        throw new BadRequestException(
+          'Deleted comments cannot receive reactions',
+        );
+      const existing = await tx.commentReaction.findUnique({
+        where: {
+          commentId_userId_emoji: {
+            commentId,
+            userId,
+            emoji: normalized,
+          },
+        },
+      });
+      if (existing) {
+        await tx.commentReaction.delete({ where: { id: existing.id } });
+      } else {
+        await tx.commentReaction.create({
+          data: { commentId, userId, emoji: normalized },
+        });
+      }
+    });
 
     return this.listReactions(commentId);
   }
@@ -250,10 +305,29 @@ export class CollaborationService {
     commentId: string,
     dto: UpdateCommentDto,
   ) {
+    await this.ensureMemberAccess(organizationId, userId);
     const thread = await this.findCommentThreadByCommentId(
       organizationId,
       commentId,
+      userId,
     );
+    await this.permissions.ensurePermission(
+      userId,
+      thread.resourceType,
+      thread.resourceId,
+      Permission.COMMENT,
+    );
+    await this.ensureResourceOrganization(
+      organizationId,
+      thread.resourceType,
+      thread.resourceId,
+    );
+    const target =
+      thread.commentId === commentId
+        ? thread
+        : thread.replies.find((reply) => reply.commentId === commentId);
+    if (!target || target.deleted)
+      throw new BadRequestException('Deleted comments cannot be edited');
     const isAuthor = await this.isCommentAuthor(
       organizationId,
       commentId,
@@ -264,7 +338,7 @@ export class CollaborationService {
     }
 
     const body = this.normalizeBody(dto.body);
-    await this.audit.log({
+    await this.recordCommentEvent({
       action: AuditAction.TEAM_COMMENT_EDIT,
       userId,
       organizationId,
@@ -291,9 +365,22 @@ export class CollaborationService {
     userId: string,
     commentId: string,
   ) {
+    await this.ensureMemberAccess(organizationId, userId);
     const thread = await this.findCommentThreadByCommentId(
       organizationId,
       commentId,
+      userId,
+    );
+    await this.permissions.ensurePermission(
+      userId,
+      thread.resourceType,
+      thread.resourceId,
+      Permission.COMMENT,
+    );
+    await this.ensureResourceOrganization(
+      organizationId,
+      thread.resourceType,
+      thread.resourceId,
     );
 
     const isAuthor = await this.isCommentAuthor(
@@ -314,7 +401,7 @@ export class CollaborationService {
       }
     }
 
-    await this.audit.log({
+    await this.recordCommentEvent({
       action: AuditAction.TEAM_COMMENT_DELETE,
       userId,
       organizationId,
@@ -325,8 +412,6 @@ export class CollaborationService {
         resourceId: thread.resourceId,
       },
     });
-
-    await this.prisma.commentReaction.deleteMany({ where: { commentId } });
   }
 
   private async isCommentAuthor(
@@ -334,7 +419,7 @@ export class CollaborationService {
     commentId: string,
     userId: string,
   ): Promise<boolean> {
-    const log = await this.prisma.auditLog.findFirst({
+    const log = await this.prisma.commentEvent.findFirst({
       where: {
         organizationId,
         action: {
@@ -343,7 +428,7 @@ export class CollaborationService {
             String(AuditAction.TEAM_COMMENT_REPLY),
           ],
         },
-        details: { contains: `"commentId":"${commentId}"` },
+        id: commentId,
       },
       select: { userId: true },
       orderBy: { createdAt: 'asc' },
@@ -361,6 +446,18 @@ export class CollaborationService {
     const thread = await this.findCommentThreadByCommentId(
       organizationId,
       commentId,
+      userId,
+    );
+    await this.permissions.ensurePermission(
+      userId,
+      thread.resourceType,
+      thread.resourceId,
+      Permission.READ,
+    );
+    await this.ensureResourceOrganization(
+      organizationId,
+      thread.resourceType,
+      thread.resourceId,
     );
     const canResolve =
       thread.author.id === userId ||
@@ -377,7 +474,7 @@ export class CollaborationService {
       );
     }
 
-    await this.audit.log({
+    await this.recordCommentEvent({
       action: AuditAction.TEAM_COMMENT_RESOLVE,
       userId,
       organizationId,
@@ -410,6 +507,60 @@ export class CollaborationService {
     if (!member) {
       throw new ForbiddenException('You are not a member');
     }
+  }
+
+  private async ensureResourceOrganization(
+    organizationId: string,
+    resourceType: ResourceType,
+    resourceId: string,
+  ) {
+    const resource = await this.loadResourceSnapshot(resourceType, resourceId);
+    if (resource.organizationId !== organizationId)
+      throw new NotFoundException('Resource not found in this organization');
+    return resource;
+  }
+
+  private async recordCommentEvent(params: {
+    action: AuditAction;
+    userId: string;
+    organizationId: string;
+    details: CommentDetails;
+  }) {
+    const { resourceType, resourceId, commentId, threadId } = params.details;
+    const isCreation =
+      params.action === AuditAction.TEAM_COMMENT_CREATE ||
+      params.action === AuditAction.TEAM_COMMENT_REPLY;
+    const data: Prisma.CommentEventUncheckedCreateInput = {
+      id: isCreation ? commentId : undefined,
+      action: params.action,
+      userId: params.userId,
+      organizationId: params.organizationId,
+      resourceType,
+      resourceId,
+      commentId,
+      threadId,
+      details: JSON.stringify(params.details),
+      connectionId:
+        resourceType === ResourceType.CONNECTION ? resourceId : undefined,
+      queryId: resourceType === ResourceType.QUERY ? resourceId : undefined,
+      dashboardId:
+        resourceType === ResourceType.DASHBOARD ? resourceId : undefined,
+      erdId: resourceType === ResourceType.ERD ? resourceId : undefined,
+    };
+    await this.prisma.$transaction(async (tx) => {
+      if (params.action === AuditAction.TEAM_COMMENT_DELETE) {
+        await tx.$queryRaw`SELECT id FROM "CommentEvent" WHERE id = ${commentId} FOR UPDATE`;
+      }
+      await tx.commentEvent.create({ data });
+      if (params.action === AuditAction.TEAM_COMMENT_DELETE) {
+        await tx.commentReaction.deleteMany({ where: { commentId } });
+      }
+    });
+    // Audit is activity history; its existing best-effort failure cannot erase a committed comment.
+    await this.audit.log({
+      ...params,
+      details: { ...params.details, storageVersion: 2 },
+    });
   }
 
   private normalizeBody(body: string) {
@@ -463,7 +614,48 @@ export class CollaborationService {
     }
 
     try {
-      return JSON.parse(details) as CommentDetails;
+      const parsed: unknown = JSON.parse(details);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+        return null;
+      const value = parsed as Record<string, unknown>;
+      const resourceType = Object.values(ResourceType).find(
+        (type) => type === value.resourceType,
+      );
+      if (
+        !resourceType ||
+        typeof value.commentId !== 'string' ||
+        !value.commentId ||
+        typeof value.threadId !== 'string' ||
+        !value.threadId ||
+        typeof value.resourceId !== 'string' ||
+        !value.resourceId ||
+        (value.body !== undefined && typeof value.body !== 'string') ||
+        (value.parentCommentId != null &&
+          typeof value.parentCommentId !== 'string')
+      )
+        return null;
+      const mentions = value.mentions ?? [];
+      const attachments = value.attachments ?? [];
+      if (
+        !Array.isArray(mentions) ||
+        !mentions.every((item): item is string => typeof item === 'string') ||
+        !Array.isArray(attachments) ||
+        !attachments.every((item): item is string => typeof item === 'string')
+      )
+        return null;
+      return {
+        commentId: value.commentId,
+        threadId: value.threadId,
+        resourceId: value.resourceId,
+        resourceType,
+        parentCommentId:
+          typeof value.parentCommentId === 'string'
+            ? value.parentCommentId
+            : null,
+        body: typeof value.body === 'string' ? value.body : undefined,
+        mentions,
+        ...(this.validateAttachments(attachments) ? { attachments } : {}),
+      };
     } catch {
       return null;
     }
@@ -745,8 +937,6 @@ export class CollaborationService {
       ) {
         continue;
       }
-      if (!log.user && !log.userId) continue;
-
       if (!log.user && log.userId) authorIds.add(log.userId);
       for (const mentionId of details.mentions ?? []) {
         mentionIds.add(mentionId);
@@ -760,10 +950,11 @@ export class CollaborationService {
     ]);
 
     for (const { log, details } of parsedLogs) {
-      const authorSnapshot = log.user ?? authorMap.get(log.userId as string);
-      if (!authorSnapshot) {
-        continue;
-      }
+      const authorSnapshot = log.user ??
+        (log.userId ? authorMap.get(log.userId) : undefined) ?? {
+          id: 'deleted-user',
+          email: '',
+        };
       const author = this.normalizeParticipant(authorSnapshot);
       const mentions = (details.mentions ?? [])
         .map((mentionId) => mentionMap.get(mentionId))
@@ -795,7 +986,8 @@ export class CollaborationService {
         const target = findCommentTarget(details.commentId);
         if (target) {
           const record = target.reply ?? target.thread;
-          record.body = details.body;
+          if (record.deleted) continue;
+          record.body = details.body ?? record.body;
           record.editedAt = log.createdAt.toISOString();
           record.updatedAt = log.createdAt.toISOString();
         }
@@ -808,6 +1000,8 @@ export class CollaborationService {
           const record = target.reply ?? target.thread;
           record.deleted = true;
           record.body = '';
+          record.mentions = [];
+          delete record.attachments;
           record.updatedAt = log.createdAt.toISOString();
         }
         continue;
@@ -818,7 +1012,7 @@ export class CollaborationService {
           commentId: details.commentId,
           threadId: details.threadId,
           parentCommentId: details.parentCommentId,
-          body: details.body,
+          body: details.body ?? '',
           author,
           mentions,
           createdAt: log.createdAt.toISOString(),
@@ -843,7 +1037,7 @@ export class CollaborationService {
         resourceType: details.resourceType,
         resourceId: details.resourceId,
         organizationId,
-        body: details.body,
+        body: details.body ?? '',
         author,
         mentions,
         createdAt: log.createdAt.toISOString(),
@@ -871,10 +1065,11 @@ export class CollaborationService {
 
   /** Loads reaction groups from CommentReaction for every visible comment. */
   private async attachReactions(threads: CommentThread[]) {
-    const commentIds = threads.flatMap((thread) => [
-      thread.commentId,
-      ...thread.replies.map((reply) => reply.commentId),
-    ]);
+    const commentIds = threads.flatMap((thread) =>
+      [thread, ...thread.replies]
+        .filter((comment) => !comment.deleted)
+        .map((comment) => comment.commentId),
+    );
     if (commentIds.length === 0) return;
 
     const reactions = await this.prisma.commentReaction.findMany({
@@ -933,10 +1128,9 @@ export class CollaborationService {
     resourceId: string,
     threadId: string,
   ) {
-    const logs = await this.audit.findOrganizationLogs(organizationId, {
-      limit: 500,
-      order: 'asc',
-      actions: COMMENT_ACTIONS,
+    const logs = await this.prisma.commentEvent.findMany({
+      where: { organizationId, resourceType, resourceId, threadId },
+      orderBy: { sequence: 'asc' },
     });
     const threads = await this.buildCommentThreads(
       logs,
@@ -959,25 +1153,41 @@ export class CollaborationService {
   private async findCommentThreadByCommentId(
     organizationId: string,
     commentId: string,
+    userId: string,
   ) {
-    const logs = await this.audit.findOrganizationLogs(organizationId, {
-      limit: 500,
-      order: 'asc',
-      actions: COMMENT_ACTIONS,
+    const target = await this.prisma.commentEvent.findFirst({
+      where: {
+        id: commentId,
+        organizationId,
+        action: {
+          in: [AuditAction.TEAM_COMMENT_CREATE, AuditAction.TEAM_COMMENT_REPLY],
+        },
+      },
+      select: { resourceType: true, resourceId: true, threadId: true },
     });
-
-    const threads = await this.buildCommentThreads(logs, organizationId);
-    const thread = threads.find(
-      (entry) =>
-        entry.threadId === commentId ||
-        entry.commentId === commentId ||
-        entry.replies.some((reply) => reply.commentId === commentId),
+    if (!target) throw new NotFoundException('Comment thread not found');
+    const resourceType = Object.values(ResourceType).find(
+      (type) => String(type) === String(target.resourceType),
     );
-    if (thread) {
-      return thread;
-    }
-
-    throw new NotFoundException('Comment thread not found');
+    if (!resourceType)
+      throw new NotFoundException('Comment resource not found');
+    await this.permissions.ensurePermission(
+      userId,
+      resourceType,
+      target.resourceId,
+      Permission.READ,
+    );
+    await this.ensureResourceOrganization(
+      organizationId,
+      resourceType,
+      target.resourceId,
+    );
+    return this.findCommentThreadInResource(
+      organizationId,
+      resourceType,
+      target.resourceId,
+      target.threadId,
+    );
   }
 
   private async resolveMentionSnapshots(

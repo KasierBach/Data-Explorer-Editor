@@ -10,11 +10,13 @@ import type {
   Relationship,
   DatabaseMetrics,
   ConnectionConfig,
+  QueryExecutionOptions,
 } from './database-strategy.interface';
 import { SchemaOperation } from '../query/dto/schema-operations.types';
 import { Injectable } from '@nestjs/common';
 import { createClient, ClickHouseClient } from '@clickhouse/client';
 import { SqlUtil } from '../utils/sql.util';
+import { isSqlAllowedOnReadOnly } from '../query/query-guard.util';
 import {
   allowInsecureDatabaseTls,
   isLocalDatabaseHost,
@@ -106,7 +108,7 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
   async runStatementsInTransaction(
     pool: ClickHouseClient,
     statements: string[],
-    options?: { limit?: number; offset?: number },
+    options?: QueryExecutionOptions,
   ): Promise<QueryResult> {
     // ClickHouse does not support multi-statement transactions; execute
     // sequentially and return the last statement's result.
@@ -118,6 +120,8 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
         statement,
         isLast ? options : undefined,
       );
+      if (!isSqlAllowedOnReadOnly(statement, 'clickhouse'))
+        await options?.onMutation?.();
     }
     return result;
   }
@@ -418,13 +422,18 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
     return [];
   }
 
-  async seedData(pool: ClickHouseClient): Promise<QueryResult> {
+  async seedData(
+    pool: ClickHouseClient,
+    options?: QueryExecutionOptions,
+  ): Promise<QueryResult> {
     await pool.exec({
       query: `CREATE TABLE IF NOT EXISTS users (id UInt32, name String, email String) ENGINE = MergeTree() ORDER BY id`,
     });
+    await options?.onMutation?.();
     await pool.exec({
       query: `INSERT INTO users VALUES (1, 'Alice', 'alice@example.com'), (2, 'Bob', 'bob@example.com')`,
     });
+    await options?.onMutation?.();
     return { rows: [], columns: [], rowCount: 0 };
   }
 

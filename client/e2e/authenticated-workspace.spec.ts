@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { fulfillAuxiliaryApi } from './support/auxiliary-api';
 
 const apiHeaders = {
   'access-control-allow-credentials': 'true',
@@ -26,7 +27,7 @@ async function mockAuthenticatedApi(page: Page) {
       return;
     }
 
-    if (pathname === '/api/auth/refresh') {
+    if (pathname === '/api/auth/refresh' && request.method() === 'POST') {
       await fulfillJson(route, {
         access_token: 'e2e-access-token',
         accessTokenExpiresAt: 4_102_444_800,
@@ -57,6 +58,13 @@ async function mockAuthenticatedApi(page: Page) {
       return;
     }
 
+    if (pathname === '/api/metadata/hierarchy' && request.method() === 'POST') {
+      const payload = request.postDataJSON() as { connectionId: string };
+      expect(payload.connectionId).toBe('connection-e2e');
+      await fulfillJson(route, []);
+      return;
+    }
+
     if (pathname === '/api/query' && request.method() === 'POST') {
       const payload = request.postDataJSON() as { confirmed?: boolean };
       if (!payload.confirmed) {
@@ -76,7 +84,7 @@ async function mockAuthenticatedApi(page: Page) {
               summary: 'DELETE without a WHERE clause can remove every row.',
             },
           },
-        }, 400);
+        }, 403);
         return;
       }
 
@@ -103,7 +111,7 @@ async function mockAuthenticatedApi(page: Page) {
       return;
     }
 
-    if (pathname.endsWith('/health-check')) {
+    if (request.method() === 'POST' && pathname === '/api/connections/connection-e2e/health-check') {
       await fulfillJson(route, {
         status: 'healthy',
         checkedAt: '2026-07-23T00:00:00.000Z',
@@ -113,12 +121,12 @@ async function mockAuthenticatedApi(page: Page) {
       return;
     }
 
-    if (pathname === '/api/notifications/stream-ticket') {
+    if (pathname === '/api/notifications/stream-ticket' && request.method() === 'POST') {
       await fulfillJson(route, { ticket: 'e2e-ticket' });
       return;
     }
 
-    if (pathname === '/api/notifications/stream') {
+    if (pathname === '/api/notifications/stream' && request.method() === 'GET') {
       await route.fulfill({
         status: 200,
         contentType: 'text/event-stream',
@@ -128,11 +136,18 @@ async function mockAuthenticatedApi(page: Page) {
       return;
     }
 
-    await fulfillJson(route, []);
+    await fulfillAuxiliaryApi(route);
   });
 }
 
 test('restores an authenticated workspace and guards destructive SQL', async ({ page }) => {
+  const queryRequests: Array<{ confirmed: boolean; sql: string }> = [];
+  page.on('request', (request) => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/query') {
+      const payload = request.postDataJSON() as { confirmed?: boolean; sql: string };
+      queryRequests.push({ confirmed: payload.confirmed === true, sql: payload.sql });
+    }
+  });
   await mockAuthenticatedApi(page);
 
   await page.goto('/sql-explorer');
@@ -157,4 +172,23 @@ test('restores an authenticated workspace and guards destructive SQL', async ({ 
   await expect(warning.getByText(/^(HIGH SEVERITY WARNING|CẢNH BÁO NGHIÊM TRỌNG)$/)).toBeVisible();
   await expect(warning.getByText('DELETE FROM users', { exact: true })).toBeVisible();
   await expect(warning.getByRole('button', { name: /^(I reviewed this, run anyway|Tôi đã review, vẫn chạy)$/ })).toBeVisible();
+  expect(queryRequests).toEqual([{ confirmed: false, sql: 'DELETE FROM users' }]);
+
+  await warning.getByRole('button', { name: /^(Cancel|Hủy)$/ }).click();
+  await expect(warning).not.toBeVisible();
+  expect(queryRequests).toEqual([{ confirmed: false, sql: 'DELETE FROM users' }]);
+
+  await page.getByRole('button', { name: /^(Execute|Thực thi)$/ }).click();
+  await expect(warning).toBeVisible();
+  expect(queryRequests).toEqual([
+    { confirmed: false, sql: 'DELETE FROM users' },
+    { confirmed: false, sql: 'DELETE FROM users' },
+  ]);
+  await warning.getByRole('button', { name: /^(I reviewed this, run anyway|Tôi đã review, vẫn chạy)$/ }).click();
+  await expect(warning).not.toBeVisible();
+  await expect.poll(() => queryRequests).toEqual([
+    { confirmed: false, sql: 'DELETE FROM users' },
+    { confirmed: false, sql: 'DELETE FROM users' },
+    { confirmed: true, sql: 'DELETE FROM users' },
+  ]);
 });

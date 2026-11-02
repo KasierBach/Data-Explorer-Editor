@@ -88,7 +88,16 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
     const [serverTotalCount, setServerTotalCount] = useState<number | undefined>(
         typeof initialMetadata.totalCount === 'number' ? initialMetadata.totalCount : undefined,
     );
-    const [runNonce, setRunNonce] = useState(initialMetadata.executedQuery ? 1 : 0);
+    const [runNonce, setRunNonce] = useState(0);
+    const [executionScope, setExecutionScope] = useState<{
+        tabId: string; connectionId: string | null; database: string | null;
+    } | null>(null);
+    const scopeMatches = executionScope?.tabId === tabId
+        && executionScope?.connectionId === activeConnectionId
+        && executionScope?.database === activeDatabase;
+    useEffect(() => {
+        if (!scopeMatches) setExecutionScope(null);
+    }, [scopeMatches]);
     const [activeResultTab, setActiveResultTab] = useState(
         typeof initialMetadata.resultTab === 'string' ? initialMetadata.resultTab : 'data',
     );
@@ -200,7 +209,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
     }, [externalSql]);
 
     useEffect(() => {
-        if (!externalRunRequest || lastHandledRunRequestRef.current === externalRunRequest) {
+        if (!activeConnectionId || !externalRunRequest || lastHandledRunRequestRef.current === externalRunRequest) {
             return;
         }
 
@@ -211,29 +220,32 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
             setClientPageIndex(0);
             setServerTotalCount(undefined);
             setExecutedQuery(externalSql);
+            setExecutionScope({ tabId, connectionId: activeConnectionId, database: activeDatabase });
             setRunNonce((current) => current + 1);
             updateTabMetadata(tabId, { runRequestedAt: null, pageIndex: 0, totalCount: undefined });
         }
-    }, [externalRunRequest, externalSql, tabId, updateTabMetadata]);
+    }, [externalRunRequest, externalSql, tabId, activeConnectionId, activeDatabase, updateTabMetadata]);
 
     const { data: results, isLoading, isFetching, error, dataUpdatedAt, errorUpdatedAt, isSuccess, isError } = useQuery<QueryResult | null, Error>({
-        queryKey: ['query-execution', activeConnectionId, activeDatabase, executedQuery, clientPageIndex, clientPageSize, runNonce],
-        queryFn: async () => {
+        queryKey: ['query-execution', tabId, activeConnectionId, activeDatabase, executedQuery, clientPageIndex, clientPageSize, scopeMatches ? runNonce : 0],
+        queryFn: async ({ signal }) => {
             if (!executedQuery) return null;
             if (!activeConnection) throw new Error('No active connection');
 
             const adapter = connectionService.getAdapter(activeConnection.id, activeConnection.type);
             await adapter.connect(activeConnection);
+            signal.throwIfAborted();
 
             const shouldPaginate = /^\s*(SELECT|WITH)\b/i.test(executedQuery);
             return adapter.executeQuery(executedQuery, {
+                signal,
                 database: activeDatabase || undefined,
                 limit: shouldPaginate ? clientPageSize : undefined,
                 offset: shouldPaginate ? clientPageIndex * clientPageSize : undefined,
                 includeTotalCount: shouldPaginate && clientPageIndex === 0 && serverTotalCount === undefined,
             });
         },
-        enabled: !!executedQuery && !!activeConnectionId && runNonce > 0,
+        enabled: scopeMatches && !!executedQuery && !!activeConnectionId && runNonce > 0,
         retry: false,
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
@@ -347,12 +359,13 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
             }
         }
 
-        if (!sqlToExecute.trim()) return;
+        if (!sqlToExecute.trim() || !activeConnectionId) return;
         setExplainPlan(null);
         setClientPageIndex(0);
         setServerTotalCount(undefined);
         updateTabMetadata(tabId, { pageIndex: 0, totalCount: undefined });
         setExecutedQuery(sqlToExecute);
+        setExecutionScope({ tabId, connectionId: activeConnectionId, database: activeDatabase });
         setRunNonce((current) => current + 1);
     };
 

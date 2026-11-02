@@ -45,12 +45,20 @@ describe('migration-batch-sizing.util', () => {
     expect(reduceMigrationBatchSize(30, 25)).toBe(25);
   });
 
-  it('recognizes retryable batch errors', () => {
+  it('retries known pre-execution parameter limits, never ambiguous timeouts', () => {
+    expect(
+      isRetryableMigrationBatchError(
+        Object.assign(new Error('Too many parameters. Maximum is 2100.'), {
+          code: 'EREQUEST',
+          number: 8003,
+        }),
+      ),
+    ).toBe(true);
     expect(
       isRetryableMigrationBatchError(
         new Error('Request timeout while sending a large packet'),
       ),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isRetryableMigrationBatchError(
         new Error('Duplicate key value violates unique constraint'),

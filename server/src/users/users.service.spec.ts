@@ -15,22 +15,29 @@ describe('UsersService', () => {
     };
     const prisma = {
       user: {
-        findUnique: jest.fn().mockResolvedValue(expiredUser),
-        update: jest.fn().mockResolvedValue(updatedUser),
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce(expiredUser)
+          .mockResolvedValue(updatedUser),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       billingSubscription: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      $transaction: jest.fn(async (operations: Promise<unknown>[]) =>
-        Promise.all(operations),
+      $transaction: jest.fn((callback: (tx: unknown) => unknown) =>
+        callback(prisma),
       ),
     };
     const service = new UsersService(prisma as never);
 
     await expect(service.findById('user_1')).resolves.toEqual(updatedUser);
-    expect(prisma.user.update).toHaveBeenCalledWith(
+    expect(prisma.user.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'user_1' },
+        where: {
+          id: 'user_1',
+          plan: 'pro',
+          planExpiresAt: { lte: expect.any(Date) },
+        },
         data: expect.objectContaining({
           plan: 'free',
           subscriptionStatus: 'expired',

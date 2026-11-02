@@ -53,18 +53,16 @@ describe('SQL guard — readOnly bypass attack vectors', () => {
     });
   });
 
-  describe('known limitation — write keywords inside string literals (over-blocks, safe direction)', () => {
-    // The keyword-based guard cannot distinguish code from data, so it
-    // blocks SELECTs containing write keywords inside string literals.
-    // This is a false positive in the SAFE direction (blocks a legitimate
-    // read; never allows a write). Documented here so a future parser-based
-    // guard (e.g. node-sql-parser AST) can flip these expectations.
+  describe('write keywords inside string literals are data, not executable SQL', () => {
     it.each([
       "SELECT 'DROP TABLE users' AS harmless",
       "SELECT * FROM users WHERE name = 'delete me'",
-    ])('currently blocks (safe over-block): %s', (sql) => {
-      expect(isSqlAllowedOnReadOnly(sql)).toBe(false);
-    });
+    ])(
+      'allows a literal without weakening executable-write checks: %s',
+      (sql) => {
+        expect(isSqlAllowedOnReadOnly(sql)).toBe(true);
+      },
+    );
   });
 
   describe('destructive confirmation analysis catches hidden mutations', () => {

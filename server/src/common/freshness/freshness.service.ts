@@ -1,29 +1,19 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
+import { MongoBulkWriteError } from 'mongodb';
 
 @Injectable()
 export class FreshnessService {
+  private readonly logger = new Logger(FreshnessService.name);
   private readonly versionTtlMs = 30 * 24 * 60 * 60 * 1000;
 
   constructor(@Inject(CACHE_MANAGER) private readonly cacheManager: Cache) {}
 
-  private normalizeScope(
-    scopeParts: Array<string | number | null | undefined>,
-  ) {
-    return scopeParts
-      .map((part) =>
-        String(part ?? '')
-          .trim()
-          .toLowerCase(),
-      )
-      .filter(Boolean);
-  }
-
-  private hash(parts: string[]) {
+  private hash(parts: Array<string | number | null | undefined>) {
     return createHash('sha256')
-      .update(parts.join('|'))
+      .update(JSON.stringify(parts))
       .digest('hex')
       .slice(0, 16);
   }
@@ -32,8 +22,8 @@ export class FreshnessService {
     namespace: string,
     scopeParts: Array<string | number | null | undefined>,
   ) {
-    const scopeHash = this.hash(this.normalizeScope(scopeParts));
-    return `freshness:${namespace}:${scopeHash}:version`;
+    const scopeHash = this.hash(scopeParts);
+    return `freshness:v2:${namespace}:${scopeHash}:version`;
   }
 
   private async readVersion(
@@ -41,8 +31,7 @@ export class FreshnessService {
     scopeParts: Array<string | number | null | undefined>,
   ) {
     const versionKey = this.getVersionKey(namespace, scopeParts);
-    const current = await this.cacheManager.get<number>(versionKey);
-    return Number(current ?? 0) || 0;
+    return (await this.cacheManager.get<string>(versionKey)) ?? '0';
   }
 
   async bump(
@@ -50,7 +39,8 @@ export class FreshnessService {
     scopeParts: Array<string | number | null | undefined>,
   ) {
     const versionKey = this.getVersionKey(namespace, scopeParts);
-    const nextVersion = (await this.readVersion(namespace, scopeParts)) + 1;
+    // Unique generations avoid concurrent read/increment/write reusing a cache key.
+    const nextVersion = randomUUID();
     await this.cacheManager.set(versionKey, nextVersion, this.versionTtlMs);
     return nextVersion;
   }
@@ -61,8 +51,47 @@ export class FreshnessService {
     cacheParts: Array<string | number | null | undefined>,
   ) {
     const version = await this.readVersion(namespace, scopeParts);
-    const scopeHash = this.hash(this.normalizeScope(scopeParts));
-    const cacheHash = this.hash(this.normalizeScope(cacheParts));
-    return `freshness:${namespace}:${scopeHash}:v${version}:${cacheHash}`;
+    const scopeHash = this.hash(scopeParts);
+    const cacheHash = this.hash(cacheParts);
+    return `freshness:v2:${namespace}:${scopeHash}:v${version}:${cacheHash}`;
+  }
+
+  async invalidateConnection(connectionId: string, database?: string | null) {
+    await this.bump('query', [connectionId, database ?? null]);
+    for (const namespace of [
+      'hierarchy',
+      'databases',
+      'relationships',
+      'columns',
+      'metrics',
+      'fullmeta',
+    ]) {
+      await this.bump(namespace, [connectionId]);
+    }
+    await this.bump('nosql-schema', [connectionId, database ?? null]);
+    await this.bump('ai-schema', [connectionId, database ?? null]);
+    if (database != null) await this.bump('ai-schema', [connectionId, null]);
+  }
+
+  async invalidatePartialWrite(
+    error: unknown,
+    connectionId: string,
+    database?: string | null,
+  ) {
+    if (
+      error instanceof MongoBulkWriteError &&
+      (error.insertedCount > 0 ||
+        error.modifiedCount > 0 ||
+        error.deletedCount > 0 ||
+        error.upsertedCount > 0)
+    ) {
+      try {
+        await this.invalidateConnection(connectionId, database);
+      } catch {
+        this.logger.error(
+          `Cache refresh failed after a partial write on connection ${connectionId}.`,
+        );
+      }
+    }
   }
 }

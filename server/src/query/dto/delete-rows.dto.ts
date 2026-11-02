@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, IsArray, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsArray,
+  IsOptional,
+  ArrayMinSize,
+  ArrayMaxSize,
+} from 'class-validator';
+import type { RowIdentity } from '../../database-strategies/database-strategy.interface';
 
 export class DeleteRowsDto {
   @IsString()
@@ -22,6 +30,13 @@ export class DeleteRowsDto {
   pkColumn: string;
 
   @IsArray()
-  @IsNotEmpty()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(1000)
   pkValues: any[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(1000)
+  identities?: RowIdentity[];
 }

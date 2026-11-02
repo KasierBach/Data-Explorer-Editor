@@ -17,7 +17,7 @@ import { allowInsecureDatabaseTls } from '../common/utils/database-network.util'
 
 // Read-only commands allowed through the generic query endpoint; writes go
 // through updateRow/insertRow/deleteRows.
-const REDIS_READ_COMMANDS = new Set([
+export const REDIS_READ_COMMANDS = new Set([
   'GET',
   'MGET',
   'KEYS',

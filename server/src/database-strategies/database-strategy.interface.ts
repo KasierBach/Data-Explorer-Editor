@@ -77,11 +77,14 @@ export interface DatabaseMetrics {
   tableTypes: { type: string; count: number }[];
 }
 
+export type RowIdentity = Array<{ column: string; value: unknown }>;
+
 export interface UpdateRowParams {
   schema: string;
   table: string;
   pkColumn: string;
   pkValue: unknown;
+  identity?: RowIdentity;
   updates: Record<string, unknown>;
 }
 
@@ -96,6 +99,7 @@ export interface DeleteRowsParams {
   table: string;
   pkColumn: string;
   pkValues: unknown[];
+  identities?: RowIdentity[];
 }
 
 export interface ConnectionConfig {
@@ -111,6 +115,19 @@ export interface ConnectionConfig {
 
 export type DatabasePool = object;
 
+export interface QueryExecutionHandle {
+  cancel: () => Promise<boolean>;
+}
+
+export interface QueryExecutionOptions {
+  limit?: number;
+  offset?: number;
+  readOnly?: boolean;
+  onExecution?: (execution: QueryExecutionHandle) => void;
+  /** Refresh after a committed write or an uncertain partial batch; this is not a success signal. */
+  onMutation?: () => Promise<void>;
+}
+
 export interface IDatabaseStrategy {
   createPool(
     connectionConfig: ConnectionConfig,
@@ -121,7 +138,7 @@ export interface IDatabaseStrategy {
   executeQuery(
     pool: unknown,
     sql: string,
-    options?: { limit?: number; offset?: number },
+    options?: QueryExecutionOptions,
   ): Promise<QueryResult>;
   /**
    * Cancels the query currently running on the given execution, if the
@@ -129,14 +146,14 @@ export interface IDatabaseStrategy {
    */
   cancelActiveQuery(execution: unknown): Promise<boolean>;
   /**
-   * Executes multiple SQL statements atomically inside a single transaction.
-   * If any statement fails, all changes are rolled back. The last statement's
-   * result is returned (with pagination options applied to it).
+   * Executes a batch using the engine's transaction capability. PostgreSQL/SQLite
+   * roll back the batch; MySQL DDL can commit implicitly and ClickHouse is sequential.
+   * onMutation reports those partial boundaries. The last statement's result is returned.
    */
   runStatementsInTransaction(
     pool: unknown,
     statements: string[],
-    options?: { limit?: number; offset?: number },
+    options?: QueryExecutionOptions,
   ): Promise<QueryResult>;
   updateRow(
     pool: unknown,
@@ -225,7 +242,10 @@ export interface IDatabaseStrategy {
     parsedParams: unknown,
     connectionInfo: unknown,
   ): Promise<TreeNodeResult[]>;
-  seedData(pool: unknown): Promise<QueryResult>;
+  seedData(
+    pool: unknown,
+    options?: QueryExecutionOptions,
+  ): Promise<QueryResult>;
   getSampleRows(
     pool: unknown,
     schema: string,
