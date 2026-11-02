@@ -61,10 +61,58 @@ export class MigrationService {
     this.logger.log('Migration service initialized with BullMQ.');
   }
 
+  private async authorizeMigrationEndpoints(
+    userId: string,
+    dto: StartMigrationDto,
+  ) {
+    const sourceConn = await this.connectionsService.getMigrationConnection(
+      dto.sourceConnectionId,
+      userId,
+      {
+        permission: Permission.READ,
+        database: undefined,
+        schema: dto.sourceSchema,
+        write: false,
+      },
+    );
+    const targetConn = await this.connectionsService.getMigrationConnection(
+      dto.targetConnectionId,
+      userId,
+      {
+        permission: Permission.WRITE,
+        database: undefined,
+        schema: dto.targetSchema,
+        write: true,
+      },
+    );
+
+    if (!sourceConn || !targetConn) {
+      throw new Error('Source or target connection not found.');
+    }
+
+    return { sourceConn, targetConn };
+  }
+
   async startMigration(
     userId: string,
     dto: StartMigrationDto,
   ): Promise<{ jobId: string }> {
+    const { sourceConn, targetConn } = await this.authorizeMigrationEndpoints(
+      userId,
+      dto,
+    );
+    if (
+      this.comparisonService.sameMigrationEndpoint(
+        dto,
+        sourceConn.type,
+        targetConn.type,
+      )
+    ) {
+      throw new Error(
+        'Source and target cannot point to the same table or collection.',
+      );
+    }
+
     const job = await this.migrationQueue.add(
       'migration-job',
       { userId, dto },
@@ -196,29 +244,27 @@ export class MigrationService {
     const jobId = options.jobId;
     const strict = options.strict ?? true;
 
-    if (this.comparisonService.sameMigrationEndpoint(dto)) {
+    if (jobId) {
+      await this.markStage(jobId, 'validating', 'running');
+    }
+
+    const { sourceConn: rawSourceConn, targetConn: rawTargetConn } =
+      await this.authorizeMigrationEndpoints(userId, dto);
+
+    if (
+      this.comparisonService.sameMigrationEndpoint(
+        dto,
+        rawSourceConn.type,
+        rawTargetConn.type,
+      )
+    ) {
       throw new Error(
         'Source and target cannot point to the same table or collection.',
       );
     }
 
     if (jobId) {
-      await this.markStage(jobId, 'validating', 'running');
-    }
-
-    const rawSourceConn = await this.connectionsService.getDecryptedConnection(
-      dto.sourceConnectionId,
-      userId,
-      Permission.READ,
-    );
-    const rawTargetConn = await this.connectionsService.getDecryptedConnection(
-      dto.targetConnectionId,
-      userId,
-      Permission.WRITE,
-    );
-
-    if (!rawSourceConn || !rawTargetConn) {
-      throw new Error('Source or target connection not found.');
+      await this.markStage(jobId, 'connecting');
     }
 
     const sourceConn: MigrationConnection = {
@@ -229,10 +275,6 @@ export class MigrationService {
       ...rawTargetConn,
       type: rawTargetConn.type as import('./migration.types').ConnectionType,
     };
-
-    if (jobId) {
-      await this.markStage(jobId, 'connecting');
-    }
 
     const sourceStrategy = this.dbStrategiesFactory.getStrategy(
       sourceConn.type,

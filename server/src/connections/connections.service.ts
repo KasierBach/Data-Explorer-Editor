@@ -521,6 +521,54 @@ export class ConnectionsService implements OnModuleDestroy {
     return safeConnection as unknown as Connection;
   }
 
+  async getMigrationConnection(
+    id: string,
+    userId: string,
+    options: {
+      permission: Permission;
+      database?: string | null;
+      schema?: string | null;
+      write: boolean;
+    },
+  ) {
+    const connection = await this.findRawOne(id, userId, options.permission);
+    const schemaDatabase =
+      connection.type === 'mysql' || connection.type === 'mariadb'
+        ? options.schema?.trim()
+        : undefined;
+    const database = schemaDatabase || options.database || connection.database;
+
+    if (connection.organizationId && connection.userId !== userId) {
+      const role = await this.permissionsService.getMemberRole(
+        userId,
+        connection.organizationId,
+      );
+      assertTeamConnectionAccess(
+        connection,
+        { userId, role },
+        { database, isReadOnlySql: !options.write },
+      );
+    }
+
+    if (connection.allowImportExport === false) {
+      throw new ForbiddenException(
+        'Import/export is disabled for this connection.',
+      );
+    }
+    if (options.write && connection.readOnly) {
+      throw new ForbiddenException(
+        'This connection is read-only and cannot receive migrated data.',
+      );
+    }
+
+    return {
+      ...connection,
+      password: connection.password
+        ? decryptAttribute(connection.password)
+        : undefined,
+    };
+  }
+
   /**
    * Retrieves a connection with the password decrypted.
    * Internal use only (e.g. MigrationService).

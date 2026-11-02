@@ -31,11 +31,24 @@ export class MigrationComparisonService {
     return table.trim();
   }
 
-  sameMigrationEndpoint(dto: StartMigrationDto): boolean {
+  sameMigrationEndpoint(
+    dto: StartMigrationDto,
+    sourceType?: string,
+    targetType?: string,
+  ): boolean {
+    if (dto.sourceConnectionId !== dto.targetConnectionId) return false;
+
+    const normalizedSourceSchema = sourceType
+      ? this.normalizeSchemaName(sourceType, dto.sourceSchema)
+      : (dto.sourceSchema || '').trim();
+    const normalizedTargetSchema = targetType
+      ? this.normalizeSchemaName(targetType, dto.targetSchema)
+      : (dto.targetSchema || '').trim();
+
     return (
-      dto.sourceConnectionId === dto.targetConnectionId &&
-      (dto.sourceSchema || '') === (dto.targetSchema || '') &&
-      dto.sourceTable === dto.targetTable
+      normalizedSourceSchema === normalizedTargetSchema &&
+      this.normalizeTableName(dto.sourceTable) ===
+        this.normalizeTableName(dto.targetTable)
     );
   }
 

@@ -52,6 +52,89 @@ describe('ConnectionsService security', () => {
     );
   });
 
+  it('authorizes migration source and target intents with team restrictions', async () => {
+    const connection = {
+      id: 'conn-migration',
+      userId: 'owner',
+      organizationId: 'org',
+      database: 'allowed',
+      type: 'postgres',
+      password: null,
+      readOnly: false,
+      allowImportExport: true,
+      allowedDatabases: ['allowed'],
+      roleQueryModes: { MEMBER: 'readonly' },
+    };
+    prismaMock.connection.findFirst.mockResolvedValue(connection);
+
+    await expect(
+      (service as any).getMigrationConnection(
+        'conn-migration',
+        'member',
+        {
+          permission: Permission.READ,
+          database: 'allowed',
+          write: false,
+        },
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'conn-migration' }));
+
+    await expect(
+      (service as any).getMigrationConnection(
+        'conn-migration',
+        'member',
+        {
+          permission: Permission.WRITE,
+          database: 'allowed',
+          write: true,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(permissionsMock.ensurePermission).toHaveBeenLastCalledWith(
+      'member',
+      ResourceType.CONNECTION,
+      'conn-migration',
+      Permission.WRITE,
+    );
+  });
+
+  it('rejects migration targets that are readonly, disabled, or outside the database whitelist', async () => {
+    const baseConnection = {
+      id: 'conn-migration',
+      userId: 'owner',
+      organizationId: 'org',
+      database: 'allowed',
+      type: 'mysql',
+      password: null,
+      readOnly: false,
+      allowImportExport: true,
+      allowedDatabases: ['allowed'],
+      roleQueryModes: { MEMBER: 'full' },
+    };
+
+    prismaMock.connection.findFirst
+      .mockResolvedValueOnce({ ...baseConnection, readOnly: true })
+      .mockResolvedValueOnce({ ...baseConnection, allowImportExport: false })
+      .mockResolvedValueOnce(baseConnection);
+
+    const authorizeTarget = () =>
+      (service as any).getMigrationConnection('conn-migration', 'member', {
+        permission: Permission.WRITE,
+        database: 'allowed',
+        write: true,
+      });
+
+    await expect(authorizeTarget()).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(authorizeTarget()).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      (service as any).getMigrationConnection('conn-migration', 'member', {
+        permission: Permission.WRITE,
+        database: 'private',
+        write: true,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('rejects a forbidden database even when its pool is warm', async () => {
     prismaMock.connection.findFirst.mockResolvedValue({
       id: 'conn',

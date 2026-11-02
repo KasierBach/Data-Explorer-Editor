@@ -110,6 +110,11 @@ describe('MigrationService', () => {
     };
 
     mockConnectionsService = {
+      getMigrationConnection: jest.fn().mockImplementation((id: string) => {
+        if (id === 'src-1') return Promise.resolve(mockSourceConn);
+        if (id === 'tgt-1') return Promise.resolve(mockTargetConn);
+        return Promise.resolve(null);
+      }),
       getDecryptedConnection: jest.fn().mockImplementation((id: string) => {
         if (id === 'src-1') return Promise.resolve(mockSourceConn);
         if (id === 'tgt-1') return Promise.resolve(mockTargetConn);
@@ -169,6 +174,43 @@ describe('MigrationService', () => {
     expect(mockJobs.has(result.jobId)).toBe(true);
   });
 
+  it('authorizes both endpoints before enqueuing a migration', async () => {
+    await service.startMigration('user-1', baseDto);
+
+    expect(mockConnectionsService.getMigrationConnection).toHaveBeenNthCalledWith(
+      1,
+      'src-1',
+      'user-1',
+      expect.objectContaining({
+        permission: Permission.READ,
+        database: undefined,
+        write: false,
+      }),
+    );
+    expect(mockConnectionsService.getMigrationConnection).toHaveBeenNthCalledWith(
+      2,
+      'tgt-1',
+      'user-1',
+      expect.objectContaining({
+        permission: Permission.WRITE,
+        database: undefined,
+        write: true,
+      }),
+    );
+    expect(mockMigrationQueue.add).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not enqueue when migration authorization fails', async () => {
+    mockConnectionsService.getMigrationConnection.mockRejectedValueOnce(
+      new Error('migration denied'),
+    );
+
+    await expect(
+      service.startMigration('user-1', baseDto),
+    ).rejects.toThrow('migration denied');
+    expect(mockMigrationQueue.add).not.toHaveBeenCalled();
+  });
+
   // ─── Test 2: Batch Chunking (Core Streaming Logic) ───
 
   it('should batch rows in chunks of 2000 and call importData correct number of times', async () => {
@@ -201,15 +243,15 @@ describe('MigrationService', () => {
 
     // 5000 rows / 2000 batch = 2 full batches + 1 partial = 3 calls
     expect(targetStrategy.importData).toHaveBeenCalledTimes(3);
-    expect(mockConnectionsService.getDecryptedConnection).toHaveBeenCalledWith(
+    expect(mockConnectionsService.getMigrationConnection).toHaveBeenCalledWith(
       'src-1',
       'user-1',
-      Permission.READ,
+      expect.objectContaining({ permission: Permission.READ, write: false }),
     );
-    expect(mockConnectionsService.getDecryptedConnection).toHaveBeenCalledWith(
+    expect(mockConnectionsService.getMigrationConnection).toHaveBeenCalledWith(
       'tgt-1',
       'user-1',
-      Permission.WRITE,
+      expect.objectContaining({ permission: Permission.WRITE, write: true }),
     );
 
     // First call should have 2000 rows
@@ -292,15 +334,37 @@ describe('MigrationService', () => {
 
   // ─── Test 5: Connection Not Found ───
 
-  it('should fail immediately if source connection is not found', async () => {
-    mockConnectionsService.getDecryptedConnection.mockResolvedValue(null);
+  it('reauthorizes queued migration endpoints before creating pools', async () => {
+    const sourceStrategy = createMockStrategy();
+    const targetStrategy = createMockStrategy();
+    const stream = new PassThrough({ objectMode: true });
+    sourceStrategy.exportStream.mockResolvedValue(stream);
+    mockStrategyFactory.getStrategy
+      .mockReturnValueOnce(sourceStrategy)
+      .mockReturnValueOnce(targetStrategy);
 
     const { jobId } = await service.startMigration('user-1', baseDto);
+    mockConnectionsService.getMigrationConnection.mockClear();
+    mockConnectionsService.getMigrationConnection.mockRejectedValueOnce(
+      new Error('access revoked'),
+    );
+
     await startPipeline(jobId, baseDto);
 
     const job = await service.getPublicJob(jobId, 'user-1');
     expect(job.status).toBe('failed');
-    expect(job.error).toContain('not found');
+    expect(job.error).toContain('access revoked');
+    expect(sourceStrategy.createPool).not.toHaveBeenCalled();
+    expect(targetStrategy.createPool).not.toHaveBeenCalled();
+  });
+
+  it('should reject before enqueue if source connection is not found', async () => {
+    mockConnectionsService.getMigrationConnection.mockResolvedValue(null);
+
+    await expect(
+      service.startMigration('user-1', baseDto),
+    ).rejects.toThrow('not found');
+    expect(mockMigrationQueue.add).not.toHaveBeenCalled();
   });
 
   // ─── Test 6: Empty Table (0 rows) ───
@@ -331,23 +395,30 @@ describe('MigrationService', () => {
     expect(targetStrategy.importData).not.toHaveBeenCalled();
   });
 
-  it('should fail immediately when source and target point to the same table', async () => {
-    const { jobId } = await service.startMigration('user-1', {
-      ...baseDto,
-      targetConnectionId: 'src-1',
-      targetSchema: 'public',
-      targetTable: 'users',
-    });
-    await startPipeline(jobId, {
-      ...baseDto,
-      targetConnectionId: 'src-1',
-      targetSchema: 'public',
-      targetTable: 'users',
-    });
+  it('should reject before enqueue when source and target point to the same table', async () => {
+    await expect(
+      service.startMigration('user-1', {
+        ...baseDto,
+        targetConnectionId: 'src-1',
+        targetSchema: 'public',
+        targetTable: 'users',
+      }),
+    ).rejects.toThrow('same table');
+    expect(mockMigrationQueue.add).not.toHaveBeenCalled();
+  });
 
-    const job = await service.getPublicJob(jobId, 'user-1');
-    expect(job.status).toBe('failed');
-    expect(job.error).toContain('same table');
+  it('treats normalized schema and table aliases as the same endpoint', async () => {
+    await expect(
+      service.startMigration('user-1', {
+        ...baseDto,
+        targetConnectionId: 'src-1',
+        sourceSchema: '',
+        targetSchema: ' public ',
+        sourceTable: ' users ',
+        targetTable: 'users',
+      }),
+    ).rejects.toThrow('same table');
+    expect(mockMigrationQueue.add).not.toHaveBeenCalled();
   });
 
   it('should fail during preflight when SQL target is missing source columns', async () => {
