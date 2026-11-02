@@ -126,26 +126,49 @@ export class QueryService {
     return /^\s*(SELECT|WITH)\b/i.test(sql.trim());
   }
 
-  private hasExplicitSqlLimit(sql: string): boolean {
-    return /\b(LIMIT|TOP|FETCH\s+(?:FIRST|NEXT))\b/i.test(sql);
+  private hasExplicitSqlLimit(sql: string, type: Connection['type']): boolean {
+    if (!this.isSqlBrowseCapableConnection(type)) return false;
+    const dialect = type === 'mariadb' ? 'mysql' : type;
+    if (
+      !['postgres', 'cockroach', 'mysql', 'mssql', 'sqlite', 'clickhouse'].includes(
+        dialect,
+      )
+    ) {
+      return false;
+    }
+    return Boolean(
+      SqlUtil.analyzeOuterLimit(
+        sql,
+        (dialect === 'cockroach' ? 'postgres' : dialect) as
+          | 'postgres'
+          | 'mysql'
+          | 'mssql'
+          | 'sqlite'
+          | 'clickhouse',
+      )?.valid,
+    );
   }
 
-  private assertRawQueryLimit(sql: string): void {
-    if (!this.isSelectLikeQuery(sql)) return;
+  private assertRawQueryLimit(
+    sql: string,
+    type: Connection['type'],
+  ): void {
+    if (!this.isSelectLikeQuery(sql) || !this.isSqlBrowseCapableConnection(type))
+      return;
 
-    const hasUnlimitedLimit = /\bLIMIT\s+ALL\b/i.test(sql);
-    const explicitLimits = [
-      ...sql.matchAll(/\bLIMIT\s+(\d+)/gi),
-      ...sql.matchAll(/\bTOP\s*\(?\s*(\d+)\s*\)?/gi),
-      ...sql.matchAll(/\bFETCH\s+(?:FIRST|NEXT)\s+(\d+)/gi),
-    ].map((match) => Number.parseInt(match[1], 10));
-    const exceedsCap = explicitLimits.some(
-      (value) => Number.isFinite(value) && value > this.DEFAULT_QUERY_LIMIT,
+    const dialect =
+      type === 'cockroach'
+        ? 'postgres'
+        : type === 'mariadb'
+          ? 'mysql'
+          : type;
+    const outer = SqlUtil.analyzeOuterLimit(
+      sql,
+      dialect as 'postgres' | 'mysql' | 'mssql' | 'sqlite' | 'clickhouse',
     );
-    const hasOffsetWithoutCap =
-      /\bOFFSET\b/i.test(sql) && explicitLimits.length === 0;
+    if (!outer) return;
 
-    if (hasUnlimitedLimit || exceedsCap || hasOffsetWithoutCap) {
+    if (!outer.valid || !outer.value || outer.value > this.DEFAULT_QUERY_LIMIT) {
       throw new BadRequestException(
         `Raw query results are capped at ${this.DEFAULT_QUERY_LIMIT.toLocaleString()} rows. Use result pagination or export for larger datasets.`,
       );
@@ -193,6 +216,7 @@ export class QueryService {
     result: QueryResult,
     sql: string,
     options: { limit?: number; offset?: number },
+    type: Connection['type'],
   ): QueryResult {
     const nextResult: QueryResult = { ...result };
 
@@ -211,7 +235,7 @@ export class QueryService {
       return nextResult;
     }
 
-    if (!this.hasExplicitSqlLimit(sql)) {
+    if (!this.hasExplicitSqlLimit(sql, type)) {
       nextResult.appliedLimit = this.DEFAULT_QUERY_LIMIT;
       nextResult.limitSource = 'protective_default';
     }
@@ -601,7 +625,7 @@ export class QueryService {
       const finalSql = executableStatements[statementCount - 1];
       const isMultiStatement = executableStatements.length > 1;
       for (const statement of executableStatements) {
-        this.assertRawQueryLimit(statement);
+        this.assertRawQueryLimit(statement, connection.type);
       }
 
       // Register the in-flight query so the user can cancel it.
@@ -688,6 +712,7 @@ export class QueryService {
             nativeResult,
             finalSql,
             { limit, offset },
+            connection.type,
           );
           if (!isMultiStatement && includeTotalCount === true) {
             const countSql = this.buildQueryCountSql(finalSql);

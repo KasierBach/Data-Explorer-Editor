@@ -112,6 +112,37 @@ describe('SqlUtil pagination', () => {
     expect(result).toContain('ORDER BY `id``x` DESC');
   });
 
+  it.each([
+    ["SELECT 'LIMIT 1' AS sample, * FROM users", "SELECT 'LIMIT 1' AS sample, * FROM users LIMIT 100;"],
+    ['SELECT * FROM users /* LIMIT 1 */', 'SELECT * FROM users /* LIMIT 1 */ LIMIT 100;'],
+    ['SELECT * FROM users WHERE id IN (SELECT id FROM audit LIMIT 1)', 'SELECT * FROM users WHERE id IN (SELECT id FROM audit LIMIT 1) LIMIT 100;'],
+    ['WITH one AS (SELECT * FROM users LIMIT 1) SELECT * FROM one', 'WITH one AS (SELECT * FROM users LIMIT 1) SELECT * FROM one LIMIT 100;'],
+  ])('does not treat inner or inert LIMIT text as an outer cap', (sql, expected) => {
+    expect(SqlUtil.injectLimit(sql, 100)).toBe(expected);
+  });
+
+  it('inserts the outer cap before a trailing line comment', () => {
+    expect(SqlUtil.injectLimit('SELECT * FROM users -- LIMIT 1', 100)).toBe(
+      'SELECT * FROM users LIMIT 100; -- LIMIT 1',
+    );
+  });
+
+  it('rewrites only an outer LIMIT ALL', () => {
+    expect(
+      SqlUtil.injectLimit(
+        'SELECT * FROM users WHERE id IN (SELECT id FROM audit LIMIT ALL)',
+        100,
+      ),
+    ).toBe(
+      'SELECT * FROM users WHERE id IN (SELECT id FROM audit LIMIT ALL) LIMIT 100;',
+    );
+  });
+
+  it('rejects ambiguous or unbounded outer cap forms', () => {
+    expect(() => SqlUtil.injectLimit('SELECT * FROM users LIMIT NULL', 100)).toThrow();
+    expect(() => SqlUtil.injectLimit('SELECT * FROM users LIMIT -1', 100)).toThrow();
+  });
+
   it('rewrites LIMIT ALL to a bounded limit', () => {
     expect(SqlUtil.injectLimit('SELECT * FROM users LIMIT ALL', 500)).toBe(
       'SELECT * FROM users LIMIT 500',

@@ -1,3 +1,10 @@
+import {
+  analyzeOuterSqlLimit,
+  appendBeforeTrailingLineComment,
+  hasTopLevelSqlPagination,
+  type SqlDialect,
+} from './sql-limit.util';
+
 export class SqlUtil {
   /** Returns true only when a WITH query's outer statement is a SELECT. */
   private static isSelectStatement(sql: string): boolean {
@@ -50,21 +57,40 @@ export class SqlUtil {
     return false;
   }
 
+  static analyzeOuterLimit(sql: string, dialect: SqlDialect) {
+    return analyzeOuterSqlLimit(sql, dialect);
+  }
+
+  static isSelect(sql: string): boolean {
+    return SqlUtil.isSelectStatement(sql);
+  }
+
   /**
    * Appends a LIMIT clause to a bare SELECT statement if it lacks one, to prevent OOM.
-   * Also rewrites `LIMIT ALL` (Postgres) to a bounded limit so the query cannot
-   * return an unbounded number of rows.
+   * Also rewrites an outer `LIMIT ALL` to a bounded limit.
    */
-  static injectLimit(sql: string, limit: number = 50000): string {
-    let safeSql = sql;
-    if (SqlUtil.isSelectStatement(safeSql)) {
-      if (/\bLIMIT\s+ALL\b/i.test(safeSql)) {
-        safeSql = safeSql.replace(/\bLIMIT\s+ALL\b/i, `LIMIT ${limit}`);
-      } else if (!/\bLIMIT\b/i.test(safeSql)) {
-        safeSql = `${safeSql.trim().replace(/;$/, '')} LIMIT ${limit};`;
+  static injectLimit(
+    sql: string,
+    limit: number = 50000,
+    dialect: Exclude<SqlDialect, 'mssql'> = 'postgres',
+  ): string {
+    if (!SqlUtil.isSelectStatement(sql)) return sql;
+
+    const outer = analyzeOuterSqlLimit(sql, dialect);
+    if (outer) {
+      if (!outer.valid) {
+        if (sql.slice(outer.start, outer.end).toUpperCase().includes('ALL')) {
+          return `${sql.slice(0, outer.start)}LIMIT ${limit}${sql.slice(outer.end)}`;
+        }
+        throw new Error(outer.reason || 'Unsupported outer result limit.');
       }
+      if (outer.value !== undefined && outer.value > limit) {
+        throw new Error(`Outer result limit exceeds ${limit}.`);
+      }
+      return sql;
     }
-    return safeSql;
+
+    return appendBeforeTrailingLineComment(sql, `LIMIT ${limit}`);
   }
 
   /**
@@ -75,8 +101,16 @@ export class SqlUtil {
     if (/^\s*WITH\b/i.test(safeSql)) {
       return SqlUtil.injectPagination(safeSql, limit, 0, 'mssql');
     }
-    if (/^\s*SELECT\s+(?!TOP\b)/i.test(safeSql)) {
-      safeSql = safeSql.replace(/^\s*SELECT\s+/i, `SELECT TOP ${limit} `);
+    if (/^\s*SELECT\b/i.test(safeSql)) {
+      const outer = analyzeOuterSqlLimit(safeSql, 'mssql');
+      if (outer && !outer.valid) {
+        throw new Error(outer.reason || 'Unsupported outer result limit.');
+      }
+      if (!outer) {
+        safeSql = safeSql.replace(/^\s*SELECT\s+/i, `SELECT TOP ${limit} `);
+      } else if (outer.value !== undefined && outer.value > limit) {
+        throw new Error(`Outer result limit exceeds ${limit}.`);
+      }
     }
     return safeSql;
   }
@@ -96,8 +130,7 @@ export class SqlUtil {
 
     if (!SqlUtil.isSelectStatement(trimmed)) return sql;
 
-    const hasExplicitPagination =
-      /\b(LIMIT|OFFSET|FETCH\s+(?:FIRST|NEXT)|TOP\s*\(?)\b/i.test(trimmed);
+    const hasExplicitPagination = hasTopLevelSqlPagination(trimmed);
     if (hasExplicitPagination) {
       if (dialect === 'mssql') {
         return `SELECT * FROM (${trimmed}) AS _paged_result ORDER BY (SELECT NULL) OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY;`;

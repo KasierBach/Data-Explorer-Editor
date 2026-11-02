@@ -255,6 +255,32 @@ describe('PostgresStrategy', () => {
       );
     });
 
+    it('caps an outer query even when a subquery already has a LIMIT', async () => {
+      mockClient.query.mockResolvedValue({ rows: [], fields: [], rowCount: 0 });
+
+      await strategy.executeQuery(
+        mockPool,
+        'SELECT * FROM big_table CROSS JOIN (SELECT 1 LIMIT 1) marker',
+      );
+
+      expect(mockClient.query).toHaveBeenCalledWith(
+        'SELECT * FROM big_table CROSS JOIN (SELECT 1 LIMIT 1) marker LIMIT 50000;',
+      );
+    });
+
+    it('caps a query when LIMIT appears only inside a string literal', async () => {
+      mockClient.query.mockResolvedValue({ rows: [], fields: [], rowCount: 0 });
+
+      await strategy.executeQuery(
+        mockPool,
+        "SELECT 'LIMIT 1' AS label, * FROM big_table",
+      );
+
+      expect(mockClient.query).toHaveBeenCalledWith(
+        "SELECT 'LIMIT 1' AS label, * FROM big_table LIMIT 50000;",
+      );
+    });
+
     it('should not append LIMIT if query already has a LIMIT clause', async () => {
       mockClient.query.mockResolvedValue({ rows: [], fields: [], rowCount: 0 });
 
