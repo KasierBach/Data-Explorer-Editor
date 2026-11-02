@@ -3,6 +3,7 @@ import {
   ConflictException,
   UnauthorizedException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 
@@ -63,20 +64,58 @@ describe('AuthService - login', () => {
       ),
     ).rejects.toThrow('Invalid credentials');
   });
-  it('rejects a local account without a password hash', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue({
-      provider: 'local',
-      password: null,
-      language: 'vi',
-    });
 
-    await expect(
-      authService.login({
-        email: 'local@example.com',
-        password: 'pw',
-      } as LoginDto),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
-  });
+  it.each([
+    ['vi', 'en', 'Thông tin đăng nhập không hợp lệ'],
+    ['en', 'vi', 'Invalid credentials'],
+  ] as const)(
+    'uses request locale %s for an invalid password on a %s account',
+    async (lang, userLang, message) => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'existing@example.com',
+        provider: 'local',
+        password: await bcrypt.hash('correct-password', 4),
+        language: userLang,
+      });
+
+      await expect(
+        authService.login(
+          {
+            email: 'existing@example.com',
+            password: 'wrong-password',
+          } as LoginDto,
+          undefined,
+          lang,
+        ),
+      ).rejects.toThrow(message);
+    },
+  );
+
+  it.each([
+    ['vi', 'en', 'Thông tin đăng nhập không hợp lệ'],
+    ['en', 'vi', 'Invalid credentials'],
+  ] as const)(
+    'uses request locale %s for a %s local account without a password hash',
+    async (lang, userLang, message) => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        provider: 'local',
+        password: null,
+        language: userLang,
+      });
+
+      await expect(
+        authService.login(
+          {
+            email: 'local@example.com',
+            password: 'pw',
+          } as LoginDto,
+          undefined,
+          lang,
+        ),
+      ).rejects.toThrow(message);
+    },
+  );
   it('rejects registration when legal terms are not accepted', async () => {
     await expect(
       authService.register({

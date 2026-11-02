@@ -135,6 +135,24 @@ describe('Auth security (full-stack e2e)', () => {
       expect(responses[0].body.message).toBe(responses[1].body.message);
     });
 
+    it('uses the request language uniformly for missing and existing emails', async () => {
+      const responses = await Promise.all(
+        [emailA, `missing-vi-${suffix}@example.com`].map((email) =>
+          request(app.getHttpServer())
+            .post('/api/auth/login')
+            .set('Accept-Language', 'vi')
+            .send({ email, password: 'definitely-wrong' }),
+        ),
+      );
+
+      expect(responses[0].status).toBe(401);
+      expect(responses[1].status).toBe(401);
+      expect(responses[0].body.message).toBe(
+        'Thông tin đăng nhập không hợp lệ',
+      );
+      expect(responses[0].body.message).toBe(responses[1].body.message);
+    });
+
     it('allows five failed attempts then blocks attempts six and seven', async () => {
       const statuses: number[] = [];
       for (let i = 0; i < 7; i++) {

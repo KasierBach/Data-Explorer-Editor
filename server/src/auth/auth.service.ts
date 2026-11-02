@@ -150,11 +150,7 @@ export class AuthService implements OnModuleInit {
       }
 
       throw new UnauthorizedException(
-        this.t(
-          userLang,
-          'Thông tin đăng nhập không hợp lệ',
-          'Invalid credentials',
-        ),
+        this.t(lang, 'Thông tin đăng nhập không hợp lệ', 'Invalid credentials'),
       );
     }
 
@@ -171,11 +167,7 @@ export class AuthService implements OnModuleInit {
         ipAddress: clientIp,
       });
       throw new UnauthorizedException(
-        this.t(
-          userLang,
-          'Thông tin đăng nhập không hợp lệ',
-          'Invalid credentials',
-        ),
+        this.t(lang, 'Thông tin đăng nhập không hợp lệ', 'Invalid credentials'),
       );
     }
 
