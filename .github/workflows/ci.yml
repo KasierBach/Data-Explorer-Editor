@@ -33,35 +33,32 @@ jobs:
           # SPA-only usage; allow the React Router RSC advisory while keeping all other high/critical findings blocking.
           NPM_AUDIT_ALLOW_GHSA: GHSA-QWWW-VCR4-C8H2
       - run: npm run lint
-      - run: npm run test:ci
+      - run: npm run test:cov
       - run: npm run test:prerender
       - run: node --test ../.github/scripts/deploy-render.test.mjs ../.github/scripts/npm-audit.test.mjs
       - run: npm run build
       - run: npx playwright install --with-deps chromium firefox webkit
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --reporter=github,html
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: client-verification-${{ github.sha }}
+          path: |
+            client/coverage/
+            client/playwright-report/
+            client/test-results/
 
   server:
     name: Server
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: data_explorer_ci
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d data_explorer_ci"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     defaults:
       run:
         working-directory: server
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/data_explorer_ci
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:15432/data_explorer_e2e
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:15432/data_explorer_e2e
+      E2E_REDIS_URL: redis://127.0.0.1:16379/15
+      COMPOSE_PROJECT_NAME: data-explorer-server-${{ github.run_id }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -76,14 +73,82 @@ jobs:
           # Keep this known transitive CLI/config advisory explicit while retaining all other blockers.
           NPM_AUDIT_ALLOW_GHSA: GHSA-GGR8-5VV4-36MX
       - run: npm run prisma:generate
+      - run: npm run typecheck
+      - run: node --test scripts/prisma-generate-safe.test.mjs
+      - name: Start owned PostgreSQL, Redis, MongoDB and MySQL fixtures
+        run: docker compose -f test/compose.e2e.yml -f test/compose.r03.yml up -d --wait
       - run: npx prisma migrate deploy
       - run: npm run lint
-      - run: npm run test:ci
+      - run: npm run test:cov
       - run: npm run build
+      - run: npm run test:e2e -- --detectOpenHandles --json --outputFile=e2e-results.json 2>&1 | tee e2e.log
+      - name: Capture fixture logs
+        if: always()
+        run: docker compose -f test/compose.e2e.yml -f test/compose.r03.yml logs --no-color > fixture.log
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: server-verification-${{ github.sha }}
+          path: |
+            server/coverage/
+            server/e2e-results.json
+            server/e2e.log
+            server/fixture.log
+      - name: Remove owned fixtures
+        if: always()
+        run: docker compose -f test/compose.e2e.yml -f test/compose.r03.yml down --volumes --remove-orphans
+
+  full-stack:
+    name: Full-stack browser
+    needs: [client, server]
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:15432/data_explorer_e2e
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:15432/data_explorer_e2e
+      E2E_REDIS_URL: redis://127.0.0.1:16379/15
+      COMPOSE_PROJECT_NAME: data-explorer-browser-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+      - run: npm ci
+        working-directory: server
+      - run: npm ci
+        working-directory: client
+      - run: npm run build
+        working-directory: server
+      - name: Start owned PostgreSQL and Redis fixtures
+        run: docker compose -f server/test/compose.e2e.yml up -d --wait
+      - run: npx prisma migrate deploy
+        working-directory: server
+      - run: npx playwright install --with-deps chromium
+        working-directory: client
+      - run: npm run test:full-stack 2>&1 | tee full-stack.log
+        working-directory: client
+      - name: Capture fixture logs
+        if: always()
+        run: docker compose -f server/test/compose.e2e.yml logs --no-color > fixture-browser.log
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: full-stack-verification-${{ github.sha }}
+          path: |
+            client/playwright-full-stack-report/
+            client/test-results-full-stack/
+            client/full-stack.log
+            fixture-browser.log
+      - name: Remove owned fixtures
+        if: always()
+        run: docker compose -f server/test/compose.e2e.yml down --volumes --remove-orphans
 
   containers:
     name: Container images
-    needs: [client, server]
+    needs: [client, server, full-stack]
     runs-on: ubuntu-latest
     permissions:
       contents: read
