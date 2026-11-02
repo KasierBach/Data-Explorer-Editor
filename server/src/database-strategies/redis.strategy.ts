@@ -43,6 +43,13 @@ export const REDIS_READ_COMMANDS = new Set([
 ]);
 
 const MAX_SCAN_COUNT = 500;
+const MAX_COLLECTION_ITEMS = 500;
+
+function parseInteger(value: string): number | undefined {
+  if (!/^-?\d+$/.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
+}
 
 @Injectable()
 export class RedisStrategy implements IDatabaseStrategy {
@@ -117,7 +124,8 @@ export class RedisStrategy implements IDatabaseStrategy {
         limit < 1 ||
         !Number.isSafeInteger(offset) ||
         offset < 0 ||
-        !Number.isSafeInteger(limit + offset + 1)
+        !Number.isSafeInteger(limit + offset + 1) ||
+        limit + offset > MAX_SCAN_COUNT
       ) {
         throw new BadRequestException('Invalid Redis key page bounds.');
       }
@@ -174,6 +182,8 @@ export class RedisStrategy implements IDatabaseStrategy {
         rowCount: 1,
       };
     }
+
+    await this.assertBoundedRead(client, command, args);
 
     // Generic single-result read commands (GET, TTL, TYPE, ...).
     const result = await client.call(command, ...args);
@@ -448,7 +458,62 @@ export class RedisStrategy implements IDatabaseStrategy {
     return [{ key: table, type, ttl, value }].slice(0, limit);
   }
 
-  /** Serialize a cell value for Redis storage (JSON for structured data). */
+  private async assertBoundedRead(
+    client: Redis,
+    command: string,
+    args: string[],
+  ): Promise<void> {
+    if (command === 'MGET') {
+      if (args.length < 1 || args.length > MAX_COLLECTION_ITEMS) {
+        throw new BadRequestException(
+          `MGET supports between 1 and ${MAX_COLLECTION_ITEMS} keys.`,
+        );
+      }
+      return;
+    }
+
+    if (command === 'LRANGE' || command === 'ZRANGE') {
+      if (args.length !== 3) {
+        throw new BadRequestException(
+          `${command} requires a key, start and stop.`,
+        );
+      }
+      const start = parseInteger(args[1]);
+      const stop = parseInteger(args[2]);
+      if (
+        start === undefined ||
+        stop === undefined ||
+        start < 0 ||
+        stop < start ||
+        stop - start + 1 > MAX_COLLECTION_ITEMS
+      ) {
+        throw new BadRequestException(
+          `${command} must request a finite range of at most ${MAX_COLLECTION_ITEMS} items.`,
+        );
+      }
+      return;
+    }
+
+    if (command === 'SMEMBERS' || command === 'HGETALL') {
+      if (args.length !== 1) {
+        throw new BadRequestException(`${command} requires exactly one key.`);
+      }
+      const count =
+        command === 'SMEMBERS'
+          ? await client.scard(args[0])
+          : await client.hlen(args[0]);
+      this.assertCollectionSize(command, count);
+    }
+  }
+
+  private assertCollectionSize(type: string, count: number): void {
+    if (count > MAX_COLLECTION_ITEMS) {
+      throw new BadRequestException(
+        `${type} contains more than ${MAX_COLLECTION_ITEMS} items and cannot be materialized safely.`,
+      );
+    }
+  }
+
   private serializeValue(value: unknown): string {
     if (value === null || value === undefined) return '';
     if (typeof value === 'string') return value;
@@ -539,14 +604,26 @@ export class RedisStrategy implements IDatabaseStrategy {
     switch (type) {
       case 'string':
         return client.get(key);
-      case 'list':
-        return client.lrange(key, 0, -1);
-      case 'set':
+      case 'list': {
+        const count = await client.llen(key);
+        this.assertCollectionSize('Redis list', count);
+        return client.lrange(key, 0, count - 1);
+      }
+      case 'set': {
+        const count = await client.scard(key);
+        this.assertCollectionSize('Redis set', count);
         return client.smembers(key);
-      case 'hash':
+      }
+      case 'hash': {
+        const count = await client.hlen(key);
+        this.assertCollectionSize('Redis hash', count);
         return client.hgetall(key);
-      case 'zset':
-        return client.zrange(key, 0, -1, 'WITHSCORES');
+      }
+      case 'zset': {
+        const count = await client.zcard(key);
+        this.assertCollectionSize('Redis sorted set', count);
+        return client.zrange(key, 0, count - 1, 'WITHSCORES');
+      }
       default:
         return null;
     }

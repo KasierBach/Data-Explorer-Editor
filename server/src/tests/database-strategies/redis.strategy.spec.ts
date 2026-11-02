@@ -20,7 +20,9 @@ function createMockClient() {
       }
       return deleted;
     }),
-    type: jest.fn(async (key: string) => (store.has(key) ? 'string' : 'none')),
+    type: jest.fn(async (key: string): Promise<string> =>
+      store.has(key) ? 'string' : 'none',
+    ),
     ttl: jest.fn(async () => -1),
     scan: jest.fn(async () => ['0', [...store.keys()]]),
     dbsize: jest.fn(async () => store.size),
@@ -33,12 +35,22 @@ function createMockClient() {
       return '# Server\r\nredis_version:7.0\r\n';
     }),
     ping: jest.fn(async () => 'PONG'),
-    call: jest.fn(async (command: string, ...args: string[]) => {
-      if (command === 'GET') return store.get(args[0]) ?? null;
-      if (command === 'TTL') return -1;
-      if (command === 'EXISTS') return store.has(args[0]) ? 1 : 0;
-      return null;
-    }),
+    call: jest.fn(
+      async (command: string, ...args: string[]): Promise<unknown> => {
+        if (command === 'GET') return store.get(args[0]) ?? null;
+        if (command === 'TTL') return -1;
+        if (command === 'EXISTS') return store.has(args[0]) ? 1 : 0;
+        return null;
+      },
+    ),
+    scard: jest.fn(async () => 0),
+    hlen: jest.fn(async () => 0),
+    llen: jest.fn(async () => 0),
+    zcard: jest.fn(async () => 0),
+    lrange: jest.fn(async () => []),
+    smembers: jest.fn(async () => []),
+    hgetall: jest.fn(async () => ({})),
+    zrange: jest.fn(async () => []),
     disconnect: jest.fn(),
   };
   return { client, store };
@@ -59,6 +71,49 @@ describe('RedisStrategy', () => {
       const result = await strategy.executeQuery(client, 'GET greeting');
       expect(result.rows[0]).toEqual({ result: 'hello' });
       expect(result.columns).toEqual(['result']);
+    });
+
+    it('rejects collection commands that cannot prove a complete bounded result', async () => {
+      const { client } = createMockClient();
+      client.scard.mockResolvedValue(501);
+      client.hlen.mockResolvedValue(501);
+
+      await expect(
+        strategy.executeQuery(client, 'SMEMBERS large-set'),
+      ).rejects.toThrow('500');
+      await expect(
+        strategy.executeQuery(client, 'HGETALL large-hash'),
+      ).rejects.toThrow('500');
+      expect(client.call).not.toHaveBeenCalledWith('SMEMBERS', 'large-set');
+      expect(client.call).not.toHaveBeenCalledWith('HGETALL', 'large-hash');
+    });
+
+    it('rejects unbounded ranges and oversized MGET before calling Redis', async () => {
+      const { client } = createMockClient();
+      const keys = Array.from({ length: 501 }, (_, index) => `key-${index}`);
+
+      await expect(
+        strategy.executeQuery(client, 'LRANGE queue 0 -1'),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        strategy.executeQuery(client, 'ZRANGE scores 0 -1'),
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        strategy.executeQuery(client, `MGET ${keys.join(' ')}`),
+      ).rejects.toThrow(BadRequestException);
+      expect(client.call).not.toHaveBeenCalled();
+    });
+
+    it('allows complete collection reads within the safety budget', async () => {
+      const { client } = createMockClient();
+      client.scard.mockResolvedValue(2);
+      client.call.mockResolvedValue(['a', 'b']);
+
+      const result = await strategy.executeQuery(client, 'SMEMBERS small-set');
+
+      expect(result.rows).toEqual([{ result: ['a', 'b'] }]);
+      expect(client.scard).toHaveBeenCalledWith('small-set');
+      expect(client.call).toHaveBeenCalledWith('SMEMBERS', 'small-set');
     });
 
     it('rejects dangerous commands like FLUSHALL', async () => {
@@ -106,6 +161,22 @@ describe('RedisStrategy', () => {
       await client.set('b', '2');
       const result = await strategy.executeQuery(client, 'DBSIZE');
       expect(result.rows[0]).toEqual({ keyCount: 2 });
+    });
+  });
+
+  describe('bounded sampling and export', () => {
+    it('rejects oversized complete collection samples and exports', async () => {
+      const { client } = createMockClient();
+      client.type.mockResolvedValue('list');
+      client.llen.mockResolvedValue(501);
+
+      await expect(
+        strategy.getSampleRows(client, '0', 'large-list', 1),
+      ).rejects.toThrow('500');
+      await expect(
+        strategy.exportStream(client, '0', 'large-list'),
+      ).rejects.toThrow('500');
+      expect(client.lrange).not.toHaveBeenCalled();
     });
   });
 

@@ -124,6 +124,16 @@ describe('R14 Redis scan boundaries', () => {
     expect(result.appliedOffset).toBe(2);
   });
 
+  it('rejects deep offset work before scanning the keyspace', async () => {
+    await expect(
+      strategy.executeQuery(redis, `KEYS ${pattern}`, {
+        limit: 500,
+        offset: 1,
+      }),
+    ).rejects.toThrow('page bounds');
+    expect(scan).not.toHaveBeenCalled();
+  });
+
   it.each([
     'SCAN',
     'SCAN -1',
