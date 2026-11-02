@@ -35,7 +35,7 @@ jobs:
       - run: npm run lint
       - run: npm run test:cov
       - run: npm run test:prerender
-      - run: node --test ../.github/scripts/deploy-render.test.mjs ../.github/scripts/npm-audit.test.mjs
+      - run: node --test ../.github/scripts/deploy-render.test.mjs ../.github/scripts/deployment-config.test.mjs ../.github/scripts/npm-audit.test.mjs
       - run: npm run build
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run test:e2e -- --reporter=github,html
