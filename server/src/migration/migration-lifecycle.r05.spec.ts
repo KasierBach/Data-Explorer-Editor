@@ -48,7 +48,7 @@ function setup() {
     >(async () => ({ success: true, rowCount: 2 })),
   };
   const connections = {
-    getDecryptedConnection: jest.fn(async (id: string) => ({
+    getMigrationConnection: jest.fn(async (id: string) => ({
       id,
       name: id,
       type: id === 'source' ? 'postgres' : 'sqlite',
