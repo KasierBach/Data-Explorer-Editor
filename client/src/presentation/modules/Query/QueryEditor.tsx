@@ -456,6 +456,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
 
         if (currentSavedQueryId && currentSavedQuery?.isOwner) {
             try {
+                updateTabMetadata(tabId, { sql: query });
                 const updated = await SavedQueryService.updateSavedQuery(currentSavedQueryId, { sql: query });
                 saveQuery(updated);
                 toast.success(text.savedQueryUpdated);
@@ -475,9 +476,10 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
             });
             setIsSaveDialogOpen(true);
         }
-    }, [query, currentSavedQueryId, currentSavedQuery, saveQuery, lang, activeOrganizationId, text]);
+    }, [query, currentSavedQueryId, currentSavedQuery, saveQuery, lang, activeOrganizationId, text, tabId, updateTabMetadata]);
 
     const handleSaveDialogSubmit = useCallback(async (values: SaveQueryFormValues) => {
+        updateTabMetadata(tabId, { sql: query });
         const payload = {
             name: values.name,
             sql: query,
