@@ -67,11 +67,15 @@ describe('R14 session refresh ownership', () => {
     vi.unstubAllGlobals();
   });
 
-  it('invalidates stale success after automatic logout and same-user login', async () => {
+  it.each(['http', 'malformed', 'network'] as const)('invalidates stale success after automatic %s logout and same-user login', async (failure) => {
     const staleRead = deferred<Response>();
     fixture.fetch.mockImplementation((url: string) => {
       if (url.endsWith('/expire')) return Promise.resolve(response(401, { message: 'expired' }));
-      if (url.endsWith('/auth/refresh')) return Promise.resolve(response(401, { message: 'refresh failed' }));
+      if (url.endsWith('/auth/refresh')) {
+        if (failure === 'network') return Promise.reject(new TypeError('Refresh connection lost'));
+        if (failure === 'malformed') return Promise.resolve(response(200, { user: refreshBody().user }));
+        return Promise.resolve(response(401, { message: 'refresh failed' }));
+      }
       return staleRead.promise;
     });
 
@@ -305,6 +309,7 @@ describe('R14 session refresh ownership', () => {
     expect(errors.every(error => error instanceof Error)).toBe(true);
     expect(fixture.state.accessToken).toBeNull();
     expect(fixture.state.restoreSession).not.toHaveBeenCalled();
+    expect(fixture.state.logout).toHaveBeenCalledTimes(1);
     expect(refreshCalls()).toHaveLength(1);
 
     fixture.state.accessToken = 'next-expired-token';
