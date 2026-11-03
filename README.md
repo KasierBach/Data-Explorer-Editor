@@ -1,595 +1,348 @@
 # Data Explorer
 
+[![CI](https://github.com/KasierBach/Data-Explorer-Editor/actions/workflows/ci.yml/badge.svg)](https://github.com/KasierBach/Data-Explorer-Editor/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/KasierBach/Data-Explorer-Editor/actions/workflows/codeql.yml/badge.svg)](https://github.com/KasierBach/Data-Explorer-Editor/actions/workflows/codeql.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-1.6.7-blue.svg)](package.json)
+
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
-[![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
-[![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supported-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![MySQL](https://img.shields.io/badge/MySQL-Supported-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Supported-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Framer Motion](https://img.shields.io/badge/Framer_Motion-12-0055FF?logo=framer&logoColor=white)](https://motion.dev/)
+
+[![Node.js](https://img.shields.io/badge/Node.js-22-5FA04E?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)](https://nestjs.com/)
+[![Prisma](https://img.shields.io/badge/Prisma-6.19.3-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-Database-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Database-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Redis](https://img.shields.io/badge/Redis-Infrastructure-DC382D?logo=redis&logoColor=white)](https://redis.io/)
-[![Framer_Motion](https://img.shields.io/badge/Framer_Motion-12-0055FF?logo=framer&logoColor=white)](https://www.framer.com/motion/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](#license)
-[![Version](https://img.shields.io/badge/Version-1.6.7-blue.svg)](https://github.com/KasierBach/Data-Explorer-Editor/releases)
 
-**Data Explorer** is a high-fidelity, high-performance database management and visualization IDE. It provides a unified, intelligent interface for developers and data engineers to explore, query, and visualize multi-engine databases, all supercharged by a context-aware AI.
+[![Docker](https://img.shields.io/badge/Docker-Containers-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Playwright](https://img.shields.io/badge/Playwright-E2E-2EAD33)](https://playwright.dev/)
 
-Current documentation focus reflects the **v1.6.7** workspace: production-grade CockroachDB and MariaDB engines with a shared TLS contract, adversarial security testing, a hardened web platform (PWA, security.txt), query cancellation with an Active Queries panel, and configurable AI roles with custom OpenAI-compatible providers.
+A web-based SQL and NoSQL workspace for exploring schemas, running queries, visualizing results, and collaborating with optional AI assistance.
 
-Documentation: [Documentation index](docs/README.md).
+**[Live demo](https://data-explorer-editor.vercel.app/) · [User guide](https://data-explorer-editor.vercel.app/docs) · [Documentation](docs/README.md) · [Report a bug](https://github.com/KasierBach/Data-Explorer-Editor/issues)**
 
----
+## Highlights
 
-## Key Features
+- **SQL workspace:** Monaco editor, multiple tabs, saved queries, history, query cancellation, execution plans, and ordered SQL steps.
+- **Database exploration:** schema navigation, server-side pagination, result export, and connection health checks.
+- **NoSQL tools:** MongoDB JSON/tree and grid views, aggregation building, schema analysis, and bounded Redis browsing.
+- **Visualizations:** entity-relationship diagrams and charts built from query results.
+- **Team collaboration:** teamspaces, shared resources, resource permissions, comments, mentions, and activity notifications.
+- **Optional AI:** SQL generation, explanations, autocomplete, and attachment-aware assistance with configurable models and OpenAI-compatible providers.
+- **Workspace preferences:** English/Vietnamese, light/dark themes, mobile navigation, and persistent editor drafts.
 
-### AI Assistant and Routing
+## Quick Start
 
-- **Context-Aware SQL Generation**: Describe complex data needs in natural language and the AI generates SQL based on your live schema and foreign key relationships.
-- **Schema-Only AI Context by Default**: AI receives table, column, and relationship metadata without reading or sending row values.
-- **Vision Integration**: Upload screenshots of DB diagrams or whiteboards for AI-assisted schema reconstruction and query help.
-- **Global Assistant Panel**: A resizable, toggleable sidebar available across major modules with SSE-based streaming responses.
-- **Configure AI by Role**: Choose separate models for **AI Assistant**, **Explain**, **AI SQL**, **AI NoSQL**, and **Autocomplete**, or let those roles inherit the main assistant model when you want a simpler setup.
-- **Custom OpenAI-Compatible Providers**: Add your own provider from the UI with a name, Base URL, API key, default model, and on-demand model catalog loading.
-- **Provider-Aware Routing**: Gemini remains the premium lane, Cerebras/OpenRouter/Groq can be configured as lower-cost, fast, or fallback lanes, and Beeknoee can be chosen explicitly when you want tighter model control.
-- **Dedicated AI Services**: Prompt building, schema context assembly, provider execution, connection context, and routing are separated into focused services for easier testing and safer future changes.
-- **Intelligent Model Fallback**: The AI layer can iterate through providers and models when a requested lane fails, helping keep generation more resilient without hanging the backend.
-- **Surgical Precision Autocomplete**: Inline AI suggestions prioritize exact SQL syntax completion without unnecessary explanations.
-- **Chain Tabbing**: Accept multi-line AI suggestions incrementally with the `Tab` key for fast editing flow.
-- **Chat Persistence**: Conversation history is stored in app state for continuity across sessions.
+Choose **Docker** for a local containerized setup or **development mode** to work on the source.
 
-### Multi-Database Strategy
+The application uses its own PostgreSQL database for accounts and workspace metadata, plus Redis for infrastructure. These are separate from the databases you connect to and browse.
 
-- **Unified Engine Architecture**: Connect to multiple engines through a strategy-based backend:
-  - **PostgreSQL** (Neon, Supabase, RDS, Local)
-  - **CockroachDB** (PostgreSQL wire-compatible, default port 26257)
-  - **MySQL** (PlanetScale, Local, TiDB)
-  - **MariaDB** (MySQL drop-in compatible, default port 3306)
-  - **SQL Server** (Azure SQL, Local MSSQL)
-  - **ClickHouse**
-  - **MongoDB** and **MongoDB Atlas (SRV)**
-  - **Redis** (as a browsable key-value database with a read-only command whitelist, plus runtime infrastructure for caching, queues, notifications, presence, and search indexing)
-- **Enterprise-Grade Credential Protection**: Saved connection passwords are encrypted using **AES-256-GCM** before persistence.
-- **Connection Safety Controls**: Each saved connection can now be configured as read-only and can independently allow or block query execution, schema changes, and import/export flows.
-- **Connection Health Visibility**: Saved connections track their last health-check result, latency, and last successful connection timestamp so operators can spot broken credentials or degraded endpoints faster.
-- **Centralized Persistence**: Connections are stored in the app database so they survive client refreshes and redeployments.
-- **Real-time Discovery**: Fast schema inspection for tables, columns, views, indexes, and metadata.
-- **Cross-DB Browsing**: Jump between databases and schemas in a single workspace.
+### Prerequisites
 
-### Redis Infrastructure
+- Git and either Docker with Compose, or Node.js 22 and npm.
+- Development mode also needs PostgreSQL and Redis; the supplied Compose stack provides PostgreSQL 15 and Redis 7.
+- AI, OAuth, mail, and billing integrations require separate provider configuration. **AI keys are not required for the core database workspace.**
 
-- **Caching Layer**: Redis backs repeated metadata reads and query results so the app stays responsive under load.
-- **Notification Bus**: SSE notifications are broadcast through Redis Pub/Sub for progress updates and system messages.
-- **Presence and Collaboration**: Team presence and shared workspace signals are coordinated through Redis-backed flows.
-- **Rate Limiting**: Redis keeps API throttling consistent across multiple backend instances.
-- **Background Work**: Export, sync, and other long-running tasks can be queued without blocking the UI.
-- **Search Indexing**: Global search and metadata lookups use Redis-backed indexing for fast workspace navigation.
-- **Organization Safety**: Redis powers the Organization Backup and Migration Preview engines to handle bulk exports without downtime.
+Clone the repository:
 
-### Team Collaboration
+```bash
+git clone https://github.com/KasierBach/Data-Explorer-Editor.git
+cd Data-Explorer-Editor
+```
 
-- **Team Workspace**: Create teams, invite members, and manage roles from the Team page.
-- **Shared Resources**: Teams can share connections, queries, and dashboards.
-- **Role-Based Membership**: Invite users as viewers, members, or admins depending on how much control they need.
-- **Mobile Entry Point**: Teams can be opened directly from the mobile avatar menu.
-- **Activity Visibility**: Shared dashboard activity and team-level usage signals help collaborators see what changed.
-- **Presence Tracking**: Real-time indicators show active members within shared teamspaces.
-- **Org Backup System**: Admins can export and migrate entire organization configurations safely.
+### Option A: Run locally with Docker
 
-### Access and Legal Surface
+1. Create the backend configuration from the template:
 
-- **Public Legal Center**: The landing surface now links to dedicated /legal, /privacy, and /terms pages.
-- **Signup Consent Gate**: Local signups must accept the Terms of Service and Privacy Policy before account creation succeeds.
-- **Workspace Consent Enforcement**: Accounts without recorded legal acceptance are redirected to a dedicated consent screen before entering the SQL or NoSQL workspace.
+   ```bash
+   cp server/.env.example server/.env
+   ```
 
-### Entity Relationship Diagrams (ERD)
+   Replace `JWT_SECRET` and `ENCRYPTION_KEY` with real random values; a separate `REFRESH_TOKEN_SECRET` is recommended. Clear unused sample AI/OAuth/mail credentials. Do not overwrite an existing configuration.
 
-- **Intelligent Auto-Layout**: Dynamic graph generation using React Flow with automatic node positioning.
-- **Schema Exploration**: Visualize table structures and relationships in an ERD-style workspace.
-- **Visual Intelligence**: Primary and foreign keys are highlighted for fast structural understanding.
+2. Set `POSTGRES_PASSWORD` in a root `.env` file if you want to override the **local-only** default, `change-me-local`. Use a URL-safe password with this Compose configuration. The root `.env` controls Compose interpolation; backend settings come from `server/.env`.
 
-### Analytics and Insights
+3. Start the stack:
 
-- **Heuristic Dashboard**: Surface connection health, storage distribution, and table usage metrics.
-- **Visual Intelligence**: Interactive charts powered by Recharts for operational visibility.
-- **Table Distribution**: Heatmaps and row-count style analytics to spot bottlenecks quickly.
+   ```bash
+   docker compose up --build -d
+   ```
 
-### Pro SQL Workspace
+   The `migrate` service applies committed Prisma migrations before the backend starts. Compose supplies the container database, Redis, and local frontend URLs automatically.
 
-- **Monaco Engine**: VS Code-grade editing experience with advanced syntax highlighting and multi-cursor support.
-- **Schema-Aware IntelliSense**: Deep autocompletion that understands your tables, columns, and custom types.
-- **Smart Safeguards and Optimization**: Automatic limit injection, pagination support, and per-engine query guards help prevent accidental OOM scenarios.
-- **Backend-Enforced Guardrails**: Read-only and restricted connections are enforced server-side, so blocked updates, deletes, DDL, and imports cannot be bypassed by skipping the UI.
-- **SQL Steps Sequencing**: Split a multi-statement SQL script into draggable steps, reorder them, edit each block, apply the sequence back to the editor, or run it sequentially.
-- **AI Query Explanation Dialog**: Open a dedicated explanation surface with a line-numbered SQL preview and markdown-based AI breakdown of the script.
-- **Keyboard Shortcuts**: Use `Ctrl+Enter` to run, `Ctrl+S` to save, and `Ctrl+H` to open history.
-- **Execution Analytics**: Query plans and execution timing are surfaced in the workspace.
-- **Tabbed Results**: Separate panes for data, messages, and explain output.
-- **Export Capabilities**: Export result data as **CSV**, **JSON**, or **SQL** from the grid tooling.
+| Service | Local address |
+| --- | --- |
+| Web application | <http://localhost> |
+| API readiness | <http://localhost:3001/api/health/ready> |
+| Application PostgreSQL | `127.0.0.1:5435`, database `data_explorer`, user `postgres` |
+| Redis | `127.0.0.1:6379` |
 
-### Premium UI and Responsive Experience
+Published ports bind to loopback by default. This is a **local development setup**, not an Internet-facing production configuration. PostgreSQL and Redis use persistent Docker volumes; changing `POSTGRES_PASSWORD` does not change the password already initialized in an existing database volume.
 
-- **Fully Responsive Architecture**: Works across mobile and desktop layouts.
-- **Mobile-Adaptive Interface**:
-  - Animated menu and drawer patterns
-  - Touch-friendly controls
-  - Overlay navigation for constrained screens
-  - Horizontal tab management for dense workflows
-- **Desktop Mode on Mobile**: Mobile browsers can switch into a denser desktop-style layout when users need the full database IDE surface.
-- **Centered Desktop Navigation**: The top navbar keeps the primary workspace switcher visually balanced while preserving the right-side user, theme, AI, timer, settings, and team controls.
-- **High-Density Desktop Mode**: Designed for productivity with compact, information-rich layouts.
-- **Modern UI System**: Uses Radix UI, Tailwind, motion, and a componentized feature-driven structure.
-- **Standardized API Communication**: Consistent response shapes keep frontend handling predictable.
-- **Uptime Monitoring Ready**: Exposes `/api/health` for monitoring and host keep-alive setups.
+### Option B: Run in development mode
 
----
+Install all three packages; the root package does not install the client and server dependencies:
+
+```bash
+npm ci
+npm ci --prefix server
+npm ci --prefix client
+cp server/.env.example server/.env
+```
+
+If using the supplied local database containers:
+
+```bash
+docker compose up -d db redis
+```
+
+Edit `server/.env`. For fresh containers using the default local password:
+
+```env
+DATABASE_URL=postgresql://postgres:change-me-local@127.0.0.1:5435/data_explorer
+REDIS_URL=redis://127.0.0.1:6379
+FRONTEND_URL=http://localhost:5173
+API_PUBLIC_URL=http://localhost:3001/api
+PORT=3001
+```
+
+If you changed `POSTGRES_PASSWORD`, make `DATABASE_URL` match it. Supply the required security values below and clear unused sample provider credentials before starting the API.
+
+Create `client/.env` for local development:
+
+```env
+VITE_API_URL=http://localhost:3001/api
+```
+
+The committed client template is aimed at a hosted backend; do not copy it unchanged for local development.
+
+Generate Prisma, apply migrations to the configured **application database**, and launch:
+
+```bash
+npm run prisma:generate --prefix server
+cd server
+npx prisma migrate deploy
+cd ..
+npm run dev
+```
+
+Open <http://localhost:5173>. You can also use `npm run server` and `npm run client` from the root to start them separately.
+
+Commands above use a POSIX-style shell such as Git Bash. In PowerShell, use `Copy-Item server/.env.example server/.env` instead of `cp`.
+
+## Database Capabilities
+
+An engine adapter does not imply identical query, schema, or editing capabilities across every database.
+
+| Engine | Query and browsing interface | Structured grid update/delete |
+| --- | --- | --- |
+| PostgreSQL / CockroachDB | SQL, schema exploration, result grids | Supported for compatible primary-key identities |
+| MySQL / MariaDB | SQL, schema exploration, result grids | Supported for compatible primary-key identities |
+| SQL Server | SQL, schema exploration, result grids | Supported for compatible primary-key identities |
+| SQLite | SQL and server-side file connections | Supported for compatible primary-key identities; `main` only |
+| ClickHouse | SQL, metadata, result grids | Not supported |
+| MongoDB / MongoDB Atlas | JSON commands, collections, aggregation tools | Not supported |
+| Redis | Bounded read-only commands and key browsing | Not supported |
+
+Connection permissions can disable execution, schema changes, or import/export independently. Updates and deletes require safe row identity; primary-key columns are not editable. Insertion follows a separate engine-specific path.
+
+### Important limits
+
+- Raw SQL results have a protective **50,000-row hard ceiling**. Table browsing uses bounded pagination, with a maximum requested page size of **1,000**.
+- Redis browsing uses strict item, byte, and scan-work limits. Its bounded read path requires Redis 7+ and permission to run the internal read-only scripts; a restricted Redis ACL can reject these operations.
+- AI generation is separate from query execution. Review generated SQL/commands before running them; high-impact operations can require confirmation.
+- Organization JSON export covers workspace artifacts and sharing metadata, **not connected-database dumps or a full server backup**. It is not a transactionally consistent snapshot; pause concurrent artifact edits when consistency matters.
+- Data transfers are engine-dependent and may partially commit. Do not assume automatic resume, whole-transfer rollback, or safe retry after an unknown outcome.
+
+## Configuration Essentials
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Application PostgreSQL connection; keep separate from databases being browsed |
+| `REDIS_URL` | Application Redis connection |
+| `JWT_SECRET` | Random access-token signing secret, at least **32 bytes** |
+| `REFRESH_TOKEN_SECRET` | Recommended independent refresh-token signing secret |
+| `ENCRYPTION_KEY` | Exactly **32 UTF-8 bytes** for saved connection-password encryption |
+| `FRONTEND_URL` | Allowed frontend origin for CORS and redirects |
+| `API_PUBLIC_URL` | Public backend URL used by integrations; Render can derive it from its platform URL |
+| `VITE_API_URL` | Client's backend API URL; set at development/build time |
+
+Use randomly generated secrets, not the placeholders in the examples. A 64-character hexadecimal string is **not** a 32-byte encryption key in this configuration. Never put secrets in `VITE_*` variables: those values can be included in the browser bundle.
+
+See [backend environment examples](server/.env.example) and [frontend deployment examples](client/.env.example) for optional AI, OAuth, mail, and integration settings. Keep `.env` files out of Git. Leave `ALLOW_INSECURE_DATABASE_TLS=false` in production; only permit private-network access deliberately.
+
+## Development and Testing
+
+Run the package-level checks from the repository root after installing dependencies and generating Prisma:
+
+```bash
+npm run lint --prefix client
+npm run test:ci --prefix client
+npm run build --prefix client
+
+npm run typecheck --prefix server
+npm run lint --prefix server
+npm run test:ci --prefix server
+npm run build --prefix server
+```
+
+Coverage commands are `npm run test:cov --prefix client` and `npm run test:cov --prefix server`.
+
+Browser tests require installed Playwright browsers:
+
+```bash
+cd client
+npx playwright install chromium firefox webkit
+npm run typecheck:browser
+npm run test:e2e -- --workers=1 --retries=0
+```
+
+The browser E2E suite uses mock API fixtures. Server integration and browser-to-real-backend suites require isolated Docker fixtures and a checkout without workstation secrets; see [CI configuration](.github/workflows/ci.yml) for the maintained setup. Do not substitute production connection strings or run migrations/reset commands against a live database to prepare tests.
+
+CI checks include lint, types, unit/coverage tests, native integration tests, browser tests, full-stack flows, dependency audits, container scans, and SBOM generation. These checks do not certify every engine, deployment topology, or external provider.
+
+### Project structure
+
+```text
+client/       React application, browser tests, and build tooling
+server/       NestJS API, engine adapters, Prisma migrations, and integration tests
+docs/         Maintained public guides
+.github/      CI, deployment workflows, and repository automation
+```
 
 ## Tech Stack and Ecosystem
 
 ### Frontend (Client-Side)
 
-| Layer                | Technologies                                        |
-| -------------------- | --------------------------------------------------- |
-| **Core Framework**   | React 19, Vite, TypeScript                          |
-| **State Management** | Zustand, TanStack Query v5                          |
-| **UI Components**    | Radix UI, Shadcn UI, Tailwind CSS                   |
-| **Visualizations**   | React Flow, Recharts, Lucide Icons                  |
-| **Editor**           | Monaco Editor                                       |
-| **Animations**       | Framer Motion, CSS Keyframes, Intersection Observer |
+| Layer | Technologies | Role |
+| --- | --- | --- |
+| **Core framework** | React 19, Vite 7, TypeScript | Application UI, development server, and production builds |
+| **Routing** | React Router 7 | Public pages and authenticated SQL/NoSQL workspaces |
+| **State management** | Zustand, TanStack Query v5 | Workspace preferences, persisted drafts, server-state fetching, and cache lifecycle |
+| **UI components** | Radix UI, shadcn-style components, Tailwind CSS 4, Lucide Icons | Dialogs, menus, forms, themes, and workspace controls |
+| **SQL editor** | Monaco Editor, `@monaco-editor/react`, `sql-formatter` | Editing, schema-aware suggestions, and SQL formatting |
+| **Result grids** | TanStack Table, TanStack Virtual | Table rendering, row interactions, and virtualized results |
+| **Diagrams and charts** | React Flow, Dagre, Recharts | ERD layout and result-driven visualizations |
+| **Motion and layout** | Framer Motion, CSS transitions, React Resizable Panels | Animations and adjustable workspace panels |
+| **Content and files** | React Markdown, SheetJS (`xlsx`), PDF.js | Markdown presentation and spreadsheet/PDF tooling |
 
 ### Backend (Server-Side)
 
-| Layer                 | Technologies                                                                                                                         |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Architecture**      | NestJS                                                                                                                               |
-| **ORM / Persistence** | Prisma                                                                                                                               |
-| **AI Engine**         | Gemini plus OpenAI-compatible provider routing (Cerebras, OpenRouter, Groq, Beeknoee), SSE streaming, attachment-aware orchestration |
-| **Engines Support**   | `pg`, `mysql2` (MySQL & MariaDB), `pg`-wire CockroachDB, `mssql`, `mongodb`, `@clickhouse/client`                                    |
-| **Security**          | JWT, Passport.js, AES-256-GCM encryption                                                                                             |
-| **Infrastructure**    | Redis, BullMQ, SSE notifications, presence coordination, search indexing                                                             |
+| Layer | Technologies | Role |
+| --- | --- | --- |
+| **API framework** | NestJS 11, Express, TypeScript | Feature modules, controllers, dependency injection, and HTTP endpoints |
+| **Application persistence** | PostgreSQL, Prisma 6.19.3, `@prisma/adapter-pg` | Accounts, connections, saved queries, and collaboration metadata |
+| **SQL drivers** | `pg`, `mysql2`, `mssql`, `better-sqlite3`, `@clickhouse/client` | PostgreSQL/CockroachDB, MySQL/MariaDB, SQL Server, SQLite, and ClickHouse adapters |
+| **NoSQL drivers** | MongoDB Node.js driver, `ioredis` | MongoDB/Atlas connections and bounded Redis operations |
+| **Caching and coordination** | Redis, Keyv/cache-manager, Pub/Sub | Metadata/count caching, freshness, notifications, presence, and search infrastructure |
+| **Background jobs** | BullMQ | Queued processing and job lifecycle management |
+| **Authentication and security** | JWT, Passport.js, bcryptjs, AES-256-GCM, Helmet | Session authentication, password hashing, credential encryption, and HTTP hardening |
+| **Validation and logging** | class-validator, class-transformer, Pino | Request validation, DTO transformation, and structured logs |
+| **AI integrations** | Google Gen AI SDK, OpenAI-compatible provider APIs, SSE | Configurable generation, explanations, and streamed responses |
 
----
+### Testing and Delivery
 
-## Project Architecture and Structure
+| Area | Tools | Scope |
+| --- | --- | --- |
+| **Unit and component tests** | Vitest, Testing Library, Jest | Client components/services and backend unit tests |
+| **Browser and accessibility tests** | Playwright, Axe | Browser interactions, responsive layouts, and automated accessibility checks |
+| **Native integration fixtures** | Docker Compose, PostgreSQL, Redis, MongoDB, MySQL | Isolated API and full-stack verification with synthetic data |
+| **Code quality** | TypeScript, ESLint, Prettier | Type checking, linting, and formatting |
+| **CI and supply-chain checks** | GitHub Actions, CodeQL, npm audit, Trivy, SBOM generation | Automated verification and dependency/container analysis |
+| **Local containers** | Docker Compose, Nginx | Local services and a container-served frontend |
+| **Production delivery** | Render, Vercel, GitHub Actions | CI-gated backend and frontend deployment |
 
-### Current Architecture Notes
+Driver availability does not imply identical engine capabilities. External AI providers and production hosts require their own configuration and credentials.
 
-- **Frontend layering**: `core` keeps shared app/domain state, `infrastructure` keeps bootstrapping/plumbing, and `presentation` owns UI composition by feature module.
-- **Backend layering**: NestJS modules separate auth, permissions, connection persistence, query execution, AI, metadata, migrations, teamspaces, notifications, and Redis-backed infrastructure.
-- **AI layering**: Prompt building, schema context, routing, provider execution, and connection context are split so provider changes do not leak into UI or query services.
-- **Database strategy pattern**: Engine-specific SQL/NoSQL behavior lives behind database strategy implementations, keeping query services and controllers cleaner.
-- **Responsive shell**: `Layout` owns AppShell, NoSQL shell, navbar, profile dialog, compact mobile chrome, and desktop-mode-on-mobile behavior.
+## Deployment
 
-### Code Intelligence and Review Workflow
+[CI/CD operations](docs/operations/ci-cd.md) covers the Render backend and Vercel frontend setup.
 
-- **GitNexus indexed workspace**: The repository is indexed as `Data-Explorer-Workspace` with symbol, relationship, and execution-flow awareness for safer navigation and refactoring.
-- **Impact-first changes**: Before changing an important function, class, or method, run GitNexus impact analysis to understand direct callers, affected flows, and blast radius.
-- **Pre-commit scope check**: Use GitNexus change detection before committing so the changed symbols and execution flows match the intended patch.
-- **AI-assisted review option**: CodeRabbit can be used for an additional review pass on larger PRs, especially for regressions, maintainability, and security notes.
+A successful CI run from a push to `main` triggers the configured delivery workflows for the tested commit. Deployment requires the corresponding Render/Vercel secrets and any configured production-environment approvals. Backend delivery verifies `/api/health/ready` and the deployed commit; `/api/health/live` is process liveness only.
 
-```bash
-Data Explorer/
-├── client/                                # React + Vite frontend application
-│   └── src/
-│       ├── core/                          # Client-side domain layer and shared app logic
-│       ├── infrastructure/                # Infra-specific frontend plumbing and bootstrapping
-│       ├── lib/                           # Small shared utilities such as class merging helpers
-│       ├── presentation/                  # UI layer and feature composition
-│       │   ├── components/                # Reusable UI pieces, docs primitives, code editor pieces
-│       │   ├── hooks/                     # UI/data hooks such as schema sync and media queries
-│       │   ├── modules/                   # Feature-driven application modules
-│       │   │   ├── Connection/            # Connection dialog and connection management flows
-│       │   │   ├── Dashboard/             # Insights and analytics dashboards
-│       │   │   ├── DataGrid/              # Result grid, export, import, and table data tools
-│       │   │   ├── Explorer/              # Sidebar tree, navigation, and database explorer UX
-│       │   │   ├── LandingPage/           # Marketing/landing page sections
-│       │   │   ├── Layout/                # AppShell, navbar, profile dialog, and shell composition
-│       │   │   ├── Migration/             # Migration workflow UI and progress surfaces
-│       │   │   ├── NoSqlExplorer/         # MongoDB-focused workspace and JSON exploration
-│       │   │   ├── Query/                 # SQL editor, AI assistant, history, results, explain plans
-│       │   │   └── Visualization/         # ERD and visual exploration workspaces
-│       │   └── pages/                     # Route-level entry pages such as login, docs, admin, teams
-├── server/                                # NestJS backend API
-│   ├── prisma/                            # Prisma schema, migrations/config, and generated setup inputs
-│   └── src/
-│       ├── ai/                            # AI routing, provider runners, prompts, chat, streaming, autocomplete
-│       ├── audit/                         # Audit logging and audit history APIs
-│       ├── auth/                          # JWT auth, OAuth, token exchange, guards, roles
-│       ├── collaboration/                 # Shared workspace state and team collaboration logic
-│       ├── common/                        # Shared backend primitives and cross-cutting helpers
-│       ├── connections/                   # Saved connection lifecycle and persistence
-│       ├── dashboards/                    # Dashboard APIs and dashboard persistence
-│       ├── database-strategies/           # Per-engine query/metadata/export strategy implementations
-│       ├── erd-workspaces/                # Persisted ERD workspace state and diagram APIs
-│       ├── mail/                          # Mail delivery and notification email helpers
-│       ├── metadata/                      # Metadata freshness tracking and schema analysis
-│       ├── migration/                     # Cross-database migration orchestration and progress streaming
-│       ├── nosql/                         # MongoDB/NoSQL workspace APIs and collection operations
-│       ├── notifications/                 # SSE notification streaming and Redis pub/sub
-│       ├── organizations/                 # Org-level management and enterprise backups
-│       ├── otp/                           # One-time passcode flows for authentication/security
-│       ├── permissions/                   # Permission checks and access-control helpers
-│       ├── presence/                      # Real-time team presence tracking (Redis-backed)
-│       ├── prisma/                        # Prisma service and database access integration
-│       ├── query/                         # Query execution, DML helpers, and result APIs
-│       ├── redis/                         # Redis module, clients, and shared Redis utilities
-│       ├── saved-queries/                 # Saved query APIs and persistence
-│       ├── search/                        # Redis-backed search and metadata indexing
-│       ├── seed/                          # Seed/dev data helpers
-│       ├── teamspaces/                    # Dynamic team workspace and permission management
-│       ├── tests/                         # Server-side strategy and service test coverage
-│       ├── users/                         # User profile, settings, roles, billing, onboarding
-│       ├── version-history/               # Entity version control and schema change tracking
-│       └── utils/                         # Encryption, SQL guards, and backend utility helpers
-├── docs/                                  # Local documentation and generated knowledge assets
-├── plans/                                 # Implementation plans and review notes
-├── docker-compose.yml                     # Local container orchestration for db + backend + frontend
-├── package.json                           # Root dev scripts for running client and server together
-├── .env.example                           # Root Docker-friendly example values
-├── server/.env.example                    # Backend env template for local/dev/prod setup
-└── README.md                              # Project overview and setup guide
-```
+**Back up the application database before migrations.** Plan compatibility or a maintenance window for upgrades. Rolling back an application release does not automatically roll back database changes.
 
----
+## Security and Data Handling
 
-## Comprehensive User Guide
+- Saved connection passwords are encrypted using AES-256-GCM; this does not mean all application data is encrypted.
+- Authorization and connection policies are enforced on the backend. Prefer least-privilege database accounts, especially when connecting to production data.
+- Refresh tokens use HTTP-only cookies; access tokens are held in memory and restored through the session flow.
+- Default AI context uses schema metadata. Prompts, selected context, and uploaded files may contain sensitive information and are sent to the configured external provider; review what you submit.
+- Redis count/metadata caching uses freshness invalidation. Do not assume every raw-query result is cached.
+- Never commit real credentials, customer data, database exports, or internal security reports. Remove sensitive content from issue screenshots and logs.
 
-### 1. Connection Management
+## Troubleshooting
 
-- **Universal Drivers**: Click the `+` in the Explorer sidebar to add a new connection. The main UI currently exposes **PostgreSQL**, **MySQL**, **SQL Server**, **ClickHouse**, **MongoDB**, and **MongoDB Atlas (SRV)**.
-- **Metadata Sync**: After connecting, the app crawls your schema and builds the tree view.
-- **Switching Context**: Move between saved connections and databases from the same workspace.
+### The API does not start or cannot connect to PostgreSQL
 
-### 2. Pro SQL Workspace
+- Check `DATABASE_URL` in `server/.env` and confirm PostgreSQL is running.
+- If using Compose's database from a host-run API, use `127.0.0.1:5435`, not the container hostname `db`.
+- The Compose default password is `change-me-local`. Match any `POSTGRES_PASSWORD` override in your connection URL; an existing database volume retains its original password.
+- Check migration errors before retrying startup. Do not delete a database volume to work around a credentials or migration problem.
 
-- **Multi-Tab Editing**: Open multiple SQL tabs and execute with **Ctrl/Cmd + Enter**.
-- **Smart IntelliSense**: Schema-aware suggestions are available inside the editor.
-- **Explain and Analyze**: Use the plan/analyze tooling for engine execution plans, and use the dedicated AI explanation dialog when you want a natural-language breakdown of the current SQL script.
-- **SQL Steps**: Break a long script into ordered steps, rearrange them visually, then apply the sequence back to the editor or run it one step at a time in order.
-- **Saved Queries and History**: Save reusable queries and reopen recent executions quickly.
-- **Query Guardrails**: Read-only and restricted connections are enforced at both UI and server levels.
-- **Balanced IDE Chrome**: The desktop navbar centers the SQL/NoSQL workspace switcher while preserving enough space for teams, theme controls, AI, timer, settings, and profile actions.
-- **Mobile/Desktop Toggle**: On mobile browsers, users can stay in compact mode or enable desktop-style mode when they need the full query/editor surface.
+### Docker services stay unhealthy
 
-### 3. Team Collaboration
-
-- **Invite and Manage Members**: Create teams, invite members by email, and assign roles.
-- **Share Work**: Connections, queries, and dashboards can be shared to a team from the Team page.
-- **Track Team Activity**: Team dashboards and activity feeds help you see what the group has been using recently.
-- **Open on Mobile**: Teams is available from the avatar menu on mobile, even when the desktop navigation is collapsed.
-
-### 4. Using the AI Assistant
-
-- **Contextual Knowledge**: The assistant is aware of your active connection, schema context, and current workspace state.
-- **Vision Features**: Drop in screenshots or reference material for AI-assisted schema and SQL help.
-- **Configure AI**: Open `Profile > Configure AI` to set separate models for Assistant, Explain, AI SQL, AI NoSQL, and Autocomplete, or let those roles inherit the Assistant model.
-- **Custom Providers**: Add your own OpenAI-compatible provider with a Base URL and API key, load the available models from that endpoint, and use them in role-based configuration.
-- **Routing Modes**: Use premium Gemini for harder work, optional Cerebras/OpenRouter/Groq lanes for cheaper, faster, or fallback chat flows, and explicit Beeknoee picks when you want to lock the provider/model.
-- **Operational Safety**: Provider requests include timeout and stream-idle limits so failed or slow model lanes do not block the app indefinitely.
-- **Prompt Engineering**: Ask practical questions like:
-  - `"Summarize the relationship between orders and customers"`
-  - `"Find the top 5 customers with high churn risk based on transaction volume"`
-
-### 5. Interactive Visualizations
-
-- **ERD Exploration**: Open the ERD module to inspect table relationships visually.
-- **Insights Dashboard**: Review health signals, charts, and high-level usage indicators.
-- **NoSQL Workspace**: MongoDB-oriented flows now include Tree JSON browsing, Auto-Flatten Grid, schema analysis, aggregation building, and result-driven insights in a dedicated workspace.
-- **Metadata Analytics**: Inspect schema version history and metadata freshness signals from the sidebar.
-
-### 6. Redis Infrastructure
-
-- **Redis-backed Search**: The backend keeps a fast metadata index in Redis so global search and workspace lookups stay responsive.
-- **Notification Streaming**: Long-running operations publish progress through Redis Pub/Sub and SSE.
-- **Presence Coordination**: Team presence and collaborative status indicators rely on Redis-backed runtime state.
-- **Shared Throttling**: If you run multiple backend instances, Redis keeps rate limits aligned across the cluster.
-- **Job Processing**: Export and sync flows rely on Redis-backed queues so the UI stays responsive while work happens in the background.
-
----
-
-## Installation and Local Development
-
-### Requirements
-
-- **Node.js 22+** (matches the committed `.nvmrc`)
-- **npm**
-- **PostgreSQL** for the app metadata database
-- **Redis** for caching, notifications, presence, search, and background jobs
-- **At least one built-in AI provider key, or a custom OpenAI-compatible provider you will add from the Configure AI screen** (optional, only needed for AI features)
-- **Docker and Docker Compose** (optional, for the containerized path)
-
----
-
-## One-Click Docker Deployment (Recommended)
-
-This is the fastest way to run **Data Explorer** locally with PostgreSQL, Redis, the backend API, and an Nginx-served frontend.
-
-1. **Environment Setup**
-   - Copy `server/.env.example` to `server/.env`.
-   - Fill in at least `JWT_SECRET`, `ENCRYPTION_KEY`, and any optional AI or OAuth variables you want to use.
-   - No manual Prisma sync is required before first boot. The Docker stack runs the dedicated `migrate` service and applies the committed baseline automatically.
-   - If you are serving the frontend through Docker on port `80`, set:
-     - `FRONTEND_URL=http://localhost`
-
-2. **Launch**
-   ```bash
-   docker compose up --build -d
-   ```
-
-### Access Points
-
-- **Web Interface**: [http://localhost](http://localhost)
-- **Backend API**: [http://localhost:3001/api/health](http://localhost:3001/api/health)
-- **Primary Database**: `localhost:5435`
-  - user: `postgres`
-  - password: `postgres`
-  - database: `data_explorer`
-- **Redis**: `localhost:6379` (for caching, notifications, queues, presence, and search indexing)
-
-Note:
-
-- `docker-compose.yml` reads backend env vars from `server/.env`, not from the root `.env.example`.
-- The backend container listens on port `3001`.
-- The frontend build arg defaults to `VITE_API_URL=http://localhost:3001/api`.
-- The Docker stack starts Redis automatically, so no separate Redis install is needed in that path.
-- The `migrate` service uses Prisma Migrate with the committed `0_init` Postgres baseline, so you do not need a pre-run `db push`.
-
----
-
-## Production Delivery (Render + GitHub Actions)
-
-The repository includes a production Blueprint at `render.yaml` and a gated delivery workflow at `.github/workflows/deploy-production.yml`.
-
-1. Create or sync the backend service from the Render Blueprint and set its required `sync: false` secrets (`DATABASE_URL`, `REDIS_URL`, JWT secrets, and encryption key). Add AI, OAuth, mail, or billing secrets only when those features are enabled. Keep `ALLOW_INSECURE_DATABASE_TLS=false`.
-2. Create a Render Deploy Hook for the backend service and store it as the GitHub Actions secret `RENDER_DEPLOY_HOOK_URL`.
-3. Link the `client` directory to the production Vercel project, then store `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as secrets in the GitHub `production` environment. Git-triggered Vercel deployments are disabled in `client/vercel.json`, so production frontend releases only run after CI succeeds.
-4. For another deployment or a custom domain, set the GitHub Actions repository variable `PRODUCTION_API_URL` to the public backend origin. This repository defaults to its verified Render origin, and the backend derives `API_PUBLIC_URL` from Render's built-in `RENDER_EXTERNAL_URL` unless explicitly overridden.
-5. Protect the GitHub `production` environment if deployment approval is required.
-
-Every push to `main` must pass lint, unit tests, production dependency audit, client build, browser E2E/accessibility checks, server build, migration validation, and container builds. The delivery workflows then deploy the exact tested commit to Render and Vercel. Backend delivery waits for `/api/health/ready` to confirm PostgreSQL, Redis, and `RENDER_GIT_COMMIT` before succeeding; frontend delivery deploys the prebuilt Vercel output with the production API URL. `/api/health/live` is the process-only liveness endpoint.
-
-Render keeps the previous healthy instance serving traffic when a new deploy fails. Database changes must therefore remain backward-compatible during rolling releases.
-
----
-
-### Initial Setup
-
-1. **Clone and Install**
-
-   ```bash
-   git clone https://github.com/KasierBach/Data-Explorer-Editor.git
-   cd Data-Explorer-Editor
-   npm install
-   ```
-
-2. **Backend Configuration**
-
-   ```bash
-   cd server
-   npm install
-   cp .env.example .env
-   npx prisma generate
-   npx prisma migrate deploy
-   npm run start:dev
-   ```
-
-   Recommended local values in `server/.env`:
-
-   ```env
-   DATABASE_URL=postgresql://postgres:postgres@localhost:5435/data_explorer
-   REDIS_URL=redis://localhost:6379
-   FRONTEND_URL=http://localhost:5173
-   PORT=3001
-   JWT_SECRET=replace-with-a-random-secret-at-least-32-bytes-long
-   ENCRYPTION_KEY=replace-with-exactly-32-random-characters
-   ```
-
-3. **Frontend Configuration**
-
-   ```bash
-   cd ../client
-   npm install
-   npm run dev
-   ```
-
-   Optional `client/.env`:
-
-   ```env
-   VITE_API_URL=http://localhost:3001/api
-   ```
-
-4. **Launch**
-   Visit **[http://localhost:5173](http://localhost:5173)** to start exploring.
-
-5. **Run Both from Root**
-   ```bash
-   npm run dev
-   ```
-
-### Root Convenience Scripts
-
-From the repository root:
+From the repository root, inspect service status and recent logs:
 
 ```bash
-npm run dev      # Start server and client together
-npm run server   # Start only the NestJS backend in watch mode
-npm run client   # Start only the Vite client with host binding
+docker compose ps -a
+docker compose logs --tail=100 db redis migrate backend
 ```
 
-From each workspace:
+The backend waits for PostgreSQL, Redis, and the `migrate` service. Fix the first failing dependency rather than repeatedly restarting the whole stack. Remove credentials and private data before sharing logs.
 
-```bash
-cd client && npm run lint && npm run build
-cd server && npm run lint && npm run build
-```
+### The frontend cannot reach the API
 
----
+- Set `VITE_API_URL=http://localhost:3001/api` for local development. The committed client template points to a hosted backend.
+- Set `FRONTEND_URL` to the actual browser origin: `http://localhost:5173` for Vite or `http://localhost` for the supplied Docker frontend.
+- Restart Vite after changing `client/.env`; rebuild/redeploy production bundles after changing `VITE_API_URL`.
+- Confirm the API responds at `/api/health/ready`. A browser CORS error can also mean the API is unavailable or the configured origins do not match.
 
-## Configuration
+### Redis-dependent features fail
 
-### Environment Variables
+- Verify `REDIS_URL` and the Redis service. A host-run API uses `127.0.0.1:6379`; Compose supplies `redis://redis:6379` inside containers.
+- Redis database browsing requires Redis 7+ and ACL permission for the internal read-only scripts. If a command is rejected, check the returned capability/ACL error rather than enabling arbitrary scripting.
+- Oversized collections or scan work can be rejected by the browsing safety limits. Use a smaller supported scope; do not assume a rejected export is complete.
 
-The backend reads configuration from `server/.env`. The frontend reads `VITE_API_URL` from `client/.env` or from the Docker build arg.
+### Production startup rejects a secret
 
-Built-in AI lanes such as Gemini, OpenRouter, Groq, Cerebras, and Beeknoee are backend env-driven. User-added OpenAI-compatible providers, loaded model catalogs, and per-role model choices for Assistant / Explain / AI SQL / AI NoSQL / Autocomplete are configured from `Profile > Configure AI` and stored locally on that client machine/browser.
+- Replace sample values with real randomly generated secrets. `JWT_SECRET` must be at least 32 bytes; `ENCRYPTION_KEY` must be exactly 32 UTF-8 bytes.
+- Check for accidental whitespace, Unicode byte-length differences, or a 64-character hex string being used as the encryption key.
+- Keep the encryption key stable across deployments. Do not rotate it casually to fix an unrelated startup error.
 
-| Variable                    | Required | Description                                                                                                                                                                  |
-| --------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`              | Yes      | Connection string for the app's central PostgreSQL database. Docker default: `postgresql://postgres:postgres@db:5432/data_explorer`.                                         |
-| `REDIS_URL`                 | Yes      | Redis connection string for caching, notifications, queues, presence, search indexing, and throttling. Docker default: `redis://redis:6379`.                                 |
-| `GEMINI_API_KEY`            | No       | Gemini API key used for the premium AI lane, vision-capable prompts, and current-info capable flows.                                                                         |
-| `AI_PROVIDER_TIMEOUT_MS`    | No       | Timeout in milliseconds for AI provider requests. Default: `90000`.                                                                                                          |
-| `AI_STREAM_IDLE_TIMEOUT_MS` | No       | Idle timeout in milliseconds for streaming AI responses. Default: `90000`.                                                                                                   |
-| `CEREBRAS_API_KEY`          | No       | Optional lower-cost AI provider key used by AI routing in `Auto` / `Fast` mode.                                                                                              |
-| `CEREBRAS_BASE_URL`         | No       | Base URL for Cerebras' OpenAI-compatible API. Default: `https://api.cerebras.ai/v1`.                                                                                         |
-| `CEREBRAS_CHAT_MODEL`       | No       | Preferred Cerebras chat model for cheaper AI routing.                                                                                                                        |
-| `OPENROUTER_API_KEY`        | No       | Optional fallback AI provider key used when you want more free/cheap routing options.                                                                                        |
-| `OPENROUTER_BASE_URL`       | No       | Base URL for OpenRouter. Default: `https://openrouter.ai/api/v1`.                                                                                                            |
-| `OPENROUTER_CHAT_MODEL`     | No       | OpenRouter model slug to use in `Auto` / `Fast` mode.                                                                                                                        |
-| `GROQ_API_KEY`              | No       | Optional Groq key for low-latency OpenAI-compatible AI routing.                                                                                                              |
-| `GROQ_BASE_URL`             | No       | Base URL for Groq. Default: `https://api.groq.com/openai/v1`.                                                                                                                |
-| `GROQ_CHAT_MODEL`           | No       | Groq model slug used in `Auto` / `Fast` mode. Default: `openai/gpt-oss-120b`.                                                                                                |
-| `BEEKNOEE_API_KEY`          | No       | Optional Beeknoee key used when a user explicitly selects a Beeknoee model in AI Assistant.                                                                                  |
-| `BEEKNOEE_BASE_URL`         | No       | Base URL for Beeknoee's OpenAI-compatible API. Default: `https://platform.beeknoee.com/api/v1`.                                                                              |
-| `BEEKNOEE_CHAT_MODEL`       | No       | Default Beeknoee chat model slug. Current recommended value: `glm-4.7-flash`.                                                                                                |
-| `JWT_SECRET`                | Yes      | Strong secret used to sign access tokens. Placeholder values are rejected.                                                                                                   |
-| `REFRESH_TOKEN_SECRET`      | No       | Recommended separate secret for refresh-token cookies. If omitted, the app falls back to `JWT_SECRET`.                                                                       |
-| `ENCRYPTION_KEY`            | Yes      | Exactly **32 characters**, used to encrypt saved database connection passwords.                                                                                              |
-| `LEGACY_ENCRYPTION_KEYS`    | No       | Comma-separated list of older keys used to decrypt connections saved before the hardening update.                                                                            |
-| `PORT`                      | No       | Server port. Local default: `3001`.                                                                                                                                          |
-| `FRONTEND_URL`              | Yes      | Frontend URL used for CORS and OAuth redirects. Use `http://localhost:5173` for Vite local dev, or `http://localhost` when serving the frontend through Docker on port `80`. |
-| `API_PUBLIC_URL`            | Yes\*    | Public backend API base used for billing callbacks. Render derives it from `RENDER_EXTERNAL_URL`; set it explicitly on other production hosts or to use a custom domain.     |
-| `ALLOW_INTERNAL_IPS`        | No       | Recommended default is `false`. Local development still allows `localhost`, `127.0.0.1`, and `::1`.                                                                          |
-| `GOOGLE_CLIENT_ID`          | No       | Google login client ID.                                                                                                                                                      |
-| `GOOGLE_CLIENT_SECRET`      | No       | Google login client secret.                                                                                                                                                  |
-| `GOOGLE_CALLBACK_URL`       | No       | Google OAuth callback URL. Local default: `http://localhost:3001/api/auth/google/callback`.                                                                                  |
-| `GITHUB_CLIENT_ID`          | No       | GitHub login client ID.                                                                                                                                                      |
-| `GITHUB_CLIENT_SECRET`      | No       | GitHub login client secret.                                                                                                                                                  |
-| `GITHUB_CALLBACK_URL`       | No       | GitHub OAuth callback URL. Local default: `http://localhost:3001/api/auth/github/callback`.                                                                                  |
-| `MAIL_USER`                 | No       | Email address or sender used for system mail.                                                                                                                                |
-| `MAIL_PASS`                 | No       | App password or provider API key.                                                                                                                                            |
-| `VITE_API_URL`              | No       | Frontend backend API URL. Default: `http://localhost:3001/api`.                                                                                                              |
+### Saved connections stop working after a key change
 
----
+- Restore the previous `ENCRYPTION_KEY` if the change was accidental, or configure retained keys through `LEGACY_ENCRYPTION_KEYS` when performing a deliberate rotation.
+- Each legacy key must meet the 32-byte requirement. Keep old keys in secret storage, never in the README, logs, or a public issue.
+- Without the original encryption key, stored encrypted passwords cannot be recovered; re-enter the connection credentials instead.
 
-## Security and Production Notes
+### Prisma generation fails with `EPERM` on Windows
 
-Recent hardening introduced a few important changes:
+- A running backend can hold a Prisma file open. Stop the relevant local development process, then retry generation or the server build.
+- `npm run build --prefix server` uses the maintained generation wrapper, which checks whether the existing client matches the schema.
+- Do not suppress generation errors, delete database data, or run `prisma migrate reset` to fix a file-lock issue.
 
-- **Safer OAuth flow**: Google and GitHub login no longer return bearer tokens in the query string. The frontend now receives `/login#code=...` and exchanges it for a normal token.
-- **Stronger secret enforcement**: Weak or placeholder `JWT_SECRET` values prevent the backend from starting.
-- **Encrypted connection credentials**: Saved DB connection passwords are encrypted with **AES-256-GCM**, and the backend supports `LEGACY_ENCRYPTION_KEYS` to preserve older saved connections.
-- **Advanced Guardrails**: Read-only connections now block `EXEC/EXECUTE` bypasses and similar custom execution commands.
-- **SSH Tunnel SSRF protection**: The system blocks unsafe `dbHost` targets (localhost, 127.0.0.1, and internal IP ranges) within SSH tunnels to prevent intranet scanning.
-- **Tightened Team Privacy**: Shared resources are strictly isolated, removing insecure domain-based auto-sharing (e.g., preventing data leaks between different users on public domains like gmail.com).
-- **Resource Safety**: Data migration processes now include mandatory safety timeouts to prevent resource exhaustion (DoS).
-- **Reduced XSS exposure**: AI markdown no longer renders raw HTML in the client.
-- **Safer session handling**: Refresh tokens now live in `httpOnly` cookies, while access tokens stay in memory and are re-bootstrapped through `/auth/refresh`.
-- **Sanitized DB Errors**: Database error messages are sanitized before being sent to the client to prevent infrastructure information leakage.
-- **AI request guardrails**: Provider calls now use request timeouts and streaming idle timeouts so a slow lane cannot hang the backend indefinitely.
-- **Legal access flow**: New local registrations require Terms + Privacy consent, and users who have not accepted the legal flow are redirected to `/legal-consent` before entering the main workspace.
-- **CSRF protection**: Mutating requests must carry the `X-Requested-With: XMLHttpRequest` header (browser-based CSRF attacks cannot set custom headers without a CORS preflight), with a small exempt list for public auth and payment-webhook endpoints.
-- **NoSQL injection sanitizer**: MongoDB payloads are validated against an action whitelist, depth/size limits, and a banned-operator list (`$where`, `$function`, `$eval`, and similar server-side JavaScript vectors).
-- **Fail-closed SSRF validation**: Host validation rejects empty or whitespace-only hosts instead of treating them as safe targets, alongside the existing DNS-rebinding and private-range checks.
-- **Adversarial pentest coverage**: The server ships dedicated pentest suites (SQL guard bypass, statement-splitter evasion, NoSQL sanitizer bypass, identifier injection, SSRF IP confusion, CSRF header spoofing) — 160 security tests in total run as part of the standard test suite.
+### Google/GitHub login or AI features do not work
 
----
+- OAuth requires provider credentials and callback URLs that match the running backend. Check `FRONTEND_URL`, the corresponding callback variable, and the provider's registered callback.
+- AI features require a configured provider key/endpoint and an available model. Check role-specific model selection, provider access, and timeout/error feedback.
+- Do not put provider secrets in `VITE_*` variables or paste them into issue reports. Database browsing does not require AI configuration.
 
-## OAuth Flow Notes
+### An upgrade reports a migration conflict
 
-If you configure Google or GitHub login, make sure:
+Back up the application database and compare its migration history with the release before making changes. For an existing database, baseline/repair decisions require schema inspection; do not blindly mark migrations as applied or reset a live database. See the [deployment guide](docs/operations/ci-cd.md) for the release flow.
 
-- `FRONTEND_URL` matches the frontend origin you are actually using
-- callback URLs in your OAuth provider match your local or production backend
-- after login, the app redirects in this format:
+## Support and Contributing
 
-```text
-/login#code=...
-```
+[Open an issue](https://github.com/KasierBach/Data-Explorer-Editor/issues) with the affected version, reproduction steps, and sanitized logs. Contributions should stay focused, include relevant tests, and pass the package-level checks.
 
-The frontend then calls the exchange endpoint to convert the short-lived code into a normal access token.
-
----
-
-## Legacy Connection Compatibility
-
-If older saved DB connections stopped working after changing `ENCRYPTION_KEY`, you can add:
-
-```env
-LEGACY_ENCRYPTION_KEYS=12345678901234567890123456789012,abcdefghijklmnopqrstuvwxyz123456
-```
-
-Notes:
-
-- Each key must be exactly **32 characters**
-- In local development, the system automatically tries the old fallback key to reduce the chance that you need to re-enter passwords
-- If an old password was encrypted with a key you no longer have, it cannot be recovered from the stored data
-
----
-
-## Build, Test, and Troubleshooting
-
-### Build
-
-```bash
-cd client
-npm run build
-
-cd ../server
-npm run build
-```
-
-### Test
-
-```bash
-cd client
-npm test
-
-cd ../server
-npm test
-```
-
-### Security Tests Only
-
-```bash
-cd server
-npx jest --runInBand --testPathPatterns "(pentest|security|attack|fuzz|ssrf|guard)"
-```
-
-This runs the adversarial pentest suites (SQL guard bypass, NoSQL sanitizer bypass, SSRF IP confusion, CSRF header spoofing) together with the existing security, fuzz, and attack-vector coverage — 160 tests in total.
-
-### Common Issues
-
-- **Google / GitHub login is not working**
-  - Check `JWT_SECRET`
-  - Check the callback URLs in your OAuth provider
-  - Check `FRONTEND_URL`
-
-- **Older saved connections no longer work**
-  - Check `ENCRYPTION_KEY`
-  - Add `LEGACY_ENCRYPTION_KEYS` if you previously used another key
-  - Restart the backend after updating env values
-
-- **Localhost databases do not connect**
-  - Local development already allows `localhost`, `127.0.0.1`, and `::1`
-  - Only enable `ALLOW_INTERNAL_IPS=true` if you intentionally need broader private-network access
-
-- **Prisma build fails with `EPERM` on Windows**
-  - This usually happens because the backend dev server is still locking the Prisma engine file
-  - Stop the running backend process and build again
-
-- **You already have data in Postgres and want Prisma tracking**
-  - Use the committed baseline plus `prisma migrate resolve` if you need to attach Prisma history to an existing database
-  - Do not run `prisma migrate reset` against a live database
-
----
-
-## Contributing and Support
-
-- **Bug Reports**: Open an issue on the [GitHub Repo](https://github.com/KasierBach/Data-Explorer-Editor/issues).
-- **Custom Adapters**: New database engine support can be added via the `database-strategies` module.
+Do not post credentials or sensitive vulnerability details in public issues. Use GitHub private vulnerability reporting if it is enabled for the repository.
 
 ## License
 
-This project is licensed under the **MIT License**. See [LICENSE](./LICENSE).
+Data Explorer is available under the [MIT License](LICENSE).
