@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, Database, Leaf, Users } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
 import { useAppStore } from '@/core/services/store';
@@ -37,7 +38,7 @@ export const Navbar: React.FC = () => {
     };
 
     return (
-        <header data-testid="workspace-header" className="sticky top-0 z-40 flex w-full shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-background/95 px-2 py-2 backdrop-blur-md select-none sm:px-4">
+        <header data-testid="workspace-header" className="relative h-14 border-b flex items-center px-4 bg-background/95 backdrop-blur-md select-none shrink-0 sticky top-0 z-[60] w-full">
             <ProfileDialog
                 isOpen={isProfileOpen}
                 onClose={() => setIsProfileOpen(false)}
@@ -45,10 +46,10 @@ export const Navbar: React.FC = () => {
                 returnFocusRef={profileTriggerRef}
             />
 
-            <div className="flex min-w-0 shrink-0 items-center gap-2">
+            <div className="absolute left-4 top-1/2 z-10 flex -translate-y-1/2 items-center gap-4 min-w-0">
                 <div className="flex items-center gap-2 shrink-0">
                     {useCompactChrome && (
-                        <Button variant="ghost" size="icon" className="h-11 w-11" aria-label={isSidebarOpen ? text.navMenus.hideSidebar : text.navMenus.showSidebar} onClick={() => setSidebarOpen(!isSidebarOpen)}>
+                        <Button variant="ghost" size="icon" className="h-9 w-9" aria-label={isSidebarOpen ? text.navMenus.hideSidebar : text.navMenus.showSidebar} onClick={() => setSidebarOpen(!isSidebarOpen)}>
                             {isSidebarOpen ? <X className="w-5 h-5 text-primary" /> : <Menu className="w-5 h-5" />}
                         </Button>
                     )}
@@ -56,8 +57,15 @@ export const Navbar: React.FC = () => {
                 </div>
             </div>
 
-            <div className="order-3 flex w-full flex-wrap items-center justify-center gap-2 border-t border-border/30 pt-2 min-[1440px]:order-none min-[1440px]:w-auto min-[1440px]:border-0 min-[1440px]:pt-0">
-                <div className="flex items-center border-r border-border/30 pr-2">
+            <div
+                className={cn(
+                    "absolute top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-1 md:gap-2 px-2 md:px-6 min-w-0",
+                    useCompactChrome ? "max-w-[calc(100vw-9rem)]" : "max-w-[calc(100vw-42rem)]"
+                )}
+                style={{ left: useCompactChrome ? '50%' : 'calc(50% - 5.75rem)' }}
+            >
+                {!useCompactChrome && (
+                    <div className="flex items-center border-r border-border/30 pr-2">
                         <NavMainActions
                             activeConnectionId={activeConnectionId}
                             openInsightsTab={openInsightsTab}
@@ -66,17 +74,53 @@ export const Navbar: React.FC = () => {
                             isNoSql={isNoSqlRoute}
                         />
                     </div>
+                )}
 
-                <div className="order-first flex shrink-0 items-center gap-1 rounded-xl border border-border/40 bg-muted/40 p-1">
-                    <Button variant={isSqlRoute ? 'default' : 'ghost'} className="h-11 px-3" aria-label="SQL" aria-pressed={isSqlRoute} onClick={() => navigate('/sql-explorer')}>
-                        <Database className="h-4 w-4" aria-hidden="true" /> SQL
-                    </Button>
-                    <Button variant={isNoSqlRoute ? 'default' : 'ghost'} className="h-11 px-3" aria-label="NoSQL" aria-pressed={isNoSqlRoute} onClick={() => navigate('/nosql-explorer')}>
-                        <Leaf className="h-4 w-4" aria-hidden="true" /> NoSQL
-                    </Button>
+                <div className="relative flex items-center bg-muted/40 p-0.5 md:p-1 rounded-xl border border-border/40 gap-0.5 md:gap-1 shadow-inner mx-0.5 md:mx-1 flex-none">
+                    <motion.div
+                        className={cn(
+                            "absolute h-[calc(100%-4px)] md:h-[calc(100%-8px)] rounded-lg shadow-sm z-0",
+                            isSqlRoute ? "bg-gradient-to-r from-blue-600 to-indigo-600" : "bg-gradient-to-r from-emerald-600 to-green-600"
+                        )}
+                        initial={false}
+                        animate={{
+                            x: isSqlRoute ? 0 : (useCompactChrome ? 40 : 81),
+                            width: useCompactChrome ? 40 : 78
+                        }}
+                        transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                    />
+                    <button
+                        type="button"
+                        aria-label="SQL"
+                        aria-pressed={isSqlRoute}
+                        onClick={() => navigate('/sql-explorer')}
+                        className={cn(
+                            "relative z-10 flex items-center justify-center gap-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all",
+                            isSqlRoute ? "text-white" : "text-muted-foreground hover:text-foreground",
+                            useCompactChrome ? "w-10 h-8" : "w-[78px] py-1.5"
+                        )}
+                    >
+                        <Database className={cn("w-3.5 h-3.5", isSqlRoute && "scale-110")} aria-hidden="true" />
+                        {!useCompactChrome && <span>SQL</span>}
+                    </button>
+                    <button
+                        type="button"
+                        aria-label="NoSQL"
+                        aria-pressed={isNoSqlRoute}
+                        onClick={() => navigate('/nosql-explorer')}
+                        className={cn(
+                            "relative z-10 flex items-center justify-center gap-1.5 rounded-lg text-[10px] md:text-xs font-bold transition-all",
+                            isNoSqlRoute ? "text-white" : "text-muted-foreground hover:text-foreground",
+                            useCompactChrome ? "w-10 h-8" : "w-[78px] py-1.5"
+                        )}
+                    >
+                        <Leaf className={cn("w-3.5 h-3.5", isNoSqlRoute && "scale-110")} aria-hidden="true" />
+                        {!useCompactChrome && <span>NoSQL</span>}
+                    </button>
                 </div>
 
-                <div className="flex items-center border-l border-border/30 pl-2">
+                {!useCompactChrome && (
+                    <div className="flex items-center border-l border-border/30 pl-2">
                         <NavMenus
                             lang={lang}
                             openQueryTab={openQueryTab}
@@ -85,10 +129,11 @@ export const Navbar: React.FC = () => {
                             isNoSql={isNoSqlRoute}
                         />
                     </div>
+                )}
             </div>
 
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-                <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <div className="absolute right-4 top-1/2 z-30 flex -translate-y-1/2 items-center justify-end gap-3 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
                     {!useCompactChrome && <div className="h-4 w-px bg-border mx-1" />}
                     <Button
                         variant="ghost"
