@@ -213,7 +213,7 @@ class ApiService {
 
     if (!response.ok) {
       if (response.status === 401 && ownsSession() && token === new Headers(this.getHeaders()).get('Authorization')) {
-        useAppStore.getState().logout({ preserveWorkspace: true });
+        this.logoutInvalidSession();
       }
       throw await this.buildApiError(response);
     }
