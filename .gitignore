@@ -16,6 +16,8 @@ agent/
 .claude/
 superpower/
 superpowers/
+.superpower/
+.superpowers/
 mobile-audit/
 /docs/*
 !/docs/README.md
@@ -32,7 +34,8 @@ plan/
 .playwright-cli/
 PROJECT_EXPLANATION.md
 yeucau.md
-/docs/superpowers/plans/
+/docs/superpower/
+/docs/superpowers/
 /plans/
 .vercel
 .env*
