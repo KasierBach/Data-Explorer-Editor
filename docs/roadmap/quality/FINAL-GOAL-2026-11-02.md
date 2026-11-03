@@ -1,6 +1,6 @@
 # Final autonomous-scope closure — 02/11/2026
 
-Status: **VERIFIED_LOCAL_AUTONOMOUS_SCOPE**. Branch `codex/roadmap-r00`, baseline HEAD `3d7ec60845ddc2a07284c2873d9d3727acd30744`; working tree vẫn chưa commit/push/deploy. Manifest portable: [final-goal-verification-2026-11-02.json](final-goal-verification-2026-11-02.json).
+Status tại gate lịch sử: **VERIFIED_LOCAL_AUTONOMOUS_SCOPE**. Branch `codex/roadmap-r00`, baseline HEAD `3d7ec60845ddc2a07284c2873d9d3727acd30744`; tree chưa commit/push/deploy tại thời điểm kiểm chứng này. Sau đó đã tích hợp bằng commit local và tiếp tục [pre-push hardening 03/11](PREPUSH-HARDENING-2026-11-03.md); không dùng các số bên dưới để certify HEAD đã sửa sau gate. Manifest portable lịch sử: [final-goal-verification-2026-11-02.json](final-goal-verification-2026-11-02.json).
 
 ## Phần việc đã đóng
 

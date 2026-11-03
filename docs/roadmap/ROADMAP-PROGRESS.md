@@ -1,6 +1,12 @@
 # Tiến độ triển khai ROADMAP.md
 
-**Plan:** [ROADMAP.md](ROADMAP.md). **Baseline:** `3d7ec60845ddc2a07284c2873d9d3727acd30744`. **Branch:** `codex/roadmap-r00`. Ngày bắt đầu: 22/10/2026, Asia/Saigon. Chưa commit/push/deploy.
+**Plan:** [ROADMAP.md](ROADMAP.md). **Baseline:** `3d7ec60845ddc2a07284c2873d9d3727acd30744`. **Branch:** `codex/roadmap-r00`. Ngày bắt đầu: 22/10/2026, Asia/Saigon. R00–R14 đã được tích hợp bằng commit local ngày 02/11; chưa push/PR/merge/deploy. Những đoạn có ngày phía dưới giữ trạng thái lịch sử tại thời điểm ghi.
+
+## Pre-push hardening — 03/11, IN_PROGRESS_LOCAL
+
+[Follow-up report](quality/PREPUSH-HARDENING-2026-11-03.md) ghi sáu finding mới từ review trước publish và các RED→GREEN/local qualification. Baseline review `78b8221`; giữ nguyên mọi snapshot cũ. Migration policy, atomic Redis materialization/work budget, lexical SQL outer cap, automatic logout generation và nested avatar focus/localized close đang được kiểm lại; không dùng focused-green đầu làm final closure khi review phát hiện gap còn sót.
+
+Dialog unit7/7/browser8/8 và negative control modal cũ2/2fail; session focused30/30. Backend cuối tại `a30d7b5`:984/984 unit,218/218 native;408 source paths vẫn khớp nên không suy là rerun mới. Theo yêu cầu người dùng, `7c33570` trả header về UI cũ; `b620685` sửa lưu/reload mất SQL draft, RED5fail/3pass → GREEN8/8. Client cuối197/197 trong56file, lint/types/build pass; clean full-stack3/3 qua fixture API port13001 riêng, không copy `.env`, cleanup giữ19volume. Browser236/236 trước UI restoration không certify source mới; affected browser14/14 và client-container build pass, full-matrix/viewport và remote/manual/image-scan acceptance chưa đủ để gọi Draft-PR/release-ready. R13/R14/product/provider/scale blockers giữ nguyên. Không push/deploy.
 
 ## Final-goal — chốt autonomous scope có contract, 02/11
 
