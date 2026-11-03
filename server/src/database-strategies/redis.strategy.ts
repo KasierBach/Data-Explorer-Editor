@@ -44,6 +44,135 @@ export const REDIS_READ_COMMANDS = new Set([
 
 const MAX_SCAN_COUNT = 500;
 const MAX_COLLECTION_ITEMS = 500;
+const MAX_SCAN_ITERATIONS = 100;
+const MAX_SCAN_WORK_KEYS = 5_000;
+// Runtime-result safety default, NOT a product quota or a JSON/heap-size limit.
+// Scalars use exact UTF-8 byte lengths; collections use full Redis memory usage
+// plus 32 bytes per returned string for integer/score expansion. No sampling.
+const MAX_RESULT_BYTES = 1024 * 1024;
+
+// Fixed internal source only. EVAL_RO (Redis 7+) atomically checks before reads;
+// there is deliberately no EVAL fallback and no caller-supplied Lua entrypoint.
+const SAFE_READ_SCRIPT = `#!lua flags=no-writes
+-- data-explorer:safe-read
+local operation = ARGV[1]
+local bytes = 0
+local function fail(message)
+  error('DE_REDIS_SAFETY ' .. message, 0)
+end
+local function reserve(size)
+  bytes = bytes + size
+  if bytes > ${MAX_RESULT_BYTES} then
+    fail('1 MiB runtime-result byte budget exceeded; complete read unavailable. Read smaller values with a bounded external Redis client.')
+  end
+end
+local function scalar(key, field)
+  if field then
+    reserve(redis.call('HSTRLEN', key, field) + 32)
+    return redis.call('HGET', key, field)
+  end
+  reserve(redis.call('STRLEN', key) + 32)
+  return redis.call('GET', key)
+end
+local countCommands = {list='LLEN', set='SCARD', hash='HLEN', zset='ZCARD'}
+local encodings = {
+  list={listpack=true},
+  set={intset=true, listpack=true, hashtable=true},
+  hash={listpack=true, hashtable=true},
+  zset={listpack=true, skiplist=true}
+}
+local function collection(key, kind, start, stop, scores)
+  local count = redis.call(countCommands[kind], key)
+  if count > ${MAX_COLLECTION_ITEMS} then
+    fail('Redis ' .. kind .. ' contains more than ${MAX_COLLECTION_ITEMS} items; complete reads and finite ranges over larger backing collections are unsupported. Use a bounded external Redis client.')
+  end
+  -- Missing keys/empty collections must never turn into a 0,-1 read.
+  if count == 0 then return {} end
+  local encoding = redis.call('OBJECT', 'ENCODING', key)
+  if not encodings[kind][encoding] then
+    -- MEMORY USAGE can count compressed quicklist storage, not expanded values.
+    -- Reject it rather than inventing an expansion factor or fetching to measure.
+    fail('Redis ' .. kind .. ' encoding ' .. tostring(encoding) .. ' cannot prove an uncompressed byte bound; only supported uncompressed encodings can be read/exported.')
+  end
+  local memory = redis.call('MEMORY', 'USAGE', key, 'SAMPLES', 0)
+  if type(memory) ~= 'number' then fail('Redis memory accounting unavailable; complete read refused.') end
+  local strings = count * ((kind == 'hash' or kind == 'zset') and 2 or 1)
+  reserve(memory + strings * 32)
+  if kind == 'set' then return redis.call('SMEMBERS', key) end
+  if kind == 'hash' then return redis.call('HGETALL', key) end
+  local first = start or 0
+  local last = stop or (count - 1)
+  if first < 0 or last < first or last - first + 1 > ${MAX_COLLECTION_ITEMS} then
+    fail('Range must be finite and contain at most ${MAX_COLLECTION_ITEMS} items.')
+  end
+  if kind == 'list' then return redis.call('LRANGE', key, first, last) end
+  if scores then return redis.call('ZRANGE', key, first, last, 'WITHSCORES') end
+  return redis.call('ZRANGE', key, first, last)
+end
+if operation == 'INFO' then
+  local info
+  if ARGV[2] then info = redis.call('INFO', ARGV[2]) else info = redis.call('INFO') end
+  reserve(#info)
+  return info
+end
+if operation == 'RANDOMKEY' then
+  local key = redis.call('RANDOMKEY')
+  if key then reserve(#key) end
+  return key
+end
+if operation == 'MGET' then
+  if #KEYS < 1 or #KEYS > ${MAX_COLLECTION_ITEMS} then fail('MGET supports 1 to ${MAX_COLLECTION_ITEMS} keys.') end
+  for _, key in ipairs(KEYS) do
+    -- MGET returns nil for non-strings rather than WRONGTYPE.
+    if redis.call('TYPE', key).ok == 'string' then reserve(redis.call('STRLEN', key)) end
+    reserve(32)
+  end
+  return redis.call('MGET', unpack(KEYS))
+end
+local key = KEYS[1]
+if operation == 'GET' then return scalar(key) end
+if operation == 'HGET' then return scalar(key, ARGV[2]) end
+if operation == 'SMEMBERS' then return collection(key, 'set') end
+if operation == 'HGETALL' then return collection(key, 'hash') end
+if operation == 'LRANGE' then return collection(key, 'list', tonumber(ARGV[2]), tonumber(ARGV[3])) end
+if operation == 'ZRANGE' then return collection(key, 'zset', tonumber(ARGV[2]), tonumber(ARGV[3])) end
+if operation == 'SNAPSHOT' then
+  reserve(#key + 256)
+  local kind = redis.call('TYPE', key).ok
+  local value = false
+  if kind == 'string' then value = scalar(key)
+  elseif countCommands[kind] then value = collection(key, kind, nil, nil, true)
+  elseif kind ~= 'none' then fail('Unsupported Redis type ' .. kind .. '; complete sample/export unavailable.') end
+  return {kind, redis.call('TTL', key), value}
+end
+fail('Unsupported internal read operation.')
+`;
+
+const SAFE_SCAN_SCRIPT = `#!lua flags=no-writes
+-- data-explorer:safe-scan
+local function fail(message)
+  error('DE_REDIS_SAFETY ' .. message, 0)
+end
+-- COUNT is only a hint. Limit the entire backing keyspace before SCAN so a
+-- collision-heavy terminal reply cannot cause unbounded server traversal.
+if redis.call('DBSIZE') > ${MAX_SCAN_WORK_KEYS} then
+  fail('SCAN keyspace exceeds ${MAX_SCAN_WORK_KEYS} keys; safe browsing unsupported. Use an external cursor-based Redis client.')
+end
+local reply
+if ARGV[4] ~= '' then
+  reply = redis.call('SCAN', ARGV[1], 'MATCH', ARGV[2], 'COUNT', ARGV[3], 'TYPE', ARGV[4])
+else
+  reply = redis.call('SCAN', ARGV[1], 'MATCH', ARGV[2], 'COUNT', ARGV[3])
+end
+local bytes = 0
+for _, key in ipairs(reply[2]) do
+  bytes = bytes + #key + 32
+end
+if #reply[2] > tonumber(ARGV[5]) or bytes > ${MAX_RESULT_BYTES} then
+  fail('SCAN reply exceeds the remaining ${MAX_SCAN_WORK_KEYS}-key work / 1 MiB byte budget; retry SCAN ' .. ARGV[1] .. ' with a smaller COUNT. No partial page returned.')
+end
+return reply
+`;
 
 function parseInteger(value: string): number | undefined {
   if (!/^-?\d+$/.test(value)) return undefined;
@@ -116,6 +245,20 @@ export class RedisStrategy implements IDatabaseStrategy {
     const args = parts.slice(1);
     const limit = Math.min(options?.limit ?? 100, MAX_SCAN_COUNT);
     const offset = options?.offset ?? 0;
+    if (
+      !Number.isSafeInteger(limit) ||
+      limit < 1 ||
+      !Number.isSafeInteger(offset) ||
+      offset < 0
+    ) {
+      throw new BadRequestException('Invalid Redis result page bounds.');
+    }
+    if (Buffer.byteLength(trimmed, 'utf8') > MAX_RESULT_BYTES) {
+      throw new BadRequestException(
+        'Redis command exceeds the 1 MiB runtime safety byte budget.',
+      );
+    }
+    this.assertBoundedRead(command, args);
 
     // SCAN-based browsing with pagination.
     if (command === 'SCAN' || command === 'KEYS') {
@@ -154,8 +297,12 @@ export class RedisStrategy implements IDatabaseStrategy {
     }
 
     if (command === 'INFO') {
-      const section = args[0];
-      const raw = await client.info(section);
+      const raw = (await this.runReadOnlyScript(
+        client,
+        SAFE_READ_SCRIPT,
+        [],
+        ['INFO', ...args],
+      )) as string;
       const rows = raw
         .split('\r\n')
         .filter((line) => line && !line.startsWith('#'))
@@ -183,10 +330,32 @@ export class RedisStrategy implements IDatabaseStrategy {
       };
     }
 
-    await this.assertBoundedRead(client, command, args);
-
-    // Generic single-result read commands (GET, TTL, TYPE, ...).
-    const result = await client.call(command, ...args);
+    // Fixed scripts cover all commands that can return stored strings/arrays.
+    // Numeric/type replies remain direct, preserving Redis WRONGTYPE behavior.
+    const storedValueReads = [
+      'GET',
+      'MGET',
+      'HGET',
+      'SMEMBERS',
+      'HGETALL',
+      'LRANGE',
+      'ZRANGE',
+      'RANDOMKEY',
+    ];
+    const keys =
+      command === 'MGET'
+        ? args
+        : command === 'RANDOMKEY'
+          ? []
+          : args.slice(0, 1);
+    const result = storedValueReads.includes(command)
+      ? await this.runReadOnlyScript(client, SAFE_READ_SCRIPT, keys, [
+          command,
+          ...(command === 'MGET' || command === 'RANDOMKEY'
+            ? []
+            : args.slice(1)),
+        ])
+      : await client.call(command, ...args);
     const normalized = this.normalizeRedisValue(result);
     return {
       rows: [{ result: normalized }],
@@ -426,8 +595,7 @@ export class RedisStrategy implements IDatabaseStrategy {
     table: string,
   ): Promise<unknown> {
     const client = pool as Redis;
-    const type = await client.type(table);
-    const value = await this.readKeyValue(client, table, type);
+    const { type, value } = await this.readKeyValue(client, table);
     return JSON.stringify({ key: table, type, value }, null, 2);
   }
 
@@ -451,27 +619,54 @@ export class RedisStrategy implements IDatabaseStrategy {
     table: string,
     limit: number,
   ): Promise<Record<string, unknown>[]> {
+    if (!Number.isSafeInteger(limit) || limit < 0) {
+      throw new BadRequestException('Invalid Redis sample row limit.');
+    }
+    if (limit === 0) return [];
     const client = pool as Redis;
-    const type = await client.type(table);
-    const value = await this.readKeyValue(client, table, type);
-    const ttl = await client.ttl(table);
-    return [{ key: table, type, ttl, value }].slice(0, limit);
+    const { type, ttl, value } = await this.readKeyValue(client, table);
+    return [{ key: table, type, ttl, value }];
   }
 
-  private async assertBoundedRead(
-    client: Redis,
-    command: string,
-    args: string[],
-  ): Promise<void> {
-    if (command === 'MGET') {
+  private assertBoundedRead(command: string, args: string[]): void {
+    if (command === 'SCAN' || command === 'KEYS') return;
+    const singleKey = [
+      'GET',
+      'TYPE',
+      'TTL',
+      'PTTL',
+      'STRLEN',
+      'SMEMBERS',
+      'HGETALL',
+      'ZCARD',
+      'LLEN',
+      'SCARD',
+      'HLEN',
+    ];
+    const arity = singleKey.includes(command)
+      ? 1
+      : command === 'HGET'
+        ? 2
+        : undefined;
+    if (arity !== undefined && args.length !== arity) {
+      throw new BadRequestException(
+        `${command} requires exactly ${arity} argument${arity === 1 ? '' : 's'}.`,
+      );
+    }
+    if (['DBSIZE', 'RANDOMKEY'].includes(command) && args.length !== 0) {
+      throw new BadRequestException(`${command} does not accept arguments.`);
+    }
+    if (['PING', 'INFO'].includes(command) && args.length > 1) {
+      throw new BadRequestException(`${command} accepts at most one argument.`);
+    }
+    if (command === 'MGET' || command === 'EXISTS') {
       if (args.length < 1 || args.length > MAX_COLLECTION_ITEMS) {
         throw new BadRequestException(
-          `MGET supports between 1 and ${MAX_COLLECTION_ITEMS} keys.`,
+          `${command} supports between 1 and ${MAX_COLLECTION_ITEMS} keys.`,
         );
       }
       return;
     }
-
     if (command === 'LRANGE' || command === 'ZRANGE') {
       if (args.length !== 3) {
         throw new BadRequestException(
@@ -491,26 +686,32 @@ export class RedisStrategy implements IDatabaseStrategy {
           `${command} must request a finite range of at most ${MAX_COLLECTION_ITEMS} items.`,
         );
       }
-      return;
-    }
-
-    if (command === 'SMEMBERS' || command === 'HGETALL') {
-      if (args.length !== 1) {
-        throw new BadRequestException(`${command} requires exactly one key.`);
-      }
-      const count =
-        command === 'SMEMBERS'
-          ? await client.scard(args[0])
-          : await client.hlen(args[0]);
-      this.assertCollectionSize(command, count);
     }
   }
 
-  private assertCollectionSize(type: string, count: number): void {
-    if (count > MAX_COLLECTION_ITEMS) {
-      throw new BadRequestException(
-        `${type} contains more than ${MAX_COLLECTION_ITEMS} items and cannot be materialized safely.`,
-      );
+  private async runReadOnlyScript(
+    client: Redis,
+    script: string,
+    keys: string[],
+    args: string[],
+  ): Promise<unknown> {
+    try {
+      return await client.eval_ro(script, keys.length, ...keys, ...args);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const safety = message.match(/DE_REDIS_SAFETY ([^\r\n]*)/);
+      if (safety) throw new BadRequestException(safety[1]);
+      if (
+        /unknown command.*eval_ro|NOPERM|not allowed.*script|cannot be called from.*script/i.test(
+          message,
+        )
+      ) {
+        throw new BadRequestException(
+          'Safe Redis reads require Redis 7+ EVAL_RO and ACL access to the internal read-only length/cardinality, OBJECT ENCODING and MEMORY USAGE checks. No unsafe fallback was used.',
+        );
+      }
+      // Keep native WRONGTYPE/timeouts/connectivity failures intact for the caller.
+      throw error;
     }
   }
 
@@ -576,19 +777,41 @@ export class RedisStrategy implements IDatabaseStrategy {
     const keys = new Set<string>();
     let cursor = options.cursor ?? '0';
     const fromStart = /^0+$/.test(cursor);
-    const scanArgs: ['MATCH', string, 'COUNT', number] = [
-      'MATCH',
-      pattern,
-      'COUNT',
-      options.count ?? 100,
-    ];
+    let iterations = 0;
+    let workKeys = 0;
+    let keyBytes = 0;
     do {
-      const [next, batch] =
-        options.type === undefined
-          ? await client.scan(cursor, ...scanArgs)
-          : await client.scan(cursor, ...scanArgs, 'TYPE', options.type);
+      if (iterations >= MAX_SCAN_ITERATIONS || workKeys >= MAX_SCAN_WORK_KEYS) {
+        throw new BadRequestException(
+          `Redis SCAN work budget exhausted (${MAX_SCAN_ITERATIONS} iterations / ${MAX_SCAN_WORK_KEYS} processed keys). Retry SCAN ${cursor} MATCH ${pattern} with a smaller COUNT; no complete page or exact count was returned.`,
+        );
+      }
+      const [next, batch] = (await this.runReadOnlyScript(
+        client,
+        SAFE_SCAN_SCRIPT,
+        [],
+        [
+          cursor,
+          pattern,
+          String(options.count ?? 100),
+          options.type ?? '',
+          String(MAX_SCAN_WORK_KEYS - workKeys),
+        ],
+      )) as [string, string[]];
+      iterations++;
       cursor = next;
-      for (const key of batch) keys.add(key);
+      workKeys += batch.length;
+      for (const key of batch) {
+        if (!keys.has(key)) {
+          keyBytes += Buffer.byteLength(key, 'utf8') + 32;
+          if (keyBytes > MAX_RESULT_BYTES) {
+            throw new BadRequestException(
+              `Redis SCAN 1 MiB cumulative key byte budget exceeded; use a smaller page/COUNT or an external cursor-based client. No complete result was returned.`,
+            );
+          }
+          keys.add(key);
+        }
+      }
     } while (cursor !== '0' && keys.size < max);
     return {
       keys: [...keys].slice(0, max),
@@ -599,34 +822,28 @@ export class RedisStrategy implements IDatabaseStrategy {
   private async readKeyValue(
     client: Redis,
     key: string,
-    type: string,
-  ): Promise<unknown> {
-    switch (type) {
-      case 'string':
-        return client.get(key);
-      case 'list': {
-        const count = await client.llen(key);
-        this.assertCollectionSize('Redis list', count);
-        return client.lrange(key, 0, count - 1);
-      }
-      case 'set': {
-        const count = await client.scard(key);
-        this.assertCollectionSize('Redis set', count);
-        return client.smembers(key);
-      }
-      case 'hash': {
-        const count = await client.hlen(key);
-        this.assertCollectionSize('Redis hash', count);
-        return client.hgetall(key);
-      }
-      case 'zset': {
-        const count = await client.zcard(key);
-        this.assertCollectionSize('Redis sorted set', count);
-        return client.zrange(key, 0, count - 1, 'WITHSCORES');
-      }
-      default:
-        return null;
+  ): Promise<{ type: string; ttl: number; value: unknown }> {
+    if (Buffer.byteLength(key, 'utf8') + 256 > MAX_RESULT_BYTES) {
+      throw new BadRequestException(
+        'Redis key exceeds the 1 MiB runtime-result safety byte budget.',
+      );
     }
+    const [type, ttl, raw] = (await this.runReadOnlyScript(
+      client,
+      SAFE_READ_SCRIPT,
+      [key],
+      ['SNAPSHOT'],
+    )) as [string, number, unknown];
+    const value =
+      type === 'hash'
+        ? Object.fromEntries(
+            Array.from({ length: (raw as string[]).length / 2 }, (_, index) => [
+              (raw as string[])[index * 2],
+              (raw as string[])[index * 2 + 1],
+            ]),
+          )
+        : this.normalizeRedisValue(raw);
+    return { type, ttl, value };
   }
 
   private normalizeRedisValue(value: unknown): unknown {

@@ -12,6 +12,37 @@ describe('R14 Redis scan boundaries', () => {
     redis = new Redis({ lazyConnect: true });
     strategy = new RedisStrategy();
     scan = jest.spyOn(redis, 'scan');
+    // Contract mock only: native Redis safety spec executes the fixed Lua scripts.
+    jest.spyOn(redis, 'eval_ro').mockImplementation(async (...input) => {
+      const [script, numberOfKeys, ...args] = input;
+      expect(String(script)).toContain('data-explorer:safe-scan');
+      expect(numberOfKeys).toBe(0);
+      const [cursor, match, count, type, remaining] = args.map(String);
+      const reply = await (type
+        ? redis.scan(
+            cursor,
+            'MATCH',
+            match,
+            'COUNT',
+            Number(count),
+            'TYPE',
+            type,
+          )
+        : redis.scan(cursor, 'MATCH', match, 'COUNT', Number(count)));
+      if (
+        reply[1].length > Number(remaining) ||
+        reply[1].reduce(
+          (bytes, key) => bytes + Buffer.byteLength(key) + 32,
+          0,
+        ) >
+          1024 * 1024
+      ) {
+        throw new Error(
+          `DE_REDIS_SAFETY SCAN reply budget exceeded; retry SCAN ${cursor} with a smaller COUNT.`,
+        );
+      }
+      return reply;
+    });
   });
 
   afterEach(() => {
@@ -132,6 +163,77 @@ describe('R14 Redis scan boundaries', () => {
       }),
     ).rejects.toThrow('page bounds');
     expect(scan).not.toHaveBeenCalled();
+  });
+
+  it('bounds empty/duplicate SCAN work and errors with a continuation cursor instead of fake completeness', async () => {
+    for (let index = 0; index < 100; index++)
+      scan.mockResolvedValueOnce([String(index + 1), []]);
+    scan.mockResolvedValueOnce(['0', ['r14:eventually']]);
+
+    await expect(
+      strategy.executeQuery(redis, `SCAN 0 MATCH ${pattern}`),
+    ).rejects.toThrow(/budget.*SCAN 100/i);
+    expect(scan).toHaveBeenCalledTimes(100);
+  });
+
+  it('bounds total processed keys even when duplicate replies do not grow the result', async () => {
+    for (let index = 0; index < 11; index++)
+      scan.mockResolvedValueOnce([
+        String(index + 1),
+        Array(500).fill('r14:duplicate'),
+      ]);
+    scan.mockResolvedValueOnce(['0', []]);
+
+    await expect(
+      strategy.executeQuery(redis, `KEYS ${pattern}`),
+    ).rejects.toThrow(/budget.*SCAN 10/i);
+    expect(scan).toHaveBeenCalledTimes(10);
+  });
+
+  it('checks remaining key work budget atomically before accepting an over-budget terminal reply', async () => {
+    for (let index = 0; index < 9; index++)
+      scan.mockResolvedValueOnce([
+        String(index + 1),
+        Array(500).fill('r14:duplicate'),
+      ]);
+    scan.mockResolvedValueOnce(['10', Array(499).fill('r14:duplicate')]);
+    scan.mockResolvedValueOnce(['0', ['r14:duplicate', 'r14:new']]);
+
+    await expect(
+      strategy.executeQuery(redis, `KEYS ${pattern}`),
+    ).rejects.toThrow(/budget/);
+    expect(scan).toHaveBeenCalledTimes(11);
+  });
+
+  it('rejects an oversized terminal SCAN reply rather than returning a sliced complete result', async () => {
+    scan.mockResolvedValueOnce([
+      '0',
+      Array.from({ length: 5_001 }, (_, index) => `r14:${index}`),
+    ]);
+
+    await expect(
+      strategy.executeQuery(redis, `KEYS ${pattern}`),
+    ).rejects.toThrow(/budget/i);
+    expect(scan).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects byte-heavy key names before materializing a client SCAN reply', async () => {
+    scan.mockResolvedValueOnce(['0', ['r14:' + '🙂'.repeat(262_145)]]);
+
+    await expect(
+      strategy.executeQuery(redis, `KEYS ${pattern}`),
+    ).rejects.toThrow(/budget/i);
+  });
+
+  it('bounds cumulative key bytes across separately safe scan replies', async () => {
+    scan.mockResolvedValueOnce(['5', ['r14:' + 'a'.repeat(600_000)]]);
+    scan.mockResolvedValueOnce(['7', ['r14:' + 'b'.repeat(600_000)]]);
+    scan.mockResolvedValueOnce(['0', []]);
+
+    await expect(
+      strategy.executeQuery(redis, `KEYS ${pattern}`),
+    ).rejects.toThrow(/byte budget/i);
+    expect(scan).toHaveBeenCalledTimes(2);
   });
 
   it.each([
