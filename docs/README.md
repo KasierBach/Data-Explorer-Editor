@@ -1,12 +1,5 @@
 # Documentation
 
-## Current roadmap and verification
-
-- [Roadmap](roadmap/ROADMAP.md): dependency order, acceptance criteria, safety rules, and current implementation status.
-- [Progress ledger](roadmap/ROADMAP-PROGRESS.md): execution history, findings, verification, and remaining blockers.
-- [Quality evidence](roadmap/quality/README.md): reproducible test commands and links to package reports/manifests.
-- [Local cleanup and retention](roadmap/quality/CLEANUP-2026-10-31.md): reviewed file moves, reproducible artifacts, and Docker ownership checks.
-
 ## Maintained guides
 
 - [CI/CD operations](operations/ci-cd.md)

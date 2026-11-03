@@ -19,7 +19,7 @@ superpowers/
 mobile-audit/
 /docs/*
 !/docs/README.md
-!/docs/roadmap/
+/docs/roadmap/
 /docs/archive/local-notes/
 /plans/phase-1-implementation-plan.md
 /plans/team-collaboration-analysis.md
