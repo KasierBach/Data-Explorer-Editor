@@ -172,7 +172,7 @@ async function runScenario({ label, rowCount, variant }) {
   };
 
   const connectionsService = {
-    async getDecryptedConnection(connectionId) {
+    async getMigrationConnection(connectionId) {
       if (connectionId === 'src-1') {
         return {
           id: 'src-1',
@@ -212,7 +212,10 @@ async function runScenario({ label, rowCount, variant }) {
     strategyFactory,
     new MigrationComparisonService(),
     queueState.queue,
-    { invalidateConnection: async () => {}, invalidatePartialWrite: async () => {} },
+    {
+      invalidateConnection: async () => {},
+      invalidatePartialWrite: async () => {},
+    },
   );
   service.logger = {
     log() {},
@@ -231,7 +234,11 @@ async function runScenario({ label, rowCount, variant }) {
 
   const { jobId } = await service.startMigration('user-1', dto);
   const startedAt = performance.now();
-  await service.runMigrationPipeline('user-1', jobId, dto);
+  await service.runMigrationPipeline(
+    'user-1',
+    jobId,
+    queueState.jobs.get(jobId).data.dto,
+  );
   const durationMs = performance.now() - startedAt;
 
   const job = queueState.jobs.get(jobId);

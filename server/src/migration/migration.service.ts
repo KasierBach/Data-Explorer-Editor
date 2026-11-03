@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -25,6 +26,8 @@ import {
 } from './migration-batch-sizing.util';
 import {
   type MigrationConnection,
+  type MigrationEndpointSnapshot,
+  type MigrationEndpointSnapshots,
   type MigrationStage,
   type MigrationJob,
   type StoredMigrationJob,
@@ -61,27 +64,82 @@ export class MigrationService {
     this.logger.log('Migration service initialized with BullMQ.');
   }
 
+  private normalizeMigrationDto(dto: StartMigrationDto): StartMigrationDto {
+    const sourceConnectionId = dto.sourceConnectionId?.trim();
+    const targetConnectionId = dto.targetConnectionId?.trim();
+    if (!sourceConnectionId || !targetConnectionId) {
+      throw new BadRequestException(
+        'Migration connection IDs must not be empty.',
+      );
+    }
+    return {
+      sourceConnectionId,
+      targetConnectionId,
+      sourceSchema: dto.sourceSchema?.trim() || '',
+      targetSchema: dto.targetSchema?.trim() || '',
+      sourceTable: this.comparisonService.normalizeTableName(dto.sourceTable),
+      targetTable: this.comparisonService.normalizeTableName(dto.targetTable),
+    };
+  }
+
+  private snapshotMigrationEndpoint(
+    connection: MigrationConnection,
+  ): MigrationEndpointSnapshot {
+    return Object.freeze({
+      id: connection.id,
+      type: connection.type,
+      host: connection.host,
+      port: connection.port,
+      database: connection.database,
+    });
+  }
+
+  private assertMigrationEndpointUnchanged(
+    expected: MigrationEndpointSnapshot,
+    actual: {
+      id: string;
+      type: string;
+      host?: string | null;
+      port?: number | null;
+      database?: string | null;
+    },
+  ): void {
+    if (
+      expected.id !== actual.id ||
+      expected.type !== actual.type ||
+      expected.host !== actual.host ||
+      expected.port !== actual.port ||
+      expected.database !== actual.database
+    ) {
+      throw new ForbiddenException(
+        'Migration endpoint changed after authorization. Start a new migration after reviewing the connection.',
+      );
+    }
+  }
+
   private async authorizeMigrationEndpoints(
     userId: string,
     dto: StartMigrationDto,
+    endpoints?: MigrationEndpointSnapshots,
   ) {
+    const normalizedDto = this.normalizeMigrationDto(dto);
     const sourceConn = await this.connectionsService.getMigrationConnection(
-      dto.sourceConnectionId,
+      normalizedDto.sourceConnectionId,
       userId,
       {
         permission: Permission.READ,
-        database: undefined,
-        schema: dto.sourceSchema,
+        database: endpoints?.source.database,
+        schema: normalizedDto.sourceSchema,
         write: false,
       },
     );
     const targetConn = await this.connectionsService.getMigrationConnection(
-      dto.targetConnectionId,
+      normalizedDto.targetConnectionId,
       userId,
       {
         permission: Permission.WRITE,
-        database: undefined,
-        schema: dto.targetSchema,
+        database: endpoints?.target.database,
+        schema: normalizedDto.targetSchema,
         write: true,
       },
     );
@@ -90,22 +148,40 @@ export class MigrationService {
       throw new Error('Source or target connection not found.');
     }
 
-    return { sourceConn, targetConn };
-  }
-
-  async startMigration(
-    userId: string,
-    dto: StartMigrationDto,
-  ): Promise<{ jobId: string }> {
-    const { sourceConn, targetConn } = await this.authorizeMigrationEndpoints(
-      userId,
-      dto,
-    );
+    for (const connection of [sourceConn, targetConn]) {
+      if (
+        (connection.type === 'postgres' || connection.type === 'cockroach') &&
+        !connection.database?.trim()
+      ) {
+        throw new BadRequestException(
+          'An explicit database is required for PostgreSQL/CockroachDB migrations; connection defaults are not inferred.',
+        );
+      }
+    }
+    if (endpoints) {
+      this.assertMigrationEndpointUnchanged(endpoints.source, sourceConn);
+      this.assertMigrationEndpointUnchanged(endpoints.target, targetConn);
+    }
+    const canonicalDto = Object.freeze({
+      ...normalizedDto,
+      sourceSchema: this.comparisonService.normalizeSchemaName(
+        sourceConn.type,
+        normalizedDto.sourceSchema,
+        sourceConn.database,
+      ),
+      targetSchema: this.comparisonService.normalizeSchemaName(
+        targetConn.type,
+        normalizedDto.targetSchema,
+        targetConn.database,
+      ),
+    });
     if (
       this.comparisonService.sameMigrationEndpoint(
-        dto,
+        canonicalDto,
         sourceConn.type,
         targetConn.type,
+        sourceConn as MigrationConnection,
+        targetConn as MigrationConnection,
       )
     ) {
       throw new Error(
@@ -113,9 +189,66 @@ export class MigrationService {
       );
     }
 
+    return { sourceConn, targetConn, dto: canonicalDto };
+  }
+
+  private async reauthorizeMigrationContext(
+    userId: string,
+    context: Pick<
+      ResolvedMigrationContext,
+      'dto' | 'sourceConn' | 'targetConn'
+    >,
+  ): Promise<void> {
+    const { dto, sourceConn, targetConn } = context;
+    // Recheck current policy against the databases of the already-created pools,
+    // never a newly configured default database or a caller-mutated DTO.
+    const currentSource = await this.connectionsService.getMigrationConnection(
+      dto.sourceConnectionId,
+      userId,
+      {
+        permission: Permission.READ,
+        database: sourceConn.database,
+        schema: dto.sourceSchema,
+        write: false,
+      },
+    );
+    const currentTarget = await this.connectionsService.getMigrationConnection(
+      dto.targetConnectionId,
+      userId,
+      {
+        permission: Permission.WRITE,
+        database: targetConn.database,
+        schema: dto.targetSchema,
+        write: true,
+      },
+    );
+    this.assertMigrationEndpointUnchanged(
+      this.snapshotMigrationEndpoint(sourceConn),
+      currentSource,
+    );
+    this.assertMigrationEndpointUnchanged(
+      this.snapshotMigrationEndpoint(targetConn),
+      currentTarget,
+    );
+  }
+
+  async startMigration(
+    userId: string,
+    dto: StartMigrationDto,
+  ): Promise<{ jobId: string }> {
+    const {
+      dto: canonicalDto,
+      sourceConn,
+      targetConn,
+    } = await this.authorizeMigrationEndpoints(userId, dto);
+    const endpoints = Object.freeze({
+      source: this.snapshotMigrationEndpoint(sourceConn as MigrationConnection),
+      target: this.snapshotMigrationEndpoint(targetConn as MigrationConnection),
+    });
+
     const job = await this.migrationQueue.add(
       'migration-job',
-      { userId, dto },
+      { userId, dto: canonicalDto, endpoints },
       {
         removeOnComplete: false,
         removeOnFail: false,
@@ -239,7 +372,11 @@ export class MigrationService {
   private async resolveMigrationContext(
     userId: string,
     dto: StartMigrationDto,
-    options: { jobId?: string; strict?: boolean } = {},
+    options: {
+      jobId?: string;
+      strict?: boolean;
+      endpoints?: MigrationEndpointSnapshots;
+    } = {},
   ): Promise<ResolvedMigrationContext> {
     const jobId = options.jobId;
     const strict = options.strict ?? true;
@@ -248,20 +385,11 @@ export class MigrationService {
       await this.markStage(jobId, 'validating', 'running');
     }
 
-    const { sourceConn: rawSourceConn, targetConn: rawTargetConn } =
-      await this.authorizeMigrationEndpoints(userId, dto);
-
-    if (
-      this.comparisonService.sameMigrationEndpoint(
-        dto,
-        rawSourceConn.type,
-        rawTargetConn.type,
-      )
-    ) {
-      throw new Error(
-        'Source and target cannot point to the same table or collection.',
-      );
-    }
+    const {
+      sourceConn: rawSourceConn,
+      targetConn: rawTargetConn,
+      dto: canonicalDto,
+    } = await this.authorizeMigrationEndpoints(userId, dto, options.endpoints);
 
     if (jobId) {
       await this.markStage(jobId, 'connecting');
@@ -282,7 +410,9 @@ export class MigrationService {
     const targetStrategy = this.dbStrategiesFactory.getStrategy(
       targetConn.type,
     );
+    const endpointContext = { dto: canonicalDto, sourceConn, targetConn };
     const partialContext: Partial<ResolvedMigrationContext> = {
+      ...endpointContext,
       sourceStrategy,
       targetStrategy,
     };
@@ -300,25 +430,11 @@ export class MigrationService {
         await this.markStage(jobId, 'preflight');
       }
 
-      const sourceSchema = this.comparisonService.normalizeSchemaName(
-        sourceConn.type,
-        dto.sourceSchema,
-      );
-      const targetSchema = this.comparisonService.normalizeSchemaName(
-        targetConn.type,
-        dto.targetSchema,
-      );
-      const sourceTable = this.comparisonService.normalizeTableName(
-        dto.sourceTable,
-      );
-      const targetTable = this.comparisonService.normalizeTableName(
-        dto.targetTable,
-      );
-
+      await this.reauthorizeMigrationContext(userId, endpointContext);
       const sourceMetadata = await sourceStrategy.getFullMetadata(
         sourcePool,
-        sourceSchema,
-        sourceTable,
+        canonicalDto.sourceSchema,
+        canonicalDto.sourceTable,
         sourceConn.database || undefined,
       );
 
@@ -328,11 +444,12 @@ export class MigrationService {
         );
       }
 
+      await this.reauthorizeMigrationContext(userId, endpointContext);
       const targetMetadata = await targetStrategy
         .getFullMetadata(
           targetPool,
-          targetSchema,
-          targetTable,
+          canonicalDto.targetSchema,
+          canonicalDto.targetTable,
           targetConn.database || undefined,
         )
         .catch((error) => {
@@ -350,6 +467,7 @@ export class MigrationService {
           } as FullTableMetadata;
         });
 
+      await this.reauthorizeMigrationContext(userId, endpointContext);
       if (strict) {
         this.comparisonService.validateTargetCompatibility(
           sourceConn,
@@ -360,8 +478,7 @@ export class MigrationService {
       }
 
       return {
-        sourceConn,
-        targetConn,
+        ...endpointContext,
         sourceStrategy,
         targetStrategy,
         sourcePool,
@@ -383,7 +500,10 @@ export class MigrationService {
       strict: false,
     });
     try {
-      return this.comparisonService.buildMigrationReviewSummary(context, dto);
+      return this.comparisonService.buildMigrationReviewSummary(
+        context,
+        context.dto,
+      );
     } finally {
       await this.closeResources(context);
     }
@@ -424,19 +544,24 @@ export class MigrationService {
           'Interrupted migrations cannot be restarted safely. Inspect the target before starting a new transfer.',
         );
       }
-      context = await this.resolveMigrationContext(userId, dto, {
-        jobId,
-        strict: true,
-      });
+      const resolvedContext = await this.resolveMigrationContext(
+        userId,
+        job.data.dto ?? dto,
+        {
+          jobId,
+          strict: true,
+          endpoints: job.data.endpoints,
+        },
+      );
+      context = resolvedContext;
+      const canonicalDto = resolvedContext.dto;
       await this.markStage(jobId, 'streaming');
+      await this.reauthorizeMigrationContext(userId, resolvedContext);
 
-      const rawStream = await context.sourceStrategy!.exportStream(
-        context.sourcePool,
-        this.comparisonService.normalizeSchemaName(
-          context.sourceConn!.type,
-          dto.sourceSchema,
-        ),
-        this.comparisonService.normalizeTableName(dto.sourceTable),
+      const rawStream = await resolvedContext.sourceStrategy.exportStream(
+        resolvedContext.sourcePool,
+        canonicalDto.sourceSchema,
+        canonicalDto.sourceTable,
       );
 
       const stream = rawStream as MigrationStream;
@@ -476,26 +601,25 @@ export class MigrationService {
           while (true) {
             if (failed) return;
             const batch = remainingRows.slice(0, attemptSize);
+            // Authorization is outside the retryable-write catch: a policy denial
+            // never retries, and cannot erase bookkeeping for a committed batch.
+            await this.reauthorizeMigrationContext(userId, resolvedContext);
+            if (failed) return;
             let imported: { success: boolean; rowCount: number };
             try {
-              imported = await context!.targetStrategy!.importData(
-                context!.targetPool,
+              imported = await resolvedContext.targetStrategy.importData(
+                resolvedContext.targetPool,
                 {
-                  schema: this.comparisonService.normalizeSchemaName(
-                    context!.targetConn!.type,
-                    dto.targetSchema,
-                  ),
-                  table: this.comparisonService.normalizeTableName(
-                    dto.targetTable,
-                  ),
+                  schema: canonicalDto.targetSchema,
+                  table: canonicalDto.targetTable,
                   data: batch,
                 },
               );
             } catch (error) {
               await this.freshnessService.invalidatePartialWrite(
                 error,
-                dto.targetConnectionId,
-                context!.targetConn!.database,
+                canonicalDto.targetConnectionId,
+                resolvedContext.targetConn.database,
               );
               if (
                 !isRetryableMigrationBatchError(error) ||
@@ -529,8 +653,8 @@ export class MigrationService {
             }
             if (imported.rowCount > 0) {
               await this.freshnessService.invalidateConnection(
-                dto.targetConnectionId,
-                context!.targetConn!.database,
+                canonicalDto.targetConnectionId,
+                resolvedContext.targetConn.database,
               );
             }
             if (

@@ -52,6 +52,7 @@ function setup() {
       id,
       name: id,
       type: id === 'source' ? 'postgres' : 'sqlite',
+      database: id === 'source' ? 'migration_r05_unit' : ':memory:',
     })),
   };
   const factory = {

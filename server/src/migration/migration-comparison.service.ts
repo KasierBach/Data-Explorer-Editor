@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   FullTableMetadata,
   ColumnInfo,
@@ -19,15 +19,28 @@ export class MigrationComparisonService {
     return type === 'mongodb' || type === 'mongodb+srv';
   }
 
-  normalizeSchemaName(type: string, schema?: string): string {
+  normalizeSchemaName(
+    type: string,
+    schema?: string,
+    database?: string | null,
+  ): string {
     if (this.isMongoLike(type)) return '';
     return (
       schema?.trim() ||
-      (type === 'postgres' || type === 'cockroach' ? 'public' : '')
+      (type === 'mysql' || type === 'mariadb' || type === 'clickhouse'
+        ? database?.trim() || ''
+        : type === 'postgres' || type === 'cockroach'
+          ? 'public'
+          : '')
     );
   }
 
   normalizeTableName(table: string): string {
+    if (typeof table !== 'string' || !table.trim()) {
+      throw new BadRequestException(
+        'Migration table or collection name must not be empty.',
+      );
+    }
     return table.trim();
   }
 
@@ -35,8 +48,32 @@ export class MigrationComparisonService {
     dto: StartMigrationDto,
     sourceType?: string,
     targetType?: string,
+    sourceEndpoint?: Pick<
+      MigrationConnection,
+      'type' | 'host' | 'port' | 'database'
+    >,
+    targetEndpoint?: Pick<
+      MigrationConnection,
+      'type' | 'host' | 'port' | 'database'
+    >,
   ): boolean {
-    if (dto.sourceConnectionId !== dto.targetConnectionId) return false;
+    if (dto.sourceConnectionId !== dto.targetConnectionId) {
+      if (
+        !sourceEndpoint ||
+        !targetEndpoint ||
+        sourceEndpoint.type !== targetEndpoint.type ||
+        sourceEndpoint.host !== targetEndpoint.host ||
+        sourceEndpoint.port !== targetEndpoint.port ||
+        sourceEndpoint.database !== targetEndpoint.database
+      )
+        return false;
+    }
+    if (
+      sourceEndpoint &&
+      targetEndpoint &&
+      sourceEndpoint.database !== targetEndpoint.database
+    )
+      return false;
 
     const normalizedSourceSchema = sourceType
       ? this.normalizeSchemaName(sourceType, dto.sourceSchema)

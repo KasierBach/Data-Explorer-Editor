@@ -68,27 +68,19 @@ describe('ConnectionsService security', () => {
     prismaMock.connection.findFirst.mockResolvedValue(connection);
 
     await expect(
-      (service as any).getMigrationConnection(
-        'conn-migration',
-        'member',
-        {
-          permission: Permission.READ,
-          database: 'allowed',
-          write: false,
-        },
-      ),
+      (service as any).getMigrationConnection('conn-migration', 'member', {
+        permission: Permission.READ,
+        database: 'allowed',
+        write: false,
+      }),
     ).resolves.toEqual(expect.objectContaining({ id: 'conn-migration' }));
 
     await expect(
-      (service as any).getMigrationConnection(
-        'conn-migration',
-        'member',
-        {
-          permission: Permission.WRITE,
-          database: 'allowed',
-          write: true,
-        },
-      ),
+      (service as any).getMigrationConnection('conn-migration', 'member', {
+        permission: Permission.WRITE,
+        database: 'allowed',
+        write: true,
+      }),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(permissionsMock.ensurePermission).toHaveBeenLastCalledWith(
       'member',
@@ -133,6 +125,128 @@ describe('ConnectionsService security', () => {
         write: true,
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it.each(['mysql', 'mariadb', 'clickhouse'])(
+    'returns the authorized schema database for %s without changing the saved connection',
+    async (type) => {
+      const connection = {
+        id: 'conn-migration',
+        userId: 'owner',
+        organizationId: 'org',
+        type,
+        database: 'legacy',
+        password: null,
+        allowImportExport: true,
+        readOnly: false,
+        allowedDatabases: ['allowed'],
+        roleQueryModes: { MEMBER: 'full' },
+      };
+      prismaMock.connection.findFirst.mockResolvedValue(connection);
+
+      const result = await service.getMigrationConnection(
+        'conn-migration',
+        'member',
+        {
+          permission: Permission.WRITE,
+          schema: ' allowed ',
+          write: true,
+        },
+      );
+
+      expect(result.database).toBe('allowed');
+      expect(connection.database).toBe('legacy');
+    },
+  );
+
+  it('rejects a forbidden ClickHouse schema database instead of authorizing its saved default', async () => {
+    prismaMock.connection.findFirst.mockResolvedValue({
+      id: 'conn-migration',
+      userId: 'owner',
+      organizationId: 'org',
+      type: 'clickhouse',
+      database: 'allowed',
+      password: null,
+      allowedDatabases: ['allowed'],
+      roleQueryModes: { MEMBER: 'full' },
+    });
+    await expect(
+      service.getMigrationConnection('conn-migration', 'member', {
+        permission: Permission.WRITE,
+        schema: ' private ',
+        write: true,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it.each(['postgres', 'cockroach'])(
+    'rejects %s migration with no explicit database instead of using username/environment defaults',
+    async (type) => {
+      for (const database of [undefined, null, '', '   ']) {
+        prismaMock.connection.findFirst.mockResolvedValue({
+          id: 'conn-migration',
+          userId: 'owner',
+          organizationId: 'org',
+          type,
+          database,
+          username: 'allowed',
+          password: null,
+          allowedDatabases: ['allowed'],
+        });
+        permissionsMock.getMemberRole.mockClear();
+        await expect(
+          service.getMigrationConnection('conn-migration', 'member', {
+            permission: Permission.READ,
+            schema: 'public',
+            write: false,
+          }),
+        ).rejects.toThrow(BadRequestException);
+        expect(permissionsMock.getMemberRole).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it.each(['postgres', 'cockroach'])(
+    'accepts an explicit %s database override even if no saved database exists',
+    async (type) => {
+      prismaMock.connection.findFirst.mockResolvedValue({
+        id: 'conn-migration',
+        userId: 'owner',
+        organizationId: 'org',
+        type,
+        username: 'different_default',
+        password: null,
+        allowedDatabases: ['allowed'],
+      });
+      await expect(
+        service.getMigrationConnection('conn-migration', 'member', {
+          permission: Permission.READ,
+          database: ' allowed ',
+          schema: 'public',
+          write: false,
+        }),
+      ).resolves.toEqual(expect.objectContaining({ database: 'allowed' }));
+    },
+  );
+
+  it('returns the trimmed database override used by migration authorization', async () => {
+    prismaMock.connection.findFirst.mockResolvedValue({
+      id: 'conn-migration',
+      userId: 'owner',
+      organizationId: 'org',
+      type: 'postgres',
+      database: 'legacy',
+      password: null,
+      allowedDatabases: ['allowed'],
+    });
+
+    const result = await service.getMigrationConnection(
+      'conn-migration',
+      'member',
+      { permission: Permission.READ, database: ' allowed ', write: false },
+    );
+
+    expect(result.database).toBe('allowed');
   });
 
   it('rejects a forbidden database even when its pool is warm', async () => {

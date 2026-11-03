@@ -25,6 +25,15 @@ export interface MigrationConnection {
   database?: string | null;
 }
 
+export type MigrationEndpointSnapshot = Readonly<
+  Pick<MigrationConnection, 'id' | 'type' | 'host' | 'port' | 'database'>
+>;
+
+export interface MigrationEndpointSnapshots {
+  source: MigrationEndpointSnapshot;
+  target: MigrationEndpointSnapshot;
+}
+
 export type MigrationStage =
   | 'queued'
   | 'validating'
@@ -66,6 +75,7 @@ export interface MigrationStream extends AsyncIterable<
 }
 
 export interface ResolvedMigrationContext {
+  dto: Readonly<import('./dto/start-migration.dto').StartMigrationDto>;
   sourceConn: MigrationConnection;
   targetConn: MigrationConnection;
   sourceStrategy: import('../database-strategies').IDatabaseStrategy;

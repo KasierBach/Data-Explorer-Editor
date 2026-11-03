@@ -53,11 +53,21 @@ if (mode === 'interrupt') {
   };
 }
 const service = new MigrationService(
-  { getDecryptedConnection: async (id) => ({ ...config, id, name: id }) },
+  {
+    getMigrationConnection: async (id, _userId, options) => ({
+      ...config,
+      id,
+      name: id,
+      database: options.database || config.database,
+    }),
+  },
   { getStrategy: () => (factoryCalls++ % 2 === 0 ? source : target) },
   new MigrationComparisonService(),
   queue,
-  { invalidateConnection: async () => {}, invalidatePartialWrite: async () => {} },
+  {
+    invalidateConnection: async () => {},
+    invalidatePartialWrite: async () => {},
+  },
 );
 let factoryCalls = 0;
 const processor = new MigrationProcessor(service);

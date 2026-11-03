@@ -533,10 +533,25 @@ export class ConnectionsService implements OnModuleDestroy {
   ) {
     const connection = await this.findRawOne(id, userId, options.permission);
     const schemaDatabase =
-      connection.type === 'mysql' || connection.type === 'mariadb'
+      connection.type === 'mysql' ||
+      connection.type === 'mariadb' ||
+      connection.type === 'clickhouse'
         ? options.schema?.trim()
         : undefined;
-    const database = schemaDatabase || options.database || connection.database;
+    const database =
+      schemaDatabase ||
+      options.database?.trim() ||
+      connection.database?.trim() ||
+      undefined;
+
+    if (
+      (connection.type === 'postgres' || connection.type === 'cockroach') &&
+      !database
+    ) {
+      throw new BadRequestException(
+        'An explicit database is required for PostgreSQL/CockroachDB migrations; connection defaults are not inferred.',
+      );
+    }
 
     if (connection.organizationId && connection.userId !== userId) {
       const role = await this.permissionsService.getMemberRole(
@@ -563,6 +578,7 @@ export class ConnectionsService implements OnModuleDestroy {
 
     return {
       ...connection,
+      database,
       password: connection.password
         ? decryptAttribute(connection.password)
         : undefined,
