@@ -1,7 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import ReactDOM from 'react-dom';
-import { Loader2, Move, RotateCcw, X, ZoomIn } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Loader2, Move, RotateCcw, ZoomIn } from 'lucide-react';
 import { Button } from '@/presentation/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogTitle,
+} from '@/presentation/components/ui/dialog';
 
 const PREVIEW_SIZE = 240;
 const OUTPUT_SIZE = 512;
@@ -79,6 +84,7 @@ interface AvatarEditorProps {
     source: string;
     isSaving: boolean;
     t: (key: string) => string;
+    returnFocusRef?: React.RefObject<HTMLElement | null>;
     onClose: () => void;
     onApply: (base64: string) => Promise<boolean>;
 }
@@ -87,10 +93,10 @@ export const AvatarEditor: React.FC<AvatarEditorProps> = ({
     source,
     isSaving,
     t,
+    returnFocusRef,
     onClose,
     onApply,
 }) => {
-    const dialogRef = useRef<HTMLDialogElement | null>(null);
     const [dimensions, setDimensions] = useState({ width: 1, height: 1 });
     const [zoom, setZoom] = useState(1);
     const [offsetX, setOffsetX] = useState(0);
@@ -105,14 +111,6 @@ export const AvatarEditor: React.FC<AvatarEditorProps> = ({
         offsetX,
         offsetY,
     }), [dimensions, offsetX, offsetY, zoom]);
-
-    useEffect(() => {
-        const dialog = dialogRef.current;
-        if (dialog && !dialog.open) dialog.showModal();
-        return () => {
-            if (dialog?.open) dialog.close();
-        };
-    }, []);
 
     const reset = () => {
         setZoom(1);
@@ -136,32 +134,27 @@ export const AvatarEditor: React.FC<AvatarEditorProps> = ({
 
     if (typeof document === 'undefined' || !document.body) return null;
 
-    return ReactDOM.createPortal(
-        <dialog
-            ref={dialogRef}
-            aria-labelledby='avatar-editor-title'
-            onCancel={(event) => {
-                event.preventDefault();
-                if (!busy) onClose();
-            }}
-            className='fixed inset-0 m-auto w-[calc(100vw-1.5rem)] max-w-md overflow-hidden rounded-2xl border border-white/10 bg-background p-0 text-foreground shadow-2xl backdrop:bg-black/75 backdrop:backdrop-blur-sm'
-        >
-            <div className='flex items-start justify-between border-b border-border/60 px-5 py-4'>
-                <div>
-                    <h3 id='avatar-editor-title' className='text-base font-semibold tracking-tight'>
-                        {t('edit_avatar_title')}
-                    </h3>
-                    <p className='mt-1 text-xs text-muted-foreground'>{t('edit_avatar_description')}</p>
-                </div>
-                <button
-                    type='button'
-                    onClick={onClose}
-                    disabled={busy}
-                    className='rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 disabled:opacity-40'
-                    aria-label={t('cancel')}
-                >
-                    <X className='h-4 w-4' />
-                </button>
+    return (
+        <Dialog open onOpenChange={(open) => { if (!open && !busy) onClose(); }}>
+            <DialogContent
+                closeLabel={t('labels.close')}
+                closeButtonDisabled={busy}
+                overlayClassName='z-[260] bg-black/75 backdrop-blur-sm'
+                onPointerDownOutside={(event) => event.preventDefault()}
+                onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}
+                onCloseAutoFocus={(event) => {
+                    if (returnFocusRef?.current) {
+                        event.preventDefault();
+                        returnFocusRef.current.focus();
+                    }
+                }}
+                className='z-[270] w-[calc(100vw-1.5rem)] max-w-md max-h-[calc(100dvh-1.5rem)] gap-0 overflow-y-auto rounded-2xl border-white/10 p-0 text-foreground shadow-2xl'
+            >
+            <div className='border-b border-border/60 px-5 py-4 pr-12'>
+                <DialogTitle className='text-base font-semibold tracking-tight'>
+                    {t('edit_avatar_title')}
+                </DialogTitle>
+                <DialogDescription className='mt-1 text-xs'>{t('edit_avatar_description')}</DialogDescription>
             </div>
 
             <div className='space-y-5 px-5 py-5'>
@@ -244,7 +237,7 @@ export const AvatarEditor: React.FC<AvatarEditorProps> = ({
                     </Button>
                 </div>
             </div>
-        </dialog>,
-        document.body,
+            </DialogContent>
+        </Dialog>
     );
 };

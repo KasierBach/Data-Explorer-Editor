@@ -67,6 +67,8 @@ describe('ProfileDialog', () => {
 
     expect(screen.getByRole('heading', { name: 'C\u00e0i \u0111\u1eb7t t\u00e0i kho\u1ea3n' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'C\u00e0i \u0111\u1eb7t n\u00e2ng cao' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '\u0110\u00f3ng' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
   });
 
   it('resets the content scroll position when switching tabs', () => {

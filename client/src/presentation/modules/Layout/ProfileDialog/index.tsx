@@ -77,7 +77,7 @@ export const ProfileDialog: React.FC<ProfileDialogProps> = ({ isOpen, onClose, i
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-            <DialogContent onCloseAutoFocus={(event) => { if (returnFocusRef?.current) { event.preventDefault(); returnFocusRef.current.focus(); } }} className="z-[200] flex max-w-4xl flex-col gap-0 overflow-hidden rounded-xl p-0 sm:flex-row" style={{ height: 'min(600px, calc(100dvh - 1rem))', maxHeight: 'calc(100dvh - 1rem)' }}>
+            <DialogContent closeLabel={t('labels.close')} onCloseAutoFocus={(event) => { if (returnFocusRef?.current) { event.preventDefault(); returnFocusRef.current.focus(); } }} className="z-[200] flex max-w-4xl flex-col gap-0 overflow-hidden rounded-xl p-0 sm:flex-row" style={{ height: 'min(600px, calc(100dvh - 1rem))', maxHeight: 'calc(100dvh - 1rem)' }}>
                 {/* Sidebar */}
                 <div className="w-full bg-muted/20 border-b flex max-h-52 shrink-0 flex-col sm:h-full sm:w-64 sm:max-h-none sm:border-b-0 sm:border-r">
                     <div className="p-4 pb-3 sm:p-6 sm:pb-4">

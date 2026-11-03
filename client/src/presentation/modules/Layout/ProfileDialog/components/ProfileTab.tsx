@@ -32,6 +32,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
     user, t, profileState, isLoading, actions 
 }) => {
     const avatarInputRef = useRef<HTMLInputElement | null>(null);
+    const avatarOpenerRef = useRef<HTMLElement | null>(null);
     const [avatarSource, setAvatarSource] = useState<string | null>(null);
     const [avatarError, setAvatarError] = useState('');
     const { 
@@ -107,7 +108,10 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                                     type="button"
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => avatarInputRef.current?.click()}
+                                    onClick={(event) => {
+                                        avatarOpenerRef.current = event.currentTarget;
+                                        avatarInputRef.current?.click();
+                                    }}
                                     disabled={isLoading}
                                 >
                                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : t('change_avatar')}
@@ -117,7 +121,10 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => setAvatarSource(user.avatarUrl!)}
+                                        onClick={(event) => {
+                                            avatarOpenerRef.current = event.currentTarget;
+                                            setAvatarSource(user.avatarUrl!);
+                                        }}
                                         disabled={isLoading}
                                     >
                                         <Pencil className="mr-1.5 h-3.5 w-3.5" />
@@ -185,6 +192,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
                     source={avatarSource}
                     isSaving={isLoading}
                     t={t}
+                    returnFocusRef={avatarOpenerRef}
                     onClose={() => setAvatarSource(null)}
                     onApply={actions.handleUploadAvatar}
                 />
