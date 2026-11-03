@@ -542,7 +542,7 @@ export class ConnectionsService implements OnModuleDestroy {
       schemaDatabase ||
       options.database?.trim() ||
       connection.database?.trim() ||
-      undefined;
+      (connection.type === 'clickhouse' ? 'default' : undefined);
 
     if (
       (connection.type === 'postgres' || connection.type === 'cockroach') &&

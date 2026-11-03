@@ -179,6 +179,42 @@ describe('ConnectionsService security', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it('authorizes ClickHouse implicit default before applying a database whitelist', async () => {
+    const connection = {
+      id: 'conn-migration',
+      userId: 'owner',
+      organizationId: 'org',
+      type: 'clickhouse',
+      database: null,
+      password: null,
+      allowImportExport: true,
+      readOnly: false,
+      allowedDatabases: ['allowed'],
+      roleQueryModes: { MEMBER: 'full' },
+    };
+    prismaMock.connection.findFirst.mockResolvedValue(connection);
+    await expect(
+      service.getMigrationConnection('conn-migration', 'member', {
+        permission: Permission.READ,
+        schema: ' ',
+        write: false,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    prismaMock.connection.findFirst.mockResolvedValue({
+      ...connection,
+      allowedDatabases: ['default'],
+    });
+    await expect(
+      service.getMigrationConnection('conn-migration', 'member', {
+        permission: Permission.READ,
+        schema: '',
+        write: false,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ database: 'default' }));
+    expect(connection.database).toBeNull();
+  });
+
   it.each(['postgres', 'cockroach'])(
     'rejects %s migration with no explicit database instead of using username/environment defaults',
     async (type) => {
