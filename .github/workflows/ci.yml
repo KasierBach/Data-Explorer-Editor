@@ -122,6 +122,8 @@ jobs:
         working-directory: client
       - run: npm run build
         working-directory: server
+      - run: npm run typecheck:browser
+        working-directory: client
       - name: Start owned PostgreSQL and Redis fixtures
         run: docker compose -f server/test/compose.e2e.yml up -d --wait
       - run: npx prisma migrate deploy

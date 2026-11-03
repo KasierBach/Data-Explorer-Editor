@@ -31,6 +31,7 @@
   "dependencies": {
     "@clickhouse/client": "^1.18.3",
     "@google/genai": "^2.13.0",
+    "@keyv/redis": "5.1.6",
     "@nest-lab/throttler-storage-redis": "^1.2.0",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/cache-manager": "^3.1.0",
@@ -51,7 +52,6 @@
     "better-sqlite3": "^12.9.0",
     "bullmq": "^5.74.1",
     "cache-manager": "^7.2.8",
-    "@keyv/redis": "5.1.6",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "helmet": "^8.1.0",
@@ -88,6 +88,7 @@
     "@types/passport-github2": "^1.2.9",
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/passport-jwt": "^4.0.1",
+    "@types/pg": "8.23.1",
     "@types/ssh2": "^1.15.5",
     "@types/supertest": "^6.0.2",
     "eslint": "^9.18.0",
@@ -107,8 +108,12 @@
     "typescript-eslint": "^8.20.0"
   },
   "overrides": {
-    "@azure/identity": { "@azure/msal-node": "7.1.1" },
-    "@nestjs/platform-express": { "multer": "2.5.0" },
+    "@azure/identity": {
+      "@azure/msal-node": "7.1.1"
+    },
+    "@nestjs/platform-express": {
+      "multer": "2.5.0"
+    },
     "flatted": "3.4.3",
     "form-data": "4.0.6",
     "handlebars": "4.7.10",
@@ -129,9 +134,20 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "coverageReporters": ["text", "json-summary", "json", "lcov", "html"],
+    "coverageReporters": [
+      "text",
+      "json-summary",
+      "json",
+      "lcov",
+      "html"
+    ],
     "coverageThreshold": {
-      "global": { "lines": 55.32, "branches": 46.88, "functions": 49.68, "statements": 54.52 }
+      "global": {
+        "lines": 55.32,
+        "branches": 46.88,
+        "functions": 49.68,
+        "statements": 54.52
+      }
     },
     "testEnvironment": "node"
   }

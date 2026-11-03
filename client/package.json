@@ -13,6 +13,7 @@
     "test:cov": "vitest run --coverage",
     "test:prerender": "node --test scripts/prerender-public.test.mjs",
     "test:e2e": "playwright test",
+    "typecheck:browser": "node scripts/typecheck-browser-tests.mjs",
     "test:full-stack": "playwright test --config playwright.full-stack.config.ts"
   },
   "dependencies": {
