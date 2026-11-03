@@ -8,7 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaClient, type Payment } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { Pool, type PoolClient } from 'pg';
+import { Pool, type PoolClient, type QueryResult } from 'pg';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -264,7 +264,10 @@ describe('R06 native PostgreSQL entitlement and signed local-provider webhooks',
     const payment = await seedPayment();
     const observationError = new Error('Synthetic lock-observation failure');
     const observer = jest
-      .spyOn(admin, 'query')
+      .spyOn(
+        admin as { query: (...args: unknown[]) => Promise<QueryResult> },
+        'query',
+      )
       .mockRejectedValueOnce(observationError);
     let webhookSettled = false;
     let webhookWork:
@@ -317,9 +320,14 @@ describe('R06 native PostgreSQL entitlement and signed local-provider webhooks',
         .mockRejectedValueOnce(rollbackError),
       release,
     } as unknown as PoolClient;
-    const connect = jest.spyOn(admin, 'connect').mockResolvedValueOnce(held);
+    const connect = jest
+      .spyOn(admin as { connect: () => Promise<PoolClient> }, 'connect')
+      .mockResolvedValueOnce(held);
     const observer = jest
-      .spyOn(admin, 'query')
+      .spyOn(
+        admin as { query: (...args: unknown[]) => Promise<QueryResult> },
+        'query',
+      )
       .mockRejectedValueOnce(observationError);
     let webhookSettled = false;
     let webhookWork:
