@@ -3,3 +3,6 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+
+# Preserve the checksum of the historically applied R09 migration, including its final blank line.
+server/prisma/migrations/20261025000000_durable_comment_events/migration.sql whitespace=blank-at-eol,space-before-tab,-blank-at-eof
