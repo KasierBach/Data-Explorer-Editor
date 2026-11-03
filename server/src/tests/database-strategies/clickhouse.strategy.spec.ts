@@ -90,6 +90,36 @@ describe('ClickHouseStrategy', () => {
     );
   });
 
+  it.each([
+    ['SELECT * FROM events LIMIT 0, 10', 'SELECT * FROM events LIMIT 0, 5'],
+    [
+      'SELECT * FROM events UNION ALL SELECT * FROM audit',
+      'SELECT * FROM (SELECT * FROM events UNION ALL SELECT * FROM audit) AS _paged_result LIMIT 5 OFFSET 0',
+    ],
+  ])(
+    'sends a total cap with ClickHouse dialect propagation (%s)',
+    async (sql, expected) => {
+      mockPool.query.mockResolvedValue({
+        json: jest.fn().mockResolvedValue([]),
+      });
+      await strategy.executeQuery(mockPool as never, sql, { limit: 5 });
+      expect(mockPool.query).toHaveBeenCalledWith({
+        query: expected,
+        format: 'JSONEachRow',
+      });
+    },
+  );
+
+  it('rejects per-key OFFSET LIMIT BY before sending a driver query', async () => {
+    await expect(
+      strategy.executeQuery(
+        mockPool as never,
+        'SELECT * FROM events LIMIT 1 OFFSET 0 BY id',
+      ),
+    ).rejects.toThrow('LIMIT BY');
+    expect(mockPool.query).not.toHaveBeenCalled();
+  });
+
   it('keeps the protective 50000-row cap for bare SELECT statements', async () => {
     mockPool.query.mockResolvedValue({
       json: jest.fn().mockResolvedValue([]),

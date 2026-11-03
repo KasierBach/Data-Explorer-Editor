@@ -85,9 +85,18 @@ export class ClickHouseStrategy implements IDatabaseStrategy {
               options.offset,
               'clickhouse',
             )
-          : SqlUtil.injectLimit(sql, options.limit);
+          : SqlUtil.injectLimit(sql, options.limit, 'clickhouse');
     } else {
-      safeSql = SqlUtil.injectLimit(sql, 50000);
+      safeSql = SqlUtil.injectLimit(sql, 50000, 'clickhouse');
+    }
+
+    if (options?.offset !== undefined && options.limit === undefined) {
+      safeSql = SqlUtil.injectPagination(
+        sql,
+        50000,
+        options.offset,
+        'clickhouse',
+      );
     }
 
     safeSql = safeSql.replace(/;$/, '');

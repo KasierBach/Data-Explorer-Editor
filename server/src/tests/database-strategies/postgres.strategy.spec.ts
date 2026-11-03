@@ -281,6 +281,76 @@ describe('PostgresStrategy', () => {
       );
     });
 
+    it.each([
+      [
+        'SELECT $q$LIMIT 1$q$ AS label, * FROM big_table',
+        undefined,
+        'SELECT $q$LIMIT 1$q$ AS label, * FROM big_table LIMIT 50000;',
+      ],
+      [
+        'SELECT * FROM big_table -- LIMIT 1',
+        { limit: 5, offset: 0 },
+        'SELECT * FROM big_table LIMIT 5 OFFSET 0; -- LIMIT 1',
+      ],
+      [
+        'SELECT * FROM big_table',
+        { offset: 2 },
+        'SELECT * FROM big_table LIMIT 50000 OFFSET 2;',
+      ],
+      [
+        'SELECT * FROM big_table LIMIT 10',
+        { limit: 5 },
+        'SELECT * FROM big_table LIMIT 5',
+      ],
+      [
+        'SELECT top FROM big_table LIMIT 10 /* , */ OFFSET 0',
+        { limit: 5 },
+        'SELECT top FROM big_table LIMIT 5 /* , */ OFFSET 0',
+      ],
+    ])(
+      'sends the actual bounded lexical rewrite to PostgreSQL (%s)',
+      async (sql, options, expected) => {
+        mockClient.query.mockResolvedValue({
+          rows: [],
+          fields: [],
+          rowCount: 0,
+        });
+        await strategy.executeQuery(
+          mockPool,
+          sql,
+          options as { limit?: number; offset?: number } | undefined,
+        );
+        expect(mockClient.query).toHaveBeenCalledWith(expected);
+      },
+    );
+
+    it('caps every SELECT in a transaction while leaving its write unchanged', async () => {
+      mockClient.query.mockResolvedValue({ rows: [], fields: [], rowCount: 0 });
+      await strategy.runStatementsInTransaction(
+        mockPool,
+        [
+          'SELECT * FROM big_table',
+          'UPDATE users SET active = true',
+          'SELECT * FROM big_table LIMIT 10',
+        ],
+        { limit: 5 },
+      );
+      expect(mockClient.query.mock.calls.map(([sql]) => sql)).toEqual([
+        'BEGIN',
+        'SELECT * FROM big_table LIMIT 50000;',
+        'UPDATE users SET active = true',
+        'SELECT * FROM big_table LIMIT 5',
+        'COMMIT',
+      ]);
+    });
+
+    it('rejects an unproved parameter row cap before connecting', async () => {
+      await expect(
+        strategy.executeQuery(mockPool, 'SELECT * FROM big_table LIMIT $1'),
+      ).rejects.toThrow('finite literal');
+      expect(mockPool.connect).not.toHaveBeenCalled();
+    });
+
     it('should not append LIMIT if query already has a LIMIT clause', async () => {
       mockClient.query.mockResolvedValue({ rows: [], fields: [], rowCount: 0 });
 

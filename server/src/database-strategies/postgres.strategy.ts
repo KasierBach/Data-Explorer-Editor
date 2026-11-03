@@ -53,9 +53,9 @@ export class PostgresStrategy implements IDatabaseStrategy {
     const pool = new Pool({
       host,
       port: connectionConfig.port ?? DEFAULT_POSTGRES_PORT,
-      user: connectionConfig.username,
+      user: connectionConfig.username ?? undefined,
       password: connectionConfig.password || undefined,
-      database: databaseOverride || connectionConfig.database,
+      database: databaseOverride || connectionConfig.database || undefined,
       ssl: isLocalhost
         ? false
         : {
@@ -114,13 +114,18 @@ export class PostgresStrategy implements IDatabaseStrategy {
       client.release(error);
     };
     const execution = createQueryExecution(async (isActive) => {
+      // node-postgres exposes the backend PID at runtime, but not on its public PoolClient type.
+      const processId = (client as typeof client & { processID?: number })
+        .processID;
+      if (!Number.isSafeInteger(processId) || (processId ?? 0) <= 0)
+        return false;
       const control = new Client(pool.options);
       try {
         await control.connect();
         if (!isActive()) return false;
         const result = await control.query<{ cancelled: boolean }>(
           'SELECT pg_cancel_backend($1) AS cancelled',
-          [client.processID],
+          [processId],
         );
         return result.rows[0]?.cancelled === true;
       } catch {
@@ -178,10 +183,18 @@ export class PostgresStrategy implements IDatabaseStrategy {
           'postgres',
         );
       } else {
-        safeSql = SqlUtil.injectLimit(sql, options.limit);
+        safeSql = SqlUtil.injectLimit(sql, options.limit, 'postgres');
       }
     } else {
-      safeSql = SqlUtil.injectLimit(sql, 50000);
+      safeSql = SqlUtil.injectLimit(sql, 50000, 'postgres');
+    }
+    if (options?.offset !== undefined && options.limit === undefined) {
+      safeSql = SqlUtil.injectPagination(
+        sql,
+        50000,
+        options.offset,
+        'postgres',
+      );
     }
 
     const { client, execution, release, cancelTimedOutQuery } =
@@ -233,18 +246,19 @@ export class PostgresStrategy implements IDatabaseStrategy {
       for (const statement of statements) {
         execution.assertRunning();
         const isLast = statement === statements[statements.length - 1];
-        let safeSql = statement;
-        if (isLast && options?.limit !== undefined) {
-          safeSql =
-            options.offset !== undefined
-              ? SqlUtil.injectPagination(
-                  statement,
-                  options.limit,
-                  options.offset,
-                  'postgres',
-                )
-              : SqlUtil.injectLimit(statement, options.limit);
-        }
+        const safeSql =
+          isLast && options?.offset !== undefined
+            ? SqlUtil.injectPagination(
+                statement,
+                options.limit ?? 50000,
+                options.offset,
+                'postgres',
+              )
+            : SqlUtil.injectLimit(
+                statement,
+                isLast ? (options?.limit ?? 50000) : 50000,
+                'postgres',
+              );
         const raw = await client.query(safeSql);
         if (isLast) {
           const queryResult = Array.isArray(raw) ? raw[raw.length - 1] : raw;
@@ -324,6 +338,9 @@ export class PostgresStrategy implements IDatabaseStrategy {
     const values = columns.map((c) => data[c]);
 
     const res = await pool.query(sql, values);
+    if (res.rowCount === null) {
+      throw new Error('Postgres insert did not report its affected-row count.');
+    }
     return { success: true, rowCount: res.rowCount };
   }
 

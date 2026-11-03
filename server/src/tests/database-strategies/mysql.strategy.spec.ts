@@ -239,6 +239,59 @@ describe('MysqlStrategy', () => {
       );
     });
 
+    it.each([
+      [
+        'SELECT * FROM big_table LIMIT 0, 10',
+        { limit: 5 },
+        'SELECT * FROM big_table LIMIT 0, 5',
+      ],
+      [
+        'SELECT * FROM big_table # LIMIT 1',
+        { limit: 5 },
+        'SELECT * FROM big_table LIMIT 5; # LIMIT 1',
+      ],
+      [
+        'SELECT * FROM big_table# LIMIT 1',
+        { limit: 5 },
+        'SELECT * FROM big_table LIMIT 5; # LIMIT 1',
+      ],
+      [
+        'SELECT * FROM big_table LIMIT 10 /* , */ OFFSET 0',
+        { limit: 5 },
+        'SELECT * FROM big_table LIMIT 5 /* , */ OFFSET 0',
+      ],
+    ])(
+      'propagates MySQL grammar to the actual driver rewrite (%s)',
+      async (sql, options, expected) => {
+        mockPool.query.mockResolvedValue([[], []]);
+        await strategy.executeQuery(
+          mockPool,
+          sql,
+          options as { limit: number },
+        );
+        expect(mockPool.query).toHaveBeenCalledWith(
+          expect.objectContaining({ sql: expected }),
+        );
+      },
+    );
+
+    it('caps each batch SELECT and only applies the requested window to the final read', async () => {
+      mockPool.query.mockResolvedValue([[], []]);
+      await strategy.runStatementsInTransaction(
+        mockPool,
+        ['SELECT * FROM big_table', 'SELECT * FROM big_table LIMIT 0, 10'],
+        { limit: 5 },
+      );
+      expect(
+        mockPool.query.mock.calls
+          .filter(([call]) => typeof call === 'object')
+          .map(([call]) => call.sql),
+      ).toEqual([
+        'SELECT * FROM big_table LIMIT 50000;',
+        'SELECT * FROM big_table LIMIT 0, 5',
+      ]);
+    });
+
     it('should not append LIMIT if query already has a LIMIT clause', async () => {
       mockPool.query.mockResolvedValue([[], []]);
 

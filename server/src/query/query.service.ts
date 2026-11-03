@@ -30,6 +30,7 @@ import {
 } from './query-guard.util';
 import { getErrorMessage } from '../common/utils/error.util';
 import { SqlUtil } from '../utils/sql.util';
+import { SqlResultCapError, type SqlDialect } from '../utils/sql-limit.util';
 import type { QueryResult } from '../database-strategies';
 import { PermissionsService } from '../permissions/services/permissions.service';
 import { Permission } from '../permissions/enums/permission.enum';
@@ -122,63 +123,54 @@ export class QueryService {
     return !['mongodb', 'mongodb+srv', 'mock'].includes(type);
   }
 
-  private isSelectLikeQuery(sql: string): boolean {
-    return /^\s*(SELECT|WITH)\b/i.test(sql.trim());
+  private sqlDialect(type: Connection['type']): SqlDialect | undefined {
+    const normalized =
+      type === 'cockroach' ? 'postgres' : type === 'mariadb' ? 'mysql' : type;
+    return ['postgres', 'mysql', 'mssql', 'sqlite', 'clickhouse'].includes(
+      normalized,
+    )
+      ? (normalized as SqlDialect)
+      : undefined;
+  }
+
+  private isSelectLikeQuery(sql: string, type?: Connection['type']): boolean {
+    const dialect = type ? this.sqlDialect(type) : 'postgres';
+    return dialect ? SqlUtil.isSelect(sql, dialect) : false;
   }
 
   private hasExplicitSqlLimit(sql: string, type: Connection['type']): boolean {
-    if (!this.isSqlBrowseCapableConnection(type)) return false;
-    const dialect = type === 'mariadb' ? 'mysql' : type;
-    if (
-      !['postgres', 'cockroach', 'mysql', 'mssql', 'sqlite', 'clickhouse'].includes(
-        dialect,
-      )
-    ) {
-      return false;
-    }
-    return Boolean(
-      SqlUtil.analyzeOuterLimit(
-        sql,
-        (dialect === 'cockroach' ? 'postgres' : dialect) as
-          | 'postgres'
-          | 'mysql'
-          | 'mssql'
-          | 'sqlite'
-          | 'clickhouse',
-      )?.valid,
-    );
+    const dialect = this.sqlDialect(type);
+    if (!dialect) return false;
+    const outer = SqlUtil.analyzeOuterLimit(sql, dialect);
+    return Boolean(outer?.valid && outer.global);
   }
 
   private assertRawQueryLimit(
     sql: string,
     type: Connection['type'],
+    options: { limit?: number; offset?: number } = {},
   ): void {
-    if (!this.isSelectLikeQuery(sql) || !this.isSqlBrowseCapableConnection(type))
-      return;
-
-    const dialect =
-      type === 'cockroach'
-        ? 'postgres'
-        : type === 'mariadb'
-          ? 'mysql'
-          : type;
-    const outer = SqlUtil.analyzeOuterLimit(
-      sql,
-      dialect as 'postgres' | 'mysql' | 'mssql' | 'sqlite' | 'clickhouse',
-    );
-    if (!outer) return;
-
-    if (!outer.valid || !outer.value || outer.value > this.DEFAULT_QUERY_LIMIT) {
-      throw new BadRequestException(
-        `Raw query results are capped at ${this.DEFAULT_QUERY_LIMIT.toLocaleString()} rows. Use result pagination or export for larger datasets.`,
-      );
+    const dialect = this.sqlDialect(type);
+    if (!dialect) return;
+    // Prove/rehearse the actual driver rewrite before acquiring a pool. A smaller
+    // requested page cannot authorize an unproved expression or >50,000 SQL cap.
+    SqlUtil.assertResultCap(sql, dialect);
+    const requested = options.limit ?? this.DEFAULT_QUERY_LIMIT;
+    if (options.offset !== undefined) {
+      SqlUtil.injectPagination(sql, requested, options.offset, dialect);
+    } else if (dialect === 'mssql') {
+      SqlUtil.injectTop(sql, requested);
+    } else {
+      SqlUtil.injectLimit(sql, requested, dialect);
     }
   }
 
-  private buildQueryCountSql(sql: string): string | undefined {
-    if (!this.isSelectLikeQuery(sql)) return undefined;
-    const normalized = sql.trim().replace(/;$/, '');
-    return `SELECT COUNT(*) AS total FROM (${normalized}) AS _query_count`;
+  private buildQueryCountSql(
+    sql: string,
+    type?: Connection['type'],
+  ): string | undefined {
+    const dialect = type ? this.sqlDialect(type) : 'postgres';
+    return dialect ? SqlUtil.buildCountQuery(sql, dialect) : undefined;
   }
 
   private async resolveQueryCount(
@@ -224,7 +216,7 @@ export class QueryService {
       nextResult.appliedOffset = options.offset;
     }
 
-    if (!this.isSelectLikeQuery(sql)) {
+    if (!this.isSelectLikeQuery(sql, type)) {
       nextResult.countStatus ??= 'skipped';
       return nextResult;
     }
@@ -602,13 +594,6 @@ export class QueryService {
 
     const startedAt = Date.now();
     try {
-      const pool = await this.connectionsService.getPool(
-        connectionId,
-        database || connection.database,
-        userId,
-      );
-      const strategy = this.strategyFactory.getStrategy(connection.type);
-
       const statements =
         connection.type === 'mongodb' ||
         connection.type === 'mongodb+srv' ||
@@ -625,8 +610,17 @@ export class QueryService {
       const finalSql = executableStatements[statementCount - 1];
       const isMultiStatement = executableStatements.length > 1;
       for (const statement of executableStatements) {
-        this.assertRawQueryLimit(statement, connection.type);
+        this.assertRawQueryLimit(statement, connection.type, {
+          limit: statement === finalSql ? limit : undefined,
+          offset: statement === finalSql ? offset : undefined,
+        });
       }
+      const pool = await this.connectionsService.getPool(
+        connectionId,
+        database || connection.database,
+        userId,
+      );
+      const strategy = this.strategyFactory.getStrategy(connection.type);
 
       // Register the in-flight query so the user can cancel it.
       const queryId = randomUUID();
@@ -715,7 +709,7 @@ export class QueryService {
             connection.type,
           );
           if (!isMultiStatement && includeTotalCount === true) {
-            const countSql = this.buildQueryCountSql(finalSql);
+            const countSql = this.buildQueryCountSql(finalSql, connection.type);
             if (countSql) {
               try {
                 const countCacheKey = await this.getQueryCacheKey(
@@ -787,6 +781,9 @@ export class QueryService {
         database || connection.database,
       );
       if (error instanceof HttpException) throw error;
+      if (error instanceof SqlResultCapError || error instanceof RangeError) {
+        throw new BadRequestException(getErrorMessage(error));
+      }
 
       const code =
         error && typeof error === 'object' && 'code' in error

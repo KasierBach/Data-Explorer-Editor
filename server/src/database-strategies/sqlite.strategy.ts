@@ -78,9 +78,13 @@ export class SqliteStrategy implements IDatabaseStrategy {
               options.offset,
               'sqlite',
             )
-          : SqlUtil.injectLimit(sql, options.limit);
+          : SqlUtil.injectLimit(sql, options.limit, 'sqlite');
     } else {
-      safeSql = SqlUtil.injectLimit(sql, 50000);
+      safeSql = SqlUtil.injectLimit(sql, 50000, 'sqlite');
+    }
+
+    if (options?.offset !== undefined && options.limit === undefined) {
+      safeSql = SqlUtil.injectPagination(sql, 50000, options.offset, 'sqlite');
     }
 
     const rows = losslessSqliteRows(
@@ -108,18 +112,19 @@ export class SqliteStrategy implements IDatabaseStrategy {
     const runAll = pool.transaction(() => {
       for (const statement of statements) {
         const isLast = statement === statements[statements.length - 1];
-        let safeSql = statement;
-        if (isLast && options?.limit !== undefined) {
-          safeSql =
-            options.offset !== undefined
-              ? SqlUtil.injectPagination(
-                  statement,
-                  options.limit,
-                  options.offset,
-                  'sqlite',
-                )
-              : SqlUtil.injectLimit(statement, options.limit);
-        }
+        const safeSql =
+          isLast && options?.offset !== undefined
+            ? SqlUtil.injectPagination(
+                statement,
+                options.limit ?? 50000,
+                options.offset,
+                'sqlite',
+              )
+            : SqlUtil.injectLimit(
+                statement,
+                isLast ? (options?.limit ?? 50000) : 50000,
+                'sqlite',
+              );
         const stmt = pool.prepare(safeSql);
         if (stmt.reader) {
           // SELECT-like statements return rows via .all().

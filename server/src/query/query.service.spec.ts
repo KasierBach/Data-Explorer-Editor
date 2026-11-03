@@ -821,6 +821,126 @@ describe('QueryService', () => {
     expect(strategy.executeQuery).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['postgres', 'SELECT * FROM users LIMIT $1'],
+    ['postgres', '/* header */ SELECT * FROM users LIMIT 50001'],
+    ['sqlite', 'SELECT * FROM users LIMIT 1+100000'],
+    ['mssql', 'SELECT TOP (1+100000) * FROM users'],
+    ['mssql', 'SELECT TOP (1) /* note */ PERCENT * FROM users'],
+    ['mssql', 'SELECT TOP (1) WITH TIES * FROM users ORDER BY id'],
+    [
+      'postgres',
+      'SELECT * FROM users ORDER BY id FETCH FIRST 1 ROWS WITH TIES',
+    ],
+    ['clickhouse', 'SELECT * FROM users LIMIT 1 OFFSET 0 BY id'],
+  ])(
+    'rejects unproved/hard-ceiling row bounds before acquiring a pool (%s)',
+    async (type, sql) => {
+      connectionsService.findOne.mockResolvedValue({
+        id: 'conn-1',
+        type,
+        database: 'main',
+        readOnly: false,
+        allowQueryExecution: true,
+        allowSchemaChanges: true,
+      });
+      await expect(
+        service.executeQuery(
+          {
+            connectionId: 'conn-1',
+            sql,
+            limit: 5,
+            offset: 0,
+            includeTotalCount: false,
+          } as any,
+          'user-1',
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(connectionsService.getPool).not.toHaveBeenCalled();
+      expect(strategy.executeQuery).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['postgres', 'SELECT $q$LIMIT 1$q$ AS label, * FROM users'],
+    ['postgres', 'SELECT top FROM users LIMIT 10 /* , */ OFFSET 0'],
+    ['mysql', 'SELECT * FROM users LIMIT 0, 10'],
+    ['mariadb', 'SELECT * FROM users LIMIT 0, 10'],
+    ['sqlite', 'WITH [update] AS (SELECT * FROM users) SELECT * FROM [update]'],
+    [
+      'mssql',
+      'WITH one AS (SELECT id FROM users) SELECT TOP 10 * FROM one ORDER BY id',
+    ],
+  ])(
+    'accepts a requested window over proved or lexical-only cap text (%s)',
+    async (type, sql) => {
+      connectionsService.findOne.mockResolvedValue({
+        id: 'conn-1',
+        type,
+        database: 'main',
+        readOnly: false,
+        allowQueryExecution: true,
+        allowSchemaChanges: true,
+      });
+      connectionsService.getPool.mockResolvedValue({});
+      strategy.executeQuery.mockResolvedValue({
+        rows: [{ id: 1 }],
+        rowCount: 1,
+      });
+      const result = await service.executeQuery(
+        {
+          connectionId: 'conn-1',
+          sql,
+          limit: 5,
+          includeTotalCount: false,
+        } as any,
+        'user-1',
+      );
+      expect(result).toMatchObject({
+        appliedLimit: 5,
+        limitSource: 'requested',
+      });
+    },
+  );
+
+  it('does not label a data-changing CTE as a requested SELECT window', async () => {
+    connectionsService.findOne.mockResolvedValue({
+      id: 'conn-1',
+      type: 'postgres',
+      database: 'main',
+      readOnly: false,
+      allowQueryExecution: true,
+      allowSchemaChanges: true,
+    });
+    connectionsService.getPool.mockResolvedValue({});
+    strategy.executeQuery.mockResolvedValue({ rows: [], rowCount: 1 });
+    const result = await service.executeQuery(
+      {
+        connectionId: 'conn-1',
+        sql: 'WITH source AS (SELECT 1) UPDATE users SET active = true',
+        confirmed: true,
+        limit: 5,
+        includeTotalCount: false,
+      } as any,
+      'user-1',
+    );
+    expect(result.appliedLimit).toBeUndefined();
+    expect(result.limitSource).toBeUndefined();
+  });
+
+  it('marks a compound result protected even when one MSSQL branch has TOP', () => {
+    const result = (service as any).applyRawQueryMetadata(
+      { rows: [] },
+      'SELECT TOP 1 id FROM users UNION ALL SELECT id FROM audit',
+      {},
+      'mssql',
+    );
+    expect(result).toMatchObject({
+      appliedLimit: 50000,
+      limitSource: 'protective_default',
+    });
+  });
+
   it('marks raw select queries with the protective default limit when no explicit limit is requested', async () => {
     connectionsService.findOne.mockResolvedValue({
       id: 'conn-1',

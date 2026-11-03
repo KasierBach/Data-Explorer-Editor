@@ -121,6 +121,46 @@ describe('MssqlStrategy', () => {
       );
     });
 
+    it.each([
+      [
+        'SELECT TOP 1 * FROM users UNION ALL SELECT * FROM audit',
+        'SELECT * FROM (SELECT TOP 1 * FROM users UNION ALL SELECT * FROM audit) AS _paged_result ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY;',
+      ],
+      [
+        'WITH one AS (SELECT TOP 2 id FROM users ORDER BY id) SELECT * FROM one',
+        'WITH one AS (SELECT TOP 2 id FROM users ORDER BY id) SELECT * FROM one ORDER BY (SELECT NULL) OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY;',
+      ],
+      [
+        'SELECT * FROM users ORDER BY id OFFSET 0 ROWS',
+        'SELECT * FROM users ORDER BY id OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY;',
+      ],
+      ['SELECT/* note */ * FROM users', 'SELECT TOP 5 /* note */ * FROM users'],
+    ])(
+      'sends a global SQL Server cap instead of trusting local/inert text (%s)',
+      async (sql, expected) => {
+        mockRequest.query.mockResolvedValue({
+          recordset: [],
+          rowsAffected: [0],
+        });
+        await strategy.executeQuery(mockPool, sql, { limit: 5 });
+        expect(mockRequest.query).toHaveBeenCalledWith(expected);
+      },
+    );
+
+    it.each([
+      'SELECT TOP (1+100000) * FROM users',
+      'SELECT TOP 1 /* note */ PERCENT * FROM users',
+      'SELECT TOP 1 WITH TIES * FROM users ORDER BY id',
+    ])(
+      'rejects unproved TOP before creating a native request (%s)',
+      async (sql) => {
+        await expect(strategy.executeQuery(mockPool, sql)).rejects.toThrow(
+          /finite|PERCENT|TIES/,
+        );
+        expect(mockPool.request).not.toHaveBeenCalled();
+      },
+    );
+
     it('should not inject TOP if query already has a TOP clause', async () => {
       mockRequest.query.mockResolvedValue({ recordset: [], rowsAffected: [0] });
 

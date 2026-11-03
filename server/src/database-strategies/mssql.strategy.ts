@@ -102,6 +102,9 @@ export class MssqlStrategy implements IDatabaseStrategy {
     } else {
       safeSql = SqlUtil.injectTop(sql, 50000);
     }
+    if (options?.offset !== undefined && options.limit === undefined) {
+      safeSql = SqlUtil.injectPagination(sql, 50000, options.offset, 'mssql');
+    }
 
     const request = pool.request();
     const execution = createQueryExecution(async (isActive) => {
@@ -153,18 +156,18 @@ export class MssqlStrategy implements IDatabaseStrategy {
       for (const statement of statements) {
         execution.assertRunning();
         const isLast = statement === statements[statements.length - 1];
-        let safeSql = statement;
-        if (isLast && options?.limit !== undefined) {
-          safeSql =
-            options.offset !== undefined
-              ? SqlUtil.injectPagination(
-                  statement,
-                  options.limit,
-                  options.offset,
-                  'mssql',
-                )
-              : SqlUtil.injectTop(statement, options.limit);
-        }
+        const safeSql =
+          isLast && options?.offset !== undefined
+            ? SqlUtil.injectPagination(
+                statement,
+                options.limit ?? 50000,
+                options.offset,
+                'mssql',
+              )
+            : SqlUtil.injectTop(
+                statement,
+                isLast ? (options?.limit ?? 50000) : 50000,
+              );
         request = transaction.request();
         const raw = await request.query(safeSql);
         if (isLast) {
