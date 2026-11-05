@@ -14,6 +14,20 @@ describe('DemoMockup product overview', () => {
         expect(screen.getAllByRole('img')).toHaveLength(1);
     });
 
+    it('keeps cinematic decoration deterministic and outside the screenshot interaction', () => {
+        const { container } = render(<DemoMockup lang="en" />);
+
+        const routes = container.querySelectorAll('.lp-data-route');
+        expect(routes).toHaveLength(4);
+        expect(container.querySelectorAll('.lp-data-packet')).toHaveLength(4);
+        expect(container.querySelector('.lp-data-paths')).toHaveAttribute('preserveAspectRatio', 'none');
+        container.querySelectorAll('.lp-data-packet').forEach(packet => expect(packet).toHaveAttribute('pathLength', '100'));
+        expect(container.querySelector('.lp-data-paths')).toHaveAttribute('aria-hidden', 'true');
+        expect(container.querySelector('.lp-stage-decoration')).toHaveAttribute('aria-hidden', 'true');
+        expect(container.querySelector('.lp-stage-scan')).toHaveAttribute('aria-hidden', 'true');
+        expect(container.querySelector('.lp-screenshot-link .lp-stage-scan')).toBeNull();
+    });
+
     it('offers the original overview image without repeating workflow panels', () => {
         render(<DemoMockup lang="en" />);
 

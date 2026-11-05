@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FocusEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, useState, type FocusEvent } from 'react';
 import { useReducedMotion } from 'framer-motion';
 
 export function useLandingMotion(paused = false) {
@@ -7,7 +7,6 @@ export function useLandingMotion(paused = false) {
     const [onscreen, setOnscreen] = useState(true);
     const [visible, setVisible] = useState(() => typeof document === 'undefined' || !document.hidden);
     const [ready, setReady] = useState(false);
-    const [hovered, setHovered] = useState(false);
     const [focused, setFocused] = useState(false);
 
     useEffect(() => {
@@ -25,14 +24,14 @@ export function useLandingMotion(paused = false) {
         };
     }, []);
 
+    const motionEnabled = ready && !paused && !reducedMotion && onscreen && visible;
+
     return {
         ref,
-        running: ready && !paused && !reducedMotion && onscreen && visible && !hovered && !focused,
+        motionEnabled,
+        pointerEnabled: motionEnabled && !focused,
+        running: motionEnabled && !focused,
         interaction: {
-            onPointerEnter: (event: PointerEvent<HTMLDivElement>) => {
-                if (event.pointerType === 'mouse') setHovered(true);
-            },
-            onPointerLeave: () => setHovered(false),
             onFocusCapture: () => setFocused(true),
             onBlurCapture: (event: FocusEvent<HTMLDivElement>) => {
                 if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);

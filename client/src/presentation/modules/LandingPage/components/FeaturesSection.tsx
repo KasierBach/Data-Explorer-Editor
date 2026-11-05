@@ -7,9 +7,10 @@ import { publicPath } from '@/core/seo/publicRoutes';
 interface FeaturesSectionProps {
     lang: string;
     isMotionPaused?: boolean;
+    addToRevealRefs?: (el: HTMLDivElement | null) => void;
 }
 
-export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, isMotionPaused = false }) => {
+export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, isMotionPaused = false, addToRevealRefs }) => {
     const vi = lang === 'vi';
     const { ref: motionRef, running, interaction } = useLandingMotion(isMotionPaused);
     const features = [
@@ -29,7 +30,7 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, isMotion
                             {[false, true].map(duplicate => (
                                 <ul key={String(duplicate)} className="lp-engine-list" aria-hidden={duplicate || undefined}>
                                     {landingEngines.map(engine => (
-                                        <li key={engine.name} className="lp-engine-chip"><engine.icon aria-hidden="true" /><span>{engine.name}</span></li>
+                                        <li key={engine.name} className="lp-engine-chip" style={{ '--lp-engine-color': engine.color } as React.CSSProperties}><engine.icon aria-hidden="true" /><span>{engine.name}</span></li>
                                     ))}
                                 </ul>
                             ))}
@@ -39,7 +40,7 @@ export const FeaturesSection: React.FC<FeaturesSectionProps> = ({ lang, isMotion
                 </div>
             </section>
             <section className="lp-section lp-features-section">
-                <div className="lp-container">
+                <div className="lp-container" ref={addToRevealRefs}>
                     <div className="lp-section-heading lp-heading-row">
                         <div><span className="lp-kicker">{vi ? 'ÍT ĐỔI TAB. NHIỀU TẬP TRUNG.' : 'LESS TAB SWITCHING. MORE FOCUS.'}</span><h2 className="lp-h2">{vi ? 'Đủ công cụ. Không rườm rà.' : 'Your toolkit. Without the clutter.'}</h2></div>
                         <a href={publicPath(vi ? 'vi' : 'en', '/docs')} className="lp-inline-link">{vi ? 'Khám phá tính năng' : 'Explore the features'}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></a>

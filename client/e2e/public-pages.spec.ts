@@ -96,6 +96,9 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.locator('.landing-page')).toHaveAttribute('data-motion', 'paused');
     await expect(page.locator('.lp-stage-window').first()).toHaveCSS('animation-name', 'none');
     await expect(page.locator('.lp-stage-region .lp-db-tile').first()).toHaveCSS('animation-play-state', 'paused');
+    await expect(page.locator('.lp-stage-region .lp-data-packet').first()).toHaveCSS('animation-play-state', 'paused');
+    await expect(page.locator('.lp-engine-rail')).toHaveCSS('animation-play-state', 'paused');
+    await expect(page.locator('.lp-engine-rail')).toHaveAttribute('data-running', 'false');
     await expect(page.locator('#demo img')).toHaveAttribute('src', '/images/landing/workspace.webp');
     await expect(page.locator('#demo [role="tablist"]')).toHaveCount(0);
     const heroImage = page.locator('#demo img');
@@ -131,6 +134,9 @@ test('landing reduced motion stops stage and rail without hiding content', async
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.locator('.lp-stage-window')).toHaveCSS('animation-name', 'none');
   await expect(page.locator('.lp-engine-track')).toHaveCSS('animation-name', 'none');
+  await expect(page.locator('.lp-data-packet').first()).toHaveCSS('animation-name', 'none');
+  await expect(page.locator('.lp-stage-scan')).toBeHidden();
+  await expect(page.locator('.lp-ambient')).toBeVisible();
   await expect(page.locator('.lp-hero-copy')).toHaveCSS('animation-name', 'none');
   await expect(page.locator('.lp-engine-list[aria-hidden="true"]')).toBeHidden();
   await expect(page.locator('.lp-engine-list').first().getByRole('listitem')).toHaveCount(9);
@@ -208,31 +214,178 @@ test('landing image viewer handles Escape without closing the open background mo
   await expect(menu).toBeFocused();
 });
 
-test('landing automatic motion pauses for focus, hidden tabs, and offscreen content', async ({ page }) => {
+test('landing automatic motion continues on hover and freezes on focus, hidden tabs, and offscreen content', async ({ page }) => {
   await page.goto('/');
   await page.mouse.move(0, 0);
-  await expect(page.locator('.lp-stage-region')).toHaveAttribute('data-running', 'true');
-  const tile = page.locator('.lp-stage-region .lp-db-tile').first();
-  const before = await tile.evaluate(element => getComputedStyle(element).translate);
-  await expect.poll(() => tile.evaluate(element => getComputedStyle(element).translate)).not.toBe(before);
+  const region = page.locator('.lp-stage-region');
+  const packet = page.locator('.lp-data-packet').first();
+  const tile = region.locator('.lp-db-tile').first();
+  const ambient = page.locator('.lp-ambient');
+  const values = () => page.evaluate(() => {
+    const ambient = document.querySelector('.lp-ambient')!;
+    return {
+      packet: getComputedStyle(document.querySelector('.lp-data-packet')!).strokeDashoffset,
+      tile: getComputedStyle(document.querySelector('.lp-db-tile')!).translate,
+      light: getComputedStyle(ambient, '::after').transform,
+    };
+  });
+  await expect(region).toHaveAttribute('data-running', 'true');
+  const hasPointerDepth = await page.evaluate(() => matchMedia('(min-width: 601px) and (hover: hover) and (pointer: fine)').matches);
+  await expect(region).toHaveAttribute('data-depth-enabled', String(hasPointerDepth));
+  const before = await values();
+  await expect.poll(async () => (await values()).packet).not.toBe(before.packet);
+  await expect.poll(async () => (await values()).tile).not.toBe(before.tile);
+  await expect.poll(async () => (await values()).light).not.toBe(before.light);
+
+  const box = await page.locator('.lp-product-stage').boundingBox();
+  await page.mouse.move(box!.x + box!.width * 0.75, box!.y + box!.height * 0.3);
+  await expect(region).toHaveAttribute('data-running', 'true');
+  await expect(packet).toHaveCSS('animation-play-state', 'running');
+  await expect(tile).toHaveCSS('animation-play-state', 'running');
+  await expect.poll(() => ambient.evaluate(element => getComputedStyle(element, '::after').animationPlayState)).toBe('running');
+  const hovered = await values();
+  await expect.poll(async () => (await values()).packet).not.toBe(hovered.packet);
+  await expect.poll(async () => (await values()).tile).not.toBe(hovered.tile);
+  await expect.poll(async () => (await values()).light).not.toBe(hovered.light);
+  await page.mouse.move(0, 0);
+  await expect(region).toHaveAttribute('data-running', 'true');
+
   await page.locator('#demo a.lp-screenshot-link').focus();
-  await expect(page.locator('.lp-stage-region')).toHaveAttribute('data-running', 'false');
+  await expect(region).toHaveAttribute('data-running', 'false');
+  await expect(region).toHaveAttribute('data-depth-enabled', 'false');
   await expect(tile).toHaveCSS('animation-play-state', 'paused');
+  await expect(packet).toHaveCSS('animation-play-state', 'paused');
+  await expect.poll(() => ambient.evaluate(element => getComputedStyle(element, '::before').animationPlayState)).toBe('paused');
+  await page.locator('.lp-ambient, .lp-product-stage').evaluateAll(elements => Promise.all(
+    elements.flatMap(element => element.getAnimations({ subtree: true })).map(animation => animation.ready),
+  ));
+  const focused = await values();
+  await page.waitForTimeout(180);
+  expect(await values()).toEqual(focused);
   await page.locator('#demo .lp-button-primary').focus();
-  await expect(page.locator('.lp-stage-region')).toHaveAttribute('data-running', 'true');
+  await expect(region).toHaveAttribute('data-running', 'true');
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await expect(page.locator('.lp-stage-region')).toHaveAttribute('data-running', 'false');
+  await expect(region).toHaveAttribute('data-running', 'false');
+  await expect.poll(() => ambient.evaluate(element => getComputedStyle(element, '::after').animationPlayState)).toBe('paused');
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: false });
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await expect(page.locator('.lp-stage-region')).toHaveAttribute('data-running', 'true');
+  await expect(region).toHaveAttribute('data-running', 'true');
   await page.locator('#get-started').scrollIntoViewIfNeeded();
-  await expect(page.locator('.lp-stage-region')).toHaveAttribute('data-running', 'false');
+  await expect(region).toHaveAttribute('data-running', 'false');
   await expect(page.locator('.lp-engine-rail')).toHaveAttribute('data-running', 'false');
+  await expect.poll(() => ambient.evaluate(element => getComputedStyle(element, '::after').animationPlayState)).toBe('paused');
+});
+
+test('landing depth only moves decoration and disables at the mobile breakpoint', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+  await page.evaluate(() => document.fonts.ready);
+  const region = page.locator('.lp-stage-region');
+  const stage = page.locator('.lp-product-stage');
+  const decoration = page.locator('.lp-depth-decoration');
+  const pointer = await page.evaluate(() => matchMedia('(hover: hover) and (pointer: fine)').matches);
+  await expect(region).toHaveAttribute('data-depth-enabled', String(pointer));
+  await expect(region).toHaveAttribute('data-running', 'true');
+  const targets = page.locator('.lp-stage-window, #demo .lp-screenshot-link, #demo .lp-screenshot-caption, #demo .lp-hero-actions a');
+  await expect.poll(() => page.locator('.lp-hero-copy').evaluate(element => new DOMMatrixReadOnly(getComputedStyle(element).transform).m42)).toBe(0);
+  const before = await targets.evaluateAll(elements => elements.map(element => {
+    const { x, y, width, height } = element.getBoundingClientRect();
+    return { x, y, width, height };
+  }));
+  const box = await stage.boundingBox();
+  const transform = await decoration.evaluate(element => getComputedStyle(element).transform);
+  await page.mouse.move(box!.x + box!.width * 0.85, box!.y + box!.height * 0.25);
+  if (pointer) {
+    await expect.poll(() => decoration.evaluate(element => getComputedStyle(element).transform)).not.toBe(transform);
+  }
+  expect(await targets.evaluateAll(elements => elements.map(element => {
+    const { x, y, width, height } = element.getBoundingClientRect();
+    return { x, y, width, height };
+  }))).toEqual(before);
+  await expect(page.locator('.lp-depth-layer').first()).toHaveCSS('pointer-events', 'none');
+
+  await page.setViewportSize({ width: 600, height: 844 });
+  await expect(region).toHaveAttribute('data-depth-enabled', 'false');
+  const small = await stage.boundingBox();
+  await page.mouse.move(small!.x + small!.width * 0.8, small!.y + small!.height * 0.3);
+  for (const layer of await page.locator('.lp-depth-layer').all()) {
+    await expect(layer).toHaveCSS('transform', 'none');
+  }
+  await expect(page.locator('.lp-data-route-2')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  await page.setViewportSize({ width: 900, height: 900 });
+  await page.mouse.move(0, 0);
+  await expect(region).toHaveAttribute('data-depth-enabled', String(pointer));
+});
+
+test('landing flares run once on borders without translating workflow or AI hit targets', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+  await page.evaluate(() => document.fonts.ready);
+  const feature = page.locator('.lp-features-section .lp-feature-card').first();
+  await feature.scrollIntoViewIfNeeded();
+  await expect(page.locator('.lp-features-section .lp-reveal')).toHaveClass(/is-active/);
+  await expect.poll(() => feature.evaluate(element => getComputedStyle(element, '::after').animationName)).toBe('lp-border-flare');
+  const workflow = page.locator('#workflows');
+  await workflow.scrollIntoViewIfNeeded();
+  await expect(page.locator('.lp-signal-section').first()).toHaveClass(/is-active/);
+  await expect(page.locator('.lp-signal-section').first()).toHaveCSS('animation-name', 'none');
+  const frame = workflow.locator('.lp-image-frame');
+  await expect.poll(() => frame.evaluate(element => getComputedStyle(element, '::after').animationIterationCount)).toBe('1');
+  await expect.poll(() => frame.evaluate(element => getComputedStyle(element, '::after').animationName)).toBe('lp-border-flare');
+  const schemaTab = page.getByRole('tab', { name: /^Schema-ERD\b/ });
+  await schemaTab.click();
+  await expect(schemaTab).toHaveAttribute('aria-selected', 'true');
+  await expect(workflow.locator('.lp-tabpanel[data-state="active"]')).toHaveCSS('animation-name', 'none');
+  await expect(workflow.locator('.lp-tabpanel[data-state="active"]')).toHaveCSS('transform', 'none');
+  await page.locator('.lp-ai-section').scrollIntoViewIfNeeded();
+  await expect(page.locator('.lp-ai-section .lp-reveal')).toHaveCSS('animation-name', 'none');
+  await expect.poll(() => page.locator('.lp-ai-section .lp-image-frame').evaluate(element => getComputedStyle(element, '::after').animationName)).toBe('lp-border-flare');
+});
+
+test('landing engine rail keeps moving on hover without a sweep over its labels and respects hidden tabs and manual pause', async ({ page }) => {
+  await page.goto('/');
+  const rail = page.locator('.lp-engine-rail');
+  const track = rail.locator('.lp-engine-track');
+  await rail.scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+  await expect(rail).toHaveAttribute('data-running', 'true');
+  const before = await track.evaluate(element => getComputedStyle(element).transform);
+  await expect.poll(() => track.evaluate(element => getComputedStyle(element).transform)).not.toBe(before);
+  const box = await rail.boundingBox();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await expect(rail).toHaveAttribute('data-running', 'true');
+  await expect(track).toHaveCSS('animation-play-state', 'running');
+  await expect.poll(() => rail.evaluate(element => getComputedStyle(element, '::after').content)).toBe('none');
+  const hovered = await track.evaluate(element => getComputedStyle(element).transform);
+  await expect.poll(() => track.evaluate(element => getComputedStyle(element).transform)).not.toBe(hovered);
+  await page.mouse.move(0, 0);
+  await expect(rail).toHaveAttribute('data-running', 'true');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(rail).toHaveAttribute('data-running', 'false');
+  await expect(track).toHaveCSS('animation-play-state', 'paused');
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await expect(rail).toHaveAttribute('data-running', 'true');
+  await page.getByRole('button', { name: /^(Tạm dừng chuyển động|Pause motion)$/ }).click();
+  await expect(rail).toHaveAttribute('data-running', 'false');
+  await expect(track).toHaveCSS('animation-play-state', 'paused');
+  await track.evaluate(element => Promise.all(element.getAnimations().map(animation => animation.ready)));
+  const frozen = await track.evaluate(element => getComputedStyle(element).transform);
+  await page.waitForTimeout(180);
+  expect(await track.evaluate(element => getComputedStyle(element).transform)).toBe(frozen);
 });
 
 test('landing anchors keep their targets', async ({ page }) => {
@@ -267,21 +420,30 @@ for (const lang of ['vi', 'en'] as const) {
         const github = element.querySelector('.lp-github-link')!.getBoundingClientRect();
         const theme = element.querySelector('button[aria-label*="giao diện"],button[aria-label*="theme"]')!.getBoundingClientRect();
         const workspace = element.querySelector('.lp-header-cta')!.getBoundingClientRect();
-        return Math.max(language.height, github.height, theme.height, workspace.height) - Math.min(language.height, github.height, theme.height, workspace.height);
+        const centers = [language, github, theme, workspace].map(box => box.y + box.height / 2);
+        return Math.max(...centers) - Math.min(...centers);
       })).toBeLessThanOrEqual(1);
       await expect.poll(() => page.locator('.lp-header-language').evaluate(element => {
-        const control = element.firstElementChild!.getBoundingClientRect();
-        const links = Array.from(element.querySelectorAll('a')).map(link => link.getBoundingClientRect());
+        const control = getComputedStyle(element.firstElementChild!);
+        const link = getComputedStyle(element.querySelector('a')!);
         return {
-          height: control.height,
+          padding: control.padding,
           separatorVisible: Array.from(element.querySelectorAll('span[aria-hidden="true"]')).some(separator => getComputedStyle(separator).display !== 'none'),
-          minLinkHeight: Math.min(...links.map(link => link.height)),
+          minLinkHeight: link.minHeight,
+          linkPadding: link.padding,
+          linkRadius: link.borderRadius,
         };
-      })).toEqual({ height: 46, separatorVisible: false, minLinkHeight: 44 });
+      })).toEqual({ padding: '4px', separatorVisible: true, minLinkHeight: '0px', linkPadding: '4px 10px', linkRadius: '8px' });
+      expect((await page.locator('.lp-header-language > div').boundingBox())!.height).toBeLessThan(40);
     }
+  });
 
-    for (const width of [1100, 1024, 901, 900, 768, 600, 390, 320]) {
+  for (const width of [1100, 1024, 901, 900, 768, 600, 390, 320]) {
+    test(`landing header ${lang} mobile navigation stays usable at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
+      await page.goto(lang === 'en' ? '/en' : '/');
+      await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+      await page.evaluate(() => document.fonts.ready);
       await expect(page.locator('.lp-desktop-nav')).toBeHidden();
       const menu = page.locator('.lp-menu-button');
       await expect(menu).toBeVisible();
@@ -300,8 +462,8 @@ for (const lang of ['vi', 'en'] as const) {
         return actions.left - brand.right;
       })).toBeGreaterThanOrEqual(8);
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
-    }
-  });
+    });
+  }
 }
 
 test('public hydration preserves full content, metadata and CSP without loading editor assets', async ({ page }) => {
@@ -321,7 +483,11 @@ test('public hydration preserves full content, metadata and CSP without loading 
 });
 
 test('public content and language links work before JavaScript', async ({ browser }) => {
-  const context = await browser.newContext({ javaScriptEnabled: false, baseURL: 'http://127.0.0.1:4173' });
+  const context = await browser.newContext({
+    javaScriptEnabled: false,
+    baseURL: 'http://127.0.0.1:4173',
+    viewport: { width: 1440, height: 900 },
+  });
   const page = await context.newPage();
   try {
     await page.goto('/');
@@ -331,7 +497,6 @@ test('public content and language links work before JavaScript', async ({ browse
     await expect(page.locator('meta[name="description"]')).toHaveCount(1);
     await expect(page.locator('title')).toHaveCount(1);
     await expect(page.locator('#demo a.lp-screenshot-link')).toHaveAttribute('href', '/images/landing/workspace.webp');
-    await page.setViewportSize({ width: 1440, height: 900 });
     await page.locator('.lp-header-language').getByRole('link', { name: 'EN', exact: true }).click();
     await expect(page).toHaveURL(/\/en$/);
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Complex data.');
@@ -430,6 +595,8 @@ test('public in-app navigation restores workspace metadata and saved locale on B
   await expect(brand).toHaveCount(1);
   await brand.click();
   await expect(page).toHaveURL('http://127.0.0.1:4173/');
+  await expect(page.locator('#demo').getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.locator('#demo').getByRole('heading', { level: 1 })).toContainText('Dữ liệu phức tạp.');
   await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://data-explorer-editor.vercel.app');
   await expect(page.locator('title')).toHaveCount(1);

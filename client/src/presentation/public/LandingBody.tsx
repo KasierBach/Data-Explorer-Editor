@@ -48,9 +48,9 @@ export function LandingBody({ lang, isAuthenticated = false, paused = false, onT
                     <DemoMockup lang={lang} isMotionPaused={paused} onToggleMotion={onToggleMotion} />
                 </div>
             </section>
-            <FeaturesSection lang={lang} isMotionPaused={paused} />
-            <div ref={reveal}><WorkflowSection lang={lang} /></div>
-            <AiSpotlightSection lang={lang} addToRevealRefs={reveal} />
+            <FeaturesSection lang={lang} isMotionPaused={paused} addToRevealRefs={reveal} />
+            <div ref={reveal} className="lp-signal-section"><WorkflowSection lang={lang} /></div>
+            <div className="lp-signal-section"><AiSpotlightSection lang={lang} addToRevealRefs={reveal} /></div>
             <PricingSection lang={lang} addToRevealRefs={reveal} />
             <div ref={reveal}><FaqSection lang={lang} /></div>
             <DocsCtaSection lang={lang} addToRevealRefs={reveal} isAuthenticated={isAuthenticated} />
