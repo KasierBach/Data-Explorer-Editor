@@ -7,26 +7,12 @@
   <link rel="manifest" href="/manifest.json" />
   <meta name="theme-color" content="#0a0a0f" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Data Explorer - Multi-Engine Database IDE</title>
-  <meta name="description"
-    content="A unified workspace for PostgreSQL, MySQL, SQL Server, and MongoDB with AI-assisted querying, schema exploration, ERD tools, and team-aware access controls." />
+  <title data-rh="true">Data Explorer</title>
+  <meta data-rh="true" name="description" content="SQL and NoSQL data workspace." />
+  <meta data-rh="true" name="robots" content="noindex, follow" />
 
-  <!-- Dynamic meta tags are managed by react-helmet-async in SEO component -->
-
-  <!-- Paint the theme background before any bundle loads to avoid a white flash on refresh. -->
-  <script>
-    (function () {
-      try {
-        var stored = localStorage.getItem('vite-ui-theme');
-        var theme = stored === 'light' || stored === 'dark' ? stored : 'system';
-        var dark = theme === 'dark' ||
-          (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.classList.add(dark ? 'dark' : 'light');
-      } catch (e) {
-        document.documentElement.classList.add('dark');
-      }
-    })();
-  </script>
+  <!-- public-head -->
+  <script src="/theme-bootstrap.js"></script>
   <style>
     html {
       background-color: #0a0a0f;

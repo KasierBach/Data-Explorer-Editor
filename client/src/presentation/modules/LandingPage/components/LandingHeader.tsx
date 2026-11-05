@@ -1,10 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Database, ArrowLeft } from 'lucide-react';
-import { Button } from '@/presentation/components/ui/button';
-import { cn } from '@/lib/utils';
 import { LanguageSwitcher } from '@/presentation/components/shared/LanguageSwitcher';
-import { getWorkspaceText } from '@/core/utils/workspaceText';
+import { LandingHeaderView } from '@/presentation/public/LandingHeaderView';
 
 interface LandingHeaderProps {
     lang: string;
@@ -13,129 +10,11 @@ interface LandingHeaderProps {
     isMobileNavOpen: boolean;
     setIsMobileNavOpen: (open: boolean) => void;
     hideSectionLinks?: boolean;
+    appearance?: 'default' | 'landing';
 }
 
-export const LandingHeader: React.FC<LandingHeaderProps> = ({
-    lang,
-    isAuthenticated,
-    logout,
-    isMobileNavOpen,
-    setIsMobileNavOpen,
-    hideSectionLinks
-}) => {
+export const LandingHeader: React.FC<LandingHeaderProps> = props => {
     const navigate = useNavigate();
-    const text = getWorkspaceText(lang).landingHeader;
-
-    return (
-        <header className="fixed top-0 w-full z-50 bg-background/40 backdrop-blur-2xl border-b border-white/[0.04] supports-[backdrop-filter]:bg-background/40 transition-all duration-300">
-            <div className="container mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-                <button 
-                    className="flex items-center gap-2 font-bold text-xl tracking-tight cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50 rounded-lg p-1" 
-                    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                    aria-label={text.backToTopAria}
-                >
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                        <Database className="w-4 h-4 text-white" aria-hidden="true" />
-                    </div>
-                    <span className="hidden min-[480px]:inline bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">Data<span className="text-blue-500">Explorer</span></span>
-                </button>
-
-                <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground absolute left-1/2 -translate-x-1/2">
-                    {!hideSectionLinks && (
-                        <>
-                            <a href="#features" className="hover:text-white text-muted-foreground/80 transition-colors uppercase tracking-[0.15em] text-[10px] font-semibold">
-                                {text.features}
-                            </a>
-                            <a href="#demo" className="hover:text-white text-muted-foreground/80 transition-colors uppercase tracking-[0.15em] text-[10px] font-semibold">
-                                {text.liveDemo}
-                            </a>
-                            <a href="#pricing" className="hover:text-white text-muted-foreground/80 transition-colors uppercase tracking-[0.15em] text-[10px] font-semibold">
-                                {text.pricing}
-                            </a>
-                        </>
-                    )}
-                    <button onClick={() => navigate('/docs')} className="relative group hover:text-white text-muted-foreground/80 transition-colors uppercase tracking-[0.15em] text-[10px] font-semibold">
-                        {text.docs}
-                    </button>
-                    <button onClick={() => navigate('/changelog')} className="relative group hover:text-white text-muted-foreground/80 transition-colors uppercase tracking-[0.15em] text-[10px] font-semibold">
-                        {text.changelog}
-                        <span className="absolute -top-3 -right-4 bg-blue-600 text-[8px] px-1 rounded-sm text-white font-bold animate-pulse group-hover:scale-110 transition-transform">NEW</span>
-                    </button>
-                </nav>
-
-                <div className="flex items-center gap-2 sm:gap-4">
-                    {hideSectionLinks && (
-                        <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="hidden md:flex text-[10px] h-8 items-center gap-1.5 text-muted-foreground uppercase tracking-widest hover:text-blue-500 hover:bg-transparent">
-                            <ArrowLeft className="w-3.5 h-3.5" />
-                            {text.goBack}
-                        </Button>
-                    )}
-                    <LanguageSwitcher />
-                    {isAuthenticated ? (
-                        <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => { void logout(); navigate('/login'); }} className="hidden sm:flex hover:bg-red-500/10 hover:text-red-500 text-xs uppercase tracking-wider">
-                                {text.logout}
-                            </Button>
-                            <Button size="sm" onClick={() => navigate('/sql-explorer')} className="bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] border border-blue-400/20 transition-all hover:scale-105 active:scale-95 text-[10px] uppercase tracking-widest font-bold rounded-lg px-4 hidden sm:flex">
-                                {text.workspace}
-                            </Button>
-                        </div>
-                    ) : (
-                        <>
-                            <Button variant="ghost" size="sm" onClick={() => navigate('/login')} className="hidden sm:flex hover:bg-blue-500/10 hover:text-blue-500 text-xs uppercase tracking-wider">
-                                {text.login}
-                            </Button>
-                            <Button size="sm" onClick={() => navigate('/login')} className="bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] border border-blue-400/20 transition-all hover:scale-105 active:scale-95 text-[10px] uppercase tracking-widest font-bold px-4 sm:px-5 rounded-lg">
-                                {text.startAnalysis}
-                            </Button>
-                        </>
-                    )}
-                    <button
-                        className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors"
-                        onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
-                        aria-label={text.toggleMenuAria}
-                    >
-                        <div className="w-5 flex flex-col gap-1">
-                            <span className={cn("h-0.5 bg-foreground rounded transition-all", isMobileNavOpen && "rotate-45 translate-y-1.5")} />
-                            <span className={cn("h-0.5 bg-foreground rounded transition-all", isMobileNavOpen && "opacity-0")} />
-                            <span className={cn("h-0.5 bg-foreground rounded transition-all", isMobileNavOpen && "-rotate-45 -translate-y-1.5")} />
-                        </div>
-                    </button>
-                </div>
-            </div>
-
-            {isMobileNavOpen && (
-                <div className="md:hidden border-t border-white/5 bg-background/95 backdrop-blur-xl animate-in slide-in-from-top duration-200">
-                    <nav className="container mx-auto px-4 py-4 flex flex-col gap-3">
-                        {!hideSectionLinks && (
-                            <>
-                                <a href="#features" onClick={() => setIsMobileNavOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5">
-                                    {text.features}
-                                </a>
-                                <a href="#demo" onClick={() => setIsMobileNavOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5">
-                                    {text.liveDemo}
-                                </a>
-                                <a href="#pricing" onClick={() => setIsMobileNavOpen(false)} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5">
-                                    {text.pricing}
-                                </a>
-                            </>
-                        )}
-                        {hideSectionLinks && (
-                            <button onClick={() => { navigate('/'); setIsMobileNavOpen(false); }} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5 text-left flex items-center gap-2">
-                                <ArrowLeft className="w-4 h-4" />
-                                {text.goBack}
-                            </button>
-                        )}
-                        <button onClick={() => { navigate('/docs'); setIsMobileNavOpen(false); }} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 border-b border-white/5 text-left">
-                            {text.docs}
-                        </button>
-                        <button onClick={() => { navigate('/changelog'); setIsMobileNavOpen(false); }} className="text-sm font-medium text-muted-foreground hover:text-blue-500 transition-colors py-2 text-left flex items-center justify-between">
-                            {text.changelog}
-                            <span className="bg-blue-600 text-[8px] px-1 rounded-sm text-white font-bold">NEW</span>
-                        </button>
-                    </nav>
-                </div>
-            )}
-        </header>
-    );
+    const logout = async () => { await props.logout(); navigate('/login'); };
+    return <LandingHeaderView {...props} logout={logout} navigate={navigate} language={<LanguageSwitcher touch={props.appearance === 'landing'} />} />;
 };

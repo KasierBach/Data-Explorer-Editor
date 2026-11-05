@@ -75,10 +75,24 @@ test('R12 Profile close action follows Vietnamese locale', async ({ page }) => {
 });
 
 test('R12 language survives public route unmount and workspace reload', async ({ page }) => {
-  await page.goto('/docs');
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('public-locale-ownership-fixture')) {
+      localStorage.setItem('lang', 'en');
+      sessionStorage.setItem('public-locale-ownership-fixture', 'true');
+    }
+  });
+  await page.goto('/en/docs');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await page.goto('/docs');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+  await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('lang'))).toBe('en');
   await page.goto('/sql-explorer');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('title')).toHaveCount(1);
+  await expect(page).toHaveTitle(/Data Explorer/);
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow');
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page).toHaveTitle(/Data Explorer/);
 });

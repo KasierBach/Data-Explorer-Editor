@@ -1,11 +1,17 @@
-﻿import React from 'react';
-import { BookOpen, Database, Github, History } from 'lucide-react';
+import React from 'react';
+import { BookOpen, Bug, Database, Github, History } from 'lucide-react';
+import { SiGithub } from 'react-icons/si';
+import { usePublicNavigation } from '@/presentation/public/PublicNavigationContext';
 
 interface LandingFooterProps {
     lang: string;
+    appearance?: 'default' | 'landing';
 }
 
-export const LandingFooter: React.FC<LandingFooterProps> = ({ lang }) => {
+export const LandingFooter: React.FC<LandingFooterProps> = ({ lang, appearance = 'default' }) => {
+    const isLanding = appearance === 'landing';
+    const navigation = usePublicNavigation();
+    const hrefFor = (href: string) => /^\/(?:$|#|docs|changelog|legal|privacy|terms)/.test(href) ? navigation.path(href) : href;
     const text = lang === 'vi'
         ? {
             brandDescription: 'Workspace cho SQL, NoSQL, ERD và các luồng AI có thể cấu hình theo từng vai trò, đủ gọn để dùng hằng ngày nhưng vẫn có guardrail khi cần.',
@@ -95,12 +101,67 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ lang }) => {
         },
     ];
 
+    if (isLanding) {
+        return (
+            <footer className="border-t" style={{ borderColor: 'var(--lp-border)', backgroundColor: 'var(--lp-surface)' }}>
+                <div className="lp-container py-12">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10">
+                        <div className="max-w-sm">
+                            <a href={navigation.path('/')} className="flex items-center gap-2 font-bold text-lg tracking-tight w-fit" style={{ color: 'var(--lp-text)' }}>
+                                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--lp-accent)' }}>
+                                    <Database className="w-4 h-4 text-white" aria-hidden="true" />
+                                </div>
+                                <span>Data Explorer</span>
+                            </a>
+                            <p className="mt-4 text-sm leading-relaxed" style={{ color: 'var(--lp-muted)' }}>
+                                {lang === 'vi' ? 'SQL, NoSQL và AI tùy chọn — một workspace mã nguồn mở cho công việc dữ liệu.' : 'SQL, NoSQL, and optional AI — an open-source workspace for your data workflow.'}
+                            </p>
+                            <div className="lp-footer-socials">
+                                <a href="https://github.com/KasierBach/Data-Explorer-Editor" target="_blank" rel="noopener noreferrer" className="lp-icon-button" aria-label="GitHub"><SiGithub className="h-5 w-5" aria-hidden="true" /></a>
+                                <a href="https://github.com/KasierBach/Data-Explorer-Editor/issues" target="_blank" rel="noopener noreferrer" className="lp-icon-button" aria-label={lang === 'vi' ? 'Báo lỗi' : 'Report an issue'}><Bug className="h-5 w-5" aria-hidden="true" /></a>
+                                <a href={navigation.path('/docs')} className="lp-icon-button" aria-label={lang === 'vi' ? 'Tài liệu' : 'Documentation'}><BookOpen className="h-5 w-5" aria-hidden="true" /></a>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-10 sm:grid-cols-3">
+                            {text.footerLinks.map((col) => (
+                                <div key={col.title}>
+                                    <h4 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--lp-muted)' }}>{col.title}</h4>
+                                    <ul className="space-y-2.5 text-sm">
+                                        {col.links.map((link) => {
+                                            const external = link.href.startsWith('http');
+                                            return (
+                                                <li key={link.label}>
+                                                    <a
+                                                        href={hrefFor(link.href)}
+                                                        target={external ? '_blank' : undefined}
+                                                        rel={external ? 'noreferrer noopener' : undefined}
+                                                        className="transition-colors"
+                                                        style={{ color: 'var(--lp-muted)' }}
+                                                    >
+                                                        {link.label}
+                                                    </a>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="mt-10 border-t pt-6 text-xs" style={{ borderColor: 'var(--lp-border)', color: 'var(--lp-muted)' }}>
+                        © 2026 Data Explorer. {text.builtForTeams}
+                    </div>
+                </div>
+            </footer>
+        );
+    }
+
     return (
         <footer className="border-t border-white/5 bg-background/50 backdrop-blur-xl pt-12 md:pt-16 pb-12">
             <div className="container mx-auto px-4 sm:px-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 md:gap-12 mb-12 md:mb-20">
                     <div className="col-span-2 lg:col-span-2">
-                        <a href="/" className="flex items-center gap-3 font-black text-2xl mb-6 tracking-tighter uppercase w-fit">
+                        <a href={navigation.path('/')} className="flex items-center gap-3 font-black text-2xl mb-6 tracking-tighter uppercase w-fit">
                             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
                                 <Database className="w-4 h-4 text-white" />
                             </div>
@@ -113,7 +174,7 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ lang }) => {
                             {shortcuts.map((item) => (
                                 <a
                                     key={item.label}
-                                    href={item.href}
+                                    href={hrefFor(item.href)}
                                     aria-label={item.label}
                                     target={item.external ? '_blank' : undefined}
                                     rel={item.external ? 'noreferrer noopener' : undefined}
@@ -134,7 +195,7 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({ lang }) => {
                                     return (
                                         <li key={link.label}>
                                             <a
-                                                href={link.href}
+                                                href={hrefFor(link.href)}
                                                 target={external ? '_blank' : undefined}
                                                 rel={external ? 'noreferrer noopener' : undefined}
                                                 className="hover:text-blue-500 transition-colors"

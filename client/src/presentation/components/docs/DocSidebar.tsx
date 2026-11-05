@@ -137,9 +137,11 @@ interface DocSidebarProps {
     onSelect: (id: string) => void;
     lang: 'vi' | 'en';
     className?: string;
+    hrefFor?: (id: string) => string;
 }
 
-export function DocSidebar({ activeId, onSelect, lang, className }: DocSidebarProps) {
+export function DocSidebar({ activeId, onSelect, lang, className, hrefFor }: DocSidebarProps) {
+    const Item = hrefFor ? 'a' : 'button';
     const text = getDocsText(lang);
 
     return (
@@ -163,9 +165,11 @@ export function DocSidebar({ activeId, onSelect, lang, className }: DocSidebarPr
                             </h4>
                             <div className="space-y-1">
                                 {section.items?.map((item) => (
-                                    <button
+                                    <Item
                                         key={item.id}
-                                        onClick={() => onSelect(item.id)}
+                                        href={hrefFor?.(item.id)}
+                                        aria-current={hrefFor && activeId === item.id ? 'page' : undefined}
+                                        onClick={() => { if (!hrefFor) onSelect(item.id); }}
                                         className={cn(
                                             'w-full text-left flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all group',
                                             activeId === item.id
@@ -182,7 +186,7 @@ export function DocSidebar({ activeId, onSelect, lang, className }: DocSidebarPr
                                                 activeId === item.id ? 'rotate-90 opacity-100' : 'opacity-0 group-hover:opacity-100',
                                             )}
                                         />
-                                    </button>
+                                    </Item>
                                 ))}
                             </div>
                         </div>
