@@ -250,7 +250,7 @@
 .landing-page .lp-header-language :is(button,a):hover, .landing-page .lp-mobile-utilities :is(button,a):hover { color: var(--lp-text); }
 .landing-page .lp-header-language :is(button,a).bg-blue-600, .landing-page .lp-mobile-utilities :is(button,a).bg-blue-600 { color: #fff; box-shadow: none; }
 .lp-header-actions > .lp-icon-button { width: 46px; height: 46px; }
-.lp-header-cta { height: 46px; min-height: 46px; padding: 8px 16px; margin-left: 2px; border-radius: 10px; font-size: 11px; }
+.lp-header-cta { height: 46px; min-height: 46px; padding: 8px 15px; margin-left: 2px; border-radius: 10px; font-size: 11px; }
 .lp-menu-button { display: none; }
 .lp-mobile-nav { display: none; }
 .lp-footer-socials { display: flex; gap: 6px; margin-top: 18px; }

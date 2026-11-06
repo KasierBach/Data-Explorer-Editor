@@ -471,7 +471,13 @@ test('public hydration preserves full content, metadata and CSP without loading 
   const requests: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => requests.push(request.url()));
+  await page.route('http://localhost:3001/api/auth/refresh', route => route.fulfill({
+    status: 401, json: { message: 'Unauthorized' },
+    headers: { 'access-control-allow-origin': 'http://127.0.0.1:4173', 'access-control-allow-credentials': 'true' },
+  }));
+  const refresh = page.waitForResponse('http://localhost:3001/api/auth/refresh');
   await page.goto('/');
+  expect((await refresh).status()).toBe(401);
   await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
   await expect(page.locator('title')).toHaveCount(1);
   await expect(page.locator('meta[name="description"]')).toHaveCount(1);
