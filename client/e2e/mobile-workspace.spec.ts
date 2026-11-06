@@ -106,3 +106,27 @@ test('mobile NoSQL shell restores collection context and renders query results',
   await expect(page.getByText('Ada Lovelace', { exact: false })).toBeVisible();
   await expectNoDocumentOverflow(page);
 });
+
+for (const route of ['/sql-explorer', '/nosql-explorer'] as const) {
+  for (const viewport of [{ width: 320, height: 844 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
+    test(`mobile language pill stays reachable in ${route} at ${viewport.width}px`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await seedPersistedWorkspace(page, { tabs: [], activeTabId: null, nosqlActiveCollection: null, isSidebarOpen: false, isAiPanelOpen: false });
+      await page.goto(route);
+      const control = page.locator('main [data-appearance="pill"]');
+      await expect(control).toBeVisible();
+      await expectTouchTargets(control.getByRole('button'));
+      await expectNoDocumentOverflow(page);
+      const hit = await control.getByRole('button', { name: 'VN', exact: true }).evaluate(element => {
+        const box = element.getBoundingClientRect();
+        const target = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+        return Boolean(target && (element === target || element.contains(target)));
+      });
+      expect(hit).toBe(true);
+      await page.screenshot({ path: test.info().outputPath(`language-pill-${viewport.width}.png`) });
+      await control.getByRole('button', { name: 'VN', exact: true }).click();
+      await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+      await expect(control.getByRole('button', { name: 'VN', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    });
+  }
+}

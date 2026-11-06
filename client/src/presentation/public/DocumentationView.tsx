@@ -26,7 +26,7 @@ export function DocumentationView({ route, isAuthenticated = false }: { route: P
     const results = search.trim() ? entries.filter(item => `${item.title} ${item.sectionTitle}`.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 8) : [];
     const href = (id: string) => navigation.path(`/docs/${id}`);
     const select = (id: string) => { window.location.assign(href(id)); };
-    const language = <LanguageControl lang={lang} onChange={() => {}} hrefs={navigation.languageUrls} touch />;
+    const language = <LanguageControl lang={lang} onChange={() => {}} hrefs={navigation.languageUrls} appearance="pill" />;
     useEffect(() => {
         const frame = requestAnimationFrame(() => setHeadings(Array.from(document.querySelectorAll('.public-docs main h2,.public-docs main h3'), (element, index) => {
             const id = element.id || `heading-${index}`;

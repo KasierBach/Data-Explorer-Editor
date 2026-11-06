@@ -126,7 +126,7 @@ export const Dashboard: React.FC = () => {
                             <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
                                 {text.databaseIntelligence}
                             </h2>
-                            <LanguageSwitcher />
+                            <LanguageSwitcher appearance="pill" />
                         </div>
                     </div>
                     <InsightsDashboard />
@@ -145,7 +145,7 @@ export const Dashboard: React.FC = () => {
                         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
                             {text.welcomeTitle}
                         </h1>
-                        <LanguageSwitcher />
+                        <LanguageSwitcher appearance="pill" />
                     </div>
                     <p className="text-muted-foreground text-base md:text-lg">
                         {text.welcomeDescription}

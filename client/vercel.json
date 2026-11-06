@@ -19,7 +19,7 @@
     }
   ],
   "rewrites": [
-    { "source": "/(login|forgot-password|legal-consent|onboarding)", "destination": "/app.html" },
-    { "source": "/(sql-explorer|nosql-explorer|admin|teams|billing)(/.*)?", "destination": "/app.html" }
+    { "source": "/(login|forgot-password|legal-consent|onboarding)", "destination": "/app" },
+    { "source": "/(sql-explorer|nosql-explorer|admin|teams|billing)(/.*)?", "destination": "/app" }
   ]
 }
