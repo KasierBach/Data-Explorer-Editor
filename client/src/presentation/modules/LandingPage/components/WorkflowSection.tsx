@@ -1,133 +1,89 @@
-﻿import React from 'react';
-import { motion } from 'framer-motion';
-import { Database, Zap, Cpu, Search } from 'lucide-react';
+import React from 'react';
+import { ArrowRight, BarChart3, GitGraph, Terminal } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/presentation/components/ui/tabs';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
+import { LandingScreenshot } from './LandingScreenshot';
+import { publicPath } from '@/core/seo/publicRoutes';
 
 interface WorkflowSectionProps {
     lang: string;
 }
 
 export const WorkflowSection: React.FC<WorkflowSectionProps> = ({ lang }) => {
-    const text = lang === 'vi'
-        ? {
-            title: 'Quy trình làm việc rõ ràng',
-            description: 'Từ đọc schema tới chạy query, mỗi bước đều có trợ giúp đúng vai trò thay vì một model ôm hết.',
-            steps: [
-                {
-                    title: 'Đọc schema',
-                    description: 'Quét cấu trúc bảng, collection và quan hệ để có đúng ngữ cảnh trước khi gõ.',
-                },
-                {
-                    title: 'Chọn AI phù hợp',
-                    description: 'Assistant, Explain, AI SQL, AI NoSQL và Autocomplete có thể dùng model khác nhau.',
-                },
-                {
-                    title: 'Chạy có guardrail',
-                    description: 'Thực thi, explain hoặc chạy tuần tự với cảnh báo mức nghiêm trọng rõ ràng hơn.',
-                },
-                {
-                    title: 'Lưu và quay lại',
-                    description: 'Lịch sử, workspace và draft được giữ lại để không mất luồng làm việc giữa các phiên.',
-                },
-            ],
-        }
-        : {
-            title: 'A clearer working loop',
-            description: 'From reading schema to running queries, each step gets the right helper instead of one model doing everything.',
-            steps: [
-                {
-                    title: 'Read the schema',
-                    description: 'Scan tables, collections, and relationships so the editor starts with real context.',
-                },
-                {
-                    title: 'Pick the right AI',
-                    description: 'Assistant, Explain, AI SQL, AI NoSQL, and Autocomplete can each use different models.',
-                },
-                {
-                    title: 'Run with guardrails',
-                    description: 'Execute, explain, or run sequences with clearer severity-based warnings.',
-                },
-                {
-                    title: 'Save and return',
-                    description: 'History, workspace state, and drafts stay around so the flow survives across sessions.',
-                },
-            ],
-        };
-
-    const steps = [
-        {
-            icon: <Search className="w-6 h-6" />,
-            ...text.steps[0],
-            bg: 'bg-blue-500/20',
-            border: 'border-blue-500/30',
-            text: 'text-blue-400',
-            shadow: 'shadow-blue-500/20'
-        },
-        {
-            icon: <Cpu className="w-6 h-6" />,
-            ...text.steps[1],
-            bg: 'bg-purple-500/20',
-            border: 'border-purple-500/30',
-            text: 'text-purple-400',
-            shadow: 'shadow-purple-500/20'
-        },
-        {
-            icon: <Zap className="w-6 h-6" />,
-            ...text.steps[2],
-            bg: 'bg-emerald-500/20',
-            border: 'border-emerald-500/30',
-            text: 'text-emerald-400',
-            shadow: 'shadow-emerald-500/20'
-        },
-        {
-            icon: <Database className="w-6 h-6" />,
-            ...text.steps[3],
-            bg: 'bg-amber-500/20',
-            border: 'border-amber-500/30',
-            text: 'text-amber-400',
-            shadow: 'shadow-amber-500/20'
-        }
-    ];
+    const images = getWorkspaceText(lang).landingImages;
+    const rows = lang === 'vi'
+        ? [
+            {
+                id: 'query', label: 'Query', hint: 'Soạn, chạy và lưu câu lệnh',
+                title: 'Từ ý tưởng tới một query rõ ràng',
+                description: 'Soạn SQL trong Monaco, xem gợi ý schema và chia script thành các bước. Chọn lúc chạy, xem lại lịch sử và lưu query để quay lại mà không phải bắt đầu từ đầu.',
+                link: 'Xem hướng dẫn query', image: '/images/landing/query.webp', alt: images.queryEditor, icon: Terminal,
+            },
+            {
+                id: 'schema', label: 'Schema-ERD', hint: 'Hiểu cấu trúc và quan hệ',
+                title: 'Nhìn được các bảng kết nối với nhau',
+                description: 'Đi từ cây schema tới sơ đồ quan hệ. Chọn bảng cần xem, kéo bố cục và lưu ERD workspace; hình bên dưới là giao diện thật, không phải sơ đồ minh họa.',
+                link: 'Xem hướng dẫn ERD', image: '/images/landing/schema-erd.webp', alt: images.schemaErd, icon: GitGraph,
+            },
+            {
+                id: 'results', label: 'Kết quả', hint: 'Đọc dữ liệu, không đổi công cụ',
+                title: 'Đưa kết quả vào đúng ngữ cảnh',
+                description: 'Đọc các dòng trả về trên grid có phân trang, xem số lượng và thời gian thực thi. Dùng kết quả để xuất dữ liệu hoặc mở công cụ trực quan hóa khi cần.',
+                link: 'Xem hướng dẫn kết quả', image: '/images/landing/results.webp', alt: images.resultsGrid, icon: BarChart3,
+            },
+        ]
+        : [
+            {
+                id: 'query', label: 'Query', hint: 'Write, run, and save statements',
+                title: 'Turn an idea into a clear query',
+                description: 'Write SQL in Monaco, inspect schema suggestions, and organize a script into steps. Decide when to run it, review history, and save your query without starting from scratch.',
+                link: 'Read the query guide', image: '/images/landing/query.webp', alt: images.queryEditor, icon: Terminal,
+            },
+            {
+                id: 'schema', label: 'Schema-ERD', hint: 'Explore structure and relations',
+                title: 'See how your tables connect',
+                description: 'Move from the schema tree to a relationship diagram. Select the tables that matter, arrange the layout, and save the ERD workspace. The capture below shows the actual interface.',
+                link: 'Read the ERD guide', image: '/images/landing/schema-erd.webp', alt: images.schemaErd, icon: GitGraph,
+            },
+            {
+                id: 'results', label: 'Results', hint: 'Read data without switching tools',
+                title: 'Put your results in context',
+                description: 'Inspect returned rows in a paginated grid alongside counts and execution timing. Export the data or open visualization tools when the result needs another perspective.',
+                link: 'Read the results guide', image: '/images/landing/results.webp', alt: images.resultsGrid, icon: BarChart3,
+            },
+        ];
 
     return (
-        <section className="py-20 md:py-32 relative overflow-hidden">
-            <div className="container mx-auto px-4 sm:px-6">
-                <div className="text-center mb-20">
-                    <h2 className="text-3xl md:text-5xl font-black tracking-tighter mb-4 uppercase">
-                        {text.title}
-                    </h2>
-                    <p className="text-muted-foreground font-medium max-w-2xl mx-auto">
-                        {text.description}
-                    </p>
+        <section id="workflows" className="lp-section">
+            <div className="lp-container">
+                <div className="lp-section-heading">
+                    <span className="lp-eyebrow">{lang === 'vi' ? 'Một workspace, ba cách khám phá' : 'One workspace, three ways to explore'}</span>
+                    <h2 className="lp-h2 mt-4">{lang === 'vi' ? 'Viết. Khám phá. Đọc kết quả.' : 'Write. Explore. Read the results.'}</h2>
+                    <p className="lp-body mt-4">{lang === 'vi' ? 'Chọn một công việc để xem đúng giao diện của nó.' : 'Choose a workflow to see its actual interface.'}</p>
                 </div>
-
-                <div className="relative">
-                    <div className="hidden lg:block absolute top-1/2 left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-y-1/2 z-0" />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 relative z-10">
-                        {steps.map((step, i) => (
-                            <motion.div
-                                key={i}
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ delay: i * 0.2 }}
-                                className="flex flex-col items-center text-center"
-                            >
-                                <motion.div
-                                    whileHover={{ scale: 1.1, rotate: 360 }}
-                                    transition={{ duration: 0.5 }}
-                                    className={`w-16 h-16 rounded-3xl ${step.bg} border ${step.border} flex items-center justify-center mb-6 shadow-2xl ${step.shadow}`}
-                                >
-                                    <div className={step.text}>
-                                        {step.icon}
-                                    </div>
-                                </motion.div>
-                                <h3 className="text-lg font-black mb-3 uppercase tracking-tight">{step.title}</h3>
-                                <p className="text-sm text-muted-foreground leading-relaxed px-4">{step.description}</p>
-                            </motion.div>
+                <Tabs defaultValue="query">
+                    <TabsList className="lp-showcase-tabs" aria-label={lang === 'vi' ? 'Các công việc dữ liệu' : 'Data workflows'}>
+                        {rows.map(row => (
+                            <TabsTrigger key={row.id} value={row.id} className="lp-showcase-trigger">
+                                <span className="lp-showcase-icon"><row.icon className="h-5 w-5" aria-hidden="true" /></span>
+                                <span><strong>{row.label}</strong><small>{row.hint}</small></span>
+                            </TabsTrigger>
                         ))}
-                    </div>
-                </div>
+                    </TabsList>
+                    {rows.map(row => (
+                        <TabsContent key={row.id} value={row.id} className="lp-tabpanel m-0">
+                            <div className="lp-showcase-layout">
+                                <div className="lp-showcase-copy">
+                                    <span className="lp-kicker">{row.label}</span>
+                                    <h3>{row.title}</h3>
+                                    <p className="lp-body">{row.description}</p>
+                                    <a href={publicPath(lang === 'en' ? 'en' : 'vi', `/docs/${row.id === 'query' ? 'editor' : row.id === 'schema' ? 'erd' : 'results'}`)} className="lp-inline-link">{row.link}<ArrowRight className="h-4 w-4" aria-hidden="true" /></a>
+                                </div>
+                                <LandingScreenshot src={row.image} alt={row.alt} lang={lang} />
+                            </div>
+                        </TabsContent>
+                    ))}
+                </Tabs>
             </div>
         </section>
     );

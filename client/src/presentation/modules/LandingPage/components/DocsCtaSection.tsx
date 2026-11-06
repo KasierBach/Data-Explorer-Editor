@@ -1,47 +1,37 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { BookOpen, Layers, ExternalLink } from 'lucide-react';
-import { Button } from '@/presentation/components/ui/button';
-import { getWorkspaceText } from '@/core/utils/workspaceText';
+import { ArrowRight, BookOpen, Globe, Terminal } from 'lucide-react';
+import { SiDocker, SiGithub } from 'react-icons/si';
+import { publicPath } from '@/core/seo/publicRoutes';
 
 interface DocsCtaSectionProps {
     lang: string;
     addToRevealRefs: (el: HTMLDivElement | null) => void;
+    isAuthenticated: boolean;
 }
 
-export const DocsCtaSection: React.FC<DocsCtaSectionProps> = ({ lang, addToRevealRefs }) => {
-    const navigate = useNavigate();
-    const text = getWorkspaceText(lang).docsCta;
+export const DocsCtaSection: React.FC<DocsCtaSectionProps> = ({ lang, addToRevealRefs, isAuthenticated }) => {
+    const vi = lang === 'vi';
+    const repository = 'https://github.com/KasierBach/Data-Explorer-Editor';
+    const workspaceHref = isAuthenticated ? '/sql-explorer' : '/login';
+    const paths = [
+        { icon: Globe, title: vi ? 'Mở trên web' : 'Open on the web', description: vi ? 'Vào workspace bằng trình duyệt. Đăng nhập để bắt đầu.' : 'Use the workspace in your browser. Sign in to get started.', action: vi ? 'Mở workspace' : 'Open workspace', href: workspaceHref, external: false },
+        { icon: SiDocker, title: vi ? 'Chạy local với Docker' : 'Run locally with Docker', description: vi ? 'Tự build và chạy trên máy của bạn. Xem Quick Start để cấu hình.' : 'Build and run on your machine. Follow Quick Start for configuration.', action: vi ? 'Xem Quick Start' : 'Read Quick Start', href: `${repository}#quick-start`, external: true },
+        { icon: SiGithub, title: vi ? 'Khám phá source' : 'Explore the source', description: vi ? 'Mã nguồn mở. Xem code, báo lỗi hoặc đóng góp.' : 'Open source. Explore the code, report issues, or contribute.', action: vi ? 'Mở GitHub' : 'View on GitHub', href: repository, external: true },
+    ];
 
     return (
-        <section id="docs" className="pb-32 relative">
-            <div className="container mx-auto px-4 sm:px-6">
-                <div ref={addToRevealRefs} className="reveal glass-panel p-8 md:p-12 rounded-[2.5rem] border-white/5 bg-gradient-to-r from-background to-muted/20 flex flex-col md:flex-row items-center justify-between gap-10">
-                    <div className="max-w-xl space-y-6">
-                        <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase leading-none">
-                            {text.title}
-                        </h2>
-                        <p className="text-lg text-muted-foreground/80 font-medium">
-                            {text.description}
-                        </p>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5">
-                                <BookOpen className="w-5 h-5 text-blue-400" />
-                                <span className="text-xs font-bold">{text.apiReference}</span>
-                            </div>
-                            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/5">
-                                <Layers className="w-5 h-5 text-purple-400" />
-                                <span className="text-xs font-bold">{text.architecture}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <Button size="lg" onClick={() => navigate('/docs')} className="h-16 px-12 rounded-2xl bg-white text-black hover:bg-gray-200 shadow-2xl transition-all hover:scale-105 active:scale-95 flex items-center gap-3">
-                        <span className="text-xs font-black uppercase tracking-[0.2em]">
-                            {text.openDocumentation}
-                        </span>
-                        <ExternalLink className="w-5 h-5" />
-                    </Button>
+        <section id="get-started" className="lp-section lp-final-cta">
+            <div className="lp-container" ref={addToRevealRefs}>
+                <div className="lp-section-heading"><span className="lp-kicker">{vi ? 'BẮT ĐẦU THEO CÁCH CỦA BẠN' : 'START YOUR WAY'}</span><h2 className="lp-h2">{vi ? 'Sẵn sàng khi bạn cần.' : 'Ready when you are.'}</h2><p className="lp-body mt-4">{vi ? 'Dùng web app hoặc tự chạy local. Không cần tìm một bản desktop để tải.' : 'Use the web app or run it locally. No desktop download required.'}</p></div>
+                <div className="lp-access-grid">
+                    {paths.map(path => (
+                        <article className="lp-access-card" key={path.title}>
+                            <path.icon className="h-7 w-7" aria-hidden="true" /><h3>{path.title}</h3><p>{path.description}</p>
+                            <a href={path.href} target={path.external ? '_blank' : undefined} rel={path.external ? 'noopener noreferrer' : undefined} className="lp-inline-link">{path.action}<ArrowRight className="h-4 w-4" aria-hidden="true" /></a>
+                        </article>
+                    ))}
                 </div>
+                <p className="lp-access-note"><Terminal className="h-4 w-4" aria-hidden="true" />{vi ? 'Docker Compose là cấu hình local development; triển khai production cần cấu hình riêng.' : 'Docker Compose is a local-development setup; production deployment needs separate configuration.'}<a href={publicPath(vi ? 'vi' : 'en', '/docs')}><BookOpen className="h-4 w-4" aria-hidden="true" />{vi ? 'Đọc tài liệu' : 'Read the docs'}</a></p>
             </div>
         </section>
     );

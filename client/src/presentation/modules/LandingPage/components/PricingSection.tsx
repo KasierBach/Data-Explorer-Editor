@@ -1,6 +1,5 @@
 import React from 'react';
 import { Check, CreditCard } from 'lucide-react';
-import { Button } from '@/presentation/components/ui/button';
 import { Badge } from '@/presentation/components/ui/badge';
 import { billingPlans } from '@/core/billing/billingPlans';
 import { cn } from '@/lib/utils';
@@ -31,84 +30,75 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ lang, addToRevea
         })
         : billingPlans;
 
-
-    const handleOpenBilling = () => {
-        window.location.href = '/sql-explorer';
-    };
-
     return (
-        <section id="pricing" className="relative py-20">
-            <div className="container mx-auto px-4 sm:px-6">
-                <div ref={addToRevealRefs} className="reveal mx-auto mb-12 max-w-2xl text-center">
-                    <h2 className="mb-4 text-3xl font-semibold tracking-normal md:text-5xl">
+        <section id="pricing" className="lp-section">
+            <div className="lp-container">
+                <div ref={addToRevealRefs} className="mx-auto mb-12 max-w-2xl text-center">
+                    <h2 className="lp-h2" style={{ color: 'var(--lp-text)' }}>
                         {text.title}
                     </h2>
-                    <p className="text-base font-medium text-muted-foreground md:text-lg">
+                    <p className="lp-body mt-4">
                         {text.description}
                     </p>
                 </div>
 
-                <div className="mx-auto grid max-w-5xl gap-4 md:grid-cols-3">
-                    {plans.map((plan, index) => {
+                <div className="lp-pricing-grid">
+                    {plans.map((plan) => {
                         const isPopular = plan.code === 'pro_yearly';
                         return (
                             <div
                                 key={plan.code}
-                                ref={addToRevealRefs}
-                                className={cn(
-                                    'reveal flex min-h-[420px] flex-col rounded-lg border bg-card p-6 transition-colors',
-                                    isPopular
-                                        ? 'border-blue-500/50 bg-blue-500/5'
-                                        : 'border-border/70',
-                                    `stagger-${index + 1}`,
-                                )}
+                                data-featured={isPopular ? 'true' : undefined}
+                                className="lp-pricing-card"
+                                style={{
+                                    backgroundColor: 'var(--lp-surface)',
+                                    borderColor: isPopular ? 'var(--lp-accent)' : 'var(--lp-border)',
+                                }}
                             >
-                                <div className="mb-5 flex items-start justify-between gap-3">
-                                    <div>
-                                        <h3 className="text-lg font-semibold">{plan.name}</h3>
-                                        <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
+                                <div className="lp-plan-header">
+                                    <div className="lp-plan-heading">
+                                        <h3 className="text-lg font-semibold" style={{ color: 'var(--lp-text)' }}>{plan.name}</h3>
+                                        {isPopular && (
+                                            <Badge className="lp-plan-badge shrink-0 whitespace-nowrap text-white" style={{ backgroundColor: 'var(--lp-accent)' }}>{text.bestValue}</Badge>
+                                        )}
                                     </div>
-                                    {isPopular && (
-                                        <Badge className="bg-blue-600 text-white">{text.bestValue}</Badge>
-                                    )}
+                                    <p className="lp-plan-description" style={{ color: 'var(--lp-muted)' }}>{plan.description}</p>
                                 </div>
 
-                                <div className="mb-5">
-                                    <div className="text-3xl font-semibold">{plan.amountVnd}</div>
-                                    <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                                <div className="lp-plan-price">
+                                    <div className="lp-plan-amount" style={{ color: 'var(--lp-text)' }}>{plan.amountVnd}</div>
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm" style={{ color: 'var(--lp-muted)' }}>
                                         <span>{plan.displayAmountUsd}</span>
                                         <span>/ {plan.cadence}</span>
                                     </div>
                                 </div>
 
-                                <div className="mb-5 h-px bg-border/70" />
+                                <div className="lp-plan-divider" style={{ backgroundColor: 'var(--lp-border)' }} />
 
                                 <ul className="mb-6 flex-1 space-y-3">
                                     {plan.features.map((feature) => (
-                                        <li key={feature} className="flex items-start gap-2 text-sm text-muted-foreground">
-                                            <Check className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
+                                        <li key={feature} className="flex items-start gap-2 text-sm" style={{ color: 'var(--lp-muted)' }}>
+                                            <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--lp-accent)' }} aria-hidden="true" />
                                             <span>{feature}</span>
                                         </li>
                                     ))}
                                 </ul>
 
-                                <Button
-                                    type="button"
-                                    className="w-full gap-2"
-                                    variant={plan.code === 'free' ? 'outline' : 'default'}
-                                    onClick={handleOpenBilling}
+                                <a
+                                    href="/sql-explorer"
+                                    className={cn('lp-button w-full', plan.code === 'free' ? 'lp-button-secondary' : 'lp-button-primary')}
                                 >
-                                    <CreditCard className="h-4 w-4" />
+                                    <CreditCard className="h-4 w-4" aria-hidden="true" />
                                     {plan.code === 'free'
                                         ? text.openWorkspace
                                         : text.upgradeInProfile}
-                                </Button>
+                                </a>
                             </div>
                         );
                     })}
                 </div>
 
-                <p className="mx-auto mt-6 max-w-3xl text-center text-xs text-muted-foreground">
+                <p className="mx-auto mt-6 max-w-3xl text-center text-xs" style={{ color: 'var(--lp-muted)' }}>
                     {text.footerNote}
                 </p>
             </div>

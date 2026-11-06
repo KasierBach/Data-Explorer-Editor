@@ -1,79 +1,71 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { build } from 'vite';
+import react from '@vitejs/plugin-react';
 
-export const PUBLIC_PAGES = {
-  '/': {
-    title: 'Data Explorer - Multi-Engine Database IDE',
-    description: 'A unified workspace for PostgreSQL, MySQL, SQL Server, and MongoDB with AI-assisted querying, schema exploration, ERD tools, and team-aware access controls.',
-  },
-  '/docs': {
-    title: 'Documentation | Data Explorer',
-    description: 'Install, configure, deploy, and operate Data Explorer with production-ready guidance.',
-  },
-  '/changelog': {
-    title: 'Changelog | Data Explorer',
-    description: 'Review the latest Data Explorer product improvements, fixes, and operational changes.',
-  },
-  '/legal': {
-    title: 'Legal center | Data Explorer',
-    description: 'Review the operating commitments, privacy rules, and product terms behind Data Explorer.',
-  },
-  '/privacy': {
-    title: 'Privacy policy | Data Explorer',
-    description: 'How Data Explorer collects, uses, retains, and protects account and workspace information.',
-  },
-  '/terms': {
-    title: 'Terms of service | Data Explorer',
-    description: 'The baseline rules for accessing, registering for, and using Data Explorer.',
-  },
-};
-
-const SITE_URL = 'https://data-explorer-editor.vercel.app';
-const OG_IMAGE = `${SITE_URL}/og-image.png`;
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function escapeAttribute(value) {
-  return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
+  return String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
 
-export function renderPage(source, route, metadata) {
-  const canonical = `${SITE_URL}${route === '/' ? '' : route}`;
-  const title = escapeAttribute(metadata.title);
-  const description = escapeAttribute(metadata.description);
-  const staticContent = [
-    '<main data-static-content hidden>',
-    `    <h1>${title}</h1>`,
-    `    <p>${description}</p>`,
-    '  </main>',
+export function renderPage(source, route, rendered) {
+  if (!rendered?.html?.includes('<main') || rendered.html.includes('data-static-content')) {
+    throw new Error(`Missing rendered public content for ${route.path}`);
+  }
+  const attributes = values => Object.entries(values).map(([name, value]) => `${name}="${escapeAttribute(value)}"`).join(' ');
+  const head = [
+    `<title data-public-seo>${escapeAttribute(rendered.tags.title)}</title>`,
+    ...rendered.tags.meta.map(meta => `<meta ${attributes(meta)} data-public-seo />`),
+    ...rendered.tags.links.map(link => `<link ${attributes(link)} data-public-seo />`),
+    `<script type="application/ld+json" data-public-seo>${rendered.tags.structuredData}</script>`,
   ].join('\n  ');
-  const socialTags = [
-    `<link rel="canonical" href="${canonical}" data-static-seo />`,
-    '<meta name="robots" content="index, follow" data-static-seo />',
-    '<meta property="og:type" content="website" data-static-seo />',
-    `<meta property="og:url" content="${canonical}" data-static-seo />`,
-    `<meta property="og:title" content="${title}" data-static-seo />`,
-    `<meta property="og:description" content="${description}" data-static-seo />`,
-    `<meta property="og:image" content="${OG_IMAGE}" data-static-seo />`,
-    '<meta name="twitter:card" content="summary_large_image" data-static-seo />',
-    '<script src="/seo-hydrate.js"></script>',
-  ].join('\n  ');
-
   return source
-    .replace(/<title>.*?<\/title>/s, `<title>${title}</title>`)
-    .replace(/<meta name="description"[\s\S]*?\/>/, `<meta name="description" content="${description}" />`)
-    .replace('<!-- Dynamic meta tags are managed by react-helmet-async in SEO component -->', socialTags)
-    .replace('<div id="root"></div>', `<div id="root">${staticContent}</div>`);
+    .replace(/<html\s+lang="[^"]*"/, `<html lang="${route.lang}"`)
+    .replace(/<title\b[^>]*>[\s\S]*?<\/title>/g, '')
+    .replace(/<meta\b[^>]*name="(?:description|robots|googlebot)"[^>]*>/g, '')
+    .replace('<!-- public-head -->', head)
+    .replace('<div id="root"></div>', `<div id="root" data-public-rendered data-public-path="${escapeAttribute(route.path)}">${rendered.html}</div>`);
 }
 
 export async function prerender(distDir) {
   const source = await readFile(path.join(distDir, 'index.html'), 'utf8');
-  for (const [route, metadata] of Object.entries(PUBLIC_PAGES)) {
-    const outputDir = route === '/' ? distDir : path.join(distDir, route.slice(1));
-    await mkdir(outputDir, { recursive: true });
-    await writeFile(path.join(outputDir, 'index.html'), renderPage(source, route, metadata));
+  if (!source.includes('<!-- public-head -->') || !source.includes('<div id="root"></div>')) throw new Error('Public render template markers are missing');
+  const publicStyles = (await readdir(path.join(distDir, 'assets'))).filter(file => /^PublicSite-.*\.css$/.test(file));
+  if (publicStyles.length !== 1) throw new Error('Public stylesheet was not emitted exactly once');
+  const publicSource = source.replace('</head>', `<link rel="stylesheet" href="/assets/${publicStyles[0]}" />\n</head>`);
+  const renderDir = path.join(root, 'node_modules/.cache/data-explorer-public-render');
+  await build({
+    configFile: false,
+    root,
+    envDir: false,
+    publicDir: false,
+    plugins: [react()],
+    resolve: { alias: { '@': path.join(root, 'src') } },
+    build: {
+      ssr: path.join(root, 'src/entry-public-server.tsx'),
+      outDir: renderDir,
+      emptyOutDir: true,
+      minify: false,
+      rollupOptions: { output: { entryFileNames: 'public-render.mjs' } },
+    },
+  });
+  const renderer = await import(pathToFileURL(path.join(renderDir, 'public-render.mjs')).href);
+  const routes = renderer.listPublicRoutes();
+  await writeFile(path.join(distDir, 'app.html'), source.replace('<!-- public-head -->', ''));
+  for (const route of routes) {
+    const rendered = await renderer.renderPublicPage(route);
+    const file = route.path === '/' ? 'index.html' : `${route.path.slice(1)}.html`;
+    const target = path.join(distDir, file);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, renderPage(publicSource, route, rendered));
   }
+  await writeFile(path.join(distDir, 'public-routes.json'), `${JSON.stringify(routes.map(route => ({ path: route.path, lang: route.lang, title: route.title, canonical: route.canonical })))}\n`);
+  await writeFile(path.join(distDir, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${routes.map(route => `  <url><loc>${escapeAttribute(route.canonical)}</loc></url>`).join('\n')}\n</urlset>\n`);
+  console.log(`Rendered ${routes.length} public pages with visible content and metadata.`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  await prerender(path.resolve('dist'));
+  await prerender(path.join(root, 'dist'));
 }

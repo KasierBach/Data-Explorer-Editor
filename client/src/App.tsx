@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState, useEffect, Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { LoginPage } from '@/presentation/pages/LoginPage'
 import { OnboardingPage } from '@/presentation/pages/OnboardingPage'
-import { LandingPage } from '@/presentation/pages/LandingPage'
+import { PublicRoutePage } from '@/presentation/public/PublicRoutePage'
+import { listPublicRoutes } from '@/core/seo/publicRoutes'
 import { ForgotPasswordPage } from '@/presentation/pages/ForgotPasswordPage'
 import { RequireAuth } from '@/presentation/components/RequireAuth'
 import { useTheme } from '@/presentation/components/theme-provider'
@@ -14,6 +16,7 @@ import { AuthService } from '@/core/services/AuthService'
 import { useNotifications } from '@/presentation/hooks/useNotifications'
 import { getWorkspaceText } from '@/core/utils/workspaceText'
 
+import { NotFoundPage } from '@/presentation/pages/NotFoundPage';
 import { Toaster } from 'sonner';
 import { DestructiveQueryDialog } from '@/presentation/components/Dialogs/DestructiveQueryDialog';
 import { CommandPalette } from '@/presentation/components/shared/CommandPalette';
@@ -28,17 +31,14 @@ const isAppTheme = (value: unknown): value is AppTheme => (
 
 const AppShell = lazy(() => import('@/presentation/modules/Layout/AppShell').then((m) => ({ default: m.AppShell })))
 const NoSqlShell = lazy(() => import('@/presentation/modules/Layout/NoSqlShell').then((m) => ({ default: m.NoSqlShell })))
-const DocumentationPage = lazy(() => import('@/presentation/pages/DocumentationPage').then((m) => ({ default: m.DocumentationPage })))
 const ERDPage = lazy(() => import('@/presentation/pages/ERDPage').then((m) => ({ default: m.ERDPage })))
 const VisualizePage = lazy(() => import('@/presentation/pages/VisualizePage').then((m) => ({ default: m.VisualizePage })))
 const AdminDashboardPage = lazy(() => import('@/presentation/pages/Admin/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })))
-const ChangelogPage = lazy(() => import('@/presentation/pages/ChangelogPage').then((m) => ({ default: m.ChangelogPage })))
 const TeamPage = lazy(() => import('@/presentation/pages/TeamPage').then((m) => ({ default: m.TeamPage })))
 const BillingReturnPage = lazy(() => import('@/presentation/pages/BillingReturnPage').then((m) => ({ default: m.BillingReturnPage })))
-const LegalCenterPage = lazy(() => import('@/presentation/pages/LegalPages').then((m) => ({ default: m.LegalCenterPage })))
-const PrivacyPage = lazy(() => import('@/presentation/pages/LegalPages').then((m) => ({ default: m.PrivacyPage })))
-const TermsPage = lazy(() => import('@/presentation/pages/LegalPages').then((m) => ({ default: m.TermsPage })))
 const LegalConsentPage = lazy(() => import('@/presentation/pages/LegalPages').then((m) => ({ default: m.LegalConsentPage })))
+
+const publicRoutes = listPublicRoutes();
 
 function RouteFallback() {
   const { lang } = useAppStore()
@@ -101,6 +101,12 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <Helmet>
+          <title>Data Explorer</title>
+          <meta name="description" content="SQL and NoSQL data workspace." />
+          <meta name="robots" content="noindex, nofollow" />
+          <meta name="googlebot" content="noindex, nofollow" />
+        </Helmet>
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-foreground focus:ring-2 focus:ring-ring">
           Skip to content
         </a>
@@ -108,16 +114,11 @@ export function App() {
           <div id="main-content" tabIndex={-1}>
             <Suspense fallback={<RouteFallback />}>
               <Routes>
-                <Route path="/" element={<LandingPage />} />
+                {publicRoutes.map(route => <Route key={route.path} path={route.path} element={<PublicRoutePage route={route} />} />)}
                 <Route path="/login" element={<RedirectIfAuth><LoginPage /></RedirectIfAuth>} />
                 <Route path="/forgot-password" element={<RedirectIfAuth><ForgotPasswordPage /></RedirectIfAuth>} />
                 <Route path="/legal-consent" element={<RequireAuth><LegalConsentPage /></RequireAuth>} />
                 <Route path="/onboarding" element={<RequireAuth><OnboardingPage /></RequireAuth>} />
-                <Route path="/docs" element={<DocumentationPage />} />
-                <Route path="/changelog" element={<ChangelogPage />} />
-                <Route path="/legal" element={<LegalCenterPage />} />
-                <Route path="/privacy" element={<PrivacyPage />} />
-                <Route path="/terms" element={<TermsPage />} />
                 <Route path="/teams" element={<RequireAuth><TeamPage /></RequireAuth>} />
                 <Route path="/billing/return" element={<RequireAuth><BillingReturnPage /></RequireAuth>} />
 
@@ -146,7 +147,7 @@ export function App() {
                 <Route path="/nosql-explorer/erd" element={<RequireAuth><ERDPage /></RequireAuth>} />
                 <Route path="/nosql-explorer/visualize" element={<RequireAuth><VisualizePage /></RequireAuth>} />
 
-                <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>
           </div>
