@@ -546,6 +546,124 @@ test('public URL routing, OG image and sitemap expose correct HTTP contracts', a
   expect(login.headers()['x-robots-tag']).toContain('noindex');
 });
 
+test('application URLs serve the SPA shell instead of public content or a server 404', async ({ request }) => {
+  for (const path of ['/login', '/forgot-password', '/legal-consent', '/onboarding', '/sql-explorer', '/sql-explorer/erd', '/nosql-explorer', '/admin', '/teams', '/billing/return']) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+    expect(response.headers()['x-robots-tag'], path).toBe('noindex, nofollow');
+    expect(response.headers()['content-type'], path).toContain('text/html');
+    const html = await response.text();
+    expect(html, path).toContain('<div id="root"></div>');
+    expect(html, path).toMatch(/<script type="module"[^>]+src="\/assets\//);
+    expect(html, path).not.toMatch(/data-public-rendered|data-static-content|Page not found/);
+    const head = await request.head(path);
+    expect(head.status(), path).toBe(200);
+    expect(head.headers()['x-robots-tag'], path).toBe('noindex, nofollow');
+  }
+});
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`Docs language pill stays compact on desktop and preserves locale links in ${theme}`, async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.addInitScript(value => localStorage.setItem('vite-ui-theme', value), theme);
+    await mockAuthenticatedApi(page);
+    await page.goto('/docs/editor#query');
+    await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+    const control = page.locator('.public-docs header [data-appearance="pill"]:visible');
+    const vietnamese = control.getByRole('link', { name: 'VN', exact: true });
+    const english = control.getByRole('link', { name: 'EN', exact: true });
+    await expect(control).toHaveCount(1);
+    await expect(vietnamese).toHaveAttribute('aria-current', 'page');
+    await expect(english).toHaveAttribute('href', '/en/docs/editor#query');
+    const compact = await page.evaluate(() => matchMedia('(min-width: 640px) and (hover: hover) and (pointer: fine)').matches);
+    await expect.poll(() => control.evaluate(element => ({
+      padding: getComputedStyle(element).padding,
+      background: getComputedStyle(element).backgroundColor,
+      border: getComputedStyle(element).borderTopColor,
+    }))).toEqual({ padding: '4px', background: theme === 'dark' ? 'rgb(12, 20, 40)' : 'rgb(238, 242, 251)', border: theme === 'dark' ? 'rgb(37, 52, 81)' : 'rgb(214, 222, 238)' });
+    await expect(vietnamese).toHaveCSS('border-radius', '8px');
+    await expect(vietnamese).toHaveCSS('box-shadow', 'none');
+    if (compact) {
+      expect((await control.boundingBox())!.height).toBeLessThan(40);
+    } else {
+      const box = await english.boundingBox();
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+    }
+    await page.screenshot({ path: test.info().outputPath(`docs-language-${theme}.png`) });
+    await english.click();
+    await expect(page).toHaveURL(/\/en\/docs\/editor#query$/);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('SQL Editor');
+    await page.reload();
+    await expect(control.getByRole('link', { name: 'EN', exact: true })).toHaveAttribute('aria-current', 'page');
+    await expect(control.getByRole('link', { name: 'VN', exact: true })).toHaveAttribute('href', '/docs/editor#query');
+  });
+}
+
+for (const width of [390, 844]) {
+  test(`Docs language pill retains touch targets at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: width === 844 ? 390 : 844 });
+    await mockAuthenticatedApi(page);
+    await page.goto('/docs/editor');
+    const control = page.locator('.public-docs header [data-appearance="pill"]:visible');
+    await expect(control).toHaveCount(1);
+    const touch = await page.evaluate(() => !matchMedia('(min-width: 640px) and (hover: hover) and (pointer: fine)').matches);
+    for (const link of await control.getByRole('link').all()) {
+      const box = await link.boundingBox();
+      if (touch) {
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+      }
+    }
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: test.info().outputPath(`docs-language-${width}.png`) });
+    await control.getByRole('link', { name: 'EN', exact: true }).click();
+    await expect(page).toHaveURL(/\/en\/docs\/editor$/);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  });
+}
+
+for (const route of ['/sql-explorer', '/nosql-explorer'] as const) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`${route} language pill matches landing and keeps workspace locale in ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await mockAuthenticatedApi(page);
+      await seedPersistedWorkspace(page, { tabs: [], activeTabId: null, nosqlActiveCollection: null, isSidebarOpen: false, isAiPanelOpen: false });
+      await page.addInitScript(value => {
+        localStorage.setItem('vite-ui-theme', value);
+        if (!sessionStorage.getItem('language-pill-initialized')) {
+          localStorage.setItem('lang', 'en');
+          sessionStorage.setItem('language-pill-initialized', 'true');
+        }
+      }, theme);
+      await page.goto(route);
+      const control = page.locator('main [data-appearance="pill"]');
+      await expect(control).toHaveCount(1);
+      const vietnamese = control.getByRole('button', { name: 'VN', exact: true });
+      const english = control.getByRole('button', { name: 'EN', exact: true });
+      await expect(english).toHaveAttribute('aria-pressed', 'true');
+      await expect(english).toHaveCSS('box-shadow', 'none');
+      await expect.poll(() => control.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(theme === 'dark' ? 'rgb(12, 20, 40)' : 'rgb(238, 242, 251)');
+      const compact = await page.evaluate(() => matchMedia('(min-width: 640px) and (hover: hover) and (pointer: fine)').matches);
+      if (compact) expect((await control.boundingBox())!.height).toBeLessThan(40);
+      await page.screenshot({ path: test.info().outputPath(`workspace-language-${theme}.png`) });
+      await vietnamese.click();
+      await expect(vietnamese).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+      expect(await page.evaluate(() => localStorage.getItem('lang'))).toBe('vi');
+      await page.reload();
+      await expect(vietnamese).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
+      await english.focus();
+      await page.keyboard.press('Enter');
+      await expect(english).toHaveAttribute('aria-pressed', 'true');
+      expect(await page.evaluate(() => localStorage.getItem('lang'))).toBe('en');
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+    });
+  }
+}
+
 test('public language switch preserves docs location and Back/Forward history', async ({ page }) => {
   await page.goto('/docs/editor');
   const english = page.locator('header').getByRole('link', { name: 'EN', exact: true });

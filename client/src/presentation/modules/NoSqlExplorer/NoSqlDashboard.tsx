@@ -45,7 +45,7 @@ export const NoSqlDashboard: React.FC = () => {
                                 <Database className="w-3.5 h-3.5" /> NoSQL
                             </span>
                         </div>
-                        <LanguageSwitcher />
+                        <LanguageSwitcher appearance="pill" />
                     </div>
                     <p className="text-muted-foreground text-base md:text-lg max-w-3xl">
                         {text.welcomeDescription}
