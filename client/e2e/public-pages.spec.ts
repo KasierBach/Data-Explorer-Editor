@@ -1207,43 +1207,84 @@ for (const lang of ['vi', 'en'] as const) {
 
 for (const lang of ['vi', 'en'] as const) {
   test(`landing header keeps its ${lang} navigation centered without overlapping controls`, async ({ page }) => {
+    await mockPublicNavigationSession(page);
     await page.setViewportSize({ width: 1917, height: 900 });
     await page.goto(lang === 'en' ? '/en' : '/');
+    await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+    await page.evaluate(() => document.fonts.ready);
 
-    for (const width of [1917, 1440, 1280, 1101]) {
-      await page.setViewportSize({ width, height: 900 });
-      await expect(page.locator('.lp-desktop-nav')).toBeVisible();
-      await expect.poll(() => page.locator('.lp-header-inner').evaluate(element => {
-        const header = element.closest('header')!.getBoundingClientRect();
-        const nav = element.querySelector('.lp-desktop-nav')!.getBoundingClientRect();
-        return Math.abs(nav.left + nav.width / 2 - (header.left + header.width / 2));
-      })).toBeLessThanOrEqual(1);
-      await expect.poll(() => page.locator('.lp-header-inner').evaluate(element => {
-        const brand = element.querySelector('.lp-brand')!.getBoundingClientRect();
-        const nav = element.querySelector('.lp-desktop-nav')!.getBoundingClientRect();
-        const actions = element.querySelector('.lp-header-actions')!.getBoundingClientRect();
-        return Math.min(nav.left - brand.right, actions.left - nav.right);
-      })).toBeGreaterThanOrEqual(16);
-      await expect.poll(() => page.locator('.lp-header-actions').evaluate(element => {
-        const language = element.querySelector('.lp-header-language > div')!.getBoundingClientRect();
-        const github = element.querySelector('.lp-github-link')!.getBoundingClientRect();
-        const theme = element.querySelector('button[aria-label*="giao diện"],button[aria-label*="theme"]')!.getBoundingClientRect();
-        const workspace = element.querySelector('.lp-header-cta')!.getBoundingClientRect();
-        const centers = [language, github, theme, workspace].map(box => box.y + box.height / 2);
-        return Math.max(...centers) - Math.min(...centers);
-      })).toBeLessThanOrEqual(1);
-      await expect.poll(() => page.locator('.lp-header-language').evaluate(element => {
-        const control = getComputedStyle(element.firstElementChild!);
-        const link = getComputedStyle(element.querySelector('a')!);
-        return {
-          padding: control.padding,
-          separatorVisible: Array.from(element.querySelectorAll('span[aria-hidden="true"]')).some(separator => getComputedStyle(separator).display !== 'none'),
-          minLinkHeight: link.minHeight,
-          linkPadding: link.padding,
-          linkRadius: link.borderRadius,
-        };
-      })).toEqual({ padding: '4px', separatorVisible: true, minLinkHeight: '0px', linkPadding: '4px 10px', linkRadius: '8px' });
-      expect((await page.locator('.lp-header-language > div').boundingBox())!.height).toBeLessThan(40);
+    for (const width of [1917, 1440, 1280, 1279, 1101]) {
+      await test.step(`${width}px desktop header`, async () => {
+        await page.setViewportSize({ width, height: 900 });
+        await expect(page.locator('.lp-desktop-nav')).toBeVisible();
+        await expect.poll(() => page.locator('.lp-header-inner').evaluate(element => {
+          const header = element.closest('header')!.getBoundingClientRect();
+          const nav = element.querySelector('.lp-desktop-nav')!.getBoundingClientRect();
+          return Math.abs(nav.left + nav.width / 2 - (header.left + header.width / 2));
+        })).toBeLessThanOrEqual(1);
+        await expect.poll(() => page.locator('.lp-header-inner').evaluate(element => {
+          const brand = element.querySelector('.lp-brand')!.getBoundingClientRect();
+          const nav = element.querySelector('.lp-desktop-nav')!.getBoundingClientRect();
+          const actions = element.querySelector('.lp-header-actions')!.getBoundingClientRect();
+          return Math.min(nav.left - brand.right, actions.left - nav.right);
+        })).toBeGreaterThanOrEqual(16);
+        await expect.poll(() => page.locator('.lp-header-actions').evaluate(element => {
+          const language = element.querySelector('.lp-header-language > div')!.getBoundingClientRect();
+          const github = element.querySelector('.lp-github-link')!.getBoundingClientRect();
+          const theme = element.querySelector('button[aria-label*="giao diện"],button[aria-label*="theme"]')!.getBoundingClientRect();
+          const workspace = element.querySelector('.lp-header-cta')!.getBoundingClientRect();
+          const centers = [language, github, theme, workspace].map(box => box.y + box.height / 2);
+          return Math.max(...centers) - Math.min(...centers);
+        })).toBeLessThanOrEqual(1);
+        await expect.poll(() => page.locator('.lp-header-language').evaluate(element => {
+          const control = getComputedStyle(element.firstElementChild!);
+          const link = getComputedStyle(element.querySelector('a')!);
+          return {
+            padding: control.padding,
+            separatorVisible: Array.from(element.querySelectorAll('span[aria-hidden="true"]')).some(separator => getComputedStyle(separator).display !== 'none'),
+            minLinkHeight: link.minHeight,
+            linkPadding: link.padding,
+            linkRadius: link.borderRadius,
+          };
+        })).toEqual({ padding: '4px', separatorVisible: true, minLinkHeight: '0px', linkPadding: '4px 10px', linkRadius: '8px' });
+        expect((await page.locator('.lp-header-language > div').boundingBox())!.height).toBeLessThan(40);
+        await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+      });
+    }
+  });
+
+  test(`landing header ${lang} preserves clearance with a wider system font near the desktop breakpoint`, async ({ page }) => {
+    await mockPublicNavigationSession(page);
+    await page.setViewportSize({ width: 1101, height: 900 });
+    await page.goto(lang === 'en' ? '/en' : '/');
+    await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+    await page.evaluate(() => document.fonts.ready);
+    await page.addStyleTag({ content: '.lp-header-inner { font-family: Verdana, sans-serif; }' });
+    const header = page.locator('.lp-header-inner');
+
+    for (const width of [1101, 1279, 1280, 1100]) {
+      await test.step(`${width}px wider-system-font header`, async () => {
+        await page.setViewportSize({ width, height: 900 });
+        const desktop = page.locator('.lp-desktop-nav');
+        if (width === 1100) {
+          await expect(desktop).toBeHidden();
+          await expect(page.locator('.lp-menu-button')).toBeVisible();
+          await expect(header).toHaveCSS('padding-left', '32px');
+        } else {
+          await expect(desktop).toBeVisible();
+          await expect(header).toHaveCSS('padding-left', width < 1280 ? '16px' : '32px');
+          await expectCenteredPageNavigation(page.locator('.lp-landing-header'), desktop);
+          await expect.poll(() => header.evaluate(element => {
+            const brand = element.querySelector('.lp-brand')!.getBoundingClientRect();
+            const nav = element.querySelector('.lp-desktop-nav')!.getBoundingClientRect();
+            const actions = element.querySelector('.lp-header-actions')!.getBoundingClientRect();
+            return Math.min(nav.left - brand.right, actions.left - nav.right);
+          })).toBeGreaterThanOrEqual(16);
+        }
+        await expect(header).toHaveCSS('padding-right', width > 1100 && width < 1280 ? '16px' : '32px');
+        await expect(header).toHaveCSS('height', '68px');
+        await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+      });
     }
   });
 
