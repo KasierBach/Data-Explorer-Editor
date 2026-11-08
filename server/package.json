@@ -114,6 +114,9 @@
     "@nestjs/platform-express": {
       "multer": "2.5.0"
     },
+    "@nestjs/swagger": {
+      "js-yaml": "5.4.1"
+    },
     "flatted": "3.4.3",
     "form-data": "4.0.6",
     "handlebars": "4.7.10",
