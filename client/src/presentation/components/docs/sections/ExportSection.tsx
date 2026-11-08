@@ -1,3 +1,4 @@
+import { publicPath } from '@/core/seo/publicRoutes';
 import { DocPageLayout, DocSection, Prose, CodeBlock, CodeLine, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
@@ -6,50 +7,49 @@ export function ExportSection({ lang }: Props) {
     const t = lang === 'vi';
     return (
         <DocPageLayout
-            title={t ? 'Xuất dữ liệu' : 'Data Export'}
+            title={t ? 'Xuất trang dữ liệu' : 'Export a data page'}
             subtitle={t
-                ? 'Chia sẻ và lưu trữ kết quả phân tích dưới nhiều định dạng chuyên nghiệp, từ CSV đến SQL scripts.'
-                : 'Share and store your analysis results in multiple professional formats, from CSV to SQL scripts.'}
+                ? 'DataGrid có CSV, JSON và SQL INSERT cho trang đã tải; Query Result chỉ có CSV trang hiện tại. Đây không phải backup toàn database.'
+                : 'DataGrid offers CSV, JSON and SQL INSERT for the loaded page; Query Result offers current-page CSV only. This is not a database backup.'}
         >
-            {/* Formats Overview */}
-            <DocSection title={t ? 'Định dạng xuất được hỗ trợ' : 'Supported Export Formats'}>
+            <DocSection title={t ? 'Định dạng trong DataGrid' : 'DataGrid formats'}>
                 <div className="space-y-4">
                     {[
                         {
-                            format: 'CSV / Excel', icon: '📊',
+                            format: 'CSV',
                             desc: t
-                                ? 'Xuất dữ liệu dạng comma-separated values. Có thể mở trực tiếp bằng Microsoft Excel, Google Sheets, hoặc bất kỳ phần mềm bảng tính nào. Headers cột được bao gồm theo mặc định.'
-                                : 'Export data as comma-separated values. Can be opened directly in Microsoft Excel, Google Sheets, or any spreadsheet software. Column headers included by default.',
-                            example: 'id,name,email,created_at\n1,"Alex Chen","alex@example.com","2024-01-15"\n2,"Sarah Miller","sarah@example.com","2024-02-20"'
+                                ? 'Có header cột và dữ liệu trang đã tải/sau lọc cục bộ. Có thể mở bằng spreadsheet, nhưng đây là CSV text, không phải file Excel XLSX.'
+                                : 'Includes headers and loaded/locally filtered page rows. A spreadsheet can open it, but this is CSV text, not an Excel XLSX file.',
+                            example: 'id,name\n1,Alex Chen\n2,Sarah Miller',
+                            filename: 'users_export.csv',
                         },
                         {
-                            format: 'JSON', icon: '📋',
+                            format: 'JSON',
                             desc: t
-                                ? 'Xuất dưới dạng mảng JSON objects. Mỗi bản ghi là một object với key là tên cột. Phù hợp để import vào ứng dụng web, NoSQL databases, hoặc xử lý bằng Python/JavaScript.'
-                                : 'Export as an array of JSON objects. Each record is an object with column names as keys. Suitable for importing into web apps, NoSQL databases, or processing with Python/JavaScript.',
-                            example: '[\n  {"id": 1, "name": "Alex Chen", "email": "alex@example.com"},\n  {"id": 2, "name": "Sarah Miller", "email": "sarah@example.com"}\n]'
+                                ? 'Mảng object theo tên cột trong trang đã tải. Giá trị nested đã có trong response được serialize, không quét thêm document/bảng liên quan.'
+                                : 'An array of objects keyed by columns in the loaded page. Nested values already in the response are serialized; it does not scan related documents/tables.',
+                            example: '[\n  {"id": 1, "name": "Alex Chen"},\n  {"id": 2, "name": "Sarah Miller"}\n]',
+                            filename: 'users_export.json',
                         },
                         {
-                            format: 'SQL INSERT', icon: '💾',
+                            format: 'SQL INSERT',
                             desc: t
-                                ? 'Tạo kịch bản SQL INSERT INTO cho từng bản ghi. Phù hợp để migrate dữ liệu giữa các database hoặc tạo seed data cho môi trường phát triển. Tự động escape các ký tự đặc biệt trong giá trị.'
-                                : 'Generate SQL INSERT INTO scripts for each record. Perfect for migrating data between databases or creating seed data for development environments. Automatically escapes special characters in values.',
-                            example: "INSERT INTO users (id, name, email) VALUES\n  (1, 'Alex Chen', 'alex@example.com'),\n  (2, 'Sarah Miller', 'sarah@example.com');"
+                                ? 'Một INSERT cho mỗi dòng của trang; quote identifier theo dialect hiện có và escape dấu nháy trong chuỗi. Không kèm schema DDL, index, FK hay bảo đảm type/engine portability.'
+                                : 'One INSERT per page row, with available dialect identifier quoting and string-quote escaping. No schema DDL, indexes, foreign keys or type/engine portability guarantee is included.',
+                            example: `INSERT INTO "public"."users" ("id", "name") VALUES (1, 'Alex Chen');\nINSERT INTO "public"."users" ("id", "name") VALUES (2, 'Sarah Miller');`,
+                            filename: 'users_export.sql',
                         },
-                    ].map((style, i) => (
-                        <div key={i} className="border rounded-2xl bg-card overflow-hidden">
+                    ].map((style) => (
+                        <div key={style.format} className="border rounded-2xl bg-card overflow-hidden">
                             <div className="flex items-center gap-3 p-5 border-b bg-muted/10">
-                                <span className="text-2xl">{style.icon}</span>
                                 <div>
                                     <span className="font-bold block">{style.format}</span>
                                     <span className="text-xs text-muted-foreground">{style.desc}</span>
                                 </div>
                             </div>
                             <div className="p-4">
-                                <CodeBlock title={t ? 'Ví dụ đầu ra' : 'Output Example'}>
-                                    {style.example.split('\n').map((line, j) => (
-                                        <CodeLine key={j}>{line}</CodeLine>
-                                    ))}
+                                <CodeBlock title={style.filename}>
+                                    {style.example.split('\n').map((line, j) => <CodeLine key={j}>{line}</CodeLine>)}
                                 </CodeBlock>
                             </div>
                         </div>
@@ -57,31 +57,39 @@ export function ExportSection({ lang }: Props) {
                 </div>
             </DocSection>
 
-            {/* How to Export */}
-            <DocSection title={t ? 'Cách xuất dữ liệu' : 'How to Export'}>
+            <DocSection title={t ? 'Xuất từ đúng bề mặt' : 'Export from the right surface'}>
                 <Prose>{t
-                    ? 'Sau khi chạy truy vấn và nhận kết quả trong Result Grid, bạn có thể xuất dữ liệu theo các bước sau:'
-                    : 'After running a query and receiving results in the Result Grid, you can export data using these steps:'}</Prose>
+                    ? 'Xác định bạn đang ở tab bảng DataGrid hay panel Query Result dưới SQL editor. Các nút và phạm vi không giống nhau.'
+                    : 'Identify whether you are in a table DataGrid tab or the SQL editor Query Result panel. Their controls and scope differ.'}</Prose>
                 <div className="space-y-3">
                     {[
-                        { step: '1', desc: t ? 'Nhìn vào góc trên bên phải của Result Grid — tìm icon Export (biểu tượng tải xuống ↓).' : 'Look at the top-right corner of the Result Grid — find the Export icon (download ↓ symbol).' },
-                        { step: '2', desc: t ? 'Click vào icon Export — một dropdown menu hiện ra với các tùy chọn: CSV, Excel (XLSX), JSON, hoặc SQL INSERT.' : 'Click the Export icon — a dropdown menu appears with options: CSV, Excel (XLSX), JSON, or SQL INSERT.' },
-                        { step: '3', desc: t ? 'Chọn định dạng mong muốn — file sẽ được tải xuống tự động với tên mặc định dựa trên tên tab hiện tại.' : 'Select your desired format — the file downloads automatically with a default name based on the current tab name.' },
-                    ].map((item, i) => (
-                        <div key={i} className="flex gap-4 items-start p-4 border rounded-xl bg-muted/20">
+                        { step: '1', desc: t ? 'DataGrid: tải trang cần xuất, kiểm tra filter cục bộ rồi mở menu Export/More của lưới và chọn CSV, JSON hoặc SQL INSERT.' : 'DataGrid: load the desired page, check local filters, open the grid Export/More menu and select CSV, JSON or SQL INSERT.' },
+                        { step: '2', desc: t ? 'Tên DataGrid dùng tên bảng: <tableName>_export.csv, .json hoặc .sql; đổi tên tab không đổi quy tắc này.' : 'DataGrid filenames use the table name: <tableName>_export.csv, .json or .sql; renaming a tab does not change this rule.' },
+                        { step: '3', desc: t ? 'Query Result: nút tải xuống xuất CSV của trang đang có trong response, tên query_result_<timestamp>.csv. Không có dropdown JSON/SQL/XLSX trên bề mặt này.' : 'Query Result: its download button exports the current response page as CSV, named query_result_<timestamp>.csv. There is no JSON/SQL/XLSX dropdown on this surface.' },
+                    ].map((item) => (
+                        <div key={item.step} className="flex gap-4 items-start p-4 border rounded-xl bg-muted/20">
                             <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shrink-0">{item.step}</div>
                             <p className="text-sm text-muted-foreground leading-relaxed pt-1">{item.desc}</p>
                         </div>
                     ))}
                 </div>
             </DocSection>
-
-            <Callout type="info">
-                <p className="font-bold">{t ? '📌 Lưu ý quan trọng' : '📌 Important Note'}</p>
+            <Callout type="warning">
+                <p className="font-bold">{t ? 'Chỉ trang đã tải, không phải toàn bộ kết quả' : 'Loaded page only, not the full result'}</p>
                 <p className="mt-1 text-muted-foreground">{t
-                    ? 'Tính năng Export xuất toàn bộ kết quả truy vấn (không chỉ trang hiện tại nếu đang phân trang). Nếu kết quả có hàng triệu bản ghi, hãy thêm LIMIT vào truy vấn trước khi xuất để tránh file quá lớn.'
-                    : 'The Export feature exports all query results (not just the current page if paginated). If results contain millions of records, add LIMIT to your query before exporting to avoid overly large files.'}</p>
+                    ? 'Cuộn hoặc chuyển qua mọi trang không tích lũy dữ liệu cho export; trang mới thay trang cũ. DataGrid xuất tất cả dòng trong row model trang hiện tại sau filter, không chỉ dòng đang nhìn trong viewport. Query Result xuất response trang hiện tại. Không có file backup đầy đủ hoặc XLSX ở đây.'
+                    : 'Scrolling or visiting every page does not accumulate data for export; each new page replaces the old one. DataGrid exports the current page row model after filtering, not only rows visible in the viewport. Query Result exports its current response page. Neither provides a complete backup or XLSX file here.'}</p>
             </Callout>
+            <Callout type="info">
+                <p className="text-sm">{t
+                    ? 'allowImportExport không phải chặn dữ liệu rời hệ thống: download được tạo từ dữ liệu đã nằm trong trình duyệt và không gọi endpoint export được bảo vệ. Dùng chính sách truy cập và phân phối dữ liệu phù hợp; kiểm tra SQL INSERT trước khi chạy ở database khác.'
+                    : 'allowImportExport is not an egress block: downloads are built from data already in the browser and do not call a guarded export endpoint. Apply suitable access/data-distribution policies, and review SQL INSERT output before running it in another database.'}</p>
+            </Callout>
+            <Prose>
+                <a href={publicPath(lang, '/docs/data-migration')}>{t ? 'Workflow chuyển dữ liệu có giới hạn' : 'Bounded data migration workflow'}</a>{' · '}
+                <a href={publicPath(lang, '/docs/data-handling')}>{t ? 'Phạm vi xử lý dữ liệu' : 'Data handling scope'}</a>{' · '}
+                <a href={publicPath(lang, '/docs/operational-limits')}>{t ? 'Giới hạn vận hành' : 'Operational limits'}</a>
+            </Prose>
         </DocPageLayout>
     );
 }

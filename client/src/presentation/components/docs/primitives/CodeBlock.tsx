@@ -8,14 +8,14 @@ interface CodeBlockProps {
 
 export function CodeBlock({ title, children }: CodeBlockProps) {
     return (
-        <div tabIndex={0} className="bg-slate-950 p-6 rounded-2xl border shadow-2xl font-mono text-sm text-slate-300 overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <div tabIndex={0} className="doc-code-block bg-slate-950 p-6 rounded-2xl border shadow-2xl font-mono text-sm text-slate-300 overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             {title && (
                 <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
                     <span className="text-xs text-slate-400 uppercase tracking-widest">{title}</span>
                     <Code className="w-4 h-4 text-slate-500" />
                 </div>
             )}
-            <div className="space-y-0.5">{children}</div>
+            <div className="doc-code-lines space-y-0.5" role="code">{children}</div>
         </div>
     );
 }

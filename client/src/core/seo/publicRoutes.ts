@@ -1,4 +1,4 @@
-import { DOCS_STRUCTURE } from '@/presentation/components/docs/DocSidebar';
+import { DOCS_TOPICS, getDocTopic } from '@/core/docs/docsCatalog';
 
 export type PublicLanguage = 'vi' | 'en';
 export type PublicPageKind = 'landing' | 'docs' | 'changelog' | 'legal' | 'privacy' | 'terms';
@@ -12,6 +12,7 @@ export interface PublicRoute {
     title: string;
     description: string;
     canonical: string;
+    dateModified?: string;
 }
 
 export const PUBLIC_SITE_URL = 'https://data-explorer-editor.vercel.app';
@@ -37,7 +38,7 @@ const copy = {
     },
 } as const;
 
-export const publicDocItems = DOCS_STRUCTURE.flatMap(section => section.items ?? []);
+export const publicDocItems = DOCS_TOPICS;
 
 export function publicPath(lang: PublicLanguage, path: string) {
     return lang === 'en' ? `/en${path === '/' ? '' : path}` : path;
@@ -59,13 +60,13 @@ export function resolvePublicRoute(pathname: string): PublicRoute | null {
     } else return null;
 
     let [title, description]: [string, string] = [...copy[lang][kind]];
-    if (kind === 'docs' && basePath !== '/docs') {
-        const item = publicDocItems.find(item => item.id === sectionId)!;
-        const label = lang === 'en' ? item.titleEn ?? item.title : item.title;
+    const docTopic = kind === 'docs' ? getDocTopic(sectionId!) : undefined;
+    if (docTopic && basePath !== '/docs') {
+        const label = lang === 'en' ? docTopic.titleEn : docTopic.title;
         title = `${label} | Data Explorer`;
-        description = lang === 'vi' ? `Hướng dẫn ${label.toLowerCase()} trong Data Explorer. Thiết lập và sử dụng công cụ phù hợp cho workspace và database của bạn.` : `Learn about ${label.toLowerCase()} in Data Explorer. Configure and use the right tools for your database and workspace.`;
+        description = lang === 'vi' ? docTopic.description : docTopic.descriptionEn;
     }
-    return { path, basePath, lang, kind, sectionId, title, description, canonical: `${PUBLIC_SITE_URL}${path === '/' ? '' : path}` };
+    return { path, basePath, lang, kind, sectionId, title, description, canonical: `${PUBLIC_SITE_URL}${path === '/' ? '' : path}`, ...(docTopic ? { dateModified: docTopic.updatedAt } : {}) };
 }
 
 export function listPublicRoutes() {
@@ -75,8 +76,25 @@ export function listPublicRoutes() {
 
 export function publicStructuredData(route: PublicRoute) {
     const website = { '@type': 'WebSite', '@id': `${PUBLIC_SITE_URL}/#website`, name: PUBLIC_SITE_NAME, url: PUBLIC_SITE_URL, inLanguage: ['vi', 'en'] };
-    const page = { '@type': 'WebPage', '@id': `${route.canonical}#page`, name: route.title, description: route.description, url: route.canonical, inLanguage: route.lang, isPartOf: { '@id': website['@id'] } };
+    const page: Record<string, unknown> = { '@type': 'WebPage', '@id': `${route.canonical}#page`, name: route.title, description: route.description, url: route.canonical, inLanguage: route.lang, isPartOf: { '@id': website['@id'] } };
     const graph: Record<string, unknown>[] = [website, page];
+    if (route.kind === 'docs') {
+        const breadcrumbId = `${route.canonical}#breadcrumb`;
+        const articleId = `${route.canonical}#article`;
+        page.breadcrumb = { '@id': breadcrumbId };
+        page.mainEntity = { '@id': articleId };
+        if (route.dateModified) page.dateModified = route.dateModified;
+        graph.push({ '@type': 'TechArticle', '@id': articleId, headline: route.title, description: route.description, url: route.canonical, inLanguage: route.lang, mainEntityOfPage: { '@id': page['@id'] }, ...(route.dateModified ? { dateModified: route.dateModified } : {}) });
+        const crumbs = [
+            { '@type': 'ListItem', position: 1, name: route.lang === 'vi' ? 'Trang chủ' : 'Home', item: `${PUBLIC_SITE_URL}${publicPath(route.lang, '/') === '/' ? '' : publicPath(route.lang, '/')}` },
+            { '@type': 'ListItem', position: 2, name: route.lang === 'vi' ? 'Tài liệu' : 'Documentation', item: `${PUBLIC_SITE_URL}${publicPath(route.lang, '/docs')}` },
+        ];
+        if (route.basePath !== '/docs') {
+            const topic = getDocTopic(route.sectionId!);
+            if (topic) crumbs.push({ '@type': 'ListItem', position: 3, name: route.lang === 'vi' ? topic.title : topic.titleEn, item: route.canonical });
+        }
+        graph.push({ '@type': 'BreadcrumbList', '@id': breadcrumbId, itemListElement: crumbs });
+    }
     if (route.kind === 'landing') {
         graph.push({ '@type': 'WebApplication', '@id': `${PUBLIC_SITE_URL}/#application`, name: PUBLIC_SITE_NAME, url: PUBLIC_SITE_URL, applicationCategory: 'DeveloperApplication', operatingSystem: 'Web browser', description: route.description, image: PUBLIC_OG_IMAGE, screenshot: `${PUBLIC_SITE_URL}/images/landing/workspace.webp`, isAccessibleForFree: true });
     }

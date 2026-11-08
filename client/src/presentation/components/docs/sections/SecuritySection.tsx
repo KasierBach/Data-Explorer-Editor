@@ -1,133 +1,50 @@
 import { Lock, ShieldCheck, KeyRound, Database, AlertTriangle, Cookie } from 'lucide-react';
+import { publicPath } from '@/core/seo/publicRoutes';
+import { DOCS_FACTS } from '@/core/docs/docsFacts';
 import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
 export function SecuritySection({ lang }: Props) {
     const t = lang === 'vi';
-
     return (
-        <DocPageLayout
-            title={t ? 'Bảo mật & Quyền riêng tư' : 'Security & Privacy'}
-            subtitle={t
-                ? 'Những lớp bảo vệ đang có trong Data Explorer, cách chúng hoạt động, và các giới hạn bạn vẫn cần hiểu trước khi dùng app với dữ liệu thật.'
-                : 'The protection layers currently present in Data Explorer, how they work, and the limits you should still understand before using the app with real data.'}
-        >
+        <DocPageLayout title={t ? 'Bảo mật & quyền riêng tư' : 'Security & privacy'} subtitle={t ? 'Các trust boundary đang được enforce, cấu hình cần có và những giới hạn phải hiểu khi làm việc với dữ liệu thật.' : 'The enforced trust boundaries, configuration requirements, and limitations to understand before working with live data.'}>
             <FeatureGrid>
-                <InfoCard icon={<Lock className="w-6 h-6 text-blue-500" />} title="AES-256-GCM" color="blue">
-                    <p>
-                        {t
-                            ? 'Saved connection passwords được mã hóa bằng AES-256-GCM trước khi lưu. Đây là lớp bảo vệ chính cho credential ở phía backend.'
-                            : 'Saved connection passwords are encrypted with AES-256-GCM before persistence. This is the primary backend protection layer for stored credentials.'}
-                    </p>
-                </InfoCard>
-                <InfoCard icon={<ShieldCheck className="w-6 h-6 text-emerald-500" />} title={t ? 'Connection guardrails' : 'Connection guardrails'} color="emerald">
-                    <p>
-                        {t
-                            ? 'Mỗi connection có thể được cấu hình read-only, cấm schema changes, cấm import/export, hoặc cấm query execution hoàn toàn.'
-                            : 'Each connection can be configured as read-only, block schema changes, block import/export, or disable query execution entirely.'}
-                    </p>
-                </InfoCard>
-                <InfoCard icon={<KeyRound className="w-6 h-6 text-amber-500" />} title={t ? 'Secret enforcement' : 'Secret enforcement'} color="amber">
-                    <p>
-                        {t
-                            ? 'Backend từ chối khởi động nếu JWT secret quá yếu. Mật khẩu admin mặc định được thay thế bằng chuỗi ngẫu nhiên nếu không có cấu hình môi trường.'
-                            : 'The backend refuses to boot if the JWT secret is too weak. Default admin credentials are replaced with random strings if environment variables are missing.'}
-                    </p>
-                </InfoCard>
-                <InfoCard icon={<AlertTriangle className="w-6 h-6 text-red-500" />} title={t ? 'SSRF & Tunnel Guard' : 'SSRF & Tunnel Guard'} color="red">
-                    <p>
-                        {t
-                            ? 'SSH Tunnel và các kết nối outbound được kiểm tra nghiêm ngặt, chặn đứng truy cập trái phép vào mạng nội bộ (127.0.0.1, dải IP RFC1918).'
-                            : 'SSH Tunnels and outbound connections are strictly validated, blocking unauthorized access to internal networks (127.0.0.1, RFC1918 ranges).'}
-                    </p>
-                </InfoCard>
+                <InfoCard icon={<Lock className="w-6 h-6 text-blue-500" />} title="AES-256-GCM" color="blue"><p>{t ? 'Mật khẩu connection, SSH secrets và API key provider tùy chỉnh được mã hóa trước khi lưu. Điều này không có nghĩa toàn bộ SQL, AI chat, attachment hay snapshot được mã hóa ở cấp record.' : 'Connection passwords, SSH secrets, and custom-provider API keys are encrypted before storage. This does not mean SQL, AI chats, attachments, or snapshots are all record-encrypted.'}</p></InfoCard>
+                <InfoCard icon={<ShieldCheck className="w-6 h-6 text-emerald-500" />} title={t ? 'Quyền và guardrails' : 'Permissions and guardrails'} color="emerald"><p>{t ? 'Backend kiểm tra resource permissions và connection policy trước mutation. Xác nhận query không cấp thêm quyền WRITE hoặc bỏ read-only.' : 'The backend checks resource permissions and connection policy before mutations. Query confirmation does not grant WRITE access or bypass read-only mode.'}</p></InfoCard>
+                <InfoCard icon={<KeyRound className="w-6 h-6 text-amber-500" />} title={t ? 'Production secrets' : 'Production secrets'} color="amber"><p>{t ? 'Production từ chối secret yếu/placeholder. Admin chỉ được seed khi có cả ADMIN_EMAIL và ADMIN_PASSWORD; không có mật khẩu ngẫu nhiên fallback.' : 'Production rejects weak secrets and placeholders. Initial-admin seeding requires both ADMIN_EMAIL and ADMIN_PASSWORD; there is no random-password fallback.'}</p></InfoCard>
+                <InfoCard icon={<AlertTriangle className="w-6 h-6 text-red-500" />} title={t ? 'Outbound network' : 'Outbound network'} color="red"><p>{t ? 'SSRF validation kiểm tra host/DNS/IP cho database, tunnel và provider outbound. Production mặc định chặn target nội bộ; development localhost và operator override là ngoại lệ có chủ đích.' : 'SSRF validation checks hosts, DNS, and IPs for databases, tunnels, and outbound providers. Production defaults deny internal targets; development localhost and operator overrides are deliberate exceptions.'}</p></InfoCard>
             </FeatureGrid>
-
-            <DocSection title={t ? 'Những gì app đang bảo vệ tốt' : 'What the app protects well today'}>
-                <ul className="grid gap-3 mt-2">
-                    {[
-                        t ? 'Credential lưu trong app database được mã hóa bằng AES-256-GCM.' : 'Credentials stored in the app database are encrypted with AES-256-GCM.',
-                        t ? 'SQL Guard chặn đứng các kỹ thuật bypass nâng cao như EXEC, EXECUTE trong kết nối Read-only.' : 'SQL Guard blocks advanced bypass techniques like EXEC, EXECUTE in Read-only connections.',
-                        t ? 'SSRF guard chặn tuyệt đối các target nội bộ hoặc localhost (chống quét mạng nội bộ qua Tunnel), fail-closed với host rỗng và chặn IPv4-mapped IPv6.' : 'SSRF guard strictly blocks internal or localhost targets (preventing intranet scanning via Tunnels), fails closed on empty hosts, and blocks IPv4-mapped IPv6 bypasses.',
-                        t ? 'Quyền riêng tư Team được cô lập, không còn chia sẻ tự động dựa trên domain email công cộng.' : 'Team privacy is isolated, removing insecure auto-sharing based on public email domains.',
-                        t ? 'Thông báo lỗi Database được làm sạch (Sanitize) để tránh rò rỉ thông tin hạ tầng nhạy cảm.' : 'Database error messages are sanitized to prevent sensitive infrastructure information leakage.',
-                        t ? 'Bộ pentest đối kháng chạy thường xuyên mô phỏng identifier smuggling, CSRF header spoofing, và property-based fuzzing cho mọi guard.' : 'Adversarial pentest suites run continuously, simulating identifier smuggling, CSRF header spoofing, and property-based fuzzing against every guard.',
-                        t ? 'security.txt công khai kênh responsible disclosure cho researcher báo cáo lỗ hổng.' : 'A public security.txt documents the responsible disclosure channel for vulnerability reports.',
-                    ].map((item) => (
-                        <li key={item} className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-                            {item}
-                        </li>
-                    ))}
-                </ul>
-            </DocSection>
-
-            <DocSection title={t ? 'Session & đăng nhập hiện tại' : 'Current session and sign-in behavior'}>
-                <div className="grid md:grid-cols-2 gap-4">
-                    <InfoCard icon={<Cookie className="w-5 h-5 text-cyan-500" />} title={t ? 'Refresh token cookie' : 'Refresh token cookie'} color="blue">
-                        <p className="text-xs">
-                            {t
-                                ? 'App hiện dùng refresh token trong httpOnly cookie. Cookie này được xoay vòng khi login, refresh session, và social-login exchange thành công.'
-                                : 'The app now uses a refresh token stored in an httpOnly cookie. That cookie is rotated on login, session refresh, and successful social-login exchange.'}
-                        </p>
-                    </InfoCard>
-                    <InfoCard icon={<ShieldCheck className="w-5 h-5 text-emerald-500" />} title={t ? 'In-memory access token' : 'In-memory access token'} color="emerald">
-                        <p className="text-xs">
-                            {t
-                                ? 'Access token chỉ sống trong memory phía client. Khi reload app, frontend bootstrap lại session bằng /auth/refresh thay vì đọc token cũ từ local storage.'
-                                : 'The access token lives in client memory only. On reload, the frontend bootstraps the session through /auth/refresh instead of reading an older token from local storage.'}
-                        </p>
-                    </InfoCard>
+            <DocSection title={t ? 'Session và dữ liệu trong browser' : 'Sessions and browser data'}>
+                <div className="grid gap-4 md:grid-cols-2">
+                    <InfoCard icon={<Cookie className="w-5 h-5" />} title={t ? 'Refresh cookie' : 'Refresh cookie'}><p>{t ? 'Refresh token nằm trong httpOnly cookie và được xoay vòng. Access token ở memory; reload gọi /auth/refresh thay vì đọc JWT cũ trong localStorage.' : 'Refresh tokens live in rotating httpOnly cookies. Access tokens stay in memory; reload calls /auth/refresh instead of reading an old localStorage JWT.'}</p></InfoCard>
+                    <InfoCard icon={<Database className="w-5 h-5" />} title={t ? 'State không phải secret vault' : 'State is not a secret vault'}><p>{t ? 'Tab/draft/layout và role preferences có thể nằm trong localStorage. Connection password/key/passphrase, provider API key và AI messages bị loại khỏi state persisted; SQL draft vẫn có thể chứa dữ liệu nhạy cảm.' : 'Tabs, drafts, layouts, and role preferences can live in localStorage. Connection passwords, keys/passphrases, provider API keys, and AI messages are stripped from persisted state; SQL drafts can still contain sensitive content.'}</p></InfoCard>
                 </div>
-                <Callout type="tip">
-                    <p className="text-sm">
-                        {t
-                            ? 'Mô hình này an toàn hơn localStorage-persisted JWT vì refresh token không thể bị JavaScript đọc trực tiếp. Muốn chạy ổn trên production cross-origin, bạn cần FRONTEND_URL đúng và HTTPS để cookie secure hoạt động đầy đủ.'
-                            : 'This model is safer than localStorage-persisted JWT because the refresh token cannot be read directly by client-side JavaScript. For reliable cross-origin production behavior, you still need the correct FRONTEND_URL and HTTPS so secure cookies work end-to-end.'}
-                    </p>
-                </Callout>
+                <Callout type="tip"><p>{t ? 'Production cross-origin cần HTTPS, FRONTEND_URL đúng origin và TRUST_PROXY phù hợp topology. httpOnly không bảo vệ toàn bộ app khỏi XSS hoặc máy browser bị xâm nhập.' : 'Cross-origin production needs HTTPS, the correct FRONTEND_URL origin, and topology-appropriate TRUST_PROXY. httpOnly does not protect the whole application from XSS or a compromised browser device.'}</p></Callout>
             </DocSection>
-
-            <DocSection title={t ? 'Read-only & policy theo connection' : 'Read-only and connection policy controls'}>
-                <div className="grid md:grid-cols-2 gap-4">
-                    <InfoCard icon={<Database className="w-5 h-5 text-cyan-500" />} title={t ? 'Server-side enforcement' : 'Server-side enforcement'} color="blue">
-                        <p className="text-xs">
-                            {t
-                                ? 'Các thao tác bị cấm như UPDATE, DELETE, DROP, schema edits, import flow, hoặc mutation NoSQL sẽ bị chặn ở backend, không chỉ ẩn ở UI.'
-                                : 'Blocked operations such as UPDATE, DELETE, DROP, schema edits, import flows, or NoSQL mutations are rejected in the backend, not merely hidden in the UI.'}
-                        </p>
-                    </InfoCard>
-                    <InfoCard icon={<AlertTriangle className="w-5 h-5 text-amber-500" />} title={t ? 'AI actions vẫn cần kiểm tra' : 'AI actions still require review'} color="amber">
-                        <p className="text-xs">
-                            {t
-                                ? 'Ngay cả khi AI gợi ý SQL hợp lý, bạn vẫn nên kiểm tra lại trước khi chạy, đặc biệt với index creation, schema changes, và các truy vấn ghi dữ liệu.'
-                                : 'Even when AI suggestions look reasonable, you should still review them before execution, especially for index creation, schema changes, and write queries.'}
-                        </p>
-                    </InfoCard>
-                </div>
+            <DocSection title={t ? 'Database permissions và giới hạn thực thi' : 'Database permissions and execution boundaries'}>
+                <Prose>{t ? 'readOnly, allowQueryExecution, allowSchemaChanges và allowImportExport là các flag riêng. SQL/NoSQL mutation bị backend kiểm tra. Tuy nhiên export dữ liệu đã trả về trong browser không phải data-egress boundary đáng tin; đọc được dữ liệu cũng có thể copy nó.' : 'readOnly, allowQueryExecution, allowSchemaChanges, and allowImportExport are separate flags. The backend checks SQL/NoSQL mutations. Browser downloads of already-returned rows are not a reliable data-egress boundary; readers can also copy data they can see.'}</Prose>
+                <Prose>{t ? `Raw SQL có cap ${DOCS_FACTS.sql.rawResultRows.toLocaleString('vi-VN')} rows; table paging tối đa ${DOCS_FACTS.sql.tablePageMax} rows/page. Read-only classification chặn các statement nguy hiểm, đồng thời engine-specific transaction/read-only mode là lớp bổ sung. Không có suite nào chứng nhận mọi query/engine.` : `Raw SQL has a ${DOCS_FACTS.sql.rawResultRows.toLocaleString('en-US')}-row cap; table pages are limited to ${DOCS_FACTS.sql.tablePageMax} rows. Read-only classification denies dangerous statements, with engine-specific transaction/read-only protection as an additional layer. No suite certifies every query or engine.`}</Prose>
+                <Callout type="warning"><p>{t ? 'SQL có destructive classification mới yêu cầu confirmation. Không có confirmation riêng cho mọi AI-origin SQL; writable Mongo mutations cũng không có destructive prompt tự động. Kiểm tra filter và backup trước thao tác rộng. Một query timeout/cancel request không chứng minh mọi write đã rollback.' : 'Only guard-classified destructive SQL requires confirmation. Not every AI-origin SQL receives a separate prompt; writable Mongo mutations also lack an automatic destructive confirmation. Review filters and backups before broad changes. A timeout or cancellation request does not prove writes were rolled back.'}</p></Callout>
+                <Prose><a href={publicPath(lang, '/docs/database-capabilities')}>{t ? 'Ma trận capabilities' : 'Capability matrix'}</a> · <a href={publicPath(lang, '/docs/operational-limits')}>{t ? 'Giới hạn vận hành' : 'Operational limits'}</a></Prose>
             </DocSection>
-
-            <DocSection title={t ? 'Best practices khuyến nghị' : 'Recommended best practices'}>
-                <ul className="grid gap-3">
-                    {[
-                        t ? 'Dùng JWT_SECRET mạnh ít nhất 32 bytes và ENCRYPTION_KEY đúng 32 ký tự.' : 'Use a strong JWT_SECRET of at least 32 bytes and an ENCRYPTION_KEY that is exactly 32 characters.',
-                        t ? 'Thiết lập ADMIN_EMAIL và ADMIN_PASSWORD trong .env để tránh việc hệ thống dùng mật khẩu ngẫu nhiên tạm thời.' : 'Set ADMIN_EMAIL and ADMIN_PASSWORD in .env to prevent the system from using temporary random passwords.',
-                        t ? 'Ưu tiên read-only connection cho các truy vấn phân tích để kích hoạt lớp bảo vệ SQL Guard.' : 'Prefer read-only connections for analytic queries to enable the SQL Guard protection layer.',
-                        t ? 'Luôn cấu hình timeout cho các database lớn để tránh chiếm dụng tài nguyên hệ thống.' : 'Always configure timeouts for large databases to prevent system resource exhaustion.',
-                    ].map((item) => (
-                        <li key={item} className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 px-4 py-3 text-xs text-muted-foreground">
-                            {item}
-                        </li>
-                    ))}
-                </ul>
+            <DocSection title={t ? 'SSRF và TLS: đặt rõ ở production' : 'SSRF and TLS: be explicit in production'}>
+                <Prose>{t ? 'Đặt ALLOW_INTERNAL_IPS=false để giữ deny mặc định cho private/loopback target ở production. Development cho phép localhost; ALLOW_INTERNAL_IPS=true bỏ hạn chế nội bộ và phải được operator cân nhắc kỹ. Validate host rỗng/DNS/IP là fail-closed nhưng không phải cam kết không thể bypass.' : 'Set ALLOW_INTERNAL_IPS=false to retain production private/loopback denial. Development permits localhost; ALLOW_INTERNAL_IPS=true overrides internal restrictions and needs deliberate operator review. Empty-host/DNS/IP validation fails closed, but it is not a promise of impossible bypasses.'}</Prose>
+                <Prose>{t ? 'ALLOW_INSECURE_DATABASE_TLS chỉ strict khi đúng chuỗi false; bỏ biến này khiến code permissive. Templates production đặt false. MySQL/MariaDB/Redis có transport toggle riêng; PostgreSQL/CockroachDB remote TLS tự động, không có SSL-mode picker. Không có custom-CA /certs contract chung.' : 'ALLOW_INSECURE_DATABASE_TLS is strict only when its value is the exact string false; omission leaves permissive behavior. Production templates set false. MySQL/MariaDB/Redis have separate transport toggles; remote PostgreSQL/CockroachDB TLS is automatic with no SSL-mode picker. There is no general /certs custom-CA contract.'}</Prose>
             </DocSection>
-
-            <DocSection title={t ? 'Điểm còn nên làm tiếp' : 'What is still worth doing next'}>
-                <Prose>
-                    {t
-                        ? 'Bản hiện tại đã an toàn hơn đáng kể, nhưng vẫn còn chỗ để harden thêm: CSP chặt hơn cho production, timeout và circuit-break cho AI providers, và policy chi tiết hơn cho destructive query flows.'
-                        : 'The current build is much safer than before, but there is still room to harden further: stricter production CSP, timeout and circuit-break policies for AI providers, and finer-grained policies for destructive query flows.'}
-                </Prose>
+            <DocSection title={t ? 'AI data handling và retention' : 'AI data handling and retention'}>
+                <Prose>{t ? 'AI là tùy chọn. Prompt, metadata/schema context, SQL và attachment bạn chọn có thể được gửi tới external provider; policy của provider áp dụng ngoài ứng dụng. Custom provider records lưu per-user server-side và key được mã hóa, còn role preferences ở browser.' : 'AI is optional. Prompts, schema metadata/context, SQL, and selected attachments can be sent to external providers, whose own policies apply outside the application. Custom provider records are stored per user on the server with encrypted keys; role preferences remain browser-local.'}</Prose>
+                <Prose>{t ? `AI chat, message và attachment payload được lưu trong application PostgreSQL, không có auto-expiry hiện tại. Delete chat xóa các message liên quan qua cascade. Audit logs mặc định ${DOCS_FACTS.dataHandling.auditRetentionDefaultDays} ngày; raw payment payload được clear sau ${DOCS_FACTS.dataHandling.paymentPayloadRetentionDefaultDays} ngày. Backup/operator/provider retention là phạm vi riêng.` : `AI chats, messages, and attachment payloads persist in application PostgreSQL with no current automatic expiry. Deleting a chat cascades to its messages. Audit logs default to ${DOCS_FACTS.dataHandling.auditRetentionDefaultDays} days; raw payment payloads are cleared after ${DOCS_FACTS.dataHandling.paymentPayloadRetentionDefaultDays} days. Backup, operator, and provider retention are separate scopes.`}</Prose>
+                <Prose><a href={publicPath(lang, '/docs/data-handling')}>{t ? 'Dữ liệu được lưu ở đâu?' : 'Where is data stored?'}</a> · <a href={publicPath(lang, '/privacy')}>{t ? 'Chính sách quyền riêng tư' : 'Privacy policy'}</a></Prose>
+            </DocSection>
+            <DocSection title={t ? 'Checklist triển khai và báo cáo lỗi' : 'Deployment and reporting checklist'}>
+                <ul className="grid gap-3 text-sm text-muted-foreground">{[
+                    t ? 'Sinh JWT/refresh secrets random ít nhất 32 UTF-8 bytes, encryption key đúng 32 UTF-8 bytes; không copy số/placeholder trong ví dụ.' : 'Generate random JWT/refresh secrets of at least 32 UTF-8 bytes and an encryption key of exactly 32 UTF-8 bytes; do not copy numeric/sample placeholders.',
+                    t ? 'Giữ encryption key ổn định; deliberate rotation cần legacy keys và backup. Thay key tùy tiện có thể mất khả năng đọc credential đã lưu.' : 'Keep encryption keys stable; deliberate rotation needs legacy keys and backups. Casual changes can make stored credentials unreadable.',
+                    t ? 'Production đã có CSP/security headers, AI request/stream timeouts và circuit breaker per-provider/model. Circuit state không phải distributed persistent guarantee.' : 'Production includes CSP/security headers, AI request/stream timeouts, and per-provider/model circuit breaking. Circuit state is not a distributed persistent guarantee.',
+                    t ? 'Security tests gồm curated SQL/NoSQL/HTTP regressions và property-based SQL/SSRF invariants; không phải chứng nhận mọi đầu vào.' : 'Security tests include curated SQL/NoSQL/HTTP regressions and property-based SQL/SSRF invariants, not certification of every input.',
+                    t ? 'Trước khi báo issue, loại bỏ credentials/SQL/data nhạy cảm khỏi log và ảnh. Dùng kênh responsible disclosure từ security.txt cho vulnerability, không đăng exploit hoặc dữ liệu riêng lên issue public.' : 'Remove credentials and sensitive SQL/data from logs and screenshots before reporting. Use the responsible-disclosure channel in security.txt for vulnerabilities, not a public issue containing exploit or private data.',
+                ].map(item => <li key={item} className="rounded-xl border p-4">{item}</li>)}</ul>
             </DocSection>
         </DocPageLayout>
     );

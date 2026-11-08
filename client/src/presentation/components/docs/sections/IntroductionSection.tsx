@@ -1,5 +1,8 @@
-import { Zap, Database, BookOpen } from "lucide-react";
+import { Zap, Database, BookOpen, ArrowDown, ArrowUpRight } from "lucide-react";
 import { Badge } from "@/presentation/components/ui/badge";
+import { KnowledgeHub } from '@/presentation/public/KnowledgeHub';
+import { KnowledgePaths } from '@/presentation/public/KnowledgePaths';
+import { publicPath } from '@/core/seo/publicRoutes';
 import {
   DocPageLayout,
   DocSection,
@@ -27,17 +30,20 @@ export function IntroductionSection({ lang }: Props) {
           : 'A modern database management platform, designed with an "AI-First" philosophy for Data Engineers and AI Developers.'
       }
       gradient
+      visual={<KnowledgeHub />}
+      actions={<div className="pe-doc-hero-actions"><a className="pe-button pe-button-primary" href={publicPath(lang, '/docs/installation')}>{t ? 'Bắt đầu khám phá' : 'Start exploring'}<ArrowUpRight size={15} aria-hidden="true" /></a><a className="pe-button" href="#knowledge-paths">{t ? 'Chọn lối đi của bạn' : 'Find your path'}<ArrowDown size={15} aria-hidden="true" /></a></div>}
     >
+      <div id="knowledge-paths"><KnowledgePaths /></div>
       <Prose className="mb-12">
         {t
-          ? "Data Explorer không chỉ là một SQL Client thông thường. Đây là một hệ sinh thái được tối ưu hóa để rút ngắn khoảng cách giữa ý tưởng và dữ liệu, sử dụng sức mạnh của các Large Language Models (LLMs) thế hệ mới nhất để biến ngôn ngữ tự nhiên thành những truy vấn phức tạp."
-          : "Data Explorer is more than just a regular SQL Client. It is an ecosystem optimized to bridge the gap between idea and data, using the power of the latest Large Language Models (LLMs) to turn natural language into complex queries."}
+          ? "Data Explorer kết hợp trình soạn thảo SQL, workspace MongoDB và công cụ khám phá dữ liệu trong trình duyệt. AI là lớp hỗ trợ tùy chọn để soạn query, giải thích và gợi ý; bạn vẫn có thể kết nối và truy vấn mà không bật AI."
+          : "Data Explorer combines a SQL editor, a MongoDB workspace and browser-based data exploration tools. AI is an optional layer for drafting queries, explanations and suggestions; you can connect and query without enabling AI."}
       </Prose>
       <Callout type="info">
         <p className="text-sm">
           {t
-            ? "Điểm nhấn của v1.6.7: CockroachDB và MariaDB nâng cấp lên production-ready với TLS contract dùng chung, bộ pentest đối kháng cho mọi guard, PWA và security.txt cho nền web hardened, hủy query qua panel Active Queries, cùng cấu hình AI theo vai trò với provider OpenAI-compatible tùy chỉnh."
-            : "v1.6.7 highlights: CockroachDB and MariaDB are now production-ready with a shared TLS contract, adversarial pentest suites cover every guard, PWA and security.txt harden the web platform, queries can be cancelled from the Active Queries panel, and AI roles are configurable with custom OpenAI-compatible providers."}
+            ? "Có trong phiên bản hiện tại: adapter CockroachDB và MariaDB, connection guardrails, hủy query, AI theo vai trò và provider OpenAI-compatible tùy chỉnh. Đây là mô tả khả năng hiện có, không phải tuyên bố mọi tính năng đều được ra mắt ở v1.6.7 hoặc chứng nhận production cho mọi engine."
+            : "Available in the current version: CockroachDB and MariaDB adapters, connection guardrails, query cancellation, per-role AI and custom OpenAI-compatible providers. This describes current capabilities, not a claim that every feature was introduced in v1.6.7 or production certification for every engine."}
         </p>
       </Callout>
       {/* Overview Cards */}
@@ -49,8 +55,8 @@ export function IntroductionSection({ lang }: Props) {
         >
           <p>
             {t
-              ? "Kết nối bản địa tới PostgreSQL, MySQL, MariaDB, CockroachDB, SQL Server, MongoDB/Atlas, Redis, SQLite và ClickHouse thông qua một giao diện thống nhất. Mỗi engine sử dụng driver riêng biệt được tối ưu hóa cho hiệu suất tốt nhất — không chỉ là một wrapper chung chung."
-              : "Native connections to PostgreSQL, MySQL, MariaDB, CockroachDB, SQL Server, MongoDB/Atlas, Redis, SQLite, and ClickHouse through a unified interface. Each engine uses its own optimized driver for maximum performance — not just a generic wrapper."}
+              ? "Adapter được đăng ký cho PostgreSQL, MySQL, MariaDB, CockroachDB, SQL Server, MongoDB/Atlas, Redis, SQLite và ClickHouse. Một số engine chia sẻ driver/giao thức; đăng ký adapter không đồng nghĩa tính năng ngang nhau. Redis và SQLite còn khoảng trống trong workspace người dùng."
+              : "Registered adapters cover PostgreSQL, MySQL, MariaDB, CockroachDB, SQL Server, MongoDB/Atlas, Redis, SQLite and ClickHouse. Some engines share drivers/protocols; adapter registration does not imply feature parity. Redis and SQLite still have user-workspace gaps."}
           </p>
         </InfoCard>
         <InfoCard
@@ -91,45 +97,37 @@ export function IntroductionSection({ lang }: Props) {
 
       {/* Quick Start Example */}
       <DocSection
-        title={t ? "Bắt đầu nhanh trong 60 giây" : "Quick Start in 60 Seconds"}
+        title={t ? "Bắt đầu với local setup" : "Start with local setup"}
       >
         <Prose>
           {t
-            ? "Dưới đây là đường chạy nhanh nhất sau khi bạn đã chuẩn bị `server/.env` theo trang Installation. Mục tiêu của đoạn này là boot app thật bằng các lệnh đang tồn tại trong repo hiện tại, không phải pseudo-script cũ."
-            : "Here is the fastest path once you have prepared `server/.env` as described on the Installation page. The goal is to boot the real app using commands that actually exist in the current repo, not older pseudo-scripts."}
+            ? "Dùng Node.js 22 theo .nvmrc. Chuẩn bị server/.env và client/.env theo trang Cài đặt trước khi generate/migrate hoặc chạy app; không chép nguyên placeholder secret trong template. Các dòng dưới là lộ trình, không phải cam kết hoàn thành trong 60 giây."
+            : "Use Node.js 22 from .nvmrc. Prepare server/.env and client/.env from the Installation page before generating/migrating or starting the app; do not copy template secret placeholders unchanged. These lines describe the sequence, not a 60-second completion promise."}
         </Prose>
-        <CodeBlock title={t ? "Khởi động nhanh" : "Quick Start"}>
-          <CodeComment>
-            {t
-              ? "Clone và cài đủ dependency cho root + hai workspace"
-              : "Clone and install root + workspace dependencies"}
-          </CodeComment>
-          <CodeLine>
-            git clone https://github.com/KasierBach/Data-Explorer-Editor.git
-          </CodeLine>
-          <CodeLine>cd Data-Explorer-Editor</CodeLine>
-          <CodeLine>npm install</CodeLine>
-          <CodeLine>npm install --prefix server</CodeLine>
-          <CodeLine>npm install --prefix client</CodeLine>
+        <CodeBlock title={t ? "Khởi động local" : "Local startup"}>
+          <CodeComment>{t ? "Sau khi clone và chọn Node 22, chạy từ root repo" : "After cloning and selecting Node 22, run from the repo root"}</CodeComment>
+          <CodeLine>npm ci</CodeLine>
+          <CodeLine>npm ci --prefix server</CodeLine>
+          <CodeLine>npm ci --prefix client</CodeLine>
+          <CodeLine>docker compose up -d db redis</CodeLine>
           <p className="mt-3" />
-          <CodeComment>
-            {t ? "Đồng bộ schema metadata app" : "Sync the app metadata schema"}
-          </CodeComment>
-          <CodeLine>cd server && npx prisma migrate deploy && cd ..</CodeLine>
-          <p className="mt-3" />
-          <CodeComment>
-            {t
-              ? "Khởi động toàn bộ dự án (server + client)"
-              : "Start the full project (server + client)"}
-          </CodeComment>
+          <CodeComment>{t ? "Đợi db/redis healthy và tạo env theo trang Cài đặt" : "Wait for healthy db/redis and create env files from Installation"}</CodeComment>
+          <CodeLine>cd server</CodeLine>
+          <CodeLine>npx prisma generate</CodeLine>
+          <CodeLine>npx prisma migrate deploy</CodeLine>
+          <CodeLine>cd ..</CodeLine>
           <CodeLine>npm run dev</CodeLine>
-          <p className="mt-3" />
-          <CodeComment>
-            {t
-              ? "Mở trình duyệt tại http://localhost:5173"
-              : "Open browser at http://localhost:5173"}
-          </CodeComment>
+          <CodeComment>{t ? "Vite: http://localhost:5173; API: http://localhost:3001/api" : "Vite: http://localhost:5173; API: http://localhost:3001/api"}</CodeComment>
         </CodeBlock>
+        <Prose>
+          {t
+            ? "Compose metadata PostgreSQL dùng host port 5435 và mật khẩu local mặc định change-me-local; Redis dùng 6379. Đặt PORT=3001 ở server/.env và VITE_API_URL=http://localhost:3001/api ở client/.env. Full Docker frontend ở http://localhost (80), khác Vite 5173. Với PowerShell, chạy từng dòng riêng."
+            : "Compose metadata PostgreSQL uses host port 5435 and local default password change-me-local; Redis uses 6379. Set PORT=3001 in server/.env and VITE_API_URL=http://localhost:3001/api in client/.env. The full Docker frontend is at http://localhost (80), unlike Vite 5173. In PowerShell, run each line separately."}
+        </Prose>
+        <Prose>
+          <a href={publicPath(lang, '/docs/installation')}>{t ? "Cài đặt và sinh secret an toàn" : "Installation and safe secret generation"}</a>{' · '}
+          <a href={publicPath(lang, '/docs/first-query')}>{t ? "Truy vấn đầu tiên" : "First query"}</a>
+        </Prose>
       </DocSection>
 
       {/* Core Values */}
@@ -148,7 +146,7 @@ export function IntroductionSection({ lang }: Props) {
                 : "Optimizes practical hot paths: global search uses candidate indexes, table browsing uses explicit server-side windows, raw SQL has a 50,000-row guardrail, NoSQL aggregate caps before materialization, and migration uses adaptive batch sizing.",
             },
             {
-              title: t ? "Bảo mật tuyệt đối" : "Absolute Security",
+              title: t ? "Bảo vệ nhiều lớp" : "Layered Protection",
               desc: t
                 ? "Kiến trúc nhiều lớp giúp tách dữ liệu kết nối, metadata app, và UI. Mật khẩu connection được mã hóa AES-256-GCM trước khi lưu; backend ép buộc secret mạnh, guardrails cho query, và SSRF validation cho host đích."
                 : "A layered architecture keeps connection data, app metadata, and UI concerns separated. Connection passwords are AES-256-GCM encrypted before storage; the backend enforces strong secrets, query guardrails, and SSRF validation for target hosts.",
@@ -156,14 +154,14 @@ export function IntroductionSection({ lang }: Props) {
             {
               title: t ? "Trải nghiệm lập trình viên" : "Developer Experience",
               desc: t
-                ? "Hỗ trợ đầy đủ phím tắt (Ctrl+Enter để thực thi, Shift+Alt+F để format), linting SQL theo từng dialect, đa con trỏ, tìm kiếm và thay thế regex, và auto-complete thông minh."
-                : "Full shortcut support (Ctrl+Enter to execute, Shift+Alt+F to format), SQL linting per dialect, multi-cursor editing, regex find & replace, and intelligent auto-complete.",
+                ? "Monaco với highlight SQL chung, gợi ý từ schema, đa con trỏ và các thao tác editor quen thuộc. Ctrl/Cmd+Enter chạy query; Ctrl/Cmd+K mở tìm kiếm, Ctrl/Cmd+I bật AI và Ctrl/Cmd+J bật kết quả. Không có cam kết linter dialect hoặc SQL worker riêng."
+                : "Monaco with generic SQL highlighting, schema completions, multi-cursor editing and familiar editor actions. Ctrl/Cmd+Enter runs queries; Ctrl/Cmd+K opens search, Ctrl/Cmd+I toggles AI and Ctrl/Cmd+J toggles results. No per-dialect linter or custom SQL worker is promised.",
             },
             {
               title: t ? "Trực quan hóa tức thời" : "Instant Visualization",
               desc: t
-                ? "Chuyển đổi kết quả truy vấn sang biểu đồ chuyên nghiệp chỉ với một cú click. Hỗ trợ 15+ loại biểu đồ. Sơ đồ ERD tương tác với auto-layout dựa trên thuật toán Dagre."
-                : "Convert query results into professional charts with a single click. 15+ chart types supported. Interactive ERD diagrams with Dagre-based auto-layout.",
+                ? "ChartStudio có 12 preset biểu đồ; widget snapshot trên dashboard có sáu kiểu biểu đồ. Biểu đồ phản ánh dữ liệu đã tải, không tự quét toàn bộ database. ERD hỗ trợ bố cục tương tác."
+                : "ChartStudio has 12 chart presets; dashboard snapshot widgets have six chart types. Charts reflect loaded data, not an automatic scan of the whole database. ERD supports interactive layouts.",
             },
           ].map((item, id) => (
             <li
@@ -189,26 +187,27 @@ export function IntroductionSection({ lang }: Props) {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <Prose>
             {t
-              ? "Chúng tôi tin rằng trong kỷ nguyên AI, việc gõ từng dòng mã SQL lặp đi lặp lại là một sự lãng phí. Triết lý AI-First của chúng tôi xoay quanh 3 trụ cột:"
-              : "We believe that in the AI era, typing repetitive SQL lines is a waste. Our AI-First philosophy revolves around 3 pillars:"}
+              ? "AI có thể hỗ trợ soạn query, nhưng người dùng vẫn kiểm soát việc xem lại và thực thi. Các luồng hỗ trợ tập trung vào ba điểm:"
+              : "AI can help draft queries, while users retain control over review and execution. Assistance focuses on three areas:"}
             <ul className="mt-6 space-y-4">
               <li>
                 <strong>1. Proactive Assistance:</strong>{" "}
                 {t
-                  ? "AI không chỉ trả lời khi được hỏi, nó chủ động gợi ý (Ghost Text) dựa trên ngữ cảnh hiện tại."
-                  : "AI doesn't just answer when asked; it proactively suggests (Ghost Text) based on code context."}
+                  ? "Khi Autocomplete được cấu hình, AI có thể gợi ý Ghost Text từ ngữ cảnh editor; gợi ý cần được xem lại."
+                  : "When Autocomplete is configured, AI can suggest Ghost Text from editor context; review suggestions before using them."}
               </li>
               <li>
                 <strong>2. Schema-Awareness:</strong>{" "}
                 {t
-                  ? 'AI của chúng tôi "thấu hiểu" lược đồ của bạn sâu sắc hơn bất kỳ công cụ IntelliSense truyền thống nào.'
-                  : 'Our AI "understands" your schema deeper than any traditional IntelliSense tool.'}
+                  ? "Luồng AI có thể dùng metadata schema của connection đang chọn; kết quả không thay thế việc xác nhận query trên engine thực tế."
+                  : "AI flows can use schema metadata from the selected connection; generated output does not replace verification against the actual engine."}
               </li>
               <li>
-                <strong>3. Privacy-First AI:</strong>{" "}
+                <strong>{t ? "3. Dữ liệu và AI tùy chọn:" : "3. Data and optional AI:"}</strong>{" "}
                 {t
-                  ? "Sử dụng AI nhưng không bao giờ đánh đổi dữ liệu khách hàng."
-                  : "Leveraging AI without ever compromising customer data."}
+                  ? "Prompt, SQL, schema, kết quả hoặc tệp đính kèm được chọn có thể đi qua backend tới provider. Xem chính sách provider và phạm vi dữ liệu trước khi bật; không có bảo đảm tuyệt đối rằng dữ liệu không bao giờ rời hệ thống."
+                  : "Prompts, SQL, schema, selected results or attachments can pass through the backend to a provider. Check provider policies and data scope before enabling AI; there is no absolute guarantee that data never leaves the system."}
+                {' '}<a href={publicPath(lang, '/docs/data-handling')}>{t ? "Tìm hiểu xử lý dữ liệu" : "Read about data handling"}</a>
               </li>
             </ul>
           </Prose>
@@ -221,25 +220,25 @@ export function IntroductionSection({ lang }: Props) {
             <div className="space-y-4">
               {[
                 {
-                  v: "Now",
+                  v: t ? "Hiện có" : "Live",
                   t: t
-                    ? "Connection guardrails + shared queries"
-                    : "Connection guardrails + shared queries",
-                  d: "✅ Live",
+                    ? "Guardrails và query chia sẻ"
+                    : "Guardrails and shared queries",
+                  d: t ? "Đang có" : "Available",
                 },
                 {
-                  v: "Next",
+                  v: t ? "Hiện có" : "Live",
                   t: t
-                    ? "ERD save/load + migration dry-run"
-                    : "ERD save/load + migration dry-run",
-                  d: "🚀 In progress",
+                    ? "ERD lưu/tải và migration dry-run"
+                    : "ERD save/load and migration dry-run",
+                  d: t ? "Có giới hạn" : "With limits",
                 },
                 {
-                  v: "Later",
+                  v: t ? "Dự kiến" : "Planned",
                   t: t
-                    ? "Scheduled reports + richer dashboards"
-                    : "Scheduled reports + richer dashboards",
-                  d: "🎯 Roadmap",
+                    ? "Báo cáo theo lịch và dashboard mở rộng"
+                    : "Scheduled reports and richer dashboards",
+                  d: t ? "Chưa cam kết" : "No commitment",
                 },
               ].map((item, i) => (
                 <div
@@ -280,23 +279,23 @@ export function IntroductionSection({ lang }: Props) {
                 {
                   feature: "Monaco SQL Editor",
                   desc: t
-                    ? "Trình soạn thảo VS Code-grade với IntelliSense"
-                    : "VS Code-grade editor with IntelliSense",
+                    ? "Monaco với highlight SQL chung và gợi ý schema"
+                    : "Monaco with generic SQL highlighting and schema completions",
                   status: "✅",
                 },
                 {
                   feature: t ? "Đa kết nối DB" : "Multi-DB Connections",
                   desc: t
-                    ? "PostgreSQL, MySQL, MariaDB, CockroachDB, MSSQL, MongoDB, MongoDB Atlas, Redis, SQLite, ClickHouse"
-                    : "PostgreSQL, MySQL, MariaDB, CockroachDB, MSSQL, MongoDB, MongoDB Atlas, Redis, SQLite, ClickHouse",
-                  status: "✅",
+                    ? "PostgreSQL, MySQL, MariaDB, CockroachDB, SQL Server, MongoDB/Atlas, Redis, SQLite, ClickHouse; Redis/SQLite còn khoảng trống workspace"
+                    : "PostgreSQL, MySQL, MariaDB, CockroachDB, SQL Server, MongoDB/Atlas, Redis, SQLite, ClickHouse; Redis/SQLite workspace gaps remain",
+                  status: t ? "Theo engine" : "By engine",
                 },
                 {
                   feature: t ? "AI SQL Generation" : "AI SQL Generation",
                   desc: t
-                    ? "AI routing + Gemini + typed recommendations"
-                    : "AI routing + Gemini + typed recommendations",
-                  status: "✅",
+                    ? "Routing theo provider/model đã cấu hình; cần xem lại query"
+                    : "Routing through configured providers/models; review generated queries",
+                  status: t ? "Tùy chọn" : "Optional",
                 },
                 {
                   feature: t ? "Saved Queries chia sẻ" : "Shared Saved Queries",
@@ -315,8 +314,8 @@ export function IntroductionSection({ lang }: Props) {
                 {
                   feature: t ? "Hệ thống Phím tắt" : "Global Shortcuts",
                   desc: t
-                    ? "Bộ phím tắt toàn cục (Ctrl+N, Ctrl+J, Ctrl+I...)"
-                    : "Global keyboard shortcuts palette",
+                    ? "Ctrl/Cmd+K tìm kiếm, +I AI, +J kết quả, +N query mới"
+                    : "Ctrl/Cmd+K search, +I AI, +J results, +N new query",
                   status: "✅",
                 },
                 {
@@ -384,38 +383,38 @@ export function IntroductionSection({ lang }: Props) {
         <div className="space-y-6">
           <Prose>
             {t
-              ? "Chúng tôi không ngừng cải tiến Data Explorer. Dưới đây là những gì chúng tôi đang phát triển cho các phiên bản tiếp theo:"
-              : "We are constantly improving Data Explorer. Here is what we are building for the upcoming versions:"}
+              ? "Các khả năng hiện có và hướng phát triển được tách riêng dưới đây. Mục dự kiến không có lịch phát hành cam kết; tính năng hiện tại vẫn có phạm vi và giới hạn theo engine."
+              : "Current capabilities and future directions are separated below. Planned items have no committed release schedule; current features still have engine-specific scope and limits."}
           </Prose>
 
           <div className="grid gap-4">
             {[
               {
-                quarter: "Q2 2026",
+                quarter: t ? "Hiện có" : "Live",
                 title: t
-                  ? "Tìm kiếm Toàn cục (Global Search)"
-                  : "Global Search (Ctrl+P)",
+                  ? "Tìm kiếm toàn cục (Ctrl/Cmd+K)"
+                  : "Global Search (Ctrl/Cmd+K)",
                 desc: t
-                  ? "Truy cập nhanh vào bảng, file, lịch sử và câu lệnh AI từ một thanh bar duy nhất."
-                  : "Instant access to tables, files, history, and AI commands from a single command palette.",
+                  ? "Tìm đối tượng database và connection qua chỉ mục đã sync; không phải command palette cho mọi loại file và hành động AI."
+                  : "Find database objects and connections through the synced index; not a command palette for every file type and AI action.",
               },
               {
-                quarter: "Q3 2026",
+                quarter: t ? "Hiện có" : "Live",
                 title: t
-                  ? "Thống kê Hiệu năng (Performance Profiler)"
-                  : "Performance Profiler",
+                  ? "Tài nguyên chia sẻ và migration có dry-run"
+                  : "Shared resources and migration dry-runs",
                 desc: t
-                  ? "Phân tích trực quan EXPLAIN ANALYZE và gợi ý index tự động dựa trên tần suất truy vấn."
-                  : "Visual breakdown of EXPLAIN ANALYZE and automated index suggestions based on query frequency.",
+                  ? "Query, dashboard và ERD có luồng chia sẻ/lưu; migration có preview với giới hạn theo cặp engine. Không phải backup hoặc chuyển dữ liệu không giới hạn."
+                  : "Queries, dashboards and ERDs have sharing/save flows; migration has previews with engine-pair limits. It is not an unlimited transfer or backup system.",
               },
               {
-                quarter: "Q4 2026",
+                quarter: t ? "Dự kiến" : "Planned",
                 title: t
-                  ? "Cộng tác Nhóm (Team Collaboration)"
-                  : "Team Collaboration",
+                  ? "Báo cáo theo lịch và phân tích hiệu năng sâu hơn"
+                  : "Scheduled reporting and deeper performance analysis",
                 desc: t
-                  ? "Chia sẻ query, dashboard và sơ đồ ERD trực tiếp trong không gian làm việc chung."
-                  : "Share queries, dashboards, and ERD diagrams directly within a shared workspace.",
+                  ? "Hướng phát triển chưa có ngày phát hành cam kết. Không coi profiler EXPLAIN ANALYZE hoặc gợi ý index tự động theo tần suất là UI đang hoạt động."
+                  : "A future direction without a committed release date. Do not treat an EXPLAIN ANALYZE profiler or frequency-based automatic index suggestions as current working UI.",
               },
             ].map((item, i) => (
               <div
@@ -437,6 +436,12 @@ export function IntroductionSection({ lang }: Props) {
               </div>
             ))}
           </div>
+          <Prose>
+            <a href={publicPath(lang, '/docs/database-capabilities')}>{t ? "Khả năng database" : "Database capabilities"}</a>{' · '}
+            <a href={publicPath(lang, '/docs/operational-limits')}>{t ? "Giới hạn vận hành" : "Operational limits"}</a>{' · '}
+            <a href={publicPath(lang, '/docs/data-migration')}>{t ? "Chuyển dữ liệu" : "Data migration"}</a>{' · '}
+            <a href={publicPath(lang, '/docs/data-handling')}>{t ? "Xử lý dữ liệu" : "Data handling"}</a>
+          </Prose>
         </div>
       </DocSection>
     </DocPageLayout>

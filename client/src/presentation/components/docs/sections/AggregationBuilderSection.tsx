@@ -5,6 +5,7 @@ import {
     Save,
     Shuffle,
 } from 'lucide-react';
+import { publicPath } from '@/core/seo/publicRoutes';
 import {
     Callout,
     CodeBlock,
@@ -116,6 +117,18 @@ export function AggregationBuilderSection({ lang }: Props) {
                 </div>
             </DocSection>
 
+            <DocSection title={t ? 'Stage được hỗ trợ và giới hạn' : 'Supported stages and limits'}>
+                <Prose>{t
+                    ? 'Đường thực thi hỗ trợ $match, $group, $project, $sort, $limit, $skip, $lookup, $unwind, $facet và $addFields. Một stage có một operator; pipeline lồng trong $lookup/$facet cũng phải được validation. Không hỗ trợ mọi stage MongoDB: $out/$merge không chạy qua đây.'
+                    : 'Execution supports $match, $group, $project, $sort, $limit, $skip, $lookup, $unwind, $facet and $addFields. Each stage has one operator; nested $lookup/$facet pipelines are also validated. Not every MongoDB stage is supported: $out/$merge do not run here.'}</Prose>
+                <Prose>{t
+                    ? 'Giới hạn: pipeline 100 stage, payload sâu 10 cấp, array 10.000 phần tử, object 2.000 key; kết quả tối đa 50.000 document và thời gian đọc/tổng hợp maxTimeMS 30 giây. Apply to Editor không bỏ các giới hạn này. Preview là JSON cuối, không phải preview dữ liệu cho từng stage.'
+                    : 'Limits: 100 pipeline stages, payload depth 10, arrays of 10,000 entries and objects of 2,000 keys; results cap at 50,000 documents and reads/aggregation use a 30-second maxTimeMS. Apply to Editor does not bypass these limits. Preview shows final JSON, not per-stage data previews.'}</Prose>
+                <Callout type="info"><p className="text-sm">{t
+                    ? 'readOnly cho phép aggregate được kiểm tra là đọc; allowQueryExecution=false chặn Run. Mutation từ raw MQL trên connection writable không có xác nhận phá hủy tự động như SQL, nên đừng nhầm validation pipeline với xác nhận dữ liệu bị thay đổi.'
+                    : 'readOnly permits validated read aggregates; allowQueryExecution=false blocks Run. Raw MQL mutations on writable connections do not get automatic destructive confirmation like SQL; pipeline validation is not a mutation confirmation step.'}</p></Callout>
+            </DocSection>
+
             <DocSection title={t ? 'Payload cuối cùng trông ra sao?' : 'What the final payload looks like'}>
                 <Prose>
                     {t
@@ -140,10 +153,14 @@ export function AggregationBuilderSection({ lang }: Props) {
             <Callout type="warning">
                 <p className="text-sm">
                     {t
-                        ? 'Aggregation Builder rất tốt cho việc dựng pipeline rõ ràng, nhưng không phải lúc nào cũng là chỗ nhanh nhất cho các case quá dị, quá dài, hoặc dùng nhiều expression nâng cao. Khi bạn cần kiểm soát hoàn toàn payload cuối, hãy Apply to Editor và tiếp tục ở raw MQL.'
-                        : 'The Aggregation Builder is excellent for clear, deliberate pipelines, but it is not always the fastest place for extremely custom, long, or expression-heavy cases. When you need total control, apply the result to the editor and continue in raw MQL.'}
+                        ? 'Raw editor cho phép sửa payload text thuận tiện hơn, không mở thêm stage bị cấm hoặc vượt qua validation/limit. Dùng Apply to Editor để xem lại JSON cuối; kết quả bị truncated chỉ phản ánh phần đã trả về, không phải toàn collection.'
+                        : 'The raw editor offers text editing, not extra unsupported stages or a bypass of validation/limits. Apply to Editor for a final JSON review; truncated output reflects only returned data, not the whole collection.'}
                 </p>
             </Callout>
+            <Prose>
+                <a href={publicPath(lang, '/docs/operational-limits')}>{t ? 'Giới hạn vận hành' : 'Operational limits'}</a>{' · '}
+                <a href={publicPath(lang, '/docs/data-handling')}>{t ? 'Xử lý dữ liệu' : 'Data handling'}</a>
+            </Prose>
         </DocPageLayout>
     );
 }

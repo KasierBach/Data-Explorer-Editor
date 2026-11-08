@@ -1,314 +1,58 @@
-import {
-  Server,
-  Globe,
-  Shield,
-  Rocket,
-  Database,
-  KeyRound,
-} from "lucide-react";
-import {
-  DocPageLayout,
-  DocSection,
-  DocSubSection,
-  CodeBlock,
-  CodeComment,
-  CodeLine,
-  Callout,
-  InfoCard,
-} from "../primitives";
+import { Server, Globe, Shield, Rocket, Database } from 'lucide-react';
+import { publicPath } from '@/core/seo/publicRoutes';
+import { DocPageLayout, DocSection, DocSubSection, CodeBlock, CodeLine, Callout, InfoCard, Prose } from '../primitives';
 
-interface Props {
-  lang: "vi" | "en";
-}
+interface Props { lang: 'vi' | 'en'; }
 
 export function DeploymentSection({ lang }: Props) {
-  const t = lang === "vi";
-
-  return (
-    <DocPageLayout
-      title={t ? "Triển khai Production" : "Production Deployment"}
-      subtitle={
-        t
-          ? "Checklist thực dụng để đưa Data Explorer lên web thật, gồm Render/Vercel, env bắt buộc, migration, OAuth callback, và những lỗi deploy hay gặp nhất."
-          : "A practical checklist for shipping Data Explorer to production, including Render/Vercel, required envs, migrations, OAuth callbacks, and the most common deployment pitfalls."
-      }
-      gradient
-    >
-      <div className="grid md:grid-cols-2 gap-6 mb-12">
-        <div className="p-8 border rounded-3xl bg-gradient-to-br from-blue-500/10 via-background to-background">
-          <Rocket className="w-10 h-10 text-blue-500 mb-6" />
-          <h3 className="text-xl font-bold mb-3">
-            {t ? "Frontend: Vercel" : "Frontend: Vercel"}
-          </h3>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {t
-              ? "Phù hợp để deploy client nhanh, CDN tốt, và chỉ cần trỏ VITE_API_URL về backend."
-              : "Great for shipping the client quickly, with strong CDN behavior and only one required API URL to point to the backend."}
-          </p>
-        </div>
-        <div className="p-8 border rounded-3xl bg-gradient-to-br from-emerald-500/10 via-background to-background">
-          <Server className="w-10 h-10 text-emerald-500 mb-6" />
-          <h3 className="text-xl font-bold mb-3">
-            {t ? "Backend: Render" : "Backend: Render"}
-          </h3>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {t
-              ? "Phù hợp để chạy NestJS backend và Prisma, miễn là build command có bước sync schema trước khi boot."
-              : "A solid fit for the NestJS backend and Prisma, as long as your build command syncs the schema before boot."}
-          </p>
-        </div>
-      </div>
-
-      <DocSection
-        title={
-          t ? "1. Build commands khuyên dùng" : "1. Recommended build commands"
-        }
-      >
-        <DocSubSection
-          title={t ? "Backend service (Render)" : "Backend service (Render)"}
-        >
-          <CodeBlock title={t ? "Build command" : "Build command"}>
-            <CodeLine>npm run build</CodeLine>
-          </CodeBlock>
-          <CodeBlock title={t ? "Start command" : "Start command"}>
-            <CodeLine>npm run start:prod</CodeLine>
-          </CodeBlock>
-          <Callout type="warning">
-            <p className="text-sm">
-              {t
-                ? "Chạy `npx prisma migrate deploy` trước khi khởi động app. Render Blueprint trong repo đã thực hiện bước này và chỉ đưa phiên bản mới vào phục vụ khi readiness check thành công."
-                : "Run `npx prisma migrate deploy` before starting the app. The repository's Render Blueprint performs this step and only serves a release after its readiness check passes."}
-            </p>
-          </Callout>
-        </DocSubSection>
-
-        <DocSubSection
-          title={t ? "Frontend service (Vercel)" : "Frontend service (Vercel)"}
-        >
-          <CodeBlock title={t ? "Frontend env" : "Frontend env"}>
-            <CodeLine>
-              VITE_API_URL=https://your-backend-domain.com/api
-            </CodeLine>
-          </CodeBlock>
-        </DocSubSection>
-      </DocSection>
-
-      <DocSection
-        title={
-          t
-            ? "2. Biến môi trường bắt buộc"
-            : "2. Required environment variables"
-        }
-      >
-        <div className="grid gap-4 mt-4">
-          {[
-            {
-              icon: <Database className="w-4 h-4" />,
-              key: "DATABASE_URL",
-              descVi: "Database trung tâm của ứng dụng.",
-              descEn: "The central database for the application.",
-            },
-            {
-              icon: <KeyRound className="w-4 h-4" />,
-              key: "JWT_SECRET",
-              descVi:
-                "Secret mạnh để ký access token. Placeholder sẽ bị backend từ chối.",
-              descEn:
-                "A strong secret used to sign access tokens. Placeholder values will be rejected by the backend.",
-            },
-            {
-              icon: <Shield className="w-4 h-4" />,
-              key: "REFRESH_TOKEN_SECRET",
-              descVi:
-                "Khuyến nghị dùng secret riêng cho refresh token cookie. Nếu để trống, app sẽ fallback về JWT_SECRET.",
-              descEn:
-                "Recommended separate secret for the refresh-token cookie. If omitted, the app falls back to JWT_SECRET.",
-            },
-            {
-              icon: <Shield className="w-4 h-4" />,
-              key: "ENCRYPTION_KEY",
-              descVi:
-                "Phải đúng 32 ký tự để mã hóa saved connection passwords.",
-              descEn:
-                "Must be exactly 32 characters to encrypt saved connection passwords.",
-            },
-            {
-              icon: <Globe className="w-4 h-4" />,
-              key: "FRONTEND_URL",
-              descVi: "Origin frontend thật dùng cho CORS và OAuth redirects.",
-              descEn:
-                "The real frontend origin used for CORS and OAuth redirects.",
-            },
-            {
-              icon: <Globe className="w-4 h-4" />,
-              key: "API_PUBLIC_URL",
-              descVi:
-                "Public API base URL; cần cho billing return/webhook flows.",
-              descEn:
-                "Public API base URL; required for billing return and webhook flows.",
-            },
-            {
-              icon: <Database className="w-4 h-4" />,
-              key: "REDIS_URL",
-              descVi:
-                "URL kết nối Redis cho caching, queue, notifications, presence, search index và rate-limiting.",
-              descEn:
-                "Redis connection URL for caching, queues, notifications, presence, search indexing, and rate-limiting.",
-            },
-            {
-              icon: <KeyRound className="w-4 h-4" />,
-              key: "ADMIN_EMAIL",
-              descVi: "Email admin khởi tạo (Seeding).",
-              descEn: "Initial admin email (Seeding).",
-            },
-            {
-              icon: <KeyRound className="w-4 h-4" />,
-              key: "ADMIN_PASSWORD",
-              descVi: "Mật khẩu admin khởi tạo. Khuyên dùng mật khẩu mạnh.",
-              descEn: "Initial admin password. Strong password recommended.",
-            },
-          ].map((env) => (
-            <div
-              key={env.key}
-              className="flex items-center justify-between gap-4 rounded-2xl border bg-muted/10 px-4 py-4"
-            >
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                  {env.icon}
-                </div>
-                <code className="text-xs font-bold text-primary">
-                  {env.key}
-                </code>
-              </div>
-              <span className="text-xs text-muted-foreground text-right max-w-[34rem]">
-                {t ? env.descVi : env.descEn}
-              </span>
+    const t = lang === 'vi';
+    return (
+        <DocPageLayout title={t ? 'Triển khai production' : 'Production deployment'} subtitle={t ? 'Luồng delivery thực tế: Node 22, Render Docker, Vercel prebuilt frontend, migration và readiness cho đúng commit đã vượt CI.' : 'The actual delivery path: Node 22, Render Docker, Vercel prebuilt frontend, migrations, and readiness for the CI-verified commit.'} gradient>
+            <div className="grid gap-6 md:grid-cols-2">
+                <InfoCard icon={<Rocket className="w-6 h-6" />} title="Frontend / Vercel" color="blue"><p>{t ? 'Client build tạo assets và các trang public prerender. Deploy workflow build với VITE_API_URL production, rồi dùng prebuilt deployment của commit đã được CI xác minh.' : 'Client builds produce assets and prerendered public pages. The deploy workflow builds with production VITE_API_URL and deploys the prebuilt artifact for the CI-verified commit.'}</p></InfoCard>
+                <InfoCard icon={<Server className="w-6 h-6" />} title="Backend / Render" color="emerald"><p>{t ? 'Blueprint dùng runtime Docker, không phải Node service chạy npm ở runtime. Image đã build giữ Prisma CLI để migration rồi chạy trực tiếp dist/src/main.js.' : 'The Blueprint uses Docker runtime, not a Node service that runs npm at runtime. The built image retains the Prisma CLI for migrations before directly launching dist/src/main.js.'}</p></InfoCard>
             </div>
-          ))}
-        </div>
-      </DocSection>
-
-      <DocSection title={t ? "3. OAuth checklist" : "3. OAuth checklist"}>
-        <ul className="grid gap-3">
-          {[
-            t
-              ? "GOOGLE_CALLBACK_URL và GITHUB_CALLBACK_URL phải trỏ về backend thật, ví dụ https://your-backend.onrender.com/api/auth/google/callback."
-              : "GOOGLE_CALLBACK_URL and GITHUB_CALLBACK_URL must point to the real backend, for example https://your-backend.onrender.com/api/auth/google/callback.",
-            t
-              ? "FRONTEND_URL phải khớp origin thực tế của client, nếu không exchange flow sau /login#code=... sẽ fail."
-              : "FRONTEND_URL must match the real client origin, otherwise the exchange flow after /login#code=... will fail.",
-            t
-              ? "Với frontend và backend khác domain ở production, hãy dùng HTTPS để refresh-token cookie có thể chạy với secure + sameSite phù hợp."
-              : "When the frontend and backend live on different production domains, use HTTPS so the refresh-token cookie can work with the correct secure + sameSite policy.",
-            t
-              ? "Sau mỗi lần đổi env OAuth, redeploy backend để callback/controller nạp cấu hình mới."
-              : "After changing any OAuth env, redeploy the backend so the callback/controller loads the new configuration.",
-          ].map((item) => (
-            <li
-              key={item}
-              className="rounded-xl border border-border/50 bg-card/40 px-4 py-3 text-xs text-muted-foreground"
-            >
-              {item}
-            </li>
-          ))}
-        </ul>
-      </DocSection>
-
-      <DocSection title={t ? "4. AI provider envs" : "4. AI provider envs"}>
-        <CodeBlock title={t ? "Optional AI lanes" : "Optional AI lanes"}>
-          <CodeComment>{t ? "Premium lane" : "Premium lane"}</CodeComment>
-          <CodeLine>GEMINI_API_KEY=...</CodeLine>
-          <CodeLine>AI_PROVIDER_TIMEOUT_MS=90000</CodeLine>
-          <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=90000</CodeLine>
-          <p className="mt-3" />
-          <CodeComment>{t ? "Lower-cost lane" : "Lower-cost lane"}</CodeComment>
-          <CodeLine>CEREBRAS_API_KEY=...</CodeLine>
-          <CodeLine>CEREBRAS_BASE_URL=https://api.cerebras.ai/v1</CodeLine>
-          <CodeLine>CEREBRAS_CHAT_MODEL=llama3.1-8b</CodeLine>
-          <p className="mt-3" />
-          <CodeComment>
-            {t ? "Flexible / fallback lane" : "Flexible / fallback lane"}
-          </CodeComment>
-          <CodeLine>OPENROUTER_API_KEY=...</CodeLine>
-          <CodeLine>OPENROUTER_BASE_URL=https://openrouter.ai/api/v1</CodeLine>
-          <CodeLine>OPENROUTER_CHAT_MODEL=</CodeLine>
-          <p className="mt-3" />
-          <CodeComment>
-            {t ? "Low-latency lane" : "Low-latency lane"}
-          </CodeComment>
-          <CodeLine>GROQ_API_KEY=...</CodeLine>
-          <CodeLine>GROQ_BASE_URL=https://api.groq.com/openai/v1</CodeLine>
-          <CodeLine>
-            GROQ_CHAT_MODEL=openai/gpt-oss-120b
-          </CodeLine>
-          <p className="mt-3" />
-          <CodeComment>
-            {t ? "Explicit Beeknoee lane" : "Explicit Beeknoee lane"}
-          </CodeComment>
-          <CodeLine>BEEKNOEE_API_KEY=...</CodeLine>
-          <CodeLine>
-            BEEKNOEE_BASE_URL=https://platform.beeknoee.com/api/v1
-          </CodeLine>
-          <CodeLine>BEEKNOEE_CHAT_MODEL=glm-4.7-flash</CodeLine>
-        </CodeBlock>
-        <Callout type="info">
-          <p className="text-sm">
-            {t
-              ? "Nếu bạn muốn dùng ảnh đính kèm trong AI chat ở production, hãy cấu hình ít nhất một lane có vision thật như Gemini hoặc một model OpenRouter hỗ trợ ảnh."
-              : "If you want image attachments to work in production AI chat, configure at least one true vision lane such as Gemini or an image-capable OpenRouter model."}
-          </p>
-        </Callout>
-      </DocSection>
-
-      <DocSection
-        title={
-          t ? "5. Những lỗi deploy hay gặp" : "5. Common deployment failures"
-        }
-      >
-        <div className="grid md:grid-cols-3 gap-4">
-          <InfoCard
-            icon={<Database className="w-4 h-4" />}
-            title={t ? "Schema lệch" : "Schema drift"}
-            color="amber"
-          >
-            <p className="text-[10px]">
-              {t
-                ? "Backend lên code mới nhưng migration chưa được áp dụng, gây lỗi 500 ở login hoặc dashboard APIs."
-                : "The backend ships new code before its migration is applied, causing 500 errors in login or dashboard APIs."}
-            </p>
-          </InfoCard>
-          <InfoCard
-            icon={<Shield className="w-4 h-4" />}
-            title={t ? "Secret yếu" : "Weak secret"}
-            color="red"
-          >
-            <p className="text-[10px]">
-              {t
-                ? "JWT_SECRET placeholder sẽ làm backend không khởi động được."
-                : "A placeholder JWT_SECRET will prevent the backend from booting."}
-            </p>
-          </InfoCard>
-          <InfoCard
-            icon={<Globe className="w-4 h-4" />}
-            title={t ? "Callback sai domain" : "Wrong callback domain"}
-            color="blue"
-          >
-            <p className="text-[10px]">
-              {t
-                ? "Google/GitHub login fail nếu callback URL hoặc FRONTEND_URL không khớp deployment thật."
-                : "Google/GitHub login will fail if callback URLs or FRONTEND_URL do not match the real deployment."}
-            </p>
-          </InfoCard>
-        </div>
-      </DocSection>
-
-      <Callout type="tip">
-        <p className="text-sm">
-          {t
-            ? "Nếu bạn muốn ship an toàn: dùng Vercel cho client, Render Blueprint cho backend, set env chuẩn, chạy migration trước khi start, rồi test login + readiness + 1 query thật trước khi public."
-            : "For a safe release: use Vercel for the client, the Render Blueprint for the backend, set envs correctly, migrate before startup, then test login, readiness, and one real query before going public."}
-        </p>
-      </Callout>
-    </DocPageLayout>
-  );
+            <DocSection title={t ? '1. Build và migration ordering' : '1. Build and migration ordering'}>
+                <DocSubSection title={t ? 'Backend image và Render command' : 'Backend image and Render command'}>
+                    <Prose>{t ? 'server/Dockerfile chạy npm ci, Prisma generation và Nest build ở build stage. Runtime là non-root và bỏ npm/npx toolchain. Đừng cấu hình npm run start:prod hoặc npx migrate như command bên trong image này.' : 'server/Dockerfile runs npm ci, Prisma generation, and the Nest build in the build stage. The non-root runtime removes npm/npx tooling. Do not configure npm run start:prod or npx migrate as commands inside this runtime image.'}</Prose>
+                    <CodeBlock title="render.yaml / dockerCommand"><CodeLine>{"/bin/sh -c 'node node_modules/prisma/build/index.js migrate deploy && exec node dist/src/main.js'"}</CodeLine></CodeBlock>
+                    <Prose>{t ? 'Local Compose dùng service migrate riêng; backend chờ migrate hoàn tất và Redis healthy. Render thực hiện migration trong command trên. Production backup và compatibility review phải hoàn tất trước khi đổi schema.' : 'Local Compose uses a separate migrate service; the backend waits for successful migration and healthy Redis. Render migrates through the command above. Production backups and compatibility review must be completed before schema changes.'}</Prose>
+                </DocSubSection>
+                <DocSubSection title={t ? 'Frontend build-time API URL' : 'Frontend build-time API URL'}>
+                    <CodeBlock title="client/.env"><CodeLine>VITE_API_URL=https://your-backend.example.com/api</CodeLine></CodeBlock>
+                    <Callout type="warning"><p>{t ? 'VITE_* được đưa vào browser bundle. Không đặt JWT secret, database password hoặc provider API key ở đây. Đổi API URL cần rebuild frontend; chỉ sửa env trên backend không đổi bundle đã deploy.' : 'VITE_* values enter the browser bundle. Never place JWT secrets, database passwords, or provider API keys here. API URL changes require a frontend rebuild; editing backend environment values does not alter an already-deployed bundle.'}</p></Callout>
+                </DocSubSection>
+            </DocSection>
+            <DocSection title={t ? '2. Cấu hình theo requiredness' : '2. Classify configuration by requiredness'}>
+                <div className="mt-6 overflow-x-auto" tabIndex={0} role="region" aria-label={t ? 'Biến môi trường production' : 'Production environment variables'}><table className="w-full text-left text-sm"><thead><tr><th className="p-3">{t ? 'Nhóm' : 'Class'}</th><th className="p-3">{t ? 'Biến' : 'Variables'}</th><th className="p-3">{t ? 'Yêu cầu' : 'Requirements'}</th></tr></thead><tbody>{[
+                    [t ? 'Bắt buộc production' : 'Required in production', 'DATABASE_URL, REDIS_URL, JWT_SECRET, ENCRYPTION_KEY, FRONTEND_URL, API_PUBLIC_URL', t ? 'App PostgreSQL/Redis riêng; JWT ≥32 UTF-8 bytes, encryption đúng 32 UTF-8 bytes. Backend từ chối placeholder.' : 'Separate application PostgreSQL/Redis; JWT ≥32 UTF-8 bytes, encryption exactly 32 UTF-8 bytes. Placeholders are rejected.'],
+                    [t ? 'Platform-derived' : 'Platform-derived', 'API_PUBLIC_URL / RENDER_EXTERNAL_URL', t ? 'Render có thể derive API_PUBLIC_URL nếu thiếu; vẫn kiểm tra public origin thật.' : 'Render can derive API_PUBLIC_URL when absent; verify the actual public origin.'],
+                    [t ? 'Khuyến nghị' : 'Recommended', 'REFRESH_TOKEN_SECRET', t ? 'Random secret độc lập ≥32 UTF-8 bytes; bỏ trống fallback về JWT_SECRET.' : 'Independent random secret ≥32 UTF-8 bytes; omission falls back to JWT_SECRET.'],
+                    [t ? 'Network hardening' : 'Network hardening', 'ALLOW_INTERNAL_IPS=false, ALLOW_INSECURE_DATABASE_TLS=false, TRUST_PROXY', t ? 'Giữ deny nội bộ và strict TLS rõ ràng; TRUST_PROXY theo số trusted hops (Render blueprint dùng 1).' : 'Explicitly retain internal denial and strict TLS; set TRUST_PROXY for trusted hops (the Render Blueprint uses 1).'],
+                    [t ? 'Retention' : 'Retention', 'AUDIT_RETENTION_DAYS=365, PAYMENT_PAYLOAD_RETENTION_DAYS=30, RETENTION_CLEANUP_INTERVAL_HOURS=24', t ? 'Cleanup audit logs/raw payment payload; không auto-expire AI chat hay backup.' : 'Cleanup audit logs/raw payment payloads; this does not automatically expire AI chats or backups.'],
+                    [t ? 'Tùy chọn integrations' : 'Optional integrations', 'AI providers, OAuth, MAIL_USER/MAIL_PASS, MoMo/ZaloPay', t ? 'Chỉ đặt credentials cho integrations được bật; kiểm thử sandbox, không gọi cổng thanh toán thật để test.' : 'Configure credentials only for enabled integrations; test in sandbox rather than charging through production gateways.'],
+                    [t ? 'Admin seed tùy chọn' : 'Optional admin seed', 'ADMIN_EMAIL, ADMIN_PASSWORD', t ? 'Phải có cả hai mới seed; không random admin khi thiếu.' : 'Both are required for seeding; missing values do not create a random administrator.'],
+                ].map(([kind, variables, notes]) => <tr key={kind} className="border-t"><td className="p-3 font-medium">{kind}</td><td className="p-3 font-mono text-xs">{variables}</td><td className="p-3 text-muted-foreground">{notes}</td></tr>)}</tbody></table></div>
+                <Prose><a href={publicPath(lang, '/docs/env-vars')}>{t ? 'Tham chiếu biến môi trường' : 'Environment variable reference'}</a> · <a href={publicPath(lang, '/docs/security')}>{t ? 'Checklist bảo mật' : 'Security checklist'}</a></Prose>
+            </DocSection>
+            <DocSection title={t ? '3. Delivery cho đúng SHA' : '3. Deliver the verified SHA'}>
+                <ul className="space-y-3 text-sm text-muted-foreground">{[
+                    t ? 'CI chạy cho PR/push main. Production workflows chỉ chạy sau successful CI push trên main, không từ test pass local.' : 'CI runs for PRs and main pushes. Production workflows run only after successful CI on a main push, not because local tests passed.',
+                    t ? 'Render deploy hook nhận ref của commit đã test; readiness poll phải trả commit SHA đó trước khi báo thành công.' : 'The Render deploy hook receives the tested commit ref; readiness polling must return that SHA before reporting success.',
+                    t ? 'Vercel workflow checkout verified SHA, pull production settings, build và deploy --prebuilt. Git auto-deployment được tắt để tránh release trùng.' : 'The Vercel workflow checks out the verified SHA, pulls production settings, builds, and deploys --prebuilt. Git auto-deployment is disabled to avoid duplicate releases.',
+                    t ? 'GitHub production environment cần RENDER_DEPLOY_HOOK_URL, VERCEL_TOKEN, VERCEL_ORG_ID và VERCEL_PROJECT_ID; không đưa secrets vào docs hoặc Git.' : 'The GitHub production environment needs RENDER_DEPLOY_HOOK_URL, VERCEL_TOKEN, VERCEL_ORG_ID, and VERCEL_PROJECT_ID. Keep these secrets out of docs and Git.',
+                ].map(item => <li key={item} className="rounded-xl border p-4">{item}</li>)}</ul>
+                <Prose><a href="https://github.com/KasierBach/Data-Explorer-Editor/blob/main/docs/operations/ci-cd.md" target="_blank" rel="noopener noreferrer">{t ? 'CI/CD operations guide' : 'CI/CD operations guide'}</a></Prose>
+            </DocSection>
+            <DocSection title={t ? '4. Readiness, cookies và integrations' : '4. Readiness, cookies, and integrations'}>
+                <CodeBlock title="Health"><CodeLine>GET /api/health/ready</CodeLine><CodeLine>GET /api/health/live</CodeLine></CodeBlock>
+                <Prose>{t ? 'ready kiểm tra app PostgreSQL/Redis; live chỉ xác nhận process. OAuth callback phải trỏ backend /api/auth/google/callback hoặc /api/auth/github/callback. FRONTEND_URL phải là browser origin thật; HTTPS/cookie policy và proxy topology cần đúng để refresh hoạt động.' : 'ready checks application PostgreSQL/Redis; live checks process liveness only. OAuth callbacks point to backend /api/auth/google/callback or /api/auth/github/callback. FRONTEND_URL must be the actual browser origin; HTTPS, cookie policy, and proxy topology must be correct for refresh.'}</Prose>
+                <Prose>{t ? 'AI lane thiếu key không sẵn sàng. Cerebras fallback hiện là gpt-oss-120b; để model env trống dùng fallback code. Custom per-user provider khác shared server.env lane. Vision/PDF/live-search cần model có capability tương ứng.' : 'An AI lane without credentials is unavailable. Cerebras currently falls back to gpt-oss-120b; an empty model environment value uses the code fallback. Per-user custom providers are separate from shared server.env lanes. Vision, PDF, and live search need corresponding model capabilities.'}</Prose>
+            </DocSection>
+            <DocSection title={t ? '5. Rollback và xử lý lỗi' : '5. Rollback and failure handling'}>
+                <div className="grid gap-4 md:grid-cols-3"><InfoCard icon={<Database className="w-5 h-5" />} title={t ? 'Schema drift' : 'Schema drift'} color="amber"><p>{t ? 'Đọc migration history và backup trước khi repair. Không reset/drop database để làm readiness pass.' : 'Inspect migration history and backups before repair. Never reset/drop the database to make readiness pass.'}</p></InfoCard><InfoCard icon={<Shield className="w-5 h-5" />} title={t ? 'Secrets và TLS' : 'Secrets and TLS'} color="red"><p>{t ? 'Kiểm UTF-8 byte length, placeholder, key rotation và strict TLS. Restore key cũ nếu thay ngoài ý muốn; không đổi key để chữa lỗi không liên quan.' : 'Check UTF-8 byte length, placeholders, key rotation, and strict TLS. Restore accidental key changes; do not rotate keys to fix unrelated failures.'}</p></InfoCard><InfoCard icon={<Globe className="w-5 h-5" />} title={t ? 'Origin và webhook' : 'Origins and webhooks'} color="blue"><p>{t ? 'CORS/cookie/webhook cần đúng public origins và credentials. Status UI pending không chứng minh provider đã paid.' : 'CORS, cookies, and webhooks need correct public origins and credentials. A pending UI does not establish provider payment.'}</p></InfoCard></div>
+                <Callout type="warning"><p>{t ? 'Redeploy commit/image cũ không tự rollback Prisma schema. Database rollback cần kế hoạch migration riêng được review. Trước deploy hãy backup app database, đánh giá backward compatibility, rồi dùng synthetic smoke checks với quyền least-privilege.' : 'Redeploying an earlier commit/image does not automatically roll back Prisma schema. Database rollback needs a separately reviewed migration plan. Back up the application database, review backward compatibility, and use synthetic least-privilege smoke checks before deployment.'}</p></Callout>
+            </DocSection>
+        </DocPageLayout>
+    );
 }

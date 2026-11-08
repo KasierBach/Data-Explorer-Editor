@@ -1,5 +1,6 @@
 import { Database, Globe, Key, Mail, Server, Shield } from "lucide-react";
-import { Callout, DocPageLayout, DocSection, Prose } from "../primitives";
+import { publicPath } from '@/core/seo/publicRoutes';
+import { Callout, CodeBlock, CodeComment, CodeLine, DocPageLayout, DocSection, Prose } from "../primitives";
 
 interface Props {
   lang: "vi" | "en";
@@ -16,8 +17,8 @@ export function EnvVarsSection({ lang }: Props) {
         {
           name: "PORT",
           desc: t
-            ? "Cổng server backend chạy (mặc định 3001)"
-            : "Backend server port (default 3001)",
+            ? "Cổng NestJS; đặt PORT=3001 cho local host dev để khớp VITE_API_URL"
+            : "NestJS port; set PORT=3001 for local host development to match VITE_API_URL",
           example: "3001",
         },
         {
@@ -41,36 +42,36 @@ export function EnvVarsSection({ lang }: Props) {
         {
           name: "JWT_SECRET",
           desc: t
-            ? "Secret mạnh để ký access token; backend sẽ từ chối placeholder yếu"
-            : "Strong secret for access-token signing; weak placeholder values are rejected by the backend",
-          example: "replace-with-a-random-secret-at-least-32-bytes-long",
+            ? "Secret ngẫu nhiên ít nhất 32 byte UTF-8 để ký access token; backend từ chối giá trị thiếu, ngắn hoặc mẫu bị cấm"
+            : "Random access-token secret of at least 32 UTF-8 bytes; missing, short or disallowed sample values are rejected",
+          example: t ? "Sinh trên máy của bạn (xem lệnh bên dưới)" : "Generate locally (see command below)",
         },
         {
           name: "REFRESH_TOKEN_SECRET",
           desc: t
-            ? "Secret riêng cho refresh token; nếu bỏ trống app có thể fallback về JWT_SECRET"
-            : "Separate secret for refresh tokens; if omitted the app may fall back to JWT_SECRET",
-          example: "another-very-long-secret",
+            ? "Secret riêng ít nhất 32 byte UTF-8 cho refresh token; nếu bỏ trống sẽ dùng JWT_SECRET"
+            : "Separate refresh-token secret of at least 32 UTF-8 bytes; omitted values fall back to JWT_SECRET",
+          example: t ? "Sinh riêng trên máy của bạn" : "Generate a separate value locally",
         },
         {
           name: "ENCRYPTION_KEY",
           desc: t
-            ? "Khóa đúng 32 ký tự để mã hóa saved connection passwords (AES-256)"
-            : "Exactly 32 characters for encrypting saved connection passwords (AES-256)",
-          example: "12345678901234567890123456789012",
+            ? "Khóa ngẫu nhiên đúng 32 byte UTF-8 để mã hóa mật khẩu kết nối và API key provider đã lưu (AES-256-GCM); không đo bằng số ký tự Unicode"
+            : "Random key of exactly 32 UTF-8 bytes for saved connection passwords and provider API keys (AES-256-GCM); do not count Unicode characters",
+          example: t ? "Sinh 16 byte ngẫu nhiên rồi encode hex (32 byte ASCII)" : "Generate 16 random bytes then hex-encode (32 ASCII bytes)",
         },
         {
           name: "LEGACY_ENCRYPTION_KEYS",
           desc: t
-            ? "Danh sách khóa cũ để đọc lại dữ liệu đã mã hóa từ các phiên bản trước"
-            : "Legacy keys used to read connection data encrypted by older versions",
+            ? "Danh sách khóa cũ phân cách bằng dấu phẩy, mỗi khóa đúng 32 byte UTF-8; chỉ giữ khóa cần để đọc dữ liệu mã hóa cũ"
+            : "Comma-separated legacy keys, each exactly 32 UTF-8 bytes; retain only keys needed to read older encrypted records",
           example: "",
         },
         {
           name: "ALLOW_INTERNAL_IPS",
           desc: t
-            ? "Cho phép kết nối tới IP nội bộ / localhost; mặc định false để giảm rủi ro SSRF"
-            : "Allow connections to internal IPs / localhost; defaults to false to reduce SSRF risk",
+            ? "Override SSRF cho địa chỉ private/internal, mặc định false. Development cho phép một số host loopback local; không bật rộng cho production chỉ để sửa lỗi kết nối"
+            : "SSRF override for private/internal addresses, default false. Development allows certain local loopback hosts; do not enable broadly in production just to fix connectivity",
           example: "true | false",
         },
         {
@@ -94,16 +95,16 @@ export function EnvVarsSection({ lang }: Props) {
         {
           name: "DATABASE_URL",
           desc: t
-            ? "Connection URL cho PostgreSQL metastore của app"
-            : "Connection URL for the app metadata PostgreSQL store",
+            ? "PostgreSQL metadata app. Ví dụ dùng host port 5435 và mật khẩu mặc định Compose change-me-local; trong container dùng db:5432"
+            : "App metadata PostgreSQL. The example uses host port 5435 and Compose's change-me-local default password; containers use db:5432",
           example:
-            "postgresql://postgres:postgres@localhost:5435/data_explorer",
+            "postgresql://postgres:change-me-local@localhost:5435/data_explorer",
         },
         {
           name: "FRONTEND_URL",
           desc: t
-            ? "Origin thật của frontend, dùng cho CORS, cookie, và redirect flows"
-            : "Real frontend origin used for CORS, cookies, and redirect flows",
+            ? "Origin thật dùng cho CORS và redirect; Vite local là http://localhost:5173, frontend Docker là http://localhost"
+            : "Actual CORS and redirect origin; local Vite uses http://localhost:5173, the Docker frontend uses http://localhost",
           example: "http://localhost:5173",
         },
         {
@@ -116,15 +117,15 @@ export function EnvVarsSection({ lang }: Props) {
         {
           name: "ALLOW_INSECURE_DATABASE_TLS",
           desc: t
-            ? "Đặt 'false' để bật verify certificate TLS cho mọi kết nối database remote (Postgres, MySQL/MariaDB, CockroachDB, Redis, ClickHouse, MSSQL). Mặc định chấp nhận certificate tự ký cho dễ dev."
-            : "Set to 'false' to enforce TLS certificate verification on every remote database connection (Postgres, MySQL/MariaDB, CockroachDB, Redis, ClickHouse, MSSQL). Defaults to accepting self-signed certificates for easier development.",
+            ? "Override TLS toàn backend. Template đặt false để verify certificate; code coi giá trị bỏ trống hoặc khác chuỗi 'false' là cho phép TLS không an toàn. Production phải đặt rõ false. Không phải cấu hình SSL mode hoặc CA riêng từng connection"
+            : "Backend-wide TLS override. Templates set false for certificate verification; the code treats an omitted value or anything other than the string 'false' as permissive. Production must explicitly set false. This is not a per-connection SSL mode or CA setting",
           example: "false",
         },
         {
           name: "VITE_API_URL",
           desc: t
-            ? "API base URL mà frontend Vite sẽ gọi tới"
-            : "API base URL the Vite frontend should call",
+            ? "API base URL trong client/.env, đọc khi Vite khởi động/build. Đây là cấu hình công khai, không đặt JWT/DB/API secret ở đây"
+            : "API base URL in client/.env, read at Vite startup/build time. This is public configuration; never put JWT/DB/API secrets here",
           example: "http://localhost:3001/api",
         },
       ],
@@ -363,8 +364,8 @@ export function EnvVarsSection({ lang }: Props) {
       title={t ? "Biến môi trường" : "Environment Variables"}
       subtitle={
         t
-          ? "Danh sách đầy đủ các cấu hình trong tệp .env để vận hành toàn bộ hệ thống Data Explorer."
-          : "A comprehensive list of all .env configurations required to operate the Data Explorer ecosystem."
+          ? "Tham chiếu các biến môi trường quan trọng, phân biệt backend runtime, Docker Compose và frontend Vite."
+          : "A reference for key environment variables, separating backend runtime, Docker Compose and the Vite frontend."
       }
     >
       <div className="space-y-12">
@@ -373,8 +374,8 @@ export function EnvVarsSection({ lang }: Props) {
         >
           <Prose>
             {t
-              ? "Data Explorer hiện có hai lớp tài liệu env đáng chú ý trong repo: `.env.example` ở root để nhìn toàn hệ thống theo kiểu Docker-friendly, và `server/.env.example` để nhìn backend runtime trực tiếp. Bảng dưới đây gộp cả hai góc nhìn để bạn không phải nhảy qua lại giữa nhiều file khi cấu hình local, staging, hoặc production."
-              : "Data Explorer currently exposes two important env references in the repo: the root `.env.example` for a Docker-friendly full-system view, and `server/.env.example` for the direct backend runtime view. The tables below combine those perspectives so you do not have to jump between multiple files when configuring local, staging, or production environments."}
+              ? "Root .env.example dành cho Compose; server/.env dành cho backend chạy trên host; client/.env chứa VITE_API_URL. Không chép nguyên placeholder: ví dụ server có mật khẩu postgres nhưng Compose mặc định change-me-local. Local host cần PORT=3001, DATABASE_URL trỏ localhost:5435, REDIS_URL trỏ localhost:6379 và FRONTEND_URL=http://localhost:5173."
+              : "The root .env.example is for Compose; server/.env is for the host backend; client/.env holds VITE_API_URL. Do not copy placeholders unchanged: the server example uses password postgres, while Compose defaults to change-me-local. Local host development needs PORT=3001, DATABASE_URL at localhost:5435, REDIS_URL at localhost:6379 and FRONTEND_URL=http://localhost:5173."}
           </Prose>
 
           <Callout type="info">
@@ -388,10 +389,33 @@ export function EnvVarsSection({ lang }: Props) {
           <Callout type="info">
             <p className="text-sm">
               {t
-                ? "Phân biệt hai lớp cấu hình AI: `server/.env` dùng cho các lane dựng sẵn và dùng chung ở backend, còn custom OpenAI-compatible providers cùng lựa chọn model theo vai trò (`Assistant`, `Explain`, `AI SQL`, `AI NoSQL`, `Autocomplete`) được lưu cục bộ trong `Cấu hình AI` trên từng máy người dùng."
-                : "Keep the two AI configuration layers separate: `server/.env` configures built-in backend lanes, while custom OpenAI-compatible providers and per-role model choices (`Assistant`, `Explain`, `AI SQL`, `AI NoSQL`, `Autocomplete`) are stored locally inside `Configure AI` on each client machine."}
+                ? "server/.env cấu hình lane AI dựng sẵn. Provider OpenAI-compatible tùy chỉnh được lưu ở server theo từng người dùng; API key được mã hóa trước khi lưu. Chỉ lựa chọn model/provider theo vai trò (Assistant, Explain, AI SQL, AI NoSQL, Autocomplete) được persist cục bộ trong trình duyệt. Không coi provider API key là dữ liệu chỉ nằm trên máy client."
+                : "server/.env configures built-in AI lanes. Custom OpenAI-compatible provider records are saved per user on the server, with API keys encrypted before storage. Only per-role model/provider preferences (Assistant, Explain, AI SQL, AI NoSQL, Autocomplete) persist locally in the browser. Do not describe provider API keys as client-only data."}
             </p>
           </Callout>
+        </DocSection>
+
+        <DocSection title={t ? "Sinh secret an toàn" : "Generate secrets safely"}>
+          <Prose>
+            {t
+              ? "Chạy lệnh sau trên máy của bạn rồi chép đầu ra vào server/.env. JWT/refresh dùng 32 byte ngẫu nhiên encode hex (64 byte ASCII); encryption key dùng 16 byte ngẫu nhiên encode hex (đúng 32 byte ASCII). Không chép ví dụ secret cố định; các giá trị mẫu như chuỗi số tuần tự đã biết bị backend từ chối. Độ dài kiểm tra là byte UTF-8 sau trim, không phải số ký tự."
+              : "Run this command locally and copy its output into server/.env. JWT/refresh use 32 random bytes hex-encoded (64 ASCII bytes); the encryption key uses 16 random bytes hex-encoded (exactly 32 ASCII bytes). Never copy a fixed secret example; known sample values such as the sequential-number key are rejected. Length checks use trimmed UTF-8 bytes, not character counts."}
+          </Prose>
+          <CodeBlock title={t ? "Terminal / PowerShell — sinh giá trị mới mỗi lần" : "Terminal / PowerShell — new values on every run"}>
+            <CodeComment>{t ? "Không commit hoặc chia sẻ đầu ra" : "Do not commit or share the output"}</CodeComment>
+            <CodeLine>{`node -e "const { randomBytes } = require('node:crypto'); console.log('JWT_SECRET=' + randomBytes(32).toString('hex')); console.log('REFRESH_TOKEN_SECRET=' + randomBytes(32).toString('hex')); console.log('ENCRYPTION_KEY=' + randomBytes(16).toString('hex'));"`}</CodeLine>
+          </CodeBlock>
+          <Callout type="warning">
+            <p className="text-sm">
+              {t
+                ? "Đặt ALLOW_INSECURE_DATABASE_TLS=false rõ ràng ở production: bỏ biến không đồng nghĩa an toàn. PostgreSQL remote tự dùng TLS, không có toggle riêng hoặc CA path từ URI. MySQL/MariaDB cần bật TLS trong form sau khi import URI; tls=false tắt transport, không chỉ tắt verify. ClickHouse remote dùng HTTP mặc định khi override bỏ trống; với false dùng HTTPS/cổng mặc định 8443."
+                : "Explicitly set ALLOW_INSECURE_DATABASE_TLS=false in production: omitting it is not secure. Remote PostgreSQL uses automatic TLS, with no per-connection toggle or URI CA path. MySQL/MariaDB require TLS enabled in the form after importing a URI; tls=false disables transport, not just verification. Remote ClickHouse defaults to HTTP when the override is omitted; false uses HTTPS/default port 8443."}
+            </p>
+          </Callout>
+          <Prose>
+            <a href={publicPath(lang, '/docs/installation')}>{t ? "Cài đặt local đầy đủ" : "Complete local setup"}</a>{' · '}
+            <a href={publicPath(lang, '/docs/data-handling')}>{t ? "Dữ liệu và AI" : "Data handling and AI"}</a>
+          </Prose>
         </DocSection>
 
         {categories.map((cat) => (

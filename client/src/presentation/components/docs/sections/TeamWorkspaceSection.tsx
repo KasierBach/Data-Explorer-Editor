@@ -15,6 +15,7 @@ import {
     InfoCard,
     Prose,
 } from '../primitives';
+import { publicPath } from '@/core/seo/publicRoutes';
 
 interface Props { lang: 'vi' | 'en'; }
 
@@ -98,11 +99,47 @@ export function TeamWorkspaceSection({ lang }: Props) {
                     </InfoCard>
                 </div>
 
+                <DocSubSection title={t ? 'Vai trò mặc định và policy theo tài nguyên' : 'Default roles and per-resource policies'}>
+                    <div className="grid gap-4 md:grid-cols-2">
+                        {[
+                            {
+                                title: 'Owner',
+                                desc: t
+                                    ? 'Mặc định có read, write, delete, manage, comment và share trên tài nguyên team. Chỉ Owner thực hiện các thao tác sở hữu như chuyển quyền Owner hoặc xóa organization.'
+                                    : 'Defaults to read, write, delete, manage, comment, and share on team resources. Ownership operations such as transferring ownership or deleting the organization are Owner-only.',
+                            },
+                            {
+                                title: 'Admin',
+                                desc: t
+                                    ? 'Mặc định có cùng bộ quyền tài nguyên với Owner và có thể quản lý các luồng team được cho phép như lời mời, teamspace và backup. Admin không có toàn bộ quyền sở hữu của Owner.'
+                                    : 'Defaults to the same resource permissions as Owner and can manage authorized team flows such as invitations, teamspaces, and backups. Admin does not inherit all Owner-only powers.',
+                            },
+                            {
+                                title: 'Member',
+                                desc: t
+                                    ? 'Mặc định có read, write và comment; không mặc định có delete, manage hay share. Quyền cụ thể vẫn được kiểm tra theo resource policy.'
+                                    : 'Defaults to read, write, and comment, not delete, manage, or share. Actual access is still checked against the resource policy.',
+                            },
+                            {
+                                title: 'Viewer',
+                                desc: t
+                                    ? 'Mặc định chỉ read, không comment hoặc edit. Policy theo tài nguyên có thể thay bộ quyền mặc định; tư cách thành viên không tự vượt quyền database hoặc connection.'
+                                    : 'Defaults to read only, without comment or edit. A resource policy can replace the default permission set; membership does not bypass database or connection permissions.',
+                            },
+                        ].map((item) => (
+                            <div key={item.title} className="rounded-2xl border border-border/60 bg-card/40 p-5">
+                                <h3 className="text-sm font-bold">{item.title}</h3>
+                                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </DocSubSection>
+
                 <DocSubSection title={t ? 'Những loại tài nguyên đang được quản lý' : 'The resource types currently managed'}>
                     <Prose>
                         {t
-                            ? 'Hiện tại Team Workspace xoay quanh ba nhóm tài nguyên người dùng thấy nhiều nhất: team connections, shared queries, và team dashboards. Đó là ba điểm nơi tri thức dữ liệu dễ bị “giam” trong cá nhân nhất, nên app đưa chúng vào cùng một lớp governance.'
-                            : 'Right now the Team Workspace is centered on the three most important shared asset types: team connections, shared queries, and team dashboards. Those are the places where data knowledge most easily gets trapped in personal silos, so the app governs them together.'}
+                            ? 'Team Workspace hiển thị connection, saved query và dashboard được chia sẻ; ERD workspace cũng thuộc lớp resource policy. Read, comment, write, delete, manage và share là các quyền riêng biệt, không phải một nhãn “thành viên team” mở toàn bộ thao tác.'
+                            : 'Team Workspace displays shared connections, saved queries, and dashboards; ERD workspaces also use resource policies. Read, comment, write, delete, manage, and share are separate permissions, not a single team-membership label that enables every action.'}
                     </Prose>
                 </DocSubSection>
             </DocSection>
@@ -137,8 +174,8 @@ export function TeamWorkspaceSection({ lang }: Props) {
             <DocSection title={t ? 'Backup & restore ở cấp team' : 'Team-level backup and restore'}>
                 <Prose>
                     {t
-                        ? 'TeamPage có backup flow riêng để export organization package thành JSON và restore lại có kiểm soát. Đây là công cụ tốt cho migration nhẹ, sao lưu cấu hình cộng tác, hoặc tạo bản chụp trước khi chỉnh lớn.'
-                        : 'TeamPage includes a dedicated backup flow that exports an organization package as JSON and restores it in a controlled way. It is useful for light migration, collaboration-config backup, or creating a snapshot before major changes.'}
+                        ? 'Owner/Admin có thể export JSON gồm metadata và settings của organization, teamspace, policy cho query/dashboard/ERD, saved query, dashboard cùng widget/data snapshot và ERD layout. Đây là gói metadata cộng tác, không phải bản backup toàn bộ hệ thống hay dữ liệu database nguồn.'
+                        : 'Owner/Admin can export JSON containing organization metadata/settings, teamspaces, query/dashboard/ERD policies, saved queries, dashboards with widget/data snapshots, and ERD layouts. This is a collaboration-metadata package, not a backup of the entire system or source database contents.'}
                 </Prose>
 
                 <div className="rounded-2xl border border-border/60 bg-card/40 p-5">
@@ -148,58 +185,41 @@ export function TeamWorkspaceSection({ lang }: Props) {
                     </div>
                     <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                         {t
-                            ? 'Hãy export trước các thay đổi có phạm vi rộng như tái cấu trúc teamspace, thay policy share, di chuyển resource giữa nhóm, hoặc cleanup dữ liệu cộng tác. Backup không thay thế database backup toàn hệ thống, nhưng rất hữu ích cho lớp tổ chức và metadata cộng tác.'
-                            : 'Export before broad changes such as teamspace restructuring, share-policy updates, moving resources between groups, or collaboration cleanup. It does not replace full database backups, but it is extremely useful for organization-level metadata and collaboration state.'}
+                            ? 'Export không chứa connection records/secrets, thành viên, lời mời, comment, activity/audit, AI chat, hoặc bản sao toàn bộ schema/dữ liệu nguồn. Nhiều tập dữ liệu được đọc riêng, nên không bảo đảm snapshot nhất quán tại một thời điểm khi team đang chỉnh sửa. JSON có query text và dashboard snapshot: lưu và chia sẻ như dữ liệu có thể nhạy cảm.'
+                            : 'Export does not include connection records/secrets, memberships, invitations, comments, activity/audit, AI chats, or full source schemas/data. Collections are read separately, so concurrent team edits mean this is not a guaranteed point-in-time consistent snapshot. JSON includes query text and dashboard snapshots: store and share it as potentially sensitive data.'}
                     </p>
                 </div>
+                <Callout type="warning">
+                    <p className="text-sm">
+                        {t
+                            ? 'Restore chỉ chấp nhận gói của cùng organization. Nó tạo thêm teamspace/query/dashboard/ERD và gắn lại policy, đồng thời áp dụng settings được lưu; không phải replace toàn bộ hay merge chống trùng. Restore lại cùng gói có thể tạo bản sao; connection cũ phải được kiểm tra lại. Đọc số lượng và warnings sau restore, không coi thành công là khôi phục mọi đối tượng.'
+                            : 'Restore accepts only a package from the same organization. It adds new teamspaces/queries/dashboards/ERDs and reattaches policies while applying stored settings; it is not a full replacement or deduplicating merge. Restoring the same package again can create duplicates; existing connections need review. Inspect counts and warnings rather than treating success as recovery of every object.'}
+                    </p>
+                </Callout>
+                <Prose>
+                    <a href={publicPath(lang, '/docs/data-handling')}>
+                        {t ? 'Xem phạm vi lưu trữ, export và backup' : 'See retention, export, and backup scope'}
+                    </a>
+                </Prose>
             </DocSection>
 
             <DocSection title={t ? 'Di chuyển dữ liệu giữa hai connection (Migration)' : 'Moving data between two connections (Migration)'}>
                 <Prose>
                     {t
-                        ? 'Migration tool cho phép stream dữ liệu từ một bảng/collection ở connection nguồn sang bảng/collection ở connection đích — kể cả khác loại engine (ví dụ MySQL sang PostgreSQL).'
-                        : 'The migration tool streams data from a table/collection on a source connection to a target on another connection — even across engine types (e.g. MySQL to PostgreSQL).'}
+                        ? 'Migration chuyển dữ liệu giữa bảng/collection trên hai connection và là luồng khác với restore metadata của team. Xem hướng dẫn riêng để kiểm tra nguồn/đích, schema, quyền và theo dõi job.'
+                        : 'Migration copies data between tables/collections on two connections and is separate from team metadata restore. Read the dedicated guide for source/target, schema, permission, and job-progress checks.'}
+                    {' '}
+                    <a href={publicPath(lang, '/docs/data-migration')}>
+                        {t ? 'Mở hướng dẫn Data Migration.' : 'Open the Data Migration guide.'}
+                    </a>
                 </Prose>
-                <div className="space-y-3">
-                    {[
-                        {
-                            step: '1',
-                            title: t ? 'Chọn nguồn và đích' : 'Pick source and target',
-                            desc: t
-                                ? 'Chọn connection nguồn, database/schema và bảng cần chuyển; sau đó chọn connection đích và bảng nhận. Hệ thống tự chặn nếu nguồn và đích trỏ vào cùng một bảng.'
-                                : 'Select the source connection, database/schema, and table; then pick the target connection and receiving table. The system blocks source and target pointing at the same table.',
-                        },
-                        {
-                            step: '2',
-                            title: t ? 'Kiểm tra tương thích schema' : 'Verify schema compatibility',
-                            desc: t
-                                ? 'Preflight so sánh cột của hai bảng và báo lỗi nếu đích thiếu cột bắt buộc. Hãy tạo schema đích trước (qua SQL Steps hoặc schema editor) nếu chưa có.'
-                                : 'A preflight compares the columns of both tables and fails when the target is missing required columns. Create the target schema first (via SQL Steps or the schema editor) if it does not exist yet.',
-                        },
-                        {
-                            step: '3',
-                            title: t ? 'Chạy và theo dõi tiến độ' : 'Run and watch progress',
-                            desc: t
-                                ? 'Quá trình chuyển chạy theo batch thích ứng trong một background job: bạn thấy số dòng đã xử lý, số batch, và stage hiện tại (validating → connecting → preflight → streaming → completed).'
-                                : 'The transfer runs in adaptive batches inside a background job: you see processed rows, batch count, and the current stage (validating → connecting → preflight → streaming → completed).',
-                        },
-                        {
-                            step: '4',
-                            title: t ? 'Xử lý lỗi giữa chừng' : 'Handling mid-run failures',
-                            desc: t
-                                ? 'Nếu kết nối nguồn hoặc đích đứt, job chuyển sang failed và dừng ở batch hiện tại — không ghi dữ liệu nửa vời vì mỗi batch được ghi trong transaction. Sửa lỗi rồi chạy lại từ đầu.'
-                                : 'If the source or target connection drops, the job fails and stops at the current batch — no partial writes because each batch is committed in a transaction. Fix the issue and rerun from the start.',
-                        },
-                    ].map((item) => (
-                        <div key={item.step} className="flex items-start gap-4 p-4 border rounded-xl bg-muted/20">
-                            <span className="bg-primary/10 text-primary border rounded-lg px-3 py-1 text-xs font-bold whitespace-nowrap">{item.step}</span>
-                            <div>
-                                <p className="text-sm font-semibold mb-1">{item.title}</p>
-                                <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                <Callout type="warning">
+                    <p className="text-sm">
+                        {t
+                            ? 'Failed hoặc cancelled không có nghĩa chưa ghi gì: batch trước có thể đã commit và một số engine có thể để lại ghi dở trong batch lỗi. Không có rollback toàn job hoặc resume chống trùng được bảo đảm. Kiểm tra dữ liệu đích, log/progress và xử lý bản ghi đã có trước khi thử lại; không chạy lại từ đầu một cách mù quáng. Sao lưu nguồn/đích phù hợp trước khi chuyển dữ liệu quan trọng.'
+                            : 'Failed or cancelled does not mean nothing was written: earlier batches may have committed, and some engines can leave partial writes in a failing batch. Whole-job rollback and deduplicating resume are not guaranteed. Inspect target data and job logs/progress, then reconcile existing rows before retrying; do not blindly rerun from the start. Back up source/target appropriately before an important transfer.'}
+                    </p>
+                </Callout>
             </DocSection>
 
             <Callout type="warning">

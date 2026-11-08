@@ -1,4 +1,5 @@
 import { MousePointerClick, Database, FileCode, Bot, BarChart3, Users, Activity } from 'lucide-react';
+import { publicPath } from '@/core/seo/publicRoutes';
 import { DocPageLayout, DocSection, DocSubSection, Prose, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
@@ -29,7 +30,7 @@ export function UiTourSection({ lang }: Props) {
             t ? 'Chọn engine bằng engine picker trực quan, điền host/port/user/pass hoặc dán URI. Nút Test kiểm tra kết nối trước khi lưu.' : 'Pick an engine with the visual picker, fill host/port/user/pass or paste a URI. The Test button verifies the connection before saving.',
         ],
         [
-            t ? 'Ô tìm kiếm (Ctrl+P)' : 'Search box (Ctrl+P)',
+            t ? 'Ô tìm kiếm (Ctrl/Cmd+K)' : 'Search box (Ctrl/Cmd+K)',
             t ? 'Mở global search' : 'Opens global search',
             t ? 'Tìm bảng, view, connection đã lưu theo tên qua search index đã sync — gõ vài chữ cái là nhảy tới đúng đối tượng.' : 'Finds tables, views, and saved connections by name through the synced search index — type a few characters to jump straight to the object.',
         ],
@@ -42,29 +43,29 @@ export function UiTourSection({ lang }: Props) {
 
     const editorStops: [string, string, string][] = [
         [
-            t ? 'Nút Run (▶) hoặc Ctrl+Enter' : 'Run button (▶) or Ctrl+Enter',
+            t ? 'Nút Run hoặc Ctrl/Cmd+Enter' : 'Run button or Ctrl/Cmd+Enter',
             t ? 'Thực thi SQL đang chọn (hoặc toàn bộ nếu không chọn gì)' : 'Executes the selected SQL (or everything if nothing is selected)',
             t ? 'Chỉ phần được bôi đen mới chạy — hữu ích khi file có nhiều câu. Query rủi ro (DROP, DELETE không WHERE) sẽ hiện dialog xác nhận trước.' : 'Only the highlighted portion runs — useful in multi-statement files. Risky queries (DROP, DELETE without WHERE) show a confirmation dialog first.',
         ],
         [
-            t ? 'Nút Stop (■)' : 'Stop button (■)',
-            t ? 'Hủy query đang chạy' : 'Cancels the running query',
-            t ? 'Hủy diễn ra ngay trên server (pg_cancel_backend / KILL QUERY) chứ không chỉ bỏ qua kết quả phía client.' : 'The cancel happens on the server (pg_cancel_backend / KILL QUERY), not just by discarding the client-side result.',
+            t ? 'Nút Stop' : 'Stop button',
+            t ? 'Yêu cầu hủy query đang chạy' : 'Requests cancellation of the running query',
+            t ? 'Dùng Stop trên toolbar của query đang chạy; backend gọi cơ chế cancel phù hợp với engine. Cancel không bảo đảm tức thì hoặc rollback các ghi đã hoàn thành; kiểm tra trạng thái trước khi chạy lại.' : 'Use Stop in the running query toolbar; the backend invokes the engine cancellation path. Cancellation is not guaranteed to be immediate or roll back completed writes; inspect the state before retrying.',
         ],
         [
-            t ? 'Nút Format (Shift+Alt+F)' : 'Format button (Shift+Alt+F)',
-            t ? 'Tự động format SQL' : 'Auto-formats the SQL',
-            t ? 'Sắp xếp lại khoảng trắng, xuống dòng theo chuẩn dễ đọc. Không đổi logic câu query.' : 'Reflows whitespace and line breaks for readability. Does not change query logic.',
+            t ? 'Nút Format trên toolbar' : 'Format button on the toolbar',
+            t ? 'Định dạng SQL bằng nút trực tiếp' : 'Formats SQL using the direct button',
+            t ? 'Không có binding SQL Shift+Alt+F được cấu hình trong app. Xem lại query sau format; định dạng không phải kiểm tra tính đúng của SQL theo dialect.' : 'The app does not configure a SQL Shift+Alt+F binding. Review the query after formatting; formatting is not dialect-aware SQL validation.',
         ],
         [
-            t ? 'Nút AI (✨)' : 'AI button (✨)',
+            t ? 'Nút AI hoặc Ctrl/Cmd+I' : 'AI button or Ctrl/Cmd+I',
             t ? 'Mở panel AI Assistant' : 'Opens the AI Assistant panel',
-            t ? 'AI đã biết schema của connection đang active — hỏi bằng tiếng nói thường, nó sinh SQL, giải thích, hoặc sửa query giúp bạn.' : 'The AI knows the active connection\'s schema — ask in plain language and it generates SQL, explains, or fixes queries for you.',
+            t ? 'AI tùy chọn có thể dùng ngữ cảnh schema để tạo, giải thích hoặc sửa query. Xem lại nội dung và phạm vi dữ liệu gửi tới provider trước khi dùng.' : 'Optional AI can use schema context to draft, explain or fix queries. Review its output and the data sent to the provider before using it.',
         ],
         [
             t ? 'Thanh tab phía trên editor' : 'Tab bar above the editor',
-            t ? 'Click để chuyển tab, click X để đóng, chuột giữa để đóng nhanh' : 'Click to switch tabs, click X to close, middle-click to close quickly',
-            t ? 'Mỗi tab giữ riêng editor content, kết quả, và vị trí cuộn. Tab DataGrid và tab Query có thể mở song song cho cùng connection.' : 'Each tab keeps its own editor content, results, and scroll position. DataGrid and Query tabs can be open side by side for the same connection.',
+            t ? 'Click chuyển tab, X hoặc chuột giữa để đóng, double-click tên để đổi tên' : 'Click to switch, X or middle-click to close, double-click the name to rename',
+            t ? 'Ctrl/Cmd+N tạo Query tab, +D nhân bản và +Shift+W đóng tất cả. Các tab có nội dung/metadata riêng trong store chung; đóng tab không tự lưu query thành tài nguyên trên server.' : 'Ctrl/Cmd+N creates a Query tab, +D duplicates and +Shift+W closes all. Tabs keep distinct content/metadata in the shared store; closing does not save a query as a server resource.',
         ],
     ];
 
@@ -72,17 +73,17 @@ export function UiTourSection({ lang }: Props) {
         [
             t ? 'Số "100 / 1,247 rows" ở footer' : 'The "100 / 1,247 rows" figure in the footer',
             t ? 'Số dòng đang hiển thị / tổng số dòng khớp query' : 'Rows currently shown / total rows matching the query',
-            t ? 'Tổng được cache ngắn hạn trong Redis nên chuyển trang không phải COUNT(*) lại. Nếu tổng chưa xong sẽ hiển thị "…"' : 'The total is briefly cached in Redis so paging does not re-run COUNT(*). While pending it shows "…"',
+            t ? 'Số dòng trang và total từ server khi có. Total có thể được cache ngắn hạn; filter cục bộ không làm total thành số khớp của cả bảng. Không coi dữ liệu nhiều trang là snapshot nhất quán.' : 'Page row count and server total when available. Totals can be briefly cached; a local filter does not turn the total into a whole-table match count. Multiple pages are not necessarily one consistent snapshot.',
         ],
         [
             t ? 'Số "23ms"' : 'The "23ms" figure',
             t ? 'Thời lượng thực thi query trên server' : 'How long the query took on the server',
-            t ? 'Đo từ lúc server nhận SQL đến khi trả xong kết quả. Query > 1s nên xem EXPLAIN (nút Explain hoặc AI Explain).' : 'Measured from when the server receives the SQL until results return. Queries over 1s deserve an EXPLAIN (the Explain button or AI Explain).',
+            t ? 'Thời lượng do response báo, không phải đo độ trễ toàn trình duyệt. Nếu cần xem query plan, chạy lệnh EXPLAIN phù hợp với engine trong editor; không có nút standalone EXPLAIN đang được nối vào UI.' : 'Duration is reported by the response, not total browser latency. To inspect a plan, run the appropriate engine EXPLAIN statement in the editor; a standalone EXPLAIN button is not wired into the current UI.',
         ],
         [
-            t ? 'Badge "windowed" / "cached"' : 'The "windowed" / "cached" badge',
-            t ? 'Cho biết dữ liệu đến từ đâu' : 'Tells you where the data came from',
-            t ? '"windowed" = server chỉ trả đúng trang đang xem; "cached" = kết quả lấy từ cache ngắn hạn, gần như tức thì.' : '"windowed" = the server returned only the visible page; "cached" = the result came from the short-term cache, near-instant.',
+            t ? 'Trạng thái giới hạn trong kết quả' : 'Result limit metadata',
+            t ? 'Kiểm tra giới hạn và nguồn dữ liệu khi có' : 'Check the applied limit and source when available',
+            t ? 'appliedLimit, limitSource và truncated là metadata response về cửa sổ/giới hạn dữ liệu. Không giả định mọi lưới luôn có badge literal "windowed" hoặc "cached", hoặc cache đồng nghĩa dữ liệu mới nhất.' : 'appliedLimit, limitSource and truncated are response metadata about data windows/limits. Do not assume every grid always displays literal "windowed" or "cached" badges, or that a cache implies fresh data.',
         ],
         [
             t ? 'Nút Previous / Next / page jump' : 'Previous / Next / page-jump controls',
@@ -90,9 +91,9 @@ export function UiTourSection({ lang }: Props) {
             t ? 'Server tự áp LIMIT/OFFSET tương ứng — bạn không phải tự viết phân trang trong SQL.' : 'The server applies the matching LIMIT/OFFSET — you never have to write pagination into your SQL.',
         ],
         [
-            t ? 'Nút Export (CSV/JSON)' : 'Export button (CSV/JSON)',
-            t ? 'Xuất kết quả đang hiển thị ra file' : 'Exports the displayed result to a file',
-            t ? 'CSV giữ encoding và delimiter đúng chuẩn Excel; JSON giữ nguyên cấu trúc nested. Chỉ xuất đúng trang đang xem — cuộn đủ rồi xuất.' : 'CSV preserves Excel-safe encoding and delimiters; JSON keeps nested structure. Only the visible page is exported — page through first if you need more.',
+            t ? 'Xuất ở DataGrid / Query Result' : 'DataGrid / Query Result export',
+            t ? 'Tải trang dữ liệu hiện tại' : 'Downloads the current data page',
+            t ? 'DataGrid có CSV, JSON và SQL INSERT cho trang đã tải/sau lọc cục bộ. Query Result chỉ có CSV trang hiện tại. Chuyển trang không tích lũy dữ liệu cho lần export tiếp theo; không có XLSX hoặc full-backup ở đây.' : 'DataGrid offers CSV, JSON and SQL INSERT for the loaded/locally filtered page. Query Result offers current-page CSV only. Paging does not accumulate data for the next export; there is no XLSX or full backup here.',
         ],
     ];
 
@@ -182,8 +183,8 @@ export function UiTourSection({ lang }: Props) {
             <DocSection title={t ? '3. Result Grid & footer — đọc kết quả' : '3. Result Grid & footer — reading results'}>
                 <Prose>
                     {t
-                        ? 'Footer của lưới kết quả chứa những con số quan trọng nhất để đánh giá query của bạn.'
-                        : 'The result-grid footer holds the most important numbers for judging your query.'}
+                        ? 'DataGrid là tab bảng có Edit → pending → Save nếu được cấp quyền; Query Result chỉ đọc. Lọc DataGrid chỉ trên trang đã tải, còn sort đầu tiên gửi tới server; không coi lọc là tìm cả bảng.'
+                        : 'DataGrid is the table tab with Edit → pending → Save when permitted; Query Result is read-only. DataGrid filtering only covers the loaded page, while the first sort goes to the server; filtering is not a whole-table search.'}
                 </Prose>
                 {renderStops(gridStops.map(([where, what, why]) => ({ where, what, why })))}
             </DocSection>
@@ -202,7 +203,7 @@ export function UiTourSection({ lang }: Props) {
                     {[
                         {
                             icon: <Bot className="w-5 h-5 text-violet-500" />,
-                            title: t ? 'AI Panel (Ctrl+J)' : 'AI Panel (Ctrl+J)',
+                            title: t ? 'AI Panel (Ctrl/Cmd+I)' : 'AI Panel (Ctrl/Cmd+I)',
                             desc: t ? 'Trò chuyện với AI về dữ liệu của bạn. Chọn model/routing mode ở đầu panel, gõ prompt ở dưới, đính kèm ảnh/PDF bằng nút kẹp giấy.' : 'Chat with the AI about your data. Pick model/routing mode at the top, type prompts at the bottom, attach images/PDFs with the paperclip.',
                         },
                         {
@@ -212,8 +213,8 @@ export function UiTourSection({ lang }: Props) {
                         },
                         {
                             icon: <FileCode className="w-5 h-5 text-emerald-500" />,
-                            title: t ? 'Query History dialog' : 'Query History dialog',
-                            desc: t ? 'Toàn bộ query đã chạy kèm thời lượng và trạng thái. Click một entry để chèn lại vào editor; lọc theo connection.' : 'Every query you ran with duration and status. Click an entry to re-insert it into the editor; filter by connection.',
+                            title: t ? 'Query History (Ctrl/Cmd+H)' : 'Query History (Ctrl/Cmd+H)',
+                            desc: t ? 'Xem query đã chạy kèm thời lượng và trạng thái. Ctrl/Cmd+H mở lịch sử của app, không phải Find & Replace; dùng menu Find của Monaco để tìm trong editor.' : 'Review executed queries, duration and status. Ctrl/Cmd+H opens app history, not Find & Replace; use Monaco Find actions to search the editor.',
                         },
                         {
                             icon: <Users className="w-5 h-5 text-amber-500" />,
@@ -223,7 +224,7 @@ export function UiTourSection({ lang }: Props) {
                         {
                             icon: <Activity className="w-5 h-5 text-rose-500" />,
                             title: t ? 'Active Queries panel' : 'Active Queries panel',
-                            desc: t ? 'Liệt kê query đang chạy trên connection với durationMs; nút hủy bên từng dòng để dừng ngay.' : 'Lists queries currently running on the connection with durationMs; the cancel button on each row stops it immediately.',
+                            desc: t ? 'Liệt kê query đang chạy cùng durationMs; nút hủy từng dòng yêu cầu cancel. Kiểm tra trạng thái hoàn tất và dữ liệu đã ghi trước khi thử lại.' : 'Lists active queries and durationMs; each cancel button requests cancellation. Check completion and any writes before retrying.',
                         },
                         {
                             icon: <Database className="w-5 h-5 text-cyan-500" />,
@@ -245,8 +246,13 @@ export function UiTourSection({ lang }: Props) {
             <DocSubSection title={t ? 'Bắt đầu từ đâu?' : 'Where to start?'}>
                 <Prose>
                     {t
-                        ? 'Nếu bạn mới dùng app: mở sidebar → tạo connection (nút +) → test → double-click một bảng để mở DataGrid → chuyển sang tab Query (Ctrl+N) viết SQL đầu tiên → Ctrl+Enter để chạy. Đó là vòng lặp cốt lõi của Data Explorer.'
-                        : 'If you are new: open the sidebar → create a connection (+ button) → test it → double-click a table to open the DataGrid → switch to a Query tab (Ctrl+N) and write your first SQL → Ctrl+Enter to run. That is the core Data Explorer loop.'}
+                        ? 'Bắt đầu bằng sidebar → tạo connection (+) → kiểm tra URI/TLS và Test → mở bảng DataGrid → Ctrl/Cmd+N tạo Query tab → Ctrl/Cmd+Enter chạy. Ctrl/Cmd+J mở/ẩn kết quả và Ctrl/Cmd+I mở/ẩn AI. Với MongoDB, dùng NoSQL Studio và payload JSON MQL thay cho SQL.'
+                        : 'Start with the sidebar → create a connection (+) → check URI/TLS and Test → open a DataGrid table → Ctrl/Cmd+N creates a Query tab → Ctrl/Cmd+Enter runs it. Ctrl/Cmd+J toggles results and Ctrl/Cmd+I toggles AI. For MongoDB, use NoSQL Studio and JSON MQL payloads instead of SQL.'}
+                </Prose>
+                <Prose>
+                    <a href={publicPath(lang, '/docs/first-query')}>{t ? 'Truy vấn đầu tiên' : 'First query'}</a>{' · '}
+                    <a href={publicPath(lang, '/docs/database-capabilities')}>{t ? 'Khả năng theo engine' : 'Capabilities by engine'}</a>{' · '}
+                    <a href={publicPath(lang, '/docs/data-handling')}>{t ? 'Xử lý dữ liệu AI' : 'AI data handling'}</a>
                 </Prose>
             </DocSubSection>
         </DocPageLayout>

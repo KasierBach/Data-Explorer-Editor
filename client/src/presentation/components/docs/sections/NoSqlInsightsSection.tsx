@@ -5,6 +5,7 @@ import {
     TableProperties,
     TreePine,
 } from 'lucide-react';
+import { publicPath } from '@/core/seo/publicRoutes';
 import {
     Callout,
     DocPageLayout,
@@ -112,6 +113,18 @@ export function NoSqlInsightsSection({ lang }: Props) {
                 </DocSubSection>
             </DocSection>
 
+            <DocSection title={t ? 'Mẫu schema, phạm vi và cache' : 'Schema sample, scope and cache'}>
+                <Prose>{t
+                    ? 'Schema Analysis gửi yêu cầu đọc riêng cho collection: mặc định 100 document, API clamp tối đa 1.000. Nó không phân tích lại mọi document của result set hiện tại hoặc dùng random sample đại diện chắc chắn cho toàn collection.'
+                    : 'Schema Analysis makes a separate collection read: 100 documents by default, clamped to at most 1,000 by the API. It does not analyze every document in the current result set or guarantee a representative random sample of the whole collection.'}</Prose>
+                <Prose>{t
+                    ? 'Thống kê chỉ ở field top-level, có count/type/probability và tối đa 5 giá trị ví dụ khác nhau mỗi field. Nested object/array được phân loại ở top-level, không có thống kê đệ quy từng path. Kết quả cache trong Redis một giờ theo connection/database/collection/sample size; refresh yêu cầu lấy lại mẫu.'
+                    : 'Statistics cover top-level fields only, with count/type/probability and at most 5 distinct example values per field. Nested objects/arrays are classified at the top level, not recursively profiled per path. Redis caches results for one hour by connection/database/collection/sample size; refresh requests a new sample.'}</Prose>
+                <Callout type="warning"><p className="text-sm">{t
+                    ? 'allowQueryExecution=false chặn schema sampling. readOnly vẫn cho phép đọc được kiểm tra nếu execution bật. Mẫu và cache có thể bỏ sót field hiếm hoặc thay đổi mới; đây là quan sát, không phải schema validator hay chứng nhận mọi document.'
+                    : 'allowQueryExecution=false blocks schema sampling. readOnly still permits validated reads when execution is enabled. Samples/caches can miss rare fields or recent changes; this is observation, not schema validation or certification of every document.'}</p></Callout>
+            </DocSection>
+
             <DocSection title={t ? 'Visual insights: hữu ích, nhưng không phải BI hoàn chỉnh' : 'Visual insights: useful, but not a full BI layer'}>
                 <div className="grid gap-4 md:grid-cols-2">
                     <InfoCard icon={<BarChart3 className="w-5 h-5 text-orange-500" />} title={t ? 'Insight nhanh từ result set' : 'Fast insight from the current result set'} color="orange">
@@ -134,8 +147,8 @@ export function NoSqlInsightsSection({ lang }: Props) {
             <Callout type="info">
                 <p className="text-sm">
                     {t
-                        ? 'Khi backend trả `truncated`, hãy coi insight là bản đọc nhanh trên sample đã giới hạn. Nếu cần số liệu toàn collection, hãy tạo pipeline rõ ràng trong Aggregation Builder với `$match`, `$project`, `$group`, `$sort` và `$limit` có chủ đích.'
-                        : 'When the backend returns `truncated`, treat the insight as a quick read over a capped sample. If you need collection-wide numbers, build an intentional Aggregation Builder pipeline with `$match`, `$project`, `$group`, `$sort`, and `$limit`.'}
+                        ? 'find/aggregate trả tối đa 50.000 document, dùng maxTimeMS 30 giây; pipeline tối đa 100 stage và payload bị giới hạn sâu 10, array 10.000 phần tử, object 2.000 key. Khi truncated, visualization phản ánh kết quả bị cap. Muốn số liệu toàn collection, thiết kế pipeline tổng hợp hợp lệ rồi kiểm tra giới hạn/tính đầy đủ của output.'
+                        : 'find/aggregate return at most 50,000 documents with a 30-second maxTimeMS; pipelines cap at 100 stages and payloads at depth 10, arrays of 10,000 entries and objects of 2,000 keys. When truncated, visualization reflects capped output. For collection-wide figures, design a valid aggregate pipeline and verify the output limits/completeness.'}
                 </p>
             </Callout>
 
@@ -146,6 +159,10 @@ export function NoSqlInsightsSection({ lang }: Props) {
                         : 'A very effective workflow is: open the collection -> run a small `find` -> inspect Tree/Grid to learn the shape -> use Schema Analysis to confirm field patterns -> move into the Aggregation Builder or AI for the next step.'}
                 </p>
             </Callout>
+            <Prose>
+                <a href={publicPath(lang, '/docs/operational-limits')}>{t ? 'Giới hạn vận hành' : 'Operational limits'}</a>{' · '}
+                <a href={publicPath(lang, '/docs/data-handling')}>{t ? 'Xử lý dữ liệu và AI' : 'Data handling and AI'}</a>
+            </Prose>
         </DocPageLayout>
     );
 }

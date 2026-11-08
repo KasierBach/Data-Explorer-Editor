@@ -5,6 +5,8 @@ import { Button } from "@/presentation/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getWorkspaceText } from "@/core/utils/workspaceText";
 import { useLandingAppearance } from "../modules/LandingPage/hooks/useLandingAppearance";
+import { PublicPageLinks } from './PublicPageLinks';
+import { publicPath } from '@/core/seo/publicRoutes';
 
 interface LandingHeaderViewProps {
     lang: string;
@@ -36,6 +38,15 @@ export function LandingHeaderView({ lang, isAuthenticated, logout, isMobileNavOp
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [isLanding, isMobileNavOpen, setIsMobileNavOpen]);
 
+    useEffect(() => {
+        if (!isLanding || !isMobileNavOpen) return;
+        const desktop = window.matchMedia('(min-width: 1101px)');
+        const closeOnDesktop = () => { if (desktop.matches) setIsMobileNavOpen(false); };
+        closeOnDesktop();
+        desktop.addEventListener('change', closeOnDesktop);
+        return () => desktop.removeEventListener('change', closeOnDesktop);
+    }, [isLanding, isMobileNavOpen, setIsMobileNavOpen]);
+
     const sectionLinks = (
         <>
             <a href="#features" className={isLanding ? 'lp-header-link' : 'hover:text-white text-muted-foreground/80 transition-colors uppercase tracking-[0.15em] text-[10px] font-semibold'}>{text.features}</a>
@@ -53,11 +64,12 @@ export function LandingHeaderView({ lang, isAuthenticated, logout, isMobileNavOp
     if (isLanding) {
         const vi = lang === 'vi';
         const workspaceHref = isAuthenticated ? '/sql-explorer' : '/login';
+        const pageHref = (path: string) => hrefFor(publicPath(vi ? 'vi' : 'en', path));
         return (
             <header className="lp-chrome lp-landing-header">
                 <div className="lp-container lp-header-inner">
-                    <a href={hrefFor('/')} className="lp-brand"><span className="lp-brand-icon"><Database className="h-4 w-4" aria-hidden="true" /></span><span>Data<span className="lp-brand-accent">Explorer</span></span></a>
-                    <nav className="lp-desktop-nav" aria-label={vi ? 'Điều hướng chính' : 'Main navigation'}>{sectionLinks}<a href={hrefFor('/docs')} className="lp-header-link">{text.docs}</a></nav>
+                    <a href={pageHref('/')} className="lp-brand"><span className="lp-brand-icon"><Database className="h-4 w-4" aria-hidden="true" /></span><span>Data<span className="lp-brand-accent">Explorer</span></span></a>
+                    <nav className="lp-desktop-nav" aria-label={vi ? 'Điều hướng chính' : 'Main navigation'}><PublicPageLinks lang={vi ? 'vi' : 'en'} currentPage="landing" className="lp-header-link" hrefFor={pageHref} /></nav>
                     <div className="lp-header-actions">
                         <div className="lp-header-language">{language}</div>
                         <a href="https://github.com/KasierBach/Data-Explorer-Editor" target="_blank" rel="noopener noreferrer" className="lp-icon-button lp-github-link" aria-label="GitHub"><SiGithub className="h-5 w-5" aria-hidden="true" /></a>
@@ -72,10 +84,7 @@ export function LandingHeaderView({ lang, isAuthenticated, logout, isMobileNavOp
                 </div>
                 {isMobileNavOpen && (
                     <nav id="landing-mobile-nav" className="lp-mobile-nav lp-container" aria-label={vi ? 'Điều hướng di động' : 'Mobile navigation'}>
-                        <a href="#features" onClick={() => setIsMobileNavOpen(false)}>{text.features}</a>
-                        <a href="#demo" onClick={() => setIsMobileNavOpen(false)}>{text.interface}</a>
-                        <a href="#pricing" onClick={() => setIsMobileNavOpen(false)}>{text.landingPricing}</a>
-                        <a href={hrefFor('/docs')}>{text.docs}</a>
+                        <PublicPageLinks lang={vi ? 'vi' : 'en'} currentPage="landing" className="lp-header-link" hrefFor={pageHref} onNavigate={() => setIsMobileNavOpen(false)} />
                         <a href="#get-started" onClick={() => setIsMobileNavOpen(false)}>{vi ? 'Chạy local' : 'Run locally'}</a>
                         <div className="lp-mobile-utilities">{language}<a href={workspaceHref} className="lp-button lp-button-primary">{text.workspace}<ArrowUpRight className="h-4 w-4" aria-hidden="true" /></a></div>
                         {isAuthenticated && <button type="button" onClick={() => { void logout(); }}>{text.logout}</button>}

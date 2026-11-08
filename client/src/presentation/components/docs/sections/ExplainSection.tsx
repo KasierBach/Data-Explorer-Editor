@@ -125,11 +125,19 @@ export function ExplainSection({ lang }: Props) {
                 </div>
             </DocSection>
 
+            <DocSection title={t ? 'Cache trong editor và request mới' : 'Mounted-editor cache and fresh requests'}>
+                <Prose>
+                    {t
+                        ? 'Editor đang mount giữ cache giải thích theo đúng SQL, connection và database. Mở lại cùng truy vấn trong editor đó có thể dùng câu trả lời đã có; đổi SQL/connection/database hoặc mount lại editor không bảo đảm giữ cache. Regenerate và follow-up vẫn gửi request AI mới, chịu quota/chi phí provider — không có cam kết “miễn phí mãi” sau lần đầu.'
+                        : 'The mounted editor caches explanations for the exact SQL, connection, and database. Reopening the same query in that editor can reuse an existing answer; changing SQL/connection/database or remounting the editor does not guarantee cache retention. Regenerate and follow-ups still send fresh AI requests subject to provider quota/cost — this is not a forever-free promise after the first explanation.'}
+                </Prose>
+            </DocSection>
+
             <Callout type="warning">
                 <p className="text-sm">
                     {t
-                        ? 'AI Query Explanation là lớp diễn giải bằng ngôn ngữ tự nhiên, không phải kết quả `EXPLAIN` / `EXPLAIN ANALYZE` của database engine. Nếu bạn cần execution plan thật để debug hiệu năng, hãy dùng công cụ plan/analyze của workspace.'
-                        : 'AI Query Explanation is a natural-language explanation layer, not the database engine’s real `EXPLAIN` / `EXPLAIN ANALYZE` output. If you need an actual execution plan for performance debugging, use the workspace plan/analyze tooling.'}
+                        ? 'AI Query Explanation chỉ diễn giải bằng ngôn ngữ tự nhiên, không lấy execution plan của engine. Codebase có hook và visualizer cho plan, nhưng chưa được nối vào SQL workspace như một công cụ dùng được ở đây. Để xem plan thật, chạy lệnh EXPLAIN phù hợp với engine trong editor hoặc dùng công cụ database riêng. EXPLAIN ANALYZE thực thi câu SQL được phân tích: có thể tốn tài nguyên, khóa hoặc thay đổi dữ liệu với câu lệnh ghi. Không chạy trên production nếu chưa đánh giá tác động.'
+                        : 'AI Query Explanation is natural-language interpretation, not an engine execution plan. The codebase contains a plan hook and visualizer, but they are not wired into the SQL workspace as a usable tool here. For a real plan, run the engine-appropriate EXPLAIN manually in the editor or use a separate database tool. EXPLAIN ANALYZE executes the analyzed SQL: it can consume resources, acquire locks, or change data for a write statement. Do not run it in production without assessing the impact.'}
                 </p>
             </Callout>
         </DocPageLayout>

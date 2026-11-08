@@ -1,5 +1,6 @@
 import { Cpu, Route, Shield, Sparkles } from 'lucide-react';
 import { Callout, CodeBlock, CodeComment, CodeLine, DocPageLayout, DocSection, Prose } from '../primitives';
+import { publicPath } from '@/core/seo/publicRoutes';
 
 interface Props { lang: 'vi' | 'en'; }
 
@@ -27,15 +28,15 @@ export function SqlGenerationSection({ lang }: Props) {
                             step: '01',
                             title: t ? 'Schema-aware context' : 'Schema-aware context',
                             desc: t
-                                ? 'Backend trích xuất metadata từ connection hiện tại: tables, columns, relationships, và một phần query context. AI không bị ép đoán tên bảng hoặc cột từ khoảng không.'
-                                : 'The backend extracts metadata from the active connection: tables, columns, relationships, and part of the query context. The AI is not forced to guess table and column names from thin air.'
+                                ? 'Backend chọn metadata liên quan từ connection đang active. Schema context được giới hạn tối đa 24 bảng và 32.000 ký tự; đây không phải toàn bộ schema và AI vẫn có thể đoán sai tên bảng/cột khi ngữ cảnh thiếu.'
+                                : 'The backend selects relevant metadata from the active connection. Schema context is capped at 24 tables and 32,000 characters; it is not the entire schema, and AI can still guess table or column names incorrectly when context is missing.'
                         },
                         {
                             step: '02',
                             title: t ? 'Provider-aware routing' : 'Provider-aware routing',
                             desc: t
-                                ? 'Routing mode trong UI chỉ là một lớp. Chain thực tế còn phụ thuộc explicit model/provider bạn chọn, việc prompt có ảnh hay không, và việc request có bị nhận diện là current-info hay không. Với SQL work thông thường, app ưu tiên chain text-capable an toàn.'
-                                : 'The routing mode in the UI is only one layer. The real chain also depends on any explicit model/provider selection, whether the prompt includes an image, and whether the request is detected as current-information work. For normal SQL tasks, the app prefers a safe text-capable chain.'
+                                ? 'Routing mode khác model picker. Assistant mặc định chọn Groq GPT OSS 120B explicit; Auto không phải model. Chain còn phụ thuộc provider đã cấu hình, model của vai trò AI SQL, fallback và capability ảnh/PDF/web; không có bảo đảm model đắt hơn sẽ luôn được chọn.'
+                                : 'Routing mode is separate from the model picker. The Assistant default is explicit Groq GPT OSS 120B; Auto is not a model. The chain also depends on configured providers, the AI SQL role model, fallback, and image/PDF/web capabilities; it does not guarantee selection of a more expensive model.'
                         },
                         {
                             step: '03',
@@ -90,29 +91,29 @@ export function SqlGenerationSection({ lang }: Props) {
                             icon: <Route className="h-5 w-5 text-primary" />,
                             title: 'Auto',
                             desc: t
-                                ? 'Mode mặc định cho phần lớn SQL work. App bắt đầu từ auto chain phù hợp rồi lọc theo capability thay vì luôn đẩy thẳng sang lane đắt nhất.'
-                                : 'The default mode for most SQL work. The app starts from the appropriate auto chain and filters it by capability instead of always jumping straight to the most expensive lane.'
+                                ? 'Nếu không có model explicit, Auto dùng thứ tự OpenRouter → Groq → Gemini → Cerebras, bỏ provider thiếu cấu hình/đã tắt rồi lọc capability. Đây hiện cũng là thứ tự của Fast / Cheap và Best Quality.'
+                                : 'Without an explicit model, Auto orders OpenRouter → Groq → Gemini → Cerebras, omits unconfigured/disabled providers, then filters capabilities. This is currently also the order for Fast / Cheap and Best Quality.'
                         },
                         {
                             icon: <Cpu className="h-5 w-5 text-primary" />,
                             title: 'Fast / Cheap',
                             desc: t
-                                ? 'Thiên về iteration nhanh và lane rẻ hơn, nhưng không ghi đè explicit provider nếu bạn đã khóa model cụ thể.'
-                                : 'Leans toward quicker iteration and cheaper lanes, but does not override an explicit provider if you already locked the model.'
+                                ? 'Hiện không đổi thứ tự provider tự chọn so với Auto khi không có model explicit. Tốc độ và chi phí phụ thuộc provider/model thực tế; tên mode không phải cam kết rẻ hoặc nhanh hơn.'
+                                : 'Currently does not change the unselected provider order from Auto when there is no explicit model. Speed and cost depend on the actual provider/model; the mode name is not a cheaper-or-faster guarantee.'
                         },
                         {
                             icon: <Sparkles className="h-5 w-5 text-primary" />,
                             title: 'Best Quality',
                             desc: t
-                                ? 'Hữu ích khi task cần reasoning, explain, rewrite, hoặc optimization sâu hơn. Nó nghiêng về lane mạnh hơn sớm hơn.'
-                                : 'Useful when a task needs heavier reasoning, explanation, rewriting, or deeper optimization. It leans toward stronger lanes earlier.'
+                                ? 'Không đổi thứ tự tự chọn chung. Với built-in model explicit và fallback Auto, best có thể xếp Gemini sớm hơn trong fallback sau model yêu cầu; không áp dụng cho custom provider cô lập, fallback cụ thể hoặc None.'
+                                : 'Does not change the general unselected order. With an explicit built-in model and Auto fallback, best can order Gemini earlier in fallback after the requested model; this does not apply to isolated custom providers, a specific fallback, or None.'
                         },
                         {
                             icon: <Shield className="h-5 w-5 text-primary" />,
                             title: 'Gemini Only',
                             desc: t
-                                ? 'Luôn dùng model Gemini bạn đã chọn. Hữu ích khi bạn cần đầu ra ổn định nhất hoặc muốn tránh provider khác.'
-                                : 'Always uses the Gemini model you selected. Useful when you want the most stable output or want to avoid other providers entirely.'
+                                ? 'Thử các candidate Gemini khi có sẵn; nếu Gemini thiếu cấu hình/đã tắt và fallback khác None, vẫn có thể chuyển provider. Dùng provider explicit có sẵn và None để tránh nối thêm provider; xem các ngoại lệ resolve selection trong tài liệu AI Routing.'
+                                : 'Tries available Gemini candidates; if Gemini is unconfigured/disabled and fallback is not None, another provider can still be used. Use an available explicit provider and None to avoid appending providers; see selection-resolution caveats in AI Routing.'
                         },
                     ].map((item) => (
                         <div key={item.title} className="rounded-2xl border bg-card/40 p-5">
@@ -122,6 +123,15 @@ export function SqlGenerationSection({ lang }: Props) {
                     ))}
                 </div>
 
+                <Prose>
+                    <a href={publicPath(lang, '/docs/ai-service')}>
+                        {t ? 'Chi tiết model, fallback None và giới hạn cô lập provider' : 'Model selection, None fallback, and provider-isolation caveats'}
+                    </a>
+                    {' · '}
+                    <a href={publicPath(lang, '/docs/data-handling')}>
+                        {t ? 'Dữ liệu gửi tới AI và lưu trữ chat' : 'Data sent to AI and chat retention'}
+                    </a>
+                </Prose>
                 <Callout type="info">
                     <p className="text-sm">
                         {t
@@ -194,8 +204,8 @@ export function SqlGenerationSection({ lang }: Props) {
             <DocSection title={t ? 'Action cards & execution safety' : 'Action cards & execution safety'}>
                 <Prose>
                     {t
-                        ? 'Recommendation cards dưới bubble AI có thể chèn SQL vào editor hoặc chạy luôn nếu card có payload phù hợp. Tuy nhiên `Insert into editor` chỉ chèn SQL, còn `Run suggestion` mới là hành động thực thi và app sẽ hỏi xác nhận trước khi chạy SQL do AI sinh ra.'
-                        : 'Recommendation cards under the AI bubble can insert SQL into the editor or run it directly when the card carries the right payload. However, `Insert into editor` only inserts the SQL, while `Run suggestion` is the execution path and the app asks for confirmation before running AI-generated SQL.'}
+                        ? 'Recommendation cards có thể chèn SQL hoặc chạy payload phù hợp. Insert into editor chỉ chèn; Run suggestion và Run trên code block chèn rồi gửi thực thi ngay. Không có bước xác nhận chung cho mọi SQL do AI sinh: chỉ khi backend phân loại high-impact mới yêu cầu xác nhận. Nếu muốn review, dùng Insert trước rồi tự chạy.'
+                        : 'Recommendation cards can insert SQL or run a suitable payload. Insert into editor only inserts; Run suggestion and a code block’s Run insert and submit execution immediately. There is no blanket confirmation for all AI-generated SQL: confirmation is requested only when the backend classifies it as high-impact. Use Insert first if you want to review before running.'}
                 </Prose>
 
                 <Callout type="warning">

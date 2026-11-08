@@ -1,5 +1,6 @@
 import { BarChart3, LineChart, PieChart, LayoutDashboard, Save, MousePointerClick } from 'lucide-react';
 import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, Callout, CodeBlock, CodeLine } from '../primitives';
+import { publicPath } from '@/core/seo/publicRoutes';
 
 interface Props { lang: 'vi' | 'en'; }
 
@@ -8,17 +9,17 @@ export function ChartsSection({ lang }: Props) {
 
     return (
         <DocPageLayout
-            title={t ? 'Biểu đồ, Dashboard & Insights' : 'Charts, Dashboards & Insights'}
+            title={t ? 'Chart Studio, Dashboard & Insights' : 'Chart Studio, Dashboards & Insights'}
             subtitle={t
-                ? 'Cách Data Explorer biến query result thành widget có thể lưu lại, gom vào dashboard, và mở lại như một tab làm việc riêng.'
-                : 'How Data Explorer turns query results into saved widgets, groups them into dashboards, and reopens them as first-class working tabs.'}
+                ? 'Phân biệt Chart Studio tương tác với 12 preset và dashboard lưu snapshot với 6 loại widget; chọn nguồn dữ liệu, cấu hình trục, xuất và mở lại đúng luồng.'
+                : 'Distinguish the interactive 12-preset Chart Studio from saved dashboards with 6 snapshot widget types; choose data, configure axes, export, and reopen the appropriate workflow.'}
         >
             <FeatureGrid>
-                <InfoCard icon={<BarChart3 className="w-6 h-6 text-blue-500" />} title={t ? 'Biểu đồ từ query result' : 'Charts from query results'} color="blue">
+                <InfoCard icon={<BarChart3 className="w-6 h-6 text-blue-500" />} title={t ? 'Chart Studio: 12 preset' : 'Chart Studio: 12 presets'} color="blue">
                     <p>
                         {t
-                            ? 'Sau khi query trả kết quả, bạn có thể lưu snapshot hiện tại thành widget thay vì chỉ xem một lần rồi mất.'
-                            : 'Once a query returns data, you can save the current snapshot as a widget instead of treating it as a one-off result.'}
+                            ? 'Chọn bảng hoặc SQL tùy chỉnh, chạy lấy dữ liệu rồi cấu hình biểu đồ trong Chart Studio. Luồng này có nhiều preset và tùy chọn hơn dialog lưu widget dashboard.'
+                            : 'Choose a table or custom SQL, fetch data, then configure a chart in Chart Studio. This flow has more presets and controls than the dashboard widget-save dialog.'}
                     </p>
                 </InfoCard>
                 <InfoCard icon={<LayoutDashboard className="w-6 h-6 text-emerald-500" />} title={t ? 'Dashboard tabs' : 'Dashboard tabs'} color="emerald">
@@ -37,7 +38,49 @@ export function ChartsSection({ lang }: Props) {
                 </InfoCard>
             </FeatureGrid>
 
-            <DocSection title={t ? 'Luồng làm việc chuẩn' : 'Recommended workflow'}>
+            <DocSection title={t ? 'Chart Studio: nguồn, preset và điều khiển' : 'Chart Studio: sources, presets, and controls'}>
+                <Prose>
+                    {t
+                        ? 'Mở Chart Studio/Visualization trên connection hiện tại, chọn database và nguồn Table hoặc Custom SQL rồi chạy lấy dữ liệu. Table mode mặc định lấy 200 dòng và có limit/sort; SQL tùy chỉnh phải có cú pháp phù hợp engine. Đổi cấu hình biểu đồ không tự tạo dashboard hay lịch refresh dữ liệu.'
+                        : 'Open Chart Studio/Visualization for the current connection, choose a database and Table or Custom SQL input, then fetch data. Table mode defaults to 200 rows with limit/sort controls; custom SQL must match the engine. Changing chart settings does not create a dashboard or a data-refresh schedule.'}
+                </Prose>
+                <div className="grid md:grid-cols-3 gap-4">
+                    {[
+                        {
+                            title: t ? '12 preset biểu đồ' : '12 chart presets',
+                            desc: t
+                                ? 'Bar, Stacked Bar, Horizontal Bar, Line, Area, Composed, Pie, Donut, Scatter, Radar, Treemap và Funnel. Chọn X và một hoặc nhiều cột Y phù hợp; preset không tự tổng hợp toàn bộ database.'
+                                : 'Bar, Stacked Bar, Horizontal Bar, Line, Area, Composed, Pie, Donut, Scatter, Radar, Treemap, and Funnel. Choose X and suitable Y column(s); a preset does not automatically aggregate the entire database.',
+                        },
+                        {
+                            title: t ? 'Tùy chọn hiển thị' : 'Display controls',
+                            desc: t
+                                ? 'Có tiêu đề, 5 palette, kiểu đường monotone/linear/step/basis/natural và bật/tắt grid, legend, data labels, animation hoặc brush zoom. Hiệu lực tùy loại biểu đồ; không có nút kéo-thả bố cục hay Share trong flow này.'
+                                : 'Controls include a title, 5 palettes, monotone/linear/step/basis/natural curves, and grid, legend, data labels, animation, or brush-zoom toggles. Applicability depends on chart type; this flow has no drag-layout or Share button.',
+                        },
+                        {
+                            title: t ? 'Xuất PNG và CSV' : 'PNG and CSV export',
+                            desc: t
+                                ? 'PNG xuất hình biểu đồ; CSV xuất chartData hiện tại đã giới hạn dòng, không phải toàn bộ bảng. State hiển thị được giữ theo connection trong client; lưu widget dashboard là luồng khác từ results panel.'
+                                : 'PNG exports the chart picture; CSV exports the current row-capped chartData, not the whole table. Display state is kept per connection on the client; saving a dashboard widget is a separate results-panel flow.',
+                        },
+                    ].map((item) => (
+                        <div key={item.title} className="rounded-2xl border bg-card/40 p-5">
+                            <h3 className="mt-3 text-sm font-bold">{item.title}</h3>
+                            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{item.desc}</p>
+                        </div>
+                    ))}
+                </div>
+                <Callout type="warning">
+                    <p className="text-sm">
+                        {t
+                            ? 'Chart Studio chỉ giữ tối đa 2.000 dòng đầu cho chartData. Khi trên 300 dòng, Line/Area/Scatter/Composed dùng mẫu mỗi ceil(N/150) dòng và luôn giữ dòng cuối (khoảng 150 điểm, tối đa 151); loại khác dùng chartData đã cap. Downsampling bỏ điểm chứ không cộng/nhóm hay bảo toàn mọi cực trị. Hãy GROUP BY, lọc và ORDER BY trong query trước nếu cần biểu đồ đại diện.'
+                            : 'Chart Studio keeps only the first 2,000 rows as chartData. Above 300 rows, Line/Area/Scatter/Composed sample every ceil(N/150) rows and keep the last row (roughly 150 points, at most 151); other types use the capped chartData. Downsampling omits points rather than aggregating or preserving every extreme. GROUP BY, filter, and ORDER BY in the query first when a representative chart matters.'}
+                    </p>
+                </Callout>
+            </DocSection>
+
+            <DocSection title={t ? 'Lưu widget vào dashboard' : 'Save a widget to a dashboard'}>
                 <div className="grid md:grid-cols-4 gap-4 mt-2">
                     {[
                         {
@@ -122,15 +165,24 @@ export function ChartsSection({ lang }: Props) {
             <DocSection title={t ? 'Giới hạn hiện tại' : 'Current limitations'}>
                 <ul className="grid gap-3">
                     {[
-                        t ? 'Widget hiện lưu dữ liệu snapshot, chưa phải scheduled live-refresh reporting.' : 'Widgets currently save a data snapshot, not a scheduled live-refresh reporting pipeline.',
-                        t ? 'Dashboard phù hợp nhất cho phân tích nhanh, review nội bộ, và query-driven exploration.' : 'Dashboards are currently best suited for quick analysis, internal review, and query-driven exploration.',
-                        t ? 'Các bước như share dashboard công khai, scheduled reports, hoặc embedded analytics vẫn là bước phát triển tiếp theo.' : 'Public dashboard sharing, scheduled reports, and embedded analytics are still future roadmap items.'
+                        t ? 'Dashboard chỉ có 6 loại widget: bar, line, pie, donut, area và table; không phải toàn bộ 12 preset của Chart Studio.' : 'Dashboards have 6 widget types: bar, line, pie, donut, area, and table; they do not include all 12 Chart Studio presets.',
+                        t ? 'Mỗi widget lưu tối đa 200 dòng snapshot và payload snapshot tối đa 512 KB. Một snapshot nhỏ không đại diện toàn bộ result set lớn.' : 'Each widget stores up to 200 snapshot rows with a 512 KB maximum snapshot payload. A small snapshot does not represent the entire large result set.',
+                        t ? 'Refresh dashboard chỉ tải lại bản lưu từ server, không chạy lại SQL và không có scheduled refresh. Muốn dữ liệu mới, chạy lại query và lưu snapshot mới; không có nút Share công khai hoặc kéo-thả bố cục trong view này.' : 'Dashboard Refresh reloads stored server data; it does not rerun SQL and there is no scheduled refresh. For newer data, rerun the query and save a new snapshot; this view has no public Share button or drag-layout control.'
                     ].map((item) => (
                         <li key={item} className="rounded-xl border border-border/50 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
                             {item}
                         </li>
                     ))}
                 </ul>
+                <Prose>
+                    <a href={publicPath(lang, '/docs/operational-limits')}>
+                        {t ? 'Xem giới hạn dữ liệu và vận hành' : 'See data and operational limits'}
+                    </a>
+                    {' · '}
+                    <a href={publicPath(lang, '/docs/data-handling')}>
+                        {t ? 'Đọc về snapshot và lưu trữ dữ liệu' : 'Read about snapshots and data retention'}
+                    </a>
+                </Prose>
             </DocSection>
 
             <DocSection title={t ? 'Ví dụ query phù hợp để lưu thành widget' : 'A query example worth saving as a widget'}>

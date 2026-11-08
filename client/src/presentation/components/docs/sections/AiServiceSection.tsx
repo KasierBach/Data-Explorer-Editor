@@ -17,6 +17,8 @@ import {
   InfoCard,
   Prose,
 } from "../primitives";
+import { publicPath } from "@/core/seo/publicRoutes";
+import { getAssistantModelCatalog } from "@/presentation/modules/Query/assistantModelCatalog";
 
 interface Props {
   lang: "vi" | "en";
@@ -24,6 +26,7 @@ interface Props {
 
 export function AiServiceSection({ lang }: Props) {
   const t = lang === "vi";
+  const modelGroups = getAssistantModelCatalog();
 
   return (
     <DocPageLayout
@@ -42,29 +45,29 @@ export function AiServiceSection({ lang }: Props) {
               step: "1",
               title: t ? "Mở panel AI và chọn model" : "Open the AI panel and pick a model",
               desc: t
-                ? "Nhấn Ctrl+J để mở panel AI. Chọn model từ dropdown (hoặc để Auto), chọn routing mode phù hợp: Auto cho cân bằng, Fast / Cheap cho prompt nhẹ, Best Quality cho việc quan trọng, Gemini Only khi cần ổn định nhất."
-                : "Press Ctrl+J to open the AI panel. Pick a model from the dropdown (or leave Auto), then choose a routing mode: Auto for balance, Fast / Cheap for light prompts, Best Quality for important work, or Gemini Only for maximum consistency.",
+                ? "Nhấn Ctrl+I (Windows/Linux) hoặc Cmd+I (macOS) để mở panel AI. Model mặc định là Groq GPT OSS 120B, một lựa chọn explicit. Auto là chế độ định tuyến riêng, không phải model trong dropdown; kiểm tra cả model lẫn fallback trước khi gửi."
+                : "Press Ctrl+I (Windows/Linux) or Cmd+I (macOS) to open the AI panel. The default model is Groq GPT OSS 120B, an explicit selection. Auto is a separate routing mode, not a dropdown model; check both the selected model and fallback before sending.",
             },
             {
               step: "2",
               title: t ? "Đặt câu hỏi với ngữ cảnh schema" : "Ask questions with schema context",
               desc: t
-                ? "Gõ câu hỏi tự nhiên ở ô nhập dưới cùng — AI đã tự biết các bảng, cột của connection đang active. Ví dụ: 'viết truy vấn đếm đơn hàng theo tháng trong năm nay'. Schema context được lấy tự động theo prompt."
-                : "Type a natural-language question in the composer at the bottom — the AI already knows the tables and columns of the active connection. Example: 'write a query counting orders per month this year'. Schema context is selected automatically per prompt.",
+                ? "Gõ câu hỏi ở ô nhập dưới cùng, ví dụ: 'viết truy vấn đếm đơn hàng theo tháng trong năm nay'. App chọn schema liên quan theo prompt, tối đa 24 bảng và 32.000 ký tự; AI không có toàn bộ database và vẫn có thể thiếu ngữ cảnh."
+                : "Type a question in the composer, for example: 'write a query counting orders per month this year'. The app selects relevant schema for the prompt, up to 24 tables and 32,000 characters; AI does not receive the entire database and can still lack context.",
             },
             {
               step: "3",
               title: t ? "Chạy SQL gợi ý ngay trong editor" : "Run suggested SQL straight in the editor",
               desc: t
-                ? "Khi AI trả về SQL, nhấn nút chạy trên khối code để chèn vào editor và thực thi luôn (với query rủi ro sẽ có bước xác nhận). Hoặc copy thủ công để chỉnh trước khi chạy."
-                : "When the AI returns SQL, press the run button on the code block to insert it into the editor and execute immediately (risky queries still require confirmation). Or copy manually to edit before running.",
+                ? "Đọc SQL trước khi bấm Run: thao tác này chèn vào editor và gửi thực thi ngay. Chỉ khi backend đánh dấu câu lệnh là high-impact mới có bước xác nhận; nguồn gốc AI không khiến mọi query đều phải xác nhận. Dùng Insert hoặc copy nếu muốn chỉnh trước."
+                : "Read the SQL before pressing Run: it inserts into the editor and submits execution immediately. Confirmation appears only when the backend classifies the statement as high-impact; AI origin does not make every query require confirmation. Use Insert or copy when you want to edit first.",
             },
             {
               step: "4",
               title: t ? "Đính kèm ảnh, PDF và hỏi follow-up" : "Attach images/PDFs and ask follow-ups",
               desc: t
-                ? "Nhấn nút kẹp giấy để đính kèm ảnh chụp màn hình lỗi, sơ đồ, hoặc PDF — AI sẽ phân tích nội dung. Sau mỗi câu trả lời, tiếp tục hỏi follow-up trong cùng luồng hội thoại; AI giữ ngữ cảnh của các lượt trước."
-                : "Press the paperclip to attach an error screenshot, a diagram, or a PDF — the AI analyzes the content. After each answer, keep asking follow-ups in the same conversation; the AI retains the context of previous turns.",
+                ? "Dùng kẹp giấy với model có capability phù hợp. UI có thể chứa nhiều attachment nhưng chỉ ảnh đầu tiên và PDF đầu tiên có dữ liệu gốc được gửi vào đường native; ảnh thêm chỉ có ghi chú, PDF thêm dùng text trích xuất. PDF gốc tối đa 5 MiB ở client; nên giữ ảnh không quá 5 MB để giảm payload, không coi đó là image cap được thực thi. Follow-up dùng lịch sử có giới hạn."
+                : "Use the paperclip with a model that has the matching capability. The UI can hold multiple attachments, but only the first image and first PDF with raw data reach native input; extra images become notes and extra PDFs use extracted text. Native PDFs have a 5 MiB client threshold; keep images within 5 MB as payload guidance, not an enforced image cap. Follow-ups use bounded history.",
             },
             {
               step: "5",
@@ -95,8 +98,8 @@ export function AiServiceSection({ lang }: Props) {
         >
           <p>
             {t
-              ? "AI không chạy theo một model cứng duy nhất. Prompt ngắn, prompt dài, ảnh đính kèm, và yêu cầu thông tin hiện thời có thể đi qua các lane khác nhau nếu routing mode và capability cho phép."
-              : "AI does not run through one hard-coded model. Short prompts, longer tasks, image input, and current-information requests can travel through different lanes when the routing mode and capability filters allow it."}
+              ? "Routing phụ thuộc model/provider explicit, fallback, provider đã cấu hình hoặc tắt, và capability ảnh/PDF/web. Khi không có model explicit, Auto, Fast / Cheap và Best Quality hiện dùng cùng thứ tự provider; nhãn mode không phải cam kết chọn model khác theo độ dài prompt."
+              : "Routing depends on the explicit model/provider, fallback, configured or disabled providers, and image/PDF/web capabilities. Without an explicit model, Auto, Fast / Cheap, and Best Quality currently use the same provider order; the mode label is not a promise to switch models based on prompt length."}
           </p>
         </InfoCard>
         <InfoCard
@@ -207,8 +210,8 @@ export function AiServiceSection({ lang }: Props) {
       >
         <Prose>
           {t
-            ? "Ngoài các lane có sẵn như Gemini, OpenRouter, Groq, Cerebras, và Beeknoee, app còn cho phép bạn thêm provider OpenAI-compatible của riêng mình ngay trong UI. Form hiện tại hỗ trợ tên provider, Base URL, API key, model mặc định, và nút tải danh sách model từ endpoint đó."
-            : "Besides built-in lanes such as Gemini, OpenRouter, Groq, Cerebras, and Beeknoee, the app also lets you add your own OpenAI-compatible provider directly in the UI. The current form supports a provider name, base URL, API key, default model, and a button to load the model list from that endpoint."}
+            ? "Trong Configure AI, provider tùy chỉnh được lưu thành record thuộc người dùng trên server; API key được mã hóa trong metastore và không trả lại trong catalog công khai của tài khoản. Model theo vai trò và lựa chọn bật/tắt provider vẫn là preference local của trình duyệt. Chúng không thay thế server/.env hoặc tạo lane dùng chung cho cả hệ thống."
+            : "In Configure AI, a custom provider is stored as a per-user record on the server; its API key is encrypted in the metastore and is not returned in the account’s provider listing. Role-model choices and provider enabled/disabled preferences remain local to the browser. They do not replace server/.env or create a shared system-wide lane."}
         </Prose>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -225,13 +228,13 @@ export function AiServiceSection({ lang }: Props) {
           <div className="rounded-2xl border border-border/60 bg-card/40 p-5">
             <h3 className="text-sm font-bold">
               {t
-                ? "Lưu cục bộ theo máy/người dùng"
-                : "Stored locally per machine/user"}
+                ? "Load models / Test / Save"
+                : "Load models / Test / Save"}
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               {t
-                ? "Custom provider và role preference được lưu cục bộ trên client hiện tại. Chúng không thay thế `server/.env`, cũng không tự biến thành lane dùng chung cho toàn bộ hệ thống."
-                : "Custom providers and role preferences are stored locally on the current client. They do not replace `server/.env`, and they do not automatically become shared global lanes for the whole system."}
+                ? "Nhập Base URL, API key và model; dùng Load models nếu endpoint hỗ trợ catalog, hoặc nhập model thủ công. Test gửi một chat ngắn để kiểm tra kết nối; lỗi discovery không nhất thiết là lỗi chat. Save lưu cấu hình, không tự chứng minh vision/PDF hoạt động."
+                : "Enter the Base URL, API key, and model; use Load models if the endpoint exposes a catalog, or type the model manually. Test sends a short chat to check connectivity; discovery failure does not necessarily mean chat failure. Save stores the configuration, not proof that vision/PDF works."}
             </p>
           </div>
         </div>
@@ -260,8 +263,8 @@ export function AiServiceSection({ lang }: Props) {
       >
         <Prose>
           {t
-            ? "Routing mode là lớp điều khiển ở trên model picker. Nó quyết định app nên ưu tiên ổn định, chi phí, tốc độ, hay chất lượng cho request hiện tại."
-            : "Routing mode sits above the model picker. It decides whether the app should favor stability, cost, speed, or quality for the current request."}
+            ? "Routing mode và model picker là hai cấu hình khác nhau. Với request không có model explicit, Auto, Fast / Cheap và Best Quality hiện đều xếp OpenRouter → Groq → Gemini → Cerebras, bỏ provider chưa cấu hình/đã tắt và lọc theo capability. Model mặc định của Assistant lại là Groq explicit nên thường đi theo nhánh requested model, không phải nhánh tự chọn này."
+            : "Routing mode and the model picker are separate settings. With no explicit model, Auto, Fast / Cheap, and Best Quality currently order OpenRouter → Groq → Gemini → Cerebras, omitting unavailable/disabled providers and filtering capabilities. The Assistant default is an explicit Groq model, so it normally uses the requested-model branch rather than this unselected branch."}
         </Prose>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -269,30 +272,30 @@ export function AiServiceSection({ lang }: Props) {
             {
               title: "Auto",
               descVi:
-                "Mode mặc định cho đa số tác vụ. App bắt đầu từ auto chain rồi lọc lại theo capability như vision hoặc live search khi prompt thực sự cần.",
+                "Mode mặc định. Thử model explicit trước nếu có; nếu không có, dùng thứ tự tự chọn hiện tại. Ảnh, PDF gốc và live search còn lọc bỏ các candidate thiếu capability.",
               descEn:
-                "The default mode for most tasks. The app starts from the auto chain and then filters it by capabilities such as vision or live search when the prompt genuinely needs them.",
+                "The default mode. Tries an explicit model first when supplied; otherwise uses the current unselected order. Images, native PDFs, and live search also filter candidates that lack the required capability.",
             },
             {
               title: "Fast / Cheap",
               descVi:
-                "Nghiêng về lane rẻ hơn và phản hồi nhanh hơn, nhưng không ghi đè explicit provider nếu bạn đã khóa model cụ thể.",
+                "Hiện không đổi thứ tự tự chọn so với Auto khi không có model explicit. Tên mode không bảo đảm request rẻ hơn hoặc nhanh hơn; chi phí và tốc độ phụ thuộc model/provider thực tế.",
               descEn:
-                "Leans toward cheaper and faster lanes, but does not override an explicit provider if you already locked a concrete model.",
+                "Currently does not change the unselected order from Auto when no explicit model is supplied. Its name does not guarantee a cheaper or faster request; cost and latency depend on the actual model/provider.",
             },
             {
               title: "Best Quality",
               descVi:
-                "Phù hợp cho prompt dài, tái cấu trúc truy vấn, explain sâu, hoặc những request cần reasoning chắc hơn.",
+                "Không đổi thứ tự tự chọn chung. Khi có built-in model explicit và fallback là Auto, best có thể đưa Gemini lên trước các fallback low-cost sau model được yêu cầu. Không áp dụng cho custom provider bị cô lập, fallback cụ thể hoặc None; không cam kết chất lượng cao hơn cho mọi request.",
               descEn:
-                "Best for long prompts, deeper query rewrites, detailed explanations, or requests that need stronger reasoning.",
+                "Does not change the general unselected order. With an explicit built-in model and Auto fallback, best can put Gemini ahead of low-cost fallback candidates after the requested model. This does not apply to isolated custom providers, a specific fallback, or None, and is not a global quality guarantee.",
             },
             {
               title: "Gemini Only",
               descVi:
-                "Khóa workflow vào lane Gemini đã chọn để giảm khác biệt giữa nhiều provider và giữ hành vi ổn định hơn.",
+                "Ưu tiên các candidate Gemini khi Gemini có sẵn. Nếu Gemini thiếu cấu hình hoặc bị tắt và fallback không phải None, router vẫn có thể dùng provider khác. Vì vậy Gemini Only một mình không phải ranh giới cô lập provider.",
               descEn:
-                "Locks the workflow to the selected Gemini lane to reduce cross-provider variance and keep behavior more predictable.",
+                "Uses Gemini candidates when Gemini is available. If Gemini is unconfigured or disabled and fallback is not None, the router can still use another provider. Gemini Only alone is therefore not a provider-isolation boundary.",
             },
           ].map((item) => (
             <div
@@ -306,6 +309,14 @@ export function AiServiceSection({ lang }: Props) {
             </div>
           ))}
         </div>
+
+        <Callout type="warning">
+          <p className="text-sm">
+            {t
+              ? "Fallback None không nối thêm provider dự phòng cho model explicit đã resolve. Ngoài Gemini Only, custom provider đã resolve được thử riêng và không dùng fallback built-in; Gemini Only có thể bỏ qua lựa chọn custom để dùng các candidate Gemini. Nhưng None không xác minh model/credential: nếu Groq/OpenRouter đã chọn không có cấu hình, hoặc custom selection local không còn tồn tại/đã tắt, app có thể resolve sang candidate hoặc Assistant khác. Gemini Only vẫn có thể thử nhiều model Gemini. Provider disabled lọc auto/fallback, không bảo đảm chặn một lựa chọn explicit. Muốn giới hạn dữ liệu, chọn provider explicit có sẵn, đặt None, kiểm tra role kế thừa và provider thực tế; request thiếu capability có thể bị từ chối."
+              : "Fallback None does not append backup providers for a resolved explicit model. Outside Gemini Only, a resolved custom provider is tried alone without built-in fallback; Gemini Only can ignore the custom selection in favor of Gemini candidates. But None does not validate models/credentials: an unconfigured Groq/OpenRouter selection, or a missing/disabled local custom selection, can resolve to another candidate or the Assistant. Gemini Only can still try multiple Gemini models. Disabled providers are filtered from auto/fallback, not guaranteed to block an explicit selection. To limit data routing, choose an available explicit provider, set None, check inherited roles and the actual provider; a request without the required capability can be rejected."}
+          </p>
+        </Callout>
       </DocSection>
 
       <DocSection
@@ -323,8 +334,8 @@ export function AiServiceSection({ lang }: Props) {
           >
             <p className="text-xs">
               {t
-                ? "Lane chất lượng cao cho reasoning dài, image input, và các task cần độ ổn định cao hơn."
-                : "The higher-quality lane for longer reasoning, image input, and tasks that need stronger reliability."}
+                ? "Gemini nhận ảnh/PDF gốc và hỗ trợ live web search trong wiring hiện tại. Model đã chọn vẫn phải có sẵn với API key và quota của deployment; không có cam kết chất lượng hay uptime tuyệt đối."
+                : "Gemini accepts images/native PDFs and supports live web search in the current wiring. The selected model must still be available with the deployment’s API key and quota; this is not an absolute quality or uptime guarantee."}
             </p>
           </InfoCard>
           <InfoCard
@@ -345,8 +356,8 @@ export function AiServiceSection({ lang }: Props) {
           >
             <p className="text-xs">
               {t
-                ? "Lane phản hồi nhanh cho chat ngắn và iteration nhanh, không phải lane chính cho vision hoặc live search."
-                : "A low-latency lane optimized for short chat and fast iteration rather than vision or live search."}
+                ? "Groq có model text; Qwen khớp capability vision nhận ảnh; Compound và Compound Mini có live web search. GPT OSS không tự có hai capability đó chỉ vì cùng provider."
+                : "Groq has text models; the matching Qwen vision model accepts images; Compound and Compound Mini support live web search. GPT OSS does not inherit those capabilities merely by sharing the provider."}
             </p>
           </InfoCard>
           <InfoCard
@@ -356,8 +367,8 @@ export function AiServiceSection({ lang }: Props) {
           >
             <p className="text-xs">
               {t
-                ? "Lane chi phí thấp hơn cho các tác vụ không cần ảnh và không cần live web search."
-                : "A lower-cost lane for tasks that do not need images or live web search."}
+                ? "Cerebras là lane text cấu hình phía server và có thể tham gia auto/fallback khi sẵn sàng; không phải nhóm model selectable trong catalog Assistant hiện tại. Không có vision, PDF gốc hay live search trong wiring này."
+                : "Cerebras is a server-configured text lane that can participate in auto/fallback when available; it is not a selectable model group in the current Assistant catalog. It has no image, native-PDF, or live-search wiring here."}
             </p>
           </InfoCard>
           <InfoCard
@@ -376,8 +387,8 @@ export function AiServiceSection({ lang }: Props) {
         <Callout type="info">
           <p className="text-sm">
             {t
-              ? "Ghi chú triển khai quan trọng: `Beeknoee` hiện chưa tự được nhét vào auto chain mặc định. Lane này chỉ tham gia khi bạn chọn explicit model/provider hoặc khi code được mở rộng thêm trong tương lai."
-              : "Important implementation note: `Beeknoee` is not injected into the default auto chain on its own right now. It participates when you explicitly select that provider or when the code is expanded later."}
+              ? "Beeknoee không tự tham gia auto chain mặc định. Bạn có thể chọn model explicit hoặc đặt Beeknoee làm fallback cụ thể khi provider đã cấu hình và chưa bị tắt cho fallback. Model khớp Gemini/Bee Gemini, MiniMax hoặc Claude có vision; GLM không được đánh dấu vision."
+              : "Beeknoee is not part of the default auto chain. You can select an explicit model or set Beeknoee as a specific fallback when configured and not disabled for fallback. Matching Gemini/Bee Gemini, MiniMax, and Claude models have vision; GLM is not marked vision-capable."}
           </p>
         </Callout>
       </DocSection>
@@ -396,19 +407,17 @@ export function AiServiceSection({ lang }: Props) {
         </Prose>
 
         <CodeBlock
-          title={t ? "Ví dụ model selection" : "Model selection examples"}
+          title={t ? "Ví dụ từ catalog model của Assistant" : "Examples from the Assistant model catalog"}
         >
-          <CodeComment>
-            {t ? "Gemini chất lượng cao" : "Higher-quality Gemini lane"}
-          </CodeComment>
-          <CodeLine>gemini-3.5-flash</CodeLine>
-          <p className="mt-3" />
-          <CodeComment>
-            {t
-              ? "Provider explicit của Beeknoee"
-              : "Explicit Beeknoee provider"}
-          </CodeComment>
-          <CodeLine>beeknoee:qwen-3-235b-a22b-instruct-2507</CodeLine>
+          {modelGroups.map((group) => (
+            <div key={group.group}>
+              <CodeComment>{group.group}</CodeComment>
+              {group.items.slice(0, 2).map((model) => (
+                <CodeLine key={model.id}>{model.id}</CodeLine>
+              ))}
+              <p className="mt-3" />
+            </div>
+          ))}
         </CodeBlock>
       </DocSection>
 
@@ -426,8 +435,8 @@ export function AiServiceSection({ lang }: Props) {
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               {t
-                ? "Trong repo hiện tại, Gemini là lane vision mặc định mạnh nhất. OpenRouter cũng có thể đóng vai trò vision nếu model được chọn thực sự hỗ trợ ảnh."
-                : "In the current repo, Gemini is the strongest default vision lane. OpenRouter can also act as a vision path when the chosen model genuinely supports images."}
+                ? "Ảnh: Gemini, OpenRouter model khớp vision, Groq Qwen khớp vision, Beeknoee model khớp vision, hoặc custom provider bật vision. PDF gốc: Gemini, OpenRouter, hoặc custom bật document. Capability PDF/document tách biệt với vision; bật flag không kiểm chứng khả năng của endpoint."
+                : "Images: Gemini, matching OpenRouter vision models, matching Groq Qwen, matching Beeknoee vision models, or a custom provider with vision enabled. Native PDFs: Gemini, OpenRouter, or a custom provider with document enabled. PDF/document capability is separate from vision; setting a flag does not verify the endpoint’s actual support."}
             </p>
           </div>
           <div className="rounded-2xl border border-border/60 bg-card/40 p-5">
@@ -436,8 +445,8 @@ export function AiServiceSection({ lang }: Props) {
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               {t
-                ? "Live search không đồng nghĩa với “model nghe như có web”. Trong wiring hiện tại, live-search được dành cho Gemini hoặc OpenRouter."
-                : "Live search is not the same as a model sounding web-aware. In the current wiring, live search is reserved for Gemini and OpenRouter."}
+                ? "Live web search được wiring cho Gemini, OpenRouter và Groq Compound/Compound Mini. Vision không đồng nghĩa web; custom provider, Cerebras và Beeknoee không được coi là live-search lane ở đây. Hãy kiểm tra nguồn và provider/model thực tế thay vì chỉ tin câu trả lời có vẻ cập nhật."
+                : "Live web search is wired for Gemini, OpenRouter, and Groq Compound/Compound Mini. Vision does not imply web access; custom providers, Cerebras, and Beeknoee are not live-search lanes here. Check sources and the actual provider/model rather than trusting an answer that merely sounds current."}
             </p>
           </div>
         </div>
@@ -475,11 +484,35 @@ export function AiServiceSection({ lang }: Props) {
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               {t
-                ? "Khi bạn chọn chạy, query vẫn phải đi qua query service, connection policy, và các guardrail của engine hiện tại. AI không có quyền bỏ qua các lớp đó."
-                : "When you choose to run, the query still passes through the query service, connection policy, and engine guardrails. AI cannot bypass those layers."}
+                ? "Run gửi SQL thực thi ngay qua query service và connection policy. Backend chỉ yêu cầu xác nhận khi phân loại high-impact; không có hộp xác nhận chung cho mọi SQL do AI sinh. Hãy chọn Insert để review trước khi gửi, đặc biệt với lệnh ghi dữ liệu hoặc DDL."
+                : "Run submits SQL immediately through the query service and connection policy. The backend requests confirmation only for high-impact classifications; there is no blanket confirmation dialog for all AI-generated SQL. Choose Insert to review before submission, especially for writes or DDL."}
             </p>
           </div>
         </div>
+      </DocSection>
+
+      <DocSection title={t ? "Ngữ cảnh, lưu trữ và xóa chat" : "Context, storage, and chat deletion"}>
+        <Prose>
+          {t
+            ? "Mỗi request dùng tối đa 20 message lịch sử/24.000 ký tự và 24 bảng/32.000 ký tự schema. Text từ mỗi PDF/tệp text được cắt ở 50.000 ký tự trước ghi chú. Body JSON server giới hạn 10 MiB (10.485.760 byte); base64 làm tệp lớn hơn nên ảnh và PDF gần 5 MiB mỗi tệp vẫn có thể vượt body khi gửi chung. Đây là giới hạn request, không phải thời hạn lưu dữ liệu."
+            : "Each request uses up to 20 history messages/24,000 characters and 24 tables/32,000 schema characters. Text from each PDF/text file is clipped at 50,000 characters before annotations. The server JSON body limit is 10 MiB (10,485,760 bytes); base64 increases size, so an image and PDF near 5 MiB each can exceed the combined body. These are request limits, not retention periods."}
+        </Prose>
+        <Callout type="warning">
+          <p className="text-sm">
+            {t
+              ? "Chat AI, message và dữ liệu attachment được lưu trong metastore phía server; không có TTL tự động cho chat. Cắt lịch sử gửi model không xóa bản lưu. Delete chat của người dùng xóa chat và các message liên quan theo cascade, không chứng minh provider bên ngoài đã xóa dữ liệu hoặc backup đã biến mất. Chỉ gửi dữ liệu được phép chia sẻ."
+              : "AI chats, messages, and attachment data are persisted in the server metastore; chats have no automatic TTL. Truncating history sent to a model does not delete stored history. The user’s Delete chat action cascades to its messages; it does not prove deletion at external providers or from backups. Send only data you are authorized to share."}
+          </p>
+        </Callout>
+        <Prose>
+          <a href={publicPath(lang, "/docs/data-handling")}>
+            {t ? "Đọc cách xử lý dữ liệu, lưu trữ và xóa" : "Read about data handling, retention, and deletion"}
+          </a>
+          {" · "}
+          <a href={publicPath(lang, "/docs/operational-limits")}>
+            {t ? "Xem giới hạn vận hành" : "See operational limits"}
+          </a>
+        </Prose>
       </DocSection>
 
       <Callout type="tip">

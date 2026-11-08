@@ -1,155 +1,32 @@
-import { DocPageLayout } from "../primitives";
+import { publicPath } from '@/core/seo/publicRoutes';
+import { DATABASE_CAPABILITIES, DOCS_FACTS } from '@/core/docs/docsFacts';
+import { DocPageLayout, Prose } from '../primitives';
 
-interface Props {
-  lang: "vi" | "en";
-}
+interface Props { lang: 'vi' | 'en'; }
 
 export function FaqSection({ lang }: Props) {
-  const t = lang === "vi";
-
-  const faqs = [
-    {
-      q: t
-        ? "Tôi có cần cài database trước khi dùng Data Explorer không?"
-        : "Do I need a database before using Data Explorer?",
-      a: t
-        ? "Có. Data Explorer là công cụ quản lý và khám phá dữ liệu, không phải database server. Bạn cần ít nhất một database đang chạy để kết nối vào. App metadata của Data Explorer cũng cần một PostgreSQL riêng cho users, connections, saved queries, dashboards và các dữ liệu nội bộ khác."
-        : "Yes. Data Explorer is a management and exploration tool, not a database server. You need at least one running database to connect to. The app itself also needs a separate PostgreSQL database for users, connections, saved queries, dashboards, and other internal metadata.",
-    },
-    {
-      q: t
-        ? "App hiện hỗ trợ những engine nào?"
-        : "Which engines are supported right now?",
-      a: t
-        ? "Hiện tại app hỗ trợ PostgreSQL, MySQL, SQL Server, MongoDB và MongoDB Atlas (SRV). SQL workspace và NoSQL workspace là hai bề mặt riêng, nhưng cùng dùng chung hệ thống auth, connections, AI, dashboards và audit."
-        : "The app currently supports PostgreSQL, MySQL, SQL Server, MongoDB, and MongoDB Atlas (SRV). The SQL workspace and NoSQL workspace are separate surfaces, but they share the same auth, connections, AI, dashboards, and audit foundations.",
-    },
-    {
-      q: t
-        ? "Dữ liệu của tôi có bị gửi lên cloud không?"
-        : "Is my data sent to the cloud?",
-      a: t
-        ? "Không theo kiểu dump toàn bộ data lên cloud. Khi dùng AI, app có thể gửi prompt, schema context hoặc ngữ cảnh bạn chủ động yêu cầu sang provider AI đang cấu hình. App không render raw HTML từ AI và không tự gửi toàn bộ result set trừ khi flow đó thật sự cần."
-        : "Not in the sense of dumping your whole database to the cloud. When you use AI, the app can send prompts, schema context, or the context you explicitly request to the configured AI provider. The app does not render raw HTML from AI and does not automatically send full result sets unless that flow really needs them.",
-    },
-    {
-      q: t
-        ? "AI hiện dùng Gemini hay gì khác?"
-        : "Does the AI only use Gemini?",
-      a: t
-        ? "Không còn chỉ là Gemini. App hiện có AI routing với Gemini, OpenRouter, Groq, Cerebras, và lane explicit của Beeknoee. Routing mode trong UI quyết định hướng ưu tiên chung, nhưng explicit model/provider vẫn là nút điều khiển mạnh nhất. Mỗi response cũng hiển thị provider/model thực tế để bạn không bị nhầm lane."
-        : "No longer Gemini-only. The app now supports AI routing across Gemini, OpenRouter, Groq, Cerebras, and the Beeknoee explicit lane. The routing mode in the UI sets the broad preference, but explicit model/provider selection remains the strongest control. Each response also shows the actual provider/model so the lane stays transparent.",
-    },
-    {
-      q: t
-        ? "Tại sao AI trả lời khác nhau giữa các mode như Auto, Fast / Cheap và Gemini Only?"
-        : "Why do answers differ across Auto, Fast / Cheap, and Gemini Only?",
-      a: t
-        ? "Vì mode chỉ là một phần của router. Auto cân bằng chung, Fast / Cheap thiên về lane nhẹ hơn, Best Quality nghiêng về lane mạnh hơn, còn Gemini Only khóa hẳn vào Gemini. Nhưng kết quả cuối còn phụ thuộc explicit model/provider, việc prompt có ảnh hay không, và việc request có bị nhận diện là current-info hay không."
-        : "Because the mode is only one part of the router. Auto balances broadly, Fast / Cheap leans toward lighter lanes, Best Quality leans toward stronger lanes, and Gemini Only locks into Gemini. But the final result also depends on any explicit model/provider selection, whether the prompt contains an image, and whether the request is detected as current-information work.",
-    },
-    {
-      q: t
-        ? "Tại sao tôi vẫn bị mất đăng nhập sau refresh hay restart?"
-        : "Why do I still lose my login after refresh or restart?",
-      a: t
-        ? "Phiên hiện tại dùng refresh token trong httpOnly cookie và access token trong memory. Nếu bạn vẫn bị out, hãy kiểm tra FRONTEND_URL, HTTPS hoặc cookie policy ở production, và JWT_SECRET hoặc REFRESH_TOKEN_SECRET có bị đổi giữa các lần deploy không. Một secret đổi giữa các lần deploy sẽ làm phiên cũ mất hiệu lực."
-        : "The current session model uses a refresh token in an httpOnly cookie and an access token in memory. If you still get logged out, check FRONTEND_URL, HTTPS or cookie policy in production, and whether JWT_SECRET or REFRESH_TOKEN_SECRET changed between deploys. Rotating those secrets will invalidate older sessions.",
-    },
-    {
-      q: t
-        ? "Saved queries hiện lưu ở đâu?"
-        : "Where are saved queries stored now?",
-      a: t
-        ? "Saved queries không còn chỉ là local-only nữa. Chúng được lưu ở backend metadata database và hỗ trợ private, team và workspace visibility. Tab content vẫn có state phía client để phục hồi UX, nhưng luồng saved queries đã là server-backed."
-        : "Saved queries are no longer local-only. They are stored in the backend metadata database and support private, team, and workspace visibility. Tab content still has client-side state for UX recovery, but the saved-query flow itself is now server-backed.",
-    },
-    {
-      q: t
-        ? "Khi nào nên dùng Prisma Migrate thay vì db push?"
-        : "When should I use Prisma Migrate instead of db push?",
-      a: t
-        ? "Dùng `npx prisma migrate deploy` cho staging và production để giữ lịch sử schema có thể kiểm toán. Chỉ dùng `db push` cho prototype local có thể xóa bỏ, không dùng cho dữ liệu production."
-        : "Use `npx prisma migrate deploy` in staging and production so schema history remains auditable. Reserve `db push` for disposable local prototypes, never production data.",
-    },
-    {
-      q: t
-        ? "Tại sao kết nối database ở trường hoặc mạng công cộng lại hay bị lỗi?"
-        : "Why do database connections often fail on school or public networks?",
-      a: t
-        ? "Nhiều mạng chặn trực tiếp các cổng database như 5432, 3306 hoặc 27017. Khi đó cả local dev lẫn app web đều có thể mất reachability tới DB cloud hoặc private. Cách thực tế nhất là dùng DB local cho dev, hoặc tunnel, VPN hay agent trên các mạng bị chặn mạnh."
-        : "Many networks block database ports such as 5432, 3306, or 27017 directly. In that case, both local development and the deployed app can lose reachability to cloud or private databases. The most practical workaround is to use a local database for development, or tunnels, VPNs, or agents on heavily restricted networks.",
-    },
-    {
-      q: t
-        ? "AI-generated SQL có chạy ngay lập tức không?"
-        : "Does AI-generated SQL run immediately?",
-      a: t
-        ? "Không mặc định. Insert into editor chỉ chèn SQL vào editor. Run suggestion mới là hành động chạy, và app hiện có bước xác nhận trước khi execute SQL do AI đề xuất để giảm rủi ro chạy nhầm."
-        : "Not by default. Insert into editor only inserts SQL into the editor. Run suggestion is the action that executes it, and the app now shows a confirmation step before running AI-generated SQL to reduce the risk of accidental execution.",
-    },
-    {
-      q: t
-        ? "Tại sao connection của tôi bị chặn bởi guardrails?"
-        : "Why is my connection blocked by guardrails?",
-      a: t
-        ? "Connection hiện có policy flags như readOnly, allowSchemaChanges, allowImportExport và allowQueryExecution. Backend sẽ enforce các guardrails này kể cả khi frontend bị bypass. Nếu một câu lệnh bị chặn, UI sẽ hiển thị lý do thay vì chỉ thất bại mơ hồ."
-        : "Connections now carry policy flags such as readOnly, allowSchemaChanges, allowImportExport, and allowQueryExecution. The backend enforces these guardrails even if the frontend is bypassed. When a statement is blocked, the UI shows a clear reason instead of failing vaguely.",
-    },
-    {
-      q: t
-        ? "Tại sao tôi không thấy query của đồng nghiệp mặc dù cả hai đều dùng @gmail.com?"
-        : "Why can't I see my colleague's queries if we both use @gmail.com?",
-      a: t
-        ? "Bảo mật quyền riêng tư của bạn là ưu tiên hàng đầu. Data Explorer đã loại bỏ việc tự động chia sẻ query dựa trên domain email công cộng (như @gmail.com, @outlook.com) để tránh rò rỉ dữ liệu giữa những người dùng không liên quan. Để chia sẻ, hãy tạo một Organization và mời đồng nghiệp vào."
-        : "Your privacy is our priority. Data Explorer has removed automatic query sharing based on public email domains (like @gmail.com, @outlook.com) to prevent data leaks between unrelated users. To share, create an Organization and invite your colleagues.",
-    },
-    {
-      q: t
-        ? "Tại sao đích đến (host) của SSH tunnel của tôi bị chặn?"
-        : "Why is my SSH tunnel destination host blocked?",
-      a: t
-        ? "SshTunnelService hiện áp dụng SSRF validation nghiêm ngặt. Hệ thống chặn các kết nối tới localhost, 127.0.0.1 và các dải IP nội bộ RFC1918 thông qua tunnel để bảo vệ mạng nội bộ của bạn khỏi các hành vi thám thính hoặc tấn công SSRF."
-        : "SshTunnelService now applies strict SSRF validation. The system blocks connections to localhost, 127.0.0.1, and RFC1918 internal IP ranges through tunnels to protect your internal network from reconnaissance or SSRF attacks.",
-    },
-  ];
-
-  return (
-    <DocPageLayout
-      title={
-        t ? "Câu hỏi thường gặp & khắc phục sự cố" : "FAQ & troubleshooting"
-      }
-      subtitle={
-        t
-          ? "Những câu hỏi và lỗi phổ biến nhất, được cập nhật đúng với Data Explorer hiện tại."
-          : "The most common questions and failure modes, updated to match the current Data Explorer codebase."
-      }
-    >
-      <div className="space-y-4">
-        {faqs.map((faq, i) => (
-          <details
-            key={i}
-            className="group border rounded-2xl bg-card overflow-hidden"
-          >
-            <summary className="flex items-center gap-4 p-5 cursor-pointer hover:bg-muted/30 transition-colors list-none">
-              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-sm shrink-0 group-open:bg-primary group-open:text-primary-foreground transition-colors">
-                {i + 1}
-              </div>
-              <span className="font-bold text-sm">{faq.q}</span>
-              <span className="ml-auto text-muted-foreground group-open:rotate-180 transition-transform">
-                ▼
-              </span>
-            </summary>
-            <div className="px-5 pb-5 pt-0">
-              <div className="pl-12 border-l-2 border-primary/20 ml-4">
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {faq.a}
-                </p>
-              </div>
-            </div>
-          </details>
-        ))}
-      </div>
-    </DocPageLayout>
-  );
+    const t = lang === 'vi';
+    const faqs = [
+        { q: t ? 'Cần database nào để chạy ứng dụng?' : 'Which databases does the application need?', a: t ? 'Self-host cần application PostgreSQL cho accounts/workspace metadata và Redis cho cache/queues/presence/search. Đây khác database đích bạn muốn khám phá. Hosted web dùng hạ tầng đã cấu hình; trình duyệt không tự chạy database server.' : 'Self-hosting needs application PostgreSQL for accounts/workspace metadata and Redis for caches, queues, presence, and search. These differ from target databases you explore. Hosted web uses configured infrastructure; the browser does not run a database server.' },
+        { q: t ? 'Engine nào được hỗ trợ?' : 'Which engines are supported?', a: t ? `Backend đăng ký ${DATABASE_CAPABILITIES.map(engine => engine.name).join(', ')}. Capabilities không đồng đều: Redis được selector NoSQL liệt kê nhưng main chỉ chạy MongoDB/Atlas; SQLite có form/strategy nhưng SQL selector chưa liệt kê. Xem ma trận trước khi dựa vào một workflow.` : `The backend registers ${DATABASE_CAPABILITIES.map(engine => engine.name).join(', ')}. Capabilities differ: Redis appears in the NoSQL selector, but the main workspace accepts only MongoDB/Atlas; SQLite has a form/strategy but is absent from the SQL selector. Check the matrix before relying on a workflow.` },
+        { q: t ? 'Backend không chạy hoặc frontend gọi sai API?' : 'Why does the backend fail or the frontend use the wrong API?', a: t ? 'Dùng Node 22, npm ci cho root/client/server và generate Prisma. Server template đặt PORT=3001; nếu bỏ PORT source fallback là 3000. Local client/.env đặt VITE_API_URL=http://localhost:3001/api và restart Vite. Compose metadata DB host là 127.0.0.1:5435, password mới mặc định change-me-local.' : 'Use Node 22, npm ci for root/client/server, and generate Prisma. The server template sets PORT=3001; omitting PORT falls back to 3000 in source. Set local client/.env VITE_API_URL=http://localhost:3001/api and restart Vite. Compose metadata PostgreSQL uses host 127.0.0.1:5435 with the fresh default password change-me-local.' },
+        { q: t ? 'Vì sao production từ chối encryption key?' : 'Why does production reject my encryption key?', a: t ? 'ENCRYPTION_KEY phải random đúng 32 UTF-8 bytes, không phải 32 ký tự Unicode hoặc 64 ký tự hex. JWT/refresh secrets ít nhất 32 bytes. Placeholder/chuỗi số mẫu bị từ chối. Không thay encryption key tùy tiện: credential cũ cần key cũ hoặc LEGACY_ENCRYPTION_KEYS.' : 'ENCRYPTION_KEY must be random and exactly 32 UTF-8 bytes, not 32 Unicode characters or 64 hex characters. JWT/refresh secrets need at least 32 bytes. Numeric/sample placeholders are rejected. Do not casually change encryption keys: stored credentials need the original key or LEGACY_ENCRYPTION_KEYS.' },
+        { q: t ? 'Dữ liệu được gửi tới AI và lưu ở đâu?' : 'What is sent to AI, and where is it stored?', a: t ? 'Prompt, schema/context, SQL và attachments được chọn có thể đến external provider. AI chat/message/attachment payload còn lưu ở app PostgreSQL không có auto-expiry; Delete chat cascade message. Custom provider key được mã hóa per-user server-side, local preference không giữ API key. Audit/payment cleanup không phải chat-retention policy.' : 'Prompts, schema/context, SQL, and selected attachments can reach external providers. AI chat/message/attachment payloads also persist in application PostgreSQL without automatic expiry; Delete chat cascades messages. Custom provider keys are encrypted per user server-side, while local preferences strip API keys. Audit/payment cleanup is not a chat-retention policy.' },
+        { q: t ? 'Tìm kiếm, AI và results dùng phím tắt nào?' : 'Which shortcuts open search, AI, and results?', a: t ? 'Ctrl/Cmd+K mở command palette, Ctrl/Cmd+I bật/tắt Assistant, Ctrl/Cmd+J bật/tắt Results. Query toolbar AI SQL generator khác Assistant. Query Editor dùng Ctrl/Cmd+H cho History; đừng coi đó là shortcut bulk replace. Tabs có N/new, D/duplicate và Shift+W/close-all với modifier Ctrl/Cmd.' : 'Ctrl/Cmd+K opens the command palette, Ctrl/Cmd+I toggles Assistant, and Ctrl/Cmd+J toggles results. The toolbar AI SQL generator differs from Assistant. Query Editor uses Ctrl/Cmd+H for History, not bulk replace. Tabs implement Ctrl/Cmd+N new, +D duplicate, and +Shift+W close-all.' },
+        { q: t ? 'Auto, Fast / Cheap, Best Quality và Gemini Only khác nhau thế nào?' : 'How do Auto, Fast / Cheap, Best Quality, and Gemini Only differ?', a: t ? 'Auto là routing mode, không model entry. Khi không có explicit selection, Auto/Fast/Best hiện có cùng provider ordering; best có ảnh hưởng vài requested-model fallback path. Gemini Only ưu tiên Gemini nhưng có thể dùng fallback nếu Gemini không khả dụng; chọn fallback None để không tự đổi provider. Custom selection có capability filtering và không auto-chain rộng.' : 'Auto is a routing mode, not a model entry. Without explicit selection, Auto/Fast/Best currently use the same provider ordering; best affects some requested-model fallback paths. Gemini Only prefers Gemini but can fall back when Gemini is unavailable; choose fallback None to avoid automatic provider switching. Custom selections use capability filtering without a broad auto-chain.' },
+        { q: t ? 'AI-generated SQL có chạy tự động không?' : 'Does AI-generated SQL run automatically?', a: t ? 'Insert chỉ chèn vào editor. Run suggestion gửi query ngay; chỉ SQL bị guard phân loại high-impact/destructive mới bật confirmation. Không có prompt riêng cho mọi query nguồn AI. Writable Mongo mutations cũng không có destructive confirmation tự động. Hãy review filter/statement trước.' : 'Insert only places SQL into the editor. Run suggestion submits immediately; only guard-classified high-impact/destructive SQL triggers confirmation. Not every AI-origin query gets a separate prompt. Writable Mongo mutations also lack automatic destructive confirmation. Review filters/statements first.' },
+        { q: t ? 'Export có phải toàn bộ dữ liệu không?' : 'Does export contain the whole dataset?', a: t ? 'Không. DataGrid CSV/JSON/SQL dùng các rows đang tải/lọc trên page; Query Result chỉ CSV trang hiện tại. Chuyển trang không cộng dồn thành file đầy đủ. allowImportExport hiện không chặn mọi browser download của rows đã trả về, nên không là chống data-egress boundary.' : 'No. DataGrid CSV/JSON/SQL uses the loaded/filtered page rows; Query Result exports current-page CSV only. Paging does not accumulate a complete file. allowImportExport does not block every browser download of returned rows, so it is not a data-egress boundary.' },
+        { q: t ? 'Query timeout hoặc Cancel có bảo đảm rollback không?' : 'Does timeout or Cancel guarantee rollback?', a: t ? `Không. SQL deadline mặc định ${DOCS_FACTS.sql.timeoutDefaultMs / 1000}s, tối đa ${DOCS_FACTS.sql.timeoutMaxMs / 1000}s. Active Queries yêu cầu cancel ở engine hỗ trợ; SQLite/MongoDB/ClickHouse/Redis không mid-flight cancel. Kiểm tra write outcome trước retry; MySQL DDL/ClickHouse batch có thể không atomic.` : `No. SQL deadlines default to ${DOCS_FACTS.sql.timeoutDefaultMs / 1000}s with a ${DOCS_FACTS.sql.timeoutMaxMs / 1000}s maximum. Active Queries requests cancellation on supported engines; SQLite/MongoDB/ClickHouse/Redis lack mid-flight cancellation. Inspect write outcomes before retrying; MySQL DDL/ClickHouse batches may be non-atomic.` },
+        { q: t ? 'Saved query và tab lưu ở đâu?' : 'Where are saved queries and tabs stored?', a: t ? 'Saved queries server-backed với private hoặc organization workspace cho create mới; team chỉ legacy read compatibility. Tabs/drafts/layout ở localStorage JSON không nén; query results và AI messages không persisted ở local store. Đóng tab không tương đương xóa saved query.' : 'Saved queries are server-backed with private or organization workspace visibility for new records; team is legacy read compatibility. Tabs/drafts/layouts use uncompressed localStorage JSON; query results and AI messages are not persisted in the local store. Closing a tab does not delete a saved query.' },
+        { q: t ? 'Tại sao mất đăng nhập sau reload?' : 'Why do I lose sign-in after reload?', a: t ? 'Access token ở memory, refresh token httpOnly cookie. Kiểm tra FRONTEND_URL, HTTPS/cookie settings, TRUST_PROXY và secret có đổi giữa deploy không. Legal consent/onboarding còn là gate riêng. OAuth callback phải trỏ backend thật.' : 'Access tokens stay in memory and refresh tokens in httpOnly cookies. Check FRONTEND_URL, HTTPS/cookie settings, TRUST_PROXY, and secret changes between deployments. Legal consent/onboarding are separate gates. OAuth callbacks must point to the real backend.' },
+        { q: t ? 'Vì sao host nội bộ/TLS bị từ chối?' : 'Why are private hosts or TLS connections rejected?', a: t ? 'Production ALLOW_INTERNAL_IPS=false giữ deny private/loopback; development localhost là ngoại lệ. Chỉ operator mới quyết định override. TLS strict cần ALLOW_INSECURE_DATABASE_TLS=false rõ ràng, vì bỏ flag là permissive; MySQL/MariaDB/Redis còn cần transport toggle đúng. Browser mạng khác backend mạng: DB phải reachable từ host backend.' : 'Production ALLOW_INTERNAL_IPS=false retains private/loopback denial; development localhost is an exception. Overrides need operator decisions. Strict TLS needs explicit ALLOW_INSECURE_DATABASE_TLS=false because omission is permissive; MySQL/MariaDB/Redis also need the correct transport toggle. Browser networking differs from backend networking: the database must be reachable from the backend host.' },
+        { q: t ? 'Khi nào dùng Prisma Migrate và backup?' : 'When should I use Prisma Migrate and backups?', a: t ? 'Dùng committed migrate deploy cho application schema, backup/review trước production migrations. db push chỉ cho prototype disposable. Organization JSON backup không gồm connection secrets/members/comments, không là DB dump; restore additive cùng organization có thể duplicate. Migration data có partial commits, kiểm target trước rerun.' : 'Use committed migrate deploy for application schema and back up/review before production migrations. db push is for disposable prototypes only. Organization JSON backups exclude connection secrets/members/comments and are not database dumps; additive same-organization restores can duplicate artifacts. Data migrations can partially commit: inspect targets before rerunning.' },
+        { q: t ? 'Thanh toán Pro pending hoặc active nghĩa là gì?' : 'What do pending or active Pro payments mean?', a: t ? 'Chỉ verified provider webhook nâng Pro status, status page đọc local record và không tự poll provider. Pending thì refresh sau hoặc liên hệ support với payment ID đã loại thông tin nhạy cảm. Hiện Pro Monthly/Yearly chỉ ghi status 30/365 ngày, chưa có feature-entitlement matrix đã triển khai; không giả cancel/refund tự phục vụ.' : 'Only verified provider webhooks activate Pro status; the status page reads a local record without provider polling. Refresh pending payments later or contact support with a sanitized payment ID. Monthly/Yearly currently records 30/365-day status without an implemented feature-entitlement matrix; do not assume self-service cancellation/refunds.' },
+    ];
+    return (
+        <DocPageLayout title={t ? 'FAQ & khắc phục sự cố' : 'FAQ & troubleshooting'} subtitle={t ? 'Câu hỏi thường gặp theo đúng behavior và các limitation hiện tại.' : 'Common questions grounded in current behavior and limitations.'}>
+            <div className="space-y-4">{faqs.map((faq, index) => <details key={faq.q} className="group overflow-hidden rounded-2xl border bg-card"><summary className="flex cursor-pointer list-none items-center gap-4 p-5"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-bold text-primary">{index + 1}</span><span className="font-bold text-sm">{faq.q}</span><span className="ml-auto text-muted-foreground" aria-hidden="true">⌄</span></summary><div className="px-5 pb-5"><p className="text-sm leading-relaxed text-muted-foreground">{faq.a}</p></div></details>)}</div>
+            <Prose><a href={publicPath(lang, '/docs/first-query')}>{t ? 'Query đầu tiên' : 'First query'}</a> · <a href={publicPath(lang, '/docs/database-capabilities')}>{t ? 'Engine capabilities' : 'Engine capabilities'}</a> · <a href={publicPath(lang, '/docs/data-handling')}>{t ? 'Data handling' : 'Data handling'}</a></Prose>
+        </DocPageLayout>
+    );
 }

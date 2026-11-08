@@ -1,4 +1,5 @@
 import { Box, Database, Globe, Terminal } from "lucide-react";
+import { publicPath } from '@/core/seo/publicRoutes';
 import {
   Callout,
   CodeBlock,
@@ -22,8 +23,8 @@ export function InstallationSection({ lang }: Props) {
       title={t ? "Cài đặt & chạy local" : "Installation & local setup"}
       subtitle={
         t
-          ? "Thiết lập Data Explorer đúng với repo hiện tại: Prisma Migrate, backend NestJS, frontend Vite, và các biến môi trường cần thiết."
-          : "Set up Data Explorer the way the current repo works: Prisma Migrate, a NestJS backend, a Vite frontend, and the required environment variables."
+          ? "Chạy Node.js 22, PostgreSQL và Redis cho metadata app, tạo Prisma Client, áp dụng migration, rồi khởi động NestJS và Vite."
+          : "Use Node.js 22, PostgreSQL and Redis for app metadata, generate Prisma Client, apply migrations, then start NestJS and Vite."
       }
     >
       <div className="mb-12 grid gap-4 md:grid-cols-2">
@@ -34,215 +35,165 @@ export function InstallationSection({ lang }: Props) {
           </h4>
           <p className="text-xs leading-relaxed text-muted-foreground">
             {t
-              ? "Phù hợp nhất cho phát triển hằng ngày: chạy app metadata database, backend, và frontend riêng để debug nhanh hơn."
-              : "Best for day-to-day development: run the app metadata database, backend, and frontend separately for faster debugging."}
+              ? "Chạy backend và frontend trên máy; dùng Docker Compose chỉ cho db và redis để debug dễ hơn."
+              : "Run the backend and frontend on your host; use Docker Compose only for db and redis for easier debugging."}
           </p>
         </div>
-
         <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6">
           <h4 className="mb-2 flex items-center gap-2 font-bold">
             <Box className="h-4 w-4 text-primary" />
-            {t ? "Docker là tùy chọn" : "Docker is optional"}
+            {t ? "Docker cho hạ tầng local" : "Docker for local infrastructure"}
           </h4>
           <p className="text-xs leading-relaxed text-muted-foreground">
             {t
-              ? "Docker hữu ích khi bạn muốn có PostgreSQL local ổn định cho metadata app. Với repo hiện tại, manual setup vẫn là đường đơn giản nhất cho dev."
-              : "Docker is useful if you want a stable local PostgreSQL instance for app metadata. For the current repo, manual setup is still the simplest development path."}
+              ? "Nếu không dùng Docker, cung cấp PostgreSQL và Redis tương đương rồi sửa URL. Metadata app tách biệt với database đích bạn muốn khám phá."
+              : "Without Docker, provide equivalent PostgreSQL and Redis services and adjust the URLs. App metadata is separate from the target databases you explore."}
           </p>
         </div>
       </div>
 
       <DocSection title={t ? "Local setup chuẩn" : "Standard local setup"}>
-        <StepBlock
-          step={1}
-          title={
-            t
-              ? "Clone repo và cài dependency cho root + từng workspace"
-              : "Clone the repo and install root + workspace dependencies"
-          }
-        >
-          <CodeBlock title="Terminal">
-            <CodeLine>
-              git clone https://github.com/KasierBach/Data-Explorer-Editor.git
-            </CodeLine>
-            <CodeLine>cd Data-Explorer-Editor</CodeLine>
-            <CodeLine>npm install</CodeLine>
-            <CodeLine>npm install --prefix server</CodeLine>
-            <CodeLine>npm install --prefix client</CodeLine>
-          </CodeBlock>
-        </StepBlock>
-
-        <StepBlock
-          step={2}
-          title={t ? "Tạo file server/.env" : "Create server/.env"}
-        >
+        <StepBlock step={1} title={t ? "Node.js 22 và ba gói npm" : "Node.js 22 and three npm packages"}>
           <Prose>
             {t
-              ? "Local run cần app metadata database, Redis, JWT secret đủ mạnh, encryption key đúng 32 ký tự, và `FRONTEND_URL`. OAuth và AI provider là tùy chọn."
-              : "A local run needs an app metadata database, Redis, a strong JWT secret, an encryption key with exactly 32 characters, and `FRONTEND_URL`. OAuth and AI providers are optional."}
+              ? "Repo ghim Node.js 22 trong .nvmrc. Chọn phiên bản đó trước khi cài; với nvm trên macOS/Linux dùng nvm install rồi nvm use. Root, server và client có lockfile riêng, nên chạy npm ci ở cả ba nơi."
+              : "The repo pins Node.js 22 in .nvmrc. Select that version before installing; with nvm on macOS/Linux use nvm install then nvm use. Root, server and client have separate lockfiles, so run npm ci for all three."}
           </Prose>
-
-          <CodeBlock title="server/.env">
-            <CodeComment>{t ? "Bắt buộc" : "Required"}</CodeComment>
-            <CodeLine>
-              DATABASE_URL=postgresql://postgres:postgres@localhost:5432/data_explorer_dev?schema=public
-            </CodeLine>
-            <CodeLine>
-              JWT_SECRET=replace-with-a-strong-secret-at-least-32-chars
-            </CodeLine>
-            <CodeLine>
-              ENCRYPTION_KEY=replace-with-exactly-32-characters
-            </CodeLine>
-            <CodeLine>FRONTEND_URL=http://localhost:5173</CodeLine>
-            <p className="mt-3" />
-            <CodeComment>
-              {t
-                ? "Tùy chọn cho compatibility / local rules"
-                : "Optional compatibility / local rules"}
-            </CodeComment>
-            <CodeLine>LEGACY_ENCRYPTION_KEYS=</CodeLine>
-            <CodeLine>ALLOW_INTERNAL_IPS=false</CodeLine>
-            <CodeLine>ADMIN_EMAIL=admin@example.com</CodeLine>
-            <CodeLine>ADMIN_PASSWORD=your-secure-password</CodeLine>
-            <p className="mt-3" />
-            <CodeComment>
-              {t ? "Tùy chọn cho AI routing" : "Optional for AI routing"}
-            </CodeComment>
-            <CodeLine>GEMINI_API_KEY=...</CodeLine>
-            <CodeLine>AI_PROVIDER_TIMEOUT_MS=90000</CodeLine>
-            <CodeLine>AI_STREAM_IDLE_TIMEOUT_MS=90000</CodeLine>
-            <CodeLine>CEREBRAS_API_KEY=...</CodeLine>
-            <CodeLine>CEREBRAS_BASE_URL=https://api.cerebras.ai/v1</CodeLine>
-            <CodeLine>CEREBRAS_CHAT_MODEL=llama3.1-8b</CodeLine>
-            <CodeLine>OPENROUTER_API_KEY=...</CodeLine>
-            <CodeLine>
-              OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-            </CodeLine>
-            <CodeLine>OPENROUTER_CHAT_MODEL=</CodeLine>
-            <CodeLine>GROQ_API_KEY=...</CodeLine>
-            <CodeLine>GROQ_BASE_URL=https://api.groq.com/openai/v1</CodeLine>
-            <CodeLine>
-              GROQ_CHAT_MODEL=openai/gpt-oss-120b
-            </CodeLine>
-            <CodeLine>BEEKNOEE_API_KEY=...</CodeLine>
-            <CodeLine>
-              BEEKNOEE_BASE_URL=https://platform.beeknoee.com/api/v1
-            </CodeLine>
-            <CodeLine>BEEKNOEE_CHAT_MODEL=glm-4.7-flash</CodeLine>
+          <CodeBlock title="Terminal">
+            <CodeLine>git clone https://github.com/KasierBach/Data-Explorer-Editor.git</CodeLine>
+            <CodeLine>cd Data-Explorer-Editor</CodeLine>
+            <CodeLine>node --version</CodeLine>
+            <CodeLine>npm ci</CodeLine>
+            <CodeLine>npm ci --prefix server</CodeLine>
+            <CodeLine>npm ci --prefix client</CodeLine>
           </CodeBlock>
-
-          <Callout type="info">
+          <Callout type="tip">
             <p className="text-sm">
               {t
-                ? "Các biến AI trong `server/.env` cấu hình những lane dựng sẵn cho toàn hệ thống như Gemini, OpenRouter, Groq, Cerebras, và Beeknoee. Nếu bạn muốn thêm provider OpenAI-compatible riêng, hãy làm sau khi app chạy bằng `Hồ sơ > Cấu hình AI`; phần đó được lưu cục bộ trên máy người dùng chứ không nằm trong file env."
-                : "The AI variables in `server/.env` configure the built-in shared lanes such as Gemini, OpenRouter, Groq, Cerebras, and Beeknoee. If you want to add your own OpenAI-compatible provider, do that after the app boots from `Profile > Configure AI`; that configuration is stored locally on the client machine instead of in the env file."}
+                ? "Windows/PowerShell: với nvm-windows, chọn Node 22 bằng nvm install 22 và nvm use 22. Chạy mỗi dòng riêng; PowerShell 5.1 không hỗ trợ nối lệnh bằng &&. Khi đi tới đường dẫn có dấu cách, dùng Set-Location với đường dẫn trong dấu nháy."
+                : "Windows/PowerShell: with nvm-windows, select Node 22 using nvm install 22 and nvm use 22. Run each line separately; PowerShell 5.1 does not support && command chaining. Use Set-Location with a quoted path when it contains spaces."}
             </p>
           </Callout>
         </StepBlock>
 
-        <StepBlock
-          step={3}
-          title={t ? "Đồng bộ schema app" : "Sync the app schema"}
-        >
+        <StepBlock step={2} title={t ? "Khởi động PostgreSQL và Redis" : "Start PostgreSQL and Redis"}>
+          <CodeBlock title="Docker Compose">
+            <CodeLine>docker compose up -d db redis</CodeLine>
+            <CodeLine>docker compose ps db redis</CodeLine>
+          </CodeBlock>
           <Prose>
             {t
-              ? "Repo có migration PostgreSQL baseline đã commit. Dùng `migrate deploy` để áp dụng đúng lịch sử schema ở mọi môi trường."
-              : "The repository includes a committed PostgreSQL migration baseline. Use `migrate deploy` to apply the same schema history in every environment."}
+              ? "Đợi hai service healthy. Compose mặc định mở PostgreSQL trên 127.0.0.1:5435 (trong container là 5432), user postgres, database data_explorer, mật khẩu local change-me-local; Redis ở 127.0.0.1:6379. Nếu đã đổi POSTGRES_PASSWORD hoặc dùng volume cũ, dùng mật khẩu thật của database trong DATABASE_URL."
+              : "Wait until both services are healthy. Compose publishes PostgreSQL on 127.0.0.1:5435 (5432 inside the container), with user postgres, database data_explorer and local password change-me-local; Redis is on 127.0.0.1:6379. If you changed POSTGRES_PASSWORD or reuse an older volume, put the database's actual password in DATABASE_URL."}
           </Prose>
-
-          <CodeBlock title="Terminal">
-            <CodeLine>cd server</CodeLine>
-            <CodeLine>npx prisma migrate deploy</CodeLine>
-          </CodeBlock>
         </StepBlock>
 
-        <StepBlock
-          step={4}
-          title={
-            t ? "Chạy backend và frontend" : "Run the backend and frontend"
-          }
-        >
-          <CodeBlock title="Backend">
-            <CodeLine>cd server</CodeLine>
-            <CodeLine>npm run start:dev</CodeLine>
+        <StepBlock step={3} title={t ? "Tạo server/.env và client/.env" : "Create server/.env and client/.env"}>
+          <Prose>
+            {t
+              ? "Tạo server/.env với các giá trị local bên dưới, rồi thêm ba dòng secret do lệnh sinh ngẫu nhiên tạo ra. Không dùng nguyên placeholder trong .env.example; để trống các key OAuth/AI tùy chọn khi chưa cấu hình."
+              : "Create server/.env with the local values below, then add the three secret lines produced by the random-generation command. Do not retain the placeholders from .env.example; leave optional OAuth/AI keys empty until configured."}
+          </Prose>
+          <CodeBlock title="server/.env">
+            <CodeLine>PORT=3001</CodeLine>
+            <CodeLine>NODE_ENV=development</CodeLine>
+            <CodeLine>DATABASE_URL=postgresql://postgres:change-me-local@localhost:5435/data_explorer</CodeLine>
+            <CodeLine>REDIS_URL=redis://localhost:6379</CodeLine>
+            <CodeLine>FRONTEND_URL=http://localhost:5173</CodeLine>
+            <CodeLine>API_PUBLIC_URL=http://localhost:3001/api</CodeLine>
+            <CodeLine>ALLOW_INTERNAL_IPS=false</CodeLine>
+            <CodeLine>ALLOW_INSECURE_DATABASE_TLS=false</CodeLine>
           </CodeBlock>
           <div className="h-4" />
-          <CodeBlock title="Frontend">
-            <CodeLine>cd client</CodeLine>
-            <CodeLine>npm run dev</CodeLine>
+          <CodeBlock title={t ? "Sinh secret — chạy trên máy của bạn" : "Generate secrets — run on your own machine"}>
+            <CodeComment>{t ? "Chép ba dòng đầu ra vào server/.env, không chia sẻ chúng" : "Copy the three output lines into server/.env; do not share them"}</CodeComment>
+            <CodeLine>{`node -e "const { randomBytes } = require('node:crypto'); console.log('JWT_SECRET=' + randomBytes(32).toString('hex')); console.log('REFRESH_TOKEN_SECRET=' + randomBytes(32).toString('hex')); console.log('ENCRYPTION_KEY=' + randomBytes(16).toString('hex'));"`}</CodeLine>
+          </CodeBlock>
+          <Callout type="warning">
+            <p className="text-sm">
+              {t
+                ? "JWT_SECRET cần ít nhất 32 byte UTF-8; ENCRYPTION_KEY cần đúng 32 byte UTF-8, không phải 32 ký tự Unicode hoặc một chuỗi hex dài 64 ký tự. Lệnh trên sinh JWT/refresh secret dài 64 byte ASCII và encryption key dài 32 byte ASCII. Backend từ chối secret thiếu, sai độ dài và một số giá trị mẫu đã biết; đạt độ dài không thay thế yêu cầu ngẫu nhiên và giữ bí mật."
+                : "JWT_SECRET needs at least 32 UTF-8 bytes; ENCRYPTION_KEY needs exactly 32 UTF-8 bytes, not 32 Unicode characters or a 64-character hex string. The command generates 64-byte ASCII JWT/refresh secrets and a 32-byte ASCII encryption key. The backend rejects missing secrets, invalid lengths and known sample values; meeting the length is not a substitute for randomness and secrecy."}
+            </p>
+          </Callout>
+          <CodeBlock title="client/.env">
+            <CodeLine>VITE_API_URL=http://localhost:3001/api</CodeLine>
+          </CodeBlock>
+          <Prose>
+            {t
+              ? "VITE_API_URL thuộc client/.env, không phải server/.env. Vite đọc giá trị khi khởi động/build; khởi động lại frontend sau khi đổi. Các biến VITE_ là cấu hình công khai trong bundle, tuyệt đối không đặt secret vào đó."
+              : "VITE_API_URL belongs in client/.env, not server/.env. Vite reads it at startup/build time; restart the frontend after changing it. VITE_ values are public bundle configuration; never put secrets there."}
+          </Prose>
+        </StepBlock>
+
+        <StepBlock step={4} title={t ? "Tạo Prisma Client và áp dụng migration" : "Generate Prisma Client and deploy migrations"}>
+          <Prose>
+            {t
+              ? "Từ root repo, chạy các dòng sau sau khi metadata database đã healthy và server/.env đã hoàn chỉnh. migrate deploy áp dụng lịch sử migration đã commit; không dùng db push thay cho bước này."
+              : "From the repo root, run these lines after the metadata database is healthy and server/.env is complete. migrate deploy applies the committed migration history; do not substitute db push for this step."}
+          </Prose>
+          <CodeBlock title="Terminal">
+            <CodeLine>cd server</CodeLine>
+            <CodeLine>npx prisma generate</CodeLine>
+            <CodeLine>npx prisma migrate deploy</CodeLine>
+            <CodeLine>cd ..</CodeLine>
           </CodeBlock>
         </StepBlock>
 
-        <StepBlock
-          step={5}
-          title={
-            t
-              ? "Tùy chọn: cấu hình AI trong UI"
-              : "Optional: configure AI in the UI"
-          }
-        >
+        <StepBlock step={5} title={t ? "Khởi động từ root repo" : "Start from the repo root"}>
+          <CodeBlock title="Terminal">
+            <CodeLine>npm run dev</CodeLine>
+          </CodeBlock>
           <Prose>
             {t
-              ? "Sau khi đăng nhập, mở `Hồ sơ > Cấu hình AI` để chọn model riêng cho `AI Assistant`, `Explain`, `AI SQL`, `AI NoSQL`, và `Autocomplete`. Nếu bạn có provider OpenAI-compatible của riêng mình, nhập Base URL + API key rồi bấm `Tải model` để lấy danh sách model; nếu provider không trả catalog, bạn vẫn có thể nhập model thủ công."
-              : "After signing in, open `Profile > Configure AI` to choose separate models for `AI Assistant`, `Explain`, `AI SQL`, `AI NoSQL`, and `Autocomplete`. If you have your own OpenAI-compatible provider, enter its Base URL and API key, then press `Load models` to fetch the model catalog; if the provider does not return a catalog, you can still type the model manually."}
+              ? "Script root chạy NestJS và Vite cùng lúc. Mở http://localhost:5173; API ở http://localhost:3001/api. Nếu cần tách hai terminal, từ root dùng npm run server và npm run client."
+              : "The root script starts NestJS and Vite together. Open http://localhost:5173; the API is at http://localhost:3001/api. To split them into two terminals, use npm run server and npm run client from the root."}
+          </Prose>
+        </StepBlock>
+
+        <StepBlock step={6} title={t ? "Tùy chọn: cấu hình AI trong UI" : "Optional: configure AI in the UI"}>
+          <Prose>
+            {t
+              ? "Sau khi đăng nhập, mở Hồ sơ > Cấu hình AI để chọn model cho Assistant, Explain, AI SQL, AI NoSQL và Autocomplete. Provider OpenAI-compatible tùy chỉnh được lưu ở server theo từng người dùng, API key mã hóa trước khi lưu; lựa chọn model theo vai trò được lưu cục bộ trong trình duyệt. AI không bắt buộc để kết nối và chạy query."
+              : "After signing in, open Profile > Configure AI to select models for Assistant, Explain, AI SQL, AI NoSQL and Autocomplete. Custom OpenAI-compatible provider records are saved per user on the server, with encrypted API keys; per-role model preferences are stored locally in the browser. AI is not required to connect and run queries."}
+          </Prose>
+          <Prose>
+            <a href={publicPath(lang, '/docs/data-handling')}>{t ? "Đọc phạm vi dữ liệu được gửi tới AI trước khi bật." : "Read what data can be sent to AI before enabling it."}</a>
           </Prose>
         </StepBlock>
       </DocSection>
 
-      <DocSection title={t ? "Chạy từ root repo" : "Run from the repo root"}>
+      <DocSection title={t ? "Chạy toàn bộ bằng Docker" : "Run the full stack with Docker"}>
         <Prose>
           {t
-            ? "Nếu muốn bật toàn bộ stack development bằng một lệnh, root repo đã có script `npm run dev`. Lưu ý: script này chỉ hoạt động khi `server/node_modules` và `client/node_modules` đã được cài trước."
-            : "If you want to boot the whole development stack with one command, the repo root already provides `npm run dev`. Note that this works only after `server/node_modules` and `client/node_modules` have already been installed."}
+            ? "Sau khi chuẩn bị server/.env với secret thật, lệnh sau build và chạy toàn bộ stack. Service migrate áp dụng migration trước backend. Compose dùng db:5432 và redis:6379 nội bộ, ghi đè FRONTEND_URL thành http://localhost, và build frontend với API local 3001."
+            : "After preparing server/.env with real secrets, this command builds and starts the full stack. The migrate service runs before the backend. Compose uses db:5432 and redis:6379 internally, overrides FRONTEND_URL to http://localhost, and builds the frontend with the local API on 3001."}
         </Prose>
-
-        <CodeBlock title="Terminal">
-          <CodeLine>npm run dev</CodeLine>
+        <CodeBlock title="Docker Compose">
+          <CodeLine>docker compose up --build -d</CodeLine>
         </CodeBlock>
+        <Callout type="info">
+          <p className="text-sm">
+            {t
+              ? "Frontend Docker ở http://localhost (cổng 80), không phải Vite 5173. Không chạy hai backend cùng chiếm cổng 3001. Mật khẩu change-me-local chỉ là mặc định local; thay secret/mật khẩu và origin trước khi triển khai ngoài máy của bạn."
+              : "The Docker frontend is at http://localhost (port 80), not Vite 5173. Do not run two backends competing for port 3001. change-me-local is only a local default; change secrets/passwords and origins before deploying beyond your own machine."}
+          </p>
+        </Callout>
       </DocSection>
 
-      <DocSection title={t ? "Docker notes" : "Docker notes"}>
-        <Prose>
-          {t
-            ? "Docker phù hợp khi bạn muốn metadata database cục bộ ổn định hoặc không muốn cài PostgreSQL trực tiếp trên máy. Compose tự chạy `prisma migrate deploy`; dependency của `server` và `client` vẫn nên được cài riêng nếu bạn chạy dev ngoài container."
-            : "Docker is a good fit if you want a stable local metadata database or do not want to install PostgreSQL directly. Compose runs `prisma migrate deploy` automatically; install `server` and `client` dependencies separately when developing outside containers."}
-        </Prose>
-
-        <CodeBlock title="Docker">
-          <CodeLine>docker-compose up --build -d</CodeLine>
-        </CodeBlock>
-      </DocSection>
-
-      <DocSection
-        title={t ? "Các địa chỉ local quan trọng" : "Important local URLs"}
-      >
+      <DocSection title={t ? "Các địa chỉ local quan trọng" : "Important local URLs"}>
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-border/50 bg-card/40 p-4">
-            <div className="flex items-center gap-2 text-sm font-bold">
-              <Globe className="h-4 w-4 text-blue-500" />
-              Frontend
-            </div>
-            <div className="mt-2 font-mono text-xs text-muted-foreground">
-              http://localhost:5173
-            </div>
+            <div className="flex items-center gap-2 text-sm font-bold"><Globe className="h-4 w-4 text-blue-500" />Frontend</div>
+            <div className="mt-2 font-mono text-xs text-muted-foreground">Vite: http://localhost:5173<br />Docker: http://localhost</div>
           </div>
           <div className="rounded-2xl border border-border/50 bg-card/40 p-4">
-            <div className="flex items-center gap-2 text-sm font-bold">
-              <Terminal className="h-4 w-4 text-emerald-500" />
-              API
-            </div>
-            <div className="mt-2 font-mono text-xs text-muted-foreground">
-              http://localhost:3001/api
-            </div>
+            <div className="flex items-center gap-2 text-sm font-bold"><Terminal className="h-4 w-4 text-emerald-500" />API</div>
+            <div className="mt-2 font-mono text-xs text-muted-foreground">http://localhost:3001/api</div>
           </div>
           <div className="rounded-2xl border border-border/50 bg-card/40 p-4">
-            <div className="flex items-center gap-2 text-sm font-bold">
-              <Database className="h-4 w-4 text-amber-500" />
-              Health
-            </div>
-            <div className="mt-2 font-mono text-xs text-muted-foreground">
-              http://localhost:3001/api/health
-            </div>
+            <div className="flex items-center gap-2 text-sm font-bold"><Database className="h-4 w-4 text-amber-500" />{t ? "Sẵn sàng" : "Readiness"}</div>
+            <div className="mt-2 font-mono text-xs text-muted-foreground">http://localhost:3001/api/health/ready</div>
           </div>
         </div>
       </DocSection>
@@ -250,26 +201,14 @@ export function InstallationSection({ lang }: Props) {
       <Callout type="warning">
         <p className="text-sm">
           {t
-            ? "Nếu backend không khởi động được sau khi sửa env, hãy kiểm tra `JWT_SECRET` và `ENCRYPTION_KEY` trước. Backend hiện fail-closed nếu secret yếu hoặc sai format. Nếu bạn đang dùng DB cloud, hãy nhớ local/network có thể chặn các cổng database như 5432, 3306, hoặc 27017."
-            : "If the backend refuses to start after env changes, check `JWT_SECRET` and `ENCRYPTION_KEY` first. The backend now fails closed when secrets are weak or wrongly formatted. If you use a cloud database, remember that local networks can block database ports such as 5432, 3306, or 27017."}
+            ? "Nếu backend không khởi động, kiểm tra Node 22, secret theo byte UTF-8, DATABASE_URL đúng mật khẩu/cổng 5435, Redis và migration trước. Localhost trong URL target database là máy chạy backend, không phải máy của người dùng web."
+            : "If the backend does not start, check Node 22, UTF-8 secret lengths, the DATABASE_URL password/port 5435, Redis and migrations first. Localhost in a target database URL means the backend host, not the web user's machine."}
         </p>
       </Callout>
-
-      <Callout type="info">
-        <p className="text-sm">
-          {t
-            ? "Production build image một lần, chạy `npx prisma migrate deploy` trước khi start, và chỉ nhận traffic sau khi `/api/health/ready` xác nhận database cùng Redis đều sẵn sàng."
-            : "Build the production image once, run `npx prisma migrate deploy` before startup, and accept traffic only after `/api/health/ready` confirms both the database and Redis are ready."}
-        </p>
-      </Callout>
-
-      <Callout type="tip">
-        <p className="text-sm">
-          {t
-            ? "Lưu ý về timeout AI: code fallback và example file trong repo hiện đều dùng `90000ms`. Nếu local/dev của bạn cần fail nhanh hơn để debug, hãy chủ động hạ riêng giá trị này."
-            : "AI timeout note: the code fallback and the example files in the repo now both use `90000ms`. If you want local/dev to fail faster while debugging, lower that value explicitly for your environment."}
-        </p>
-      </Callout>
+      <Prose>
+        <a href={publicPath(lang, '/docs/env-vars')}>{t ? "Tham chiếu biến môi trường" : "Environment variable reference"}</a>{' · '}
+        <a href={publicPath(lang, '/docs/first-query')}>{t ? "Truy vấn đầu tiên" : "First query"}</a>
+      </Prose>
     </DocPageLayout>
   );
 }

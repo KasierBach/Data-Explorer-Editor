@@ -1,114 +1,81 @@
-import React from 'react';
-import { DocPageLayout } from './primitives';
+import type { ReactElement } from 'react';
+import { getDocTopic, type DocTopicId } from '@/core/docs/docsCatalog';
+import { DocPageLayout, Prose } from './primitives';
 import {
-    AggregationBuilderSection,
-    AiServiceSection,
-    ArchitectureSection,
-    AuthenticationSection,
-    BillingSection,
-    ChartsSection,
-    CleanCodeSection,
-    ConnectionSection,
-    DeploymentSection,
-    EditorSection,
-    EnvVarsSection,
-    ErdSection,
-    ExplainSection,
-    ExportSection,
-    FaqSection,
-    InstallationSection,
-    IntroductionSection,
-    LifecycleSection,
-    UiTourSection,
-    NoSqlInsightsSection,
-    NoSqlStudioSection,
-    PrerequisitesSection,
-    RedisSection,
-    ResultsSection,
-    SecuritySection,
-    SqlGenerationSection,
-    TabsSection,
-    TeamWorkspaceSection,
-    TechStackSection,
-    TestingSection,
-    VisionSection,
+    AggregationBuilderSection, AiServiceSection, ArchitectureSection, AuthenticationSection,
+    BillingSection, ChartsSection, CleanCodeSection, ConnectionSection, DeploymentSection,
+    EditorSection, EnvVarsSection, ErdSection, ExplainSection, ExportSection, FaqSection,
+    InstallationSection, IntroductionSection, LifecycleSection, UiTourSection, NoSqlInsightsSection,
+    NoSqlStudioSection, PrerequisitesSection, RedisSection, ResultsSection, SecuritySection,
+    SqlGenerationSection, TabsSection, TeamWorkspaceSection, TechStackSection, TestingSection, VisionSection,
+    FirstQuerySection, SqliteConnectionSection, ClickHouseConnectionSection, DatabaseCapabilitiesSection,
+    OperationalLimitsSection, MigrationSection, DataHandlingSection,
 } from './sections';
+
+type DocLanguage = 'vi' | 'en';
+type DocRenderer = (props: { lang: DocLanguage }) => ReactElement;
+
+/** Exhaustive presentation registry: catalog/SEO never import section components. */
+export const DOC_RENDERERS = {
+    introduction: IntroductionSection,
+    'first-query': FirstQuerySection,
+    'ui-tour': UiTourSection,
+    installation: InstallationSection,
+    prerequisites: PrerequisitesSection,
+    'env-vars': EnvVarsSection,
+    postgres: ({ lang }) => <ConnectionSection lang={lang} engine="postgres" />,
+    mysql: ({ lang }) => <ConnectionSection lang={lang} engine="mysql" />,
+    mariadb: ({ lang }) => <ConnectionSection lang={lang} engine="mariadb" />,
+    cockroach: ({ lang }) => <ConnectionSection lang={lang} engine="cockroach" />,
+    mssql: ({ lang }) => <ConnectionSection lang={lang} engine="mssql" />,
+    mongodb: ({ lang }) => <ConnectionSection lang={lang} engine="mongodb" />,
+    sqlite: SqliteConnectionSection,
+    clickhouse: ClickHouseConnectionSection,
+    'database-capabilities': DatabaseCapabilitiesSection,
+    'nosql-studio': NoSqlStudioSection,
+    'aggregation-builder': AggregationBuilderSection,
+    'nosql-insights': NoSqlInsightsSection,
+    editor: EditorSection,
+    tabs: TabsSection,
+    results: ResultsSection,
+    export: ExportSection,
+    'ai-service': AiServiceSection,
+    'sql-generation': SqlGenerationSection,
+    vision: VisionSection,
+    explain: ExplainSection,
+    erd: ErdSection,
+    charts: ChartsSection,
+    'team-workspace': TeamWorkspaceSection,
+    'data-migration': MigrationSection,
+    authentication: AuthenticationSection,
+    billing: BillingSection,
+    architecture: ArchitectureSection,
+    'tech-stack': TechStackSection,
+    redis: RedisSection,
+    security: SecuritySection,
+    'operational-limits': OperationalLimitsSection,
+    'data-handling': DataHandlingSection,
+    deployment: DeploymentSection,
+    testing: TestingSection,
+    'clean-code': CleanCodeSection,
+    lifecycle: LifecycleSection,
+    faq: FaqSection,
+} satisfies Record<DocTopicId, DocRenderer>;
 
 interface DocContentProps {
     sectionId: string;
-    lang: 'vi' | 'en';
+    lang: DocLanguage;
 }
 
 export function DocContent({ sectionId, lang }: DocContentProps) {
-    const t = lang === 'vi';
-
-    const sectionMap: Record<string, React.ReactNode> = {
-        introduction: <IntroductionSection lang={lang} />,
-        'ui-tour': <UiTourSection lang={lang} />,
-        installation: <InstallationSection lang={lang} />,
-        prerequisites: <PrerequisitesSection lang={lang} />,
-        'env-vars': <EnvVarsSection lang={lang} />,
-
-        postgres: <ConnectionSection lang={lang} engine="postgres" />,
-        mysql: <ConnectionSection lang={lang} engine="mysql" />,
-        mariadb: <ConnectionSection lang={lang} engine="mariadb" />,
-        cockroach: <ConnectionSection lang={lang} engine="cockroach" />,
-        mssql: <ConnectionSection lang={lang} engine="mssql" />,
-        mongodb: <ConnectionSection lang={lang} engine="mongodb" />,
-
-        'nosql-studio': <NoSqlStudioSection lang={lang} />,
-        'aggregation-builder': <AggregationBuilderSection lang={lang} />,
-        'nosql-insights': <NoSqlInsightsSection lang={lang} />,
-
-        editor: <EditorSection lang={lang} />,
-        tabs: <TabsSection lang={lang} />,
-        results: <ResultsSection lang={lang} />,
-        export: <ExportSection lang={lang} />,
-
-        'ai-service': <AiServiceSection lang={lang} />,
-        'sql-generation': <SqlGenerationSection lang={lang} />,
-        vision: <VisionSection lang={lang} />,
-        explain: <ExplainSection lang={lang} />,
-
-        erd: <ErdSection lang={lang} />,
-        charts: <ChartsSection lang={lang} />,
-
-        'team-workspace': <TeamWorkspaceSection lang={lang} />,
-        authentication: <AuthenticationSection lang={lang} />,
-        billing: <BillingSection lang={lang} />,
-
-        architecture: <ArchitectureSection lang={lang} />,
-        'tech-stack': <TechStackSection lang={lang} />,
-        redis: <RedisSection lang={lang} />,
-        security: <SecuritySection lang={lang} />,
-        deployment: <DeploymentSection lang={lang} />,
-        testing: <TestingSection lang={lang} />,
-        'clean-code': <CleanCodeSection lang={lang} />,
-        lifecycle: <LifecycleSection lang={lang} />,
-        faq: <FaqSection lang={lang} />,
-    };
-
-    const content = sectionMap[sectionId];
-
-    if (content) {
-        return <>{content}</>;
+    const topic = getDocTopic(sectionId);
+    if (!topic) {
+        return (
+            <DocPageLayout title={lang === 'vi' ? 'Không tìm thấy tài liệu' : 'Documentation not found'} subtitle={lang === 'vi' ? 'Mục này không có trong danh mục tài liệu.' : 'This topic is not in the documentation catalog.'}>
+                <Prose>{lang === 'vi' ? 'Chọn một mục trong menu tài liệu để tiếp tục.' : 'Choose a topic in the documentation navigation to continue.'}</Prose>
+            </DocPageLayout>
+        );
     }
-
-    return (
-        <DocPageLayout
-            title={t ? 'Đang cập nhật' : 'Coming Soon'}
-            subtitle={t
-                ? 'Nội dung của phần này đang được hoàn thiện để bám sát codebase và trải nghiệm sản phẩm hiện tại.'
-                : 'This section is being expanded so it can stay aligned with the live codebase and product experience.'}
-        >
-            <div className="flex flex-col items-center justify-center p-12 text-center h-64 border-2 border-dashed border-muted rounded-3xl bg-muted/5">
-                <span className="text-4xl mb-4">🚧</span>
-                <p className="text-muted-foreground max-w-md">
-                    {t
-                        ? 'Phần này chưa có nội dung hiển thị tương ứng. Hãy quay lại sidebar để chọn một mục đã được tài liệu hóa.'
-                        : 'There is no mapped content for this section yet. Use the sidebar to return to a documented page.'}
-                </p>
-            </div>
-        </DocPageLayout>
-    );
+    const Renderer = DOC_RENDERERS[topic.id];
+    return <div data-doc-topic={topic.id} data-doc-lang={lang}><Renderer lang={lang} /></div>;
 }

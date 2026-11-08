@@ -10,6 +10,7 @@ describe('CodeBlock keyboard scrolling', () => {
         expect(block).toHaveClass('overflow-x-auto', 'bg-slate-950', 'font-mono', 'focus-visible:ring-2');
         expect(screen.getByText('Local setup')).toHaveClass('text-slate-400');
         expect(screen.getByText('npm run dev')).toBeInTheDocument();
+        expect(screen.getByRole('code')).toHaveClass('doc-code-lines');
         block.focus();
         expect(block).toHaveFocus();
     });

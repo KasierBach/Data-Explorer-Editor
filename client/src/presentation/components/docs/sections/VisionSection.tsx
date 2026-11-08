@@ -6,6 +6,7 @@ import {
   FeatureGrid,
   InfoCard,
 } from "../primitives";
+import { publicPath } from "@/core/seo/publicRoutes";
 
 interface Props {
   lang: "vi" | "en";
@@ -62,8 +63,8 @@ export function VisionSection({ lang }: Props) {
         >
           <p>
             {t
-              ? "Không phải mọi lane AI trong app đều hiểu ảnh. Chỉ những lane được repo đánh dấu là vision-capable mới được dùng cho prompt có attachment."
-              : "Not every AI lane in the app can understand images. Only the lanes that the repo marks as vision-capable are allowed to handle attachment-based prompts."}
+              ? "Không phải mọi attachment đều là ảnh. Ảnh cần capability vision; PDF gửi nguyên tệp cần capability document (nhãn PDF trong catalog). Text trích xuất từ tài liệu đi theo đường text, không tự tạo khả năng đọc ảnh hay PDF gốc."
+              : "Not every attachment is an image. Images require vision capability; a PDF sent as a native file requires document capability (the PDF catalog badge). Extracted document text uses the text path and does not imply image or native-PDF support."}
           </p>
         </InfoCard>
       </FeatureGrid>
@@ -135,8 +136,8 @@ export function VisionSection({ lang }: Props) {
       <DocSection
         title={
           t
-            ? "Provider vision nào đang đáng tin trong repo hiện tại?"
-            : "Which vision providers are trustworthy in the current repo?"
+            ? "Provider nào có đường xử lý ảnh trong app?"
+            : "Which providers have an image path in the app?"
         }
       >
         <div className="grid gap-4 md:grid-cols-3">
@@ -144,8 +145,8 @@ export function VisionSection({ lang }: Props) {
             <h3 className="text-sm font-bold">Gemini</h3>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               {t
-                ? "Lane vision mặc định mạnh nhất và ổn định nhất trong repo hiện tại. Đây là lựa chọn an toàn khi bạn muốn quality cao hơn cho ảnh."
-                : "The strongest and most stable default vision lane in the current repo. This is the safe choice when image quality matters more."}
+                ? "Gemini được đánh dấu vision và document cho PDF gốc. Model phải có sẵn với API key/quota của deployment; capability không phải cam kết đọc ảnh chính xác hay uptime tuyệt đối."
+                : "Gemini is marked for image vision and native-PDF document input. The model must be available with the deployment’s API key/quota; capability is not a guarantee of perfect image reading or uptime."}
             </p>
           </div>
           <div className="rounded-2xl border border-border/60 bg-card/40 p-5">
@@ -154,6 +155,14 @@ export function VisionSection({ lang }: Props) {
               {t
                 ? "Có thể đi đường vision nếu model bạn chọn thật sự hỗ trợ ảnh. Vì OpenRouter là multi-model lane, khả năng này phụ thuộc model cụ thể chứ không chỉ phụ thuộc provider."
                 : "Can serve as a vision path when the chosen model truly supports images. Because OpenRouter is a multi-model lane, the capability depends on the selected model rather than the provider label alone."}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border/60 bg-card/40 p-5">
+            <h3 className="text-sm font-bold">Groq / Beeknoee / Custom</h3>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {t
+                ? "Groq chỉ nhận ảnh với Qwen qwen3.6-27b khớp capability. Beeknoee nhận ảnh với model khớp Gemini/Bee Gemini, MiniMax hoặc Claude, không phải GLM. Custom provider cần bật vision và endpoint thực sự hỗ trợ ảnh; flag document dành riêng cho PDF gốc."
+                : "Groq accepts images only with its matching Qwen qwen3.6-27b model. Beeknoee image support matches Gemini/Bee Gemini, MiniMax, or Claude models, not GLM. A custom provider needs vision enabled and actual image support at its endpoint; document is a separate flag for native PDFs."}
             </p>
           </div>
         </div>
@@ -187,8 +196,8 @@ export function VisionSection({ lang }: Props) {
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               {t
-                ? "Gắn ảnh không đồng nghĩa với việc model bỗng có internet. Vision và live search là hai capability khác nhau. Một lane có thể đọc ảnh tốt nhưng vẫn không có quyền trả lời theo web thời gian thực."
-                : "Attaching an image does not magically give the model internet access. Vision and live search are different capabilities. A lane can read images well and still be unable to answer with real-time web data."}
+                ? "Vision và live web search là capability khác nhau. Web hiện được wiring cho Gemini, OpenRouter và Groq Compound/Compound Mini; Qwen Vision, Beeknoee và custom provider không tự được coi là web lane. Có ảnh không đồng nghĩa có internet."
+                : "Vision and live web search are separate capabilities. Web is currently wired for Gemini, OpenRouter, and Groq Compound/Compound Mini; Qwen Vision, Beeknoee, and custom providers are not automatically web lanes. An image does not imply internet access."}
             </p>
           </div>
           <div className="rounded-2xl border border-border/60 bg-card/40 p-5">
@@ -247,14 +256,48 @@ export function VisionSection({ lang }: Props) {
         </div>
       </DocSection>
 
+      <DocSection title={t ? "Giới hạn attachment và ngữ cảnh" : "Attachment and context limits"}>
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            {
+              title: t ? "Ảnh và PDF gốc" : "Images and native PDFs",
+              desc: t
+                ? "UI cho phép nhiều attachment nhưng chỉ ảnh đầu tiên và PDF đầu tiên có dữ liệu gốc đi vào đường native. Ảnh thêm chỉ gửi ghi chú; PDF thêm hoặc PDF trên 5 MiB (5 × 1.024 × 1.024 byte) dùng text trích xuất. Ngưỡng 5 MiB được kiểm tra cho PDF gốc phía client, không phải giới hạn upload ảnh được bảo đảm; ảnh còn chịu giới hạn body JSON chung. Native PDF cần document, không dùng vision thay thế."
+                : "The UI allows multiple attachments, but only the first image and first PDF with raw data reach native input. Extra images send only notes; extra PDFs or PDFs above 5 MiB (5 × 1,024 × 1,024 bytes) use extracted text. The client checks that 5 MiB threshold for native PDFs, not as a guaranteed image-upload ceiling; images are subject to the overall JSON body limit. Native PDFs require document, not a substitute vision flag.",
+            },
+            {
+              title: t ? "Text trích xuất và body" : "Extracted text and body size",
+              desc: t
+                ? "Text trích xuất từ mỗi PDF/tệp text được cắt ở 50.000 ký tự trước khi thêm ghi chú. Body JSON server giới hạn 10 MiB (10.485.760 byte); base64 tăng kích thước nên ảnh và PDF gần 5 MiB mỗi tệp vẫn có thể vượt body khi gửi chung lịch sử/schema."
+                : "Extracted text from each PDF/text file is clipped at 50,000 characters before annotations. The server JSON body limit is 10 MiB (10,485,760 bytes); base64 increases size, so an image and PDF near 5 MiB each can exceed the body limit together with history/schema.",
+            },
+            {
+              title: t ? "Lịch sử và schema" : "History and schema",
+              desc: t
+                ? "Request dùng tối đa 20 message/24.000 ký tự lịch sử và 24 bảng/32.000 ký tự schema. Đây là phần ngữ cảnh gửi model, không phải cam kết AI nhớ toàn bộ cuộc hội thoại hoặc chính sách xóa dữ liệu."
+                : "Requests use up to 20 messages/24,000 history characters and 24 tables/32,000 schema characters. This bounds context sent to the model, not a promise to remember the entire chat or a deletion policy.",
+            },
+          ].map((item) => (
+            <div key={item.title} className="rounded-2xl border border-border/60 bg-card/40 p-5">
+              <h3 className="text-sm font-bold">{item.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </DocSection>
+
       <Callout type="warning">
         <p className="font-bold">
-          {t ? "Cần lane có vision thật" : "A true vision lane is required"}
+          {t ? "Capability và lưu trữ là hai vấn đề khác nhau" : "Capability and retention are separate concerns"}
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
           {t
-            ? "Để dùng ảnh đính kèm trong trạng thái wiring hiện tại, bạn cần ít nhất một trong các cấu hình sau: `GEMINI_API_KEY` hoặc `OPENROUTER_API_KEY`. Nếu không có lane vision-capable, app sẽ từ chối tác vụ ảnh."
-            : "To use image attachments with the current wiring, you need at least one of: `GEMINI_API_KEY` or `OPENROUTER_API_KEY`. Without a vision-capable lane, the app rejects image-based tasks."}
+            ? "Cần provider đã cấu hình và model/flag khớp capability; thiếu capability có thể khiến request bị từ chối. Chat và dữ liệu attachment được lưu trong metastore, không có TTL chat tự động. Delete chat cascade tới message của chat; giới hạn ngữ cảnh không xóa bản lưu hoặc dữ liệu ở provider ngoài."
+            : "A configured provider and matching model/flag are required; missing capability can cause rejection. Chats and attachment data persist in the metastore with no automatic chat TTL. Delete chat cascades to its messages; context limits do not delete stored data or external-provider copies."}
+          {" "}
+          <a href={publicPath(lang, "/docs/data-handling")}>
+            {t ? "Xem xử lý dữ liệu và lưu trữ." : "See data handling and retention."}
+          </a>
         </p>
       </Callout>
 

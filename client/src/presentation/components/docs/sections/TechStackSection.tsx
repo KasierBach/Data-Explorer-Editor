@@ -1,4 +1,6 @@
 import { DocPageLayout, DocSection, Callout } from "../primitives";
+import { getAssistantModelCatalog } from "@/presentation/modules/Query/assistantModelCatalog";
+import { publicPath } from "@/core/seo/publicRoutes";
 
 interface Props {
   lang: "vi" | "en";
@@ -16,6 +18,14 @@ export function TechStackSection({ lang }: Props) {
           : "Overview of the frameworks, runtimes, drivers, and AI lanes actually used in Data Explorer today."
       }
     >
+      <Callout type="info">
+        <p className="text-muted-foreground">
+          {t
+            ? "Các phiên bản dưới đây phản ánh manifest và lockfile hiện tại, không phải cam kết luôn dùng bản mới nhất. Node.js 22 được dùng trong Docker và CI; phạm vi capability theo engine nằm ở "
+            : "These versions reflect the current manifests and lockfiles, not a promise to always use the latest release. Docker and CI use Node.js 22; engine capability differences are documented in "}
+          <a className="text-primary hover:underline" href={publicPath(lang, '/docs/database-capabilities')}>{t ? "ma trận database" : "the database matrix"}</a>.
+        </p>
+      </Callout>
       <DocSection title={t ? "Frontend" : "Frontend"}>
         <div className="border rounded-2xl overflow-hidden">
           <table className="w-full text-sm">
@@ -171,7 +181,7 @@ export function TechStackSection({ lang }: Props) {
                 },
                 {
                   tech: "pg / mysql2 / mssql",
-                  ver: "8.18 / 3.16 / 12.2",
+                  ver: "8.18 / 3.24 / 12.2",
                   role: t
                     ? "Native database drivers cho SQL execution linh hoạt."
                     : "Native database drivers for flexible SQL execution.",
@@ -238,15 +248,15 @@ export function TechStackSection({ lang }: Props) {
                   tech: "Docker",
                   provider: "Containerization",
                   role: t
-                    ? "Đóng gói toàn bộ ecosystem để triển khai một chạm."
-                    : "Packaging the entire ecosystem for one-click deployment.",
+                    ? "Build image và Compose baseline local; production vẫn cần cấu hình secret, mạng, TLS và migration."
+                    : "Image builds and a local Compose baseline; production still needs secrets, networking, TLS, and migrations configured.",
                 },
                 {
                   tech: "Nginx",
                   provider: "In Docker stack",
                   role: t
-                    ? "Reverse proxy và phục vụ frontend static files."
-                    : "Reverse proxy and serving frontend static files.",
+                    ? "Phục vụ frontend static và SPA fallback trong image client; cấu hình này không proxy /api tới backend."
+                    : "Serves frontend static files and SPA fallback in the client image; this configuration does not proxy /api to the backend.",
                 },
               ].map((row, i) => (
                 <tr key={i} className="hover:bg-muted/20 transition-colors">
@@ -277,50 +287,17 @@ export function TechStackSection({ lang }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {[
-                {
-                  service: "Gemini default high-quality lane",
-                  model:
-                    "gemini-3.5-flash / gemini-3.1-pro-preview / gemini-2.5-flash",
-                  role: t
-                    ? "Lane mặc định mạnh nhất cho reasoning, attachment-aware work, và các request cần độ ổn định cao."
-                    : "The strongest default lane for reasoning, attachment-aware work, and requests that need higher reliability.",
-                },
-                {
-                  service: "OpenRouter default auto lane",
-                  model: "Env default hoặc model explicit từ catalog",
-                  role: t
-                    ? "Lane linh hoạt cho auto chain mặc định, một phần vision flow, và web-backed search tùy model."
-                    : "The flexible lane behind the default auto chain, part of the vision flow, and some web-backed search paths depending on the model.",
-                },
-                {
-                  service: "Groq fast lane",
-                  model: "Llama 4 Scout / Llama 3.3 70B / Mixtral",
-                  role: t
-                    ? "Lane độ trễ thấp cho chat nhanh và iteration ngắn."
-                    : "The low-latency lane for rapid chat and short iteration loops.",
-                },
-                {
-                  service: "Cerebras low-cost lane",
-                  model: "Env-configured text model",
-                  role: t
-                    ? "Lane chi phí thấp hơn cho prompt nhẹ, không phải đường chính cho vision hoặc live search."
-                    : "A lower-cost lane for lighter prompts, not the main path for vision or live search.",
-                },
-                {
-                  service: "Beeknoee explicit lane",
-                  model: "GLM 4.7 Flash / Qwen 3 235B / MiniMax M2.7",
-                  role: t
-                    ? "Provider explicit từ model catalog khi bạn muốn khóa model cụ thể thay vì chỉ dựa vào fallback mặc định."
-                    : "An explicit provider from the model catalog when you want to lock to a concrete model instead of relying on default fallback.",
-                },
-              ].map((row, i) => (
-                <tr key={i} className="hover:bg-muted/20 transition-colors">
-                  <td className="p-4 font-bold">{row.service}</td>
+              {getAssistantModelCatalog().map((group) => (
+                <tr key={group.group} className="hover:bg-muted/20 transition-colors">
+                  <td className="p-4 font-bold">{group.group}</td>
                   <td className="p-4 font-mono text-primary font-bold text-xs">
-                    {row.model}
+                    {group.items.slice(0, 3).map((model) => model.label).join(" / ")}
                   </td>
-                  <td className="p-4 text-muted-foreground">{row.role}</td>
+                  <td className="p-4 text-muted-foreground">
+                    {t
+                      ? "Ví dụ từ catalog UI hiện tại; khả dụng và capability còn phụ thuộc cấu hình/provider."
+                      : "Examples from the current UI catalog; availability and capabilities also depend on provider configuration."}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -376,17 +353,17 @@ export function TechStackSection({ lang }: Props) {
                 },
                 {
                   tech: "ts-jest",
-                  ver: "29.2.x",
+                  ver: "29.4.6 (lockfile; manifest ^29.2.5)",
                   role: t
                     ? "TypeScript transform cho backend test suite."
                     : "TypeScript transform for the backend test suite.",
                 },
                 {
                   tech: "fast-check",
-                  ver: "4.x",
+                  ver: t ? "3.23.2 (phụ thuộc gián tiếp)" : "3.23.2 (transitive)",
                   role: t
-                    ? "Property-based fuzzing sinh hàng nghìn input ngẫu nhiên cho SQL/NoSQL guard và SSRF validator."
-                    : "Property-based fuzzing generating thousands of randomized inputs against the SQL/NoSQL guards and SSRF validator.",
+                    ? "Được một số adversarial/property-based tests import nhưng hiện chỉ có trong lockfile backend như phụ thuộc gián tiếp, không được khai báo trực tiếp trong manifest."
+                    : "Imported by some adversarial/property-based tests, but currently present only as a transitive backend lockfile dependency, not a direct manifest declaration.",
                 },
                 {
                   tech: t ? "Pentest suites (Jest)" : "Pentest suites (Jest)",
@@ -397,10 +374,10 @@ export function TechStackSection({ lang }: Props) {
                 },
                 {
                   tech: "Playwright",
-                  ver: "1.5x",
+                  ver: "1.61.x",
                   role: t
-                    ? "E2E đa trình duyệt (Chromium + Firefox) cho checkout, billing return và responsive workspace."
-                    : "Multi-browser E2E (Chromium + Firefox) covering checkout, billing return, and the responsive workspace.",
+                    ? "Browser E2E trong e2e và full-stack; cấu hình có Chromium, Firefox và mobile WebKit/Chrome tùy suite."
+                    : "Browser E2E under e2e and full-stack; the configurations include Chromium, Firefox, and mobile WebKit/Chrome depending on the suite.",
                 },
                 {
                   tech: "Trivy + SBOM",

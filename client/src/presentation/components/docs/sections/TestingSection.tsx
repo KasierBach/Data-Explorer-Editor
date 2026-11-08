@@ -1,167 +1,48 @@
 import { Beaker, FlaskConical, Github, CheckCircle, Terminal, ShieldCheck } from 'lucide-react';
-import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, CodeBlock, CodeComment, CodeLine } from '../primitives';
+import { publicPath } from '@/core/seo/publicRoutes';
+import { DocPageLayout, DocSection, Prose, InfoCard, FeatureGrid, CodeBlock, CodeLine, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
 
 export function TestingSection({ lang }: Props) {
     const t = lang === 'vi';
-
     return (
-        <DocPageLayout
-            title={t ? 'Kiểm thử & Đóng góp' : 'Testing & Contribution'}
-            subtitle={t
-                ? 'Cách chúng tôi đảm bảo chất lượng phần mềm thông qua các bài kiểm tra tự động và quy trình đóng góp mã nguồn (Pull Request).'
-                : 'How we ensure software quality through automated tests and the contribution process (Pull Request).'}
-        >
+        <DocPageLayout title={t ? 'Kiểm thử & đóng góp' : 'Testing & contribution'} subtitle={t ? 'Các lớp kiểm thử hiện có, lệnh chạy đúng workspace và cách đóng góp một thay đổi có bằng chứng hồi quy.' : 'Existing test layers, package-scoped commands, and how to contribute a change with regression evidence.'}>
             <FeatureGrid>
-                <InfoCard icon={<Beaker className="w-6 h-6 text-orange-500" />} title="Backend Testing" color="blue">
-                    <p>
-                        {t
-                            ? 'Sử dụng Jest cho Unit Tests và Integration Tests. Toàn bộ logic nghiệp vụ (Use Cases) đều được bao phủ để tránh lỗi hồi quy.'
-                            : 'Using Jest for Unit and Integration Tests. All business logic (Use Cases) is covered to prevent regressions.'}
-                    </p>
-                </InfoCard>
-                <InfoCard icon={<FlaskConical className="w-6 h-6 text-indigo-500" />} title="Frontend Testing" color="purple">
-                    <p>
-                        {t
-                            ? 'Sử dụng Vitest kết hợp React Testing Library để kiểm tra các component UI và luồng xử lý trạng thái (Zustand).'
-                            : 'Using Vitest with React Testing Library to verify UI components and state management (Zustand).'}
-                    </p>
-                </InfoCard>
-                <InfoCard icon={<CheckCircle className="w-6 h-6 text-emerald-500" />} title="Guardrails" color="emerald">
-                    <p>
-                        {t
-                            ? 'Mọi thay đổi nhạy cảm đều phải vượt qua các bài kiểm thử AI (ai.service.spec.ts) để đảm bảo không làm vỡ luồng routing.'
-                            : 'Sensitive changes must pass AI tests (ai.service.spec.ts) to ensure the routing engine remains intact.'}
-                    </p>
-                </InfoCard>
+                <InfoCard icon={<Beaker className="w-6 h-6" />} title="Backend / Jest" color="blue"><p>{t ? 'Unit tests nằm rải trong server/src, gồm service/controller/strategy/guard specs. Native integration suites ở server/test dùng fixture PostgreSQL/Redis/MongoDB/MySQL riêng.' : 'Unit tests are colocated throughout server/src, including services, controllers, strategies, and guards. Native integration suites in server/test use dedicated PostgreSQL/Redis/MongoDB/MySQL fixtures.'}</p></InfoCard>
+                <InfoCard icon={<FlaskConical className="w-6 h-6" />} title="Client / Vitest" color="purple"><p>{t ? 'Vitest + Testing Library kiểm tra component, hooks và services. Pool vmThreads hỗ trợ Windows paths có khoảng trắng; không đổi pool để chữa test failure.' : 'Vitest and Testing Library cover components, hooks, and services. vmThreads supports Windows paths containing spaces; do not change the pool to hide test failures.'}</p></InfoCard>
+                <InfoCard icon={<CheckCircle className="w-6 h-6" />} title="Browser / Playwright" color="emerald"><p>{t ? 'Mock API regressions khác browser-to-real-backend tests. Pass browser UI không chứng nhận native engine, external AI provider hoặc production deployment.' : 'Mock-API regressions differ from browser-to-real-backend tests. Passing UI tests does not certify native engines, external AI providers, or production deployments.'}</p></InfoCard>
             </FeatureGrid>
-
-            {/* Backend Tests */}
-            <DocSection title={t ? 'Kiểm thử Backend (NestJS + Jest)' : 'Backend Testing (NestJS + Jest)'} icon={<Terminal className="w-5 h-5"/>}>
-                <Prose>
-                    {t
-                        ? 'Các bài kiểm tra backend nằm trong thư mục `server/src/tests`. Chúng tôi ưu tiên kiểm tra các Database Strategies và AI Service.'
-                        : 'Backend tests are located in `server/src/tests`. We prioritize testing Database Strategies and the AI Service.'}
-                </Prose>
-                <div className="mt-8">
-                    <CodeBlock title={t ? 'Lệnh chạy test backend' : 'Backend test commands'}>
-                        <CodeComment>{t ? 'Chạy toàn bộ test' : 'Run all tests'}</CodeComment>
-                        <CodeLine>npm run test</CodeLine>
-                        <p className="mt-4" />
-                        <CodeComment>{t ? 'Chạy test ở mode watch (dùng khi đang dev)' : 'Run tests in watch mode (for dev)'}</CodeComment>
-                        <CodeLine>npm run test:watch</CodeLine>
-                        <p className="mt-4" />
-                        <CodeComment>{t ? 'Chạy một file test cụ thể' : 'Run a specific test file'}</CodeComment>
-                        <CodeLine>npx jest server/src/tests/ai/ai.service.spec.ts</CodeLine>
-                    </CodeBlock>
-                </div>
+            <DocSection title={t ? '1. Kiểm tra nhanh từ root repository' : '1. Fast checks from the repository root'} icon={<Terminal className="w-5 h-5" />}>
+                <Prose>{t ? 'Cài root/client/server dependencies và generate Prisma trước. Các command dưới đây chạy ở root với --prefix; không giả root có script test/build của mọi package.' : 'Install root/client/server dependencies and generate Prisma first. These commands run from the root using --prefix; the root package does not provide every package’s test/build scripts.'}</Prose>
+                <CodeBlock title="Client"><CodeLine>npm --prefix client run lint</CodeLine><CodeLine>npm --prefix client run test:ci</CodeLine><CodeLine>npm --prefix client run test:prerender</CodeLine><CodeLine>npm --prefix client run build</CodeLine></CodeBlock>
+                <CodeBlock title="Server"><CodeLine>npm --prefix server run prisma:generate</CodeLine><CodeLine>npm --prefix server run typecheck</CodeLine><CodeLine>npm --prefix server run lint</CodeLine><CodeLine>npm --prefix server run test:ci</CodeLine><CodeLine>npm --prefix server run build</CodeLine></CodeBlock>
+                <Prose>{t ? 'Client test (không :ci) là watch mode; server có test:watch. Chạy một server spec bằng npm --prefix server run test:ci -- src/tests/ai/ai.service.spec.ts. Chọn thêm suite liên quan tới phần thực sự thay đổi, không chỉ một AI spec cho mọi security fix.' : 'Client test without :ci is watch mode; the server has test:watch. Run a specific server spec with npm --prefix server run test:ci -- src/tests/ai/ai.service.spec.ts. Include suites related to the changed behavior, not just one AI spec for every security fix.'}</Prose>
+                <Prose><a href={publicPath(lang, '/docs/installation')}>{t ? 'Setup và Prisma prerequisites' : 'Setup and Prisma prerequisites'}</a></Prose>
             </DocSection>
-
-            {/* Frontend Tests */}
-            <DocSection title={t ? 'Kiểm thử Frontend (Vite + Vitest)' : 'Frontend Testing (Vite + Vitest)'}>
-                <Prose>
-                    {t
-                        ? 'Phía frontend sử dụng Vitest để đạt tốc độ tối đa trong môi trường phát triển.'
-                        : 'The frontend uses Vitest for maximum speed in the development environment.'}
-                </Prose>
-                <div className="mt-8">
-                    <CodeBlock title={t ? 'Lệnh chạy test frontend' : 'Frontend test commands'}>
-                        <CodeComment>{t ? 'Chạy test frontend' : 'Run frontend tests'}</CodeComment>
-                        <CodeLine>cd client && npm run test</CodeLine>
-                    </CodeBlock>
-                </div>
+            <DocSection title={t ? '2. Browser và full-stack fixtures' : '2. Browser and full-stack fixtures'}>
+                <CodeBlock title="Playwright / client"><CodeLine>cd client</CodeLine><CodeLine>npx playwright install chromium firefox webkit</CodeLine><CodeLine>npm run typecheck:browser</CodeLine><CodeLine>npm run test:e2e -- --workers=1 --retries=0</CodeLine></CodeBlock>
+                <Prose>{t ? 'Public/mobile regressions dùng Chromium, Firefox, mobile Chrome và mobile WebKit. Native server test:e2e và client test:full-stack cần compose fixtures cô lập. Full-stack browser không được thay bằng mock tests khi cần kiểm actual API/login/database.' : 'Public/mobile regressions use Chromium, Firefox, mobile Chrome, and mobile WebKit. Server test:e2e and client test:full-stack require isolated Compose fixtures. Mock tests do not replace full-stack checks of actual API, login, and database behavior.'}</Prose>
+                <CodeBlock title="Isolated integration checks"><CodeLine>npm --prefix server run test:e2e</CodeLine><CodeLine>npm --prefix client run test:full-stack</CodeLine></CodeBlock>
+                <Callout type="warning"><p>{t ? 'Chỉ chạy integration checks sau khi làm theo fixture setup trong CI/CD guide, không dùng DATABASE_URL/REDIS_URL của workstation hoặc production. Không migrate/reset/drop live database để chuẩn bị tests. Secret và customer data không được nằm trong fixture/log/ảnh.' : 'Run integration checks only after configuring fixtures from the CI/CD guide, never against workstation or production DATABASE_URL/REDIS_URL. Do not migrate, reset, or drop a live database to prepare tests. Keep secrets and customer data out of fixtures, logs, and screenshots.'}</p></Callout>
+                <Prose><a href="https://github.com/KasierBach/Data-Explorer-Editor/blob/main/docs/operations/ci-cd.md" target="_blank" rel="noopener noreferrer">{t ? 'Hướng dẫn fixture và delivery' : 'Fixture and delivery guide'}</a></Prose>
             </DocSection>
-
-            {/* Security Audits */}
-            <DocSection title={t ? 'Kiểm tra An ninh (Security Audits)' : 'Security Audits'}>
-                <Prose>
-                    {t
-                        ? 'Định kỳ, Data Explorer trải qua các đợt kiểm tra an ninh (Pentest) chuyên sâu để phát hiện các rủi ro về logic phân quyền, SSRF và Injection.'
-                        : 'Periodically, Data Explorer undergoes in-depth Security Audits (Pentest) to identify risks in authorization logic, SSRF, and Injections.'}
-                </Prose>
-                <div className="mt-6 grid md:grid-cols-2 gap-4">
-                    <InfoCard icon={<ShieldCheck className="w-5 h-5 text-red-500" />} title={t ? 'Logic Hardening' : 'Logic Hardening'} color="red">
-                        <p className="text-xs">
-                            {t
-                                ? 'Mọi bản vá bảo mật đều dựa trên các kịch bản tấn công thực tế (như IDOR visibilty hay SQL bypass).'
-                                : 'All security patches are based on real-world attack scenarios (like IDOR visibility or SQL bypass).'}
-                        </p>
-                    </InfoCard>
-                    <InfoCard icon={<Terminal className="w-5 h-5 text-blue-500" />} title={t ? 'Manual Validation' : 'Manual Validation'} color="blue">
-                        <p className="text-xs">
-                            {t
-                                ? 'Các lỗ hổng logic phức tạp được kiểm tra thủ công bởi đội ngũ phát triển trước khi tích hợp vào core.'
-                                : 'Complex logic vulnerabilities are manually validated by the dev team before core integration.'}
-                        </p>
-                    </InfoCard>
-                </div>
+            <DocSection title={t ? '3. Coverage và security evidence' : '3. Coverage and security evidence'}>
+                <CodeBlock title="Coverage"><CodeLine>npm --prefix client run test:cov</CodeLine><CodeLine>npm --prefix server run test:cov</CodeLine></CodeBlock>
+                <Prose>{t ? 'Coverage floors hiện tại: client 18,08% lines / 11,07% branches; server 55,32% lines / 46,88% branches. Đây là floor toàn production source, không phải claim mọi business use case đã covered. Không hạ threshold hoặc bỏ source để test pass.' : 'Current all-source coverage floors are client 18.08% lines / 11.07% branches and server 55.32% lines / 46.88% branches. These are floors across production source, not a claim that every business use case is covered. Do not lower thresholds or exclude source to obtain a pass.'}</Prose>
+                <InfoCard icon={<ShieldCheck className="w-5 h-5" />} title={t ? 'Đối kháng và supply chain' : 'Adversarial and supply-chain checks'}><p>{t ? 'Curated suites kiểm SQL/NoSQL/HTTP regressions; property-based fuzzing kiểm một số SQL/SSRF invariants. CI còn lint/typecheck, coverage, builds, prerender, mock/native/full-stack checks, dependency audits, container scan và SBOM. Đó là nhiều lớp bằng chứng, không phải chứng nhận mọi engine/provider.' : 'Curated suites cover SQL/NoSQL/HTTP regressions; property-based fuzzing tests selected SQL/SSRF invariants. CI also runs lint/types, coverage, builds, prerender, mock/native/full-stack checks, dependency audits, container scans, and SBOM generation. These are layers of evidence, not certification of every engine/provider.'}</p></InfoCard>
             </DocSection>
-
-            {/* Contribution Guide */}
-            <DocSection title={t ? 'Hướng dẫn Đóng góp (Contribution Flow)' : 'Contribution Flow'} icon={<Github className="w-5 h-5"/>}>
-                <div className="space-y-6">
-                    <Prose>
-                        {t
-                            ? 'Chúng tôi tuân thủ quy trình GitHub Flow. Mọi thay đổi đều bắt đầu từ một feature branch mới.'
-                            : 'We follow the GitHub Flow. Every change starts with a new feature branch.'}
-                    </Prose>
-                    <div className="grid md:grid-cols-2 gap-4">
-                        {[
-                            {
-                                step: "1",
-                                title: t ? "Tạo Branch" : "Create Branch",
-                                desc: "feature/your-feature-name"
-                            },
-                            {
-                                step: "2",
-                                title: t ? "Commit & Push" : "Commit & Push",
-                                desc: "Tuân thủ Conventional Commits (feat:, fix:, chore:)"
-                            },
-                            {
-                                step: "3",
-                                title: t ? "Mở Pull Request" : "Open Pull Request",
-                                desc: "Mô tả rõ ràng các thay đổi và đính kèm video/ảnh minh họa"
-                            },
-                            {
-                                step: "4",
-                                title: t ? "Review & Merge" : "Review & Merge",
-                                desc: "Ít nhất 1 approval từ maintainers"
-                            }
-                        ].map((item, i) => (
-                            <div key={i} className="p-4 border border-white/5 rounded-2xl bg-white/[0.02] flex gap-4 items-start">
-                                <div className="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center font-black text-sm shrink-0">
-                                    {item.step}
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-sm text-white">{item.title}</h4>
-                                    <p className="text-xs text-muted-foreground mt-1">{item.desc}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+            <DocSection title={t ? '4. Contribution workflow' : '4. Contribution workflow'} icon={<Github className="w-5 h-5" />}>
+                <ul className="grid gap-3 text-sm text-muted-foreground">{[
+                    t ? 'Tạo branch từ main; giữ diff focused và bảo toàn thay đổi không thuộc scope.' : 'Create a branch from main, keep the diff focused, and preserve unrelated work.',
+                    t ? 'Viết regression test cho behavior thay đổi và ghi rõ commands/results. Conventional Commits là convention, không tự claim commitlint enforce.' : 'Add regression tests for changed behavior and record commands/results. Conventional Commits is a convention, not a claim of commitlint enforcement.',
+                    t ? 'Mở PR với mục tiêu, compatibility/safety notes và bằng chứng nhỏ đã loại secrets. Maintainer review nên có; không khẳng định một approval là ruleset bắt buộc khi chưa enforce.' : 'Open a PR with the goal, compatibility/safety notes, and compact sanitized evidence. Maintainer review is recommended; do not claim one approval is mandatory unless enforced by the ruleset.',
+                    t ? 'Theo AGENTS.md, chạy upstream impact trước khi edit symbol và detect_changes trước commit. HIGH/CRITICAL cần được báo và kiểm caller/flow liên quan.' : 'Follow AGENTS.md: run upstream impact before symbol edits and detect_changes before committing. Report HIGH/CRITICAL results and examine related callers/flows.',
+                    t ? 'Vulnerability có dữ liệu nhạy cảm đi qua responsible disclosure, không đăng secret/exploit lên public issue.' : 'Use responsible disclosure for sensitive vulnerabilities, not a public issue containing secrets or exploit details.',
+                ].map(item => <li key={item} className="rounded-xl border p-4">{item}</li>)}</ul>
             </DocSection>
-
-            <DocSection title={t ? 'Quy chuẩn mã nguồn' : 'Coding Standards'}>
-                <Prose>
-                    {t
-                        ? 'Để giữ cho project dễ bảo trì, chúng tôi áp dụng các quy tắc sau:'
-                        : 'To keep the project maintainable, we apply the following rules:'}
-                </Prose>
-                <div className="mt-6 grid gap-3">
-                    {[
-                        t ? 'Sử dụng ESLint và Prettier để tự động hóa format code.' : 'Use ESLint and Prettier for automated formatting.',
-                        t ? 'Mọi hàm mới đều phải có kiểu dữ liệu (TypeScript strict mode).' : 'All new functions must be typed (TypeScript strict mode).',
-                        t ? 'Sử dụng kiến trúc Ports & Adapters thay vì gọi trực tiếp thư viện trong Service.' : 'Use Ports & Adapters architecture instead of direct library calls in Services.',
-                        t ? 'Tránh lồng nháy (Nesting) quá sâu và ưu tiên Early Return.' : 'Avoid deep nesting and prioritize Early Returns.'
-                    ].map((item) => (
-                        <div key={item} className="flex gap-3 items-center text-xs text-muted-foreground bg-white/[0.01] border border-white/5 p-3 rounded-xl">
-                            <div className="w-1 h-1 rounded-full bg-primary" />
-                            {item}
-                        </div>
-                    ))}
-                </div>
+            <DocSection title={t ? '5. Coding standards và giới hạn tooling' : '5. Coding standards and tooling boundaries'}>
+                <Prose>{t ? 'Client TypeScript strict; server có strictNullChecks nhưng noImplicitAny=false. Server ESLint tích hợp Prettier; client ESLint không phải cam kết repo-wide Prettier. Function components/hooks là mặc định, class error boundary là ngoại lệ hợp lệ. Viết code theo idiom xung quanh và ưu tiên early return.' : 'Client TypeScript is strict; the server has strictNullChecks but noImplicitAny=false. Server ESLint integrates Prettier; client ESLint is not a repository-wide Prettier guarantee. Function components/hooks are the default, with class error boundaries as a valid exception. Match surrounding idioms and prefer early returns.'}</Prose>
             </DocSection>
         </DocPageLayout>
     );

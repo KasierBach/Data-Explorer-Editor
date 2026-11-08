@@ -4,6 +4,7 @@ import {
     PanelBottom,
     Shield,
 } from 'lucide-react';
+import { publicPath } from '@/core/seo/publicRoutes';
 import {
     Callout,
     CodeBlock,
@@ -105,8 +106,8 @@ export function NoSqlStudioSection({ lang }: Props) {
             <DocSection title={t ? 'MQL trong app này có hình dạng gì?' : 'What MQL looks like in this app'}>
                 <Prose>
                     {t
-                        ? 'Data Explorer không ép bạn viết shell script dài dòng. Với MongoDB và các lane NoSQL hiện tại, editor ưu tiên một payload JSON có trường `action`, `collection`, và phần dữ liệu đi kèm. Cách này giúp UI hiểu được đâu là lệnh đọc, đâu là lệnh biến đổi dữ liệu, và khi nào cần bật guardrails mạnh hơn.'
-                        : 'Data Explorer does not force you into long shell scripts. For MongoDB and the current NoSQL lanes, the editor prefers a JSON payload with an `action`, a `collection`, and the relevant operation body. That lets the UI distinguish read operations from mutations and decide when stronger guardrails are needed.'}
+                        ? 'NoSQL Studio mô tả workspace MongoDB và Atlas, không phải workspace Redis hoàn chỉnh. Lệnh thực thi là payload JSON với action, collection và dữ liệu tương ứng; raw mongosh script không được chạy như mã tùy ý.'
+                        : 'NoSQL Studio describes the MongoDB and Atlas workspace, not a complete Redis workspace. Executable commands are JSON payloads with action, collection and operation data; raw mongosh scripts are not executed as arbitrary code.'}
                 </Prose>
 
                 <CodeBlock title={t ? 'Ví dụ đọc dữ liệu' : 'Read example'}>
@@ -135,16 +136,16 @@ export function NoSqlStudioSection({ lang }: Props) {
                 <Callout type="info">
                     <p className="text-sm">
                         {t
-                            ? 'Các action như `insertOne`, `updateOne`, `updateMany`, `deleteOne`, hoặc `deleteMany` là mutation. App sẽ không nên coi chúng như “chạy vô tư như find”. Hãy dùng chúng với kết nối phù hợp, review kỹ filter, và ưu tiên chạy thử trên môi trường an toàn trước.'
-                            : 'Actions such as `insertOne`, `updateOne`, `updateMany`, `deleteOne`, and `deleteMany` are mutations. The app should not treat them like harmless `find` operations. Use them on the right connection, review filters carefully, and prefer a safe environment first.'}
+                            ? 'insertOne, insertMany, updateOne, updateMany, deleteOne và deleteMany là mutation. Chúng chỉ được phép khi connection writable, allowQueryExecution bật và người dùng có quyền WRITE. Khác SQL rủi ro, đường MongoDB mutation không có dialog xác nhận phá hủy tự động; review filter và payload trước khi Run, đặc biệt filter {} của updateMany/deleteMany.'
+                            : 'insertOne, insertMany, updateOne, updateMany, deleteOne and deleteMany are mutations. They require a writable connection, allowQueryExecution enabled and WRITE permission. Unlike high-impact SQL, MongoDB mutations do not get an automatic destructive-confirmation dialog; review the filter and payload before Run, especially {} filters on updateMany/deleteMany.'}
                     </p>
                 </Callout>
 
                 <Callout type="info">
                     <p className="text-sm">
                         {t
-                            ? 'Với `aggregate`, backend áp giới hạn trên cursor trước khi gọi `toArray()`. Response có `appliedLimit`, `limitSource` và `truncated`, nên nếu kết quả bị cap thì UI sẽ nói rõ thay vì khiến bạn tưởng đó là toàn bộ collection.'
-                            : 'For `aggregate`, the backend applies the limit on the cursor before calling `toArray()`. Responses include `appliedLimit`, `limitSource`, and `truncated`, so capped results are surfaced clearly instead of looking like the full collection.'}
+                            ? 'find/aggregate có trần trả về 50.000 document và maxTimeMS 30.000ms cho thao tác đọc/tổng hợp. Aggregate giới hạn cursor trước khi materialize; appliedLimit, limitSource và truncated là metadata response để nhận biết kết quả bị giới hạn, không có nghĩa đã đọc toàn collection.'
+                            : 'find/aggregate have a 50,000-document result ceiling and a 30,000ms maxTimeMS for reads/aggregation. Aggregate bounds the cursor before materializing; appliedLimit, limitSource and truncated are response metadata for capped results, not evidence that the whole collection was read.'}
                     </p>
                 </Callout>
             </DocSection>
@@ -158,8 +159,8 @@ export function NoSqlStudioSection({ lang }: Props) {
                         </div>
                         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                             {t
-                                ? 'Nếu kết nối bị tắt quyền chạy query, UI vẫn cho bạn đọc tài liệu, soạn payload, hoặc dùng AI để chuẩn bị lệnh, nhưng nút thực thi sẽ không còn là đường chạy hợp lệ.'
-                                : 'If a connection has query execution disabled, the UI still lets you inspect docs, prepare payloads, or use AI, but execution is intentionally blocked.'}
+                                ? 'allowQueryExecution=false chặn thực thi query và schema sampling tại backend, dù đó là lệnh đọc. Bạn có thể soạn payload nhưng không thể dùng Run để vượt qua policy. readOnly là cờ khác, cho phép đọc được kiểm tra khi execution vẫn bật.'
+                                : 'allowQueryExecution=false blocks query execution and schema sampling at the backend, including reads. You can author a payload but Run cannot bypass the policy. readOnly is a separate flag allowing validated reads when execution remains enabled.'}
                         </p>
                     </div>
                     <div className="rounded-2xl border border-border/60 bg-card/40 p-5">
@@ -169,8 +170,8 @@ export function NoSqlStudioSection({ lang }: Props) {
                         </div>
                         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                             {t
-                                ? 'Với read-only, app ưu tiên các action đọc như `find` và `aggregate`. Đây là chế độ rất hợp cho production browsing, audit nhanh, hoặc review dataset mà không chạm vào dữ liệu thật.'
-                                : 'In read-only mode, the app prioritizes non-mutating actions such as `find` and `aggregate`. This is ideal for production browsing, auditing, or reviewing a live dataset safely.'}
+                                ? 'readOnly chặn mutation tại backend, không chỉ ưu tiên action đọc. Các action đọc và pipeline được validation như find/aggregate vẫn có thể chạy nếu allowQueryExecution bật. Không có bước xác nhận nào vượt qua readOnly.'
+                                : 'readOnly blocks mutations at the backend; it does not merely prioritize reads. Validated read actions/pipelines such as find/aggregate can run when allowQueryExecution is enabled. Confirmation never overrides readOnly.'}
                         </p>
                     </div>
                     <div className="rounded-2xl border border-border/60 bg-card/40 p-5 md:col-span-2">
@@ -185,6 +186,19 @@ export function NoSqlStudioSection({ lang }: Props) {
                         </p>
                     </div>
                 </div>
+            </DocSection>
+
+            <DocSection title={t ? 'Giới hạn payload và pipeline' : 'Payload and pipeline limits'}>
+                <Prose>{t
+                    ? 'Pipeline tối đa 100 stage; JSON payload có độ sâu tối đa 10, array tối đa 10.000 phần tử và object tối đa 2.000 key. Đây là giới hạn validation, không phải bảo đảm pipeline lớn sẽ chạy xong trong 30 giây. Viết trong raw editor không vượt qua giới hạn backend.'
+                    : 'Pipelines allow at most 100 stages; JSON payload depth is capped at 10, arrays at 10,000 entries and objects at 2,000 keys. These are validation limits, not a guarantee that a large pipeline completes within 30 seconds. The raw editor does not bypass backend limits.'}</Prose>
+                <Prose>{t
+                    ? 'Các stage được hỗ trợ: $match, $group, $project, $sort, $limit, $skip, $lookup, $unwind, $facet, $addFields. Stage khác như $out/$merge không được đường thực thi này hỗ trợ; aggregate không phải đường vòng ghi dữ liệu.'
+                    : 'Supported stages are $match, $group, $project, $sort, $limit, $skip, $lookup, $unwind, $facet and $addFields. Other stages such as $out/$merge are not supported on this execution path; aggregate is not a write bypass.'}</Prose>
+                <Prose>
+                    <a href={publicPath(lang, '/docs/operational-limits')}>{t ? 'Giới hạn vận hành' : 'Operational limits'}</a>{' · '}
+                    <a href={publicPath(lang, '/docs/aggregation-builder')}>{t ? 'Dựng pipeline' : 'Build a pipeline'}</a>
+                </Prose>
             </DocSection>
 
             <DocSection title={t ? 'Đọc kết quả bằng đúng góc nhìn' : 'Use the right lens for the result'}>
@@ -207,8 +221,8 @@ export function NoSqlStudioSection({ lang }: Props) {
                 <DocSubSection title={t ? 'Schema Analysis và Aggregation Builder' : 'Schema Analysis and Aggregation Builder'}>
                     <Prose>
                         {t
-                            ? 'Khi mục tiêu chuyển từ “xem document” sang “hiểu field” hoặc “tạo pipeline”, hãy đổi sang Schema Analysis hoặc Aggregation Builder. Chúng giúp bạn đi từ dữ liệu thô sang insight có cấu trúc mà không phải làm mọi thứ trong một ô editor duy nhất.'
-                            : 'When the goal shifts from reading documents to understanding fields or building pipelines, move into Schema Analysis or the Aggregation Builder. Those views take you from raw data to structured insight without forcing everything into one editor box.'}
+                            ? 'Schema Analysis đọc mặc định 100 document từ collection (API tối đa 1.000), thống kê field top-level với tối đa 5 giá trị ví dụ và cache một giờ. Đây là mẫu khác với kết quả find hiện tại và không phải phân tích schema toàn collection hoặc mọi field lồng nhau.'
+                            : 'Schema Analysis reads 100 collection documents by default (API maximum 1,000), reports top-level fields with at most 5 example values and caches for one hour. This sample is separate from the current find result and is not whole-collection or recursively nested schema analysis.'}
                     </Prose>
                 </DocSubSection>
             </DocSection>
@@ -228,6 +242,10 @@ export function NoSqlStudioSection({ lang }: Props) {
                         : 'If writing MQL is the bottleneck, use the NoSQL AI box as a smart draft tool: describe your intent in plain language, receive a payload, apply it to the editor, and then manually refine sensitive fields before running it.'}
                 </p>
             </Callout>
+            <Prose>
+                <a href={publicPath(lang, '/docs/database-capabilities')}>{t ? 'Khả năng engine' : 'Engine capabilities'}</a>{' · '}
+                <a href={publicPath(lang, '/docs/data-handling')}>{t ? 'Xử lý dữ liệu và AI' : 'Data handling and AI'}</a>
+            </Prose>
         </DocPageLayout>
     );
 }

@@ -1,4 +1,5 @@
 import { normalizeAppLang, pickLocalizedText, type AppLang } from '@/core/utils/i18n';
+import { CURRENT_RELEASE, getReleaseDate } from '@/core/productRelease';
 
 export type ChangelogIconKey =
   | 'sparkles'
@@ -61,28 +62,28 @@ export function getChangelogPageContent(
       'Những cập nhật mới nhất của nền tảng Data Explorer.',
       'The latest updates from the Data Explorer platform.',
     ),
-    heading: pickLocalizedText(currentLang, 'Bản ghi cập nhật', 'Changelog'),
+    heading: pickLocalizedText(currentLang, 'Cập nhật sản phẩm', 'Changelog'),
     subtitle: pickLocalizedText(
       currentLang,
-      'Theo dõi hành trình phát triển của hệ quản trị cơ sở dữ liệu thế hệ mới.',
-      'Track the journey of the next-generation database management IDE.',
+      'Những thay đổi, cải tiến và bản sửa lỗi của Data Explorer — theo từng phiên bản.',
+      'What’s new, improved, and fixed in Data Explorer — release by release.',
     ),
     releases: [
       {
-        version: 'v1.6.7',
-        date: pickLocalizedText(currentLang, '2 tháng 9, 2026', 'September 2, 2026'),
+        version: CURRENT_RELEASE.tag,
+        date: getReleaseDate(currentLang),
         title: pickLocalizedText(
           currentLang,
-          'CockroachDB & MariaDB thực chiến, kiểm thử tấn công & nền web hardened',
-          'Production-grade CockroachDB & MariaDB, Adversarial Testing & a Hardened Web Platform',
+          'CockroachDB, MariaDB, kiểm thử bảo mật và nền tảng web',
+          'CockroachDB, MariaDB, Security Testing & Web Platform Updates',
         ),
         badge: pickLocalizedText(currentLang, 'Mới nhất', 'Latest'),
         features: [
           feature(
             currentLang,
             'database',
-            'CockroachDB và MariaDB nâng cấp lên production-ready',
-            'CockroachDB and MariaDB promoted to production-ready',
+            'Nâng cấp strategy CockroachDB và MariaDB',
+            'CockroachDB and MariaDB strategy improvements',
             'CockroachDB có riêng một strategy kế thừa Postgres với default port 26257 và metrics qua crdb_internal thay vì SQL chỉ có trên PostgreSQL; MariaDB có đủ views, functions, tham số hàm và chặn cập nhật rỗng trước khi sinh SQL sai cú pháp.',
             'CockroachDB now gets a dedicated Postgres-derived strategy with the 26257 default port and crdb_internal-based metrics instead of PostgreSQL-only SQL; MariaDB gains views, functions, function parameters, and a guard that blocks empty updates before invalid SQL is generated.',
           ),
@@ -99,16 +100,16 @@ export function getChangelogPageContent(
             'shieldCheck',
             'Bộ pentest đối kháng cho guard SQL/NoSQL và HTTP layer',
             'Adversarial pentest suites for SQL/NoSQL guards and the HTTP layer',
-            'Thêm các suite tấn công mới mô phỏng bypass qua identifier smuggling, IPv4-mapped IPv6, CSRF header spoofing, validateHost fail-closed cho host rỗng, cùng fuzzing property-based cho mọi đầu vào.',
-            'New attack suites simulate bypasses via identifier smuggling, IPv4-mapped IPv6, and CSRF header spoofing; validateHost is now fail-closed for empty hosts, with property-based fuzzing covering all inputs.',
+            'Thêm các suite đối kháng cho identifier smuggling, IPv4-mapped IPv6, CSRF header spoofing và host rỗng; property-based fuzzing kiểm tra một số bất biến SQL và SSRF. Các suite này không chứng nhận mọi đầu vào hoặc mọi engine.',
+            'Added adversarial suites for identifier smuggling, IPv4-mapped IPv6, spoofed CSRF headers, and empty hosts, plus property-based checks for selected SQL and SSRF invariants. These suites do not certify every input or engine.',
           ),
           feature(
             currentLang,
             'zap',
             'Nền web hardened: PWA, sitemap, security.txt và e2e billing',
             'Hardened web platform: PWA, sitemap, security.txt, and billing e2e',
-            'Thêm PWA manifest, sitemap với lastmod động, security.txt cho responsible disclosure, html lang đồng bộ ngôn ngữ app, và luồng e2e cho trang return sau thanh toán MoMo/ZaloPay.',
-            'Added a PWA manifest, a sitemap with dynamic lastmod, a security.txt for responsible disclosure, an html lang synced to the app language, and an e2e flow for the MoMo/ZaloPay billing return page.',
+            'Thêm PWA manifest, sitemap sinh từ danh sách route, security.txt cho responsible disclosure, html lang theo ngôn ngữ app và e2e cho trang return MoMo/ZaloPay. Ngày cập nhật sitemap, khi có, phản ánh nội dung đã rà soát chứ không phải clock của lần build.',
+            'Added a PWA manifest, a route-generated sitemap, security.txt for responsible disclosure, locale-aware html lang, and MoMo/ZaloPay return-page E2E. Sitemap modification dates, where present, reflect reviewed content rather than the build clock.',
           ),
           feature(
             currentLang,
@@ -142,16 +143,16 @@ export function getChangelogPageContent(
             'code2',
             'Hủy query đang chạy & panel Active Queries',
             'Running-query cancellation & the Active Queries panel',
-            'Mỗi engine có cơ chế hủy riêng (pg_cancel_backend, KILL QUERY) nên việc hủy diễn ra ngay trên server; panel Active Queries liệt kê query đang chạy và cho hủy từng cái trực tiếp.',
-            'Each engine has its own cancellation path (pg_cancel_backend, KILL QUERY) so cancels happen on the server; the Active Queries panel lists running queries and cancels them individually.',
+            'Panel Active Queries liệt kê query đang chạy và cho yêu cầu hủy ở engine hỗ trợ: PostgreSQL dùng pg_cancel_backend, MySQL/MariaDB dùng KILL QUERY và SQL Server có request cancellation. MongoDB, SQLite, ClickHouse và Redis chưa có mid-flight cancellation trong app.',
+            'The Active Queries panel lists running queries and requests cancellation on supported engines: PostgreSQL uses pg_cancel_backend, MySQL/MariaDB use KILL QUERY, and SQL Server supports request cancellation. The app does not provide mid-flight cancellation for MongoDB, SQLite, ClickHouse, or Redis.',
           ),
           feature(
             currentLang,
             'sparkles',
             'AI Explain cache theo SQL & follow-up prompts',
             'SQL-keyed AI Explain cache & follow-up prompts',
-            'Lời giải thích truy vấn bằng AI được cache theo nội dung câu SQL nên hỏi lại cùng query không tốn thêm chi phí; sau mỗi giải thích có thể đặt câu hỏi follow-up ngay trong luồng.',
-            'AI query explanations are cached by SQL content so re-asking the same query costs nothing extra; each explanation supports inline follow-up questions.',
+            'Editor giữ cache giải thích trong memory theo SQL, connection và database khi còn mount. Reload, regenerate hoặc prompt follow-up có thể gọi AI lại và phát sinh chi phí; cache này không phải chính sách lưu trữ miễn phí lâu dài.',
+            'The mounted editor keeps an in-memory explanation cache keyed by SQL, connection, and database. Reloading, regeneration, or a custom follow-up can call AI again and incur cost; this is not a persistent zero-cost cache.',
           ),
           feature(
             currentLang,
@@ -201,8 +202,8 @@ export function getChangelogPageContent(
             'sparkles',
             'PDF gửi native tới provider & migration sang Google GenAI SDK',
             'Native PDF delivery & Google GenAI SDK migration',
-            'Tài liệu PDF đính kèm được chuyển thẳng tới provider hỗ trợ thay vì trích xuất văn bản, đồng thời toàn bộ lane Gemini được chuyển sang Google GenAI SDK mới để đồng bộ phiên bản driver.',
-            'Attached PDF documents are passed through natively to capable providers instead of text extraction, and the entire Gemini lane migrated to the new Google GenAI SDK for driver-version alignment.',
+            'PDF tối đa 5 MB có thể gửi native tới provider hỗ trợ; text vẫn được trích xuất làm fallback với giới hạn độ dài. Lane Gemini chuyển sang Google GenAI SDK để đồng bộ integration.',
+            'PDFs up to 5 MB can be delivered natively to a capable provider, while extracted text remains a length-limited fallback. Gemini integrations migrated to the Google GenAI SDK.',
           ),
           feature(
             currentLang,
@@ -215,10 +216,10 @@ export function getChangelogPageContent(
           feature(
             currentLang,
             'shieldCheck',
-            'Auth hardened & transaction nguyên tử cho multi-statement',
-            'Hardened auth & atomic multi-statement transactions',
-            'Token refresh và OAuth identity linking được siết lại chống race condition, billing activation trở nên race-safe, và các script SQL nhiều câu chạy trong một transaction duy nhất — lỗi giữa chừng sẽ rollback toàn bộ.',
-            'Token refresh and OAuth identity linking were tightened against race conditions, billing activation became race-safe, and multi-statement SQL scripts now run inside a single transaction — a mid-script failure rolls everything back.',
+            'Auth hardened và thực thi multi-statement theo engine',
+            'Hardened auth and engine-aware multi-statement execution',
+            'Siết token refresh, OAuth identity linking và billing race conditions. SQL nhiều câu dùng transaction ở engine hỗ trợ; MySQL DDL có thể commit ngầm, ClickHouse chạy tuần tự không atomic. Không giả định mọi script sẽ rollback toàn bộ khi lỗi.',
+            'Hardened token refresh, OAuth identity linking, and billing race handling. Multi-statement SQL uses transactions where supported; MySQL DDL may commit implicitly and ClickHouse runs sequentially without atomic rollback. Do not assume every script is fully rolled back on failure.',
           ),
           feature(
             currentLang,

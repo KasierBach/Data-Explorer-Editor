@@ -1,3 +1,4 @@
+import { publicPath } from '@/core/seo/publicRoutes';
 import {
   Cpu,
   Database,
@@ -35,8 +36,8 @@ export function PrerequisitesSection({ lang }: Props) {
           <h4 className="font-bold text-sm mb-2">Runtime</h4>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
             {t
-              ? "Node.js 20.x LTS được khuyên dùng. Frontend build bằng Vite 7.x."
-              : "Node.js 20.x LTS is recommended. The frontend builds with Vite 7.x."}
+              ? "Node.js 22 theo .nvmrc của repo. Frontend build bằng Vite 7.x."
+              : "Node.js 22 as pinned in the repo's .nvmrc. The frontend builds with Vite 7.x."}
           </p>
         </div>
         <div className="p-6 border rounded-3xl bg-emerald-500/5 border-emerald-500/10">
@@ -53,8 +54,8 @@ export function PrerequisitesSection({ lang }: Props) {
           <h4 className="font-bold text-sm mb-2">Security</h4>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
             {t
-              ? "JWT secret mạnh, ENCRYPTION_KEY đúng 32 ký tự, và outbound HTTPS tới AI providers nếu bạn bật AI routing."
-              : "A strong JWT secret, an ENCRYPTION_KEY with exactly 32 characters, and outbound HTTPS to AI providers if you enable AI routing."}
+              ? "JWT secret ngẫu nhiên ít nhất 32 byte UTF-8, ENCRYPTION_KEY ngẫu nhiên đúng 32 byte UTF-8, và outbound HTTPS tới AI providers chỉ khi bạn bật AI."
+              : "A random JWT secret of at least 32 UTF-8 bytes, a random ENCRYPTION_KEY of exactly 32 UTF-8 bytes, and outbound HTTPS to AI providers only when you enable AI."}
           </p>
         </div>
       </div>
@@ -74,8 +75,8 @@ export function PrerequisitesSection({ lang }: Props) {
             >
               <p className="text-xs">
                 {t
-                  ? "Khuyên dùng Node.js 20.x LTS cho dev và production builds."
-                  : "Node.js 20.x LTS is recommended for development and production builds."}
+                  ? "Dùng Node.js 22 theo .nvmrc cho dev và build; kiểm tra node --version trước khi chạy npm ci."
+                  : "Use Node.js 22 from .nvmrc for development and builds; check node --version before running npm ci."}
               </p>
             </InfoCard>
             <InfoCard
@@ -85,8 +86,8 @@ export function PrerequisitesSection({ lang }: Props) {
             >
               <p className="text-xs">
                 {t
-                  ? "npm là đường được dùng nhiều nhất trong repo hiện tại. Tránh trộn nhiều package manager để khỏi lệch lockfile."
-                  : "npm is the most common path in the current repo. Avoid mixing package managers to prevent lockfile drift."}
+                  ? "Dùng npm ci cho root, server và client vì mỗi gói có lockfile riêng. Không trộn package manager hoặc thay lockfile để cài local."
+                  : "Use npm ci for root, server and client because each package has its own lockfile. Do not mix package managers or replace lockfiles for local setup."}
               </p>
             </InfoCard>
             <InfoCard
@@ -96,8 +97,8 @@ export function PrerequisitesSection({ lang }: Props) {
             >
               <p className="text-xs">
                 {t
-                  ? "Production áp dụng migration PostgreSQL đã commit bằng `npx prisma migrate deploy`; chỉ dùng `db push` cho prototype local có thể bỏ đi."
-                  : "Production schema updates use committed PostgreSQL migrations via `npx prisma migrate deploy`; use `db push` only for disposable local prototypes."}
+                  ? "Trong server, chạy npx prisma generate rồi npx prisma migrate deploy trên metadata PostgreSQL đã sẵn sàng. Sau đó về root chạy npm run dev."
+                  : "In server, run npx prisma generate then npx prisma migrate deploy against the ready metadata PostgreSQL database. Then return to the root and run npm run dev."}
               </p>
             </InfoCard>
           </FeatureGrid>
@@ -106,9 +107,14 @@ export function PrerequisitesSection({ lang }: Props) {
 
       <DocSection
         title={
-          t ? "Ma trận tương thích database" : "Database compatibility matrix"
+          t ? "Engine được đăng ký và fixture kiểm thử" : "Registered engines and test fixtures"
         }
       >
+        <Prose>
+          {t
+            ? "Danh sách dưới đây là đăng ký adapter, không phải chứng nhận tương thích hoặc phiên bản tối thiểu. Fixture CI/E2E hiện dùng PostgreSQL 16-alpine, MySQL 8.4, MongoDB 7 và Redis 7-alpine; đó chỉ là môi trường kiểm thử. MariaDB, CockroachDB, SQL Server, SQLite và ClickHouse không có chứng nhận phiên bản từ các fixture này."
+            : "This list describes adapter registrations, not compatibility certification or minimum versions. Current CI/E2E fixtures use PostgreSQL 16-alpine, MySQL 8.4, MongoDB 7 and Redis 7-alpine; these are test environments only. Those fixtures do not certify versions of MariaDB, CockroachDB, SQL Server, SQLite or ClickHouse."}
+        </Prose>
         <div className="border rounded-2xl overflow-hidden bg-card/30">
           <table className="w-full text-xs">
             <thead>
@@ -117,7 +123,7 @@ export function PrerequisitesSection({ lang }: Props) {
                   {t ? "Engine" : "Engine"}
                 </th>
                 <th className="text-left p-4 font-bold">
-                  {t ? "Phiên bản" : "Versions"}
+                  {t ? "Fixture CI/E2E" : "CI/E2E fixture"}
                 </th>
                 <th className="text-left p-4 font-bold">
                   {t ? "Ghi chú" : "Notes"}
@@ -128,52 +134,66 @@ export function PrerequisitesSection({ lang }: Props) {
               {[
                 {
                   engine: "PostgreSQL",
-                  ver: "12+",
+                  ver: "16-alpine",
                   feat: t
-                    ? "SQL workspace chính, health checks, explain, dashboards."
-                    : "Primary SQL workspace, health checks, explain, dashboards.",
+                    ? "SQL workspace; Compose metadata local dùng 15-alpine, đây là vai trò riêng."
+                    : "SQL workspace; local Compose metadata uses 15-alpine, a separate role.",
                 },
                 {
-                  engine: "MySQL / MariaDB",
-                  ver: "5.7 / 8.0+",
+                  engine: "MySQL",
+                  ver: "8.4",
                   feat: t
-                    ? "SQL workspace, guardrails, saved queries, AI context."
-                    : "SQL workspace, guardrails, saved queries, AI context.",
+                    ? "SQL workspace; bật TLS rõ ràng sau khi dán URI cho server remote."
+                    : "SQL workspace; explicitly enable TLS after importing a URI for a remote server.",
                 },
                 {
                   engine: "MariaDB",
-                  ver: "10.6+",
+                  ver: t ? "Không có fixture này" : "Not in these fixtures",
                   feat: t
-                    ? "Drop-in của MySQL: CRUD/query, views, functions, TLS toggle riêng cho server không SSL."
-                    : "MySQL drop-in: CRUD/query, views, functions, and a dedicated TLS toggle for servers without SSL.",
+                    ? "Dùng adapter tương thích MySQL; không suy ra mọi tính năng MySQL đều tương đương."
+                    : "Uses a MySQL-compatible adapter; do not infer full MySQL feature parity.",
                 },
                 {
                   engine: "CockroachDB",
-                  ver: "v23+",
+                  ver: t ? "Không có fixture này" : "Not in these fixtures",
                   feat: t
-                    ? "PostgreSQL wire-compatible: query/CRUD qua strategy riêng (port 26257), metrics qua crdb_internal."
-                    : "PostgreSQL wire-compatible: query/CRUD via a dedicated strategy (port 26257) with crdb_internal metrics.",
+                    ? "Adapter qua giao thức PostgreSQL, cổng mặc định 26257; không phải PostgreSQL đầy đủ."
+                    : "PostgreSQL-wire adapter, default port 26257; not full PostgreSQL parity.",
                 },
                 {
                   engine: "SQL Server",
-                  ver: "2017+",
+                  ver: t ? "Không có fixture này" : "Not in these fixtures",
                   feat: t
-                    ? "SQL workspace, metadata explorer, AI-assisted query flow."
-                    : "SQL workspace, metadata explorer, AI-assisted query flow.",
+                    ? "SQL workspace với SQL authentication; URI kiểu mssql://, không phải chuỗi dấu chấm phẩy."
+                    : "SQL workspace with SQL authentication; mssql:// URLs, not semicolon connection strings.",
                 },
                 {
-                  engine: "MongoDB",
-                  ver: "6+",
+                  engine: "MongoDB / Atlas (SRV)",
+                  ver: "MongoDB 7",
                   feat: t
-                    ? "NoSQL workspace và document exploration."
-                    : "NoSQL workspace and document exploration.",
+                    ? "NoSQL Studio; fixture MongoDB không chứng nhận dịch vụ Atlas."
+                    : "NoSQL Studio; the MongoDB fixture does not certify the Atlas service.",
                 },
                 {
-                  engine: "MongoDB Atlas (SRV)",
-                  ver: "Current",
+                  engine: "Redis",
+                  ver: "7-alpine",
                   feat: t
-                    ? "Atlas SRV parsing, SSRF-aware validation, NoSQL workspace."
-                    : "Atlas SRV parsing, SSRF-aware validation, NoSQL workspace.",
+                    ? "Adapter có đăng ký; chưa có workspace lệnh Redis hoàn chỉnh. Redis hạ tầng app là dịch vụ khác."
+                    : "Adapter registered; no complete Redis command workspace. App infrastructure Redis is a separate service.",
+                },
+                {
+                  engine: "SQLite",
+                  ver: t ? "Không có fixture này" : "Not in these fixtures",
+                  feat: t
+                    ? "Adapter có đăng ký và đường dẫn file phía backend; workspace SQL còn khoảng trống, không phải SQLite trên trình duyệt."
+                    : "Adapter registered with backend file paths; SQL workspace gaps remain, not browser-local SQLite.",
+                },
+                {
+                  engine: "ClickHouse",
+                  ver: t ? "Không có fixture này" : "Not in these fixtures",
+                  feat: t
+                    ? "Adapter phân tích dữ liệu; không mặc định có transaction hoặc CRUD giống PostgreSQL."
+                    : "Analytics adapter; do not assume PostgreSQL-style transactions or CRUD.",
                 },
               ].map((row, i) => (
                 <tr key={i} className="hover:bg-muted/10 transition-colors">
@@ -211,8 +231,8 @@ export function PrerequisitesSection({ lang }: Props) {
             {
               label: t ? "App ports" : "App ports",
               desc: t
-                ? "Local dev mặc định dùng 5173 cho frontend và 3001 cho backend API. Production thường đặt frontend sau Vercel và backend sau Render hoặc nginx."
-                : "Local development uses 5173 for the frontend and 3001 for the backend API by default. Production commonly places the frontend behind Vercel and the backend behind Render or nginx.",
+                ? "Local host dev cần PORT=3001, client/.env có VITE_API_URL=http://localhost:3001/api và FRONTEND_URL=http://localhost:5173 ở server/.env. Frontend Docker dùng http://localhost (80); metadata PostgreSQL Compose mở cổng 5435, Redis 6379."
+                : "Local host development needs PORT=3001, VITE_API_URL=http://localhost:3001/api in client/.env and FRONTEND_URL=http://localhost:5173 in server/.env. The Docker frontend uses http://localhost (80); Compose metadata PostgreSQL is published on 5435 and Redis on 6379.",
             },
           ].map((item, i) => (
             <li
@@ -228,6 +248,12 @@ export function PrerequisitesSection({ lang }: Props) {
           ))}
         </ul>
       </DocSection>
+      <Prose>
+        <a href={publicPath(lang, '/docs/installation')}>{t ? "Các bước cài đặt và ghi chú PowerShell" : "Setup steps and PowerShell notes"}</a>{' · '}
+        <a href={publicPath(lang, '/docs/database-capabilities')}>{t ? "Khả năng theo engine" : "Capabilities by engine"}</a>{' · '}
+        <a href={publicPath(lang, '/docs/sqlite')}>SQLite</a>{' · '}
+        <a href={publicPath(lang, '/docs/clickhouse')}>ClickHouse</a>
+      </Prose>
     </DocPageLayout>
   );
 }

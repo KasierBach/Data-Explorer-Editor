@@ -21,6 +21,10 @@ superpowers/
 mobile-audit/
 /docs/*
 !/docs/README.md
+!/docs/operations/
+/docs/operations/*
+!/docs/operations/ci-cd.md
+!/docs/operations/docs-product-gaps.md
 /docs/roadmap/
 /docs/archive/local-notes/
 /plans/phase-1-implementation-plan.md

@@ -1,0 +1,117 @@
+/* Changelog is a reading surface. Decorative scenes remain on the landing and docs pages. */
+html:has(.public-changelog) { scroll-behavior: auto; }
+.public-changelog { color: var(--pe-text); padding-block: 48px 64px; background: var(--pe-bg); }
+.public-changelog .pc-container { max-width: 1136px; }
+.public-changelog .pc-masthead { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding-bottom: 28px; margin-bottom: 24px; border-bottom: 1px solid var(--pe-border); }
+.public-changelog .pc-eyebrow { margin: 0 0 10px; color: var(--pe-blue); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.public-changelog .pc-masthead h1 { margin: 0; color: var(--pe-text); font-size: clamp(30px, 3.5vw, 42px); line-height: 1.18; font-weight: 750; letter-spacing: -.035em; text-wrap: balance; }
+.public-changelog .pc-subtitle { margin: 12px 0 0; max-width: 68ch; color: var(--pe-muted); font-size: 15px; line-height: 1.7; text-wrap: pretty; }
+.public-changelog .pc-latest-link { display: flex; align-items: center; gap: 10px; flex-shrink: 0; min-height: 44px; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--pe-blue) 25%, var(--pe-border)); border-radius: 9px; background: color-mix(in srgb, var(--pe-blue) 5%, var(--pe-surface)); color: var(--pe-blue); font-size: 12px; }
+.public-changelog .pc-latest-link > strong { color: var(--pe-text); font-size: 13px; font-variant-numeric: tabular-nums; }
+.public-changelog .pc-search-tools { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
+.public-changelog .pc-search-tools[hidden] { display: none; }
+.public-changelog .pc-search { display: flex; align-items: center; gap: 12px; width: min(100%, 480px); min-height: 48px; padding: 0 14px; color: var(--pe-muted); border: 1px solid var(--pe-border); border-radius: 10px; background: var(--pe-surface); }
+.public-changelog .pc-search:focus-within { border-color: var(--pe-blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pe-blue) 10%, transparent); }
+.public-changelog .pc-search > svg { flex-shrink: 0; }
+.public-changelog .pc-search input { width: 100%; min-width: 0; height: 46px; border: 0; outline: none; background: transparent; color: var(--pe-text); font: inherit; font-size: 14px; }
+.public-changelog .pc-search input:focus-visible { outline: none; }
+.public-changelog .pc-search input::placeholder { color: var(--pe-muted); opacity: .85; }
+.public-changelog .pc-search input::-webkit-search-cancel-button { display: none; }
+.public-changelog .pc-search button { display: grid; place-items: center; min-width: 44px; min-height: 44px; margin-right: -12px; border: 0; border-radius: 7px; background: transparent; color: var(--pe-muted); cursor: pointer; }
+.public-changelog .pc-result-count { margin: 0; color: var(--pe-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.public-changelog .pc-journal { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 40px; align-items: start; }
+.public-changelog .pc-index { position: sticky; top: var(--pe-reading-offset, 94px); min-width: 0; scroll-margin-top: var(--pe-reading-offset, 94px); }
+.public-changelog .pc-index-desktop > h2 { margin: 4px 0 14px; padding-inline: 10px; font-size: 12px; line-height: 1.5; font-weight: 700; color: var(--pe-muted); }
+.public-changelog .pc-index-desktop nav { max-height: calc(100svh - var(--pe-reading-offset, 94px) - 46px); padding: 4px; margin: -4px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--pe-border) transparent; }
+.public-changelog .pc-index nav ol { margin: 0; padding: 0; list-style: none; }
+.public-changelog .pc-index-link { display: flex; align-items: center; gap: 8px; min-height: 58px; padding: 9px 10px; color: var(--pe-muted); border-left: 2px solid transparent; border-radius: 0 7px 7px 0; font-size: 13px; transition: background-color 150ms, color 150ms; }
+.public-changelog .pc-index-link-copy { flex: 1; min-width: 0; }
+.public-changelog .pc-index-version { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.public-changelog .pc-index-date { display: block; margin-top: 3px; font-size: 11px; font-weight: 400; line-height: 1.5; }
+.public-changelog .pc-index-badge { color: var(--pe-blue); font-size: 10px; font-weight: 600; }
+.public-changelog .pc-index-link > svg { width: 14px; height: 14px; flex-shrink: 0; opacity: .5; }
+.public-changelog .pc-index-link[aria-current='location'] { color: var(--pe-text); border-left-color: var(--pe-blue); background: color-mix(in srgb, var(--pe-blue) 6%, var(--pe-surface)); }
+.public-changelog .pc-index-mobile { display: none; }
+.public-changelog .pc-release-list { min-width: 0; }
+.public-changelog .pc-release { padding: 26px 30px 18px; margin: 0 0 20px; border: 1px solid var(--pe-border); border-radius: 14px; background: var(--pe-surface); scroll-margin-top: var(--pe-reading-offset, 94px); }
+.public-changelog .pc-release[hidden] { display: none; }
+.public-changelog .pc-release:last-child { margin-bottom: 0; }
+.public-changelog .pc-release[data-latest='true'] { border-top: 3px solid var(--pe-blue); padding-top: 24px; }
+.public-changelog .pc-release-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.public-changelog .pc-release-meta h2 { margin: 0; color: var(--pe-text); font-size: 23px; line-height: 1.4; font-weight: 750; letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
+.public-changelog .pc-release-badge { padding: 3px 7px; color: var(--pe-blue); border: 1px solid color-mix(in srgb, var(--pe-blue) 24%, var(--pe-border)); border-radius: 5px; background: color-mix(in srgb, var(--pe-blue) 6%, transparent); font-size: 11px; font-weight: 650; }
+.public-changelog .pc-release-date { margin-left: auto; color: var(--pe-muted); font-size: 12px; line-height: 1.6; }
+.public-changelog .pc-release-header h3 { margin: 12px 0 18px; color: var(--pe-text); font-size: clamp(17px, 1.6vw, 20px); font-weight: 650; line-height: 1.5; letter-spacing: -.015em; text-wrap: pretty; }
+.public-changelog .pc-features { margin: 0; padding: 0; list-style: none; }
+.public-changelog .pc-feature { display: flex; align-items: flex-start; gap: 14px; padding-block: 20px; border-top: 1px solid var(--pe-border); }
+.public-changelog .pc-feature-icon { display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; margin-top: 2px; color: var(--pe-blue); border-radius: 7px; background: color-mix(in srgb, var(--pe-blue) 8%, var(--pe-surface)); }
+.public-changelog .pc-feature-icon svg { width: 16px; height: 16px; }
+.public-changelog .pc-feature-icon[data-palette='shieldCheck'], .public-changelog .pc-feature-icon[data-palette='sparkles'] { color: var(--pe-purple); background: color-mix(in srgb, var(--pe-purple) 7%, var(--pe-surface)); }
+.public-changelog .pc-feature > div { min-width: 0; }
+.public-changelog .pc-feature h4 { margin: 0 0 7px; color: var(--pe-text); font-size: 15px; font-weight: 650; line-height: 1.55; }
+.public-changelog .pc-feature p { margin: 0; color: var(--pe-muted); font-size: 15px; line-height: 1.75; overflow-wrap: anywhere; }
+.public-changelog .pc-release-footer { display: flex; align-items: center; min-height: 48px; border-top: 1px solid var(--pe-border); }
+.public-changelog .pc-permalink { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; color: var(--pe-muted); font-size: 12px; }
+.public-changelog .pc-release-details > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 46px; padding-bottom: 2px; color: var(--pe-muted); font-size: 12px; cursor: pointer; list-style: none; }
+.public-changelog .pc-release-details > summary::-webkit-details-marker, .public-changelog .pc-index-mobile > summary::-webkit-details-marker { display: none; }
+.public-changelog .pc-details-action { display: inline-flex; align-items: center; gap: 8px; color: var(--pe-blue); font-size: 13px; font-weight: 600; }
+.public-changelog .pc-details-action > svg { transition: transform 150ms; }
+.public-changelog .pc-release-details[open] > summary { padding-bottom: 14px; }
+.public-changelog .pc-release-details[open] .pc-details-action > svg { transform: rotate(180deg); }
+.public-changelog .pc-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; min-height: 300px; padding: 48px 24px; border: 1px dashed var(--pe-border); border-radius: 14px; background: var(--pe-surface); color: var(--pe-muted); }
+.public-changelog .pc-empty h2 { margin: 0; color: var(--pe-text); font-size: 20px; font-weight: 650; }
+.public-changelog .pc-empty p { margin: 0 0 8px; font-size: 14px; line-height: 1.7; }
+.public-changelog :is(a,button,summary):focus-visible { outline: 2px solid var(--pe-blue); outline-offset: 4px; }
+@media (hover: hover) {
+    .public-changelog .pc-index-link:hover { color: var(--pe-text); background: var(--pe-raised); }
+    .public-changelog .pc-latest-link:hover { border-color: var(--pe-blue); }
+    .public-changelog .pc-permalink:hover, .public-changelog .pc-release-details > summary:hover .pc-details-action { color: var(--pe-blue); }
+    .public-changelog .pc-search button:hover { color: var(--pe-text); background: var(--pe-raised); }
+}
+@media (max-width: 900px) {
+    .public-changelog .pc-journal { grid-template-columns: 184px minmax(0, 1fr); gap: 24px; }
+    .public-changelog .pc-masthead { align-items: flex-start; }
+    .public-changelog .pc-latest-link > span { display: none; }
+    .public-changelog .pc-release { padding-inline: 24px; }
+    .public-changelog .pc-release-date { width: 100%; margin-left: 0; }
+}
+@media (max-width: 700px) {
+    .public-changelog { padding-block: 28px 44px; }
+    .public-changelog .pc-container { padding-inline: 20px; }
+    .public-changelog .pc-masthead { gap: 16px; padding-bottom: 22px; margin-bottom: 20px; }
+    .public-changelog .pc-masthead h1 { font-size: 30px; }
+    .public-changelog .pc-subtitle { font-size: 14px; line-height: 1.7; }
+    .public-changelog .pc-search-tools { align-items: stretch; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+    .public-changelog .pc-search { width: 100%; }
+    .public-changelog .pc-result-count { font-size: 11px; }
+    .public-changelog .pc-journal { display: block; }
+    .public-changelog .pc-index { position: relative; top: auto; margin-bottom: 20px; }
+    .public-changelog .pc-index-desktop { display: none; }
+    .public-changelog .pc-index-mobile { display: block; border: 1px solid var(--pe-border); border-radius: 9px; background: var(--pe-surface); }
+    .public-changelog .pc-index-mobile > summary { display: flex; align-items: center; gap: 9px; min-height: 48px; padding: 10px 13px; color: var(--pe-text); font-size: 13px; list-style: none; cursor: pointer; }
+    .public-changelog .pc-selected-version { margin-left: auto; color: var(--pe-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+    .public-changelog .pc-index-mobile nav { max-height: 260px; padding: 8px; border-top: 1px solid var(--pe-border); overflow-y: auto; }
+    .public-changelog .pc-index-mobile nav ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+    .public-changelog .pc-release { padding: 20px 20px 12px; margin-bottom: 16px; border-radius: 11px; }
+    .public-changelog .pc-release[data-latest='true'] { padding-top: 18px; }
+    .public-changelog .pc-release-meta h2 { font-size: 22px; }
+    .public-changelog .pc-release-header h3 { font-size: 18px; margin-bottom: 16px; }
+    .public-changelog .pc-feature { gap: 10px; padding-block: 18px; }
+    .public-changelog .pc-feature p { font-size: 14px; line-height: 1.75; }
+    .public-changelog .pc-feature-icon { width: 26px; height: 26px; }
+}
+@media (max-width: 380px) {
+    .public-changelog .pc-container { padding-inline: 16px; }
+    .public-changelog .pc-masthead { flex-wrap: wrap; }
+    .public-changelog .pc-latest-link { padding: 8px 12px; }
+    .public-changelog .pc-release { padding-inline: 16px; }
+    .public-changelog .pc-feature-icon { display: none; }
+    .public-changelog .pc-index-mobile nav ol { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .public-changelog *, .public-changelog *::before, .public-changelog *::after { animation: none !important; transition: none !important; scroll-behavior: auto; }
+}
+@media (forced-colors: active) {
+    .public-changelog .pc-release, .public-changelog .pc-search, .public-changelog .pc-index-mobile, .public-changelog .pc-latest-link { border-color: CanvasText; }
+    .public-changelog .pc-index-link[aria-current='location'] { border-left-color: Highlight; }
+}

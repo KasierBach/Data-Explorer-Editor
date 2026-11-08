@@ -1,4 +1,5 @@
 import { Zap, Activity, Shield, Sparkles, Cpu } from 'lucide-react';
+import { publicPath } from '@/core/seo/publicRoutes';
 import { DocPageLayout, DocSection, DocSubSection, Prose, CodeBlock, CodeComment, CodeLine, Callout } from '../primitives';
 
 interface Props { lang: 'vi' | 'en'; }
@@ -7,29 +8,28 @@ export function EditorSection({ lang }: Props) {
     const t = lang === 'vi';
     return (
         <DocPageLayout
-            title={t ? 'Trình soạn thảo SQL Chuyên dụng' : 'Advanced SQL Editor'}
+            title={t ? 'Trình soạn thảo SQL' : 'SQL Editor'}
             subtitle={t
-                ? 'Kế thừa sức mạnh từ Monaco Engine (VS Code), được tinh chỉnh để tối ưu hóa hiệu suất viết truy vấn và phân tích dữ liệu.'
-                : 'Powered by the Monaco Engine (VS Code), fine-tuned for high-performance query writing and data analysis.'}
+                ? 'Monaco với highlight SQL chung, gợi ý schema và các thao tác chạy, format, Stop trực tiếp trên toolbar.'
+                : 'Monaco with generic SQL highlighting, schema completions and direct Run, Format and Stop toolbar actions.'}
             gradient
         >
-            {/* Core Capabilities */}
             <div className="grid md:grid-cols-3 gap-6 mb-12">
                 {[
                     {
                         icon: <Zap className="w-8 h-8 text-yellow-500" />,
-                        title: t ? 'Hiệu suất Cực cao' : 'High Performance',
-                        desc: t ? 'Xử lý mượt mà kịch bản SQL hàng chục MB nhờ công nghệ Virtual DOM và Tokenization riêng biệt.' : 'Fluidly handles massive SQL scripts using Virtual DOM and isolated Tokenization technology.'
+                        title: t ? 'Monaco editor' : 'Monaco editor',
+                        desc: t ? 'Soạn SQL với highlight, đa con trỏ và thao tác tìm kiếm quen thuộc. Không có cam kết xử lý script hàng chục MB hoặc tốc độ 60fps.' : 'Write SQL with highlighting, multi-cursor editing and familiar search actions. No tens-of-megabytes script capacity or 60fps guarantee is made.'
                     },
                     {
                         icon: <Activity className="w-8 h-8 text-emerald-500" />,
-                        title: t ? 'Grammar Đa dạng' : 'Multi-Dialect Support',
-                        desc: t ? 'Tự động nhận diện cú pháp PostgreSQL, MySQL, và MSSQL để cung cấp gợi ý và highlight chính xác.' : 'Auto-detects PostgreSQL, MySQL, and MSSQL syntax for accurate highlighting and suggestions.'
+                        title: t ? 'SQL chung và metadata' : 'Generic SQL and metadata',
+                        desc: t ? 'Editor dùng ngôn ngữ SQL chung và completion từ schema đang tải; không có parser/linter theo dialect hoặc suy luận alias riêng.' : 'The editor uses generic SQL and completions from loaded schema; it has no custom per-dialect parser/linter or alias inference.'
                     },
                     {
                         icon: <Shield className="w-8 h-8 text-rose-500" />,
-                        title: t ? 'Safe Execution' : 'Safe Execution',
-                        desc: t ? 'Kết quả SELECT được tải theo từng trang từ server; timeout, connection guardrails và xác nhận SQL rủi ro vẫn được áp dụng trước khi thực thi. Raw SQL không phân trang vẫn có trần bảo vệ 50.000 dòng.' : 'SELECT results are fetched page by page from the server; timeout rules, connection guardrails, and risky-SQL confirmation still run before execution. Unpaged raw SQL keeps a protective 50,000-row cap.'
+                        title: t ? 'Thực thi có kiểm tra' : 'Guarded execution',
+                        desc: t ? 'Backend áp quyền connection và xác nhận SQL rủi ro. SELECT dùng cửa sổ kết quả từ server; raw SQL có trần 50.000 dòng. Guard không thay thế quyền database thật.' : 'The backend checks connection permissions and high-impact SQL confirmation. SELECT uses server result windows; raw SQL has a 50,000-row ceiling. Guards do not replace actual database permissions.'
                     }
                 ].map((item, i) => (
                     <div key={i} className="p-6 border rounded-3xl bg-card/50 space-y-4">
@@ -41,184 +41,109 @@ export function EditorSection({ lang }: Props) {
             </div>
 
             <Callout type="info">
-                <p className="text-sm">
-                    {t
-                        ? 'DataGrid dùng `/query/table-window`; Query Result dùng endpoint thực thi chung với `limit` và `offset` theo trang. Cả hai đều chỉ tải cửa sổ dữ liệu đang xem, giữ tổng số dòng trong cache ngắn hạn và không đưa toàn bộ dataset vào trình duyệt.'
-                        : 'DataGrid uses `/query/table-window`; Query Result uses the general execution endpoint with page-level `limit` and `offset`. Both fetch only the visible data window, keep row counts in a short-lived cache, and avoid loading the full dataset into the browser.'}
-                </p>
+                <p className="text-sm">{t
+                    ? 'DataGrid là tab bảng có chức năng sửa dữ liệu; Query Result bên dưới SQL editor chỉ đọc. Cả hai tải theo trang, nhưng có bộ thao tác và định dạng export khác nhau.'
+                    : 'DataGrid is the table tab with editing controls; Query Result below the SQL editor is read-only. Both fetch pages, but their actions and export formats differ.'}</p>
             </Callout>
 
-            {/* Technical Inner Workings */}
-            <DocSection title={t ? 'Cơ chế hoạt động (The Inner Workings)' : 'The Inner Workings'}>
-                <Prose>
-                    {t
-                        ? 'Data Explorer không chỉ nhúng editor vào website, chúng tôi đã cấu hình lại hạ tầng của Monaco để tối ưu cho SQL và Data Engineering.'
-                        : 'Data Explorer doesn\'t just embed an editor; we have re-engineered Monaco\'s infrastructure to optimize for SQL and Data Engineering.'}
-                </Prose>
-
+            <DocSection title={t ? 'Soạn query và completion' : 'Authoring queries and completions'}>
+                <Prose>{t
+                    ? 'Monaco hiển thị SQL chung. Metadata của connection cung cấp tên bảng/cột cho completion; danh sách phụ thuộc schema đã tải và quyền truy cập. Màu cú pháp không có nghĩa query hợp lệ trên engine đang chọn.'
+                    : 'Monaco displays generic SQL. Connection metadata supplies table/column completion names; suggestions depend on loaded schema and access permissions. Syntax colors do not mean a query is valid for the selected engine.'}</Prose>
                 <div className="mt-8 space-y-6">
                     <div className="p-6 border rounded-2xl bg-muted/5 group hover:border-primary/50 transition-colors">
-                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2">
-                            <Cpu className="w-4 h-4 text-blue-500" />
-                            {t ? 'Web Worker-based Validation' : 'Web Worker-based Validation'}
-                        </h5>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                            {t
-                                ? 'Toàn bộ việc kiểm tra cú pháp (Syntax Checking) và cung cấp gợi ý được chạy trong một luồng nền (Web Worker) riêng biệt. Điều này đảm bảo rằng ngay cả khi bạn đang gõ trong một tệp SQL khổng lồ, giao diện người dùng vẫn phản hồi tức thì với tốc độ 60fps.'
-                                : 'All syntax checking and suggestion generation run in a separate background thread (Web Worker). This ensures that even when typing in a massive SQL file, the UI remains responsive at 60fps.'}
-                        </p>
+                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2"><Cpu className="w-4 h-4 text-blue-500" />{t ? 'Gợi ý từ schema' : 'Schema-derived suggestions'}</h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{t
+                            ? 'Dùng completion để tìm tên object, sau đó kiểm tra schema đầy đủ trong Explorer. Không có custom SQL worker để lint/format theo dialect hoặc tự ánh xạ u. thành cột của alias u.'
+                            : 'Use completions to find object names, then inspect the full schema in Explorer. There is no custom SQL worker for dialect linting/formatting or automatic mapping of u. to the columns of alias u.'}</p>
                     </div>
-
                     <div className="p-6 border rounded-2xl bg-muted/5 group hover:border-primary/50 transition-colors">
-                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-purple-500" />
-                            {t ? 'AI Inline Completions (Ghost Text)' : 'AI Inline Completions (Ghost Text)'}
-                        </h5>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                            {t
-                                ? 'Inline AI completions hiện đi qua lớp AI routing của app thay vì cứng vào một provider duy nhất. Hệ thống dùng debouncing để chỉ gọi AI khi có ngữ cảnh đủ rõ, giúp tiết kiệm chi phí và tránh làm editor bị ồn.'
-                                : 'Inline AI completions now go through the app’s AI routing layer instead of being hard-wired to a single provider. The system uses debouncing so AI is only called when the context is clear enough, reducing cost and keeping the editor calm.'}
-                        </p>
+                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2"><Sparkles className="w-4 h-4 text-purple-500" />{t ? 'AI inline completion tùy chọn' : 'Optional AI inline completions'}</h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{t
+                            ? 'Ghost Text dùng vai trò Autocomplete đã cấu hình. Ngữ cảnh editor/schema có thể được gửi qua backend tới provider. AI không bắt buộc và gợi ý không được thực thi tự động; xem lại trước khi chấp nhận.'
+                            : 'Ghost Text uses the configured Autocomplete role. Editor/schema context can be sent through the backend to a provider. AI is optional and suggestions are not automatically executed; review before accepting.'}</p>
                     </div>
                 </div>
             </DocSection>
 
-            {/* Query Execution Control */}
-            <DocSection title={t ? 'Điều khiển thực thi truy vấn' : 'Query Execution Control'}>
+            <DocSection title={t ? 'Run, Format và Stop' : 'Run, Format and Stop'}>
                 <div className="mt-2 space-y-6">
                     <div className="p-6 border rounded-2xl bg-muted/5 group hover:border-primary/50 transition-colors">
-                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2">
-                            <Activity className="w-4 h-4 text-emerald-500" />
-                            {t ? 'Hủy truy vấn đang chạy' : 'Cancel a running query'}
-                        </h5>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                            {t
-                                ? 'Mỗi engine có cơ chế hủy riêng (pg_cancel_backend cho PostgreSQL, KILL QUERY cho MySQL/MariaDB) nên việc hủy diễn ra ngay trên server thay vì chỉ bỏ qua kết quả phía client.'
-                                : 'Each engine has its own cancellation path (pg_cancel_backend for PostgreSQL, KILL QUERY for MySQL/MariaDB), so cancellation happens on the server instead of merely discarding the client-side result.'}
-                        </p>
+                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-emerald-500" />{t ? 'Chạy phần chọn hoặc toàn query' : 'Run the selection or full query'}</h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{t
+                            ? 'Run hoặc Ctrl/Cmd+Enter chạy phần đang chọn; nếu không chọn thì chạy nội dung editor. Kiểm tra connection/database trước. Xác nhận SQL rủi ro không vượt qua readOnly hoặc allowQueryExecution=false.'
+                            : 'Run or Ctrl/Cmd+Enter executes the selection, or the editor contents when nothing is selected. Check the connection/database first. High-impact SQL confirmation does not override readOnly or allowQueryExecution=false.'}</p>
                     </div>
                     <div className="p-6 border rounded-2xl bg-muted/5 group hover:border-primary/50 transition-colors">
-                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2">
-                            <Cpu className="w-4 h-4 text-blue-500" />
-                            {t ? 'Panel Active Queries' : 'Active Queries panel'}
-                        </h5>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                            {t
-                                ? 'Panel Active Queries liệt kê các truy vấn đang chạy trên connection, hiển thị thời lượng thực thi (durationMs) và cho phép hủy từng truy vấn trực tiếp.'
-                                : 'The Active Queries panel lists queries currently running on a connection, shows execution duration (durationMs), and lets you cancel individual queries in place.'}
-                        </p>
+                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-blue-500" />{t ? 'Format bằng nút trực tiếp' : 'Use the direct Format button'}</h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{t
+                            ? 'Bấm Format trên toolbar để định dạng query. App không đăng ký binding SQL Shift+Alt+F; không coi format là bước kiểm chứng ngữ nghĩa hoặc linter dialect.'
+                            : 'Press Format in the toolbar to format a query. The app does not register a SQL Shift+Alt+F binding; formatting is not semantic verification or dialect linting.'}</p>
                     </div>
                     <div className="p-6 border rounded-2xl bg-muted/5 group hover:border-primary/50 transition-colors">
-                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-purple-500" />
-                            {t ? 'AI Explain có cache và follow-up' : 'Cached AI Explain with follow-ups'}
-                        </h5>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                            {t
-                                ? 'Giải thích truy vấn bằng AI được cache theo nội dung câu SQL, và sau mỗi lời giải thích bạn có thể đặt câu hỏi follow-up ngay trong luồng đó thay vì bắt đầu lại.'
-                                : 'AI-powered query explanations are cached by SQL content, and each explanation supports inline follow-up questions instead of starting over.'}
-                        </p>
+                        <h5 className="font-bold text-sm mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-emerald-500" />{t ? 'Stop và Active Queries' : 'Stop and Active Queries'}</h5>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{t
+                            ? 'Khi query đang chạy, bấm Stop trực tiếp; Active Queries cho phép yêu cầu cancel từng query. PostgreSQL dùng pg_cancel_backend, MySQL/MariaDB dùng KILL QUERY khi khả dụng. Cancel là yêu cầu tới engine, không bảo đảm tức thì hoặc rollback ghi đã hoàn thành.'
+                            : 'While a query runs, press Stop directly; Active Queries lets you request cancellation per query. PostgreSQL uses pg_cancel_backend and MySQL/MariaDB use KILL QUERY where available. Cancellation is an engine request, not a guarantee of immediate stopping or rollback of completed writes.'}</p>
                     </div>
                 </div>
             </DocSection>
 
-            {/* IntelliSense Deep Dive */}
-            <DocSection title={t ? 'IntelliSense & Schema Awareness' : 'IntelliSense & Schema Awareness'}>
-                <Prose>
-                    {t
-                        ? 'IntelliSense trong Data Explorer hiểu được Schema hiện tại của bạn dựa trên kết quả của quá trình Introspection để cung cấp gợi ý chính xác tới từng tên cột.'
-                        : 'IntelliSense in Data Explorer understands your actual Schema based on Introspection results to provide precise column-level completions.'}
-                </Prose>
+            <DocSection title={t ? 'Ví dụ và kiểm tra kết quả' : 'Example and result checks'}>
                 <div className="mt-8 grid md:grid-cols-2 gap-8 items-start">
                     <div className="space-y-6">
-                        <DocSubSection title={t ? 'Gợi ý theo ngữ cảnh' : 'Context-aware Suggestions'}>
-                            <ul className="space-y-3">
-                                {[
-                                    { k: 'FROM/JOIN', v: t ? 'Gợi ý Table/View/Schema' : 'Suggests Tables/Views/Schemas' },
-                                    { k: 'SELECT/WHERE', v: t ? 'Gợi ý Cột dựa theo Alias của bảng' : 'Suggests Columns based on Table Aliases' },
-                                    { k: 'INSERT', v: t ? 'Gợi ý danh sách cột của bảng mục tiêu' : 'Suggests column list for target table' }
-                                ].map((item, i) => (
-                                    <li key={i} className="flex gap-3 text-xs">
-                                        <code className="bg-primary/10 text-primary px-2 py-0.5 rounded font-bold h-fit uppercase">{item.k}</code>
-                                        <span className="text-muted-foreground">{item.v}</span>
-                                    </li>
-                                ))}
-                            </ul>
+                        <DocSubSection title={t ? 'Query nhỏ, thứ tự rõ ràng' : 'Small query, explicit ordering'}>
+                            <Prose>{t
+                                ? 'Bắt đầu bằng SELECT nhỏ và ORDER BY ổn định. Thay public.orders/cột bằng tên trong schema của bạn. Alias vẫn là SQL hợp lệ, nhưng không có completion nhận diện alias được cam kết.'
+                                : 'Start with a small SELECT and stable ORDER BY. Replace public.orders/columns with names from your schema. Aliases are valid SQL, but alias-aware completion is not promised.'}</Prose>
                         </DocSubSection>
-                        <Callout type="tip">
-                            {t ? 'Sử dụng Alias (ví dụ: `FROM users u`) giúp IntelliSense hoạt động hiệu quả nhất. Khi gõ `u.`, hệ thống sẽ chỉ hiển thị các cột thuộc bảng `users`.' : 'Using Aliases (e.g., `FROM users u`) makes IntelliSense most effective. Typing `u.` will only show columns belonging to the `users` table.'}
-                        </Callout>
+                        <Callout type="tip">{t
+                            ? 'Query Result chỉ đọc. Muốn sửa dữ liệu, mở bảng DataGrid rồi dùng Edit → sửa thành pending → Save, nếu connection và khóa dòng cho phép.'
+                            : 'Query Result is read-only. To edit data, open the table DataGrid and use Edit → pending changes → Save, when connection permissions and row identity allow it.'}</Callout>
                     </div>
-                    <CodeBlock title="Smart Completion Example">
-                        <CodeComment>{t ? '-- Gõ "SELECT o." để thấy gợi ý cột' : '-- Type "SELECT o." for column suggestions'}</CodeComment>
-                        <CodeLine>SELECT o.order_id, o.amount, c.full_name</CodeLine>
-                        <CodeLine>FROM public.orders o</CodeLine>
-                        <CodeLine>JOIN public.customers c ON o.customer_id = c.id</CodeLine>
+                    <CodeBlock title={t ? 'Ví dụ PostgreSQL — thay tên theo schema của bạn' : 'PostgreSQL example — substitute your schema names'}>
+                        <CodeComment>{t ? 'Một query có giới hạn rõ ràng' : 'A query with an explicit bound'}</CodeComment>
+                        <CodeLine>SELECT order_id, amount</CodeLine>
+                        <CodeLine>FROM public.orders</CodeLine>
+                        <CodeLine>ORDER BY order_id</CodeLine>
+                        <CodeLine>LIMIT 20;</CodeLine>
                     </CodeBlock>
                 </div>
+                <Prose>{t
+                    ? 'AI Explain giải thích query theo luồng hỗ trợ AI, không thay thế execution plan từ database. Standalone hook EXPLAIN cũ không được nối vào UI hiện tại; nếu cần plan, tự chạy lệnh EXPLAIN phù hợp với engine và quyền của bạn.'
+                    : 'AI Explain explains a query through AI assistance; it does not replace a database execution plan. The older standalone EXPLAIN hook is not wired into the current UI; run an appropriate EXPLAIN statement manually when you need a plan and have permission.'}</Prose>
             </DocSection>
 
-            {/* Shortcuts Cheat Sheet */}
-            <DocSection title={t ? 'Bảng phím tắt (Cheat Sheet)' : 'Shortcuts Cheat Sheet'}>
+            <DocSection title={t ? 'Bảng phím tắt' : 'Shortcuts cheat sheet'}>
                 <div className="overflow-hidden border rounded-3xl mb-8">
                     <table className="w-full text-left border-collapse text-xs">
-                        <thead>
-                            <tr className="bg-muted/50 border-b">
-                                <th className="p-4 font-bold uppercase tracking-widest text-muted-foreground">{t ? 'Thao tác' : 'Action'}</th>
-                                <th className="p-4 font-bold uppercase tracking-widest text-muted-foreground text-right">{t ? 'Phím tắt' : 'Shortcut'}</th>
-                            </tr>
-                        </thead>
+                        <thead><tr className="bg-muted/50 border-b"><th className="p-4 font-bold uppercase tracking-widest text-muted-foreground">{t ? 'Thao tác' : 'Action'}</th><th className="p-4 font-bold uppercase tracking-widest text-muted-foreground text-right">{t ? 'Phím tắt' : 'Shortcut'}</th></tr></thead>
                         <tbody className="divide-y">
                             {[
-                                { a: t ? 'Thực thi khối lệnh / Toàn bộ' : 'Execute Block / All', s: 'Ctrl + Enter' },
-                                { a: t ? 'Truy vấn mới (New Query)' : 'New Query Tab', s: 'Ctrl + N' },
-                                { a: t ? 'Bật/Tắt Bảng kết quả' : 'Toggle Result Panel', s: 'Ctrl + J' },
-                                { a: t ? 'Bật/Tắt Sidebar Điều hướng' : 'Toggle Sidebar (Explorer)', s: 'Ctrl + B' },
-                                { a: t ? 'Bật/Tắt Trợ lý AI' : 'Toggle AI Assistant', s: 'Ctrl + I' },
-                                { a: t ? 'Nhân bản Tab hiện tại' : 'Duplicate Current Tab', s: 'Ctrl + D' },
-                                { a: t ? 'Đóng tất cả các Tab' : 'Close All Tabs', s: 'Ctrl + Shift + W' },
-                                { a: t ? 'Tự động định dạng mã SQL' : 'Auto Format SQL', s: 'Shift + Alt + F' },
-                                { a: t ? 'Bật/Tắt chú thích dòng' : 'Toggle Array Comment', s: 'Ctrl + /' },
-                                { a: t ? 'Tìm kiếm & Thay thế' : 'Find & Replace', s: 'Ctrl + H' }
+                                { a: t ? 'Chạy phần chọn / toàn query' : 'Run selection / full query', s: 'Ctrl/Cmd + Enter' },
+                                { a: t ? 'Tìm kiếm toàn cục' : 'Global search', s: 'Ctrl/Cmd + K' },
+                                { a: t ? 'Query tab mới' : 'New Query tab', s: 'Ctrl/Cmd + N' },
+                                { a: t ? 'Bật/tắt kết quả' : 'Toggle results', s: 'Ctrl/Cmd + J' },
+                                { a: t ? 'Bật/tắt Explorer' : 'Toggle Explorer', s: 'Ctrl/Cmd + B' },
+                                { a: t ? 'Bật/tắt AI Assistant' : 'Toggle AI Assistant', s: 'Ctrl/Cmd + I' },
+                                { a: t ? 'Nhân bản tab' : 'Duplicate tab', s: 'Ctrl/Cmd + D' },
+                                { a: t ? 'Đóng tất cả tab' : 'Close all tabs', s: 'Ctrl/Cmd + Shift + W' },
+                                { a: t ? 'Mở Query History (không phải thay thế)' : 'Open Query History (not replace)', s: 'Ctrl/Cmd + H' },
                             ].map((row, i) => (
-                                <tr key={i} className="hover:bg-muted/30 transition-colors">
-                                    <td className="p-4 font-medium">{row.a}</td>
-                                    <td className="p-4 text-right">
-                                        <kbd className="bg-muted px-2 py-1 rounded border font-mono text-[10px] font-bold shadow-sm">{row.s}</kbd>
-                                    </td>
-                                </tr>
+                                <tr key={i} className="hover:bg-muted/30 transition-colors"><td className="p-4 font-medium">{row.a}</td><td className="p-4 text-right"><kbd className="bg-muted px-2 py-1 rounded border font-mono text-[10px] font-bold shadow-sm">{row.s}</kbd></td></tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
+                <Prose>{t
+                    ? 'Phím Ctrl/Cmd có thể bị trình duyệt/hệ điều hành giữ. Dùng nút Run, Format, Stop, tab X/chuột giữa và double-click tên tab làm đường trực tiếp; dùng menu Find của Monaco thay vì gán Ctrl/Cmd+H cho Replace.'
+                    : 'The browser/OS may intercept Ctrl/Cmd shortcuts. Use direct Run, Format, Stop, tab X/middle-click and double-click tab rename actions; use Monaco Find actions rather than assigning Ctrl/Cmd+H to Replace.'}</Prose>
             </DocSection>
-
-            <DocSection title={t ? 'Dưới lớp vỏ (Under the Hood): Monaco Engine' : 'Under the Hood: Monaco Engine'}>
-                <div className="grid md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                        <h5 className="text-sm font-bold flex items-center gap-2 text-primary">
-                            <Cpu className="w-4 h-4" />
-                            {t ? 'Custom SQL Worker' : 'Custom SQL Worker'}
-                        </h5>
-                        <Prose className="text-xs">
-                            {t
-                                ? 'Chúng tôi không sử dụng trình kiểm tra cú pháp mặc định. Data Explorer triển khai một Web Worker riêng biệt để xử lý việc token hóa (tokenization) và định dạng mã SQL mà không làm treo UI thread.'
-                                : 'We don\'t use the default syntax checker. Data Explorer implements a dedicated Web Worker to handle SQL tokenization and formatting without freezing the UI thread.'}
-                        </Prose>
-                    </div>
-                    <div className="space-y-4">
-                        <h5 className="text-sm font-bold flex items-center gap-2 text-primary">
-                            <Zap className="w-4 h-4" />
-                            {t ? 'Schema-Aware IntelliSense' : 'Schema-Aware IntelliSense'}
-                        </h5>
-                        <Prose className="text-xs">
-                            {t
-                                ? 'Hệ thống IntelliSense được "bơm" metadata trực tiếp từ database hiện tại. Điều này cho phép gợi ý chính xác tên bảng, cột và quan hệ FK ngay khi bạn gõ `JOIN`.'
-                                : 'The IntelliSense system is "injected" with metadata directly from the active database. This allows precise suggestions for tables, columns, and FK relations as soon as you type `JOIN`.'}
-                        </Prose>
-                    </div>
-                </div>
-            </DocSection>
+            <Prose>
+                <a href={publicPath(lang, '/docs/first-query')}>{t ? 'Truy vấn đầu tiên' : 'First query'}</a>{' · '}
+                <a href={publicPath(lang, '/docs/operational-limits')}>{t ? 'Giới hạn vận hành' : 'Operational limits'}</a>{' · '}
+                <a href={publicPath(lang, '/docs/data-handling')}>{t ? 'Dữ liệu và AI' : 'Data and AI'}</a>
+            </Prose>
         </DocPageLayout>
     );
 }

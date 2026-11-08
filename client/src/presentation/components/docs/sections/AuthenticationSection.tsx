@@ -24,7 +24,7 @@ export function AuthenticationSection({ lang }: Props) {
 
     return (
         <DocPageLayout
-            title={t ? 'Authentication & Onboarding' : 'Authentication & Onboarding'}
+            title={t ? 'Xác thực, đồng ý pháp lý & Onboarding' : 'Authentication, Legal Consent & Onboarding'}
             subtitle={t
                 ? 'Tổng hợp toàn bộ luồng truy cập của người dùng: đăng ký bằng email, OTP xác minh, đăng nhập, OAuth, onboarding sau lần vào đầu tiên, và các lưu ý bảo mật/đa ngôn ngữ liên quan.'
                 : 'A complete guide to user access flows: email registration, OTP verification, sign-in, OAuth, first-time onboarding, and the related security and localization behavior.'}
@@ -41,15 +41,15 @@ export function AuthenticationSection({ lang }: Props) {
                 <InfoCard icon={<MailCheck className="w-6 h-6 text-emerald-500" />} title={t ? 'OTP xác minh' : 'OTP verification'} color="emerald">
                     <p>
                         {t
-                            ? 'Người dùng mới phải xác minh email bằng mã OTP trước khi đi tiếp. Điều này giảm tài khoản rác và giúp luồng mời/invite đáng tin hơn.'
-                            : 'New users verify their email with an OTP before continuing. That reduces junk accounts and makes invitation flows more trustworthy.'}
+                            ? 'Tài khoản đăng ký local xác minh email bằng OTP 6 chữ số có hiệu lực 15 phút. OAuth dùng email đã được provider xác minh thay vì bắt mọi người dùng social login qua cùng bước OTP local.'
+                            : 'Locally registered accounts verify email with a 6-digit OTP valid for 15 minutes. OAuth relies on an email verified by the provider instead of sending every social-login user through the local OTP step.'}
                     </p>
                 </InfoCard>
                 <InfoCard icon={<UserCheck className="w-6 h-6 text-purple-500" />} title={t ? 'Social login + onboarding' : 'Social login and onboarding'} color="purple">
                     <p>
                         {t
-                            ? 'Google/GitHub có thể đưa người dùng vào app nhanh hơn, nhưng app vẫn giữ bước onboarding để quyết định người dùng nên vào workspace chính hay hoàn tất thiết lập ban đầu trước.'
-                            : 'Google/GitHub can bring users into the product faster, but the app still keeps onboarding as a gate to decide whether they should enter the main workspace or complete first-time setup first.'}
+                            ? 'Google/GitHub cần trả email đã được xác minh. Sau đăng nhập, app kiểm tra đồng ý pháp lý trước, rồi onboarding nếu chưa hoàn tất; có token không đồng nghĩa đã vào workspace chính.'
+                            : 'Google/GitHub must provide a verified email. After sign-in, the app checks legal consent first, then incomplete onboarding; having tokens does not mean the main workspace is ready.'}
                     </p>
                 </InfoCard>
             </FeatureGrid>
@@ -57,8 +57,8 @@ export function AuthenticationSection({ lang }: Props) {
             <DocSection title={t ? 'Luồng đăng ký và xác minh email' : 'Email registration and verification'}>
                 <Prose>
                     {t
-                        ? 'Local auth của Data Explorer được thiết kế để có thể đứng độc lập, không phụ thuộc vào OAuth. Người dùng mới đăng ký bằng tên, email, mật khẩu; nếu tài khoản chưa xác minh, UI chuyển ngay sang màn hình OTP thay vì để họ “đăng nhập nửa chừng” rồi mới vấp lỗi ở sâu bên trong.'
-                        : 'Data Explorer’s local auth is designed to stand on its own rather than depend on OAuth. New users register with a name, email, and password; if the account is still unverified, the UI switches immediately into OTP verification instead of letting them stumble into deeper flows first.'}
+                        ? 'Local auth đăng ký bằng tên, email và mật khẩu, rồi yêu cầu OTP xác minh 6 chữ số (15 phút). Sau xác minh/đăng nhập, điều hướng còn kiểm tra đồng ý các tài liệu pháp lý hiện hành và onboarding trước khi vào workspace. Đăng ký thành công không tự bỏ qua các bước này.'
+                        : 'Local auth registers a name, email, and password, then requires a 6-digit verification OTP (15 minutes). After verification/sign-in, navigation still checks consent to the current legal documents and onboarding before the workspace. Successful registration does not bypass these gates.'}
                 </Prose>
 
                 <div className="grid gap-4 md:grid-cols-2">
@@ -84,8 +84,8 @@ export function AuthenticationSection({ lang }: Props) {
             <DocSection title={t ? 'Google, GitHub, và callback flows' : 'Google, GitHub, and callback flows'}>
                 <Prose>
                     {t
-                        ? 'Social login không chỉ là nút “đăng nhập cho đẹp”. Nó là một route thật đi qua backend, trao đổi code lấy token, rồi mới hydrate user state về client. Sau khi hoàn tất, app còn kiểm tra onboarding để quyết định route cuối cùng.'
-                        : 'Social login is not just a decorative button. It is a real backend route that exchanges an OAuth code for tokens and only then hydrates user state on the client. After that, the app still checks onboarding before deciding the final route.'}
+                        ? 'Google/GitHub đi qua callback backend và chỉ chấp nhận email được provider xác minh; không bắt buộc OTP local cho OAuth. Backend đưa mã exchange ngắn hạn về client để lấy phiên app. Sau đó app kiểm tra legal consent, rồi onboarding trước route workspace.'
+                        : 'Google/GitHub use a backend callback and require a provider-verified email; OAuth does not require the local OTP step. The backend returns a short-lived exchange code to the client for an app session. The app then checks legal consent, followed by onboarding before the workspace route.'}
                 </Prose>
 
                 <DocSubSection title={t ? 'Điểm cần nhớ khi cấu hình callback URL' : 'What matters when configuring callback URLs'}>
@@ -102,34 +102,42 @@ export function AuthenticationSection({ lang }: Props) {
                     <InfoCard icon={<Shield className="w-5 h-5 text-emerald-500" />} title={t ? 'Token chỉ là điểm bắt đầu' : 'Tokens are only the starting point'} color="emerald">
                         <p className="text-xs">
                             {t
-                                ? 'Sau khi login thành công, app còn nạp dữ liệu người dùng và trạng thái quan trọng khác như connections để người dùng vào workspace với ngữ cảnh hoàn chỉnh hơn.'
-                                : 'After a successful login, the app still hydrates the user and supporting state such as connections so the workspace opens with meaningful context.'}
+                                ? 'Sau login, app nạp user và kiểm tra legal consent rồi onboarding. Access token có thời hạn 1 giờ, refresh token 7 ngày và OAuth exchange code 2 phút; các thời hạn này là riêng biệt, không phải thời gian hiệu lực OTP hoặc cam kết phiên luôn hoạt động.'
+                                : 'After login, the app hydrates the user and checks legal consent, then onboarding. Access tokens last 1 hour, refresh tokens 7 days, and OAuth exchange codes 2 minutes; these are separate lifetimes, not OTP expiry or a guarantee that a session always remains usable.'}
                         </p>
                     </InfoCard>
                     <InfoCard icon={<UserCheck className="w-5 h-5 text-blue-500" />} title={t ? 'Onboarding tách riêng khỏi auth' : 'Onboarding is separate from auth'} color="blue">
                         <p className="text-xs">
                             {t
-                                ? 'Đăng nhập thành công không đồng nghĩa người dùng đã sẵn sàng vào trang chính. Nếu `isOnboarded` chưa hoàn tất, app điều hướng sang onboarding để hoàn thành bước thiết lập ban đầu.'
-                                : 'A successful login does not automatically mean the user should land on the main workspace. If `isOnboarded` is still incomplete, the app redirects into onboarding first.'}
+                                ? 'Thứ tự điều hướng là đăng nhập → legal consent còn thiếu → onboarding chưa hoàn tất → workspace. Nếu isOnboarded chưa hoàn tất, người dùng vẫn phải làm onboarding sau khi đồng ý pháp lý; việc này không phải lỗi đăng nhập.'
+                                : 'Navigation is sign-in → missing legal consent → incomplete onboarding → workspace. If isOnboarded is incomplete, the user still needs onboarding after legal consent; this is not a sign-in failure.'}
                         </p>
                     </InfoCard>
                 </div>
             </DocSection>
 
+            <DocSection title={t ? 'Khôi phục mật khẩu' : 'Password recovery'}>
+                <Prose>
+                    {t
+                        ? 'Forgot password gửi OTP reset mật khẩu có hiệu lực 5 phút, khác OTP xác minh email 15 phút. Nhập mã và mật khẩu mới trong flow reset; mã hết hạn cần yêu cầu lại. Không gửi OTP, password hoặc token cho người hỗ trợ.'
+                        : 'Forgot password sends a password-reset OTP valid for 5 minutes, separate from the 15-minute email-verification OTP. Enter the code and a new password in the reset flow; request another code if it expires. Never send an OTP, password, or token to support.'}
+                </Prose>
+            </DocSection>
+
             <DocSection title={t ? 'Đa ngôn ngữ và email hệ thống' : 'Localization and system emails'}>
                 <Prose>
                     {t
-                        ? 'Phần auth không chỉ dịch giao diện. Hệ thống còn có i18n đi xuyên server-side error messages, email xác minh, email reset mật khẩu, cảnh báo bảo mật, và các template thư khác. Điều này rất quan trọng nếu app chạy cho nhiều team có ngôn ngữ mặc định khác nhau.'
-                        : 'Authentication is not only localized in the UI. The system also localizes server-side error messages, verification mail, password-reset mail, security alerts, and other templates. That matters when the product serves teams with different default languages.'}
+                        ? 'Auth có bản dịch VI/EN cho nhiều màn hình, lỗi server và email, nhưng phần copy/locale của onboarding chưa đồng bộ đầy đủ; không giả định mọi bước luôn dùng đúng ngôn ngữ đã chọn. Khi dev thiếu cấu hình mail, đường debug có thể ghi OTP/nội dung mail vào log; đây không phải đảm bảo email được gửi thật trong production. Kiểm tra mail provider và delivery end-to-end, không chia sẻ log chứa mã.'
+                        : 'Auth localizes many screens, server errors, and emails in VI/EN, but onboarding copy/locale is not fully aligned; do not assume every step follows the selected language. In development, missing mail configuration can use a debug path that logs OTP/mail content; it is not a production delivery guarantee. Verify the mail provider and end-to-end delivery, and do not share logs containing codes.'}
                 </Prose>
             </DocSection>
 
             <DocSection title={t ? 'Biến môi trường auth thường phải kiểm tra' : 'Auth environment variables you should verify'}>
                 <CodeBlock title={t ? 'Core auth envs' : 'Core auth envs'}>
-                    <CodeComment>{t ? 'Bảo mật cốt lõi' : 'Core security'}</CodeComment>
-                    <CodeLine>JWT_SECRET=replace-with-a-random-secret-at-least-32-bytes-long</CodeLine>
-                    <CodeLine>REFRESH_TOKEN_SECRET=another-very-long-secret</CodeLine>
-                    <CodeLine>ENCRYPTION_KEY=12345678901234567890123456789012</CodeLine>
+                    <CodeComment>{t ? 'Sinh secret riêng cho mỗi deployment; chạy từng lệnh và đưa kết quả vào server/.env' : 'Generate independent deployment secrets; run each command and place its output in server/.env'}</CodeComment>
+                    <CodeLine>{'node -e "console.log(\'JWT_SECRET=\' + require(\'node:crypto\').randomBytes(32).toString(\'hex\'))"'}</CodeLine>
+                    <CodeLine>{'node -e "console.log(\'REFRESH_TOKEN_SECRET=\' + require(\'node:crypto\').randomBytes(32).toString(\'hex\'))"'}</CodeLine>
+                    <CodeLine>{'node -e "console.log(\'ENCRYPTION_KEY=\' + require(\'node:crypto\').randomBytes(24).toString(\'base64url\'))"'}</CodeLine>
                     <p className="mt-3" />
                     <CodeComment>{t ? 'OAuth providers' : 'OAuth providers'}</CodeComment>
                     <CodeLine>GOOGLE_CLIENT_ID=...</CodeLine>
@@ -143,6 +151,11 @@ export function AuthenticationSection({ lang }: Props) {
                     <CodeLine>MAIL_USER=your-email@example.com</CodeLine>
                     <CodeLine>MAIL_PASS=your-provider-key</CodeLine>
                 </CodeBlock>
+                <Prose>
+                    {t
+                        ? 'JWT_SECRET và REFRESH_TOKEN_SECRET cần ít nhất 32 byte UTF-8, không dùng lại cùng giá trị. ENCRYPTION_KEY phải đúng 32 byte UTF-8: lệnh base64url từ 24 byte ngẫu nhiên phía trên tạo 32 ký tự ASCII, được dùng như text chứ không decode base64. Không dùng 32 ký tự Unicode hoặc hex từ 32 byte (64 ký tự) làm key này. Thay key mà không có kế hoạch legacy-key/migration có thể khiến secret đã mã hóa không đọc được.'
+                        : 'JWT_SECRET and REFRESH_TOKEN_SECRET need at least 32 UTF-8 bytes; do not reuse the same value. ENCRYPTION_KEY must be exactly 32 UTF-8 bytes: the 24-random-byte base64url command above produces 32 ASCII characters used as text, not decoded base64. Do not substitute 32 Unicode characters or 32-byte hex (64 characters) for this key. Changing it without a legacy-key/migration plan can make encrypted secrets unreadable.'}
+                </Prose>
             </DocSection>
 
             <Callout type="warning">

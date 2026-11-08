@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { listPublicRoutes, publicPath, publicStructuredData, resolvePublicRoute, serializePublicData } from './publicRoutes';
 import { publicSeoTags } from './publicMetadata';
+import { DOCS_TOPICS, getDocTopic } from '@/core/docs/docsCatalog';
 
 // Public routes use URL locale; stored UI preferences must not affect crawl output.
 describe('public SEO routes', () => {
@@ -39,6 +40,51 @@ describe('public SEO routes', () => {
         expect(tags.links.filter(link => link.rel === 'alternate')).toHaveLength(3);
         expect(tags.meta.find(meta => meta.property === 'og:image:width')?.content).toBe('1200');
         expect(tags.meta.find(meta => meta.property === 'og:image:height')?.content).toBe('630');
+    });
+
+    it('uses catalog copy and actual review dates on docs only', () => {
+        const routes = listPublicRoutes();
+        expect(routes).toHaveLength((43 + 6) * 2);
+        expect(routes.filter(route => route.kind === 'docs')).toHaveLength((43 + 1) * 2);
+        for (const topic of DOCS_TOPICS) for (const lang of ['vi', 'en'] as const) {
+            const route = resolvePublicRoute(publicPath(lang, `/docs/${topic.id}`))!;
+            expect(route.description).toBe(lang === 'vi' ? topic.description : topic.descriptionEn);
+            expect(route.dateModified).toBe(topic.updatedAt);
+            expect(route.sectionId).toBe(topic.id);
+        }
+        for (const route of routes.filter(route => route.kind !== 'docs')) expect(route).not.toHaveProperty('dateModified');
+        expect(resolvePublicRoute('/docs')?.dateModified).toBe(getDocTopic('introduction')?.updatedAt);
+    });
+
+    it('preserves slash normalization, locale and unknown-route boundaries', () => {
+        expect(resolvePublicRoute('/en/docs/editor///')?.path).toBe('/en/docs/editor');
+        expect(resolvePublicRoute('/en/docs/editor///')?.canonical).toBe('https://data-explorer-editor.vercel.app/en/docs/editor');
+        expect(resolvePublicRoute('/docs/')?.sectionId).toBe('introduction');
+        expect(resolvePublicRoute('/en/')?.canonical).toBe('https://data-explorer-editor.vercel.app/en');
+        for (const path of ['/docs/editor/subpage', '/en/docs/unknown', '/en/sql-explorer', '/nosql-explorer', '/billing/return', '/admin', '/enigma']) expect(resolvePublicRoute(path)).toBeNull();
+    });
+
+    it('emits factual article/breadcrumb schema for docs, not authors or HowTo', () => {
+        for (const lang of ['vi', 'en'] as const) {
+            const route = resolvePublicRoute(publicPath(lang, '/docs/first-query'))!;
+            const data = publicStructuredData(route);
+            const article = data['@graph'].find(node => node['@type'] === 'TechArticle')!;
+            expect(article.dateModified).toBe('2026-11-07');
+            expect(article.headline).toBe(route.title);
+            expect(article.url).toBe(route.canonical);
+            expect(article.inLanguage).toBe(lang);
+            const breadcrumb = data['@graph'].find(node => node['@type'] === 'BreadcrumbList')!;
+            const crumbs = breadcrumb.itemListElement as Array<{ position: number; item: string; name: string }>;
+            expect(crumbs.map(crumb => crumb.position)).toEqual([1, 2, 3]);
+            expect(crumbs[2].item).toBe(route.canonical);
+            expect(crumbs[2].name).toBe(lang === 'vi' ? getDocTopic('first-query')!.title : getDocTopic('first-query')!.titleEn);
+            expect(JSON.stringify(data)).not.toMatch(/HowTo|author|datePublished|review|aggregateRating|award/);
+        }
+        for (const path of ['/', '/privacy', '/terms', '/legal', '/changelog']) {
+            const data = publicStructuredData(resolvePublicRoute(path)!);
+            expect(data['@graph'].some(node => node['@type'] === 'TechArticle')).toBe(false);
+            expect(JSON.stringify(data)).not.toContain('dateModified');
+        }
     });
 
     it('serializes embedded JSON safely', () => {

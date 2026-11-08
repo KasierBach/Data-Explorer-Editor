@@ -8,6 +8,7 @@ import { PricingSection } from '../modules/LandingPage/components/PricingSection
 import { FaqSection } from '../modules/LandingPage/components/FaqSection';
 import { DocsCtaSection } from '../modules/LandingPage/components/DocsCtaSection';
 import type { PublicLanguage } from '@/core/seo/publicRoutes';
+import { LandingBackToTop } from './LandingBackToTop';
 
 interface LandingBodyProps {
     lang: PublicLanguage;
@@ -17,6 +18,7 @@ interface LandingBodyProps {
 }
 
 export function LandingBody({ lang, isAuthenticated = false, paused = false, onToggleMotion }: LandingBodyProps) {
+    const top = useRef<HTMLDivElement>(null);
     const revealRefs = useRef<HTMLDivElement[]>([]);
     const observer = useRef<IntersectionObserver | null>(null);
     useEffect(() => {
@@ -41,6 +43,7 @@ export function LandingBody({ lang, isAuthenticated = false, paused = false, onT
     };
     return (
         <main className="flex-1 flex flex-col">
+            <div id="landing-top" ref={top} tabIndex={-1} className="lp-top-target" />
             <section id="demo" className="lp-section lp-hero-section">
                 <div className="lp-ambient" aria-hidden="true" />
                 <div className="lp-container lp-hero-grid">
@@ -54,6 +57,7 @@ export function LandingBody({ lang, isAuthenticated = false, paused = false, onT
             <PricingSection lang={lang} addToRevealRefs={reveal} />
             <div ref={reveal}><FaqSection lang={lang} /></div>
             <DocsCtaSection lang={lang} addToRevealRefs={reveal} isAuthenticated={isAuthenticated} />
+            <LandingBackToTop lang={lang} targetRef={top} />
         </main>
     );
 }
