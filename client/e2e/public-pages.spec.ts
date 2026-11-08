@@ -669,6 +669,13 @@ async function expectDocsTopic(page: Page, id: string, heading: string, lang: Na
 async function expectDocsReadingStart(page: Page) {
   await expect(page.locator('.pe-doc-article h1')).toBeFocused();
   await expect.poll(() => page.locator('.pe-doc-scroll').evaluate(element => element.scrollTop)).toBe(0);
+  const positions = await page.locator('.pe-doc-scroll').evaluate(element => new Promise<number[]>(resolve => {
+    requestAnimationFrame(() => {
+      const first = element.scrollTop;
+      requestAnimationFrame(() => resolve([first, element.scrollTop]));
+    });
+  }));
+  expect(positions).toEqual([0, 0]);
 }
 
 for (const lang of ['vi', 'en'] as const) {
@@ -722,12 +729,29 @@ test('Docs instant navigation keeps sidebar, previous/next and history in one do
   const pageScroll = await page.evaluate(() => scrollY);
   const sidebarScroll = await sidebar.evaluate(element => element.scrollTop);
   for (const [id, heading] of [['prerequisites', 'Prerequisites'], ['installation', 'Installation']] as const) {
-    await page.locator(`.pe-doc-after > div a[href="/en/docs/${id}"]`).click();
-    await expectDocsTopic(page, id, heading);
-    await expectDocsReadingStart(page);
-    expect(await page.evaluate(() => scrollY)).toBe(pageScroll);
-    expect(await sidebar.evaluate(element => element.scrollTop)).toBe(sidebarScroll);
-    await evidence.assertSameDocument();
+    await test.step(`pointer previous/next → ${id}`, async () => {
+      await page.locator(`.pe-doc-after > div a[href="/en/docs/${id}"]`).click();
+      await expectDocsTopic(page, id, heading);
+      await expectDocsReadingStart(page);
+      expect(await page.evaluate(() => scrollY)).toBe(pageScroll);
+      expect(await sidebar.evaluate(element => element.scrollTop)).toBe(sidebarScroll);
+      await evidence.assertSameDocument();
+    });
+  }
+  for (const [id, heading] of [['prerequisites', 'Prerequisites'], ['installation', 'Installation']] as const) {
+    await test.step(`keyboard previous/next → ${id}`, async () => {
+      const link = page.locator(`.pe-doc-after > div a[href="/en/docs/${id}"]`);
+      await link.scrollIntoViewIfNeeded();
+      await link.focus();
+      await expect(link).toBeFocused();
+      await expect.poll(() => articleScroll.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+      await link.press('Enter');
+      await expectDocsTopic(page, id, heading);
+      await expectDocsReadingStart(page);
+      expect(await page.evaluate(() => scrollY)).toBe(pageScroll);
+      expect(await sidebar.evaluate(element => element.scrollTop)).toBe(sidebarScroll);
+      await evidence.assertSameDocument();
+    });
   }
   await sidebar.getByRole('link', { name: 'Monaco Editor', exact: true }).click();
   await expectDocsTopic(page, 'editor', 'SQL Editor');
@@ -1202,6 +1226,62 @@ for (const lang of ['vi', 'en'] as const) {
         }
       });
     }
+  }
+}
+
+for (const lang of ['vi', 'en'] as const) {
+  for (const authenticated of [false, true]) {
+    test(`Docs header ${lang} ${authenticated ? 'authenticated' : 'guest'} stays compact with wider system fonts at responsive boundaries`, async ({ page }) => {
+      await mockPublicNavigationSession(page, authenticated);
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(localizedNavigationPath(lang, '/docs/editor'));
+      const evidence = await docsNavigationEvidence(page);
+      await page.evaluate(() => document.fonts.ready);
+      await page.addStyleTag({ content: '.pe-doc-header { font-family: Verdana, sans-serif; }' });
+      const header = page.locator('.pe-doc-header');
+      const workspace = header.locator('.pe-doc-workspace');
+      const tools = header.locator('.pe-doc-search-tools');
+      const search = tools.getByRole('combobox');
+      const filter = tools.locator('.pe-doc-filter');
+
+      for (const width of [900, 901, 1100, 1101, 1279, 1280, 1440]) {
+        await test.step(`${width}px wider-system-font docs header`, async () => {
+          await page.setViewportSize({ width, height: 900 });
+          await expect(header).toBeVisible();
+          await expect(workspace).toBeVisible();
+          await expect(workspace).toHaveAttribute('href', authenticated ? '/sql-explorer' : '/login');
+          await expect(workspace).toHaveCSS('white-space', 'nowrap');
+          await expect(workspace).toHaveCSS('flex-shrink', '0');
+          await expect.poll(() => header.evaluate(element => element.getBoundingClientRect().height)).toBeLessThanOrEqual(width <= 900 ? 124 : 72);
+          await expect.poll(() => header.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(width <= 900 ? 116 : 68);
+          expect((await workspace.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+          expect((await workspace.boundingBox())!.height).toBeLessThanOrEqual(53);
+          expect((await search.boundingBox())!.width).toBeGreaterThanOrEqual(44);
+          expect((await search.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+          expect((await filter.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+          expect((await tools.boundingBox())!.width).toBeLessThanOrEqual(472);
+          expect((await header.locator('.pe-doc-search').boundingBox())!.width).toBeLessThanOrEqual(360);
+          await expect(search).toHaveCSS('font-size', '14px');
+          await expect(filter).toHaveCSS('font-size', '14px');
+          await expect.poll(() => workspace.evaluate(element => {
+            const textNode = Array.from(element.childNodes).find(node => node.nodeType === Node.TEXT_NODE)!;
+            const range = document.createRange();
+            range.selectNodeContents(textNode);
+            return range.getClientRects().length;
+          })).toBe(1);
+          await expect(header.locator('.pe-doc-desktop-pages')).toBeVisible({ visible: width > 1100 });
+          await expect(header.locator('.pe-doc-explore')).toBeVisible({ visible: width <= 1100 });
+          if (width > 900) {
+            const [brandBox, toolsBox] = await Promise.all([header.locator('.pe-doc-brand-row').boundingBox(), tools.boundingBox()]);
+            const logoGap = toolsBox!.x - (brandBox!.x + brandBox!.width);
+            expect(Math.abs(logoGap - (width > 1279 ? 40 : width > 1100 ? 34 : 22))).toBeLessThanOrEqual(1);
+          }
+          await expectHeaderControlsNotOverlapping(header, true);
+          await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+          await evidence.assertSameDocument();
+        });
+      }
+    });
   }
 }
 

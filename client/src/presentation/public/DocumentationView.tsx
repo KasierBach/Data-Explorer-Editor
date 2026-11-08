@@ -82,11 +82,11 @@ export function DocumentationView({ route, isAuthenticated = false }: { route: P
         if (previous.key === articleKey && previous.hash === navigation.hash) return;
         previousArticle.current = { key: articleKey, hash: navigation.hash };
         const changedTopic = previous.key !== articleKey;
-        if (changedTopic && scroll.current) scroll.current.scrollTop = 0;
         const frame = requestAnimationFrame(() => {
             if (changedTopic) {
                 const heading = article.current?.querySelector<HTMLElement>('h1');
                 if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
+                scroll.current?.scrollTo({ top: 0, behavior: 'instant' });
             }
             let fragment = '';
             try { fragment = decodeURIComponent(navigation.hash.slice(1)); } catch { return; }

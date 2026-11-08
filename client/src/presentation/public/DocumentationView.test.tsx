@@ -445,6 +445,11 @@ describe('DocumentationView in-place navigation', () => {
     }
     const articleScroll = container.querySelector<HTMLElement>('.pe-doc-scroll')!;
     const sidebarScroll = container.querySelector<HTMLElement>('.pe-doc-sidebar .doc-sidebar-nav')!;
+    const resetArticleScroll = vi.fn((options: ScrollToOptions) => {
+      expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
+      articleScroll.scrollTop = options.top ?? articleScroll.scrollTop;
+    });
+    Object.defineProperty(articleScroll, 'scrollTo', { configurable: true, value: resetArticleScroll });
     articleScroll.scrollTop = 420;
     sidebarScroll.scrollTop = 87;
     rerender(navigationView('/en/docs/results', navigateDocs));
@@ -453,6 +458,8 @@ describe('DocumentationView in-place navigation', () => {
     expect(nextHeading).toHaveAttribute('tabindex', '-1');
     const focusIndex = focus.mock.contexts.lastIndexOf(nextHeading);
     expect(focus.mock.calls[focusIndex]).toEqual([{ preventScroll: true }]);
+    expect(resetArticleScroll).toHaveBeenCalledOnce();
+    expect(resetArticleScroll).toHaveBeenLastCalledWith({ top: 0, behavior: 'instant' });
     expect(articleScroll.scrollTop).toBe(0);
     expect(sidebarScroll.scrollTop).toBe(87);
     expect(screen.getByRole('combobox')).toBe(input);
@@ -461,6 +468,8 @@ describe('DocumentationView in-place navigation', () => {
     articleScroll.scrollTop = 230;
     rerender(navigationView('/docs/results', navigateDocs));
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveFocus());
+    expect(resetArticleScroll).toHaveBeenCalledTimes(2);
+    expect(resetArticleScroll).toHaveBeenLastCalledWith({ top: 0, behavior: 'instant' });
     expect(articleScroll.scrollTop).toBe(0);
     expect(sidebarScroll.scrollTop).toBe(87);
     expect(input).toHaveValue('postgres');
@@ -475,6 +484,8 @@ describe('DocumentationView in-place navigation', () => {
     const target = container.querySelector<HTMLElement>('.pe-doc-article h2')!;
     await waitFor(() => expect(target.id).not.toBe(''));
     const scroll = container.querySelector<HTMLElement>('.pe-doc-scroll')!;
+    const resetArticleScroll = vi.fn();
+    Object.defineProperty(scroll, 'scrollTo', { configurable: true, value: resetArticleScroll });
     scroll.scrollTop = 310;
     const scrollIntoView = vi.mocked(HTMLElement.prototype.scrollIntoView);
     scrollIntoView.mockClear();
@@ -485,6 +496,7 @@ describe('DocumentationView in-place navigation', () => {
     await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'instant' }));
     expect(scrollIntoView.mock.contexts.at(-1)).toBe(target);
     expect(scroll.scrollTop).toBe(310);
+    expect(resetArticleScroll).not.toHaveBeenCalled();
     expect(focus.mock.contexts).not.toContain(screen.getByRole('heading', { level: 1 }));
   });
 });

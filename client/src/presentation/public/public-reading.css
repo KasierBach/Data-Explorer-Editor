@@ -61,7 +61,7 @@
 .public-docs .pe-doc-desktop-pages .pe-nav-link { padding-inline: 8px; font-size: 14px; }
 .public-docs .pe-doc-search-slot { min-width: 0; width: calc(100% - 20px); margin-left: 20px; max-width: 472px; justify-self: start; grid-column: 2; grid-row: 1; }
 .public-docs .pe-doc-header-actions { display: flex; align-items: center; justify-self: end; gap: 12px; grid-column: 5; grid-row: 1; }
-.public-docs .pe-doc-workspace { font-size: 13px; background: transparent; box-shadow: none; }
+.public-docs .pe-doc-workspace { flex-shrink: 0; white-space: nowrap; font-size: 13px; background: transparent; box-shadow: none; }
 .public-docs .pe-doc-explore { display: none; position: relative; }
 .public-docs .pe-doc-explore > summary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding: 8px 10px; border: 1px solid var(--pe-border); border-radius: 8px; color: var(--pe-muted); font-size: 13px; white-space: nowrap; list-style: none; cursor: pointer; }
 .public-docs .pe-doc-explore > summary::-webkit-details-marker { display: none; }
