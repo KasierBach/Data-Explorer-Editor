@@ -107,6 +107,72 @@ describe('aiChatSlice persistence', () => {
     expect(aiChatServiceMocks.saveMessage).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    { usageCoverage: 'partial', attemptCount: 3, measuredAttemptCount: 1, costCoverage: 'unavailable',
+      usage: null, observedUsage: { promptTokens: 4, completionTokens: null, totalTokens: null } },
+    { usageCoverage: 'complete', attemptCount: 1, measuredAttemptCount: 1, costCoverage: 'unavailable',
+      usage: { promptTokens: 0, completionTokens: 2, totalTokens: 2 }, observedUsage: { promptTokens: 0, completionTokens: 2, totalTokens: 2 } },
+    { usageCoverage: 'unavailable', attemptCount: 2, measuredAttemptCount: 0, costCoverage: 'unavailable', usage: null, observedUsage: null },
+  ])('retains execution metadata through final sync and a fresh-store reload: %j', async (metadata) => {
+    const store = makeStore();
+    await store.getState().addAiMessage('chat-1', { ...message(aiId, 'ai'), content: '' });
+    const finalMessage = { ...message(aiId, 'ai'), content: 'Final answer', generationId: 'received-generation', ...metadata } as AiMessage;
+    store.getState().updateAiMessage('chat-1', aiId, finalMessage);
+    const saved = await store.getState().syncAiMessage('chat-1', finalMessage);
+    expect(aiChatServiceMocks.saveMessage).toHaveBeenCalledWith('chat-1', expect.objectContaining(finalMessage), { expectedUpdatedAt: version });
+    aiChatServiceMocks.loadMessages.mockResolvedValue({ messages: [JSON.parse(JSON.stringify(saved))], serverUpdatedAt: nextVersion });
+    const reloaded = makeStore();
+    await reloaded.getState().loadAiChatMessages('chat-1');
+    expect(reloaded.getState().aiChats[0].messages[0]).toMatchObject({ ...finalMessage, delivery: 'saved' });
+  });
+
+  it.each([
+    { name: 'usage coverage', before: {}, after: { usageCoverage: 'partial' } },
+    { name: 'attempt count', before: {}, after: { attemptCount: 2 } },
+    { name: 'measured attempt count', before: {}, after: { measuredAttemptCount: 1 } },
+    { name: 'cost coverage', before: {}, after: { costCoverage: 'unavailable' } },
+    { name: 'observed usage', before: {}, after: { observedUsage: { promptTokens: 0 } } },
+    { name: 'observed prompt', before: { observedUsage: { promptTokens: 0 } }, after: { observedUsage: { promptTokens: null } } },
+    { name: 'observed output', before: { observedUsage: { completionTokens: 0 } }, after: { observedUsage: { completionTokens: null } } },
+    { name: 'observed total', before: { observedUsage: { totalTokens: 0 } }, after: { observedUsage: { totalTokens: null } } },
+    { name: 'usage absent to null', before: {}, after: { usage: null } },
+    { name: 'usage null to absent', before: { usage: null }, after: { usage: undefined } },
+    { name: 'observed usage absent to null', before: {}, after: { observedUsage: null } },
+    { name: 'observed usage null to absent', before: { observedUsage: null }, after: { observedUsage: undefined } },
+  ])('PATCHes only changed $name metadata and deduplicates the next identical sync', async ({ before, after }) => {
+    const store = makeStore();
+    const initial = { ...message(aiId, 'ai'), generationId: 'same-generation', ...before } as AiMessage;
+    await store.getState().addAiMessage('chat-1', initial);
+    await store.getState().syncAiMessage('chat-1', initial);
+    const changed = { ...initial, ...after } as AiMessage;
+    store.getState().updateAiMessage('chat-1', aiId, changed);
+    await store.getState().syncAiMessage('chat-1', changed);
+    expect(aiChatServiceMocks.saveMessage).toHaveBeenCalledTimes(1);
+    expect(aiChatServiceMocks.updateMessage).toHaveBeenCalledTimes(1);
+    expect(aiChatServiceMocks.updateMessage).toHaveBeenCalledWith('chat-1', aiId, expect.objectContaining(changed), { expectedUpdatedAt: nextVersion });
+    await store.getState().syncAiMessage('chat-1', changed);
+    expect(aiChatServiceMocks.updateMessage).toHaveBeenCalledTimes(1);
+    expect(store.getState().aiChats[0].messages).toHaveLength(1);
+  });
+
+  it('waits for a pending POST before PATCHing metadata-only updates with the canonical ID', async () => {
+    const store = makeStore();
+    const saving = deferred<AiMessagePersistenceResult>();
+    aiChatServiceMocks.saveMessage.mockReturnValueOnce(saving.promise);
+    const initial = { ...message(aiId, 'ai'), generationId: 'same-generation' };
+    await store.getState().addAiMessage('chat-1', initial);
+    const first = store.getState().syncAiMessage('chat-1', initial);
+    const updated = { ...initial, usage: null, usageCoverage: 'partial', attemptCount: 2, measuredAttemptCount: 1,
+      costCoverage: 'unavailable', observedUsage: { promptTokens: 0, completionTokens: null, totalTokens: null } } as AiMessage;
+    const second = store.getState().syncAiMessage('chat-1', updated);
+    await vi.waitFor(() => expect(aiChatServiceMocks.saveMessage).toHaveBeenCalledTimes(1));
+    expect(aiChatServiceMocks.updateMessage).not.toHaveBeenCalled();
+    saving.resolve(persisted('canonical-id'));
+    await Promise.all([first, second]);
+    expect(aiChatServiceMocks.updateMessage).toHaveBeenCalledWith('chat-1', 'canonical-id', expect.objectContaining({ ...updated, id: 'canonical-id' }), { expectedUpdatedAt: nextVersion });
+    expect(store.getState().aiChats[0].messages[0]).toMatchObject({ ...updated, id: 'canonical-id', clientId: aiId, delivery: 'saved' });
+  });
+
   it('rejects failed saves, retains history and exposes delivery errors', async () => {
     const store = makeStore([message(aiId, 'ai')]);
     const failure = Object.assign(new Error('Chat changed'), { statusCode: 409, reason: 'conflict' });

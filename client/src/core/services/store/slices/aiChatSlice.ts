@@ -18,6 +18,14 @@ export interface AiRecommendation {
     fields?: string[];
 }
 
+export type AiMessageUsageCoverage = 'complete' | 'partial' | 'unavailable';
+
+export interface AiMessageTokenUsage {
+    promptTokens?: number | null;
+    completionTokens?: number | null;
+    totalTokens?: number | null;
+}
+
 export interface AiMessage {
     id: string;
     clientId?: string;
@@ -30,11 +38,12 @@ export interface AiMessage {
     thought?: string;
     recommendations?: AiRecommendation[];
     sources?: string[];
-    usage?: {
-        promptTokens?: number;
-        completionTokens?: number;
-        totalTokens?: number;
-    };
+    usage?: AiMessageTokenUsage | null;
+    usageCoverage?: AiMessageUsageCoverage;
+    attemptCount?: number;
+    measuredAttemptCount?: number;
+    costCoverage?: 'unavailable';
+    observedUsage?: AiMessageTokenUsage | null;
     warnings?: string[];
     generationId?: string;
     contractVersion?: 1;
@@ -144,7 +153,10 @@ export const createAiChatSlice: StateCreator<AiChatSlice> = (set, get, api) => {
     };
     const payloadKey = (message: AiMessage) => JSON.stringify([
         message.role, message.content, message.sql, message.explanation, message.thought, message.error || false,
-        message.attachments, message.modelInfo, message.recommendations, message.sources, message.usage,
+        message.attachments, message.modelInfo, message.recommendations, message.sources,
+        message.usage !== undefined, message.usage,
+        message.usageCoverage, message.attemptCount, message.measuredAttemptCount,
+        message.costCoverage, message.observedUsage !== undefined, message.observedUsage,
         message.warnings, message.generationId, message.contractVersion,
     ]);
     const versioned = (chat: AiChat, version?: string, fromList = false): AiChat => version &&

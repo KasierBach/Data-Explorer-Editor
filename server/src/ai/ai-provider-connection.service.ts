@@ -255,10 +255,10 @@ export class AiProviderConnectionService {
       assertAiRequestActive(deadline);
       const result = await operation(execution, deadline);
       assertAiRequestActive(deadline);
-      settled = true;
       const summary = await this.ledgerOperation(() =>
         execution!.complete({ provider: plan.provider, model: plan.model }),
       );
+      settled = true;
       if (summary.outcome !== 'succeeded')
         throw new ServiceUnavailableException(
           'AI execution was not durably completed.',

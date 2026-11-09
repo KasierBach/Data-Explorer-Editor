@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { CHECKS, MAX_AGE_MS, assessReadiness, createVitestFileReport, localPath, normalizeTap, normalizeTestJson, parseManifestJson, validateReleaseSha } from './ai-release-readiness.mjs';
+import { CHECKS, MAX_AGE_MS, assessReadiness, createVitestFileReport, hasHiddenWorktreeIndexBits, localPath, normalizeTap, normalizeTestJson, parseManifestJson, validateReleaseSha } from './ai-release-readiness.mjs';
 
 const script = fileURLToPath(new URL('./ai-release-readiness.mjs', import.meta.url));
 const START = '2026-11-09T12:00:00.000Z';
@@ -304,6 +304,40 @@ test('full package test:ci commands have no file, test-name or path filters', ()
 });
 
 for (const path of ['https://private.example/manifest.json', '//server/share/manifest.json', '\\\\server\\share\\manifest.json', '../private.json', 'safe/../private.json', 'file:///private.json', 'nul.json', 'bad\nname.json', 'manifest.txt']) test('network, traversal, device or unsafe manifest path refused', () => { assert.throws(() => localPath(path, true)); });
+
+test('Git index flags cannot hide working-tree changes from readiness preflight', async () => {
+  const folder = await mkdtemp(join(tmpdir(), 'ai-a16-index-flags-'));
+  const git = (...args) => spawnSync('git', ['-C', folder, ...args], { encoding: 'utf8', timeout: 10000 });
+  try {
+    assert.equal(git('init').status, 0);
+    assert.equal(git('config', 'user.name', 'Fixture').status, 0);
+    assert.equal(git('config', 'user.email', 'fixture@example.test').status, 0);
+    await writeFile(join(folder, 'ordinary.txt'), 'ordinary\n');
+    await writeFile(join(folder, 'assumed.txt'), 'assumed\n');
+    await writeFile(join(folder, 'skipped.txt'), 'skipped\n');
+    assert.equal(git('add', '.').status, 0);
+    assert.equal(git('commit', '-m', 'fixture').status, 0);
+
+    assert.equal(git('update-index', '--assume-unchanged', 'assumed.txt').status, 0);
+    assert.equal(git('update-index', '--skip-worktree', 'skipped.txt').status, 0);
+    await writeFile(join(folder, 'assumed.txt'), 'hidden assumed change\n');
+    await writeFile(join(folder, 'skipped.txt'), 'hidden skipped change\n');
+    assert.equal(git('status', '--porcelain=v1', '--untracked-files=all').stdout, '');
+
+    const listing = git('ls-files', '-v', '-z');
+    assert.equal(listing.status, 0);
+    assert.match(listing.stdout, /(?:^|\0)h assumed\.txt\0/);
+    assert.match(listing.stdout, /(?:^|\0)S skipped\.txt\0/);
+    assert.equal(hasHiddenWorktreeIndexBits(listing.stdout), true);
+    assert.equal(hasHiddenWorktreeIndexBits('h assumed.txt\0'), true);
+    assert.equal(hasHiddenWorktreeIndexBits('S skipped.txt\0'), true);
+    assert.equal(hasHiddenWorktreeIndexBits('H ordinary.txt\0'), false);
+    assert.equal(hasHiddenWorktreeIndexBits(''), false);
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
+});
+
 test('plain local JSON path accepted without echoing it', () => { assert.ok(localPath(join(tmpdir(), 'safe-manifest.json'), true)); });
 
 test('CLI invalid flags and missing artifacts fail with redacted metadata only', async () => {

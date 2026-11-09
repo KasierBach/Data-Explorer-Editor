@@ -517,6 +517,45 @@ describe("useAiChat account policy entry points", () => {
     });
   });
 
+  it.each([
+    { usageCoverage: "partial", attemptCount: 3, measuredAttemptCount: 1, costCoverage: "unavailable",
+      usage: null, observedUsage: { promptTokens: 12, completionTokens: null, totalTokens: null } },
+    { usageCoverage: "complete", attemptCount: 1, measuredAttemptCount: 1, costCoverage: "unavailable",
+      usage: { promptTokens: 0, completionTokens: 2, totalTokens: 2 }, observedUsage: { promptTokens: 0, completionTokens: 2, totalTokens: 2 } },
+    { usageCoverage: "unavailable", attemptCount: 2, measuredAttemptCount: 0, costCoverage: "unavailable", usage: null, observedUsage: null },
+  ])("carries execution metadata from terminal SSE through save and fresh reload: %j", async (metadata) => {
+    let payload: Record<string, unknown> | undefined;
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, request?: RequestInit) => {
+      if (request?.method === "GET") return { ok: true, headers: { get: () => "application/json" }, json: async () => ({
+        updatedAt: "2026-11-09T12:00:00.123Z",
+        messages: [{ ...payload, id: "canonical-ai-id", createdAt: "2026-11-09T11:00:00.001Z" }],
+      }) };
+      payload = JSON.parse(request!.body as string);
+      return { ok: true, headers: { get: () => "application/json" }, json: async () => ({
+        id: "canonical-ai-id", chatUpdatedAt: "2026-11-09T12:00:00.123Z", persistence: { state: "saved" },
+      }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const data = { message: "Final answer", generationId: "received-generation", ...metadata };
+    mocks.generateSqlStream.mockImplementation(async () => streamResponse([
+      `data: ${JSON.stringify({ type: "done", data })}`,
+      'data: {"type":"done","data":{"message":"Stale answer","generationId":"stale-generation","attemptCount":8,"observedUsage":{"totalTokens":999}}}',
+      "", "",
+    ].join("\n")));
+    mocks.syncAiMessage.mockImplementation((chatId: string, message: AiMessage) => AiChatService.saveMessage(chatId, message));
+    const { result } = renderHook(() => useAiChat());
+    await act(async () => { result.current.setInput("Fixture prompt"); });
+    await act(async () => { await result.current.handleSend(); });
+    const expected = { ...metadata, generationId: data.generationId, contractVersion: 1 };
+    expect(messages.at(-1)).toMatchObject({ ...expected, content: data.message });
+    expect(mocks.syncAiMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.syncAiMessage.mock.calls[0][1]).toMatchObject(expected);
+    expect(payload?.attachments).toMatchObject(expected);
+    const [loaded] = await AiChatService.loadMessages("chat-1");
+    expect(loaded).toMatchObject({ ...expected, content: data.message, delivery: "saved" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("does not infer usage, model metadata or a generation ID for legacy done events", async () => {
     const { result } = renderHook(() => useAiChat());
     await act(async () => {
@@ -528,8 +567,8 @@ describe("useAiChat account policy entry points", () => {
     const finalMessage = messages.at(-1)!;
     expect(finalMessage.content).toBe("Fixture answer");
     expect(finalMessage.contractVersion).toBe(1);
-    for (const key of ["sources", "usage", "warnings", "generationId", "modelInfo"] as const) {
-      expect(finalMessage[key]).toBeUndefined();
+    for (const key of ["sources", "usage", "warnings", "generationId", "modelInfo", "usageCoverage", "attemptCount", "measuredAttemptCount", "costCoverage", "observedUsage"] as const) {
+      expect((finalMessage as unknown as Record<string, unknown>)[key]).toBeUndefined();
       expect(mocks.syncAiMessage.mock.calls.at(-1)![1][key]).toBeUndefined();
     }
   });
@@ -655,7 +694,9 @@ describe("useAiChat account policy entry points", () => {
         else mockStore.accessToken = "fixture-session-2";
         // The live store guard must work without relying on effect timing.
         await act(async () => {
-          stream.enqueue('data: {"type":"done","data":{"message":"Stale answer","generationId":"stale-generation"}}\n\n');
+          stream.enqueue(`data: ${JSON.stringify({ type: "done", data: { message: "Stale answer", generationId: "stale-generation",
+            usageCoverage: "complete", attemptCount: 8, measuredAttemptCount: 8, costCoverage: "unavailable",
+            usage: { promptTokens: 0, completionTokens: 999, totalTokens: 999 }, observedUsage: { totalTokens: 999 } } })}\n\n`);
           await pending;
           await vi.advanceTimersByTimeAsync(50);
         });
@@ -666,6 +707,9 @@ describe("useAiChat account policy entry points", () => {
         expect(mocks.syncAiMessage).not.toHaveBeenCalled();
         expect(messages.at(-1)!.content).toBe("Draft");
         expect(messages.at(-1)!.generationId).toBeUndefined();
+        for (const key of ["usageCoverage", "attemptCount", "measuredAttemptCount", "costCoverage", "usage", "observedUsage"]) {
+          expect((messages.at(-1)! as unknown as Record<string, unknown>)[key]).toBeUndefined();
+        }
         expect(result.current.isLoading).toBe(false);
       } finally {
         vi.useRealTimers();

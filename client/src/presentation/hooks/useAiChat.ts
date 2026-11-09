@@ -60,6 +60,11 @@ interface AiStreamDoneData {
     recommendations?: AiMessage['recommendations'];
     sources?: AiMessage['sources'];
     usage?: AiMessage['usage'];
+    usageCoverage?: AiMessage['usageCoverage'];
+    attemptCount?: AiMessage['attemptCount'];
+    measuredAttemptCount?: AiMessage['measuredAttemptCount'];
+    costCoverage?: AiMessage['costCoverage'];
+    observedUsage?: AiMessage['observedUsage'];
     warnings?: AiMessage['warnings'];
     generationId?: AiMessage['generationId'];
     contractVersion?: AiMessage['contractVersion'];

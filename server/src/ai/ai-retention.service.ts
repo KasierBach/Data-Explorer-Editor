@@ -25,6 +25,13 @@ type RetentionPolicy =
   | EnabledPolicy
   | { status: 'disabled' | 'invalid_configuration' };
 
+type RetentionCandidate = {
+  id: string;
+  userId: string;
+  updatedAt: Date;
+  messageCount: bigint;
+};
+
 export interface AiRetentionCleanupResult {
   status:
     | 'disabled'
@@ -117,17 +124,16 @@ export class AiRetentionService implements OnModuleInit, OnModuleDestroy {
       const result = await this.prisma.$transaction(
         async (tx) => {
           if (!this.isPolicyCurrent(policy)) throw policyAbort;
-          const chats = await tx.aiChat.findMany({
-            where: { updatedAt: { lt: cutoff } },
-            orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
-            take: policy.batchSize,
-            select: {
-              id: true,
-              userId: true,
-              updatedAt: true,
-              _count: { select: { messages: true } },
-            },
-          });
+          const chats = await tx.$queryRaw<RetentionCandidate[]>(Prisma.sql`
+            SELECT c."id", c."userId", c."updatedAt", COUNT(m."id")::bigint AS "messageCount"
+            FROM "AiChat" c
+            LEFT JOIN "AiMessage" m ON m."chatId" = c."id"
+            WHERE c."updatedAt" < ${cutoff}
+            GROUP BY c."id", c."userId", c."updatedAt"
+            HAVING COUNT(m."id") <= ${MAX_CASCADE_MESSAGES}
+            ORDER BY c."updatedAt" ASC, c."id" ASC
+            LIMIT ${policy.batchSize}
+          `);
           const counts: AiRetentionCleanupResult = {
             ...empty,
             status: 'completed',
@@ -136,7 +142,13 @@ export class AiRetentionService implements OnModuleInit, OnModuleDestroy {
           let remainingMessages = MAX_CASCADE_MESSAGES;
           for (const chat of chats) {
             if (!this.isPolicyCurrent(policy)) throw policyAbort;
-            const messageCount = chat._count.messages;
+            const rawMessageCount = chat.messageCount;
+            const messageCount =
+              typeof rawMessageCount === 'bigint' &&
+              rawMessageCount >= 0n &&
+              rawMessageCount <= BigInt(Number.MAX_SAFE_INTEGER)
+                ? Number(rawMessageCount)
+                : Number.NaN;
             // Retain oversized histories intact, including their attachments;
             // never partially truncate a conversation just to fit this job.
             if (

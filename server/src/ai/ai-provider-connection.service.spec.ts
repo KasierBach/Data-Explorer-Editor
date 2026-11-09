@@ -605,6 +605,12 @@ describe('AiProviderConnectionService', () => {
       if (phase === 'begin' || phase === 'attempt')
         expect(fetchAiProvider).not.toHaveBeenCalled();
       else expect(execution.complete).toHaveBeenCalledTimes(1);
+      if (phase === 'attempt' || phase === 'complete')
+        expect(execution.fail).toHaveBeenCalledWith('failed');
+      else expect(execution.fail).not.toHaveBeenCalled();
+      expect(execution.release).toHaveBeenCalledTimes(
+        phase === 'begin' ? 0 : 1,
+      );
     },
   );
 

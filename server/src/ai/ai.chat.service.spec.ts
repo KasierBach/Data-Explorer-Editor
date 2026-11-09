@@ -593,6 +593,377 @@ describe('AiChatService persistence integrity', () => {
     });
     expect(JSON.stringify(result.attachments)).not.toContain('secret-key');
   });
+
+  describe.each(['save', 'PATCH', 'edit-and-truncate PATCH'])(
+    'A10 metadata allowlist on %s (mock DB)',
+    (operation) => {
+      it.each([
+        ...['complete', 'partial', 'unavailable'].map((usageCoverage) => ({
+          name: `${usageCoverage} usage coverage`,
+          input: { usageCoverage },
+          expected: { usageCoverage },
+        })),
+        {
+          name: 'unavailable cost coverage without a cost ledger',
+          input: { costCoverage: 'unavailable' },
+          expected: { costCoverage: 'unavailable' },
+        },
+        {
+          name: 'independent zero attempt count',
+          input: { attemptCount: 0 },
+          expected: { attemptCount: 0 },
+        },
+        {
+          name: 'independent zero measured count without inventing attempts',
+          input: { measuredAttemptCount: 0 },
+          expected: { measuredAttemptCount: 0 },
+        },
+        {
+          name: 'attempt counts at the inclusive cap',
+          input: { attemptCount: 8, measuredAttemptCount: 8 },
+          expected: { attemptCount: 8, measuredAttemptCount: 8 },
+        },
+        {
+          name: 'measured count exceeding attempts is omitted independently',
+          input: { attemptCount: 3, measuredAttemptCount: 4 },
+          expected: { attemptCount: 3 },
+        },
+        {
+          name: 'valid measured count survives an invalid attempt count',
+          input: { attemptCount: '1', measuredAttemptCount: 1 },
+          expected: { measuredAttemptCount: 1 },
+        },
+        {
+          name: 'valid attempt count survives an invalid measured count',
+          input: { attemptCount: 1, measuredAttemptCount: '1' },
+          expected: { attemptCount: 1 },
+        },
+        {
+          name: 'unknown or case-mismatched coverage and unsupported cost claims',
+          input: { usageCoverage: 'COMPLETE', costCoverage: 'complete' },
+          expected: {},
+        },
+        ...[
+          9,
+          -1,
+          0.5,
+          Number.MAX_SAFE_INTEGER + 1,
+          '1',
+          null,
+          NaN,
+          Infinity,
+        ].map((value) => ({
+          name: `invalid attempt counts ${String(value)}`,
+          input: { attemptCount: value, measuredAttemptCount: value },
+          expected: {},
+        })),
+        ...['promptTokens', 'completionTokens', 'totalTokens'].flatMap(
+          (counter) => [
+            {
+              name: `${counter} numeric zero independently`,
+              input: {
+                usage: { [counter]: 0 },
+                observedUsage: { [counter]: 0 },
+              },
+              expected: {
+                usage: { [counter]: 0 },
+                observedUsage: { [counter]: 0 },
+              },
+            },
+            {
+              name: `${counter} explicit null independently`,
+              input: {
+                usage: { [counter]: null },
+                observedUsage: { [counter]: null },
+              },
+              expected: {
+                usage: { [counter]: null },
+                observedUsage: { [counter]: null },
+              },
+            },
+          ],
+        ),
+        {
+          name: 'explicit usage object null with observed usage absent',
+          input: { usage: null },
+          expected: { usage: null },
+        },
+        {
+          name: 'explicit observed usage object null with usage absent',
+          input: { observedUsage: null },
+          expected: { observedUsage: null },
+        },
+        {
+          name: 'mixed numeric and null counters without inferring a total',
+          input: {
+            usage: { promptTokens: 7, completionTokens: null },
+            observedUsage: { promptTokens: null, completionTokens: 0 },
+          },
+          expected: {
+            usage: { promptTokens: 7, completionTokens: null },
+            observedUsage: { promptTokens: null, completionTokens: 0 },
+          },
+        },
+        {
+          name: 'safe token counters are not capped like attempt counts',
+          input: {
+            usage: { promptTokens: Number.MAX_SAFE_INTEGER },
+            observedUsage: { totalTokens: Number.MAX_SAFE_INTEGER },
+          },
+          expected: {
+            usage: { promptTokens: Number.MAX_SAFE_INTEGER },
+            observedUsage: { totalTokens: Number.MAX_SAFE_INTEGER },
+          },
+        },
+        {
+          name: 'negative fractional unsafe and string counters are stripped',
+          input: {
+            usage: {
+              promptTokens: -1,
+              completionTokens: 0,
+              totalTokens: 1.5,
+              apiKey: 'secret-key',
+            },
+            observedUsage: {
+              promptTokens: Number.MAX_SAFE_INTEGER + 1,
+              completionTokens: null,
+              totalTokens: '1',
+              rawResponse: { token: 'secret-key' },
+            },
+          },
+          expected: {
+            usage: { completionTokens: 0 },
+            observedUsage: { completionTokens: null },
+          },
+        },
+        {
+          name: 'nonfinite counters are stripped without coercion to null',
+          input: {
+            usage: {
+              promptTokens: NaN,
+              completionTokens: 0,
+              totalTokens: Infinity,
+            },
+            observedUsage: {
+              promptTokens: -Infinity,
+              completionTokens: null,
+              totalTokens: -1,
+            },
+          },
+          expected: {
+            usage: { completionTokens: 0 },
+            observedUsage: { completionTokens: null },
+          },
+        },
+        {
+          name: 'legacy absent usage metadata is not invented',
+          input: {},
+          expected: {},
+        },
+      ])(
+        '$name retains returned and staged JSON only',
+        async ({ input, expected }) => {
+          const db = persistenceMock();
+          const dto = {
+            ...DTO,
+            expectedUpdatedAt: VERSION.toISOString(),
+            attachments: {
+              contractVersion: 1,
+              generationId: 'generation-1',
+              ...input,
+              providerOverride: { apiKey: 'secret-key' },
+              rawResponse: { token: 'secret-key' },
+              rawUsage: { total_tokens: 999999 },
+              attempts: [
+                { usage: { totalTokens: 999999 }, apiKey: 'secret-key' },
+              ],
+              costAmount: 999,
+              priceSnapshotId: 'untrusted-price',
+            } as any,
+          };
+          const result =
+            operation === 'save'
+              ? await db.service.addMessage('user-1', 'chat-1', dto)
+              : operation === 'PATCH'
+                ? await db.service.updateMessage(
+                    'user-1',
+                    'chat-1',
+                    'msg-b',
+                    dto,
+                  )
+                : await db.service.editMessageAndTruncate(
+                    'user-1',
+                    'chat-1',
+                    'msg-b',
+                    dto,
+                  );
+          const attachments = {
+            contractVersion: 1,
+            generationId: 'generation-1',
+            ...expected,
+          };
+          expect(result.attachments).toEqual(attachments);
+          expect(JSON.parse(JSON.stringify(result.attachments))).toEqual(
+            attachments,
+          );
+          expect(db.state.messages.get(result.id)?.attachments).toEqual(
+            attachments,
+          );
+          const write =
+            operation === 'save'
+              ? db.tx.aiMessage.create
+              : db.tx.aiMessage.update;
+          expect(write).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({ attachments }),
+            }),
+          );
+          expect(result.persistence.state).toBe('saved');
+          expect(
+            JSON.stringify(db.state.messages.get(result.id)?.attachments),
+          ).not.toContain('secret-key');
+          if (operation !== 'edit-and-truncate PATCH')
+            expect(db.tx.aiMessage.deleteMany).not.toHaveBeenCalled();
+        },
+      );
+    },
+  );
+
+  it('keeps identical A10 metadata retries already_saved with an unchanged version and no writes', async () => {
+    const db = persistenceMock();
+    const attachments = {
+      contractVersion: 1,
+      generationId: 'generation-1',
+      usageCoverage: 'partial',
+      attemptCount: 2,
+      measuredAttemptCount: 1,
+      costCoverage: 'unavailable',
+      usage: null,
+      observedUsage: { promptTokens: 0, completionTokens: null },
+    };
+    const dto = {
+      ...DTO,
+      clientMessageId: CLIENT_ID,
+      expectedUpdatedAt: VERSION.toISOString(),
+      attachments: attachments as any,
+    };
+    const first = await db.service.addMessage('user-1', 'chat-1', dto);
+    const before = db.snapshot();
+    const retry = await db.service.addMessage('user-1', 'chat-1', dto);
+    expect(retry.id).toBe(CLIENT_ID);
+    expect(retry.persistence.state).toBe('already_saved');
+    expect(retry.chatUpdatedAt).toEqual(first.chatUpdatedAt);
+    expect(db.snapshot()).toEqual(before);
+    expect(db.tx.aiChat.updateMany).not.toHaveBeenCalled();
+    expect(db.tx.aiMessage.create).not.toHaveBeenCalled();
+    expect(db.tx.aiMessage.update).not.toHaveBeenCalled();
+    expect(db.tx.aiMessage.deleteMany).not.toHaveBeenCalled();
+    expect(retry.attachments).toEqual(attachments);
+    expect(first.attachments).toEqual(attachments);
+    expect(db.state.messages.get(CLIENT_ID)?.attachments).toEqual(attachments);
+  });
+
+  it.each([
+    {
+      name: 'usage coverage',
+      original: { usageCoverage: 'complete' },
+      changed: { usageCoverage: 'partial' },
+    },
+    {
+      name: 'attempt count',
+      original: { attemptCount: 0 },
+      changed: { attemptCount: 1 },
+    },
+    {
+      name: 'measured attempt count',
+      original: { measuredAttemptCount: 0 },
+      changed: { measuredAttemptCount: 1 },
+    },
+    {
+      name: 'cost coverage absent to unavailable',
+      original: {},
+      changed: { costCoverage: 'unavailable' },
+    },
+    {
+      name: 'cost coverage unavailable to absent',
+      original: { costCoverage: 'unavailable' },
+      changed: {},
+    },
+    ...['promptTokens', 'completionTokens', 'totalTokens'].map((counter) => ({
+      name: `observed ${counter}`,
+      original: { observedUsage: { [counter]: 0 } },
+      changed: { observedUsage: { [counter]: 1 } },
+    })),
+    {
+      name: 'observed counter absent to null',
+      original: { observedUsage: { promptTokens: 0 } },
+      changed: { observedUsage: { promptTokens: 0, completionTokens: null } },
+    },
+    {
+      name: 'usage absent to object null',
+      original: {},
+      changed: { usage: null },
+    },
+    {
+      name: 'usage object null to absent',
+      original: { usage: null },
+      changed: {},
+    },
+    {
+      name: 'observed usage absent to object null',
+      original: {},
+      changed: { observedUsage: null },
+    },
+    {
+      name: 'observed usage object null to absent',
+      original: { observedUsage: null },
+      changed: {},
+    },
+    {
+      name: 'usage counter absent to null',
+      original: { usage: { promptTokens: 0 } },
+      changed: { usage: { promptTokens: 0, completionTokens: null } },
+    },
+    {
+      name: 'usage counter null to absent',
+      original: { usage: { promptTokens: 0, completionTokens: null } },
+      changed: { usage: { promptTokens: 0 } },
+    },
+  ])(
+    'rejects metadata-only same-id collision for $name without writes',
+    async ({ original, changed }) => {
+      const db = persistenceMock();
+      const dto = {
+        ...DTO,
+        clientMessageId: CLIENT_ID,
+        expectedUpdatedAt: VERSION.toISOString(),
+      };
+      await db.service.addMessage('user-1', 'chat-1', {
+        ...dto,
+        attachments: {
+          contractVersion: 1,
+          generationId: 'generation-1',
+          ...original,
+        } as any,
+      });
+      const before = db.snapshot();
+      await expect(
+        db.service.addMessage('user-1', 'chat-1', {
+          ...dto,
+          attachments: {
+            contractVersion: 1,
+            generationId: 'generation-1',
+            ...changed,
+          } as any,
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(db.snapshot()).toEqual(before);
+      expect(db.tx.aiChat.updateMany).not.toHaveBeenCalled();
+      expect(db.tx.aiMessage.create).not.toHaveBeenCalled();
+      expect(db.tx.aiMessage.update).not.toHaveBeenCalled();
+      expect(db.tx.aiMessage.deleteMany).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('AiChatController HTTP persistence contract (mock DB)', () => {
@@ -675,6 +1046,60 @@ describe('AiChatController HTTP persistence contract (mock DB)', () => {
     });
     expect(retry.body.chatUpdatedAt).toBe(first.body.chatUpdatedAt);
   });
+
+  it.each([
+    ['POST', '/ai/chats/chat-1/messages', 201],
+    ['PATCH', '/ai/chats/chat-1/messages/msg-b', 200],
+  ] as const)(
+    'passes A10 metadata through ValidationPipe on %s and stores only the allowlist',
+    async (method, url, status) => {
+      const attachments = {
+        contractVersion: 1,
+        generationId: 'generation-http',
+        usageCoverage: 'partial',
+        attemptCount: 2,
+        measuredAttemptCount: 1,
+        costCoverage: 'unavailable',
+        usage: null,
+        observedUsage: {
+          promptTokens: 0,
+          completionTokens: null,
+          totalTokens: 9,
+          apiKey: 'secret-key',
+        },
+        rawResponse: { token: 'secret-key' },
+        costAmount: 999,
+      };
+      const response = await request(app.getHttpServer())
+        [method === 'POST' ? 'post' : 'patch'](url)
+        .set('x-test-user', 'user-1')
+        .send({ ...DTO, attachments })
+        .expect(status);
+      const expected = {
+        contractVersion: 1,
+        generationId: 'generation-http',
+        usageCoverage: 'partial',
+        attemptCount: 2,
+        measuredAttemptCount: 1,
+        costCoverage: 'unavailable',
+        usage: null,
+        observedUsage: {
+          promptTokens: 0,
+          completionTokens: null,
+          totalTokens: 9,
+        },
+      };
+      expect(response.body.attachments).toEqual(expected);
+      expect(JSON.stringify(response.body.attachments)).not.toContain(
+        'secret-key',
+      );
+      expect(
+        [...db.state.messages.values()].find(
+          (row) => row.id === response.body.id,
+        )?.attachments,
+      ).toEqual(expected);
+    },
+  );
 
   it.each(['userId', 'actorId', 'user', 'actor'])(
     'rejects spoofed %s in the message body',

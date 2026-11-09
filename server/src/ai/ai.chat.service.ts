@@ -59,7 +59,7 @@ export class AiChatService {
 
     if (Array.isArray(dto.attachments)) return items(dto.attachments);
     const envelope = record(dto.attachments);
-    const payload: Record<string, Prisma.InputJsonValue> = {};
+    const payload: Record<string, Prisma.InputJsonValue | null> = {};
     if (envelope.items !== undefined) payload.items = items(envelope.items);
     if (envelope.modelInfo != null) {
       payload.modelInfo = stringFields(record(envelope.modelInfo), [
@@ -111,20 +111,60 @@ export class AiChatService {
       }
       payload.sources = [...sources];
     }
-    if (envelope.usage != null) {
-      const usage = record(envelope.usage);
-      const counters: Record<string, number> = {};
-      for (const key of ['promptTokens', 'completionTokens', 'totalTokens']) {
-        const value = usage[key];
-        if (
-          typeof value === 'number' &&
-          Number.isSafeInteger(value) &&
-          value >= 0
-        )
-          counters[key] = value;
+    const usage = (key: 'usage' | 'observedUsage') => {
+      if (envelope[key] === null) {
+        payload[key] = null;
+        return;
       }
-      if (Object.keys(counters).length) payload.usage = counters;
-    }
+      if (envelope[key] === undefined) return;
+      const value = record(envelope[key]);
+      const counters: Record<string, number | null> = {};
+      for (const counter of [
+        'promptTokens',
+        'completionTokens',
+        'totalTokens',
+      ]) {
+        const observed = value[counter];
+        if (
+          observed === null ||
+          (typeof observed === 'number' &&
+            Number.isSafeInteger(observed) &&
+            observed >= 0)
+        )
+          counters[counter] = observed;
+      }
+      if (Object.keys(counters).length) payload[key] = counters;
+    };
+
+    usage('usage');
+    usage('observedUsage');
+    if (
+      typeof envelope.usageCoverage === 'string' &&
+      ['complete', 'partial', 'unavailable'].includes(envelope.usageCoverage)
+    )
+      payload.usageCoverage = envelope.usageCoverage;
+    const attemptCount =
+      typeof envelope.attemptCount === 'number' &&
+      Number.isSafeInteger(envelope.attemptCount) &&
+      envelope.attemptCount >= 0 &&
+      envelope.attemptCount <= 8
+        ? envelope.attemptCount
+        : undefined;
+    const measuredAttemptCount =
+      typeof envelope.measuredAttemptCount === 'number' &&
+      Number.isSafeInteger(envelope.measuredAttemptCount) &&
+      envelope.measuredAttemptCount >= 0 &&
+      envelope.measuredAttemptCount <= 8
+        ? envelope.measuredAttemptCount
+        : undefined;
+    if (attemptCount !== undefined) payload.attemptCount = attemptCount;
+    if (
+      measuredAttemptCount !== undefined &&
+      (attemptCount === undefined || measuredAttemptCount <= attemptCount)
+    )
+      payload.measuredAttemptCount = measuredAttemptCount;
+    if (envelope.costCoverage === 'unavailable')
+      payload.costCoverage = 'unavailable';
     if (Array.isArray(envelope.warnings)) {
       payload.warnings = stringArray(envelope.warnings).filter((value) =>
         value.trim(),

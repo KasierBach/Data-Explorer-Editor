@@ -121,11 +121,15 @@ export class AiQualityService {
   private sumTokenUsage(generations: GenerationMetadata[]) {
     const observed = (
       key: 'promptTokens' | 'completionTokens' | 'totalTokens',
-    ) =>
-      generations.reduce(
-        (sum, generation) => sum + Number(generation[key] ?? 0n),
-        0,
-      );
+    ): number | null => {
+      const total = generations.reduce<bigint | null>((sum, generation) => {
+        const value = generation[key];
+        return value === null ? sum : (sum ?? 0n) + value;
+      }, null);
+      return total !== null && total <= BigInt(Number.MAX_SAFE_INTEGER)
+        ? Number(total)
+        : null;
+    };
     const attempts = generations.reduce(
       (sum, generation) => sum + generation.attemptCount,
       0,

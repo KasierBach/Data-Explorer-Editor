@@ -163,6 +163,80 @@ describe('AiSchemaContextService', () => {
     );
   });
 
+  it('bounds and discloses truncated schema inventories before cache and column work', async () => {
+    const cacheManager = {
+      get: jest.fn().mockResolvedValue(undefined),
+      set: jest.fn().mockResolvedValue(undefined),
+    };
+    const freshnessService = {
+      buildKey: jest
+        .fn()
+        .mockResolvedValueOnce('ai-schema:inventory')
+        .mockResolvedValueOnce('ai-schema:context'),
+    };
+    const publicTables = Array.from({ length: 4_999 }, (_, index) => ({
+      name: `table_${index}`,
+    }));
+    const relationships = Array.from({ length: 10_250 }, (_, index) => ({
+      constraint_name: `fk_${index}`,
+      source_table: `table_${index % 100}`,
+      source_column: 'id',
+      target_table: `table_${(index + 1) % 100}`,
+      target_column: 'id',
+    }));
+    const strategy = {
+      getSchemas: jest.fn().mockResolvedValue(['public', 'archive', 'ignored']),
+      getTables: jest
+        .fn()
+        .mockResolvedValueOnce(publicTables)
+        .mockResolvedValueOnce([
+          { name: 'final_allowed' },
+          { name: 'not_retained' },
+        ]),
+      getColumns: jest.fn().mockResolvedValue([
+        {
+          name: 'id',
+          type: 'uuid',
+          isNullable: false,
+          isPrimaryKey: true,
+        },
+      ]),
+      getRelationships: jest.fn().mockResolvedValue(relationships),
+    };
+    const service = new AiSchemaContextService(
+      cacheManager as never,
+      freshnessService as never,
+    );
+
+    const context = await service.gatherSchemaContext(
+      {},
+      strategy as never,
+      'app',
+      'connection-1',
+      'final allowed',
+    );
+
+    expect(strategy.getTables).toHaveBeenCalledTimes(2);
+    expect(strategy.getTables).not.toHaveBeenCalledWith({}, 'ignored', 'app');
+    expect(strategy.getColumns).toHaveBeenCalledWith(
+      {},
+      'archive',
+      'final_allowed',
+      'app',
+    );
+    expect(strategy.getColumns).toHaveBeenCalledTimes(1);
+    expect(context).toContain('final_allowed');
+    expect(context).toContain(
+      'Schema inventory truncated to operational limits',
+    );
+    const inventoryCall = cacheManager.set.mock.calls.find(
+      ([key]) => key === 'ai-schema:inventory',
+    );
+    expect(inventoryCall?.[1]).toMatchObject({ truncated: true });
+    expect(inventoryCall?.[1].tables).toHaveLength(5_000);
+    expect(inventoryCall?.[1].relationships).toHaveLength(10_000);
+  });
+
   it('returns a cached empty context without rebuilding schema metadata', async () => {
     const cacheManager = {
       get: jest.fn().mockResolvedValue(''),

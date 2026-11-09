@@ -436,6 +436,16 @@ function git(args) {
   try { return execFileSync('git', ['-C', ROOT, ...args], { encoding: 'utf8', timeout: 10000, maxBuffer: MAX_REPORT_BYTES, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_OPTIONAL_LOCKS: '0' } }).trim(); }
   catch { throw new ReadinessError('GIT_INSPECTION_FAILED'); }
 }
+export function hasHiddenWorktreeIndexBits(listing) {
+  if (typeof listing !== 'string' || listing === '') return false;
+  for (const entry of listing.split('\0')) {
+    if (!entry) continue;
+    requireValue(entry.length >= 3 && entry[1] === ' ', 'INVALID_GIT_INDEX');
+    const tag = entry[0];
+    if (tag === 'S' || tag === tag.toLowerCase()) return true;
+  }
+  return false;
+}
 async function repositoryContext(releaseSha) {
   const packageBindings = {};
   for (const id of ['server', 'client']) {
@@ -445,7 +455,9 @@ async function repositoryContext(releaseSha) {
     }
   }
   const ci = process.env.GITHUB_ACTIONS === 'true';
-  return { releaseSha, headSha: git(['rev-parse', '--verify', 'HEAD']), treeSha: git(['rev-parse', 'HEAD^{tree}']), dirty: git(['status', '--porcelain=v1', '--untracked-files=all']) !== '', packageBindings, now: Date.now(), source: ci ? 'ci' : 'local', githubSha: ci ? process.env.GITHUB_SHA : null, runId: ci ? process.env.GITHUB_RUN_ID : null, runAttempt: ci ? process.env.GITHUB_RUN_ATTEMPT : null };
+  const dirty = git(['status', '--porcelain=v1', '--untracked-files=all']) !== '' ||
+    hasHiddenWorktreeIndexBits(git(['ls-files', '-v', '-z']));
+  return { releaseSha, headSha: git(['rev-parse', '--verify', 'HEAD']), treeSha: git(['rev-parse', 'HEAD^{tree}']), dirty, packageBindings, now: Date.now(), source: ci ? 'ci' : 'local', githubSha: ci ? process.env.GITHUB_SHA : null, runId: ci ? process.env.GITHUB_RUN_ID : null, runAttempt: ci ? process.env.GITHUB_RUN_ATTEMPT : null };
 }
 async function envFilesPresent() {
   for (const folder of [ROOT, join(ROOT, 'server'), join(ROOT, 'client')]) {

@@ -69,6 +69,11 @@ interface AiMessagePayloadEnvelope {
     recommendations?: AiMessage['recommendations'];
     sources?: AiMessage['sources'];
     usage?: AiMessage['usage'];
+    usageCoverage?: AiMessage['usageCoverage'];
+    attemptCount?: AiMessage['attemptCount'];
+    measuredAttemptCount?: AiMessage['measuredAttemptCount'];
+    costCoverage?: AiMessage['costCoverage'];
+    observedUsage?: AiMessage['observedUsage'];
     warnings?: AiMessage['warnings'];
     generationId?: AiMessage['generationId'];
     contractVersion?: AiMessage['contractVersion'];
@@ -88,7 +93,29 @@ function getPayloadRecord(payload: unknown) {
         : null;
 }
 
-type AiMessageProvenance = Pick<AiMessage, 'sources' | 'usage' | 'warnings' | 'generationId' | 'contractVersion'>;
+type AiMessageProvenance = Pick<AiMessage,
+    'sources' | 'usage' | 'usageCoverage' | 'attemptCount' | 'measuredAttemptCount' |
+    'costCoverage' | 'observedUsage' | 'warnings' | 'generationId' | 'contractVersion'>;
+
+function normalizeAiMessageUsage(value: unknown): AiMessage['usage'] | undefined {
+    if (value === null) return null;
+    const usageRecord = getPayloadRecord(value);
+    if (!usageRecord) return undefined;
+    const usage: Exclude<AiMessage['usage'], null | undefined> = {};
+    for (const key of ['promptTokens', 'completionTokens', 'totalTokens'] as const) {
+        const counter = usageRecord[key];
+        if (counter === null || (typeof counter === 'number' && Number.isSafeInteger(counter) && counter >= 0)) {
+            usage[key] = counter;
+        }
+    }
+    return Object.keys(usage).length ? usage : undefined;
+}
+
+function normalizeAiMessageAttemptCount(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 && value <= 8
+        ? value
+        : undefined;
+}
 
 export function normalizeAiMessageProvenance(payload: unknown): AiMessageProvenance {
     const payloadRecord = getPayloadRecord(payload);
@@ -115,16 +142,22 @@ export function normalizeAiMessageProvenance(payload: unknown): AiMessageProvena
         if (sources.size) provenance.sources = [...sources];
     }
 
-    const usageRecord = getPayloadRecord(payloadRecord.usage);
-    if (usageRecord) {
-        const usage: NonNullable<AiMessage['usage']> = {};
-        for (const key of ['promptTokens', 'completionTokens', 'totalTokens'] as const) {
-            const value = usageRecord[key];
-            if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) usage[key] = value;
-        }
-        // Missing counters are unknown, not zero or an inferred total.
-        if (Object.keys(usage).length) provenance.usage = usage;
+    const usage = normalizeAiMessageUsage(payloadRecord.usage);
+    if (usage !== undefined) provenance.usage = usage;
+    const observedUsage = normalizeAiMessageUsage(payloadRecord.observedUsage);
+    if (observedUsage !== undefined) provenance.observedUsage = observedUsage;
+
+    if (typeof payloadRecord.usageCoverage === 'string' &&
+        ['complete', 'partial', 'unavailable'].includes(payloadRecord.usageCoverage)) {
+        provenance.usageCoverage = payloadRecord.usageCoverage as NonNullable<AiMessage['usageCoverage']>;
     }
+    const attemptCount = normalizeAiMessageAttemptCount(payloadRecord.attemptCount);
+    if (attemptCount !== undefined) provenance.attemptCount = attemptCount;
+    const measuredAttemptCount = normalizeAiMessageAttemptCount(payloadRecord.measuredAttemptCount);
+    if (measuredAttemptCount !== undefined && (attemptCount === undefined || measuredAttemptCount <= attemptCount)) {
+        provenance.measuredAttemptCount = measuredAttemptCount;
+    }
+    if (payloadRecord.costCoverage === 'unavailable') provenance.costCoverage = 'unavailable';
 
     if (Array.isArray(payloadRecord.warnings)) {
         const warnings = payloadRecord.warnings.filter((warning): warning is string => (

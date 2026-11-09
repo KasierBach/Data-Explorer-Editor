@@ -1,3 +1,8 @@
+import type {
+  AiExecutionUsage,
+  AiUsageCoverage,
+} from './dto/ai-execution.types';
+
 export type AiProvider =
   | 'gemini'
   | 'cerebras'
@@ -44,11 +49,21 @@ export interface AiMessageAttachment {
   data?: string;
 }
 
-export interface AiMessagePayloadEnvelope {
-  contractVersion?: 1;
+export interface AiExecutionResponseMetadata {
   generationId?: string;
+  usageCoverage?: AiUsageCoverage;
+  attemptCount?: number;
+  measuredAttemptCount?: number;
+  costCoverage?: 'unavailable';
+  /** Legacy usage is emitted only for complete coverage; counters are never inferred. */
+  usage?: AiExecutionUsage | null;
+  /** Received subtotals only; never an estimate of unknown attempts or a bill. */
+  observedUsage?: AiExecutionUsage | null;
+}
+
+export interface AiMessagePayloadEnvelope extends AiExecutionResponseMetadata {
+  contractVersion?: 1;
   sources?: string[];
-  usage?: TokenUsage;
   warnings?: string[];
   items?: AiMessageAttachment[];
   modelInfo?: AiMessageModelInfo;
@@ -137,9 +152,8 @@ export interface TokenUsage {
   totalTokens: number;
 }
 
-export interface ChatResult {
+export interface ChatResult extends AiExecutionResponseMetadata {
   contractVersion?: 1;
-  generationId?: string;
   warnings?: string[];
   message: string;
   sql?: string;
@@ -150,7 +164,6 @@ export interface ChatResult {
   providerLabel?: string;
   model: string;
   routingMode: AiRoutingMode;
-  usage?: TokenUsage;
 }
 
 export interface ProviderPlan {
@@ -173,11 +186,9 @@ export interface RouteDecision {
   responseFormat: AiResponseFormat;
 }
 
-export interface StreamDoneData {
+export interface StreamDoneData extends AiExecutionResponseMetadata {
   contractVersion?: 1;
-  generationId?: string;
   warnings?: string[];
-  usage?: TokenUsage;
   message: string;
   sql?: string;
   explanation?: string;

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AiChatService } from './AiChatService';
+import { AiChatService, normalizeAiMessageProvenance } from './AiChatService';
 
 const savedResponse = { id: 'server-message', chatUpdatedAt: '2026-11-09T12:00:00.123Z', persistence: { state: 'saved' } };
 const clientMessageId = '123e4567-e89b-42d3-a456-426614174000';
@@ -157,6 +157,75 @@ describe('AiChatService', () => {
     });
     expect(persisted.modelInfo).toBeUndefined();
     expect(persisted.usage).toBeUndefined();
+  });
+
+  describe.each(['save', 'update'] as const)('%s execution metadata', (operation) => {
+    it.each([
+      { usageCoverage: 'complete', attemptCount: 1, measuredAttemptCount: 1, costCoverage: 'unavailable',
+        usage: { promptTokens: 0, completionTokens: 2, totalTokens: 2 }, observedUsage: { promptTokens: 0, completionTokens: 2, totalTokens: 2 } },
+      { usageCoverage: 'partial', attemptCount: 3, measuredAttemptCount: 1, costCoverage: 'unavailable',
+        usage: null, observedUsage: { promptTokens: 12, completionTokens: null, totalTokens: null } },
+      { usageCoverage: 'partial', attemptCount: 2, measuredAttemptCount: 1, costCoverage: 'unavailable',
+        usage: null, observedUsage: { promptTokens: null, completionTokens: 0, totalTokens: null } },
+      { usageCoverage: 'partial', attemptCount: 2, measuredAttemptCount: 1, costCoverage: 'unavailable',
+        usage: null, observedUsage: { promptTokens: null, completionTokens: null, totalTokens: 9 } },
+      { usageCoverage: 'unavailable', attemptCount: 2, measuredAttemptCount: 0, costCoverage: 'unavailable', usage: null, observedUsage: null },
+      { usageCoverage: 'unavailable', attemptCount: 0, measuredAttemptCount: 0, costCoverage: 'unavailable', usage: null, observedUsage: null },
+      { usage: { promptTokens: 0, completionTokens: null, totalTokens: null } },
+      { usage: null },
+      { observedUsage: null },
+      {},
+    ])('round-trips optional nullable metadata without inference: %j', async (metadata) => {
+      const input = { role: 'ai' as const, content: 'Final answer', generationId: 'received-generation', ...metadata };
+      let stored: Record<string, unknown> | undefined;
+      mockFetch.mockImplementation(async (_url: string, request?: RequestInit) => {
+        if (request?.method === 'GET') return { ok: true, headers: { get: () => 'application/json' }, json: async () => ({
+          updatedAt: savedResponse.chatUpdatedAt,
+          messages: [{ id: clientMessageId, role: 'model', content: input.content, attachments: stored, createdAt: '2026-11-09T11:00:00.001Z' }],
+        }) };
+        stored = JSON.parse(request!.body as string).attachments;
+        return { ok: true, headers: { get: () => 'application/json' }, json: async () => ({
+          ...savedResponse, id: clientMessageId, role: 'ai', content: input.content, attachments: stored, createdAt: '2026-11-09T11:00:00.001Z',
+        }) };
+      });
+      const result = operation === 'save'
+        ? await AiChatService.saveMessage('chat-1', input as never)
+        : await AiChatService.updateMessage('chat-1', clientMessageId, input as never);
+      const expected = { ...metadata, generationId: input.generationId, contractVersion: 1 };
+      expect(stored).toEqual({ items: [], ...expected });
+      expect(normalizeAiMessageProvenance(result.message)).toEqual(expected);
+      const snapshot = await AiChatService.loadMessages('chat-1', true);
+      expect(snapshot.serverUpdatedAt).toBe(savedResponse.chatUpdatedAt);
+      expect(normalizeAiMessageProvenance(snapshot.messages[0])).toEqual(expected);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it.each([
+    { input: { usageCoverage: 'complete', costCoverage: 'unavailable', attemptCount: 8, measuredAttemptCount: 8 },
+      expected: { usageCoverage: 'complete', costCoverage: 'unavailable', attemptCount: 8, measuredAttemptCount: 8 } },
+    { input: { usageCoverage: 'partial', costCoverage: 'unavailable', attemptCount: 1, measuredAttemptCount: 2 },
+      expected: { usageCoverage: 'partial', costCoverage: 'unavailable', attemptCount: 1 } },
+    { input: { measuredAttemptCount: 1 }, expected: { measuredAttemptCount: 1 } },
+    { input: { usage: null, observedUsage: null }, expected: { usage: null, observedUsage: null } },
+    { input: { usage: { promptTokens: null, completionTokens: 0, totalTokens: undefined }, observedUsage: { promptTokens: 3, completionTokens: null, totalTokens: null } },
+      expected: { usage: { promptTokens: null, completionTokens: 0 }, observedUsage: { promptTokens: 3, completionTokens: null, totalTokens: null } } },
+    { input: { usage: { promptTokens: 3, completionTokens: 4 }, observedUsage: { promptTokens: 3, completionTokens: 4 } },
+      expected: { usage: { promptTokens: 3, completionTokens: 4 }, observedUsage: { promptTokens: 3, completionTokens: 4 } } },
+    { input: { usageCoverage: 'COMPLETE', costCoverage: 'complete', attemptCount: 9, measuredAttemptCount: 9, usage: {}, observedUsage: {} }, expected: {} },
+    { input: { usageCoverage: null, costCoverage: null, attemptCount: -1, measuredAttemptCount: 1.5, observedUsage: { promptTokens: -1, completionTokens: 1.5, totalTokens: Number.MAX_SAFE_INTEGER + 1 } }, expected: {} },
+    { input: { attemptCount: '2', measuredAttemptCount: true, usage: { promptTokens: NaN, completionTokens: Infinity, totalTokens: '3' } }, expected: {} },
+    { input: { attemptCount: Number.MAX_SAFE_INTEGER + 1, measuredAttemptCount: -1, observedUsage: [] }, expected: {} },
+    { input: { usage: undefined, observedUsage: undefined, apiKey: 'not-metadata', rawResponse: { secret: 'not-metadata' } }, expected: {} },
+  ])('normalizes optional counters and coverage without claiming ledger authority: %j', ({ input, expected }) => {
+    expect(normalizeAiMessageProvenance(input)).toEqual(expected);
+  });
+
+  it.each(['promptTokens', 'completionTokens', 'totalTokens'] as const)('drops only invalid observed %s while preserving safe siblings', (key) => {
+    const input = { promptTokens: 0, completionTokens: 2, totalTokens: 5, [key]: Number.MAX_SAFE_INTEGER + 1 };
+    const expected = { ...input };
+    delete expected[key];
+    expect(normalizeAiMessageProvenance({ usage: input, observedUsage: input })).toEqual({ usage: expected, observedUsage: expected });
   });
 
   it.each([

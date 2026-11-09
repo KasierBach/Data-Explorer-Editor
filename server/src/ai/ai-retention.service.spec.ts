@@ -38,6 +38,12 @@ function createFixture(
     beforeDelete?: () => void;
     afterDelete?: () => void;
     queryError?: Error;
+    rawCandidates?: Array<{
+      id: string;
+      userId: string;
+      updatedAt: Date;
+      messageCount: unknown;
+    }>;
     deleteError?: Error;
     commitError?: Error;
   } = {};
@@ -53,6 +59,38 @@ function createFixture(
   };
   const tx = {
     ...excluded,
+    $queryRaw: jest.fn(async (query: { values?: unknown[] }) => {
+      if (controls.holdQuery) await controls.holdQuery;
+      if (controls.queryError) throw controls.queryError;
+      const values = query.values || [];
+      const cutoff = values[0] as Date;
+      const maxMessages = Number(values[1]);
+      const take = Number(values[2]);
+      const selected = controls.rawCandidates
+        ? controls.rawCandidates.slice(0, take)
+        : [...state.values()]
+            .filter(
+              (row) =>
+                row.updatedAt < cutoff &&
+                Number.isSafeInteger(row.messageCount) &&
+                row.messageCount >= 0 &&
+                row.messageCount <= maxMessages,
+            )
+            .sort(
+              (a, b) =>
+                a.updatedAt.getTime() - b.updatedAt.getTime() ||
+                a.id.localeCompare(b.id),
+            )
+            .slice(0, take)
+            .map((row) => ({
+              id: row.id,
+              userId: row.userId,
+              updatedAt: row.updatedAt,
+              messageCount: BigInt(row.messageCount),
+            }));
+      controls.afterFind?.();
+      return selected;
+    }),
     aiChat: {
       findMany: jest.fn(
         async ({
@@ -230,9 +268,9 @@ describe('AiRetentionService (mock storage only)', () => {
       status: 'completed',
       scannedChats: 0,
     });
-    expect(db.tx.aiChat.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 100 }),
-    );
+    expect(db.tx.$queryRaw).toHaveBeenCalledTimes(1);
+    const selection = db.tx.$queryRaw.mock.calls[0][0];
+    expect(selection.values).toEqual([expect.any(Date), 1000, 100]);
   });
 
   it('uses inactivity cutoff, stable bounded selection and exact owner/version delete; preserves other stores', async () => {
@@ -264,17 +302,8 @@ describe('AiRetentionService (mock storage only)', () => {
       maxWait: 1000,
       timeout: 5000,
     });
-    expect(db.tx.aiChat.findMany).toHaveBeenCalledWith({
-      where: { updatedAt: { lt: CUTOFF } },
-      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
-      take: 1,
-      select: {
-        id: true,
-        userId: true,
-        updatedAt: true,
-        _count: { select: { messages: true } },
-      },
-    });
+    expect(db.tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(db.tx.$queryRaw.mock.calls[0][0].values).toEqual([CUTOFF, 1000, 1]);
     expect(db.tx.aiChat.deleteMany).toHaveBeenCalledWith({
       where: {
         id: 'a',
@@ -303,15 +332,47 @@ describe('AiRetentionService (mock storage only)', () => {
     ]);
     await expect(db.service.runCleanup(NOW)).resolves.toEqual({
       status: 'completed',
-      scannedChats: 4,
+      scannedChats: 3,
       deletedChats: 2,
       deletedMessages: 998,
-      skippedChats: 2,
-      messageBudgetSkippedChats: 2,
+      skippedChats: 1,
+      messageBudgetSkippedChats: 1,
     });
     expect([...db.state.keys()]).toEqual(['a', 'd']);
     expect(db.tx.aiChat.deleteMany).toHaveBeenCalledTimes(2);
     expect(db.excluded.aiMessage.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('does not let a full oversized page starve later eligible expired chats', async () => {
+    const db = createFixture(
+      { ...ENABLED, AI_RETENTION_CLEANUP_BATCH_SIZE: '1' },
+      [
+        {
+          id: 'a-oversized',
+          userId: 'user-1',
+          updatedAt: OLD,
+          messageCount: 1001,
+        },
+        { id: 'b-eligible', userId: 'user-2', updatedAt: OLD, messageCount: 1 },
+      ],
+    );
+
+    await expect(db.service.runCleanup(NOW)).resolves.toEqual({
+      status: 'completed',
+      scannedChats: 1,
+      deletedChats: 1,
+      deletedMessages: 1,
+      skippedChats: 0,
+      messageBudgetSkippedChats: 0,
+    });
+    expect([...db.state.keys()]).toEqual(['a-oversized']);
+    expect(db.tx.aiChat.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: 'b-eligible',
+        userId: 'user-2',
+        updatedAt: { equals: OLD, lt: CUTOFF },
+      },
+    });
   });
 
   it.each([-1, NaN, 0.5])(
@@ -320,6 +381,14 @@ describe('AiRetentionService (mock storage only)', () => {
       const db = createFixture(ENABLED, [
         { id: 'a', userId: 'u', updatedAt: OLD, messageCount },
       ]);
+      db.controls.rawCandidates = [
+        {
+          id: 'a',
+          userId: 'u',
+          updatedAt: OLD,
+          messageCount,
+        },
+      ];
       await expect(db.service.runCleanup(NOW)).resolves.toMatchObject({
         deletedChats: 0,
         messageBudgetSkippedChats: 1,

@@ -24,8 +24,11 @@ interface SchemaTable {
 interface SchemaInventory {
   tables: SchemaTable[];
   relationships: Relationship[];
+  truncated?: boolean;
 }
 
+const MAX_SCHEMA_INVENTORY_TABLES = 5_000;
+const MAX_SCHEMA_INVENTORY_RELATIONSHIPS = 10_000;
 const MAX_DETAILED_TABLES = 24;
 const MAX_SCHEMA_CONTEXT_CHARACTERS = 32_000;
 
@@ -172,6 +175,7 @@ export class AiSchemaContextService {
       if (!inventory) {
         const schemas = await run(() => strategy.getSchemas(pool, database));
         const allTables: SchemaTable[] = [];
+        let inventoryTruncated = false;
         const skipSchemas = [
           'pg_catalog',
           'information_schema',
@@ -199,8 +203,13 @@ export class AiSchemaContextService {
                   : (table as { name?: string }).name;
               if (tableName) {
                 allTables.push({ name: tableName, schema: schemaName });
+                if (allTables.length >= MAX_SCHEMA_INVENTORY_TABLES) {
+                  inventoryTruncated = true;
+                  break;
+                }
               }
             }
+            if (inventoryTruncated) break;
           } catch (error) {
             if (
               request.signal?.aborted ||
@@ -214,9 +223,16 @@ export class AiSchemaContextService {
 
         let relationships: Relationship[] = [];
         try {
-          relationships = await run(() =>
+          const discoveredRelationships = await run(() =>
             strategy.getRelationships(pool, database),
           );
+          relationships = discoveredRelationships.slice(
+            0,
+            MAX_SCHEMA_INVENTORY_RELATIONSHIPS,
+          );
+          if (discoveredRelationships.length > relationships.length) {
+            inventoryTruncated = true;
+          }
         } catch (error) {
           if (
             request.signal?.aborted ||
@@ -226,7 +242,11 @@ export class AiSchemaContextService {
             throw error;
           // Relationships are optional for some engines.
         }
-        inventory = { tables: allTables, relationships };
+        inventory = {
+          tables: allTables,
+          relationships,
+          ...(inventoryTruncated ? { truncated: true } : {}),
+        };
 
         if (inventoryCacheKey) {
           await run(() =>
@@ -278,6 +298,11 @@ export class AiSchemaContextService {
         columnMap,
         relationships,
       );
+      if (inventory.truncated) {
+        schemaContext =
+          '[Schema inventory truncated to operational limits; omitted objects may exist]\n' +
+          schemaContext;
+      }
       if (schemaContext.length > MAX_SCHEMA_CONTEXT_CHARACTERS) {
         schemaContext =
           schemaContext.slice(0, MAX_SCHEMA_CONTEXT_CHARACTERS) +

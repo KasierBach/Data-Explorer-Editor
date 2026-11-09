@@ -73,6 +73,29 @@ describe('AiQualityView operational coverage display', () => {
         expect(screen.queryByText('0')).not.toBeInTheDocument();
     });
 
+    it.each(['en', 'vi'] as const)('keeps prompt-only partial usage independent in %s', (lang) => {
+        const { container } = renderMetrics({ ...metrics, tokens: { ...measured, completionTokens: null, totalTokens: null } }, lang);
+        expect(screen.getByText('1.2K')).toBeInTheDocument();
+        expect(screen.getAllByText('—')).toHaveLength(3);
+        expect(screen.queryByText('0')).not.toBeInTheDocument();
+        expect(container.textContent).toContain(lang === 'en' ? 'Coverage: partial. Cost: unavailable.' : 'Độ phủ: một phần. Chi phí: không khả dụng.');
+        expect(container.querySelector('.grid')).toHaveClass('gap-3', 'sm:grid-cols-2', 'xl:grid-cols-5');
+    });
+
+    it.each(['en', 'vi'] as const)('distinguishes measured prompt zero from missing output and total in %s', (lang) => {
+        renderMetrics({ ...metrics, tokens: { ...measured, promptTokens: 0, completionTokens: null, totalTokens: null } }, lang);
+        expect(screen.getAllByText('0')).toHaveLength(1);
+        expect(screen.getAllByText('—')).toHaveLength(3);
+    });
+
+    it.each(['complete', 'partial'] as const)('keeps an unrepresentable total unknown with %s measurement coverage', (usageCoverage) => {
+        renderMetrics({ ...metrics, tokens: { ...measured, totalTokens: null, usageCoverage } });
+        expect(screen.getByText('1.2K')).toBeInTheDocument();
+        expect(screen.getByText('300')).toBeInTheDocument();
+        expect(screen.getAllByText('—')).toHaveLength(2);
+        expect(screen.getByText(new RegExp(`Coverage: ${usageCoverage}`))).toBeInTheDocument();
+    });
+
     it('handles missing/null metadata without undefined values or invented metrics', () => {
         const { container } = renderMetrics({
             ...metrics, generations: null, successRate: null, averageLatencyMs: null,

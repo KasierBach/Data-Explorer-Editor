@@ -74,6 +74,29 @@ describe('AiUsageCard observed-usage contract', () => {
         expect(screen.getByText('1.5K')).toBeInTheDocument();
     });
 
+    it.each(['en', 'vi'] as const)('keeps prompt-only partial usage independent in %s', (lang) => {
+        const { container } = renderUsage({ ...measured, completionTokens: null, totalTokens: null }, lang);
+        expect(screen.getByText('1.2K')).toBeInTheDocument();
+        expect(screen.getAllByText('—')).toHaveLength(2);
+        expect(screen.queryByText('0')).not.toBeInTheDocument();
+        expect(container.textContent).toContain(lang === 'en' ? 'Coverage: partial. Cost: unavailable.' : 'Độ phủ: một phần. Chi phí: không khả dụng.');
+        expect(container.querySelector('.grid')).toHaveClass('grid-cols-3', 'gap-3');
+    });
+
+    it.each(['en', 'vi'] as const)('distinguishes measured prompt zero from missing output and total in %s', (lang) => {
+        renderUsage({ ...measured, promptTokens: 0, completionTokens: null, totalTokens: null }, lang);
+        expect(screen.getAllByText('0')).toHaveLength(1);
+        expect(screen.getAllByText('—')).toHaveLength(2);
+    });
+
+    it.each(['complete', 'partial'] as const)('keeps an unrepresentable total unknown with %s measurement coverage', (usageCoverage) => {
+        renderUsage({ ...measured, totalTokens: null, usageCoverage });
+        expect(screen.getByText('1.2K')).toBeInTheDocument();
+        expect(screen.getByText('300')).toBeInTheDocument();
+        expect(screen.getAllByText('—')).toHaveLength(1);
+        expect(screen.getByText(new RegExp(`Coverage: ${usageCoverage}`))).toBeInTheDocument();
+    });
+
     it('uses the existing admin endpoint for platform scope', () => {
         renderUsage(measured, 'en', 'admin');
         expect(mocks.getAiQualityMetrics).toHaveBeenCalledWith(30);
