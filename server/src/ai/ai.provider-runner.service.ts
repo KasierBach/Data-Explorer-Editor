@@ -1,11 +1,21 @@
 ﻿import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GoogleGenAI, type GenerateContentResponse } from '@google/genai';
+import type { GenerateContentResponse } from '@google/genai';
+import {
+  AiGeminiProviderError,
+  AiGeminiTransport,
+} from './ai-gemini-transport';
 import { AiPromptBuilderService } from './ai.prompt-builder.service';
 import {
   buildGeminiStructuredGenerationConfig,
   buildOpenAiStructuredResponseFormat,
 } from './ai.structured-output';
+import {
+  AiRetryPolicyError,
+  aiRetryDelayMs,
+  isAiProviderTerminalError,
+  parseAiRetryAfter,
+} from './ai-retry-policy';
 import { AI_CONSTANTS } from './ai.constants';
 import type {
   AiPromptCapabilities,
@@ -37,7 +47,9 @@ import {
   waitForAiResult,
 } from './ai-request-lifecycle';
 
-type AiRequestContext = Pick<ChatParams, 'signal' | 'deadlineAt'>;
+type AiRequestContext = Pick<ChatParams, 'signal' | 'deadlineAt'> & {
+  retryBudget?: { attempts: number; lastError?: unknown };
+};
 type AiAttemptParams = AiRequestContext &
   Pick<ChatParams, 'beforeProviderAttempt' | 'execution'>;
 type TrackedProviderAttempt = AiProviderAttempt & { finished: boolean };
@@ -72,7 +84,7 @@ type OpenAiResponsePayload = {
 
 @Injectable()
 export class AiProviderRunnerService {
-  private readonly genAI: GoogleGenAI | null;
+  private readonly genAI: AiGeminiTransport | null;
   private readonly logger = new Logger(AiProviderRunnerService.name);
   private readonly openAiAttempts = new WeakMap<
     Response,
@@ -88,7 +100,7 @@ export class AiProviderRunnerService {
       this.logger.warn('GEMINI_API_KEY not set - Gemini lane disabled');
       this.genAI = null;
     } else {
-      this.genAI = new GoogleGenAI({ apiKey });
+      this.genAI = new AiGeminiTransport(apiKey);
     }
   }
 
@@ -211,10 +223,10 @@ export class AiProviderRunnerService {
     plan: ProviderPlan,
     params: AiAttemptParams,
     operation: () => Promise<T>,
-    extractUsage?: (result: T) => TokenUsage | undefined,
+    extractUsage?: (result: T) => Partial<TokenUsage> | undefined,
   ): Promise<T> {
     const attempt = await this.beginProviderAttempt(plan, params);
-    let usage: TokenUsage | undefined;
+    let usage: Partial<TokenUsage> | undefined;
     try {
       assertAiRequestActive(params);
       const result = await operation();
@@ -224,6 +236,8 @@ export class AiProviderRunnerService {
       assertAiRequestActive(params);
       return result;
     } catch (error) {
+      if (error instanceof AiGeminiProviderError)
+        usage = this.extractGeminiAttemptUsage(error) ?? usage;
       await attempt?.fail(this.getAttemptOutcome(error, params), { usage });
       throw error;
     }
@@ -269,7 +283,10 @@ export class AiProviderRunnerService {
         AI_CONSTANTS.DEFAULT_PROVIDER_TIMEOUT_MS,
     );
     return Number.isFinite(raw) && raw > 0
-      ? raw
+      ? Math.max(
+          1,
+          Math.min(AI_CONSTANTS.DEFAULT_PROVIDER_TIMEOUT_MS, Math.floor(raw)),
+        )
       : AI_CONSTANTS.DEFAULT_PROVIDER_TIMEOUT_MS;
   }
 
@@ -278,17 +295,29 @@ export class AiProviderRunnerService {
       this.configService.get<string>('AI_STREAM_IDLE_TIMEOUT_MS') ||
         this.getProviderTimeoutMs(),
     );
-    return Number.isFinite(raw) && raw > 0 ? raw : this.getProviderTimeoutMs();
+    return Number.isFinite(raw) && raw > 0
+      ? Math.max(
+          1,
+          Math.min(AI_CONSTANTS.DEFAULT_PROVIDER_TIMEOUT_MS, Math.floor(raw)),
+        )
+      : this.getProviderTimeoutMs();
   }
 
   private createRequestScope(context: AiRequestContext) {
-    return createAiRequestScope({
+    const scope = createAiRequestScope({
       ...context,
       timeoutMs:
         context.deadlineAt === undefined
           ? this.getProviderTimeoutMs()
-          : Math.max(1, context.deadlineAt - Date.now()),
+          : Math.max(
+              1,
+              Math.min(
+                AI_CONSTANTS.DEFAULT_PROVIDER_TIMEOUT_MS,
+                context.deadlineAt - Date.now(),
+              ),
+            ),
     });
+    return { ...scope, retryBudget: context.retryBudget ?? { attempts: 0 } };
   }
 
   private async waitForProviderResult<T>(
@@ -372,6 +401,17 @@ export class AiProviderRunnerService {
   }
 
   private isModelNotFoundError(error: unknown): boolean {
+    if (
+      !this.isRetryableTransportError(error) &&
+      isAiProviderTerminalError(error)
+    )
+      return false;
+    if (typeof error === 'object' && error !== null) {
+      const status =
+        (error as { status?: number; response?: { status?: number } }).status ??
+        (error as { response?: { status?: number } }).response?.status;
+      if (typeof status === 'number') return status === 404;
+    }
     if (typeof error !== 'object' || error === null) return false;
 
     const candidate = error as {
@@ -413,47 +453,35 @@ export class AiProviderRunnerService {
   private isRetryableTransportError(error: unknown): boolean {
     if (
       error instanceof AiAttemptControlError ||
-      isAiRequestStoppedError(error)
+      isAiRequestStoppedError(error) ||
+      isAiProviderTerminalError(error)
     )
       return false;
+    if (error instanceof AiProviderTransportError)
+      return error.code === 'NETWORK' || error.code === 'TIMEOUT';
     if (typeof error === 'object' && error !== null) {
       const candidate = error as {
         status?: number;
         code?: number | string;
         response?: { status?: number };
-        message?: string;
+        getStatus?: () => number;
       };
-      const status = candidate.status ?? candidate.response?.status;
+      const status =
+        candidate.status ??
+        candidate.response?.status ??
+        candidate.getStatus?.();
+      if (typeof status === 'number')
+        return this.isTransientOpenAiStatus(status);
       const code =
         typeof candidate.code === 'string'
           ? candidate.code.toLowerCase()
           : undefined;
-
-      if (typeof status === 'number' && this.isTransientOpenAiStatus(status)) {
+      if (code && ['resource_exhausted', 'unavailable'].includes(code))
         return true;
-      }
-
-      if (
-        code &&
-        [
-          'aborted',
-          'deadline_exceeded',
-          'resource_exhausted',
-          'unavailable',
-        ].includes(code)
-      ) {
-        return true;
-      }
-    }
-
-    if (error instanceof AiProviderTransportError) {
-      return error.code === 'NETWORK' || error.code === 'TIMEOUT';
     }
     if (!(error instanceof Error)) return false;
-
     const message = error.message.toLowerCase();
     return (
-      error.name === 'AbortError' ||
       message.includes('timed out') ||
       message.includes('fetch failed') ||
       message.includes('network') ||
@@ -464,10 +492,12 @@ export class AiProviderRunnerService {
     );
   }
 
-  private getRetryDelayMs(attempt: number): number {
-    return (
-      AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_BASE_DELAY_MS * Math.pow(2, attempt)
-    );
+  private getRetryDelayMs(
+    attempt: number,
+    error?: unknown,
+    context: AiRequestContext = {},
+  ): number {
+    return aiRetryDelayMs(attempt, error, context.deadlineAt);
   }
 
   private async sleep(ms: number, context: AiRequestContext = {}) {
@@ -493,8 +523,8 @@ export class AiProviderRunnerService {
     context: AiRequestContext = {},
   ): Promise<T> {
     const maxAttempts = AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_ATTEMPTS;
-
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const budget = context.retryBudget ?? { attempts: 0 };
+    while (budget.attempts < maxAttempts) {
       assertAiRequestActive(context);
       await waitForAiResult(
         Promise.resolve().then(() => {
@@ -504,31 +534,36 @@ export class AiProviderRunnerService {
         context.signal,
       );
       assertAiRequestActive(context);
+      const attempt = budget.attempts++;
       try {
-        // The operation owns its abort wait and ledger settlement.
         const result = await execute(attempt);
         assertAiRequestActive(context);
         return result;
       } catch (error) {
+        budget.lastError = error;
         if (error instanceof AiAttemptControlError) throw error;
         assertAiRequestActive(context);
-        if (
-          !this.isRetryableTransportError(error) ||
-          attempt >= maxAttempts - 1
-        ) {
+        if (!this.isRetryableTransportError(error)) throw error;
+        const delay = this.getRetryDelayMs(attempt, error, context);
+        if (budget.attempts >= maxAttempts) {
+          if (
+            error &&
+            typeof error === 'object' &&
+            'retryAfterMs' in error &&
+            typeof error.retryAfterMs === 'number' &&
+            error.retryAfterMs > 0
+          )
+            throw new AiRetryPolicyError('AI_RETRY_DEFERRED');
           throw error;
         }
-
-        const message =
-          error instanceof Error ? error.message : 'Unknown transient error';
         this.logger.warn(
-          `${label} failed with transient error: ${message}. Retrying (${attempt + 2}/${maxAttempts})...`,
+          `${label} failed with a transient error. Retrying (${budget.attempts + 1}/${maxAttempts})...`,
         );
-        await this.sleep(this.getRetryDelayMs(attempt), context);
+        await this.sleep(delay, context);
       }
     }
-
-    throw new Error(`${label} failed before a result was returned`);
+    if (budget.lastError instanceof Error) throw budget.lastError;
+    throw new AiRetryPolicyError('AI_ATTEMPT_BUDGET_EXHAUSTED');
   }
 
   private async executeOpenAiRequestWithRetry(
@@ -543,18 +578,18 @@ export class AiProviderRunnerService {
         const response = await send(attempt);
         try {
           assertAiRequestActive(context);
-          if (
-            !response.ok &&
-            this.isTransientOpenAiStatus(response.status) &&
-            attempt < AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_ATTEMPTS - 1
-          ) {
+          if (!response.ok && this.isTransientOpenAiStatus(response.status)) {
+            await this.readProviderErrorPayload(response, context);
             await this.finishOpenAiAttempt(response, undefined, context);
             await this.cancelStreamResource(() => response.body?.cancel());
-            const error = Object.assign(
-              new Error(`${label} failed with ${response.status}`),
-              { status: response.status },
+            throw this.getProviderHttpError(
+              label,
+              '',
+              response.status,
+              undefined,
+              '',
+              parseAiRetryAfter(response.headers?.get('retry-after')),
             );
-            throw error;
           }
           return response;
         } catch (error) {
@@ -609,30 +644,48 @@ export class AiProviderRunnerService {
     }
   }
 
+  private assertOpenAiResponseAllowed(payload: unknown): void {
+    if (
+      !payload ||
+      typeof payload !== 'object' ||
+      !('choices' in payload) ||
+      !Array.isArray(payload.choices)
+    )
+      return;
+    for (const choice of payload.choices) {
+      if (!choice || typeof choice !== 'object') continue;
+      if (choice.finish_reason === 'content_filter')
+        throw new AiRetryPolicyError('AI_PROVIDER_REFUSED');
+      for (const content of [choice.message, choice.delta]) {
+        if (
+          content &&
+          typeof content === 'object' &&
+          content.refusal != null &&
+          content.refusal !== ''
+        )
+          throw new AiRetryPolicyError('AI_PROVIDER_REFUSED');
+      }
+    }
+  }
+
   private getProviderHttpError(
     provider: string,
     model: string,
     status: number,
     errorPayload: unknown,
     apiKey: string,
+    retryAfterMs?: number,
   ): Error {
     const target = `${provider} model ${model}`;
-    if (status === 429) {
-      return new Error(
-        `${target} is temporarily rate limited (429). Wait and retry or choose another model.`,
-      );
-    }
-    if (status === 402) {
-      return new Error(
-        `${target} requires provider credits (402). Add credits or choose another model.`,
-      );
-    }
-    if (status === 404) {
-      return new Error(`${target} is unavailable (404). Choose another model.`);
-    }
-    return new Error(
-      `${provider} error (${status}). The provider request failed.`,
-    );
+    const message =
+      status === 429
+        ? `${target} is temporarily rate limited (429). Wait and retry or choose another model.`
+        : status === 402
+          ? `${target} requires provider credits (402). Add credits or choose another model.`
+          : status === 404
+            ? `${target} is unavailable (404). Choose another model.`
+            : `${provider} error (${status}). The provider request failed.`;
+    return Object.assign(new Error(message), { status, retryAfterMs });
   }
 
   private extractProviderErrorMessage(errorPayload: unknown): string {
@@ -683,6 +736,8 @@ export class AiProviderRunnerService {
   }
 
   private isGeminiStructuredOutputUnsupportedError(error: unknown): boolean {
+    if (isAiProviderTerminalError(error)) return false;
+    if (error instanceof AiGeminiProviderError) return error.schemaUnsupported;
     if (!(error instanceof Error)) {
       return false;
     }
@@ -761,8 +816,31 @@ export class AiProviderRunnerService {
     return { promptTokens, completionTokens, totalTokens };
   }
 
+  private extractGeminiAttemptUsage(
+    response: Pick<GenerateContentResponse, 'usageMetadata'>,
+  ): Partial<TokenUsage> | undefined {
+    const raw = response.usageMetadata;
+    if (!raw) return undefined;
+    const result: Partial<TokenUsage> = {};
+    for (const [source, target] of [
+      ['promptTokenCount', 'promptTokens'],
+      ['candidatesTokenCount', 'completionTokens'],
+      ['totalTokenCount', 'totalTokens'],
+    ] as const) {
+      const value = raw[source];
+      if (
+        typeof value === 'number' &&
+        Number.isSafeInteger(value) &&
+        value >= 0 &&
+        value <= 2_147_483_647
+      )
+        result[target] = value;
+    }
+    return Object.keys(result).length ? result : undefined;
+  }
+
   private extractGeminiUsage(
-    response: GenerateContentResponse,
+    response: Pick<GenerateContentResponse, 'usageMetadata'>,
   ): TokenUsage | undefined {
     const usage = response.usageMetadata as
       | {
@@ -904,27 +982,34 @@ export class AiProviderRunnerService {
               () =>
                 this.withTimeout(
                   (scope) =>
-                    this.genAI!.models.generateContent({
-                      model: mId,
-                      contents: params.prompt,
-                      config: {
-                        temperature:
-                          params.temperature ??
-                          AI_CONSTANTS.TEMPERATURE_PRECISE,
-                        maxOutputTokens:
-                          params.maxOutputTokens ??
-                          AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
-                        abortSignal: scope.signal,
-                        httpOptions: {
-                          timeout: Math.max(1, scope.deadlineAt - Date.now()),
+                    this.genAI!.models.generateContent(
+                      {
+                        model: mId,
+                        contents: params.prompt,
+                        config: {
+                          temperature:
+                            params.temperature ??
+                            AI_CONSTANTS.TEMPERATURE_PRECISE,
+                          maxOutputTokens:
+                            params.maxOutputTokens ??
+                            AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
+                          abortSignal: scope.signal,
+                          httpOptions: {
+                            timeout: Math.max(1, scope.deadlineAt - Date.now()),
+                          },
                         },
                       },
-                    }),
+                      this.providerTransportOptions(
+                        { provider: 'gemini', model: mId },
+                        params,
+                        scope,
+                      ),
+                    ),
                   `Gemini completion (${mId})`,
                   timeout,
                   requestScope,
                 ),
-              (result) => this.extractGeminiUsage(result),
+              (result) => this.extractGeminiAttemptUsage(result),
             ),
           params.beforeProviderRequest,
           requestScope,
@@ -1040,8 +1125,13 @@ export class AiProviderRunnerService {
       );
       assertAiRequestActive(requestScope);
       if (!response.ok) {
-        throw new Error(
-          `${plan.provider} completion error (${response.status})`,
+        throw this.getProviderHttpError(
+          plan.provider,
+          plan.model,
+          response.status,
+          undefined,
+          plan.apiKey,
+          parseAiRetryAfter(response.headers?.get('retry-after')),
         );
       }
 
@@ -1051,6 +1141,7 @@ export class AiProviderRunnerService {
         requestScope,
       )) as OpenAiResponsePayload;
       receivedUsage = this.extractOpenAiUsage(result);
+      this.assertOpenAiResponseAllowed(result);
       const content = result.choices?.[0]?.message?.content;
       if (typeof content !== 'string')
         throw new Error('Provider returned invalid completion content');
@@ -1124,22 +1215,25 @@ export class AiProviderRunnerService {
               () =>
                 this.withTimeout(
                   (scope) =>
-                    this.genAI!.models.generateContent({
-                      model: plan.model,
-                      contents,
-                      config: {
-                        ...config,
-                        abortSignal: scope.signal,
-                        httpOptions: {
-                          timeout: Math.max(1, scope.deadlineAt - Date.now()),
+                    this.genAI!.models.generateContent(
+                      {
+                        model: plan.model,
+                        contents,
+                        config: {
+                          ...config,
+                          abortSignal: scope.signal,
+                          httpOptions: {
+                            timeout: Math.max(1, scope.deadlineAt - Date.now()),
+                          },
                         },
                       },
-                    }),
+                      this.providerTransportOptions(plan, params, scope),
+                    ),
                   `Gemini request (${plan.model})`,
                   this.getProviderTimeoutMs(),
                   requestScope,
                 ),
-              (result) => this.extractGeminiUsage(result),
+              (result) => this.extractGeminiAttemptUsage(result),
             ),
           params.beforeProviderRequest,
           requestScope,
@@ -1292,14 +1386,6 @@ export class AiProviderRunnerService {
               requestScope,
             ),
         );
-        if (
-          !response.ok &&
-          this.isTransientOpenAiStatus(response.status) &&
-          attempt < AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_ATTEMPTS - 1
-        ) {
-          scope.abort();
-          scope.dispose();
-        }
         return response;
       };
 
@@ -1339,6 +1425,7 @@ export class AiProviderRunnerService {
           response.status,
           errorPayload,
           plan.apiKey,
+          parseAiRetryAfter(response.headers?.get('retry-after')),
         );
       }
 
@@ -1348,6 +1435,7 @@ export class AiProviderRunnerService {
         requestScope,
       )) as OpenAiResponsePayload;
       receivedUsage = this.extractOpenAiUsage(result);
+      this.assertOpenAiResponseAllowed(result);
       const responseText = result.choices?.[0]?.message?.content ?? '';
       if (typeof responseText !== 'string')
         throw new Error('Provider returned invalid completion content');
@@ -1413,6 +1501,7 @@ export class AiProviderRunnerService {
     let iterator: AsyncGenerator<GenerateContentResponse> | undefined;
     let trackedAttempt: TrackedProviderAttempt | undefined;
     let usage: TokenUsage | undefined;
+    let observedUsage: Partial<TokenUsage> | undefined;
     try {
       assertAiRequestActive(requestScope);
       if (!this.genAI) throw new Error('Gemini provider is not configured');
@@ -1455,29 +1544,39 @@ export class AiProviderRunnerService {
             );
             requestTimeout = scope;
             assertAiRequestActive(scope);
+            trackedAttempt = undefined;
+            usage = undefined;
+            observedUsage = undefined;
             trackedAttempt = await this.beginProviderAttempt(plan, {
               ...params,
               ...requestScope,
             });
             try {
               return await this.waitForProviderResult(
-                this.genAI!.models.generateContentStream({
-                  model: plan.model,
-                  contents,
-                  config: {
-                    ...config,
-                    abortSignal: scope.signal,
-                    httpOptions: {
-                      timeout: Math.max(1, scope.deadlineAt - Date.now()),
+                this.genAI!.models.generateContentStream(
+                  {
+                    model: plan.model,
+                    contents,
+                    config: {
+                      ...config,
+                      abortSignal: scope.signal,
+                      httpOptions: {
+                        timeout: Math.max(1, scope.deadlineAt - Date.now()),
+                      },
                     },
                   },
-                }),
+                  this.providerTransportOptions(plan, params, scope),
+                ),
                 scope,
                 requestScope,
               );
             } catch (error) {
+              if (error instanceof AiGeminiProviderError)
+                observedUsage =
+                  this.extractGeminiAttemptUsage(error) ?? observedUsage;
               await trackedAttempt?.fail(
                 this.getAttemptOutcome(error, requestScope),
+                { usage: observedUsage },
               );
               scope.abort(error);
               scope.dispose();
@@ -1525,6 +1624,9 @@ export class AiProviderRunnerService {
           throw new Error('AI provider stream event exceeded the size limit');
         }
         usage = this.extractGeminiUsage(nextChunk.value) ?? usage;
+        const receivedUsage = this.extractGeminiAttemptUsage(nextChunk.value);
+        if (receivedUsage)
+          observedUsage = { ...observedUsage, ...receivedUsage };
         if (searchEnabled) {
           providerSourceDetails.push(
             ...this.promptBuilder.extractSourceDetails(nextChunk.value),
@@ -1552,7 +1654,7 @@ export class AiProviderRunnerService {
         providerSourceDetails.map((source) => source.url),
       );
       assertAiRequestActive(requestScope);
-      await trackedAttempt?.complete({ usage });
+      await trackedAttempt?.complete({ usage: observedUsage });
       assertAiRequestActive(requestScope);
       yield {
         type: 'done',
@@ -1573,8 +1675,13 @@ export class AiProviderRunnerService {
         },
       };
     } catch (error) {
+      if (error instanceof AiGeminiProviderError) {
+        const receivedUsage = this.extractGeminiAttemptUsage(error);
+        if (receivedUsage)
+          observedUsage = { ...observedUsage, ...receivedUsage };
+      }
       await trackedAttempt?.fail(this.getAttemptOutcome(error, requestScope), {
-        usage,
+        usage: observedUsage,
       });
       throw error;
     } finally {
@@ -1583,7 +1690,7 @@ export class AiProviderRunnerService {
       try {
         await trackedAttempt?.fail(
           this.getAttemptOutcome(undefined, requestScope),
-          { usage },
+          { usage: observedUsage },
         );
       } finally {
         // Native iterators may ignore AbortSignal or queue return() behind a
@@ -1681,14 +1788,6 @@ export class AiProviderRunnerService {
               requestScope,
             ),
         );
-        if (
-          !result.ok &&
-          this.isTransientOpenAiStatus(result.status) &&
-          attempt < AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_ATTEMPTS - 1
-        ) {
-          scope.abort();
-          scope.dispose();
-        }
         return result;
       };
 
@@ -1728,6 +1827,7 @@ export class AiProviderRunnerService {
           response.status,
           errorPayload,
           plan.apiKey,
+          parseAiRetryAfter(response.headers?.get('retry-after')),
         );
       }
 
@@ -1807,6 +1907,7 @@ export class AiProviderRunnerService {
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
         return '';
       usage = this.extractOpenAiUsage(parsed) ?? usage;
+      this.assertOpenAiResponseAllowed(parsed);
       providerSources.push(...this.extractOpenAiSources(parsed));
       const text = this.promptBuilder.extractOpenAiStreamText(parsed);
       if (text) fullText = this.appendStreamText(fullText, text);

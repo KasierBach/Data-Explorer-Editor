@@ -2,6 +2,173 @@ import { Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { AiCircuitBreakerService } from './ai.circuit-breaker.service';
 
+type TestAdmission = { success(): void; failure(): void; cancel(): void };
+type FencedBreaker = AiCircuitBreakerService & {
+  tryAcquire(
+    provider: string,
+    model: string,
+    scope?: string,
+  ): TestAdmission | undefined;
+};
+function takeAdmission(
+  breaker: AiCircuitBreakerService,
+  model = 'model-a',
+  scope?: string,
+): TestAdmission {
+  const admission = (breaker as FencedBreaker).tryAcquire('groq', model, scope);
+  if (!admission) throw new Error('Expected a circuit admission');
+  return admission;
+}
+
+describe('fenced circuit ownership', () => {
+  beforeEach(() =>
+    jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined),
+  );
+  afterEach(() => jest.restoreAllMocks());
+
+  it.each(['success', 'failure', 'cancel'] as const)(
+    'ignores expired probe A %s after replacement B is admitted',
+    (outcome) => {
+      const clock = jest.spyOn(Date, 'now').mockReturnValue(0);
+      const breaker = new AiCircuitBreakerService();
+      for (let index = 0; index < 5; index++) takeAdmission(breaker).failure();
+      clock.mockReturnValue(30_000);
+      const first = takeAdmission(breaker);
+      clock.mockReturnValue(60_000);
+      const replacement = takeAdmission(breaker);
+      first[outcome]();
+      expect(
+        (breaker as FencedBreaker).tryAcquire('groq', 'model-a'),
+      ).toBeUndefined();
+      replacement.success();
+      expect(
+        (breaker as FencedBreaker).tryAcquire('groq', 'model-a'),
+      ).toBeDefined();
+    },
+  );
+
+  it.each(['success', 'failure', 'cancel'] as const)(
+    'invalidates concurrent closed admission %s after failures open the circuit',
+    (outcome) => {
+      const clock = jest.spyOn(Date, 'now').mockReturnValue(0);
+      const breaker = new AiCircuitBreakerService();
+      const admissions = Array.from({ length: 6 }, () =>
+        takeAdmission(breaker),
+      );
+      for (let index = 0; index < 5; index++) admissions[index].failure();
+      clock.mockReturnValue(25_000);
+      admissions[5][outcome]();
+      expect(
+        (breaker as FencedBreaker).tryAcquire('groq', 'model-a'),
+      ).toBeUndefined();
+      clock.mockReturnValue(30_000);
+      const probe = takeAdmission(breaker);
+      admissions[5].cancel();
+      expect(
+        (breaker as FencedBreaker).tryAcquire('groq', 'model-a'),
+      ).toBeUndefined();
+      probe.success();
+    },
+  );
+
+  it('settles each handle once and cannot release its replacement through repeated callbacks', () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(0);
+    const breaker = new AiCircuitBreakerService();
+    const first = takeAdmission(breaker);
+    first.failure();
+    first.failure();
+    first.success();
+    first.cancel();
+    for (let index = 0; index < 3; index++) takeAdmission(breaker).failure();
+    expect(
+      (breaker as FencedBreaker).tryAcquire('groq', 'model-a'),
+    ).toBeDefined();
+    takeAdmission(breaker).failure();
+    clock.mockReturnValue(30_000);
+    const probe = takeAdmission(breaker);
+    probe.cancel();
+    const replacement = takeAdmission(breaker);
+    probe.success();
+    probe.failure();
+    expect(
+      (breaker as FencedBreaker).tryAcquire('groq', 'model-a'),
+    ).toBeUndefined();
+    replacement.cancel();
+  });
+
+  it('accepts a current-owner failure after lease expiry when no replacement exists', () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(0);
+    const breaker = new AiCircuitBreakerService();
+    for (let index = 0; index < 5; index++) takeAdmission(breaker).failure();
+    clock.mockReturnValue(30_000);
+    const probe = takeAdmission(breaker);
+    clock.mockReturnValue(60_000);
+    probe.failure();
+    clock.mockReturnValue(89_999);
+    expect(
+      (breaker as FencedBreaker).tryAcquire('groq', 'model-a'),
+    ).toBeUndefined();
+    clock.mockReturnValue(90_000);
+    expect(
+      (breaker as FencedBreaker).tryAcquire('groq', 'model-a'),
+    ).toBeDefined();
+  });
+
+  it('never reuses a state incarnation after pruning and ignores stale outcomes', () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(0);
+    const breaker = new AiCircuitBreakerService();
+    const stale = takeAdmission(breaker);
+    clock.mockReturnValue(300_000);
+    expect(breaker.size).toBe(0);
+    for (let index = 0; index < 5; index++) takeAdmission(breaker).failure();
+    stale.success();
+    stale.failure();
+    stale.cancel();
+    expect(
+      (breaker as FencedBreaker).tryAcquire('groq', 'model-a'),
+    ).toBeUndefined();
+  });
+
+  it('keeps stale probe outcomes fenced after successful replacement and a newly opened circuit', () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(0);
+    const breaker = new AiCircuitBreakerService();
+    for (let index = 0; index < 5; index++) takeAdmission(breaker).failure();
+    clock.mockReturnValue(30_000);
+    const stale = takeAdmission(breaker);
+    clock.mockReturnValue(60_000);
+    takeAdmission(breaker).success();
+    for (let index = 0; index < 5; index++) takeAdmission(breaker).failure();
+    stale.success();
+    expect(
+      (breaker as FencedBreaker).tryAcquire('groq', 'model-a'),
+    ).toBeUndefined();
+  });
+
+  it('bounds closed-state tracking and keeps independent scopes distinct', () => {
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(0);
+    const breaker = new AiCircuitBreakerService();
+    for (let index = 0; index < 1_000; index++)
+      takeAdmission(breaker, `model-${index}`).cancel();
+    expect(breaker.size).toBe(1_000);
+    expect(
+      (breaker as FencedBreaker).tryAcquire('groq', 'overflow'),
+    ).toBeUndefined();
+    clock.mockReturnValue(300_000);
+    expect(breaker.size).toBe(0);
+    for (let index = 0; index < 5; index++)
+      takeAdmission(breaker, 'model-a').failure();
+    expect(
+      (breaker as FencedBreaker).tryAcquire('groq', 'model-a', ''),
+    ).toBeDefined();
+    expect(
+      (breaker as FencedBreaker).tryAcquire('groq', 'model-a', 'scope'),
+    ).toBeDefined();
+    expect(
+      (breaker as FencedBreaker).tryAcquire('groq', 'model-a'),
+    ).toBeUndefined();
+  });
+});
+
 describe('AiCircuitBreakerService', () => {
   beforeEach(() => {
     jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);

@@ -1,8 +1,10 @@
 import { ConfigService } from '@nestjs/config';
+import { GoogleGenAI } from '@google/genai';
 import { AI_CONSTANTS } from './ai.constants';
 import { AiPromptBuilderService } from './ai.prompt-builder.service';
 import { AiProviderRunnerService } from './ai.provider-runner.service';
 import { AiRequestStoppedError } from './ai-request-lifecycle';
+import { AiGeminiProviderError } from './ai-gemini-transport';
 import type {
   AiRoutingMode,
   ChatHistoryMessage,
@@ -15,6 +17,11 @@ import {
   readAiProviderJson,
   validateAiProviderUrl,
 } from './ai-provider-transport';
+
+jest.mock('@google/genai', () => ({
+  ...jest.requireActual('@google/genai'),
+  GoogleGenAI: jest.fn(),
+}));
 
 jest.mock('./ai-provider-transport', () => ({
   ...jest.requireActual('./ai-provider-transport'),
@@ -70,6 +77,572 @@ describe('AiProviderRunnerService streaming', () => {
       new AiPromptBuilderService(),
     );
   });
+
+  describe('bounded retry reliability', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+      jest.restoreAllMocks();
+    });
+    const retryPlan = {
+      provider: 'custom' as const,
+      model: 'fixture',
+      apiKey: 'fixture-key',
+      baseUrl: 'https://fixture.example/v1',
+    };
+    const flushRetry = async () => {
+      for (let index = 0; index < 60; index++) await Promise.resolve();
+    };
+
+    it('honors Retry-After as a minimum and preserves fresh policy on the next attempt', async () => {
+      jest.useFakeTimers();
+      const beforeProviderRequest = jest.fn();
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          headers: new Headers({ 'retry-after': '2' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ choices: [{ message: { content: 'Ready' } }] }),
+        });
+      const pending = service.completeOpenAiCompatibleText(retryPlan, {
+        prompt: 'Hello',
+        systemPrompt: 'Be concise',
+        beforeProviderRequest,
+      });
+      await flushRetry();
+      await jest.advanceTimersByTimeAsync(1999);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(beforeProviderRequest).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(await pending).toBe('Ready');
+      expect(beforeProviderRequest).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry early when Retry-After exceeds the remaining request deadline', async () => {
+      jest.useFakeTimers();
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'retry-after': '2' }),
+      });
+      const pending = service
+        .completeOpenAiCompatibleText(retryPlan, {
+          prompt: 'Hello',
+          systemPrompt: 'Be concise',
+          deadlineAt: Date.now() + 1000,
+        })
+        .catch((error) => error);
+      await flushRetry();
+      await jest.advanceTimersByTimeAsync(1000);
+      expect(await pending).toMatchObject({ code: 'AI_RETRY_DEFERRED' });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it.each([401, 403, 422])(
+      'does not retry explicit terminal HTTP %s because its error mentions network',
+      async (status) => {
+        const error = Object.assign(new Error('network unavailable'), {
+          status,
+        });
+        mockFetch.mockRejectedValue(error);
+        await expect(
+          service.completeOpenAiCompatibleText(retryPlan, {
+            prompt: 'Hello',
+            systemPrompt: 'Be concise',
+          }),
+        ).rejects.toBe(error);
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it('keeps one three-attempt budget across Gemini schema fallback', async () => {
+      jest.useFakeTimers();
+      const generateContent = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('network unavailable'))
+        .mockRejectedValueOnce(
+          new AiGeminiProviderError('GEMINI_HTTP', {
+            status: 400,
+            schemaUnsupported: true,
+          }),
+        )
+        .mockRejectedValueOnce(new Error('network unavailable'))
+        .mockResolvedValue({ text: '{"message":"Unexpected fourth attempt"}' });
+      (
+        service as unknown as {
+          genAI: { models: { generateContent: jest.Mock } };
+        }
+      ).genAI = { models: { generateContent } };
+      const pending = service
+        .runGemini(
+          { provider: 'gemini', model: 'fixture' },
+          { prompt: 'Hello' },
+          'auto',
+          structuredDbDecision,
+        )
+        .catch((error) => error);
+      await jest.runAllTimersAsync();
+      expect(await pending).toHaveProperty('message', 'network unavailable');
+      expect(generateContent).toHaveBeenCalledTimes(3);
+    });
+
+    it('cancels a Retry-After wait without another policy, ledger or provider attempt', async () => {
+      jest.useFakeTimers();
+      const controller = new AbortController();
+      const beforeProviderRequest = jest.fn();
+      const complete = jest.fn();
+      const fail = jest.fn();
+      const beforeAttempt = jest
+        .fn()
+        .mockResolvedValue({ attemptId: 'retry-attempt', complete, fail });
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: new Headers({ 'retry-after': '2' }),
+      });
+      const pending = service
+        .completeOpenAiCompatibleText(retryPlan, {
+          prompt: 'Hello',
+          systemPrompt: 'Be concise',
+          signal: controller.signal,
+          beforeProviderRequest,
+          execution: { generationId: 'retry-generation', beforeAttempt },
+        })
+        .catch((error) => error);
+      await flushRetry();
+      controller.abort(new AiRequestStoppedError('AI_REQUEST_CANCELLED'));
+      expect(await pending).toMatchObject({ reason: 'AI_REQUEST_CANCELLED' });
+      await jest.advanceTimersByTimeAsync(3000);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(beforeProviderRequest).toHaveBeenCalledTimes(1);
+      expect(beforeAttempt).toHaveBeenCalledTimes(1);
+      expect(fail).toHaveBeenCalledTimes(1);
+      expect(complete).not.toHaveBeenCalled();
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it.each(['chat', 'stream'])(
+      'retains the shared three-attempt budget through compatible schema fallback: %s',
+      async (lane) => {
+        jest.useFakeTimers();
+        mockFetch
+          .mockResolvedValueOnce({ ok: false, status: 503 })
+          .mockResolvedValueOnce({
+            ok: false,
+            status: 400,
+            json: async () => ({
+              error: { message: 'response_format unsupported' },
+            }),
+          })
+          .mockResolvedValueOnce({ ok: false, status: 503 })
+          .mockResolvedValue({
+            ok: true,
+            json: async () => ({
+              choices: [
+                {
+                  message: {
+                    content: '{"message":"Unexpected fourth attempt"}',
+                  },
+                },
+              ],
+            }),
+          });
+        const pending = (
+          lane === 'chat'
+            ? service.runOpenAiCompatible(
+                retryPlan,
+                { prompt: 'Hello' },
+                'auto',
+                structuredDbDecision,
+              )
+            : service
+                .streamOpenAiCompatible(
+                  retryPlan,
+                  { prompt: 'Hello' },
+                  'auto',
+                  structuredDbDecision,
+                )
+                .next()
+        ).catch((error) => error);
+        await jest.runAllTimersAsync();
+        expect(await pending).toMatchObject({ status: 503 });
+        expect(mockFetch).toHaveBeenCalledTimes(3);
+      },
+    );
+
+    it('uses the same three-attempt budget across Gemini model compatibility fallback', async () => {
+      jest.useFakeTimers();
+      const generateContent = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('network unavailable'))
+        .mockRejectedValueOnce(
+          new AiGeminiProviderError('GEMINI_HTTP', { status: 404 }),
+        )
+        .mockRejectedValueOnce(new Error('network unavailable'))
+        .mockResolvedValue({ text: 'Unexpected fourth attempt' });
+      (
+        service as unknown as {
+          genAI: { models: { generateContent: jest.Mock } };
+        }
+      ).genAI = { models: { generateContent } };
+      const pending = service
+        .completeGeminiText({ model: 'fixture', prompt: 'Hello' })
+        .catch((error) => error);
+      await jest.runAllTimersAsync();
+      expect(await pending).toHaveProperty('message', 'network unavailable');
+      expect(generateContent).toHaveBeenCalledTimes(3);
+      expect(generateContent.mock.calls[2][0].model).toBe(
+        'gemini-3.5-flash-lite',
+      );
+    });
+
+    it('honors normalized Gemini Retry-After without starting a replacement request early', async () => {
+      jest.useFakeTimers();
+      const generateContent = jest
+        .fn()
+        .mockRejectedValueOnce(
+          new AiGeminiProviderError('GEMINI_HTTP', {
+            status: 429,
+            retryAfterMs: 2000,
+          }),
+        )
+        .mockResolvedValue({ text: 'Ready' });
+      (
+        service as unknown as {
+          genAI: { models: { generateContent: jest.Mock } };
+        }
+      ).genAI = { models: { generateContent } };
+      const pending = service.completeGeminiText({
+        model: 'fixture',
+        prompt: 'Hello',
+      });
+      await flushRetry();
+      await jest.advanceTimersByTimeAsync(1999);
+      expect(generateContent).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(await pending).toBe('Ready');
+      expect(generateContent).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps error-body limits terminal even when HTTP status is transient', async () => {
+      const { AiProviderTransportError } = jest.requireActual<
+        typeof import('./ai-provider-transport')
+      >('./ai-provider-transport');
+      mockFetch.mockResolvedValue({ ok: false, status: 503 });
+      readAiProviderJsonMock.mockRejectedValueOnce(
+        new AiProviderTransportError(
+          'LIMIT_EXCEEDED',
+          'Provider response is too large',
+        ),
+      );
+      await expect(
+        service.runOpenAiCompatible(
+          retryPlan,
+          { prompt: 'Hello' },
+          'auto',
+          structuredDbDecision,
+        ),
+      ).rejects.toMatchObject({ code: 'LIMIT_EXCEEDED' });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects streaming refusal before forwarding blocked text', async () => {
+      mockFetch.mockResolvedValue(
+        createSseResponse([
+          'data: {"choices":[{"delta":{"content":"Forbidden answer","refusal":"Blocked"},"finish_reason":"content_filter"}]}\n',
+          'data: [DONE]\n',
+        ]),
+      );
+      await expect(
+        service
+          .streamOpenAiCompatible(
+            retryPlan,
+            { prompt: 'Hello' },
+            'auto',
+            liveSearchDecision,
+          )
+          .next(),
+      ).rejects.toMatchObject({ code: 'AI_PROVIDER_REFUSED' });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects compatible refusal before treating valid-looking JSON as an answer', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: '{"message":"Forged allowed answer"}',
+                refusal: 'Not allowed',
+              },
+              finish_reason: 'content_filter',
+            },
+          ],
+        }),
+      });
+      await expect(
+        service.runOpenAiCompatible(
+          retryPlan,
+          { prompt: 'Hello' },
+          'auto',
+          structuredDbDecision,
+        ),
+      ).rejects.toMatchObject({ code: 'AI_PROVIDER_REFUSED' });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it.each(['chat', 'completion', 'stream'])(
+    'routes configured Gemini %s through pinned transport, never SDK networking',
+    async (lane) => {
+      const sdkCall = jest
+        .fn()
+        .mockRejectedValue(new Error('Direct SDK networking is forbidden'));
+      jest.mocked(GoogleGenAI).mockImplementation(
+        () =>
+          ({
+            models: {
+              generateContent: sdkCall,
+              generateContentStream: sdkCall,
+            },
+          }) as unknown as GoogleGenAI,
+      );
+      const configured = new AiProviderRunnerService(
+        {
+          get: (key: string) =>
+            key === 'GEMINI_API_KEY' ? 'fixture-key' : undefined,
+        } as ConfigService,
+        new AiPromptBuilderService(),
+      );
+      const reply = {
+        candidates: [
+          {
+            index: 0,
+            content: { role: 'model', parts: [{ text: 'Ready' }] },
+            finishReason: 'STOP',
+          },
+        ],
+        usageMetadata: {
+          promptTokenCount: 3,
+          candidatesTokenCount: 2,
+          totalTokenCount: 5,
+        },
+      };
+      mockFetch.mockResolvedValue(
+        lane === 'stream'
+          ? new Response(`data: ${JSON.stringify(reply)}\n\n`, {
+              headers: { 'content-type': 'text/event-stream' },
+            })
+          : new Response(JSON.stringify(reply), {
+              headers: { 'content-type': 'application/json' },
+            }),
+      );
+      if (lane === 'chat')
+        await expect(
+          configured.runGemini(
+            { provider: 'gemini', model: 'gemini-fixture' },
+            { prompt: 'Hello' },
+            'auto',
+            liveSearchDecision,
+          ),
+        ).resolves.toMatchObject({ message: expect.stringContaining('Ready') });
+      else if (lane === 'completion')
+        await expect(
+          configured.completeGeminiText({
+            model: 'gemini-fixture',
+            prompt: 'Hello',
+          }),
+        ).resolves.toBe('Ready');
+      else {
+        const events: StreamEvent[] = [];
+        for await (const event of configured.streamGemini(
+          { provider: 'gemini', model: 'gemini-fixture' },
+          { prompt: 'Hello' },
+          'auto',
+          liveSearchDecision,
+        ))
+          events.push(event);
+        expect(events.at(-1)).toMatchObject({
+          type: 'done',
+          data: { message: expect.stringContaining('Ready') },
+        });
+      }
+      expect(sdkCall).not.toHaveBeenCalled();
+      expect(GoogleGenAI).not.toHaveBeenCalled();
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch.mock.calls[0]?.[0]).toMatch(
+        /^https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-fixture:/,
+      );
+    },
+  );
+
+  it('does not carry failed bootstrap usage into a successful Gemini stream retry', async () => {
+    jest.useFakeTimers();
+    try {
+      const handles: Array<{ complete: jest.Mock; fail: jest.Mock }> = [];
+      const execution = {
+        generationId: 'generation-fixture',
+        beforeAttempt: jest.fn(async () => {
+          const handle = {
+            attemptId: `attempt-${handles.length + 1}`,
+            complete: jest.fn(),
+            fail: jest.fn(),
+          };
+          handles.push(handle);
+          return handle;
+        }),
+      };
+      const generateContentStream = jest
+        .fn()
+        .mockRejectedValueOnce(
+          new AiGeminiProviderError('GEMINI_HTTP', {
+            status: 503,
+            usageMetadata: { promptTokenCount: 9 },
+          }),
+        )
+        .mockResolvedValueOnce(
+          (async function* () {
+            yield { text: 'Ready after retry' };
+          })(),
+        );
+      (
+        service as unknown as {
+          genAI: { models: { generateContentStream: jest.Mock } };
+        }
+      ).genAI = { models: { generateContentStream } };
+      const pending = (async () => {
+        const values: StreamEvent[] = [];
+        for await (const value of service.streamGemini(
+          { provider: 'gemini', model: 'gemini-fixture' },
+          { prompt: 'Hello', execution },
+          'auto',
+          liveSearchDecision,
+        ))
+          values.push(value);
+        return values;
+      })();
+      for (let index = 0; index < 60; index++) await Promise.resolve();
+      await jest.advanceTimersByTimeAsync(
+        AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_BASE_DELAY_MS,
+      );
+      expect((await pending).at(-1)).toMatchObject({ type: 'done' });
+      expect(handles).toHaveLength(2);
+      expect(handles[0].fail).toHaveBeenCalledWith('failed', {
+        provider: 'gemini',
+        model: 'gemini-fixture',
+        usage: { promptTokens: 9 },
+      });
+      expect(handles[1].complete).toHaveBeenCalledWith({
+        provider: 'gemini',
+        model: 'gemini-fixture',
+        usage: undefined,
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('preserves partial Gemini error usage in a single failed tracked attempt', async () => {
+    const fail = jest.fn();
+    const complete = jest.fn();
+    const beforeAttempt = jest
+      .fn()
+      .mockResolvedValue({ attemptId: 'attempt-fixture', fail, complete });
+    const generateContent = jest.fn().mockRejectedValue(
+      new AiGeminiProviderError('GEMINI_BLOCKED', {
+        usageMetadata: { promptTokenCount: 4 },
+      }),
+    );
+    (
+      service as unknown as {
+        genAI: { models: { generateContent: jest.Mock } };
+      }
+    ).genAI = { models: { generateContent } };
+    await expect(
+      service.completeGeminiText({
+        model: 'gemini-fixture',
+        prompt: 'Hello',
+        execution: { generationId: 'generation-fixture', beforeAttempt },
+      }),
+    ).rejects.toMatchObject({ code: 'GEMINI_BLOCKED' });
+    expect(beforeAttempt).toHaveBeenCalledTimes(1);
+    expect(generateContent).toHaveBeenCalledTimes(1);
+    expect(complete).not.toHaveBeenCalled();
+    expect(fail).toHaveBeenCalledWith('failed', {
+      provider: 'gemini',
+      model: 'gemini-fixture',
+      usage: { promptTokens: 4 },
+    });
+  });
+
+  it.each(['chat', 'completion', 'stream'])(
+    'denies Gemini at post-DNS transport boundary without a second ledger reservation: %s',
+    async (lane) => {
+      const denied = new Error('Recipient revoked after DNS');
+      const beforeProviderAttempt = jest
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValue(denied);
+      const beforeProviderRequest = jest.fn().mockResolvedValue(undefined);
+      const fail = jest.fn();
+      const complete = jest.fn();
+      const beforeAttempt = jest
+        .fn()
+        .mockResolvedValue({ attemptId: 'attempt-fixture', fail, complete });
+      const configured = new AiProviderRunnerService(
+        {
+          get: (key: string) =>
+            key === 'GEMINI_API_KEY' ? 'fixture-key' : undefined,
+        } as ConfigService,
+        new AiPromptBuilderService(),
+      );
+      mockFetch.mockImplementationOnce(async (_url, _init, options) => {
+        await options.beforeDispatch();
+        throw new Error('Cannot dispatch after denial');
+      });
+      const params = {
+        prompt: 'Hello',
+        beforeProviderAttempt,
+        beforeProviderRequest,
+        execution: { generationId: 'generation-fixture', beforeAttempt },
+      };
+      const pending =
+        lane === 'chat'
+          ? configured.runGemini(
+              { provider: 'gemini', model: 'gemini-fixture' },
+              params,
+              'auto',
+              liveSearchDecision,
+            )
+          : lane === 'completion'
+            ? configured.completeGeminiText({
+                ...params,
+                model: 'gemini-fixture',
+              })
+            : configured
+                .streamGemini(
+                  { provider: 'gemini', model: 'gemini-fixture' },
+                  params,
+                  'auto',
+                  liveSearchDecision,
+                )
+                .next();
+      await expect(pending).rejects.toMatchObject({
+        aiRequestFatal: true,
+        cause: denied,
+      });
+      expect(beforeAttempt).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(fail).toHaveBeenCalledTimes(1);
+      expect(complete).not.toHaveBeenCalled();
+      expect(beforeProviderRequest).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it('blocks unsafe openai-compatible URLs before sending credentials', async () => {
     validateAiProviderUrlMock.mockImplementationOnce(() => {
@@ -1353,6 +1926,7 @@ describe('AiProviderRunnerService streaming', () => {
 
     it('retains one direct total deadline across attempt timeouts and backoff', async () => {
       jest.useFakeTimers();
+      jest.spyOn(Math, 'random').mockReturnValue(1);
       service = new AiProviderRunnerService(
         {
           get: jest.fn((key) =>
