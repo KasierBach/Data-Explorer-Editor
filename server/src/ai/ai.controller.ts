@@ -18,37 +18,26 @@ import { GenerateSqlDto } from './dto/generate-sql.dto';
 import { AutocompleteDto } from './dto/autocomplete.dto';
 import { ProviderModelsDto } from './dto/provider-models.dto';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
-import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
-import { normalizeProviderBaseUrl } from './ai-url.util';
-import { randomUUID } from 'crypto';
+import { AiExecutionLedgerService } from './ai-execution-ledger.service';
+import {
+  aiExecutionMetadata,
+  createAiHttpExecution,
+  isAiHttpFatalError,
+  runAiLedgerOperation,
+} from './ai-http-execution';
 import { AuditAction, AuditService } from '../audit/audit.service';
 import { AiSqlFeedbackDto } from './dto/ai-sql-feedback.dto';
 import { ConfigService } from '@nestjs/config';
 import { AiProviderConnectionService } from './ai-provider-connection.service';
-
-const extractProviderErrorMessage = (payload: unknown) => {
-  if (!payload || typeof payload !== 'object') {
-    return null;
-  }
-
-  const record = payload as Record<string, unknown>;
-  if (typeof record.message === 'string' && record.message.trim()) {
-    return record.message;
-  }
-
-  if (typeof record.error === 'string' && record.error.trim()) {
-    return record.error;
-  }
-
-  if (record.error && typeof record.error === 'object') {
-    const errorRecord = record.error as Record<string, unknown>;
-    if (typeof errorRecord.message === 'string' && errorRecord.message.trim()) {
-      return errorRecord.message;
-    }
-  }
-
-  return null;
-};
+import {
+  aiHttpStoppedException,
+  createAiHttpScope,
+  writeAiSse,
+} from './ai-http-lifecycle';
+import {
+  AiAccountPolicyService,
+  isAiDisabledError,
+} from './ai-account-policy.service';
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard)
@@ -59,6 +48,8 @@ export class AiController {
     private readonly auditService: AuditService,
     private readonly configService: ConfigService,
     private readonly providerConnections: AiProviderConnectionService,
+    private readonly accountPolicy: AiAccountPolicyService,
+    private readonly ledger: AiExecutionLedgerService,
   ) {}
 
   @Get('providers/status')
@@ -87,61 +78,95 @@ export class AiController {
     @Body() body: GenerateSqlDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    const {
-      connectionId,
-      database,
-      prompt,
-      image,
-      document,
-      context,
-      model,
-      mode,
-      routingMode,
-      history,
-      providerOverride,
-      disabledProviders,
-      fallbackProvider,
-    } = body;
-
-    const { connection, schemaContext } =
-      await this.connectionService.getConnectionContext(
+    const scope = createAiHttpScope(req);
+    const execution = createAiHttpExecution(scope, this.ledger);
+    try {
+      const request = await execution.start(
+        this.accountPolicy,
+        req.user.id,
+        'chat',
+        body,
+      );
+      const {
         connectionId,
         database,
-        req.user.id,
-        (pool, strategy, db, connId) =>
-          this.aiService.gatherSchemaContext(
-            pool,
-            strategy,
-            db,
-            connId,
-            prompt,
-          ),
-      );
-
-    try {
-      return await this.aiService.chat({
-        model,
-        mode,
         prompt,
-        schemaContext,
-        databaseType: connection.type,
         image,
         document,
         context,
+        model,
+        mode,
         routingMode,
         history,
-        providerOverride: await this.providerConnections.resolveOverride(
-          req.user.id,
-          providerOverride,
-        ),
+        providerOverride,
         disabledProviders,
         fallbackProvider,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new InternalServerErrorException(
-        `AI generation failed: ${message}`,
+      } = body;
+
+      const { connection, schemaContext } = await scope.run(() =>
+        this.connectionService.getConnectionContext(
+          connectionId,
+          database,
+          req.user.id,
+          (pool, strategy, db, connId) =>
+            scope.run(() =>
+              this.aiService.gatherSchemaContext(
+                pool,
+                strategy,
+                db,
+                connId,
+                prompt,
+                {
+                  ...request,
+                },
+              ),
+            ),
+        ),
       );
+
+      try {
+        const resolvedOverride = await scope.run(() =>
+          this.providerConnections.resolveOverride(
+            req.user.id,
+            providerOverride,
+          ),
+        );
+        const result = await scope.run(() =>
+          this.aiService.chat({
+            ...request,
+            model,
+            mode,
+            prompt,
+            schemaContext,
+            databaseType: connection.type,
+            image,
+            document,
+            context,
+            routingMode,
+            history,
+            providerOverride: resolvedOverride,
+            disabledProviders,
+            fallbackProvider,
+          }),
+        );
+        return await execution.complete(result);
+      } catch (error) {
+        if (isAiDisabledError(error) || isAiHttpFatalError(error)) throw error;
+        const stopped = aiHttpStoppedException(error, scope.signal);
+        if (stopped) throw stopped;
+        throw new InternalServerErrorException('AI generation failed.');
+      }
+    } catch (error) {
+      await execution.fail(error);
+      throw isAiHttpFatalError(error)
+        ? error
+        : (aiHttpStoppedException(error, scope.signal) ?? error);
+    } finally {
+      try {
+        await execution.release();
+      } finally {
+        scope.dispose();
+      }
     }
   }
 
@@ -152,68 +177,101 @@ export class AiController {
     @Res() res: Response,
     @Req() req: AuthenticatedRequest,
   ) {
-    const {
-      connectionId,
-      database,
-      prompt,
-      image,
-      document,
-      context,
-      model,
-      mode,
-      routingMode,
-      history,
-      providerOverride,
-      disabledProviders,
-      fallbackProvider,
-    } = body;
-
-    const ctx = await this.connectionService.getConnectionContextForStream(
-      connectionId,
-      database,
-      req.user.id,
-      (pool, strategy, db, connId) =>
-        this.aiService.gatherSchemaContext(pool, strategy, db, connId, prompt),
-    );
-
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.flushHeaders();
-
+    const scope = createAiHttpScope(req, res);
+    const execution = createAiHttpExecution(scope, this.ledger);
     try {
-      const stream = this.aiService.chatStream({
-        model,
-        mode,
+      const request = await execution.start(
+        this.accountPolicy,
+        req.user.id,
+        'chat',
+        body,
+      );
+      const {
+        connectionId,
+        database,
         prompt,
-        schemaContext: ctx.schemaContext,
-        databaseType: ctx.connection.type,
         image,
         document,
         context,
+        model,
+        mode,
         routingMode,
         history,
-        providerOverride: await this.providerConnections.resolveOverride(
-          req.user.id,
-          providerOverride,
-        ),
+        providerOverride,
         disabledProviders,
         fallbackProvider,
-      });
+      } = body;
 
-      for await (const event of stream) {
-        res.write(`data: ${JSON.stringify(event)}\n\n`);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      res.write(
-        `data: ${JSON.stringify({ type: 'error', text: message })}\n\n`,
+      const ctx = await scope.run(() =>
+        this.connectionService.getConnectionContextForStream(
+          connectionId,
+          database,
+          req.user.id,
+          (pool, strategy, db, connId) =>
+            scope.run(() =>
+              this.aiService.gatherSchemaContext(
+                pool,
+                strategy,
+                db,
+                connId,
+                prompt,
+                {
+                  ...request,
+                },
+              ),
+            ),
+        ),
       );
-    }
 
-    res.write('data: [DONE]\n\n');
-    res.end();
+      scope.throwIfStopped();
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+
+      await writeAiSse(
+        res,
+        scope,
+        async () => {
+          const resolvedOverride = await scope.run(() =>
+            this.providerConnections.resolveOverride(
+              req.user.id,
+              providerOverride,
+            ),
+          );
+          scope.throwIfStopped();
+          return this.aiService.chatStream({
+            ...request,
+            model,
+            mode,
+            prompt,
+            schemaContext: ctx.schemaContext,
+            databaseType: ctx.connection.type,
+            image,
+            document,
+            context,
+            routingMode,
+            history,
+            providerOverride: resolvedOverride,
+            disabledProviders,
+            fallbackProvider,
+          });
+        },
+        execution,
+      );
+    } catch (error) {
+      await execution.fail(error);
+      throw isAiHttpFatalError(error)
+        ? error
+        : (aiHttpStoppedException(error, scope.signal) ?? error);
+    } finally {
+      try {
+        await execution.release();
+      } finally {
+        scope.dispose();
+      }
+    }
   }
 
   @Post('autocomplete')
@@ -222,114 +280,109 @@ export class AiController {
     @Body() body: AutocompleteDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    const {
-      connectionId,
-      database,
-      beforeCursor,
-      afterCursor,
-      context,
-      model,
-      providerOverride,
-    } = body;
-
-    const { connection, schemaContext } =
-      await this.connectionService.getConnectionContext(
+    const scope = createAiHttpScope(req);
+    const execution = createAiHttpExecution(scope, this.ledger);
+    try {
+      const request = await execution.start(
+        this.accountPolicy,
+        req.user.id,
+        'autocomplete',
+        body,
+      );
+      const {
         connectionId,
         database,
-        req.user.id,
-        (pool, strategy, db, connId) =>
-          this.aiService.gatherSchemaContext(
-            pool,
-            strategy,
-            db,
-            connId,
-            context ? `${context}\n${beforeCursor}` : beforeCursor,
-          ),
+        beforeCursor,
+        afterCursor,
+        context,
+        model,
+        providerOverride,
+        disabledProviders,
+        fallbackProvider,
+      } = body;
+
+      const { connection, schemaContext } = await scope.run(() =>
+        this.connectionService.getConnectionContext(
+          connectionId,
+          database,
+          req.user.id,
+          (pool, strategy, db, connId) =>
+            scope.run(() =>
+              this.aiService.gatherSchemaContext(
+                pool,
+                strategy,
+                db,
+                connId,
+                context ? `${context}\n${beforeCursor}` : beforeCursor,
+                {
+                  ...request,
+                },
+              ),
+            ),
+        ),
       );
 
-    const completion = await this.aiService.autocomplete({
-      beforeCursor,
-      afterCursor,
-      schemaContext: context ? `${context}\n\n${schemaContext}` : schemaContext,
-      databaseType: connection.type,
-      model,
-      providerOverride: await this.providerConnections.resolveOverride(
-        req.user.id,
-        providerOverride,
-      ),
-    });
+      const resolvedOverride = await scope.run(() =>
+        this.providerConnections.resolveOverride(req.user.id, providerOverride),
+      );
+      const completion = await scope.run(() =>
+        this.aiService.autocomplete({
+          connectionId,
+          database,
+          ...request,
+          disabledProviders,
+          fallbackProvider,
+          beforeCursor,
+          afterCursor,
+          schemaContext: context
+            ? `${context}\n\n${schemaContext}`
+            : schemaContext,
+          databaseType: connection.type,
+          model,
+          providerOverride: resolvedOverride,
+        }),
+      );
 
-    return { completion };
+      return await execution.complete({ completion });
+    } catch (error) {
+      await execution.fail(error);
+      throw isAiHttpFatalError(error)
+        ? error
+        : (aiHttpStoppedException(error, scope.signal) ?? error);
+    } finally {
+      try {
+        await execution.release();
+      } finally {
+        scope.dispose();
+      }
+    }
   }
 
   @Post('provider-models')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  async listProviderModels(@Body() body: ProviderModelsDto) {
-    const baseUrl =
-      typeof body?.baseUrl === 'string'
-        ? normalizeProviderBaseUrl(body.baseUrl)
-        : '';
-    const apiKey = typeof body?.apiKey === 'string' ? body.apiKey.trim() : '';
-
-    if (!baseUrl) {
-      throw new BadRequestException('Base URL is required');
+  async listProviderModels(
+    @Body() body: ProviderModelsDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    await this.accountPolicy.assertEnabled(req.user.id);
+    if (
+      typeof body?.baseUrl !== 'string' ||
+      !body.baseUrl.trim() ||
+      body.baseUrl.length > 2000
+    ) {
+      throw new BadRequestException('A valid Base URL is required');
     }
-
-    let requestUrl: string;
-    try {
-      requestUrl = new URL('models', `${baseUrl}/`).toString();
-    } catch {
-      throw new BadRequestException('Invalid Base URL');
+    if (
+      body.apiKey !== undefined &&
+      (typeof body.apiKey !== 'string' || body.apiKey.length > 4000)
+    ) {
+      throw new BadRequestException('Invalid provider API key');
     }
-    if (!(await validateExternalUrl(requestUrl))) {
-      throw new BadRequestException('Unsafe provider URL');
-    }
-
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (apiKey) {
-      headers.Authorization = `Bearer ${apiKey}`;
-    }
-    if (baseUrl.includes('openrouter.ai')) {
-      headers['HTTP-Referer'] =
-        process.env.FRONTEND_URL || 'http://localhost:5173';
-      headers['X-Title'] = 'Data Explorer';
-    }
-
-    let response: globalThis.Response;
-    try {
-      response = await fetch(requestUrl, {
-        method: 'GET',
-        headers,
-        redirect: 'manual',
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to reach provider';
-      throw new BadRequestException(message);
-    }
-
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) {
-      throw new BadRequestException(
-        extractProviderErrorMessage(payload) ||
-          `Provider returned ${response.status}`,
-      );
-    }
-
-    const models = Array.isArray((payload as { data?: unknown[] } | null)?.data)
-      ? Array.from(
-          new Set(
-            (payload as { data: Array<{ id?: unknown }> }).data
-              .map((item) =>
-                typeof item?.id === 'string' ? item.id.trim() : '',
-              )
-              .filter(Boolean),
-          ),
-        ).sort((left, right) => left.localeCompare(right))
-      : [];
-
+    const models = await this.providerConnections.listModels(
+      body.baseUrl.trim(),
+      body.apiKey?.trim() || undefined,
+      req.user.id,
+    );
     return { models };
   }
 
@@ -339,88 +392,137 @@ export class AiController {
     @Body() body: GenerateSqlDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    const generationId = randomUUID();
-    const startedAt = Date.now();
-    const {
-      connectionId,
-      database,
-      prompt,
-      model,
-      mode,
-      routingMode,
-      providerOverride,
-      disabledProviders,
-      fallbackProvider,
-    } = body;
-
-    const { connection, schemaContext } =
-      await this.connectionService.getConnectionContext(
+    const scope = createAiHttpScope(req);
+    const execution = createAiHttpExecution(scope, this.ledger);
+    try {
+      const request = await execution.start(
+        this.accountPolicy,
+        req.user.id,
+        'generate_sql',
+        body,
+      );
+      const generationId = execution.generationId!;
+      const startedAt = Date.now();
+      const {
         connectionId,
         database,
-        req.user.id,
-        (pool, strategy, db, connId) =>
-          this.aiService.gatherSchemaContext(
-            pool,
-            strategy,
-            db,
-            connId,
-            prompt,
-          ),
-      );
-
-    try {
-      const result = await this.aiService.generateSql({
-        query: prompt,
-        databaseType: connection.type,
-        schemaContext,
+        prompt,
         model,
         mode,
         routingMode,
-        providerOverride: await this.providerConnections.resolveOverride(
-          req.user.id,
-          providerOverride,
-        ),
+        providerOverride,
         disabledProviders,
         fallbackProvider,
-      });
+      } = body;
 
-      await this.auditService.log({
-        action: AuditAction.AI_SQL_GENERATED,
-        userId: req.user.id,
-        details: {
-          generationId,
+      const { connection, schemaContext } = await scope.run(() =>
+        this.connectionService.getConnectionContext(
           connectionId,
-          databaseType: connection.type,
-          requestedModel: model || null,
-          provider: result.provider,
-          model: result.model,
-          mode: mode || 'fast',
-          routingMode: result.routingMode,
-          customProvider: Boolean(providerOverride),
-          latencyMs: Date.now() - startedAt,
-          usage: result.usage ?? null,
-        },
-      });
+          database,
+          req.user.id,
+          (pool, strategy, db, connId) =>
+            scope.run(() =>
+              this.aiService.gatherSchemaContext(
+                pool,
+                strategy,
+                db,
+                connId,
+                prompt,
+                {
+                  ...request,
+                },
+              ),
+            ),
+        ),
+      );
 
-      return { ...result, generationId };
+      try {
+        const resolvedOverride = await scope.run(() =>
+          this.providerConnections.resolveOverride(
+            req.user.id,
+            providerOverride,
+          ),
+        );
+        const result = await scope.run(() =>
+          this.aiService.generateSql({
+            ...request,
+            query: prompt,
+            databaseType: connection.type,
+            schemaContext,
+            model,
+            mode,
+            routingMode,
+            providerOverride: resolvedOverride,
+            disabledProviders,
+            fallbackProvider,
+          }),
+        );
+
+        const completed = await execution.complete(result);
+        await scope
+          .run(() =>
+            this.auditService.log({
+              action: AuditAction.AI_SQL_GENERATED,
+              userId: req.user.id,
+              details: {
+                generationId,
+                connectionId,
+                databaseType: connection.type,
+                requestedModel: model || null,
+                provider: result.provider,
+                model: result.model,
+                mode: mode || 'fast',
+                routingMode: result.routingMode,
+                customProvider: Boolean(providerOverride),
+                latencyMs: Date.now() - startedAt,
+                usage: completed.usage,
+                usageCoverage: completed.usageCoverage,
+                attemptCount: completed.attemptCount,
+                measuredAttemptCount: completed.measuredAttemptCount,
+                costCoverage: completed.costCoverage,
+              },
+            }),
+          )
+          .catch(() => undefined);
+
+        scope.throwIfStopped();
+        return completed;
+      } catch (error) {
+        if (isAiDisabledError(error) || isAiHttpFatalError(error)) throw error;
+        const stopped = aiHttpStoppedException(error, scope.signal);
+        if (stopped) throw stopped;
+        await scope
+          .run(() =>
+            this.auditService.log({
+              action: AuditAction.AI_SQL_GENERATION_FAILED,
+              userId: req.user.id,
+              details: {
+                generationId,
+                connectionId,
+                databaseType: connection.type,
+                requestedModel: model || null,
+                model: model || null,
+                mode: mode || 'fast',
+                routingMode: routingMode || null,
+                customProvider: Boolean(providerOverride),
+                latencyMs: Date.now() - startedAt,
+              },
+            }),
+          )
+          .catch(() => undefined);
+        throw new InternalServerErrorException('AI generation failed.');
+      }
     } catch (error) {
-      await this.auditService.log({
-        action: AuditAction.AI_SQL_GENERATION_FAILED,
-        userId: req.user.id,
-        details: {
-          generationId,
-          connectionId,
-          databaseType: connection.type,
-          requestedModel: model || null,
-          model: model || null,
-          mode: mode || 'fast',
-          routingMode: routingMode || null,
-          customProvider: Boolean(providerOverride),
-          latencyMs: Date.now() - startedAt,
-        },
-      });
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new InternalServerErrorException(message);
+      await execution.fail(error);
+      throw isAiHttpFatalError(error)
+        ? error
+        : (aiHttpStoppedException(error, scope.signal) ?? error);
+    } finally {
+      try {
+        await execution.release();
+      } finally {
+        scope.dispose();
+      }
     }
   }
 
@@ -430,11 +532,18 @@ export class AiController {
     @Body() body: AiSqlFeedbackDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    await this.auditService.log({
-      action: AuditAction.AI_SQL_FEEDBACK,
-      userId: req.user.id,
-      details: body,
-    });
+    await runAiLedgerOperation(() =>
+      this.ledger.feedback(req.user.id, body.generationId, body.rating),
+    );
+    await Promise.resolve()
+      .then(() =>
+        this.auditService.log({
+          action: AuditAction.AI_SQL_FEEDBACK,
+          userId: req.user.id,
+          details: { generationId: body.generationId, rating: body.rating },
+        }),
+      )
+      .catch(() => undefined);
 
     return { success: true };
   }
@@ -447,6 +556,8 @@ export class AiTestController {
     private readonly aiService: AiService,
     private readonly connectionService: AiConnectionService,
     private readonly providerConnections: AiProviderConnectionService,
+    private readonly accountPolicy: AiAccountPolicyService,
+    private readonly ledger: AiExecutionLedgerService,
   ) {}
 
   @Post('autocomplete')
@@ -455,48 +566,95 @@ export class AiTestController {
     @Body() body: AutocompleteDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    const {
-      connectionId,
-      database,
-      beforeCursor,
-      afterCursor,
-      context,
-      model,
-      providerOverride,
-    } = body;
-
+    const scope = createAiHttpScope(req);
+    const execution = createAiHttpExecution(scope, this.ledger);
     try {
-      const { connection, schemaContext } =
-        await this.connectionService.getConnectionContext(
-          connectionId,
-          database,
-          req.user.id,
-          (pool, strategy, db, connId) =>
-            this.aiService.gatherSchemaContext(
-              pool,
-              strategy,
-              db,
-              connId,
-              context ? `${context}\n${beforeCursor}` : beforeCursor,
-            ),
-        );
-
-      const completion = await this.aiService.autocomplete({
+      const request = await execution.start(
+        this.accountPolicy,
+        req.user.id,
+        'autocomplete',
+        body,
+      );
+      const {
+        connectionId,
+        database,
         beforeCursor,
         afterCursor,
-        schemaContext: context
-          ? `${context}\n\n${schemaContext}`
-          : schemaContext,
-        databaseType: connection.type,
+        context,
         model,
-        providerOverride: await this.providerConnections.resolveOverride(
-          req.user.id,
-          providerOverride,
-        ),
-      });
-      return { completion, error: null };
-    } catch (err) {
-      return { completion: '', error: String(err) };
+        providerOverride,
+        disabledProviders,
+        fallbackProvider,
+      } = body;
+
+      try {
+        const { connection, schemaContext } = await scope.run(() =>
+          this.connectionService.getConnectionContext(
+            connectionId,
+            database,
+            req.user.id,
+            (pool, strategy, db, connId) =>
+              scope.run(() =>
+                this.aiService.gatherSchemaContext(
+                  pool,
+                  strategy,
+                  db,
+                  connId,
+                  context ? `${context}\n${beforeCursor}` : beforeCursor,
+                  {
+                    ...request,
+                  },
+                ),
+              ),
+          ),
+        );
+
+        const resolvedOverride = await scope.run(() =>
+          this.providerConnections.resolveOverride(
+            req.user.id,
+            providerOverride,
+          ),
+        );
+        const completion = await scope.run(() =>
+          this.aiService.autocomplete({
+            connectionId,
+            database,
+            ...request,
+            disabledProviders,
+            fallbackProvider,
+            beforeCursor,
+            afterCursor,
+            schemaContext: context
+              ? `${context}\n\n${schemaContext}`
+              : schemaContext,
+            databaseType: connection.type,
+            model,
+            providerOverride: resolvedOverride,
+          }),
+        );
+        return await execution.complete({ completion, error: null });
+      } catch (err) {
+        if (isAiDisabledError(err) || isAiHttpFatalError(err)) throw err;
+        const stopped = aiHttpStoppedException(err, scope.signal);
+        if (stopped) throw stopped;
+        const failed = await execution.fail(err);
+        return {
+          completion: '',
+          error: 'AI generation failed.',
+          ...(failed ? aiExecutionMetadata(failed) : {}),
+        };
+      }
+    } catch (error) {
+      await execution.fail(error);
+      throw isAiHttpFatalError(error)
+        ? error
+        : (aiHttpStoppedException(error, scope.signal) ?? error);
+    } finally {
+      try {
+        await execution.release();
+      } finally {
+        scope.dispose();
+      }
     }
   }
 }

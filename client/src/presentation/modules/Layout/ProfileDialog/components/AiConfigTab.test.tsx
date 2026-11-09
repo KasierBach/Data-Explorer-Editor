@@ -17,10 +17,25 @@ const aiConfigTabMocks = vi.hoisted(() => ({
   updateAiPreferences: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
+  enabled: true,
+  isSaving: false,
+  setEnabled: vi.fn(),
 }));
 
 let mockPreferences: AiPreferences;
 const mockUpdateAiPreferences = aiConfigTabMocks.updateAiPreferences;
+
+vi.mock("@/core/services/aiAccountPolicy", () => ({
+  isAiEnabled: () => aiConfigTabMocks.enabled,
+  assertAiEnabled: () => {
+    if (!aiConfigTabMocks.enabled) throw new Error("AI is disabled for this account.");
+  },
+  useAiAccountPolicy: () => ({
+    enabled: aiConfigTabMocks.enabled,
+    isSaving: aiConfigTabMocks.isSaving,
+    setEnabled: aiConfigTabMocks.setEnabled,
+  }),
+}));
 
 vi.mock("@/core/services/api.service", () => ({
   apiService: {
@@ -50,7 +65,7 @@ vi.mock("@/core/services/aiPreferences", async () => {
   const actual = await import("@/core/services/aiPreferences");
   return {
     ...actual,
-    useAiPreferences: () => mockPreferences,
+    useAiPreferences: () => ({ ...mockPreferences, enabled: aiConfigTabMocks.enabled }),
     updateAiPreferences: aiConfigTabMocks.updateAiPreferences,
   };
 });
@@ -99,6 +114,9 @@ describe("filterSearchableGroups", () => {
 describe("AiConfigTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    aiConfigTabMocks.enabled = true;
+    aiConfigTabMocks.isSaving = false;
+    aiConfigTabMocks.setEnabled.mockResolvedValue(undefined);
     aiConfigTabMocks.get.mockResolvedValue([
       {
         id: "provider-1",
@@ -148,6 +166,63 @@ describe("AiConfigTab", () => {
       "confirm",
       vi.fn(() => true),
     );
+  });
+
+  it("blocks saved-provider external testing after a fresh account disable", async () => {
+    aiConfigTabMocks.post.mockResolvedValue({ ok: true, models: ["fixture-model"], latencyMs: 1 });
+    render(<AiConfigTab t={(key) => key} />);
+    fireEvent.click(screen.getByRole("button", { name: /Sửa/i }));
+    aiConfigTabMocks.enabled = false;
+    fireEvent.click(screen.getByRole("button", { name: /kết nối/i }));
+    await waitFor(() => expect(aiConfigTabMocks.post).not.toHaveBeenCalled());
+    expect(screen.getByDisplayValue("gido")).toBeInTheDocument();
+  });
+
+  it("disables provider model discovery while AI is off but allows stored-provider edits", async () => {
+    aiConfigTabMocks.enabled = false;
+    render(<AiConfigTab t={(key) => key} />);
+    fireEvent.click(screen.getByRole("button", { name: /Sửa/i }));
+    expect(screen.getByRole("button", { name: /kết nối/i })).toBeDisabled();
+    fireEvent.change(screen.getByDisplayValue("gido"), { target: { value: "stored-config-only" } });
+    fireEvent.click(screen.getByRole("button", { name: /Lưu chỉnh sửa/i }));
+    await waitFor(() => expect(aiConfigTabMocks.patch).toHaveBeenCalledWith(
+      "/ai/providers/provider-1", expect.objectContaining({ name: "stored-config-only" }),
+    ));
+    expect(aiConfigTabMocks.post).not.toHaveBeenCalled();
+    expect(aiConfigTabMocks.get).toHaveBeenCalledWith("/ai/providers");
+  });
+
+  it("waits for confirmed account save before showing toggle success", async () => {
+    let finish!: () => void;
+    aiConfigTabMocks.setEnabled.mockReturnValue(new Promise<void>((resolve) => { finish = resolve; }));
+    render(<AiConfigTab t={(key) => key} />);
+    const toggle = screen.getByRole("switch", { name: "Bật/Tắt AI" });
+    fireEvent.click(toggle);
+    expect(aiConfigTabMocks.setEnabled).toHaveBeenCalledWith(false);
+    expect(aiConfigTabMocks.toastSuccess).not.toHaveBeenCalled();
+    expect(toggle).toBeChecked();
+    finish();
+    await waitFor(() => expect(aiConfigTabMocks.toastSuccess).toHaveBeenCalledWith("Đã tắt hệ thống AI."));
+  });
+
+  it("shows a save error without optimistically enabling the account", async () => {
+    aiConfigTabMocks.enabled = false;
+    mockPreferences = { ...mockPreferences, enabled: false };
+    aiConfigTabMocks.setEnabled.mockRejectedValue(new Error("Policy save failed"));
+    render(<AiConfigTab t={(key) => key} />);
+    const toggle = screen.getByRole("switch", { name: "Bật/Tắt AI" });
+    fireEvent.click(toggle);
+    await waitFor(() => expect(aiConfigTabMocks.toastError).toHaveBeenCalledWith("Policy save failed"));
+    expect(toggle).not.toBeChecked();
+    expect(aiConfigTabMocks.toastSuccess).not.toHaveBeenCalled();
+    expect(mockPreferences.enabled).toBe(false);
+  });
+
+  it("disables the master switch while the account save is pending", () => {
+    aiConfigTabMocks.isSaving = true;
+    render(<AiConfigTab t={(key) => key} />);
+    expect(screen.getByRole("switch", { name: "Bật/Tắt AI" })).toBeDisabled();
+    expect(aiConfigTabMocks.setEnabled).not.toHaveBeenCalled();
   });
 
   it("loads a provider into the form and saves edits", async () => {

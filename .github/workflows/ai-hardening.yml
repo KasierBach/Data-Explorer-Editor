@@ -1,0 +1,121 @@
+name: AI hardening (offline readiness)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/scripts/ai-release-readiness*.mjs'
+      - '.github/workflows/ai-hardening.yml'
+      - 'docs/roadmap/evidence/ai-a16-local-readiness.md'
+      - 'server/src/**'
+      - 'server/scripts/**'
+      - 'server/prisma/**'
+      - 'server/package*.json'
+      - 'server/*config*'
+      - 'client/src/**'
+      - 'client/e2e/**'
+      - 'client/scripts/**'
+      - 'client/package*.json'
+      - 'client/*config*'
+      - 'client/vendor/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/ai-release-readiness*.mjs'
+      - '.github/workflows/ai-hardening.yml'
+      - 'docs/roadmap/evidence/ai-a16-local-readiness.md'
+      - 'server/src/**'
+      - 'server/scripts/**'
+      - 'server/prisma/**'
+      - 'server/package*.json'
+      - 'server/*config*'
+      - 'client/src/**'
+      - 'client/e2e/**'
+      - 'client/scripts/**'
+      - 'client/package*.json'
+      - 'client/*config*'
+      - 'client/vendor/**'
+  # Manual verification of the selected ref only. No inputs, approvals or release action.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-hardening-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-readiness:
+    name: AI offline checks (not a release approval)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CI: 'true'
+      AI_KILL_SWITCH: 'true'
+      AI_EGRESS_POLICY_JSON: '{"enabled":false}'
+      PRISMA_HIDE_UPDATE_MESSAGE: 'true'
+      CHECKPOINT_DISABLE: '1'
+      PRISMA_GENERATE_SKIP_AUTOINSTALL: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+      # Registry/tool downloads only; dependency lifecycle scripts are suppressed.
+      # There are no provider, database, cloud or deployment credentials in this job.
+      - name: Install server dependencies from the existing lockfile
+        id: server-install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: server
+      - name: Install client dependencies from the existing lockfile
+        id: client-install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: client
+      - name: Prepare installed Prisma tool engines (no database connection)
+        id: prisma-tools
+        run: node node_modules/@prisma/engines/scripts/postinstall.js
+        working-directory: server
+      - name: Collect exact-SHA offline verification metadata
+        if: always()
+        timeout-minutes: 55
+        shell: bash
+        env:
+          AI_A16_SERVER_SETUP: ${{ steps.server-install.outcome }}
+          AI_A16_CLIENT_SETUP: ${{ steps.client-install.outcome }}
+          AI_A16_PRISMA_SETUP: ${{ steps.prisma-tools.outcome }}
+        run: |
+          set -euo pipefail
+          # Fail closed if network namespaces are unavailable. Do not retry online.
+          # Only loopback exists here; even an accidental live call cannot leave it.
+          unshare --user --map-root-user --net sh -eu -c '
+            # This is the child namespace, never the host. Only lo is enabled.
+            timeout 5s ip link set dev lo up
+            exec node .github/scripts/ai-release-readiness.mjs run \
+              --release-sha "$1" --out-dir "$2"
+          ' ai-a16 "$GITHUB_SHA" \
+            "$RUNNER_TEMP/ai-a16-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Upload redacted readiness metadata only
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ai-hardening-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ai-a16-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}/readiness.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload validated results manifest only
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ai-hardening-manifest-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ai-a16-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}/manifest.json
+          # Invalid/dirty/unisolated evidence is not copied as a validated manifest.
+          if-no-files-found: ignore
+          retention-days: 7

@@ -12,6 +12,7 @@ import { NoSqlMainContent } from '../NoSqlExplorer/NoSqlMainContent';
 import { AiAssistant } from '@/presentation/modules/Query/AiAssistant';
 import { MobileWorkspaceBar } from './MobileWorkspaceBar';
 import { getLayoutText } from './layoutI18n';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 
 export function NoSqlShell() {
     useGlobalShortcuts();
@@ -79,6 +80,15 @@ export function NoSqlShell() {
             rightPanel.setWidth(Math.max(300, targetAiWidth));
         }
     }, [isCompactMobileLayout, isLandscapeMobile, isSmallMobile, leftPanel, rightPanel]);
+
+    const handleApplyGeneratedQuery = React.useCallback((sql: string) => {
+        const store = useAppStore.getState();
+        const connection = store.connections.find(c => c.id === store.activeConnectionId);
+        if (connection?.type !== 'mongodb' && connection?.type !== 'mongodb+srv') return;
+
+        store.setNosqlMqlQuery(sql);
+        if (store.nosqlViewMode === 'grid') store.setNosqlViewMode('tree');
+    }, []);
 
     const anyDragging = leftPanel.isDragging || rightPanel.isDragging;
 
@@ -182,15 +192,9 @@ export function NoSqlShell() {
                 >
                     <div style={{ width: `${rightPanel.width}px` }} className="h-full">
                         <AiAssistant
-                            onInsertQuery={(sql) => {
-                                const store = useAppStore.getState();
-                                store.setNosqlMqlQuery(sql);
-                                if (store.nosqlViewMode === 'grid') store.setNosqlViewMode('tree');
-                            }}
-                            onRunQuery={(sql) => {
-                                const store = useAppStore.getState();
-                                store.setNosqlMqlQuery(sql);
-                            }}
+                            onInsertQuery={handleApplyGeneratedQuery}
+                            onRunQuery={handleApplyGeneratedQuery}
+                            runActionLabel={getWorkspaceText(lang).aiMessageBubble.insertToEditor}
                             onClose={() => setAiPanelOpen(false)}
                         />
                     </div>

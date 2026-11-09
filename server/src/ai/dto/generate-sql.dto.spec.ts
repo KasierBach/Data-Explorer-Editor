@@ -37,6 +37,44 @@ describe('GenerateSqlDto', () => {
 
     expect(errors).toHaveLength(0);
   });
+  it.each([
+    { image: 'data:image/png;base64,aGVsbG8=' },
+    { image: 'data:image/png;base64,iVBORw0KGgo===' },
+    { image: 'data:image/svg+xml;base64,PHN2Zz4=' },
+    {
+      document: {
+        name: 'fixture.pdf',
+        mimeType: 'application/pdf',
+        data: 'data:application/pdf;base64,JVBERi0xLjcK',
+        size: 1,
+      },
+    },
+    {
+      prompt: 'a'.repeat(6 * 1024 * 1024),
+      context: 'b'.repeat(5 * 1024 * 1024),
+    },
+  ])(
+    'rejects invalid attachment content/declarations and aggregate payloads',
+    async (extra) => {
+      const dto = plainToInstance(GenerateSqlDto, {
+        connectionId: 'fixture',
+        prompt: 'Read fixture',
+        ...extra,
+      });
+      expect((await validate(dto)).length).toBeGreaterThan(0);
+    },
+  );
+
+  it('accepts a canonical PNG header fixture without changing existing string fields', async () => {
+    const dto = plainToInstance(GenerateSqlDto, {
+      connectionId: 'fixture',
+      prompt: 'Read fixture',
+      context: 'Context',
+      image: 'data:image/png;base64,iVBORw0KGgo=',
+    });
+    expect(await validate(dto)).toHaveLength(0);
+  });
+
   it('accepts PDF data URLs and rejects other document payloads', async () => {
     const valid = plainToInstance(GenerateSqlDto, {
       connectionId: 'conn-1',
@@ -44,7 +82,7 @@ describe('GenerateSqlDto', () => {
       document: {
         name: 'schema.pdf',
         mimeType: 'application/pdf',
-        data: 'data:application/pdf;base64,aGVsbG8=',
+        data: 'data:application/pdf;base64,JVBERi0xLjcK',
       },
     });
     const invalid = plainToInstance(GenerateSqlDto, {

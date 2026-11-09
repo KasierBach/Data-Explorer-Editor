@@ -4,8 +4,17 @@ import type { Cache } from 'cache-manager';
 import * as crypto from 'crypto';
 import { AiProviderRunnerService } from './ai.provider-runner.service';
 import { AiRoutingService } from './ai.routing.service';
+import { isAiDisabledError } from './ai-account-policy.service';
+import { isAiHttpFatalError } from './ai-http-execution';
 import { AI_CONSTANTS } from './ai.constants';
+import { extractJsonObject, stripCodeFences } from './ai-response-json';
+import {
+  assertAiRequestActive,
+  isAiRequestStoppedError,
+  waitForAiResult,
+} from './ai-request-lifecycle';
 import type { ChatParams } from './ai.types';
+import { FreshnessService } from '../common/freshness/freshness.service';
 
 type GeneratedCommandResponse = {
   explanation?: string;
@@ -32,60 +41,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function isEmptyObject(value: unknown): value is Record<string, never> {
   return isPlainObject(value) && Object.keys(value).length === 0;
-}
-
-function stripCodeFences(value: string): string {
-  return value
-    .replace(/^\s*```(?:json|sql)?\s*/i, '')
-    .replace(/\s*```$/i, '')
-    .trim();
-}
-
-function extractJsonObject(responseText: string): string {
-  const cleaned = stripCodeFences(responseText);
-  const firstBrace = cleaned.indexOf('{');
-
-  if (firstBrace === -1) {
-    return cleaned;
-  }
-
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let index = firstBrace; index < cleaned.length; index += 1) {
-    const char = cleaned[index];
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-
-    if (char === '\\') {
-      escaped = true;
-      continue;
-    }
-
-    if (char === '"') {
-      inString = !inString;
-      continue;
-    }
-
-    if (inString) {
-      continue;
-    }
-
-    if (char === '{') {
-      depth += 1;
-    } else if (char === '}') {
-      depth -= 1;
-      if (depth === 0) {
-        return cleaned.slice(firstBrace, index + 1);
-      }
-    }
-  }
-
-  return cleaned.slice(firstBrace);
 }
 
 function extractPreferredCollection(query: string): string | null {
@@ -270,9 +225,23 @@ export class AiAutocompleteService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly providerRunner: AiProviderRunnerService,
     private readonly routingService: AiRoutingService,
+    private readonly freshnessService: FreshnessService = new FreshnessService(
+      cacheManager,
+    ),
   ) {}
 
   async autocomplete(params: {
+    requestScopeKey?: ChatParams['requestScopeKey'];
+    execution?: ChatParams['execution'];
+    beforeProviderAttempt?: ChatParams['beforeProviderAttempt'];
+    cacheScope?: string;
+    connectionId?: string;
+    database?: string;
+    signal?: AbortSignal;
+    deadlineAt?: number;
+    beforeProviderRequest?: ChatParams['beforeProviderRequest'];
+    disabledProviders?: string[];
+    fallbackProvider?: string;
     beforeCursor: string;
     afterCursor?: string;
     schemaContext?: string;
@@ -280,6 +249,27 @@ export class AiAutocompleteService {
     model?: string;
     providerOverride?: ChatParams['providerOverride'];
   }): Promise<string> {
+    assertAiRequestActive(params);
+    if (
+      !params.beforeProviderRequest ||
+      !params.beforeProviderAttempt ||
+      !params.execution ||
+      !(params.requestScopeKey || params.cacheScope)
+    )
+      return '';
+    const request = {
+      requestScopeKey: params.requestScopeKey ?? params.cacheScope,
+      signal: params.signal,
+      deadlineAt: params.deadlineAt,
+      execution: params.execution,
+      beforeProviderRequest: params.beforeProviderRequest,
+      beforeProviderAttempt: params.beforeProviderAttempt,
+    };
+    await waitForAiResult(
+      Promise.resolve().then(() => request.beforeProviderRequest()),
+      params.signal,
+    );
+    assertAiRequestActive(params);
     const {
       beforeCursor,
       afterCursor = '',
@@ -299,14 +289,50 @@ export class AiAutocompleteService {
         : 'Redis Command'
       : `${databaseType} SQL`;
 
-    const cacheScope = providerOverride
-      ? `${providerOverride.baseUrl}:${providerOverride.model}`
-      : model || 'assistant-default';
-    const cacheContent = `${databaseType}:${cacheScope}:${schemaContext || ''}:${beforeCursor}`;
-    const cacheKey = `ai:autocomplete:${crypto.createHash('sha256').update(cacheContent).digest('hex')}`;
+    const boundedBefore = beforeCursor.slice(
+      -AI_CONSTANTS.AUTOCOMPLETE_CURSOR_MAX_LENGTH,
+    );
+    const boundedAfter = afterCursor.slice(0, 300);
+    const cacheScope = JSON.stringify([
+      request.requestScopeKey,
+      params.cacheScope ?? 'internal',
+      databaseType,
+      providerOverride?.providerId ?? null,
+      providerOverride?.baseUrl ?? null,
+      providerOverride?.model ?? model ?? 'assistant-default',
+      providerOverride?.apiKey
+        ? crypto
+            .createHash('sha256')
+            .update(providerOverride.apiKey)
+            .digest('hex')
+        : null,
+      [...(params.disabledProviders ?? [])]
+        .map((provider) => provider.trim().toLowerCase())
+        .sort(),
+      params.fallbackProvider ?? 'auto',
+    ]);
+    const cacheKey = await waitForAiResult(
+      this.freshnessService.buildKey(
+        'ai-schema',
+        [params.connectionId ?? params.cacheScope, params.database ?? null],
+        [
+          'autocomplete-v2',
+          cacheScope,
+          schemaContext ?? '',
+          boundedBefore,
+          boundedAfter,
+        ],
+      ),
+      params.signal,
+    );
+    assertAiRequestActive(params);
 
     try {
-      const cachedSuggestion = await this.cacheManager.get<string>(cacheKey);
+      const cachedSuggestion = await waitForAiResult(
+        this.cacheManager.get<string>(cacheKey),
+        params.signal,
+      );
+      assertAiRequestActive(params);
       if (cachedSuggestion) {
         return cachedSuggestion;
       }
@@ -323,10 +349,10 @@ CONTEXT:
 ${schemaContext || 'Empty'}
 
 BEFORE CURSOR:
-${beforeCursor.length > AI_CONSTANTS.AUTOCOMPLETE_CURSOR_MAX_LENGTH ? beforeCursor.slice(-AI_CONSTANTS.AUTOCOMPLETE_CURSOR_MAX_LENGTH) : beforeCursor}
+${boundedBefore}
 
 AFTER CURSOR:
-${afterCursor.length > 300 ? afterCursor.slice(0, 300) : afterCursor}
+${boundedAfter}
 
 NEXT CHARACTERS (START IMMEDIATELY):`;
 
@@ -338,27 +364,45 @@ NEXT CHARACTERS (START IMMEDIATELY):`;
           model,
           mode: 'fast',
           providerOverride,
+          disabledProviders: params.disabledProviders,
+          fallbackProvider: params.fallbackProvider,
         },
         this.providerRunner.isGeminiAvailable(),
       );
 
       for (const plan of plans) {
+        assertAiRequestActive(params);
+        await waitForAiResult(
+          Promise.resolve().then(() => params.beforeProviderRequest?.()),
+          params.signal,
+        );
+        assertAiRequestActive(params);
         try {
-          const responseText =
+          await waitForAiResult(
+            request.beforeProviderAttempt(plan),
+            request.signal,
+          );
+          assertAiRequestActive(params);
+          const responseText = await waitForAiResult(
             plan.provider === 'gemini'
-              ? await this.providerRunner.completeGeminiText({
+              ? this.providerRunner.completeGeminiText({
+                  ...request,
                   model: plan.model,
                   prompt: systemPrompt,
                   temperature: AI_CONSTANTS.TEMPERATURE_PRECISE,
                   maxOutputTokens: AI_CONSTANTS.AUTOCOMPLETE_MAX_OUTPUT_TOKENS,
                 })
-              : await this.providerRunner.completeOpenAiCompatibleText(plan, {
+              : this.providerRunner.completeOpenAiCompatibleText(plan, {
+                  ...request,
                   systemPrompt,
                   prompt: beforeCursor,
                   temperature: AI_CONSTANTS.TEMPERATURE_PRECISE,
                   maxOutputTokens: AI_CONSTANTS.AUTOCOMPLETE_MAX_OUTPUT_TOKENS,
-                });
+                }),
+            request.signal,
+          );
 
+          assertAiRequestActive(params);
           const suggestion = responseText
             .replace(/^```(sql|json|bash)?\n?|```$/g, '')
             .trim();
@@ -367,13 +411,24 @@ NEXT CHARACTERS (START IMMEDIATELY):`;
             continue;
           }
 
-          await this.cacheManager.set(
-            cacheKey,
-            suggestion,
-            AI_CONSTANTS.AUTOCOMPLETE_CACHE_TTL_MS,
+          await waitForAiResult(
+            this.cacheManager.set(
+              cacheKey,
+              suggestion,
+              AI_CONSTANTS.AUTOCOMPLETE_CACHE_TTL_MS,
+            ),
+            params.signal,
           );
+          assertAiRequestActive(params);
           return suggestion;
         } catch (planError) {
+          if (
+            params.signal?.aborted ||
+            isAiDisabledError(planError) ||
+            isAiHttpFatalError(planError) ||
+            isAiRequestStoppedError(planError)
+          )
+            throw planError;
           this.logger.warn(
             `[AiAutocompleteService] Autocomplete plan ${plan.provider}:${plan.model} failed: ${
               planError instanceof Error ? planError.message : 'Unknown error'
@@ -384,6 +439,13 @@ NEXT CHARACTERS (START IMMEDIATELY):`;
 
       return '';
     } catch (error) {
+      if (
+        params.signal?.aborted ||
+        isAiDisabledError(error) ||
+        isAiHttpFatalError(error) ||
+        isAiRequestStoppedError(error)
+      )
+        throw error;
       this.logger.warn(
         '[AiAutocompleteService] Autocomplete failed:',
         error instanceof Error ? error.message : 'Unknown error',

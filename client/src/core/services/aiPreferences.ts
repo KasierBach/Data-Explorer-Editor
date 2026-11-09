@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { isAiEnabled, subscribeAiAccountPolicy } from './aiAccountPolicy';
 
 export const AI_PREFERENCES_STORAGE_KEY = "data-explorer-ai-preferences-v1";
 export const INHERIT_ASSISTANT_MODEL = "__assistant__";
@@ -55,7 +56,7 @@ export interface AiPreferences {
 }
 
 const DEFAULT_AI_PREFERENCES: AiPreferences = {
-  enabled: true,
+  enabled: false,
   disabledProviders: [],
   fallbackProvider: 'auto',
   assistantModel: undefined,
@@ -146,7 +147,7 @@ function sanitizePreferences(value: unknown): AiPreferences {
   );
 
   return {
-    enabled: typeof input.enabled === "boolean" ? input.enabled : true,
+    enabled: false,
     disabledProviders: Array.isArray(input.disabledProviders)
       ? input.disabledProviders.filter((p): p is string => typeof p === "string")
       : [],
@@ -190,6 +191,7 @@ function sanitizePreferences(value: unknown): AiPreferences {
 function serializePreferences(preferences: AiPreferences) {
   return JSON.stringify({
     ...preferences,
+    enabled: false,
     customProviders: preferences.customProviders.map((provider) => ({
       ...provider,
       apiKey: "",
@@ -241,11 +243,15 @@ export function readAiPreferences(): AiPreferences {
     return DEFAULT_AI_PREFERENCES;
   }
 
+  const enabled = isAiEnabled();
   let raw: string | null = null;
 
   try {
     raw = window.localStorage.getItem(AI_PREFERENCES_STORAGE_KEY);
     if (raw === cachedPreferencesRaw) {
+      if (cachedPreferencesSnapshot.enabled !== enabled) {
+        cachedPreferencesSnapshot = { ...cachedPreferencesSnapshot, enabled };
+      }
       return cachedPreferencesSnapshot;
     }
 
@@ -258,13 +264,13 @@ export function readAiPreferences(): AiPreferences {
     }
 
     cachedPreferencesRaw = persistedRaw;
-    cachedPreferencesSnapshot = snapshot;
-    return snapshot;
+    cachedPreferencesSnapshot = { ...snapshot, enabled };
+    return cachedPreferencesSnapshot;
   } catch {
     window.localStorage.removeItem(AI_PREFERENCES_STORAGE_KEY);
     cachedPreferencesRaw = null;
-    cachedPreferencesSnapshot = DEFAULT_AI_PREFERENCES;
-    return DEFAULT_AI_PREFERENCES;
+    cachedPreferencesSnapshot = { ...DEFAULT_AI_PREFERENCES, enabled };
+    return cachedPreferencesSnapshot;
   }
 }
 
@@ -274,7 +280,7 @@ export function writeAiPreferences(next: Partial<AiPreferences>) {
   const sanitized = sanitizePreferences(next);
   const raw = serializePreferences(sanitized);
   cachedPreferencesRaw = raw;
-  cachedPreferencesSnapshot = sanitized;
+  cachedPreferencesSnapshot = { ...sanitized, enabled: isAiEnabled() };
   window.localStorage.setItem(AI_PREFERENCES_STORAGE_KEY, raw);
   emitPreferencesChanged();
 }
@@ -294,10 +300,12 @@ export function subscribeAiPreferences(listener: () => void) {
   const onChange = () => listener();
   window.addEventListener(AI_PREFERENCES_EVENT, onChange);
   window.addEventListener("storage", onChange);
+  const unsubscribeAccount = subscribeAiAccountPolicy(listener);
 
   return () => {
     window.removeEventListener(AI_PREFERENCES_EVENT, onChange);
     window.removeEventListener("storage", onChange);
+    unsubscribeAccount();
   };
 }
 

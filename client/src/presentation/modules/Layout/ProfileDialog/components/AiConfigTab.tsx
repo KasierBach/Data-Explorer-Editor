@@ -28,6 +28,7 @@ import {
     type CustomAiProvider,
 } from '@/core/services/aiPreferences';
 import { useAppStore } from '@/core/services/store';
+import { assertAiEnabled, isAiEnabled, useAiAccountPolicy } from '@/core/services/aiAccountPolicy';
 import { AiUsageCard } from '@/presentation/components/shared/AiUsageCard';
 import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
@@ -317,6 +318,7 @@ const SearchableModelSelect: React.FC<SearchableModelSelectProps> = ({
 export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
     const { lang, aiModel, setAiModel } = useAppStore();
     const preferences = useAiPreferences();
+    const { enabled: accountEnabled, isSaving: isSavingAccountPolicy, setEnabled } = useAiAccountPolicy();
     const [providerForm, setProviderForm] = useState<ProviderFormState>(EMPTY_FORM);
     const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
     const [isProviderModelPickerOpen, setIsProviderModelPickerOpen] = useState(false);
@@ -559,6 +561,8 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
     };
 
     const handleLoadProviderModels = async () => {
+        if (!isAiEnabled() || isLoadingProviderModels) return;
+        assertAiEnabled();
         const baseUrl = normalizeProviderBaseUrl(providerForm.baseUrl);
         if (!baseUrl) {
             toast.error(labels.providerBaseUrlRequired);
@@ -570,6 +574,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
             const existing = editingProviderId
                 ? preferences.customProviders.find((provider) => provider.id === editingProviderId)
                 : undefined;
+            assertAiEnabled();
             const response = existing?.serverManaged
                 ? await apiService.post<ProviderTestResult>(`/ai/providers/${existing.id}/test`, {})
                 : await apiService.post<ProviderTestResult>('/ai/providers/test', {
@@ -580,6 +585,7 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                     model: providerForm.model.trim(),
                     models: providerModels,
                 });
+            if (!isAiEnabled()) return;
             const models = Array.isArray(response.models) ? response.models : [];
             setProviderModels(models);
             setIsProviderModelPickerOpen(false);
@@ -762,16 +768,17 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
         />
     );
 
-    const handleToggleMasterEnabled = (enabled: boolean) => {
-        updateAiPreferences((current) => ({
-            ...current,
-            enabled,
-        }));
-        toast.success(
-            enabled
-                ? (isVi ? 'Đã bật hệ thống AI.' : 'AI features enabled.')
-                : (isVi ? 'Đã tắt hệ thống AI.' : 'AI features disabled.')
-        );
+    const handleToggleMasterEnabled = async (enabled: boolean) => {
+        try {
+            await setEnabled(enabled);
+            toast.success(
+                enabled
+                    ? (isVi ? 'Đã bật hệ thống AI.' : 'AI features enabled.')
+                    : (isVi ? 'Đã tắt hệ thống AI.' : 'AI features disabled.')
+            );
+        } catch (error) {
+            toast.error(getErrorMessage(error, isVi ? 'Không thể lưu trạng thái AI.' : 'Failed to save AI settings.'));
+        }
     };
 
     return (
@@ -794,11 +801,11 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                         </h4>
                         <span className={cn(
                             "text-xs font-semibold px-2.5 py-0.5 rounded-full border",
-                            preferences.enabled !== false
+                            accountEnabled
                                 ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
                                 : "bg-muted text-muted-foreground border-border"
                         )}>
-                            {preferences.enabled !== false
+                            {accountEnabled
                                 ? (isVi ? 'ĐANG BẬT' : 'ENABLED')
                                 : (isVi ? 'ĐÃ TẮT' : 'DISABLED')}
                         </span>
@@ -810,10 +817,14 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                     </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
+                    {isSavingAccountPolicy && <Loader2 className="h-4 w-4 animate-spin" aria-label={isVi ? 'Đang lưu...' : 'Saving...'} />}
                     <Switch
-                        checked={preferences.enabled !== false}
-                        onCheckedChange={handleToggleMasterEnabled}
+                        checked={accountEnabled}
+                        disabled={isSavingAccountPolicy}
+                        aria-busy={isSavingAccountPolicy}
+                        onCheckedChange={(value) => { void handleToggleMasterEnabled(value); }}
                         className="scale-125"
+                        title={isSavingAccountPolicy ? (isVi ? 'Đang lưu...' : 'Saving...') : undefined}
                         label={isVi ? 'Bật/Tắt AI' : 'Toggle AI'}
                     />
                 </div>
@@ -1064,7 +1075,8 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
                                 size="sm"
                                 className="h-10 shrink-0 gap-2 px-4 transition-colors active:translate-y-px"
                                 onClick={handleLoadProviderModels}
-                                disabled={isLoadingProviderModels}
+                                disabled={preferences.enabled !== true || isLoadingProviderModels}
+                                title={preferences.enabled === true ? undefined : (isVi ? 'AI đã tắt cho tài khoản này.' : 'AI is disabled for this account.')}
                             >
                                 {isLoadingProviderModels ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                                 {isVi ? 'Kiểm tra kết nối' : 'Test connection'}

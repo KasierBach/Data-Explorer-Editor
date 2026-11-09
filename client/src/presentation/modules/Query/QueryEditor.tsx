@@ -6,6 +6,7 @@ import { connectionService } from '@/core/services/ConnectionService';
 import { apiService } from '@/core/services/api.service';
 import { useAppStore, type SavedQuery } from '@/core/services/store';
 import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
+import { assertAiEnabled, isAiEnabled } from '@/core/services/aiAccountPolicy';
 import { SavedQueriesDialog } from './SavedQueriesDialog';
 import { QueryHistoryDialog } from './QueryHistoryDialog';
 import { ActiveQueriesPanel } from './ActiveQueriesPanel';
@@ -374,6 +375,8 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
         customPromptOverride?: string,
         forceRefresh = false
     ) => {
+        if (!isAiEnabled()) return;
+        assertAiEnabled();
         let sqlToExplain = sqlOverride || query;
         if (!sqlOverride && editorRef.current) {
             const selection = editorRef.current.getSelection();
@@ -405,6 +408,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
 
         try {
             const promptToUse = customPromptOverride || text.explainPrompt;
+            assertAiEnabled();
             const result = await apiService.post<AiExplanationResponse>('/ai/generate-sql', {
                 connectionId: activeConnectionId,
                 database: activeDatabase || undefined,
@@ -418,6 +422,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
                 fallbackProvider: preferences.fallbackProvider,
             });
 
+            if (!isAiEnabled()) return;
             const explanationText = result.message?.trim() || result.explanation?.trim() || null;
             setAiExplanation(explanationText);
             if (explanationText && !customPromptOverride) {
@@ -548,6 +553,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
                 setIsHistoryDialogOpen(true);
             }
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                if (e.target instanceof Element && e.target.closest('[data-ai-query-input]')) return;
                 e.preventDefault();
                 e.stopPropagation();
                 handleRunRef.current();
@@ -563,6 +569,7 @@ export const QueryEditor: React.FC<{ tabId: string; isActive: boolean }> = ({ ta
                 <QueryToolbar
                     isLoading={isLoading}
                     isExplaining={isAiExplaining}
+                    aiEnabled={preferences.enabled === true}
                     allowQueryExecution={activeConnection?.allowQueryExecution}
                     isCompactMobileLayout={isCompactMobileLayout}
                     isSmallMobile={isSmallMobile}

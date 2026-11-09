@@ -32,6 +32,7 @@ export interface AuthUser {
     address?: string;
     theme?: string;
     language?: string;
+    aiEnabled?: boolean;
     emailNotifications?: boolean;
     failedQueryAlerts?: boolean;
     productUpdates?: boolean;

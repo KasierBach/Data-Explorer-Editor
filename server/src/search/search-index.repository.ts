@@ -5,6 +5,11 @@ import type {
   StoredSearchIndexItem,
 } from './search-index.types';
 
+export interface SearchSemanticScope {
+  connectionId: string;
+  database: string;
+}
+
 @Injectable()
 export class SearchIndexRepository {
   private readonly maxSemanticFallbackNames = 500;
@@ -235,7 +240,18 @@ export class SearchIndexRepository {
     return matchedItems;
   }
 
-  async getSemanticFallbackNames(userId: string) {
+  async getSemanticFallbackNames(
+    userId: string,
+    approvedScopes: readonly SearchSemanticScope[] = [],
+  ) {
+    // Callers must derive these exact pairs from authenticated server records.
+    // An omitted/empty scope list never broadens to the whole user index.
+    const allowedScopes = new Set(
+      approvedScopes
+        .filter((scope) => scope.connectionId && scope.database)
+        .map((scope) => JSON.stringify([scope.connectionId, scope.database])),
+    );
+    if (allowedScopes.size === 0) return [];
     const client = this.redisService.getClient();
     const itemsKey = this.itemsKey(userId);
     const names = new Set<string>();
@@ -252,7 +268,12 @@ export class SearchIndexRepository {
       cursor = nextCursor;
       for (let index = 1; index < chunk.length; index += 2) {
         const storedItem = this.parseStoredItem(chunk[index]);
-        if (!storedItem?.name) {
+        if (
+          !storedItem?.name ||
+          !allowedScopes.has(
+            JSON.stringify([storedItem.connectionId, storedItem.database]),
+          )
+        ) {
           continue;
         }
 
@@ -266,8 +287,20 @@ export class SearchIndexRepository {
     return [...names];
   }
 
-  async getItemsByNames(userId: string, names: string[], limit = 50) {
-    if (names.length === 0) {
+  async getItemsByNames(
+    userId: string,
+    names: string[],
+    limit = 50,
+    approvedScopes?: readonly SearchSemanticScope[],
+  ) {
+    const allowedScopes =
+      approvedScopes &&
+      new Set(
+        approvedScopes
+          .filter((scope) => scope.connectionId && scope.database)
+          .map((scope) => JSON.stringify([scope.connectionId, scope.database])),
+      );
+    if (names.length === 0 || allowedScopes?.size === 0) {
       return [];
     }
 
@@ -288,7 +321,14 @@ export class SearchIndexRepository {
       cursor = nextCursor;
       for (let index = 1; index < chunk.length; index += 2) {
         const storedItem = this.parseStoredItem(chunk[index]);
-        if (!storedItem || !wantedNames.has(storedItem.name)) {
+        if (
+          !storedItem ||
+          !wantedNames.has(storedItem.name) ||
+          (allowedScopes &&
+            !allowedScopes.has(
+              JSON.stringify([storedItem.connectionId, storedItem.database]),
+            ))
+        ) {
           continue;
         }
 

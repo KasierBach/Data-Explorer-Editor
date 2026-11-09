@@ -98,6 +98,7 @@ model User {
   // Preferences
   theme           String    @default("dark") // "light", "dark", "system"
   language        String    @default("vi") // "vi", "en"
+  aiEnabled       Boolean   @default(false)
   legalAcceptedAt DateTime?
 
   // Notifications
@@ -142,6 +143,8 @@ model User {
   auditLogs             AuditLog[]
   connections           Connection[]
   aiChats               AiChat[]
+  aiGenerations         AiGeneration[]
+  aiGenerationFeedback  AiGenerationFeedback[]
   savedQueries          SavedQuery[]
   dashboards            Dashboard[]
   erdWorkspaces         ErdWorkspace[]
@@ -175,6 +178,75 @@ model AiProviderConnection {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, name])
+  @@index([userId, updatedAt])
+}
+
+// Metadata only: no request/response bodies, SQL, credentials, or tariff assumptions.
+model AiGeneration {
+  id                   String    @id @default(uuid())
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  task                 String
+  outcome              String    @default("running")
+  connectionId         String?
+  database             String?
+  requestedModel       String?
+  provider             String?
+  model                String?
+  attemptCount         Int       @default(0)
+  measuredAttemptCount Int       @default(0)
+  promptTokens         BigInt?
+  completionTokens     BigInt?
+  totalTokens          BigInt?
+  usageCoverage        String    @default("unavailable")
+  latencyMs            Int?
+  deadlineAt           DateTime
+  completedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  attempts             AiProviderAttempt[]
+  feedback             AiGenerationFeedback[]
+
+  @@unique([id, userId])
+  @@index([userId, createdAt])
+  @@index([outcome, createdAt])
+}
+
+model AiProviderAttempt {
+  id               String    @id @default(uuid())
+  generationId     String
+  generation       AiGeneration @relation(fields: [generationId], references: [id], onDelete: Restrict)
+  ordinal          Int
+  // Destination selected before dispatch is separate from actual response metadata.
+  plannedProvider  String
+  plannedModel     String
+  provider         String?
+  model            String?
+  outcome          String    @default("running")
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  usageCoverage    String    @default("unavailable")
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([generationId, ordinal])
+  @@index([generationId, outcome])
+}
+
+model AiGenerationFeedback {
+  id           String    @id @default(uuid())
+  generationId String
+  userId       String
+  // Composite foreign key makes actor ownership a database invariant too.
+  generation   AiGeneration @relation(fields: [generationId, userId], references: [id, userId], onDelete: Restrict)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  rating       String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([generationId, userId])
   @@index([userId, updatedAt])
 }
 

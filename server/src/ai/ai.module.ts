@@ -17,6 +17,10 @@ import { AuditModule } from '../audit/audit.module';
 import { AiProviderConnectionController } from './ai-provider-connection.controller';
 import { AiProviderConnectionService } from './ai-provider-connection.service';
 import { AiCircuitBreakerService } from './ai.circuit-breaker.service';
+import { AiAccountPolicyService } from './ai-account-policy.service';
+import { AiEgressPolicyService } from './ai-egress-policy.service';
+import { AiExecutionLedgerService } from './ai-execution-ledger.service';
+import { AiRetentionService } from './ai-retention.service';
 
 const isProd = process.env.NODE_ENV === 'production';
 
@@ -41,8 +45,14 @@ const isProd = process.env.NODE_ENV === 'production';
     AiConnectionService,
     AiProviderConnectionService,
     AiCircuitBreakerService,
+    AiAccountPolicyService,
+    AiEgressPolicyService,
+    AiExecutionLedgerService,
+    AiRetentionService,
   ],
   exports: [
+    AiAccountPolicyService,
+    AiExecutionLedgerService,
     AiService,
     AiChatCompletionService,
     AiSchemaContextService,

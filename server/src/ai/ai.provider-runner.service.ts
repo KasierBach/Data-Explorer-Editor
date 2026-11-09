@@ -9,7 +9,9 @@ import {
 import { AI_CONSTANTS } from './ai.constants';
 import type {
   AiPromptCapabilities,
+  AiProviderAttempt,
   AiProvider,
+  AiResponseFormat,
   AiRoutingMode,
   ChatParams,
   ChatHistoryMessage,
@@ -19,14 +21,63 @@ import type {
   StreamEvent,
   TokenUsage,
 } from './ai.types';
-import { validateExternalUrl } from '../common/utils/ssrf-validator.util';
+import {
+  AiProviderTransportError,
+  fetchAiProvider,
+  readAiProviderJson,
+  validateAiProviderUrl,
+} from './ai-provider-transport';
+import { AI_INPUT_BOUNDS } from './ai-input-bounds';
 import { normalizeProviderBaseUrl } from './ai-url.util';
 import { supportsLiveWebSearch } from './ai.provider-capabilities';
+import {
+  assertAiRequestActive,
+  createAiRequestScope,
+  isAiRequestStoppedError,
+  waitForAiResult,
+} from './ai-request-lifecycle';
+
+type AiRequestContext = Pick<ChatParams, 'signal' | 'deadlineAt'>;
+type AiAttemptParams = AiRequestContext &
+  Pick<ChatParams, 'beforeProviderAttempt' | 'execution'>;
+type TrackedProviderAttempt = AiProviderAttempt & { finished: boolean };
+
+class AiAttemptControlError extends Error {
+  readonly aiRequestFatal = true;
+
+  constructor(cause: unknown) {
+    super(
+      cause instanceof Error
+        ? cause.message
+        : 'AI attempt gate or ledger failed',
+      { cause },
+    );
+    this.name = 'AiAttemptControlError';
+  }
+}
+
+type ProviderRequestScope = ReturnType<typeof createAiRequestScope> & {
+  label: string;
+  timeoutMs: number;
+  clear: () => void;
+};
+const MAX_STREAM_TEXT_CHARACTERS = AI_CONSTANTS.MAX_OUTPUT_TOKENS * 16;
+const MAX_STREAM_EVENT_CHARACTERS = 256 * 1024;
+const STREAM_CLEANUP_TIMEOUT_MS = 100;
+const MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024;
+
+type OpenAiResponsePayload = {
+  choices?: Array<{ message?: { content?: unknown } }>;
+};
 
 @Injectable()
 export class AiProviderRunnerService {
   private readonly genAI: GoogleGenAI | null;
   private readonly logger = new Logger(AiProviderRunnerService.name);
+  private readonly openAiAttempts = new WeakMap<
+    Response,
+    TrackedProviderAttempt
+  >();
 
   constructor(
     private readonly configService: ConfigService,
@@ -43,14 +94,173 @@ export class AiProviderRunnerService {
 
   private async getSafeOpenAiCompatibleUrl(baseUrl: string): Promise<string> {
     const requestUrl = `${normalizeProviderBaseUrl(baseUrl)}/chat/completions`;
-    if (!(await validateExternalUrl(requestUrl))) {
-      throw new Error('Unsafe provider URL');
-    }
-    return requestUrl;
+    return validateAiProviderUrl(requestUrl).toString();
+  }
+
+  private providerTransportOptions(
+    plan: ProviderPlan,
+    params: AiAttemptParams & Pick<ChatParams, 'beforeProviderRequest'>,
+    scope: ProviderRequestScope,
+  ) {
+    return {
+      maxRequestBytes: AI_INPUT_BOUNDS.maxSerializedBytes,
+      maxResponseBytes: MAX_PROVIDER_RESPONSE_BYTES,
+      timeoutMs: Math.max(
+        1,
+        Math.min(300_000, scope.timeoutMs, scope.deadlineAt - Date.now()),
+      ),
+      beforeDispatch: async () => {
+        assertAiRequestActive(scope);
+        if (params.beforeProviderRequest) {
+          await waitForAiResult(params.beforeProviderRequest(), scope.signal);
+        }
+        await this.checkProviderRecipient(plan, { ...params, ...scope });
+      },
+    };
   }
 
   isGeminiAvailable(): boolean {
     return !!this.genAI;
+  }
+
+  private async checkProviderRecipient(
+    plan: ProviderPlan,
+    params: AiAttemptParams,
+  ) {
+    assertAiRequestActive(params);
+    try {
+      if (params.beforeProviderAttempt) {
+        await waitForAiResult(
+          params.beforeProviderAttempt(plan),
+          params.signal,
+        );
+      }
+    } catch (error) {
+      assertAiRequestActive(params);
+      if (isAiRequestStoppedError(error)) throw error;
+      throw new AiAttemptControlError(error);
+    }
+    assertAiRequestActive(params);
+  }
+
+  private getAttemptOutcome(
+    error: unknown,
+    context: AiRequestContext,
+  ): 'failed' | 'cancelled' | 'timed_out' {
+    const reason = context.signal?.aborted ? context.signal.reason : error;
+    if (
+      (reason as { reason?: string } | null)?.reason === 'AI_REQUEST_TIMEOUT' ||
+      (context.deadlineAt !== undefined && Date.now() >= context.deadlineAt) ||
+      (reason instanceof Error &&
+        (reason.name === 'TimeoutError' ||
+          /timed out|deadline exceeded/i.test(reason.message)))
+    )
+      return 'timed_out';
+    if (context.signal?.aborted || isAiRequestStoppedError(reason))
+      return 'cancelled';
+    return 'failed';
+  }
+
+  private async beginProviderAttempt(
+    plan: ProviderPlan,
+    params: AiAttemptParams,
+  ): Promise<TrackedProviderAttempt | undefined> {
+    await this.checkProviderRecipient(plan, params);
+    if (!params.execution) return undefined;
+    const recipient = { provider: plan.provider, model: plan.model };
+    let handle: AiProviderAttempt;
+    try {
+      // Do not race persistence against cancellation and lose a reserved handle.
+      // Only recipient identity is handed to the ledger, never credentials/URL.
+      handle = await params.execution.beforeAttempt(recipient);
+    } catch (error) {
+      throw new AiAttemptControlError(error);
+    }
+    const tracked: TrackedProviderAttempt = {
+      attemptId: handle.attemptId,
+      finished: false,
+      complete: async (result) => {
+        if (tracked.finished) return;
+        tracked.finished = true;
+        try {
+          await handle.complete({ ...recipient, ...result });
+        } catch (error) {
+          throw new AiAttemptControlError(error);
+        }
+      },
+      fail: async (outcome = 'failed', result) => {
+        if (tracked.finished) return;
+        tracked.finished = true;
+        try {
+          await handle.fail(outcome, { ...recipient, ...result });
+        } catch (error) {
+          throw new AiAttemptControlError(error);
+        }
+      },
+    };
+    try {
+      assertAiRequestActive(params);
+    } catch (error) {
+      await tracked.fail(this.getAttemptOutcome(error, params));
+      throw error;
+    }
+    return tracked;
+  }
+
+  private async executeTrackedAttempt<T>(
+    plan: ProviderPlan,
+    params: AiAttemptParams,
+    operation: () => Promise<T>,
+    extractUsage?: (result: T) => TokenUsage | undefined,
+  ): Promise<T> {
+    const attempt = await this.beginProviderAttempt(plan, params);
+    let usage: TokenUsage | undefined;
+    try {
+      assertAiRequestActive(params);
+      const result = await operation();
+      usage = extractUsage?.(result);
+      assertAiRequestActive(params);
+      await attempt?.complete({ usage });
+      assertAiRequestActive(params);
+      return result;
+    } catch (error) {
+      await attempt?.fail(this.getAttemptOutcome(error, params), { usage });
+      throw error;
+    }
+  }
+
+  private async sendTrackedOpenAiRequest(
+    plan: ProviderPlan,
+    params: AiAttemptParams,
+    operation: () => Promise<Response>,
+  ): Promise<Response> {
+    const attempt = await this.beginProviderAttempt(plan, params);
+    try {
+      assertAiRequestActive(params);
+      const response = await operation();
+      if (attempt) this.openAiAttempts.set(response, attempt);
+      return response;
+    } catch (error) {
+      await attempt?.fail(this.getAttemptOutcome(error, params));
+      throw error;
+    }
+  }
+
+  private async finishOpenAiAttempt(
+    response: Response | undefined,
+    error?: unknown,
+    context: AiRequestContext = {},
+    usage?: TokenUsage,
+  ) {
+    if (!response) return;
+    const attempt = this.openAiAttempts.get(response);
+    if (!attempt) return;
+    this.openAiAttempts.delete(response);
+    if (error !== undefined || !response.ok) {
+      await attempt.fail(this.getAttemptOutcome(error, context), { usage });
+    } else {
+      await attempt.complete({ usage });
+    }
   }
 
   private getProviderTimeoutMs(): number {
@@ -71,20 +281,82 @@ export class AiProviderRunnerService {
     return Number.isFinite(raw) && raw > 0 ? raw : this.getProviderTimeoutMs();
   }
 
-  private async withTimeout<T>(
+  private createRequestScope(context: AiRequestContext) {
+    return createAiRequestScope({
+      ...context,
+      timeoutMs:
+        context.deadlineAt === undefined
+          ? this.getProviderTimeoutMs()
+          : Math.max(1, context.deadlineAt - Date.now()),
+    });
+  }
+
+  private async waitForProviderResult<T>(
     promise: Promise<T>,
+    scope: ProviderRequestScope,
+    context: AiRequestContext,
+  ): Promise<T> {
+    // The operation may synchronously abort the caller while creating its
+    // promise (for example error-body decoding). Always observe that promise
+    // even when the active-request assertion wins the race.
+    void promise.catch(() => undefined);
+    try {
+      assertAiRequestActive(context);
+      const result = await waitForAiResult(promise, scope.signal);
+      assertAiRequestActive(context);
+      assertAiRequestActive(scope);
+      return result;
+    } catch (error) {
+      // A caller stop or the total deadline is terminal; an attempt timeout is
+      // still a transport failure while there is time left in the total budget.
+      assertAiRequestActive(context);
+      if (scope.signal.aborted) {
+        throw new Error(`${scope.label} timed out after ${scope.timeoutMs}ms`, {
+          cause: error,
+        });
+      }
+      throw error;
+    }
+  }
+
+  private async withTimeout<T>(
+    execute: (scope: ProviderRequestScope) => Promise<T>,
     label: string,
     timeoutMs = this.getProviderTimeoutMs(),
+    context: AiRequestContext = {},
   ): Promise<T> {
-    let timer: NodeJS.Timeout | null = null;
+    const scope = this.createAbortController(label, timeoutMs, context);
     try {
-      return await Promise.race<T>([
-        promise,
-        new Promise<T>((_, reject) => {
-          timer = setTimeout(
-            () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
-            timeoutMs,
-          );
+      assertAiRequestActive(scope);
+      return await this.waitForProviderResult(execute(scope), scope, context);
+    } catch (error) {
+      scope.abort(error);
+      throw error;
+    } finally {
+      scope.dispose();
+    }
+  }
+
+  private createAbortController(
+    label: string,
+    timeoutMs = this.getProviderTimeoutMs(),
+    context: AiRequestContext = {},
+  ): ProviderRequestScope {
+    const scope = createAiRequestScope({ ...context, timeoutMs });
+    return { ...scope, label, timeoutMs, clear: scope.dispose };
+  }
+
+  private async cancelStreamResource(
+    cleanup: () => Promise<unknown> | undefined,
+  ) {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        Promise.resolve()
+          .then(cleanup)
+          .catch(() => undefined),
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, STREAM_CLEANUP_TIMEOUT_MS);
         }),
       ]);
     } finally {
@@ -92,20 +364,11 @@ export class AiProviderRunnerService {
     }
   }
 
-  private createAbortController(
-    label: string,
-    timeoutMs = this.getProviderTimeoutMs(),
-  ) {
-    const controller = new AbortController();
-    const timer = setTimeout(
-      () =>
-        controller.abort(new Error(`${label} timed out after ${timeoutMs}ms`)),
-      timeoutMs,
-    );
-    return {
-      signal: controller.signal,
-      clear: () => clearTimeout(timer),
-    };
+  private appendStreamText(fullText: string, text: string): string {
+    if (fullText.length + text.length > MAX_STREAM_TEXT_CHARACTERS) {
+      throw new Error('AI response exceeded the parsing size limit');
+    }
+    return fullText + text;
   }
 
   private isModelNotFoundError(error: unknown): boolean {
@@ -148,6 +411,11 @@ export class AiProviderRunnerService {
   }
 
   private isRetryableTransportError(error: unknown): boolean {
+    if (
+      error instanceof AiAttemptControlError ||
+      isAiRequestStoppedError(error)
+    )
+      return false;
     if (typeof error === 'object' && error !== null) {
       const candidate = error as {
         status?: number;
@@ -178,6 +446,9 @@ export class AiProviderRunnerService {
       }
     }
 
+    if (error instanceof AiProviderTransportError) {
+      return error.code === 'NETWORK' || error.code === 'TIMEOUT';
+    }
     if (!(error instanceof Error)) return false;
 
     const message = error.message.toLowerCase();
@@ -199,20 +470,48 @@ export class AiProviderRunnerService {
     );
   }
 
-  private async sleep(ms: number) {
-    await new Promise((resolve) => setTimeout(resolve, ms));
+  private async sleep(ms: number, context: AiRequestContext = {}) {
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      assertAiRequestActive(context);
+      await waitForAiResult(
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, ms);
+        }),
+        context.signal,
+      );
+      assertAiRequestActive(context);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   private async executeRetriableOperation<T>(
     label: string,
     execute: (attempt: number) => Promise<T>,
+    beforeProviderRequest?: ChatParams['beforeProviderRequest'],
+    context: AiRequestContext = {},
   ): Promise<T> {
     const maxAttempts = AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_ATTEMPTS;
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      assertAiRequestActive(context);
+      await waitForAiResult(
+        Promise.resolve().then(() => {
+          assertAiRequestActive(context);
+          return beforeProviderRequest?.();
+        }),
+        context.signal,
+      );
+      assertAiRequestActive(context);
       try {
-        return await execute(attempt);
+        // The operation owns its abort wait and ledger settlement.
+        const result = await execute(attempt);
+        assertAiRequestActive(context);
+        return result;
       } catch (error) {
+        if (error instanceof AiAttemptControlError) throw error;
+        assertAiRequestActive(context);
         if (
           !this.isRetryableTransportError(error) ||
           attempt >= maxAttempts - 1
@@ -225,7 +524,7 @@ export class AiProviderRunnerService {
         this.logger.warn(
           `${label} failed with transient error: ${message}. Retrying (${attempt + 2}/${maxAttempts})...`,
         );
-        await this.sleep(this.getRetryDelayMs(attempt));
+        await this.sleep(this.getRetryDelayMs(attempt), context);
       }
     }
 
@@ -235,43 +534,37 @@ export class AiProviderRunnerService {
   private async executeOpenAiRequestWithRetry(
     label: string,
     send: (attempt: number) => Promise<Response>,
+    beforeProviderRequest?: ChatParams['beforeProviderRequest'],
+    context: AiRequestContext = {},
   ): Promise<Response> {
-    const maxAttempts = AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_ATTEMPTS;
-
-    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-      try {
+    return this.executeRetriableOperation(
+      label,
+      async (attempt) => {
         const response = await send(attempt);
-        if (
-          !response.ok &&
-          this.isTransientOpenAiStatus(response.status) &&
-          attempt < maxAttempts - 1
-        ) {
-          this.logger.warn(
-            `${label} failed with ${response.status}. Retrying (${attempt + 2}/${maxAttempts})...`,
-          );
-          await this.sleep(this.getRetryDelayMs(attempt));
-          continue;
-        }
-
-        return response;
-      } catch (error) {
-        if (
-          !this.isRetryableTransportError(error) ||
-          attempt >= maxAttempts - 1
-        ) {
+        try {
+          assertAiRequestActive(context);
+          if (
+            !response.ok &&
+            this.isTransientOpenAiStatus(response.status) &&
+            attempt < AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_ATTEMPTS - 1
+          ) {
+            await this.finishOpenAiAttempt(response, undefined, context);
+            await this.cancelStreamResource(() => response.body?.cancel());
+            const error = Object.assign(
+              new Error(`${label} failed with ${response.status}`),
+              { status: response.status },
+            );
+            throw error;
+          }
+          return response;
+        } catch (error) {
+          await this.finishOpenAiAttempt(response, error, context);
           throw error;
         }
-
-        const message =
-          error instanceof Error ? error.message : 'Unknown transport error';
-        this.logger.warn(
-          `${label} failed with transient transport error: ${message}. Retrying (${attempt + 2}/${maxAttempts})...`,
-        );
-        await this.sleep(this.getRetryDelayMs(attempt));
-      }
-    }
-
-    throw new Error(`${label} failed before a response was returned`);
+      },
+      beforeProviderRequest,
+      context,
+    );
   }
 
   private buildSystemPromptForRequest(
@@ -288,29 +581,32 @@ export class AiProviderRunnerService {
     });
   }
 
-  private async readProviderErrorPayload(response: Response): Promise<unknown> {
-    const candidate = response as Response & {
-      clone?: () => Response;
-      json?: () => Promise<unknown>;
-      text?: () => Promise<string>;
-    };
-    const jsonSource =
-      typeof candidate.clone === 'function' ? candidate.clone() : candidate;
-    const jsonPayload =
-      typeof jsonSource.json === 'function'
-        ? await jsonSource.json().catch(() => undefined)
-        : undefined;
-    if (jsonPayload !== undefined) {
-      return jsonPayload;
+  private async readProviderErrorPayload(
+    response: Response,
+    context: AiRequestContext = {},
+  ): Promise<unknown> {
+    assertAiRequestActive(context);
+    try {
+      const payload = await waitForAiResult(
+        readAiProviderJson(response, MAX_PROVIDER_RESPONSE_BYTES),
+        context.signal,
+      );
+      assertAiRequestActive(context);
+      return payload;
+    } catch (error) {
+      assertAiRequestActive(context);
+      if (
+        isAiRequestStoppedError(error) ||
+        error instanceof AiAttemptControlError
+      )
+        throw error;
+      if (
+        error instanceof AiProviderTransportError &&
+        error.code !== 'INVALID_JSON'
+      )
+        throw error;
+      return {};
     }
-
-    const textSource =
-      typeof candidate.clone === 'function' ? candidate.clone() : candidate;
-    const textPayload =
-      typeof textSource.text === 'function'
-        ? await textSource.text().catch(() => '')
-        : '';
-    return textPayload ? { error: { message: textPayload } } : {};
   }
 
   private getProviderHttpError(
@@ -334,20 +630,8 @@ export class AiProviderRunnerService {
     if (status === 404) {
       return new Error(`${target} is unavailable (404). Choose another model.`);
     }
-    const extractedDetail = this.extractProviderErrorMessage(errorPayload);
-    const detail = extractedDetail
-      .split(apiKey)
-      .join('[redacted]')
-      .replace(/(Bearer\s+)[^\s,;]+/gi, '$1[redacted]')
-      .replace(
-        /((?:api[_ -]?key|token|secret)\s*[:=]\s*)[^\s,;]+/gi,
-        '$1[redacted]',
-      )
-      .replace(/[\r\n\t]+/g, ' ')
-      .trim()
-      .slice(0, 300);
     return new Error(
-      `${provider} error (${status})${detail ? `: ${detail}` : ''}`,
+      `${provider} error (${status}). The provider request failed.`,
     );
   }
 
@@ -461,15 +745,18 @@ export class AiProviderRunnerService {
       completion_tokens?: unknown;
       total_tokens?: unknown;
     };
-    const promptTokens =
-      typeof raw.prompt_tokens === 'number' ? raw.prompt_tokens : 0;
-    const completionTokens =
-      typeof raw.completion_tokens === 'number' ? raw.completion_tokens : 0;
-    const totalTokens =
-      typeof raw.total_tokens === 'number'
-        ? raw.total_tokens
-        : promptTokens + completionTokens;
-    if (promptTokens + completionTokens + totalTokens === 0) return undefined;
+    const promptTokens = raw.prompt_tokens;
+    const completionTokens = raw.completion_tokens;
+    const totalTokens = raw.total_tokens;
+    if (
+      typeof promptTokens !== 'number' ||
+      typeof completionTokens !== 'number' ||
+      typeof totalTokens !== 'number' ||
+      ![promptTokens, completionTokens, totalTokens].every(
+        (count) => Number.isSafeInteger(count) && count >= 0,
+      )
+    )
+      return undefined;
 
     return { promptTokens, completionTokens, totalTokens };
   }
@@ -486,11 +773,18 @@ export class AiProviderRunnerService {
       | undefined;
     if (!usage) return undefined;
 
-    const promptTokens = usage.promptTokenCount ?? 0;
-    const completionTokens = usage.candidatesTokenCount ?? 0;
-    const totalTokens =
-      usage.totalTokenCount ?? promptTokens + completionTokens;
-    if (promptTokens + completionTokens + totalTokens === 0) return undefined;
+    const promptTokens = usage.promptTokenCount;
+    const completionTokens = usage.candidatesTokenCount;
+    const totalTokens = usage.totalTokenCount;
+    if (
+      typeof promptTokens !== 'number' ||
+      typeof completionTokens !== 'number' ||
+      typeof totalTokens !== 'number' ||
+      ![promptTokens, completionTokens, totalTokens].every(
+        (count) => Number.isSafeInteger(count) && count >= 0,
+      )
+    )
+      return undefined;
 
     return { promptTokens, completionTokens, totalTokens };
   }
@@ -562,72 +856,113 @@ export class AiProviderRunnerService {
     reader: ReadableStreamDefaultReader<T>,
     label: string,
     timeoutMs = this.getStreamIdleTimeoutMs(),
+    context: AiRequestContext = {},
+    abortUpstream?: (reason?: unknown) => void,
   ): Promise<ReadableStreamReadResult<T>> {
-    let timer: NodeJS.Timeout | null = null;
     try {
-      return await Promise.race<ReadableStreamReadResult<T>>([
-        reader.read(),
-        new Promise<ReadableStreamReadResult<T>>((_, reject) => {
-          timer = setTimeout(
-            () => reject(new Error(`${label} stalled after ${timeoutMs}ms`)),
-            timeoutMs,
-          );
-        }),
-      ]);
-    } finally {
-      if (timer) clearTimeout(timer);
+      return await this.withTimeout(
+        () => reader.read(),
+        label,
+        timeoutMs,
+        context,
+      );
+    } catch (error) {
+      abortUpstream?.(error);
+      throw error;
     }
   }
 
   async completeGeminiText(params: {
+    signal?: AbortSignal;
+    deadlineAt?: number;
+    beforeProviderRequest?: ChatParams['beforeProviderRequest'];
+    beforeProviderAttempt?: ChatParams['beforeProviderAttempt'];
+    execution?: ChatParams['execution'];
     model: string;
     prompt: string;
     temperature?: number;
     maxOutputTokens?: number;
     timeoutMs?: number;
   }): Promise<string> {
-    if (!this.genAI) throw new Error('Gemini provider is not configured');
-
-    const tryCompletion = async (mId: string) => {
-      const timeout = params.timeoutMs ?? this.getProviderTimeoutMs();
-      const response = await this.executeRetriableOperation(
-        `Gemini completion (${mId})`,
-        () =>
-          this.withTimeout(
-            this.genAI!.models.generateContent({
-              model: mId,
-              contents: params.prompt,
-              config: {
-                temperature:
-                  params.temperature ?? AI_CONSTANTS.TEMPERATURE_PRECISE,
-                maxOutputTokens:
-                  params.maxOutputTokens ??
-                  AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
-              },
-            }),
-            `Gemini completion (${mId})`,
-            timeout,
-          ),
-      );
-      return (response.text || '').trim();
-    };
-
+    const requestScope = this.createRequestScope(params);
     try {
-      return await tryCompletion(params.model);
-    } catch (error: unknown) {
-      if (this.isModelNotFoundError(error)) {
-        this.logger.warn(
-          `Model ${params.model} not found. Falling back to gemini-3.5-flash-lite...`,
+      assertAiRequestActive(requestScope);
+      if (!this.genAI) throw new Error('Gemini provider is not configured');
+      await this.checkProviderRecipient(
+        { provider: 'gemini', model: params.model },
+        { ...params, ...requestScope },
+      );
+
+      const tryCompletion = async (mId: string) => {
+        const timeout = params.timeoutMs ?? this.getProviderTimeoutMs();
+        const response = await this.executeRetriableOperation(
+          `Gemini completion (${mId})`,
+          () =>
+            this.executeTrackedAttempt(
+              { provider: 'gemini', model: mId },
+              { ...params, ...requestScope },
+              () =>
+                this.withTimeout(
+                  (scope) =>
+                    this.genAI!.models.generateContent({
+                      model: mId,
+                      contents: params.prompt,
+                      config: {
+                        temperature:
+                          params.temperature ??
+                          AI_CONSTANTS.TEMPERATURE_PRECISE,
+                        maxOutputTokens:
+                          params.maxOutputTokens ??
+                          AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
+                        abortSignal: scope.signal,
+                        httpOptions: {
+                          timeout: Math.max(1, scope.deadlineAt - Date.now()),
+                        },
+                      },
+                    }),
+                  `Gemini completion (${mId})`,
+                  timeout,
+                  requestScope,
+                ),
+              (result) => this.extractGeminiUsage(result),
+            ),
+          params.beforeProviderRequest,
+          requestScope,
         );
-        return await tryCompletion('gemini-3.5-flash-lite');
+        assertAiRequestActive(requestScope);
+        return (response.text || '').trim();
+      };
+
+      try {
+        return await tryCompletion(params.model);
+      } catch (error: unknown) {
+        if (error instanceof AiAttemptControlError) throw error;
+        assertAiRequestActive(requestScope);
+        if (
+          !(error instanceof AiAttemptControlError) &&
+          !isAiRequestStoppedError(error) &&
+          this.isModelNotFoundError(error)
+        ) {
+          this.logger.warn(
+            `Model ${params.model} not found. Falling back to gemini-3.5-flash-lite...`,
+          );
+          return await tryCompletion('gemini-3.5-flash-lite');
+        }
+        throw error;
       }
-      throw error;
+    } finally {
+      requestScope.dispose();
     }
   }
 
   async completeOpenAiCompatibleText(
     plan: ProviderPlan,
     params: {
+      signal?: AbortSignal;
+      deadlineAt?: number;
+      beforeProviderRequest?: ChatParams['beforeProviderRequest'];
+      beforeProviderAttempt?: ChatParams['beforeProviderAttempt'];
+      execution?: ChatParams['execution'];
       systemPrompt: string;
       prompt: string;
       context?: string;
@@ -637,63 +972,109 @@ export class AiProviderRunnerService {
       timeoutMs?: number;
     },
   ): Promise<string> {
-    if (!plan.apiKey || !plan.baseUrl)
-      throw new Error(`${plan.provider} provider is not configured`);
-    const requestUrl = await this.getSafeOpenAiCompatibleUrl(plan.baseUrl);
-
-    let requestTimeout = this.createAbortController(
-      `${plan.provider} completion`,
-      params.timeoutMs ?? this.getProviderTimeoutMs(),
-    );
-
+    const requestScope = this.createRequestScope(params);
+    let requestTimeout: ProviderRequestScope | undefined;
+    let response: Response | undefined;
+    let receivedUsage: TokenUsage | undefined;
     try {
-      const sendRequest = (attempt: number) => {
-        requestTimeout.clear();
-        requestTimeout = this.createAbortController(
+      assertAiRequestActive(requestScope);
+      if (!plan.apiKey || !plan.baseUrl)
+        throw new Error(`${plan.provider} provider is not configured`);
+      await this.checkProviderRecipient(plan, { ...params, ...requestScope });
+      const requestUrl = await waitForAiResult(
+        this.getSafeOpenAiCompatibleUrl(plan.baseUrl),
+        requestScope.signal,
+      );
+      assertAiRequestActive(requestScope);
+      const sendRequest = async (attempt: number) => {
+        assertAiRequestActive(requestScope);
+        requestTimeout?.abort();
+        requestTimeout?.dispose();
+        const scope = this.createAbortController(
           `${plan.provider} completion attempt ${attempt + 1}`,
           params.timeoutMs ?? this.getProviderTimeoutMs(),
+          requestScope,
         );
-        return fetch(requestUrl, {
-          method: 'POST',
-          headers: this.getOpenAiCompatibleHeaders(plan),
-          body: JSON.stringify({
-            model: plan.model,
-            messages: this.promptBuilder.buildOpenAiMessages(
-              params.prompt,
-              params.systemPrompt,
-              params.context,
-              params.history,
+        requestTimeout = scope;
+        assertAiRequestActive(scope);
+        return this.sendTrackedOpenAiRequest(
+          plan,
+          { ...params, ...requestScope },
+          () =>
+            this.waitForProviderResult(
+              fetchAiProvider(
+                requestUrl,
+                {
+                  method: 'POST',
+                  headers: this.getOpenAiCompatibleHeaders(plan),
+                  body: JSON.stringify({
+                    model: plan.model,
+                    messages: this.promptBuilder.buildOpenAiMessages(
+                      params.prompt,
+                      params.systemPrompt,
+                      params.context,
+                      params.history,
+                    ),
+                    temperature:
+                      params.temperature ?? AI_CONSTANTS.TEMPERATURE_PRECISE,
+                    max_tokens:
+                      params.maxOutputTokens ??
+                      AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
+                  }),
+                  signal: scope.signal,
+                  redirect: 'manual',
+                },
+                this.providerTransportOptions(plan, params, scope),
+              ),
+              scope,
+              requestScope,
             ),
-            temperature: params.temperature ?? AI_CONSTANTS.TEMPERATURE_PRECISE,
-            max_tokens:
-              params.maxOutputTokens ??
-              AI_CONSTANTS.COMPLETION_MAX_OUTPUT_TOKENS,
-          }),
-          signal: requestTimeout.signal,
-          redirect: 'manual',
-        });
+        );
       };
 
-      const response = await this.executeOpenAiRequestWithRetry(
+      response = await this.executeOpenAiRequestWithRetry(
         `${plan.provider} completion`,
         sendRequest,
+        params.beforeProviderRequest,
+        requestScope,
       );
-
+      assertAiRequestActive(requestScope);
       if (!response.ok) {
         throw new Error(
           `${plan.provider} completion error (${response.status})`,
         );
       }
 
-      const result = await response.json();
+      const result = (await this.waitForProviderResult(
+        readAiProviderJson(response, MAX_PROVIDER_RESPONSE_BYTES),
+        requestTimeout!,
+        requestScope,
+      )) as OpenAiResponsePayload;
+      receivedUsage = this.extractOpenAiUsage(result);
       const content = result.choices?.[0]?.message?.content;
-      if (typeof content !== 'string') {
-        return '';
-      }
-
-      return content.trim();
+      if (typeof content !== 'string')
+        throw new Error('Provider returned invalid completion content');
+      assertAiRequestActive(requestScope);
+      await this.finishOpenAiAttempt(
+        response,
+        undefined,
+        requestScope,
+        receivedUsage,
+      );
+      assertAiRequestActive(requestScope);
+      return typeof content === 'string' ? content.trim() : '';
+    } catch (error) {
+      await this.finishOpenAiAttempt(
+        response,
+        error,
+        requestScope,
+        receivedUsage,
+      );
+      throw error;
     } finally {
-      requestTimeout.clear();
+      requestTimeout?.abort();
+      requestTimeout?.dispose();
+      requestScope.dispose();
     }
   }
 
@@ -703,91 +1084,126 @@ export class AiProviderRunnerService {
     routingMode: AiRoutingMode,
     routeDecision: RouteDecision,
   ): Promise<ChatResult> {
-    if (!this.genAI) throw new Error('Gemini provider is not configured');
-
-    const searchEnabled = routeDecision.needsLiveSearch;
-    const systemPrompt = this.buildSystemPromptForRequest(
-      params,
-      routeDecision,
-      this.buildCapabilities(searchEnabled, !!params.image),
-    );
-    const parts = this.promptBuilder.prepareGeminiParts(
-      params.prompt,
-      params.context,
-      params.image,
-      params.document,
-    );
-
-    const baseConfig = {
-      systemInstruction: systemPrompt,
-      temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
-      maxOutputTokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
-      ...(searchEnabled ? { tools: [{ googleSearch: {} }] } : {}),
-    };
-    const structuredGenerationConfig = buildGeminiStructuredGenerationConfig(
-      routeDecision.responseFormat,
-    );
-    let config = structuredGenerationConfig
-      ? { ...baseConfig, ...structuredGenerationConfig }
-      : baseConfig;
-    const generate = () =>
-      this.executeRetriableOperation(`Gemini request (${plan.model})`, () =>
-        this.withTimeout(
-          this.genAI!.models.generateContent({
-            model: plan.model,
-            contents: [{ role: 'user', parts }],
-            config,
-          }),
-          `Gemini request (${plan.model})`,
-        ),
-      );
-    let result;
+    const requestScope = this.createRequestScope(params);
     try {
-      result = await generate();
-    } catch (error) {
-      if (
-        structuredGenerationConfig &&
-        this.isGeminiStructuredOutputUnsupportedError(error)
-      ) {
-        this.logger.warn(
-          `Gemini model ${plan.model} rejected structured output config. Retrying without provider-level schema enforcement...`,
+      assertAiRequestActive(requestScope);
+      if (!this.genAI) throw new Error('Gemini provider is not configured');
+      await this.checkProviderRecipient(plan, { ...params, ...requestScope });
+      const searchEnabled = routeDecision.needsLiveSearch;
+      const systemPrompt = this.buildSystemPromptForRequest(
+        params,
+        routeDecision,
+        this.buildCapabilities(searchEnabled, !!params.image),
+      );
+      const contents = this.promptBuilder.buildGeminiContents(
+        params.prompt,
+        params.context,
+        params.history,
+        params.image,
+        params.document,
+      );
+      const baseConfig = {
+        systemInstruction: systemPrompt,
+        temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
+        maxOutputTokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+        ...(searchEnabled ? { tools: [{ googleSearch: {} }] } : {}),
+      };
+      const structuredGenerationConfig = buildGeminiStructuredGenerationConfig(
+        routeDecision.responseFormat,
+      );
+      let config = structuredGenerationConfig
+        ? { ...baseConfig, ...structuredGenerationConfig }
+        : baseConfig;
+      const generate = () =>
+        this.executeRetriableOperation(
+          `Gemini request (${plan.model})`,
+          () =>
+            this.executeTrackedAttempt(
+              plan,
+              { ...params, ...requestScope },
+              () =>
+                this.withTimeout(
+                  (scope) =>
+                    this.genAI!.models.generateContent({
+                      model: plan.model,
+                      contents,
+                      config: {
+                        ...config,
+                        abortSignal: scope.signal,
+                        httpOptions: {
+                          timeout: Math.max(1, scope.deadlineAt - Date.now()),
+                        },
+                      },
+                    }),
+                  `Gemini request (${plan.model})`,
+                  this.getProviderTimeoutMs(),
+                  requestScope,
+                ),
+              (result) => this.extractGeminiUsage(result),
+            ),
+          params.beforeProviderRequest,
+          requestScope,
         );
-        config = baseConfig;
+      let result;
+      try {
         result = await generate();
-      } else {
-        throw error;
+      } catch (error) {
+        if (error instanceof AiAttemptControlError) throw error;
+        assertAiRequestActive(requestScope);
+        if (
+          !(error instanceof AiAttemptControlError) &&
+          !isAiRequestStoppedError(error) &&
+          structuredGenerationConfig &&
+          this.isGeminiStructuredOutputUnsupportedError(error)
+        ) {
+          this.logger.warn(
+            `Gemini model ${plan.model} rejected structured output config. Retrying without provider-level schema enforcement...`,
+          );
+          config = baseConfig;
+          result = await generate();
+        } else {
+          throw error;
+        }
       }
-    }
 
-    const responseText = result.text || '';
-    const parsed = this.promptBuilder.parseAiResponse(responseText);
-    this.promptBuilder.assertUsableStructuredResponse(
-      parsed,
-      responseText,
-      `Gemini (${plan.model})`,
-    );
-
-    const sourceDetails = searchEnabled
-      ? this.promptBuilder.extractSourceDetails(result)
-      : [];
-    const sources = this.promptBuilder.mergeSources(
-      parsed.sources,
-      sourceDetails.map((source) => source.url),
-    );
-    return {
-      ...parsed,
-      message: this.promptBuilder.appendSourcesToMessage(
-        parsed.message,
+      assertAiRequestActive(requestScope);
+      const responseText = result.text || '';
+      const parsed = this.promptBuilder.parseAiResponse(
+        responseText,
+        routeDecision.responseFormat,
+      );
+      this.promptBuilder.assertUsableStructuredResponse(
+        parsed,
+        responseText,
+        `Gemini (${plan.model})`,
+        routeDecision.responseFormat,
+      );
+      const sourceDetails = searchEnabled
+        ? this.promptBuilder.extractSourceDetails(result)
+        : [];
+      const sources = this.promptBuilder.mergeSources(
+        parsed.sources,
+        sourceDetails.map((source) => source.url),
+      );
+      assertAiRequestActive(requestScope);
+      return {
+        ...parsed,
+        message: this.promptBuilder.appendSourcesToMessage(
+          parsed.message,
+          sources,
+          sourceDetails,
+        ),
         sources,
-        sourceDetails,
-      ),
-      sources,
-      provider: 'gemini',
-      providerLabel: plan.displayName || 'gemini',
-      model: plan.model,
-      routingMode,
-      usage: this.extractGeminiUsage(result),
-    };
+        provider: 'gemini',
+        providerLabel: plan.displayName || 'gemini',
+        model: plan.model,
+        routingMode,
+        contractVersion: 1,
+        usage: this.extractGeminiUsage(result),
+      };
+    } finally {
+      requestScope.dispose();
+    }
   }
 
   async runOpenAiCompatible(
@@ -796,74 +1212,111 @@ export class AiProviderRunnerService {
     routingMode: AiRoutingMode,
     routeDecision: RouteDecision,
   ): Promise<ChatResult> {
-    if (!plan.apiKey || !plan.baseUrl)
-      throw new Error(`${plan.provider} provider is not configured`);
-    const requestUrl = await this.getSafeOpenAiCompatibleUrl(plan.baseUrl);
-
-    const searchAttempt = this.getOpenAiSearchAttempt(
-      plan,
-      params,
-      routeDecision,
-    );
-    const modelToUse = searchAttempt.model;
-    const finalPrompt = searchAttempt.prompt;
-    let structuredResponseFormat = buildOpenAiStructuredResponseFormat(
-      routeDecision.responseFormat,
-    );
-    const systemPrompt = this.buildSystemPromptForRequest(
-      params,
-      routeDecision,
-      {
-        ...searchAttempt.capabilities,
-        visionInput: !!params.image,
-      },
-    );
-    let requestTimeout = this.createAbortController(
-      `${plan.provider} request (${modelToUse})`,
-    );
-
+    const requestScope = this.createRequestScope(params);
+    let requestTimeout: ProviderRequestScope | undefined;
+    let response: Response | undefined;
+    let receivedUsage: TokenUsage | undefined;
     try {
-      const sendRequest = (attempt: number) => {
-        requestTimeout.clear();
-        requestTimeout = this.createAbortController(
+      assertAiRequestActive(requestScope);
+      if (!plan.apiKey || !plan.baseUrl)
+        throw new Error(`${plan.provider} provider is not configured`);
+      await this.checkProviderRecipient(plan, { ...params, ...requestScope });
+      const requestUrl = await waitForAiResult(
+        this.getSafeOpenAiCompatibleUrl(plan.baseUrl),
+        requestScope.signal,
+      );
+      assertAiRequestActive(requestScope);
+      const searchAttempt = this.getOpenAiSearchAttempt(
+        plan,
+        params,
+        routeDecision,
+      );
+      const modelToUse = searchAttempt.model;
+      const finalPrompt = searchAttempt.prompt;
+      let structuredResponseFormat = buildOpenAiStructuredResponseFormat(
+        routeDecision.responseFormat,
+      );
+      const systemPrompt = this.buildSystemPromptForRequest(
+        params,
+        routeDecision,
+        { ...searchAttempt.capabilities, visionInput: !!params.image },
+      );
+      const sendRequest = async (attempt: number) => {
+        assertAiRequestActive(requestScope);
+        requestTimeout?.abort();
+        requestTimeout?.dispose();
+        const scope = this.createAbortController(
           `${plan.provider} request (${modelToUse}) attempt ${attempt + 1}`,
+          this.getProviderTimeoutMs(),
+          requestScope,
         );
-        return fetch(requestUrl, {
-          method: 'POST',
-          headers: this.getOpenAiCompatibleHeaders(plan),
-          body: JSON.stringify({
-            model: modelToUse,
-            messages: this.promptBuilder.buildOpenAiMessages(
-              finalPrompt,
-              systemPrompt,
-              params.context,
-              params.history,
-              params.image,
-              plan.provider === 'openrouter' || plan.capabilities?.document
-                ? params.document
-                : undefined,
+        requestTimeout = scope;
+        assertAiRequestActive(scope);
+        const response = await this.sendTrackedOpenAiRequest(
+          { ...plan, model: modelToUse },
+          { ...params, ...requestScope },
+          () =>
+            this.waitForProviderResult(
+              fetchAiProvider(
+                requestUrl,
+                {
+                  method: 'POST',
+                  headers: this.getOpenAiCompatibleHeaders(plan),
+                  body: JSON.stringify({
+                    model: modelToUse,
+                    messages: this.promptBuilder.buildOpenAiMessages(
+                      finalPrompt,
+                      systemPrompt,
+                      params.context,
+                      params.history,
+                      params.image,
+                      plan.provider === 'openrouter' ||
+                        plan.capabilities?.document
+                        ? params.document
+                        : undefined,
+                    ),
+                    temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
+                    max_tokens: this.getOpenAiMaxOutputTokens(plan),
+                    ...this.getOpenAiDocumentOptions(plan, params),
+                    ...searchAttempt.requestOptions,
+                    ...(structuredResponseFormat
+                      ? { response_format: structuredResponseFormat }
+                      : {}),
+                  }),
+                  signal: scope.signal,
+                  redirect: 'manual',
+                },
+                this.providerTransportOptions(plan, params, scope),
+              ),
+              scope,
+              requestScope,
             ),
-            temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
-            max_tokens: this.getOpenAiMaxOutputTokens(plan),
-            ...this.getOpenAiDocumentOptions(plan, params),
-            ...searchAttempt.requestOptions,
-            ...(structuredResponseFormat
-              ? { response_format: structuredResponseFormat }
-              : {}),
-          }),
-          signal: requestTimeout.signal,
-          redirect: 'manual',
-        });
+        );
+        if (
+          !response.ok &&
+          this.isTransientOpenAiStatus(response.status) &&
+          attempt < AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_ATTEMPTS - 1
+        ) {
+          scope.abort();
+          scope.dispose();
+        }
+        return response;
       };
 
-      let response = await this.executeOpenAiRequestWithRetry(
+      response = await this.executeOpenAiRequestWithRetry(
         `${plan.provider} request (${modelToUse})`,
         sendRequest,
+        params.beforeProviderRequest,
+        requestScope,
       );
-
       while (!response.ok) {
-        const errorPayload = await this.readProviderErrorPayload(response);
-
+        const errorPayload = await this.waitForProviderResult(
+          this.readProviderErrorPayload(response, requestTimeout),
+          requestTimeout!,
+          requestScope,
+        );
+        assertAiRequestActive(requestScope);
+        await this.finishOpenAiAttempt(response, undefined, requestScope);
         if (
           structuredResponseFormat &&
           this.shouldRetryWithoutStructuredOutput(response, errorPayload)
@@ -875,10 +1328,11 @@ export class AiProviderRunnerService {
           response = await this.executeOpenAiRequestWithRetry(
             `${plan.provider} request (${modelToUse}) structured-output fallback`,
             sendRequest,
+            params.beforeProviderRequest,
+            requestScope,
           );
           continue;
         }
-
         throw this.getProviderHttpError(
           plan.provider,
           modelToUse,
@@ -888,18 +1342,37 @@ export class AiProviderRunnerService {
         );
       }
 
-      const result = await response.json();
-      const responseText = result.choices?.[0]?.message?.content || '';
-      const parsed = this.promptBuilder.parseAiResponse(responseText);
+      const result = (await this.waitForProviderResult(
+        readAiProviderJson(response, MAX_PROVIDER_RESPONSE_BYTES),
+        requestTimeout!,
+        requestScope,
+      )) as OpenAiResponsePayload;
+      receivedUsage = this.extractOpenAiUsage(result);
+      const responseText = result.choices?.[0]?.message?.content ?? '';
+      if (typeof responseText !== 'string')
+        throw new Error('Provider returned invalid completion content');
+      const parsed = this.promptBuilder.parseAiResponse(
+        responseText,
+        routeDecision.responseFormat,
+      );
       this.promptBuilder.assertUsableStructuredResponse(
         parsed,
         responseText,
         `${plan.provider} (${modelToUse})`,
+        routeDecision.responseFormat,
       );
       const sources = this.promptBuilder.mergeSources(
         parsed.sources,
         this.extractOpenAiSources(result),
       );
+      assertAiRequestActive(requestScope);
+      await this.finishOpenAiAttempt(
+        response,
+        undefined,
+        requestScope,
+        receivedUsage,
+      );
+      assertAiRequestActive(requestScope);
       return {
         ...parsed,
         message: this.promptBuilder.appendSourcesToMessage(
@@ -911,10 +1384,21 @@ export class AiProviderRunnerService {
         providerLabel: plan.displayName || plan.provider,
         model: modelToUse,
         routingMode,
+        contractVersion: 1,
         usage: this.extractOpenAiUsage(result),
       };
+    } catch (error) {
+      await this.finishOpenAiAttempt(
+        response,
+        error,
+        requestScope,
+        receivedUsage,
+      );
+      throw error;
     } finally {
-      requestTimeout.clear();
+      requestTimeout?.abort();
+      requestTimeout?.dispose();
+      requestScope.dispose();
     }
   }
 
@@ -924,117 +1408,191 @@ export class AiProviderRunnerService {
     routingMode: AiRoutingMode,
     routeDecision: RouteDecision,
   ): AsyncGenerator<StreamEvent> {
-    if (!this.genAI) throw new Error('Gemini provider is not configured');
-
-    const searchEnabled = routeDecision.needsLiveSearch;
-    const systemPrompt = this.buildSystemPromptForRequest(
-      params,
-      routeDecision,
-      this.buildCapabilities(searchEnabled, !!params.image),
-    );
-
-    const baseConfig = {
-      systemInstruction: systemPrompt,
-      temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
-      maxOutputTokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
-      ...(searchEnabled ? { tools: [{ googleSearch: {} }] } : {}),
-    };
-    const structuredGenerationConfig = buildGeminiStructuredGenerationConfig(
-      routeDecision.responseFormat,
-    );
-    let config = structuredGenerationConfig
-      ? { ...baseConfig, ...structuredGenerationConfig }
-      : baseConfig;
-    const contents = this.promptBuilder.buildGeminiContents(
-      params.prompt,
-      params.context,
-      params.history,
-      params.image,
-      params.document,
-    );
-    const generateStream = (): Promise<
-      AsyncGenerator<GenerateContentResponse>
-    > =>
-      this.executeRetriableOperation(
-        `Gemini stream bootstrap (${plan.model})`,
-        () =>
-          this.withTimeout(
-            this.genAI!.models.generateContentStream({
-              model: plan.model,
-              contents,
-              config,
-            }),
-            `Gemini stream bootstrap (${plan.model})`,
-          ),
-      );
-    let result: AsyncGenerator<GenerateContentResponse>;
+    const requestScope = this.createRequestScope(params);
+    let requestTimeout: ProviderRequestScope | undefined;
+    let iterator: AsyncGenerator<GenerateContentResponse> | undefined;
+    let trackedAttempt: TrackedProviderAttempt | undefined;
+    let usage: TokenUsage | undefined;
     try {
-      result = await generateStream();
-    } catch (error) {
-      if (
-        structuredGenerationConfig &&
-        this.isGeminiStructuredOutputUnsupportedError(error)
-      ) {
-        this.logger.warn(
-          `Gemini model ${plan.model} rejected structured output config for streaming. Retrying without provider-level schema enforcement...`,
-        );
-        config = baseConfig;
-        result = await generateStream();
-      } else {
-        throw error;
-      }
-    }
-
-    let fullText = '';
-    const providerSourceDetails: Array<{ title: string; url: string }> = [];
-    const iterator = result;
-    while (true) {
-      const nextChunk = await this.withTimeout<
-        IteratorResult<GenerateContentResponse, unknown>
-      >(
-        iterator.next(),
-        `Gemini stream (${plan.model})`,
-        this.getStreamIdleTimeoutMs(),
+      assertAiRequestActive(requestScope);
+      if (!this.genAI) throw new Error('Gemini provider is not configured');
+      await this.checkProviderRecipient(plan, { ...params, ...requestScope });
+      const searchEnabled = routeDecision.needsLiveSearch;
+      const systemPrompt = this.buildSystemPromptForRequest(
+        params,
+        routeDecision,
+        this.buildCapabilities(searchEnabled, !!params.image),
       );
-      if (nextChunk.done) break;
-      const chunkText = nextChunk.value.text || '';
-      if (searchEnabled) {
-        providerSourceDetails.push(
-          ...this.promptBuilder.extractSourceDetails(nextChunk.value),
+      const baseConfig = {
+        systemInstruction: systemPrompt,
+        temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
+        maxOutputTokens: AI_CONSTANTS.MAX_OUTPUT_TOKENS,
+        ...(searchEnabled ? { tools: [{ googleSearch: {} }] } : {}),
+      };
+      const structuredGenerationConfig = buildGeminiStructuredGenerationConfig(
+        routeDecision.responseFormat,
+      );
+      let config = structuredGenerationConfig
+        ? { ...baseConfig, ...structuredGenerationConfig }
+        : baseConfig;
+      const contents = this.promptBuilder.buildGeminiContents(
+        params.prompt,
+        params.context,
+        params.history,
+        params.image,
+        params.document,
+      );
+      const generateStream = () =>
+        this.executeRetriableOperation(
+          `Gemini stream bootstrap (${plan.model})`,
+          async () => {
+            requestTimeout?.abort();
+            requestTimeout?.dispose();
+            const scope = this.createAbortController(
+              `Gemini stream bootstrap (${plan.model})`,
+              this.getProviderTimeoutMs(),
+              requestScope,
+            );
+            requestTimeout = scope;
+            assertAiRequestActive(scope);
+            trackedAttempt = await this.beginProviderAttempt(plan, {
+              ...params,
+              ...requestScope,
+            });
+            try {
+              return await this.waitForProviderResult(
+                this.genAI!.models.generateContentStream({
+                  model: plan.model,
+                  contents,
+                  config: {
+                    ...config,
+                    abortSignal: scope.signal,
+                    httpOptions: {
+                      timeout: Math.max(1, scope.deadlineAt - Date.now()),
+                    },
+                  },
+                }),
+                scope,
+                requestScope,
+              );
+            } catch (error) {
+              await trackedAttempt?.fail(
+                this.getAttemptOutcome(error, requestScope),
+              );
+              scope.abort(error);
+              scope.dispose();
+              throw error;
+            }
+          },
+          params.beforeProviderRequest,
+          requestScope,
         );
+      try {
+        iterator = await generateStream();
+      } catch (error) {
+        if (error instanceof AiAttemptControlError) throw error;
+        assertAiRequestActive(requestScope);
+        if (
+          !(error instanceof AiAttemptControlError) &&
+          !isAiRequestStoppedError(error) &&
+          structuredGenerationConfig &&
+          this.isGeminiStructuredOutputUnsupportedError(error)
+        ) {
+          this.logger.warn(
+            `Gemini model ${plan.model} rejected structured output config for streaming. Retrying without provider-level schema enforcement...`,
+          );
+          config = baseConfig;
+          iterator = await generateStream();
+        } else {
+          throw error;
+        }
       }
-      if (chunkText) {
-        fullText += chunkText;
-        yield { type: 'chunk', text: chunkText };
+
+      let fullText = '';
+      const providerSourceDetails: Array<{ title: string; url: string }> = [];
+      while (true) {
+        assertAiRequestActive(requestScope);
+        const nextChunk = await this.withTimeout(
+          () => iterator!.next(),
+          `Gemini stream (${plan.model})`,
+          this.getStreamIdleTimeoutMs(),
+          requestTimeout,
+        );
+        assertAiRequestActive(requestScope);
+        if (nextChunk.done) break;
+        const chunkText = nextChunk.value.text || '';
+        if (chunkText.length > MAX_STREAM_EVENT_CHARACTERS) {
+          throw new Error('AI provider stream event exceeded the size limit');
+        }
+        usage = this.extractGeminiUsage(nextChunk.value) ?? usage;
+        if (searchEnabled) {
+          providerSourceDetails.push(
+            ...this.promptBuilder.extractSourceDetails(nextChunk.value),
+          );
+        }
+        if (chunkText) {
+          fullText = this.appendStreamText(fullText, chunkText);
+          assertAiRequestActive(requestScope);
+          yield { type: 'chunk', text: chunkText };
+        }
+      }
+      assertAiRequestActive(requestScope);
+      const parsed = this.promptBuilder.parseAiResponse(
+        fullText,
+        routeDecision.responseFormat,
+      );
+      this.promptBuilder.assertUsableStructuredResponse(
+        parsed,
+        fullText,
+        `Gemini stream (${plan.model})`,
+        routeDecision.responseFormat,
+      );
+      const sources = this.promptBuilder.mergeSources(
+        parsed.sources,
+        providerSourceDetails.map((source) => source.url),
+      );
+      assertAiRequestActive(requestScope);
+      await trackedAttempt?.complete({ usage });
+      assertAiRequestActive(requestScope);
+      yield {
+        type: 'done',
+        data: {
+          ...parsed,
+          message: this.promptBuilder.appendSourcesToMessage(
+            parsed.message,
+            sources,
+            providerSourceDetails,
+          ),
+          sources,
+          provider: 'gemini',
+          providerLabel: plan.displayName || 'gemini',
+          model: plan.model,
+          routingMode,
+          contractVersion: 1,
+          usage,
+        },
+      };
+    } catch (error) {
+      await trackedAttempt?.fail(this.getAttemptOutcome(error, requestScope), {
+        usage,
+      });
+      throw error;
+    } finally {
+      requestTimeout?.abort();
+      requestScope.abort();
+      try {
+        await trackedAttempt?.fail(
+          this.getAttemptOutcome(undefined, requestScope),
+          { usage },
+        );
+      } finally {
+        // Native iterators may ignore AbortSignal or queue return() behind a
+        // stalled next(). Request termination must not await them indefinitely.
+        await this.cancelStreamResource(() => iterator?.return(undefined));
+        requestTimeout?.dispose();
+        requestScope.dispose();
       }
     }
-    const parsed = this.promptBuilder.parseAiResponse(fullText);
-    this.promptBuilder.assertUsableStructuredResponse(
-      parsed,
-      fullText,
-      `Gemini stream (${plan.model})`,
-    );
-
-    const sources = this.promptBuilder.mergeSources(
-      parsed.sources,
-      providerSourceDetails.map((source) => source.url),
-    );
-    yield {
-      type: 'done',
-      data: {
-        ...parsed,
-        message: this.promptBuilder.appendSourcesToMessage(
-          parsed.message,
-          sources,
-          providerSourceDetails,
-        ),
-        sources,
-        provider: 'gemini',
-        providerLabel: plan.displayName || 'gemini',
-        model: plan.model,
-        routingMode,
-      },
-    };
   }
 
   async *streamOpenAiCompatible(
@@ -1043,74 +1601,111 @@ export class AiProviderRunnerService {
     routingMode: AiRoutingMode,
     routeDecision: RouteDecision,
   ): AsyncGenerator<StreamEvent> {
-    if (!plan.apiKey || !plan.baseUrl)
-      throw new Error(`${plan.provider} provider is not configured`);
-    const requestUrl = await this.getSafeOpenAiCompatibleUrl(plan.baseUrl);
-    const searchAttempt = this.getOpenAiSearchAttempt(
-      plan,
-      params,
-      routeDecision,
-    );
-    const modelToUse = searchAttempt.model;
-    const finalPrompt = searchAttempt.prompt;
-    let structuredResponseFormat = buildOpenAiStructuredResponseFormat(
-      routeDecision.responseFormat,
-    );
-    const systemPrompt = this.buildSystemPromptForRequest(
-      params,
-      routeDecision,
-      {
-        ...searchAttempt.capabilities,
-        visionInput: !!params.image,
-      },
-    );
-    let requestTimeout = this.createAbortController(
-      `${plan.provider} stream request (${modelToUse})`,
-    );
-
+    const requestScope = this.createRequestScope(params);
+    let requestTimeout: ProviderRequestScope | undefined;
+    let response: Response | undefined;
     try {
-      const sendRequest = (attempt: number) => {
-        requestTimeout.clear();
-        requestTimeout = this.createAbortController(
+      assertAiRequestActive(requestScope);
+      if (!plan.apiKey || !plan.baseUrl)
+        throw new Error(`${plan.provider} provider is not configured`);
+      await this.checkProviderRecipient(plan, { ...params, ...requestScope });
+      const requestUrl = await waitForAiResult(
+        this.getSafeOpenAiCompatibleUrl(plan.baseUrl),
+        requestScope.signal,
+      );
+      assertAiRequestActive(requestScope);
+      const searchAttempt = this.getOpenAiSearchAttempt(
+        plan,
+        params,
+        routeDecision,
+      );
+      const modelToUse = searchAttempt.model;
+      const finalPrompt = searchAttempt.prompt;
+      let structuredResponseFormat = buildOpenAiStructuredResponseFormat(
+        routeDecision.responseFormat,
+      );
+      const systemPrompt = this.buildSystemPromptForRequest(
+        params,
+        routeDecision,
+        { ...searchAttempt.capabilities, visionInput: !!params.image },
+      );
+      const sendRequest = async (attempt: number) => {
+        assertAiRequestActive(requestScope);
+        requestTimeout?.abort();
+        requestTimeout?.dispose();
+        const scope = this.createAbortController(
           `${plan.provider} stream request (${modelToUse}) attempt ${attempt + 1}`,
+          this.getProviderTimeoutMs(),
+          requestScope,
         );
-        return fetch(requestUrl, {
-          method: 'POST',
-          headers: this.getOpenAiCompatibleHeaders(plan),
-          body: JSON.stringify({
-            model: modelToUse,
-            messages: this.promptBuilder.buildOpenAiMessages(
-              finalPrompt,
-              systemPrompt,
-              params.context,
-              params.history,
-              params.image,
-              plan.provider === 'openrouter' || plan.capabilities?.document
-                ? params.document
-                : undefined,
+        requestTimeout = scope;
+        assertAiRequestActive(scope);
+        const result = await this.sendTrackedOpenAiRequest(
+          { ...plan, model: modelToUse },
+          { ...params, ...requestScope },
+          () =>
+            this.waitForProviderResult(
+              fetchAiProvider(
+                requestUrl,
+                {
+                  method: 'POST',
+                  headers: this.getOpenAiCompatibleHeaders(plan),
+                  body: JSON.stringify({
+                    model: modelToUse,
+                    messages: this.promptBuilder.buildOpenAiMessages(
+                      finalPrompt,
+                      systemPrompt,
+                      params.context,
+                      params.history,
+                      params.image,
+                      plan.provider === 'openrouter' ||
+                        plan.capabilities?.document
+                        ? params.document
+                        : undefined,
+                    ),
+                    temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
+                    max_tokens: this.getOpenAiMaxOutputTokens(plan),
+                    stream: true,
+                    ...this.getOpenAiDocumentOptions(plan, params),
+                    ...searchAttempt.requestOptions,
+                    ...(structuredResponseFormat
+                      ? { response_format: structuredResponseFormat }
+                      : {}),
+                  }),
+                  signal: scope.signal,
+                  redirect: 'manual',
+                },
+                this.providerTransportOptions(plan, params, scope),
+              ),
+              scope,
+              requestScope,
             ),
-            temperature: AI_CONSTANTS.TEMPERATURE_CREATIVE,
-            max_tokens: this.getOpenAiMaxOutputTokens(plan),
-            stream: true,
-            ...this.getOpenAiDocumentOptions(plan, params),
-            ...searchAttempt.requestOptions,
-            ...(structuredResponseFormat
-              ? { response_format: structuredResponseFormat }
-              : {}),
-          }),
-          signal: requestTimeout.signal,
-          redirect: 'manual',
-        });
+        );
+        if (
+          !result.ok &&
+          this.isTransientOpenAiStatus(result.status) &&
+          attempt < AI_CONSTANTS.OPENAI_COMPATIBLE_RETRY_ATTEMPTS - 1
+        ) {
+          scope.abort();
+          scope.dispose();
+        }
+        return result;
       };
 
-      let response = await this.executeOpenAiRequestWithRetry(
+      response = await this.executeOpenAiRequestWithRetry(
         `${plan.provider} stream request (${modelToUse})`,
         sendRequest,
+        params.beforeProviderRequest,
+        requestScope,
       );
-
       while (!response.ok) {
-        const errorPayload = await this.readProviderErrorPayload(response);
-
+        const errorPayload = await this.waitForProviderResult(
+          this.readProviderErrorPayload(response, requestTimeout),
+          requestTimeout!,
+          requestScope,
+        );
+        assertAiRequestActive(requestScope);
+        await this.finishOpenAiAttempt(response, undefined, requestScope);
         if (
           structuredResponseFormat &&
           this.shouldRetryWithoutStructuredOutput(response, errorPayload)
@@ -1122,10 +1717,11 @@ export class AiProviderRunnerService {
           response = await this.executeOpenAiRequestWithRetry(
             `${plan.provider} stream request (${modelToUse}) structured-output fallback`,
             sendRequest,
+            params.beforeProviderRequest,
+            requestScope,
           );
           continue;
         }
-
         throw this.getProviderHttpError(
           plan.provider,
           modelToUse,
@@ -1135,95 +1731,151 @@ export class AiProviderRunnerService {
         );
       }
 
+      assertAiRequestActive(requestScope);
       yield* this.streamFetch(
         response,
-        requestTimeout,
+        requestTimeout!,
         modelToUse,
         plan.provider,
         plan.displayName || plan.provider,
         routingMode,
+        routeDecision.responseFormat,
       );
+    } catch (error) {
+      await this.finishOpenAiAttempt(response, error, requestScope);
+      throw error;
     } finally {
-      requestTimeout.clear();
+      requestTimeout?.abort();
+      requestScope.abort();
+      try {
+        await this.finishOpenAiAttempt(
+          response,
+          requestScope.signal.reason,
+          requestScope,
+        );
+      } finally {
+        if (response?.body && !response.body.locked) {
+          await this.cancelStreamResource(() => response!.body?.cancel());
+        }
+        requestTimeout?.dispose();
+        requestScope.dispose();
+      }
     }
   }
 
   private async *streamFetch(
     response: Response,
-    abortController: { clear: () => void; signal: AbortSignal },
+    abortController: {
+      clear: () => void;
+      signal: AbortSignal;
+      deadlineAt?: number;
+      abort?: (reason?: unknown) => void;
+    },
     model: string,
     provider: AiProvider,
     providerLabel: string,
     routingMode: AiRoutingMode,
+    responseFormat: AiResponseFormat = 'chat',
   ): AsyncGenerator<StreamEvent> {
     const reader = response.body?.getReader();
     if (!reader) throw new Error('Response body is not readable');
-    const decoder = new TextDecoder();
+    const decoder = new TextDecoder('utf-8', { fatal: true });
     let fullText = '';
+    let usage: TokenUsage | undefined;
     const providerSources: string[] = [];
+    let doneStream = false;
+    const readEvent = (line: string): string => {
+      assertAiRequestActive(abortController);
+      if (line.length > MAX_STREAM_EVENT_CHARACTERS) {
+        throw new Error('AI provider stream event exceeded the size limit');
+      }
+      if (!line.startsWith('data:')) return '';
+      const data = line.slice(5).trim();
+      if (data === '[DONE]') {
+        doneStream = true;
+        return '';
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(data);
+      } catch (error) {
+        // Only JSON syntax errors are ignorable. Stop/size/control errors
+        // must never disappear into malformed-event handling.
+        if (error instanceof SyntaxError) return '';
+        throw error;
+      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+        return '';
+      usage = this.extractOpenAiUsage(parsed) ?? usage;
+      providerSources.push(...this.extractOpenAiSources(parsed));
+      const text = this.promptBuilder.extractOpenAiStreamText(parsed);
+      if (text) fullText = this.appendStreamText(fullText, text);
+      return text;
+    };
     try {
-      let doneStream = false;
       let lineBuffer = '';
       while (!doneStream) {
+        assertAiRequestActive(abortController);
         const { done, value } = await this.readWithTimeout(
           reader,
           `${provider} stream chunk`,
+          this.getStreamIdleTimeoutMs(),
+          abortController,
+          abortController.abort,
         );
+        assertAiRequestActive(abortController);
         if (done) break;
         lineBuffer += decoder.decode(value, { stream: true });
         const lines = lineBuffer.split(/\r?\n/);
         lineBuffer = lines.pop() || '';
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim();
-            if (data === '[DONE]') {
-              doneStream = true;
-              break;
-            }
-            try {
-              const parsed = JSON.parse(data);
-              providerSources.push(...this.extractOpenAiSources(parsed));
-              const text = parsed.choices?.[0]?.delta?.content || '';
-              if (text) {
-                fullText += text;
-                yield { type: 'chunk', text };
-              }
-            } catch {
-              /* skip invalid JSON */
-            }
+          const text = readEvent(line);
+          if (doneStream) break;
+          if (text) {
+            assertAiRequestActive(abortController);
+            yield { type: 'chunk', text };
+          }
+        }
+        if (!doneStream && lineBuffer.length > MAX_STREAM_EVENT_CHARACTERS) {
+          throw new Error('AI provider stream event exceeded the size limit');
+        }
+      }
+      assertAiRequestActive(abortController);
+      if (!doneStream) {
+        lineBuffer += decoder.decode();
+        if (lineBuffer) {
+          const text = readEvent(lineBuffer.trimEnd());
+          if (text) {
+            assertAiRequestActive(abortController);
+            yield { type: 'chunk', text };
           }
         }
       }
-      lineBuffer += decoder.decode();
-      if (lineBuffer && !doneStream) {
-        const line = lineBuffer.trimEnd();
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6).trim();
-          if (data !== '[DONE]') {
-            try {
-              const parsed = JSON.parse(data);
-              providerSources.push(...this.extractOpenAiSources(parsed));
-              const text = parsed.choices?.[0]?.delta?.content || '';
-              if (text) {
-                fullText += text;
-                yield { type: 'chunk', text };
-              }
-            } catch {
-              /* skip invalid JSON */
-            }
-          }
-        }
-      }
-      const parsed = this.promptBuilder.parseAiResponse(fullText);
+      assertAiRequestActive(abortController);
+      if (!doneStream)
+        throw new Error('AI provider stream ended without a terminal marker');
+      const parsed = this.promptBuilder.parseAiResponse(
+        fullText,
+        responseFormat,
+      );
       this.promptBuilder.assertUsableStructuredResponse(
         parsed,
         fullText,
         `${provider} stream (${model})`,
+        responseFormat,
       );
       const sources = this.promptBuilder.mergeSources(
         parsed.sources,
         providerSources,
       );
+      assertAiRequestActive(abortController);
+      await this.finishOpenAiAttempt(
+        response,
+        undefined,
+        abortController,
+        usage,
+      );
+      assertAiRequestActive(abortController);
       yield {
         type: 'done',
         data: {
@@ -1237,11 +1889,30 @@ export class AiProviderRunnerService {
           providerLabel,
           model,
           routingMode,
+          contractVersion: 1,
+          usage,
         },
       };
+    } catch (error) {
+      await this.finishOpenAiAttempt(response, error, abortController, usage);
+      throw error;
     } finally {
-      reader.releaseLock();
-      abortController.clear();
+      try {
+        await this.finishOpenAiAttempt(
+          response,
+          new Error('AI stream consumer cancelled'),
+          { ...abortController, signal: AbortSignal.abort() },
+          usage,
+        );
+      } finally {
+        abortController.abort?.();
+        try {
+          await this.cancelStreamResource(() => reader.cancel());
+        } finally {
+          reader.releaseLock();
+          abortController.clear();
+        }
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { useAppStore } from '@/core/services/store';
+import { useAiPreferences } from '@/core/services/aiPreferences';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { Button } from '@/presentation/components/ui/button';
 import {
@@ -84,6 +85,8 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const nosqlMqlQuery = useAppStore((state) => state.nosqlMqlQuery);
     const lang = useAppStore((state) => state.lang);
+    const aiEnabled = useAiPreferences().enabled === true;
+    const disabledTitle = getWorkspaceText(lang).aiAssistant.disabledTitle;
     const chatText = getWorkspaceText(lang).aiChatInput;
     const statusLabels: Record<AiModelRuntimeStatus, string> = lang === 'vi'
         ? { unconfigured: 'Chưa cấu hình', 'rate-limited': 'Giới hạn', 'credits-required': 'Cần credit', unavailable: 'Không khả dụng' }
@@ -118,6 +121,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                 accept="image/*,.pdf,.csv,.tsv,.xlsx,.xls,.ods,.json,.xml,.yaml,.yml,.txt,.md,.log,.sql,.py,.js,.ts,.tsx,.jsx,.html,.css,.go,.rs,.java,.cpp,.c,.h,.php,.rb,.sh,.toml,.ini,.env"
                 className="hidden"
                 onChange={handleFileSelected}
+                disabled={!aiEnabled}
             />
 
             <div className="relative bg-muted/20 border border-border/50 rounded-2xl focus-within:ring-2 focus-within:ring-violet-500/20 focus-within:border-violet-500/40 transition-all duration-300 flex flex-col shadow-sm">
@@ -155,8 +159,8 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={activeConnection ? chatText.connectedPlaceholder : chatText.disconnectedPlaceholder}
-                    disabled={isLoading || !activeConnection}
+                    placeholder={!aiEnabled ? disabledTitle : activeConnection ? chatText.connectedPlaceholder : chatText.disconnectedPlaceholder}
+                    disabled={!aiEnabled || isLoading || !activeConnection}
                     className="w-full bg-transparent border-none px-4 pt-4 pb-2 text-base md:text-sm resize-none focus:outline-none min-h-[58px] max-h-[250px] placeholder:text-muted-foreground/50 leading-relaxed scrollbar-none"
                     rows={1}
                     style={{ fieldSizing: "content" } satisfies FieldSizingStyle}
@@ -174,14 +178,15 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                     size="icon"
                                     className="h-7 w-7 rounded-lg text-muted-foreground hover:text-violet-400 hover:bg-violet-500/10 transition-colors shrink-0"
                                     aria-label={chatText.attachContextTitle}
-                                    title={chatText.attachContextTitle}
+                                    disabled={!aiEnabled}
+                                    title={aiEnabled ? chatText.attachContextTitle : disabledTitle}
                                 >
                                     <Plus className="w-4 h-4" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent side="top" align="start" className="w-56 bg-popover/95 backdrop-blur-xl border border-border/50 rounded-2xl shadow-2xl p-1.5 animate-in slide-in-from-bottom-2 duration-300 z-[110]">
                                 <DropdownMenuLabel className="px-3 py-2 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">{chatText.attachMenuLabel}</DropdownMenuLabel>
-                                <DropdownMenuItem className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-accent/50 group" onClick={() => fileInputRef.current?.click()}>
+                                <DropdownMenuItem disabled={!aiEnabled} className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer hover:bg-accent/50 group" onClick={() => fileInputRef.current?.click()}>
                                     <div className="w-8 h-8 rounded-lg bg-pink-500/10 flex items-center justify-center group-hover:bg-pink-500/20 transition-colors">
                                         <Image className="w-4 h-4 text-pink-400" />
                                     </div>
@@ -193,6 +198,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                 <DropdownMenuItem
                                     className={cn("flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer group", !hasEditorQuery && "opacity-40 grayscale pointer-events-none")}
                                     onClick={handlePasteQuery}
+                                    disabled={!aiEnabled || !hasEditorQuery}
                                 >
                                     <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center group-hover:bg-cyan-500/20 transition-colors">
                                         <FileCode2 className="w-4 h-4 text-cyan-400" />
@@ -205,6 +211,7 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                 <DropdownMenuItem
                                     className={cn("flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer group", (!activeConnection || (!activeDatabase && !hasSqlTableContext)) && "opacity-40 grayscale pointer-events-none")}
                                     onClick={handleMentionTable}
+                                    disabled={!aiEnabled || !activeConnection || (!activeDatabase && !hasSqlTableContext)}
                                 >
                                     <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
                                         <Table2 className="w-4 h-4 text-emerald-400" />
@@ -350,12 +357,13 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                                 size="icon"
                                 className={cn(
                                     "h-8 w-8 rounded-full shrink-0 text-white transition-all duration-300 border-none",
-                                    (!input.trim() && attachments.length === 0) || !activeConnection || selectedModelBlocked
+                                    !aiEnabled || (!input.trim() && attachments.length === 0) || !activeConnection || selectedModelBlocked
                                         ? "bg-muted-foreground/10 text-muted-foreground/30"
                                         : "bg-gradient-to-tr from-violet-600 to-indigo-500 hover:scale-105 active:scale-95 shadow-lg shadow-violet-500/25"
                                 )}
                                 onClick={handleSend}
-                                disabled={(!input.trim() && attachments.length === 0) || !activeConnection || selectedModelBlocked}
+                                disabled={!aiEnabled || (!input.trim() && attachments.length === 0) || !activeConnection || selectedModelBlocked}
+                                title={aiEnabled ? undefined : disabledTitle}
                                 aria-label={chatText.sendMessage}
                             >
                                 <Send className={cn("w-3.5 h-3.5 ml-0.5 transition-transform", input.trim() && "translate-x-0.5 -translate-y-px")} />
@@ -368,9 +376,11 @@ export const AiChatInput: React.FC<AiChatInputProps> = React.memo(({
                 <div className="px-3 pb-1.5">
                     <div className="flex items-center justify-between text-[8px] text-muted-foreground/50 font-medium">
                         <div className="flex items-center gap-1 truncate max-w-[70%]">
-                            {aiRoutingMode === 'gemini-only'
-                                ? 'Gemini only.'
-                                : 'Auto routing enabled.'}
+                            {!aiEnabled
+                                ? disabledTitle
+                                : aiRoutingMode === 'gemini-only'
+                                    ? 'Gemini only.'
+                                    : 'Auto routing enabled.'}
                         </div>
                         {activeDatabase && (
                             <div className="flex items-center gap-1 opacity-60 shrink-0">

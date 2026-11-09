@@ -3,6 +3,7 @@ import Editor, { useMonaco, type OnMount } from '@monaco-editor/react';
 import { useAppStore } from '@/core/services/store';
 import { Loader2 } from 'lucide-react';
 import { useAiGhostText } from '@/presentation/components/code-editor/useAiGhostText';
+import type { editor as MonacoEditor } from 'monaco-editor';
 
 interface MqlEditorProps {
     value: string;
@@ -26,10 +27,13 @@ function getEditorTheme(): EditorTheme {
 export const MqlEditor: React.FC<MqlEditorProps> = ({ value, onChange, onRun, height = '100%' }) => {
     const [theme, setTheme] = React.useState<EditorTheme>(() => getEditorTheme());
     const editorRef = useRef<MqlEditorHandle | null>(null);
+    const modelSubscriptionRef = useRef<{ dispose: () => void } | null>(null);
+    const [owningModel, setOwningModel] = React.useState<MonacoEditor.ITextModel | null>(null);
+    useEffect(() => () => modelSubscriptionRef.current?.dispose(), []);
     const { nosqlActiveConnectionId, nosqlActiveDatabase } = useAppStore();
     
     const monaco = useMonaco();
-    useAiGhostText(monaco, nosqlActiveConnectionId, nosqlActiveDatabase || undefined, 'json');
+    useAiGhostText(monaco, nosqlActiveConnectionId, nosqlActiveDatabase || undefined, 'json', owningModel);
 
     useEffect(() => {
         const observer = new MutationObserver((mutations) => {
@@ -45,6 +49,9 @@ export const MqlEditor: React.FC<MqlEditorProps> = ({ value, onChange, onRun, he
 
     const handleEditorMount: OnMount = (editor, monacoInstance) => {
         editorRef.current = editor;
+        modelSubscriptionRef.current?.dispose();
+        setOwningModel(editor.getModel());
+        modelSubscriptionRef.current = editor.onDidChangeModel(() => setOwningModel(editor.getModel()));
 
         // Ctrl+Enter → Run query
         editor.addCommand(monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Enter, () => {

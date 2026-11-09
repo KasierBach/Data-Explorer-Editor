@@ -467,8 +467,10 @@ describe('DocumentationView in-place navigation', () => {
     expect(screen.getByRole('button', { name: `Filter: ${mode === 'include' ? 'Include only' : 'Exclude'} · Connections` })).toHaveAttribute('data-active', 'true');
     articleScroll.scrollTop = 230;
     rerender(navigationView('/docs/results', navigateDocs));
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveFocus());
-    expect(resetArticleScroll).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1 })).toHaveFocus();
+      expect(resetArticleScroll).toHaveBeenCalledTimes(2);
+    });
     expect(resetArticleScroll).toHaveBeenLastCalledWith({ top: 0, behavior: 'instant' });
     expect(articleScroll.scrollTop).toBe(0);
     expect(sidebarScroll.scrollTop).toBe(87);

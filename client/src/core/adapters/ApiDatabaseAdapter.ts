@@ -11,6 +11,7 @@ import type {
 } from '../domain/database-adapter.interface';
 import type { DatabaseValue, QueryResult, RowData, TableMetadata, TreeNode } from '../domain/entities';
 import { apiService } from '../services/api.service';
+import { assertAiEnabled } from '../services/aiAccountPolicy';
 import { API_BASE_URL } from '../config/env';
 import { useAppStore } from '../services/store';
 import { ApiError } from '../services/api.service';
@@ -225,6 +226,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
     }
 
     async generateSql(params: GenerateSqlParams, options?: { signal?: AbortSignal }): Promise<Response> {
+        assertAiEnabled();
         if (!this.connectionId) throw new Error('Not connected');
 
         return fetch(`${this.baseUrl}/ai/generate-sql`, {
@@ -239,6 +241,7 @@ export class ApiDatabaseAdapter implements IDatabaseAdapter {
     }
 
     async generateSqlStream(params: GenerateSqlParams, options?: { signal?: AbortSignal }): Promise<Response> {
+        assertAiEnabled();
         if (!this.connectionId) throw new Error('Not connected');
 
         return fetch(`${this.baseUrl}/ai/generate-sql-stream`, {

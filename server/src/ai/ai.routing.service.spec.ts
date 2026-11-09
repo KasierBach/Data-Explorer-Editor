@@ -24,6 +24,62 @@ function createConfig(
 }
 
 describe('AiRoutingService', () => {
+  it.each([
+    ['groq:openai/gpt-oss-120b', 'groq'],
+    ['gemini-2.5-flash', 'gemini'],
+    ['google/gemma-4-31b-it:free', 'openrouter'],
+    ['beeknoee:glm-4.7-flash', 'beeknoee'],
+  ])(
+    'does not dispatch explicitly selected disabled provider %s',
+    (model, provider) => {
+      const service = new AiRoutingService(createConfig());
+      expect(() =>
+        service.buildPlanChain(
+          {
+            prompt: 'Explain this query',
+            model,
+            disabledProviders: [provider],
+            fallbackProvider: 'none',
+          },
+          true,
+        ),
+      ).toThrow(/disabled/i);
+    },
+  );
+
+  it('does not switch away from an explicitly disabled provider even when fallback is configured', () => {
+    const service = new AiRoutingService(createConfig());
+    expect(() =>
+      service.buildPlanChain(
+        {
+          prompt: 'Explain this query',
+          model: 'groq:openai/gpt-oss-120b',
+          disabledProviders: [' GROQ '],
+          fallbackProvider: 'gemini',
+        },
+        true,
+      ),
+    ).toThrow(/disabled/i);
+  });
+
+  it('rejects an explicitly selected disabled provider even when it is not configured', () => {
+    const service = new AiRoutingService(
+      createConfig({ GROQ_API_KEY: undefined }),
+    );
+
+    expect(() =>
+      service.buildPlanChain(
+        {
+          prompt: 'Explain this query',
+          model: 'groq:openai/gpt-oss-120b',
+          disabledProviders: ['groq'],
+          fallbackProvider: 'none',
+        },
+        true,
+      ),
+    ).toThrow(/disabled/i);
+  });
+
   it('routes an explicitly selected beeknoee model to the Beeknoee provider plan first', () => {
     const service = new AiRoutingService(createConfig());
 

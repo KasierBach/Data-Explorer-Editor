@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { aiService } from './AiService';
+import { useAppStore } from './store';
 
 // Mock global fetch using stubGlobal
 const mockFetch = vi.fn();
@@ -9,6 +10,30 @@ describe('AiService (Frontend)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    useAppStore.setState({ isAuthenticated: true, isAuthBootstrapped: true, user: { id: 'user-a', email: 'a@example.com', aiEnabled: true } });
+  });
+
+  it('does not dispatch autocomplete for a disabled or unhydrated account', async () => {
+    useAppStore.setState({ user: { id: 'user-a', email: 'a@example.com', aiEnabled: false } });
+    await expect(aiService.getAutocomplete({ connectionId: 'conn-1', beforeCursor: 'SEL' })).rejects.toMatchObject({ reason: 'AI_DISABLED' });
+    useAppStore.setState({ isAuthBootstrapped: false, user: { id: 'user-a', email: 'a@example.com', aiEnabled: true } });
+    await expect(aiService.getAutocomplete({ connectionId: 'conn-1', beforeCursor: 'SEL' })).rejects.toMatchObject({ reason: 'AI_DISABLED' });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('does not retry autocomplete after a 401 refresh', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      headers: { get: () => 'application/json' },
+      json: () => Promise.resolve({ message: 'Unauthorized' }),
+    });
+
+    await expect(aiService.getAutocomplete({ connectionId: 'conn-1', beforeCursor: 'SEL' })).resolves.toBe('');
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls[0][0]).toContain('/ai/autocomplete');
   });
 
   it('should call autocomplete endpoint and return completion string', async () => {

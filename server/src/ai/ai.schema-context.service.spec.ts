@@ -1,6 +1,63 @@
 import { AiSchemaContextService } from './ai.schema-context.service';
 
 describe('AiSchemaContextService', () => {
+  it('stops metadata gathering after cancellation instead of starting the next task', async () => {
+    const controller = new AbortController();
+    const cacheManager = {
+      get: jest.fn().mockResolvedValue(undefined),
+      set: jest.fn(),
+    };
+    const freshnessService = {
+      buildKey: jest.fn().mockResolvedValue('fixture'),
+      bump: jest.fn(),
+    };
+    const strategy = {
+      getSchemas: jest.fn(async () => {
+        controller.abort();
+        return ['public'];
+      }),
+      getTables: jest.fn(),
+      getRelationships: jest.fn(),
+      getColumns: jest.fn(),
+    };
+    const service = new AiSchemaContextService(
+      cacheManager as never,
+      freshnessService as never,
+    );
+
+    await expect(
+      service.gatherSchemaContext({}, strategy as never, 'app', 'conn-a', '', {
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow();
+    expect(strategy.getTables).not.toHaveBeenCalled();
+    expect(strategy.getColumns).not.toHaveBeenCalled();
+    expect(cacheManager.set).not.toHaveBeenCalled();
+  });
+
+  it('does not use cached schema after a fresh policy denial', async () => {
+    const cacheManager = {
+      get: jest.fn().mockResolvedValue('Cached schema'),
+      set: jest.fn(),
+    };
+    const freshnessService = {
+      buildKey: jest.fn().mockResolvedValue('fixture'),
+      bump: jest.fn(),
+    };
+    const policy = jest.fn().mockRejectedValue(new Error('Policy denied'));
+    const service = new AiSchemaContextService(
+      cacheManager as never,
+      freshnessService as never,
+    );
+
+    await expect(
+      service.gatherSchemaContext({}, {} as never, 'app', 'conn-a', '', {
+        beforeProviderRequest: policy,
+      }),
+    ).rejects.toThrow('Policy denied');
+    expect(cacheManager.get).not.toHaveBeenCalled();
+  });
+
   it('builds AI context from schema metadata without reading row values', async () => {
     const cacheManager = {
       get: jest.fn().mockResolvedValue(undefined),

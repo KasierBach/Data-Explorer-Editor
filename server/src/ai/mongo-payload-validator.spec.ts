@@ -31,6 +31,35 @@ describe('MongoDB executable payload validation', () => {
     ]);
   });
 
+  it.each(['dropDatabase', 'drop', 'mapReduce', 'eval', 'unsupported'])(
+    'rejects unsupported AI command action %s',
+    (action) => {
+      expect(
+        validateMongoExecutableCommand(
+          JSON.stringify({ action, collection: 'movies' }),
+        ),
+      ).toEqual([`MongoDB payload uses unsupported action ${action}.`]);
+    },
+  );
+
+  it.each([
+    'find',
+    'count',
+    'distinct',
+    'insertOne',
+    'insertMany',
+    'updateOne',
+    'updateMany',
+    'deleteOne',
+    'deleteMany',
+  ])('preserves supported AI command action %s', (action) => {
+    expect(
+      validateMongoExecutableCommand(
+        JSON.stringify({ action, collection: 'movies' }),
+      ),
+    ).toEqual([]);
+  });
+
   it('rejects malformed JSON before it can reach MongoDB', () => {
     expect(validateMongoExecutableCommand('{ bad json')).toEqual([
       'MongoDB payload must be valid JSON.',

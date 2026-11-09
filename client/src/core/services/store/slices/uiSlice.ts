@@ -88,7 +88,7 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
             [pageId]: { ...(state.pageStates[pageId] || {}), ...pageState }
         }
     })),
-    lang: (localStorage.getItem('lang') === 'vi' || localStorage.getItem('lang') === 'en') ? localStorage.getItem('lang') as 'vi' | 'en' : 'vi',
+    lang: typeof localStorage !== 'undefined' && (localStorage.getItem('lang') === 'vi' || localStorage.getItem('lang') === 'en') ? localStorage.getItem('lang') as 'vi' | 'en' : 'vi',
     setLang: (lang) => {
         localStorage.setItem('lang', lang);
         set({ lang });

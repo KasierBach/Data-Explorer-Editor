@@ -8,6 +8,84 @@ describe('AiPromptBuilderService', () => {
     service = new AiPromptBuilderService();
   });
 
+  it.each([
+    { message: 'A closing } in a string', sql: "SELECT '{' AS brace" },
+    { message: 'Escaped "quotes" and \\slashes { }', sql: 'SELECT 1' },
+    { message: 'Nested data', sql: 'SELECT 2', ignored: [{ value: '}' }] },
+  ])(
+    'parses complete JSON without counting braces inside strings: %j',
+    (value) => {
+      const parsed = service.parseAiResponse(
+        JSON.stringify(value),
+        'structured',
+      );
+
+      expect(parsed).toMatchObject({ message: value.message, sql: value.sql });
+    },
+  );
+
+  it('extracts a fenced JSON object with escaped braces without losing SQL', () => {
+    const value = { message: 'Literal } and {', sql: 'SELECT \'{"key":"}"}\'' };
+    const parsed = service.parseAiResponse(
+      `\`\`\`json\n${JSON.stringify(value)}\n\`\`\``,
+      'structured',
+    );
+
+    expect(parsed).toMatchObject(value);
+  });
+
+  it.each([
+    '',
+    'null',
+    'true',
+    '42',
+    '[]',
+    '{"sql":',
+    '{"message":""}',
+    'plain text',
+  ])('rejects invalid structured output %j', (value) => {
+    expect(() => {
+      const parsed = service.parseAiResponse(value, 'structured');
+      service.assertUsableStructuredResponse(
+        parsed,
+        value,
+        'Fixture',
+        'structured',
+      );
+    }).toThrow();
+  });
+
+  it.each([
+    { message: ['not text'], sql: 'SELECT 1' },
+    { message: 'Ready', sql: { action: 'find' } },
+    { explanation: 42, sql: 'SELECT 1' },
+  ])(
+    'does not coerce invalid response fields into usable content: %j',
+    (value) => {
+      expect(() =>
+        service.parseAiResponse(JSON.stringify(value), 'structured'),
+      ).toThrow();
+    },
+  );
+
+  it('preserves plain chat text when structured output was not requested', () => {
+    const value = 'This is a plain chat response with {curly braces}.';
+    const parsed = service.parseAiResponse(value, 'chat');
+
+    expect(parsed).toEqual({ message: value });
+    expect(() =>
+      service.assertUsableStructuredResponse(parsed, value, 'Fixture', 'chat'),
+    ).not.toThrow();
+  });
+
+  it('bounds response parsing before attempting JSON extraction', () => {
+    const value = 'x'.repeat(AI_CONSTANTS.MAX_OUTPUT_TOKENS * 16 + 1);
+
+    expect(() => service.parseAiResponse(value, 'structured')).toThrow(
+      /limit|large/i,
+    );
+  });
+
   it('strips raw thought content from parsed model responses', () => {
     const parsed = service.parseAiResponse(
       '<thought>private chain of thought</thought>{"message":"Ready","thought":"private json reasoning","sql":"SELECT 1"}',
@@ -41,6 +119,24 @@ describe('AiPromptBuilderService', () => {
       message: 'Fresh answer',
       sources: ['https://example.com/a'],
     });
+  });
+
+  it('rejects credential-bearing and control-character source URLs', () => {
+    const parsed = service.parseAiResponse(
+      JSON.stringify({
+        message: 'Answer',
+        sources: [
+          'https://example.com/safe',
+          'https://user:secret@example.com/private',
+          'https://example.com/unsafe\npath',
+          'javascript:alert(1)',
+        ],
+      }),
+      'structured',
+    );
+
+    expect(parsed.sources).toEqual(['https://example.com/safe']);
+    expect(JSON.stringify(parsed)).not.toContain('secret');
   });
 
   it('renders readable source labels instead of exposing redirect URLs', () => {

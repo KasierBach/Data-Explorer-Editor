@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { useAppStore } from './store';
 import {
   AI_PREFERENCES_STORAGE_KEY,
   INHERIT_ASSISTANT_MODEL,
@@ -11,6 +12,29 @@ import {
 describe("aiPreferences", () => {
   beforeEach(() => {
     localStorage.clear();
+    useAppStore.setState({ isAuthenticated: false, isAuthBootstrapped: false, user: null });
+  });
+
+  it('does not treat a legacy local enabled flag as account consent', () => {
+    localStorage.setItem(AI_PREFERENCES_STORAGE_KEY, JSON.stringify({ enabled: true }));
+    useAppStore.setState({ isAuthenticated: true, isAuthBootstrapped: true, user: { id: 'user-a', email: 'a@example.com', aiEnabled: false } });
+    expect(readAiPreferences().enabled).toBe(false);
+  });
+
+  it('uses the current authenticated account rather than the previous account enabled flag', () => {
+    useAppStore.setState({ isAuthenticated: true, isAuthBootstrapped: true, user: { id: 'user-a', email: 'a@example.com', aiEnabled: true } });
+    expect(readAiPreferences().enabled).toBe(true);
+    useAppStore.setState({ user: { id: 'user-b', email: 'b@example.com', aiEnabled: false } });
+    expect(readAiPreferences().enabled).toBe(false);
+    useAppStore.setState({ isAuthenticated: false, user: null });
+    expect(readAiPreferences().enabled).toBe(false);
+  });
+
+  it('fails closed before account policy hydration', () => {
+    useAppStore.setState({ isAuthenticated: true, isAuthBootstrapped: false, user: { id: 'user-a', email: 'a@example.com', aiEnabled: true } });
+    expect(readAiPreferences().enabled).toBe(false);
+    useAppStore.setState({ isAuthBootstrapped: true, user: { id: 'user-a', email: 'a@example.com' } });
+    expect(readAiPreferences().enabled).toBe(false);
   });
 
   it("drops legacy TokenRouter providers and resets related selections on read", () => {
@@ -36,7 +60,7 @@ describe("aiPreferences", () => {
     );
 
     expect(readAiPreferences()).toEqual({
-      enabled: true,
+      enabled: false,
       disabledProviders: [],
       fallbackProvider: "auto",
       assistantModel: undefined,

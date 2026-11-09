@@ -5,6 +5,8 @@ import { useAppStore } from "@/core/services/store"
 import { Navbar } from './Navbar';
 import { ConnectionDialog } from '@/presentation/modules/Connection/ConnectionDialog';
 import { AiAssistant } from '@/presentation/modules/Query/AiAssistant';
+import { isAiEnabled } from '@/core/services/aiAccountPolicy';
+import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { cn } from "@/lib/utils";
 import { useResizablePanel } from '@/presentation/hooks/useResizablePanel';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
@@ -26,6 +28,10 @@ export function AppShell() {
     const toggleResultPanel = useAppStore(state => state.toggleResultPanel);
     const lang = useAppStore(state => state.lang);
     const text = getLayoutText(lang);
+    const isNoSql = useAppStore(state => {
+        const type = state.connections.find(c => c.id === state.activeConnectionId)?.type;
+        return type === 'mongodb' || type === 'mongodb+srv';
+    });
 
     const { isActualMobile, isCompactMobileLayout, isSmallMobile, isLandscapeMobile } = useResponsiveLayoutMode();
 
@@ -93,19 +99,50 @@ export function AppShell() {
         placeSqlInQueryTab(sql, null);
     }, [placeSqlInQueryTab]);
 
-    const handleRunGeneratedQuery = React.useCallback((sql: string) => {
-        const confirmed = window.confirm('Run this AI-generated SQL now?');
-        if (!confirmed) return;
+    const pendingRunRef = React.useRef(false);
+    const handleRunGeneratedQuery = React.useCallback(async (sql: string) => {
+        if (!sql.trim() || pendingRunRef.current) return;
 
         const store = useAppStore.getState();
-        const activeConnection = store.connections.find(c => c.id === store.activeConnectionId);
+        const connection = store.connections.find(c => c.id === store.activeConnectionId);
+        if (!store.isAuthenticated || !store.isAuthBootstrapped || !store.user?.id
+            || !connection || connection.allowQueryExecution === false
+            || connection.type === 'mongodb' || connection.type === 'mongodb+srv') return;
 
-        if (activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv') {
-            store.setNosqlMqlQuery(sql);
-            return;
+        const snapshot = {
+            accountId: store.user.id,
+            accountAiEnabled: store.user.aiEnabled === true,
+            policyEnabled: isAiEnabled(),
+            tabId: store.activeTabId,
+            tab: store.tabs.find(t => t.id === store.activeTabId),
+            connectionId: store.activeConnectionId,
+            connection,
+            database: store.activeDatabase,
+            chatId: store.activeAiChatId,
+        };
+
+        pendingRunRef.current = true;
+        try {
+            const confirmed = await window.confirm(`${getWorkspaceText(store.lang).aiMessageBubble.runNow}?\n\n${sql}`);
+            if (confirmed !== true) return;
+
+            const current = useAppStore.getState();
+            // A confirmation belongs to the captured actor and draft, never a newly selected context.
+            if (!current.isAuthenticated || !current.isAuthBootstrapped
+                || current.user?.id !== snapshot.accountId
+                || (current.user.aiEnabled === true) !== snapshot.accountAiEnabled
+                || isAiEnabled() !== snapshot.policyEnabled
+                || current.activeTabId !== snapshot.tabId
+                || current.tabs.find(t => t.id === current.activeTabId) !== snapshot.tab
+                || current.activeConnectionId !== snapshot.connectionId
+                || current.connections.find(c => c.id === current.activeConnectionId) !== snapshot.connection
+                || current.activeDatabase !== snapshot.database
+                || current.activeAiChatId !== snapshot.chatId) return;
+
+            placeSqlInQueryTab(sql, Date.now());
+        } finally {
+            pendingRunRef.current = false;
         }
-
-        placeSqlInQueryTab(sql, Date.now());
     }, [placeSqlInQueryTab]);
 
     // Sync external sidebar width changes (e.g. from store reset)
@@ -231,7 +268,8 @@ export function AppShell() {
                     <div style={{ width: `${rightPanel.width}px` }} className="h-full">
                         <AiAssistant
                             onInsertQuery={handleInsertGeneratedQuery}
-                            onRunQuery={handleRunGeneratedQuery}
+                            onRunQuery={isNoSql ? handleInsertGeneratedQuery : handleRunGeneratedQuery}
+                            runActionLabel={isNoSql ? getWorkspaceText(lang).aiMessageBubble.insertToEditor : undefined}
                             onClose={() => setAiPanelOpen(false)}
                         />
                     </div>

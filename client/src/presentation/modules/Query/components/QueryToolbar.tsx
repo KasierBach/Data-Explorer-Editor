@@ -34,6 +34,7 @@ import { getWorkspaceText } from '@/core/utils/workspaceText';
 interface QueryToolbarProps {
     isLoading: boolean;
     isExplaining?: boolean;
+    aiEnabled?: boolean;
     allowQueryExecution?: boolean;
     isCompactMobileLayout: boolean;
     isSmallMobile: boolean;
@@ -58,6 +59,7 @@ interface QueryToolbarProps {
 export const QueryToolbar: React.FC<QueryToolbarProps> = ({
     isLoading,
     isExplaining = false,
+    aiEnabled = false,
     allowQueryExecution,
     isCompactMobileLayout,
     isSmallMobile,
@@ -180,7 +182,7 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                             <span className="whitespace-nowrap">Active</span>
                         </Button>
                         <div className="h-4 w-[1px] bg-border mx-0.5 shrink-0" />
-                        <Button variant="ghost" size="sm" onClick={onExplain} disabled={isExplaining || !activeConnectionId} className="h-7 gap-1 px-1.5 text-xs text-orange-500 hover:text-orange-600 shrink-0" title={explainLabel}>
+                        <Button variant="ghost" size="sm" onClick={onExplain} disabled={!aiEnabled || isExplaining || !activeConnectionId} className="h-7 gap-1 px-1.5 text-xs text-orange-500 hover:text-orange-600 shrink-0" title={explainLabel}>
                             {isExplaining ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                             <span className="whitespace-nowrap">{explainLabel}</span>
                         </Button>
@@ -222,7 +224,7 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
                                 </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={onExplain} className="text-orange-500" disabled={isExplaining || !activeConnectionId}>
+                            <DropdownMenuItem onClick={onExplain} className="text-orange-500" disabled={!aiEnabled || isExplaining || !activeConnectionId}>
                                 {isExplaining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
                                 <span>{explainLabel}</span>
                             </DropdownMenuItem>

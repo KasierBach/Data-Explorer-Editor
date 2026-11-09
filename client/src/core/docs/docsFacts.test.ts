@@ -91,6 +91,28 @@ function numberProperty(key: SourceKey, name: string) {
   return nodes(key, (node): node is ts.PropertyAssignment => ts.isPropertyAssignment(node) && node.name.getText() === name && ts.isNumericLiteral(unwrap(node.initializer))).map(node => literal(node.initializer));
 }
 
+function frozenNumber(key: SourceKey, name: string, field: string): number {
+  const declaration = one(nodes(key, (node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) && node.name.getText() === name), `${key}.${name}`);
+  const freeze = unwrap(declaration.initializer!);
+  expect(ts.isCallExpression(freeze) && freeze.expression.getText() === 'Object.freeze', `${name} frozen bounds`).toBe(true);
+  const object = unwrap((freeze as ts.CallExpression).arguments[0]) as ts.ObjectLiteralExpression;
+  expect(ts.isObjectLiteralExpression(object), `${name} literal bounds`).toBe(true);
+  const member = one(object.properties.filter((node): node is ts.PropertyAssignment => ts.isPropertyAssignment(node) && node.name.getText() === field), `${name}.${field}`);
+  const number = (expression: ts.Expression): number => {
+    const value = unwrap(expression);
+    if (ts.isIdentifier(value)) {
+      const resolved = binding(key, value.text);
+      expect(typeof resolved, `${key}.${value.text} numeric constant`).toBe('number');
+      return resolved as number;
+    }
+    if (ts.isBinaryExpression(value) && value.operatorToken.kind === ts.SyntaxKind.AsteriskToken) return number(value.left) * number(value.right);
+    const resolved = literal(value);
+    expect(typeof resolved, `${name}.${field} numeric literal`).toBe('number');
+    return resolved as number;
+  };
+  return number(member.initializer);
+}
+
 // These tests compare docs to actual source bindings and enforcement shapes, not to other docs values.
 describe('source-backed documentation facts', () => {
   it('points to real repository source files', () => {
@@ -191,14 +213,38 @@ describe('source-backed documentation facts', () => {
     expect(constants.CHAT_HISTORY_MAX_CHARACTERS).toBe(ai.historyCharacters);
     expect(binding('aiSchema', 'MAX_DETAILED_TABLES')).toBe(ai.detailedSchemaTables);
     expect(binding('aiSchema', 'MAX_SCHEMA_CONTEXT_CHARACTERS')).toBe(ai.schemaCharacters);
-    expect(binding('aiAttachments', 'MAX_NATIVE_PDF_BYTES')).toBe(ai.nativePdfBytes);
+    expect(frozenNumber('aiAttachmentBounds', 'AI_ATTACHMENT_BOUNDS', 'maxPdfBytes')).toBe(ai.nativePdfBytes);
+    expect(frozenNumber('aiAttachmentBounds', 'AI_ATTACHMENT_BOUNDS', 'maxImageBytes')).toBe(ai.imageBytes);
+    expect(frozenNumber('aiAttachmentBounds', 'AI_ATTACHMENT_BOUNDS', 'maxTextBytes')).toBe(ai.textFileBytes);
+    expect(frozenNumber('aiAttachmentBounds', 'AI_ATTACHMENT_BOUNDS', 'maxAttachments')).toBe(ai.maxAttachments);
+    expect(frozenNumber('aiAttachmentBounds', 'AI_ATTACHMENT_BOUNDS', 'maxAggregateBytes')).toBe(ai.attachmentAggregateBytes);
+    expect(frozenNumber('aiAttachmentBounds', 'AI_ATTACHMENT_BOUNDS', 'maxExtractedCharacters')).toBe(ai.extractedTextCharacters);
+    expect(frozenNumber('aiInputBounds', 'AI_INPUT_BOUNDS', 'maxPdfBytes')).toBe(ai.nativePdfBytes);
+    expect(frozenNumber('aiInputBounds', 'AI_INPUT_BOUNDS', 'maxImageBytes')).toBe(ai.imageBytes);
+    expect(frozenNumber('aiInputBounds', 'AI_INPUT_BOUNDS', 'maxPdfDataUrlCharacters')).toBe(ai.pdfDataUrlCharacters);
+    expect(frozenNumber('aiInputBounds', 'AI_INPUT_BOUNDS', 'maxSerializedBytes')).toBe(ai.bodyBytes);
+    expect(frozenNumber('aiAttachmentBounds', 'AI_ATTACHMENT_BOUNDS', 'maxSerializedBytes')).toBe(ai.bodyBytes);
     expect(property('aiDto', 'GenerateSqlDto', 'image').type?.getText()).toBe('string');
+    expect(property('aiDto', 'GenerateSqlDto', 'image').getText()).toContain('@Validate(AiImageBoundsConstraint)');
     expect(property('aiDto', 'GenerateSqlDto', 'document').type?.getText()).toBe('AiDocumentDto');
+    expect(property('aiDto', 'AiDocumentDto', 'data').getText()).toContain('@Validate(AiPdfBoundsConstraint)');
+    expect(property('aiDto', 'GenerateSqlDto', 'prompt').getText()).not.toContain('@MaxLength');
+    expect(property('aiDto', 'GenerateSqlDto', 'context').getText()).not.toContain('@MaxLength');
     expect(ai.imagesPerRequest).toBe(1); expect(ai.nativePdfsPerRequest).toBe(1);
     expect(source('aiAttachments').text).toContain('if (!imageData)');
     expect(source('aiAttachments').text).toContain("if (!document && att.mimeType === 'application/pdf' && att.rawData)");
-    const textClips = nodes('aiAttachments', ts.isCallExpression).filter(call => ts.isPropertyAccessExpression(call.expression) && call.expression.getText() === 'text.slice').map(call => call.arguments.map(argument => literal(argument)));
-    expect(textClips).toContainEqual([0, ai.extractedTextCharacters]);
+    const selection = one(nodes('aiAttachments', (node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) && node.name.getText() === 'handleFileSelected'), 'handleFileSelected').initializer!.getText();
+    expect(selection.indexOf('assertAiAttachmentPreflight(')).toBeLessThan(selection.indexOf('file.slice('));
+    expect(selection.indexOf('assertAiFileSignature(')).toBeLessThan(selection.indexOf('file.text('));
+    expect(selection.indexOf('assertAiFileSignature(')).toBeLessThan(selection.indexOf('reader.readAsDataURL('));
+    expect(selection.indexOf('assertAiFileSignature(')).toBeLessThan(selection.indexOf('file.arrayBuffer('));
+    expect(selection.indexOf('assertAiBinaryDataUrl(')).toBeLessThan(selection.indexOf('readPdfText('));
+    const binary = method('aiInputBounds', 'assertAiBinaryDataUrl');
+    for (const mime of ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'application/pdf']) expect(binary).toContain(mime);
+    for (const guard of ['encoded.length % 4', '/[^A-Za-z0-9+/]/', 'padding === 2', 'padding === 1', 'decodedBytes > maxBytes', 'declaredBytes !== decodedBytes', 'hasMagicHeader(mimeType, header)']) expect(binary).toContain(guard);
+    expect(method('aiInputBounds', 'assertAiInputBounds')).toContain('assertAiSerializedInputBounds(input)');
+    expect(method('aiAttachmentBounds', 'assertAiFileDeclaration')).toContain('AI_WORKBOOK_REFUSAL');
+    expect(method('aiAttachmentBounds', 'boundAiExtractedText')).toContain('content.slice(0, AI_ATTACHMENT_BOUNDS.maxExtractedCharacters)');
     expect(source('requestBody').text).toContain("bodyParser.json({ limit: '10mb' })");
     expect(ai.bodyBytes).toBe(10 * 1024 * 1024);
   });
@@ -249,14 +295,40 @@ describe('source-backed documentation facts', () => {
     expect(chat).toMatch(/user\s+User\s+@relation\([^\n]+onDelete: Cascade/);
     expect(message).toMatch(/chat\s+AiChat\s+@relation\([^\n]+onDelete: Cascade/);
     expect(message).toMatch(/attachments\s+Json\?/);
-    expect(method('chatStorage', 'deleteChat')).toContain('this.prisma.aiChat.delete');
+    const deleteChat = method('chatStorage', 'deleteChat');
+    expect(deleteChat).toContain('this.withOwnedChatWrite(userId, id');
+    expect(deleteChat).toContain('tx.aiChat.deleteMany');
+    expect(deleteChat).toContain('where: { id, userId, updatedAt }');
+    expect(deleteChat).toContain('deleted.count !== 1');
+    const ownedWrite = method('chatStorage', 'withOwnedChatWrite');
+    expect(ownedWrite).toContain('this.prisma.$transaction');
+    expect(ownedWrite).toContain('chat.userId !== userId');
+    expect(ownedWrite).toContain('Prisma.TransactionIsolationLevel.Serializable');
     expect(method('userDeletion', 'deleteAccount')).toContain('this.prisma.user.delete');
     const cleanup = method('retention', 'runCleanup');
     expect(cleanup).toContain(`'AUDIT_RETENTION_DAYS', ${handling.auditRetentionDefaultDays}`);
     expect(cleanup).toMatch(new RegExp(`'PAYMENT_PAYLOAD_RETENTION_DAYS',\\s*${handling.paymentPayloadRetentionDefaultDays}`));
     expect(cleanup).toContain('auditDays === 0'); expect(cleanup).toContain('rawPayload: Prisma.DbNull');
+    expect(cleanup.match(/this\.prisma\.[a-zA-Z]+\.(?:deleteMany|updateMany)\(/g)).toEqual(['this.prisma.auditLog.deleteMany(', 'this.prisma.payment.updateMany(']);
     expect(cleanup).not.toMatch(/aiChat|aiMessage|attachment|backup/i);
-    expect(handling.chatAutomaticExpiry).toBe(false); expect(handling.backupExpiryDefinedByApplication).toBe(false);
+    const aiPolicy = method('aiRetention', 'readPolicy');
+    for (const key of handling.chatRetentionConfiguration) expect(aiPolicy).toContain(`'${key}'`);
+    expect(aiPolicy).toContain("enabled !== true && enabled !== 'true'");
+    expect(aiPolicy).toContain("status: disabled ? 'disabled' : 'invalid_configuration'");
+    expect(aiPolicy).toContain('days === null || intervalHours === null || batchSize === null');
+    const aiCleanup = method('aiRetention', 'runCleanup');
+    expect(aiCleanup).toContain("if (policy.status !== 'enabled') return");
+    expect(aiCleanup).toContain('updatedAt: { lt: cutoff }');
+    expect(aiCleanup).toContain('take: policy.batchSize');
+    expect(aiCleanup).toContain('messageCount > remainingMessages');
+    expect(aiCleanup).toContain('updatedAt: { equals: chat.updatedAt, lt: cutoff }');
+    expect(aiCleanup.match(/tx\.[a-zA-Z]+\.(?:deleteMany|updateMany)\(/g)).toEqual(['tx.aiChat.deleteMany(']);
+    expect(aiCleanup).toContain('AiMessage and its inline attachment JSON cascade with AiChat');
+    expect(method('aiRetention', 'onModuleInit')).toContain('No startup deletion');
+    expect(handling.chatAutomaticExpiry).toBe(false);
+    expect(handling.chatRetentionRequiresExplicitConfiguration).toBe(true);
+    expect(handling.chatRetentionScope).toBe('inactive-app-chats-and-inline-messages');
+    expect(handling.backupExpiryDefinedByApplication).toBe(false);
   });
 
   it('preserves evidence for export-policy and migration-replay caveats', () => {

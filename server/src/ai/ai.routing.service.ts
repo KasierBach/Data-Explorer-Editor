@@ -235,6 +235,33 @@ export class AiRoutingService {
   } {
     const routingMode = this.normalizeRoutingMode(params.routingMode);
     const lowCostPlans = this.getLowCostPlans();
+    const disabledSet = new Set(
+      Array.isArray(params.disabledProviders)
+        ? params.disabledProviders.map((p) => p.toLowerCase().trim())
+        : [],
+    );
+
+    let selectedBuiltInProvider: ProviderPlan['provider'] | null = null;
+    if (!params.providerOverride && params.model) {
+      if (params.model.startsWith('beeknoee:')) {
+        selectedBuiltInProvider = 'beeknoee';
+      } else if (params.model.startsWith('groq:')) {
+        selectedBuiltInProvider = 'groq';
+      } else if (params.model.startsWith('gemini-')) {
+        selectedBuiltInProvider = 'gemini';
+      } else if (params.model.startsWith('tokenrouter:')) {
+        selectedBuiltInProvider = null;
+      } else if (params.model.includes('/') || params.model.includes(':')) {
+        selectedBuiltInProvider = 'openrouter';
+      } else if (params.model.startsWith('llama')) {
+        selectedBuiltInProvider = 'cerebras';
+      }
+    }
+    if (selectedBuiltInProvider && disabledSet.has(selectedBuiltInProvider)) {
+      throw new Error(
+        'The selected AI provider is disabled. Pick an enabled provider.',
+      );
+    }
 
     let requestedPlan: ProviderPlan | null = null;
     if (params.providerOverride?.type === 'openai-compatible') {
@@ -290,11 +317,14 @@ export class AiRoutingService {
       }
     }
 
-    const disabledSet = new Set(
-      Array.isArray(params.disabledProviders)
-        ? params.disabledProviders.map((p) => p.toLowerCase().trim())
-        : [],
-    );
+    if (
+      requestedPlan &&
+      disabledSet.has(requestedPlan.provider.toLowerCase())
+    ) {
+      throw new Error(
+        'The selected AI provider is disabled. Pick an enabled provider.',
+      );
+    }
     const fallbackSetting = (params.fallbackProvider || 'auto')
       .toLowerCase()
       .trim();

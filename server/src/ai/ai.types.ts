@@ -45,6 +45,11 @@ export interface AiMessageAttachment {
 }
 
 export interface AiMessagePayloadEnvelope {
+  contractVersion?: 1;
+  generationId?: string;
+  sources?: string[];
+  usage?: TokenUsage;
+  warnings?: string[];
   items?: AiMessageAttachment[];
   modelInfo?: AiMessageModelInfo;
   recommendations?: AiRecommendation[];
@@ -79,7 +84,38 @@ export interface AiDocument {
   data: string;
 }
 
+export interface AiProviderAttempt {
+  attemptId: string;
+  complete(result?: {
+    provider?: string;
+    model?: string;
+    usage?: Partial<TokenUsage> | null;
+  }): Promise<void>;
+  fail(
+    outcome?: 'failed' | 'cancelled' | 'timed_out',
+    result?: {
+      provider?: string;
+      model?: string;
+      usage?: Partial<TokenUsage> | null;
+    },
+  ): Promise<void>;
+}
+
+export interface AiRequestExecution {
+  generationId: string;
+  beforeAttempt(plan: {
+    provider: string;
+    model: string;
+  }): Promise<AiProviderAttempt>;
+}
+
 export interface ChatParams {
+  requestScopeKey?: string;
+  execution?: AiRequestExecution;
+  beforeProviderAttempt?: (plan: ProviderPlan) => Promise<void>;
+  signal?: AbortSignal;
+  deadlineAt?: number;
+  beforeProviderRequest?: () => Promise<void>;
   model?: string;
   mode?: AiChatMode;
   prompt: string;
@@ -102,6 +138,9 @@ export interface TokenUsage {
 }
 
 export interface ChatResult {
+  contractVersion?: 1;
+  generationId?: string;
+  warnings?: string[];
   message: string;
   sql?: string;
   explanation?: string;
@@ -135,6 +174,10 @@ export interface RouteDecision {
 }
 
 export interface StreamDoneData {
+  contractVersion?: 1;
+  generationId?: string;
+  warnings?: string[];
+  usage?: TokenUsage;
   message: string;
   sql?: string;
   explanation?: string;
@@ -149,4 +192,8 @@ export interface StreamDoneData {
 export type StreamEvent =
   | { type: 'chunk'; text: string }
   | { type: 'done'; data: StreamDoneData }
-  | { type: 'error'; text: string };
+  | {
+      type: 'error';
+      text: string;
+      reason?: 'AI_REQUEST_CANCELLED' | 'AI_REQUEST_TIMEOUT' | 'AI_DISABLED';
+    };

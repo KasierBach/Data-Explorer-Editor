@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsString, IsOptional, ValidateNested } from 'class-validator';
+import { IsArray, IsString, IsOptional, ValidateNested } from 'class-validator';
 import { AiProviderOverrideDto } from './generate-sql.dto';
 
 export class AutocompleteDto {
@@ -24,6 +24,15 @@ export class AutocompleteDto {
   @IsOptional()
   @IsString()
   model?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  disabledProviders?: string[];
+
+  @IsOptional()
+  @IsString()
+  fallbackProvider?: string;
 
   @IsOptional()
   @ValidateNested()

@@ -5,6 +5,14 @@ import * as crypto from 'crypto';
 import { AiSchemaContextService } from './ai.schema-context.service';
 import { AiProviderRunnerService } from './ai.provider-runner.service';
 import { AI_CONSTANTS } from './ai.constants';
+import type { ChatParams } from './ai.types';
+import { isAiDisabledError } from './ai-account-policy.service';
+import { isAiHttpFatalError } from './ai-http-execution';
+import {
+  assertAiRequestActive,
+  isAiRequestStoppedError,
+  waitForAiResult,
+} from './ai-request-lifecycle';
 import type {
   IDatabaseStrategy,
   ColumnInfo,
@@ -29,16 +37,46 @@ export class AiSchemaService {
   async suggestTablesBySemantic(
     searchTerm: string,
     tableNames: string[],
+    beforeProviderRequest?: ChatParams['beforeProviderRequest'],
+    request: Pick<
+      ChatParams,
+      | 'requestScopeKey'
+      | 'signal'
+      | 'deadlineAt'
+      | 'execution'
+      | 'beforeProviderAttempt'
+    > = {},
   ): Promise<string[]> {
+    assertAiRequestActive(request);
+    // Only authenticated server call sites can supply these capabilities. No
+    // approval snapshot is cached, and unscoped internal calls fail closed.
+    if (
+      !beforeProviderRequest ||
+      !request.beforeProviderAttempt ||
+      !request.requestScopeKey ||
+      !request.execution
+    )
+      return [];
+    await waitForAiResult(
+      Promise.resolve().then(() => beforeProviderRequest?.()),
+      request.signal,
+    );
+    assertAiRequestActive(request);
     if (!this.providerRunner.isGeminiAvailable() || tableNames.length === 0)
       return [];
 
     const cacheKey = `ai:semantic_search:${crypto
       .createHash('sha256')
-      .update(searchTerm + tableNames.join('|'))
+      .update(JSON.stringify([request.requestScopeKey, searchTerm, tableNames]))
       .digest('hex')}`;
-    const cached = await this.cacheManager.get<string[]>(cacheKey);
-    if (cached !== undefined && cached !== null) return cached;
+    const cached = await waitForAiResult(
+      this.cacheManager.get<string[]>(cacheKey),
+      request.signal,
+    );
+    assertAiRequestActive(request);
+    if (cached !== undefined && cached !== null) {
+      return cached.filter((name) => tableNames.includes(name)).slice(0, 5);
+    }
 
     const prompt = `Given the database table names below, find the most relevant ones for the search term: "${searchTerm}".
 TABLES:
@@ -51,26 +89,55 @@ Rules:
 - Understand synonyms and translations (e.g., "khách hàng" matches "customers", "user" matches "profile").`;
 
     try {
-      const response = await this.providerRunner.completeGeminiText({
-        model: 'gemini-2.5-flash',
-        prompt,
-        temperature: AI_CONSTANTS.TEMPERATURE_PRECISE,
-        maxOutputTokens: 100,
-      });
+      const plan = { provider: 'gemini' as const, model: 'gemini-2.5-flash' };
+      await waitForAiResult(
+        Promise.resolve().then(() => beforeProviderRequest()),
+        request.signal,
+      );
+      assertAiRequestActive(request);
+      await waitForAiResult(
+        request.beforeProviderAttempt(plan),
+        request.signal,
+      );
+      assertAiRequestActive(request);
+      const response = await waitForAiResult(
+        this.providerRunner.completeGeminiText({
+          ...request,
+          beforeProviderRequest,
+          model: plan.model,
+          prompt,
+          temperature: AI_CONSTANTS.TEMPERATURE_PRECISE,
+          maxOutputTokens: 100,
+        }),
+        request.signal,
+      );
 
+      assertAiRequestActive(request);
       const suggestions = response
         .split(',')
         .map((s) => s.trim())
         .filter((s) => tableNames.includes(s))
         .slice(0, 5);
 
-      await this.cacheManager.set(
-        cacheKey,
-        suggestions,
-        AI_CONSTANTS.AUTOCOMPLETE_CACHE_TTL_MS,
+      await waitForAiResult(
+        this.cacheManager.set(
+          cacheKey,
+          suggestions,
+          AI_CONSTANTS.AUTOCOMPLETE_CACHE_TTL_MS,
+        ),
+        request.signal,
       );
+      assertAiRequestActive(request);
       return suggestions;
     } catch (error) {
+      if (
+        request.signal?.aborted ||
+        isAiDisabledError(error) ||
+        isAiHttpFatalError(error) ||
+        request.execution ||
+        isAiRequestStoppedError(error)
+      )
+        throw error;
       this.logger.warn(
         '[AiSchemaService] Semantic suggestion failed:',
         error instanceof Error ? error.message : 'Unknown error',
@@ -85,6 +152,10 @@ Rules:
     database?: string,
     connectionId?: string,
     searchTerm?: string,
+    request: Pick<
+      ChatParams,
+      'signal' | 'deadlineAt' | 'beforeProviderRequest'
+    > = {},
   ): Promise<string> {
     return this.schemaContextService.gatherSchemaContext(
       pool,
@@ -92,6 +163,7 @@ Rules:
       database,
       connectionId,
       searchTerm,
+      request,
     );
   }
 

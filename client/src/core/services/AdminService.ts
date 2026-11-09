@@ -32,31 +32,39 @@ export interface AuditLogEntry {
 }
 
 export interface AiTokenUsage {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-    trackedRequests: number;
+    /** Observed subtotals only; absent coverage never establishes measured zero. */
+    promptTokens?: number | null;
+    completionTokens?: number | null;
+    totalTokens?: number | null;
+    trackedRequests?: number | null;
+    attempts?: number | null;
+    measuredAttempts?: number | null;
+    unmeasuredAttempts?: number | null;
+    usageCoverage?: 'complete' | 'partial' | 'unavailable' | null;
+    observedOnly?: true | null;
+    costCoverage?: 'unavailable' | null;
 }
 
 export interface AiQualityMetrics {
     days: number;
-    generations: number;
-    success: number;
-    failed: number;
-    successRate: number;
-    averageLatencyMs: number;
-    p95LatencyMs: number;
-    feedback: { up: number; down: number; total: number };
-    tokens: AiTokenUsage;
-    models: Array<{ model: string; success: number; failed: number; total: number }>;
+    generations: number | null;
+    success: number | null;
+    failed: number | null;
+    /** Transport/response-contract outcome, not semantic accuracy. */
+    successRate: number | null;
+    averageLatencyMs: number | null;
+    p95LatencyMs: number | null;
+    feedback?: { up: number | null; down: number | null; total: number | null } | null;
+    tokens?: AiTokenUsage | null;
+    models?: Array<{ model: string; success: number | null; failed: number | null; total: number | null }> | null;
 }
 
 export interface AiMyUsage {
     days: number;
-    generations: number;
-    success: number;
-    failed: number;
-    tokens: AiTokenUsage;
+    generations: number | null;
+    success: number | null;
+    failed: number | null;
+    tokens?: AiTokenUsage | null;
 }
 
 interface MessageResponse {
