@@ -167,7 +167,7 @@ export function normalizeTap(input) {
   for (const line of lines) {
     if (diagnostic !== null) {
       if (line === `${' '.repeat(diagnostic.indent)}...`) { diagnostic = null; continue; }
-      requireValue(line.trim() === '' || line.startsWith(' '.repeat(diagnostic.indent + 2)), 'INVALID_TAP_DIAGNOSTIC');
+      requireValue(!line.includes('\t') && (line.trim() === '' || line.startsWith(' '.repeat(diagnostic.indent))), 'INVALID_TAP_DIAGNOSTIC');
       const kind = /^\s*type: ['"]?(test|suite)['"]?$/.exec(line);
       if (kind) { requireValue(!diagnostic.point.typeSeen, 'INVALID_TAP_DIAGNOSTIC'); diagnostic.point.type = kind[1]; diagnostic.point.typeSeen = true; }
       if (/^\s*failureType: ['"]?cancelledByParent['"]?$/.test(line)) diagnostic.point.status = 'cancelled';
@@ -471,7 +471,9 @@ function isolatedNetwork() {
   return process.platform === 'linux' && Object.values(networkInterfaces()).flat().every((entry) => entry.internal);
 }
 function childEnvironment(scratch) {
-  const env = { PATH: process.env.PATH, HOME: scratch, XDG_CONFIG_HOME: scratch, TMPDIR: scratch, TMP: scratch, TEMP: scratch, CI: 'true', NODE_ENV: 'test', AI_KILL_SWITCH: 'true', AI_EGRESS_POLICY_JSON: '{"enabled":false}', NO_COLOR: '1', NPM_CONFIG_OFFLINE: 'true', NPM_CONFIG_AUDIT: 'false', NPM_CONFIG_FUND: 'false', NPM_CONFIG_USERCONFIG: join(scratch, 'npm-user.config'), NPM_CONFIG_GLOBALCONFIG: join(scratch, 'npm-global.config'), PRISMA_HIDE_UPDATE_MESSAGE: 'true', CHECKPOINT_DISABLE: '1', PRISMA_GENERATE_SKIP_AUTOINSTALL: '1' };
+  // Every child remains in the loopback-only namespace. Do not force a single
+  // application policy state onto unit tests that verify both allow and deny.
+  const env = { PATH: process.env.PATH, HOME: scratch, XDG_CONFIG_HOME: scratch, TMPDIR: scratch, TMP: scratch, TEMP: scratch, CI: 'true', NODE_ENV: 'test', NO_COLOR: '1', NPM_CONFIG_OFFLINE: 'true', NPM_CONFIG_AUDIT: 'false', NPM_CONFIG_FUND: 'false', NPM_CONFIG_USERCONFIG: join(scratch, 'npm-user.config'), NPM_CONFIG_GLOBALCONFIG: join(scratch, 'npm-global.config'), PRISMA_HIDE_UPDATE_MESSAGE: 'true', CHECKPOINT_DISABLE: '1', PRISMA_GENERATE_SKIP_AUTOINSTALL: '1' };
   // Provider credentials, GitHub tokens, NODE_OPTIONS and real DB URLs are absent.
   return env;
 }

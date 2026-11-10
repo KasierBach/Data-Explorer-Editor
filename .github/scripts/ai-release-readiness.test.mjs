@@ -233,6 +233,13 @@ test('Jest focused file with pending assertion is valid but never passed', () =>
   report.numPassedTests--; report.numPendingTests++;
   assert.equal(normalizeTestJson(report).allPassed, false);
 });
+test('Node TAP diagnostics accept canonical same-indent YAML fields', () => {
+  const diagnosticTap = tap.replace(
+    'ok 1 - first\n',
+    "ok 1 - first\n  ---\n  duration_ms: 1.25\n  type: 'test'\n  ...\n",
+  );
+  assert.equal(normalizeTap(diagnosticTap).allPassed, true);
+});
 for (const [name, input] of [
   ['summary only', tap.replace(/^TAP version 13\n|^1\.\.2\n|^ok .+\n/gm, '')],
   ['header and summary only', tap.replace(/^1\.\.2\n|^ok .+\n/gm, '')],
@@ -255,7 +262,8 @@ for (const [name, input] of [
   ['duplicate summary', tap + '# tests 2\n'],
   ['contradictory suite total', tap.replace('# suites 0', '# suites 1')],
   ['malformed summary', tap.replace('# tests 2', '# tests zero')],
-  ['unterminated diagnostic', tap.replace('ok 1 - first\n', 'ok 1 - first\n  ---\n    type: test\n')],
+  ['unterminated diagnostic', tap.replace('ok 1 - first\n', 'ok 1 - first\n  ---\n  type: test\n')],
+  ['tabbed diagnostic', tap.replace('ok 1 - first\n', 'ok 1 - first\n  ---\n\ttype: test\n  ...\n')],
 ]) test(`invalid TAP: ${name} is refused`, () => { assert.throws(() => normalizeTap(input)); });
 test('TAP trailing plan and CRLF are supported', () => {
   assert.equal(normalizeTap(tap.replace('1..2\n', '') + '1..2\n').allPassed, true);
@@ -304,6 +312,18 @@ test('full package test:ci commands have no file, test-name or path filters', ()
 });
 
 for (const path of ['https://private.example/manifest.json', '//server/share/manifest.json', '\\\\server\\share\\manifest.json', '../private.json', 'safe/../private.json', 'file:///private.json', 'nul.json', 'bad\nname.json', 'manifest.txt']) test('network, traversal, device or unsafe manifest path refused', () => { assert.throws(() => localPath(path, true)); });
+
+test('collector child environment never forwards provider, database or fixed app-policy values', async () => {
+  const sourceText = await readFile(new URL('./ai-release-readiness.mjs', import.meta.url), 'utf8');
+  const body = /function childEnvironment\(scratch\) \{([\s\S]*?)\n\}/.exec(sourceText)?.[1];
+  assert.ok(body);
+  for (const forbidden of ['AI_KILL_SWITCH', 'AI_EGRESS_POLICY_JSON', 'DATABASE_URL', 'REDIS_URL', 'API_KEY', 'GITHUB_TOKEN']) {
+    assert.ok(!body.includes(forbidden), forbidden);
+  }
+  for (const required of ['NPM_CONFIG_OFFLINE', 'NODE_ENV', 'CHECKPOINT_DISABLE', 'PRISMA_GENERATE_SKIP_AUTOINSTALL']) {
+    assert.ok(body.includes(required), required);
+  }
+});
 
 test('Git index flags cannot hide working-tree changes from readiness preflight', async () => {
   const folder = await mkdtemp(join(tmpdir(), 'ai-a16-index-flags-'));
