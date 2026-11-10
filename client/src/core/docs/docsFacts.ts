@@ -103,6 +103,8 @@ export const DOCS_FACTS = {
     extractedTextCharacters: 50_000,
     historyMessages: 20,
     historyCharacters: 24_000,
+    schemaInventoryTables: 5_000,
+    schemaInventoryRelationships: 10_000,
     detailedSchemaTables: 24,
     schemaCharacters: 32_000,
     bodyBytes: 10 * 1024 * 1024,

@@ -371,21 +371,35 @@ test('blocked collector lists all skips and publishes only redacted failure meta
     await assert.rejects(readFile(join(folder, 'manifest.json')));
   } finally { await rm(folder, { recursive: true, force: true }); }
 });
-test('workflow enables only bounded loopback inside its fail-closed child namespace', async () => {
+test('workflow enables only bounded loopback inside its fail-closed root-created network namespace', async () => {
   const workflow = await readFile(new URL('../workflows/ai-hardening.yml', import.meta.url), 'utf8');
-  const child = /unshare --user --map-root-user --net sh -eu -c '([\s\S]*?)' ai-a16/.exec(workflow)?.[1];
+  const child = /sudo unshare --net sh -eu -c '([\s\S]*?)' ai-a16/.exec(workflow)?.[1];
   assert.ok(child);
   assert.match(child, /timeout 5s ip link set dev lo up/);
-  assert.ok(child.indexOf('ip link set dev lo up') < child.indexOf('exec node'));
+  assert.match(child, /exec setpriv --reuid="\$1" --regid="\$2" --clear-groups/);
+  assert.match(child, /--no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all/);
+  assert.match(child, /env -i/);
+  assert.ok(child.indexOf('ip link set dev lo up') < child.indexOf('setpriv'));
+  assert.ok(child.indexOf('setpriv') < child.indexOf('/bin/sh "${13}"'));
   assert.equal((workflow.match(/ip link set/g) ?? []).length, 1);
-  assert.ok(!/eth\d|enp\w|--net=host|\|\|\s*true/.test(child));
-  assert.match(child, /--release-sha "\$1" --out-dir "\$2"/);
+  assert.ok(!/--user|--map-root-user|--init-groups|eth\d|enp\w|--net=host|\|\|\s*true/.test(child));
+  assert.match(workflow, /test "\$\(\/usr\/bin\/id -G\)" = "\$AI_A16_EXPECTED_GID"/);
+  assert.match(workflow, /\^NoNewPrivs:/);
+  assert.match(workflow, /for field in CapBnd CapInh CapAmb/);
+  assert.match(workflow, /if \/usr\/bin\/sudo -n true/);
+  assert.match(child, /AI_KILL_SWITCH=true/);
+  assert.match(child, /AI_EGRESS_POLICY_JSON=/);
+  assert.match(child, /AI_A16_OUT_DIR="\$\{12\}"/);
+  assert.match(workflow, /--release-sha "\$GITHUB_SHA" --out-dir "\$AI_A16_OUT_DIR"/);
+  for (const secret of ['GITHUB_TOKEN', 'DATABASE_URL', 'REDIS_URL', 'API_KEY', 'VERCEL_TOKEN', 'RENDER_DEPLOY_HOOK_URL']) {
+    assert.ok(!child.includes(secret), secret);
+  }
 });
 test('workflow has scoped verification triggers and metadata-only artifact publication', async () => {
   const workflow = await readFile(new URL('../workflows/ai-hardening.yml', import.meta.url), 'utf8');
   assert.match(workflow, /pull_request:/); assert.match(workflow, /push:/); assert.match(workflow, /branches: \[main\]/);
   assert.match(workflow, /persist-credentials: false/); assert.match(workflow, /contents: read/);
-  assert.match(workflow, /unshare --user --map-root-user --net/);
+  assert.match(workflow, /sudo unshare --net/); assert.match(workflow, /setpriv --reuid/); assert.match(workflow, /--clear-groups/); assert.match(workflow, /--no-new-privs/); assert.match(workflow, /--bounding-set=-all/); assert.match(workflow, /env -i/);
   assert.match(workflow, /--ignore-scripts/); assert.match(workflow, /AI_KILL_SWITCH: 'true'/);
   assert.match(workflow, /AI_EGRESS_POLICY_JSON: '\{"enabled":false\}'/);
   assert.match(workflow, /ai-hardening-\$\{\{ github\.sha \}\}/);

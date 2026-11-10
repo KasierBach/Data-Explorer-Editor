@@ -93,15 +93,55 @@ jobs:
           AI_A16_PRISMA_SETUP: ${{ steps.prisma-tools.outcome }}
         run: |
           set -euo pipefail
-          # Fail closed if network namespaces are unavailable. Do not retry online.
-          # Only loopback exists here; even an accidental live call cannot leave it.
-          unshare --user --map-root-user --net sh -eu -c '
-            # This is the child namespace, never the host. Only lo is enabled.
+          # Hosted runners can block unprivileged user namespaces. Root creates
+          # only the network namespace and enables loopback. The verifier then
+          # runs as the original runner identity with no groups, capabilities or
+          # privilege regain path and an explicit non-secret environment.
+          # If any isolation/setup step fails, do not retry on the host network.
+          node_bin="$(command -v node)"
+          test -x "$node_bin"
+          entrypoint="$RUNNER_TEMP/ai-a16-entrypoint-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sh"
+          trap 'rm -f "$entrypoint"' EXIT
+          cat > "$entrypoint" <<'AI_A16_ENTRYPOINT'
+          #!/bin/sh
+          set -eu
+          test "$(/usr/bin/id -u)" = "$AI_A16_EXPECTED_UID"
+          test "$(/usr/bin/id -g)" = "$AI_A16_EXPECTED_GID"
+          test "$(/usr/bin/id -G)" = "$AI_A16_EXPECTED_GID"
+          /usr/bin/grep -Eq '^NoNewPrivs:[[:space:]]+1$' /proc/self/status
+          for field in CapBnd CapInh CapAmb; do
+            /usr/bin/grep -Eq "^${field}:[[:space:]]+0+$" /proc/self/status
+          done
+          if /usr/bin/sudo -n true >/dev/null 2>&1; then
+            exit 1
+          fi
+          exec "$AI_A16_NODE_BIN" .github/scripts/ai-release-readiness.mjs run \
+            --release-sha "$GITHUB_SHA" --out-dir "$AI_A16_OUT_DIR"
+          AI_A16_ENTRYPOINT
+          chmod 0500 "$entrypoint"
+          sudo unshare --net sh -eu -c '
             timeout 5s ip link set dev lo up
-            exec node .github/scripts/ai-release-readiness.mjs run \
-              --release-sha "$1" --out-dir "$2"
-          ' ai-a16 "$GITHUB_SHA" \
-            "$RUNNER_TEMP/ai-a16-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            exec setpriv --reuid="$1" --regid="$2" --clear-groups \
+              --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all \
+              env -i \
+                PATH="$3" HOME="$4" XDG_CONFIG_HOME="$4" \
+                TMPDIR="$4" TMP="$4" TEMP="$4" \
+                CI=true GITHUB_ACTIONS=true \
+                AI_A16_EXPECTED_UID="$1" AI_A16_EXPECTED_GID="$2" \
+                AI_A16_NODE_BIN="$5" AI_A16_OUT_DIR="${12}" \
+                GITHUB_SHA="$6" GITHUB_RUN_ID="$7" GITHUB_RUN_ATTEMPT="$8" \
+                AI_KILL_SWITCH=true AI_EGRESS_POLICY_JSON="{\"enabled\":false}" \
+                PRISMA_HIDE_UPDATE_MESSAGE=true CHECKPOINT_DISABLE=1 \
+                PRISMA_GENERATE_SKIP_AUTOINSTALL=1 \
+                AI_A16_SERVER_SETUP="$9" AI_A16_CLIENT_SETUP="${10}" \
+                AI_A16_PRISMA_SETUP="${11}" \
+                /bin/sh "${13}"
+          ' ai-a16 "$(id -u)" "$(id -g)" "$PATH" "$RUNNER_TEMP" \
+            "$node_bin" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" \
+            "$AI_A16_SERVER_SETUP" "$AI_A16_CLIENT_SETUP" \
+            "$AI_A16_PRISMA_SETUP" \
+            "$RUNNER_TEMP/ai-a16-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            "$entrypoint"
       - name: Upload redacted readiness metadata only
         uses: actions/upload-artifact@v6
         if: always()

@@ -211,6 +211,8 @@ describe('source-backed documentation facts', () => {
     const constants = binding('aiConstants', 'AI_CONSTANTS') as Record<string, number>;
     expect(constants.CHAT_HISTORY_MAX_MESSAGES).toBe(ai.historyMessages);
     expect(constants.CHAT_HISTORY_MAX_CHARACTERS).toBe(ai.historyCharacters);
+    expect(binding('aiSchema', 'MAX_SCHEMA_INVENTORY_TABLES')).toBe(ai.schemaInventoryTables);
+    expect(binding('aiSchema', 'MAX_SCHEMA_INVENTORY_RELATIONSHIPS')).toBe(ai.schemaInventoryRelationships);
     expect(binding('aiSchema', 'MAX_DETAILED_TABLES')).toBe(ai.detailedSchemaTables);
     expect(binding('aiSchema', 'MAX_SCHEMA_CONTEXT_CHARACTERS')).toBe(ai.schemaCharacters);
     expect(frozenNumber('aiAttachmentBounds', 'AI_ATTACHMENT_BOUNDS', 'maxPdfBytes')).toBe(ai.nativePdfBytes);
@@ -318,8 +320,10 @@ describe('source-backed documentation facts', () => {
     expect(aiPolicy).toContain('days === null || intervalHours === null || batchSize === null');
     const aiCleanup = method('aiRetention', 'runCleanup');
     expect(aiCleanup).toContain("if (policy.status !== 'enabled') return");
-    expect(aiCleanup).toContain('updatedAt: { lt: cutoff }');
-    expect(aiCleanup).toContain('take: policy.batchSize');
+    expect(aiCleanup).toContain('WHERE c."updatedAt" < ${cutoff}');
+    expect(aiCleanup).toContain('HAVING COUNT(m."id") <= ${MAX_CASCADE_MESSAGES}');
+    expect(aiCleanup).toContain('ORDER BY c."updatedAt" ASC, c."id" ASC');
+    expect(aiCleanup).toContain('LIMIT ${policy.batchSize}');
     expect(aiCleanup).toContain('messageCount > remainingMessages');
     expect(aiCleanup).toContain('updatedAt: { equals: chat.updatedAt, lt: cutoff }');
     expect(aiCleanup.match(/tx\.[a-zA-Z]+\.(?:deleteMany|updateMany)\(/g)).toEqual(['tx.aiChat.deleteMany(']);
