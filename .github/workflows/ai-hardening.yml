@@ -83,6 +83,15 @@ jobs:
         id: prisma-tools
         run: node node_modules/@prisma/engines/scripts/postinstall.js
         working-directory: server
+      - name: Prepare installed SQLite native addon (no external database connection)
+        id: sqlite-tools
+        timeout-minutes: 5
+        # Only this lockfile-installed native dependency is rebuilt. Do not run
+        # general lifecycle scripts or download anything inside the namespace.
+        run: |
+          npm rebuild better-sqlite3 --foreground-scripts --no-audit --no-fund
+          node -e "const Database = require('better-sqlite3'); const db = new Database(':memory:'); try { if (db.prepare('SELECT 1 AS ready').get().ready !== 1) process.exitCode = 1; } finally { db.close(); }"
+        working-directory: server
       - name: Collect exact-SHA offline verification metadata
         if: always()
         timeout-minutes: 55
@@ -91,6 +100,7 @@ jobs:
           AI_A16_SERVER_SETUP: ${{ steps.server-install.outcome }}
           AI_A16_CLIENT_SETUP: ${{ steps.client-install.outcome }}
           AI_A16_PRISMA_SETUP: ${{ steps.prisma-tools.outcome }}
+          AI_A16_SQLITE_SETUP: ${{ steps.sqlite-tools.outcome }}
         run: |
           set -euo pipefail
           # Hosted runners can block unprivileged user namespaces. Root creates
@@ -134,14 +144,14 @@ jobs:
                 PRISMA_HIDE_UPDATE_MESSAGE=true CHECKPOINT_DISABLE=1 \
                 PRISMA_GENERATE_SKIP_AUTOINSTALL=1 \
                 AI_A16_SERVER_SETUP="$9" AI_A16_CLIENT_SETUP="${10}" \
-                AI_A16_PRISMA_SETUP="${11}" \
+                AI_A16_PRISMA_SETUP="${11}" AI_A16_SQLITE_SETUP="${14}" \
                 /bin/sh "${13}"
           ' ai-a16 "$(id -u)" "$(id -g)" "$PATH" "$RUNNER_TEMP" \
             "$node_bin" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" \
             "$AI_A16_SERVER_SETUP" "$AI_A16_CLIENT_SETUP" \
             "$AI_A16_PRISMA_SETUP" \
             "$RUNNER_TEMP/ai-a16-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
-            "$entrypoint"
+            "$entrypoint" "$AI_A16_SQLITE_SETUP"
       - name: Upload redacted readiness metadata only
         uses: actions/upload-artifact@v6
         if: always()

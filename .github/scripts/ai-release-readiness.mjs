@@ -530,6 +530,10 @@ function skipped(id, reason, bindings) {
   const record = { id, status: 'skipped', exitCode: null, reason, startedAt: time, completedAt: time, evidenceSha256: null };
   return bindings ? { ...record, ...bindings } : { ...record, results: null, requiredSuitesMatched: 0 };
 }
+export function isPackageSetupReady(source, packageId, env = process.env) {
+  if (!['server', 'client'].includes(packageId) || !['local', 'ci'].includes(source)) return false;
+  return source === 'local' || (env[`AI_A16_${packageId.toUpperCase()}_SETUP`] === 'success' && (packageId !== 'server' || (env.AI_A16_PRISMA_SETUP === 'success' && env.AI_A16_SQLITE_SETUP === 'success')));
+}
 async function collect(releaseSha) {
   const before = await repositoryContext(releaseSha);
   const startedAt = new Date(before.now).toISOString();
@@ -545,7 +549,7 @@ async function collect(releaseSha) {
     const env = childEnvironment(scratch);
     for (const id of ['server', 'client']) {
       const bindings = before.packageBindings[id];
-      const setupPassed = before.source !== 'ci' || (process.env[`AI_A16_${id.toUpperCase()}_SETUP`] === 'success' && (id !== 'server' || process.env.AI_A16_PRISMA_SETUP === 'success'));
+      const setupPassed = isPackageSetupReady(before.source, id);
       if (!preflight || Object.values(bindings).some((value) => value === null)) { manifest.packages.push(skipped(id, 'PREFLIGHT_BLOCKED', bindings)); continue; }
       if (!setupPassed) { manifest.packages.push(skipped(id, 'PACKAGE_BLOCKED', bindings)); continue; }
       const begin = new Date().toISOString();

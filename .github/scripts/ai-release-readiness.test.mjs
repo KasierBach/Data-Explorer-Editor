@@ -452,6 +452,52 @@ test('Git index flags cannot hide working-tree changes from readiness preflight'
 
 test('plain local JSON path accepted without echoing it', () => { assert.ok(localPath(join(tmpdir(), 'safe-manifest.json'), true)); });
 
+test('CI package setup requires the installed SQLite addon as well as Prisma engines', async () => {
+  const { isPackageSetupReady } = await import('./ai-release-readiness.mjs');
+  const ready = { AI_A16_SERVER_SETUP: 'success', AI_A16_CLIENT_SETUP: 'success', AI_A16_PRISMA_SETUP: 'success', AI_A16_SQLITE_SETUP: 'success' };
+  assert.equal(isPackageSetupReady('ci', 'server', ready), true);
+  assert.equal(isPackageSetupReady('ci', 'client', ready), true);
+  assert.equal(isPackageSetupReady('ci', 'client', { ...ready, AI_A16_PRISMA_SETUP: 'failure', AI_A16_SQLITE_SETUP: 'failure' }), true);
+  assert.equal(isPackageSetupReady('local', 'server', {}), true);
+  assert.equal(isPackageSetupReady('local', 'client', {}), true);
+  assert.equal(isPackageSetupReady('unknown', 'server', ready), false);
+  assert.equal(isPackageSetupReady('ci', 'unknown', ready), false);
+});
+for (const key of ['AI_A16_SERVER_SETUP', 'AI_A16_PRISMA_SETUP', 'AI_A16_SQLITE_SETUP']) {
+  for (const outcome of [undefined, 'failure', 'skipped', 'cancelled', 'pending', 'SUCCESS', 'success ', true]) test(`CI server setup refuses non-success ${key}`, async () => {
+    const { isPackageSetupReady } = await import('./ai-release-readiness.mjs');
+    const ready = { AI_A16_SERVER_SETUP: 'success', AI_A16_PRISMA_SETUP: 'success', AI_A16_SQLITE_SETUP: 'success' };
+    assert.equal(isPackageSetupReady('ci', 'server', { ...ready, [key]: outcome }), false);
+  });
+}
+test('CI client setup still requires its own successful install', async () => {
+  const { isPackageSetupReady } = await import('./ai-release-readiness.mjs');
+  assert.equal(isPackageSetupReady('ci', 'client', { AI_A16_CLIENT_SETUP: 'skipped', AI_A16_SQLITE_SETUP: 'success' }), false);
+  assert.equal(isPackageSetupReady('ci', 'server', {}), false);
+});
+test('workflow prepares only the installed SQLite addon before offline execution', async () => {
+  const workflow = await readFile(new URL('../workflows/ai-hardening.yml', import.meta.url), 'utf8');
+  const setup = /- name: Prepare installed SQLite native addon[\s\S]*?(?=      - name: Collect exact-SHA)/.exec(workflow)?.[0];
+  assert.ok(setup);
+  assert.match(setup, /id: sqlite-tools/);
+  assert.match(setup, /timeout-minutes: 5/);
+  assert.match(setup, /npm rebuild better-sqlite3 --foreground-scripts --no-audit --no-fund/);
+  assert.match(setup, /new Database\(':memory:'\)/);
+  assert.match(setup, /SELECT 1 AS ready/);
+  assert.match(setup, /db\.close\(\)/);
+  assert.match(setup, /working-directory: server/);
+  assert.ok(workflow.indexOf(setup) < workflow.indexOf('sudo unshare --net'));
+  assert.equal((workflow.match(/npm ci --ignore-scripts --no-audit --no-fund/g) ?? []).length, 2);
+  const child = /sudo unshare --net sh -eu -c '([\s\S]*?)' ai-a16/.exec(workflow)?.[1];
+  assert.ok(child);
+  assert.ok(!/npm rebuild|node-gyp|prebuild-install/.test(child));
+  assert.match(workflow, /AI_A16_SQLITE_SETUP: \$\{\{ steps\.sqlite-tools\.outcome \}\}/);
+  assert.match(child, /AI_A16_SQLITE_SETUP="\$\{14\}"/);
+  assert.match(workflow, /"\$entrypoint" "\$AI_A16_SQLITE_SETUP"/);
+  const collector = await readFile(new URL('./ai-release-readiness.mjs', import.meta.url), 'utf8');
+  assert.match(collector, /const setupPassed = isPackageSetupReady\(before\.source, id\)/);
+});
+
 test('CLI invalid flags and missing artifacts fail with redacted metadata only', async () => {
   const folder = await mkdtemp(join(tmpdir(), 'ai-a16-tests-'));
   try {
