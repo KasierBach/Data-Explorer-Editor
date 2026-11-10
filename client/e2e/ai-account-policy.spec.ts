@@ -434,10 +434,17 @@ test("UI-AI-001 EN off gates SQL shortcut, ghost text and chat while stored conf
 }) => {
   const { evidence } = await prepare(page);
   await page.goto("/sql-explorer");
-  const editor = page.locator("main .monaco-editor textarea").first();
+  const editor = page.locator("main .monaco-editor:visible").first();
   await expect(editor).toBeVisible();
-  await editor.press("End");
-  await editor.pressSequentially(" fixture ");
+  const input = editor.getByRole("textbox", {
+    name: "Editor content",
+    exact: true,
+  });
+  await editor.locator(".view-lines").click();
+  await expect(input).toBeFocused();
+  await input.press("End");
+  await page.keyboard.insertText(" ui_ai_off_edit ");
+  await expect(editor.locator(".view-lines")).toContainText("ui_ai_off_edit");
   await page.waitForTimeout(450);
   expect(evidence.aiTraffic).toEqual([]);
   const prompt = await openSqlPrompt(page, "en");
@@ -575,9 +582,17 @@ test("UI-AI-003 pending enable is shared, confirmed generation works, disable su
   const prompt = await openSqlPrompt(page, "en");
   await prompt.fill("Return fixture result");
   await page.getByRole("button", { name: "Generate SQL", exact: true }).click();
+  await expect
+    .poll(
+      () =>
+        fixture.evidence.aiTraffic.filter(
+          (call) => call.path === "/api/ai/nlp-to-sql",
+        ).length,
+    )
+    .toBe(1);
   await expect(
-    page.getByText("Fixture generation confirmed.", { exact: true }),
-  ).toBeVisible();
+    page.locator("main .monaco-editor:visible .view-lines").first(),
+  ).toHaveText("SELECT 42 AS fixture_result");
   const generated = fixture.evidence.aiTraffic.filter(
     (call) => call.path === "/api/ai/nlp-to-sql",
   );

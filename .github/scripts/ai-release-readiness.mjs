@@ -257,6 +257,35 @@ export function normalizeTestJson(report, requiredSuites = [], expectedFiles = n
   return { results, requiredSuitesMatched, allPassed };
 }
 
+// Diagnostic IDs come from the collector's source inventory, never reporter
+// paths or assertion text. This output is separate from readiness evidence.
+export function createTestFileDiagnostics(packageId, report, expectedFiles) {
+  requireValue(['server', 'client'].includes(packageId), 'INVALID_DIAGNOSTIC_INVENTORY');
+  requireValue(Array.isArray(expectedFiles) && expectedFiles.length > 0 && expectedFiles.length <= 1000 && expectedFiles.every((name) => typeof name === 'string' && `${packageId}/${name}`.length <= 256 && /^src\/(?:[A-Za-z0-9_-][A-Za-z0-9._-]*\/)*[A-Za-z0-9_-][A-Za-z0-9._-]*$/.test(name) && (packageId === 'server' ? /\.spec\.ts$/ : /\.test\.(?:ts|tsx)$/).test(name)), 'INVALID_DIAGNOSTIC_INVENTORY');
+  const normalized = normalizeTestJson(report, [], expectedFiles);
+  const files = [];
+  for (const expected of [...expectedFiles].sort()) {
+    const suite = report.testResults.find((entry) => {
+      const name = entry.name.replace(/\\/g, '/');
+      return name === expected || name.endsWith(`/${expected}`);
+    });
+    const results = { total: 0, passed: 0, failed: 0, skipped: 0, todo: 0 };
+    for (const assertion of suite.assertionResults) {
+      results.total++;
+      results[assertion.status === 'pending' ? 'skipped' : assertion.status]++;
+    }
+    const status = suite.status === 'failed' || results.total === 0 ? 'failed' : suite.status === 'passed' && results.passed === results.total ? 'passed' : 'skipped';
+    if (status !== 'passed') files.push({ id: `${packageId}/${expected}`, status, results });
+  }
+  return { package: packageId, fileCount: expectedFiles.length, allPassed: normalized.allPassed, files };
+}
+export async function writeTestFileDiagnostics(outDir, diagnostics) {
+  try {
+    await writeFile(join(outDir, 'diagnostics.json'), `${JSON.stringify(diagnostics, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
+    return true;
+  } catch { return false; }
+}
+
 // Vitest's native JSON counts nested describe tasks as suites, but testResults
 // contains files only. Emit a private file-level report so counts are exact and
 // every nested failure/skip is retained without trusting impossible totals.
@@ -508,6 +537,7 @@ async function collect(releaseSha) {
   const isolated = isolatedNetwork();
   const preflight = !before.dirty && before.headSha === releaseSha && isolated && !envPresent && (before.source !== 'ci' || (before.githubSha === releaseSha && /^\d+$/.test(before.runId ?? '') && /^\d+$/.test(before.runAttempt ?? '')));
   const manifest = { formatVersion: FORMAT_VERSION, releaseSha, source: before.source, runId: before.runId, runAttempt: before.runAttempt, startedAt, completedAt: startedAt, nodeVersion: process.version, git: { headSha: before.headSha, treeSha: before.treeSha, dirtyBefore: before.dirty, dirtyAfter: before.dirty }, networkIsolation: isolated ? 'ISOLATED' : 'UNVERIFIED', policy: { killSwitch: true, egressDefaultDeny: true, credentialsForwarded: false, envFilesPresent: envPresent }, packages: [], checks: [] };
+  const diagnostics = { formatVersion: FORMAT_VERSION, kind: 'test-file-diagnostics', releaseSha, treeSha: before.treeSha, runId: before.runId, runAttempt: before.runAttempt, checks: [] };
   const scratch = await mkdtemp(join(tmpdir(), 'ai-a16-private-'));
   try {
     await writeFile(join(scratch, 'npm-user.config'), '', { mode: 0o600 });
@@ -550,9 +580,14 @@ async function collect(releaseSha) {
       let evidence = result.stdout;
       if (check.kind !== 'command') {
         try {
-          const normalized = check.kind === 'tap' ? normalizeTap(decode(evidence)) : normalizeTestJson(strictJson(decode(evidence = await boundedFile(reportPath, MAX_REPORT_BYTES)), MAX_REPORT_BYTES, 256 * 1024, 32), check.suites, expectedFiles);
+          const parsed = check.kind === 'json' ? strictJson(decode(evidence = await boundedFile(reportPath, MAX_REPORT_BYTES)), MAX_REPORT_BYTES, 256 * 1024, 32) : null;
+          const normalized = check.kind === 'tap' ? normalizeTap(decode(evidence)) : normalizeTestJson(parsed, check.suites, expectedFiles);
           results = normalized.results; requiredSuitesMatched = normalized.requiredSuitesMatched;
           if (results.passed !== results.total || requiredSuitesMatched !== (check.suites?.length ?? 0) || normalized.allPassed === false) { status = 'failed'; if (reason === 'OK') reason = 'TEST_FAILURE_OR_SKIP'; }
+          if (check.kind === 'json') {
+            try { diagnostics.checks.push({ id: check.id, ...createTestFileDiagnostics(check.package, parsed, expectedFiles) }); }
+            catch { /* Optional diagnostics cannot change a readiness verdict. */ }
+          }
         } catch { status = 'failed'; if (reason === 'OK') reason = 'INVALID_REPORT'; }
       }
       manifest.checks.push({ id: check.id, status, exitCode: result.exitCode, reason, startedAt: begin, completedAt: new Date().toISOString(), evidenceSha256: hash(evidence), results, requiredSuitesMatched });
@@ -569,7 +604,7 @@ async function collect(releaseSha) {
     report.packages = manifest.packages.map(({ id, status, exitCode }) => ({ id, status, exitCode }));
     report.checks = manifest.checks.map(({ id, status, exitCode, reason, results, requiredSuitesMatched }) => ({ id, status, exitCode, reason, results, requiredSuitesMatched }));
   }
-  return { manifest, report };
+  return { manifest, report, diagnostics: report.manifestSha256 !== null ? diagnostics : null };
 }
 async function outputDirectory(value) {
   const requested = localPath(value);
@@ -598,7 +633,8 @@ export async function main(argv = process.argv.slice(2)) {
     const outDir = options['--out-dir'] ? await outputDirectory(options['--out-dir']) : null;
     let manifest;
     let report;
-    if (argv[0] === 'run') ({ manifest, report } = await collect(releaseSha));
+    let diagnostics = null;
+    if (argv[0] === 'run') ({ manifest, report, diagnostics } = await collect(releaseSha));
     else {
       const path = localPath(options['--manifest'], true);
       localPath(await realpath(path), true);
@@ -609,6 +645,7 @@ export async function main(argv = process.argv.slice(2)) {
       // Only validated schema metadata is published. Invalid input is never copied.
       if (report.manifestSha256 !== null) await writeFile(join(outDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
       await writeFile(join(outDir, 'readiness.json'), `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
+      if (diagnostics !== null) await writeTestFileDiagnostics(outDir, diagnostics);
     }
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
     return report.verification.level === 'BLOCKED' ? 1 : 0;

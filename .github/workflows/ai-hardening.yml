@@ -159,3 +159,13 @@ jobs:
           # Invalid/dirty/unisolated evidence is not copied as a validated manifest.
           if-no-files-found: ignore
           retention-days: 7
+      - name: Upload bounded test-file diagnostics only
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ai-hardening-diagnostics-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ai-a16-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}/diagnostics.json
+          # Trusted inventory IDs and status/counts only, never raw test output.
+          # Invalid/dirty/unisolated runs do not publish diagnostic evidence.
+          if-no-files-found: ignore
+          retention-days: 7

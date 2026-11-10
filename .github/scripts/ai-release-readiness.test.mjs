@@ -210,6 +210,98 @@ test('JSON suite accounting exactly matches the file inventory', () => {
   const report = jsonReporter();
   assert.equal(normalizeTestJson(report, [], ['src/first.spec.ts', 'src/second.spec.ts']).allPassed, true);
 });
+test('file diagnostics publish only inventory-owned IDs, fixed status and counts', async () => {
+  const { createTestFileDiagnostics } = await import('./ai-release-readiness.mjs');
+  const report = jsonReporter();
+  Object.assign(report, { success: false, numPassedTests: 1, numFailedTests: 1, numPassedTestSuites: 1, numFailedTestSuites: 1 });
+  Object.assign(report.testResults[0], { status: 'failed', message: 'sk-secret-sentinel https://private.example/customer' });
+  Object.assign(report.testResults[0].assertionResults[0], { status: 'failed', failureMessages: ['C:/private/customer rows sk-secret-sentinel'], failureDetails: [{ code: 'sk-secret-sentinel' }] });
+  const original = structuredClone(report);
+  const result = createTestFileDiagnostics('server', report, ['src/first.spec.ts', 'src/second.spec.ts']);
+  assert.deepEqual(result, { package: 'server', fileCount: 2, allPassed: false, files: [
+    { id: 'server/src/first.spec.ts', status: 'failed', results: { total: 1, passed: 0, failed: 1, skipped: 0, todo: 0 } },
+  ] });
+  assert.ok(!/private|secret|customer|https?:|failureMessages|failureDetails|message|title/.test(JSON.stringify(result)));
+  assert.deepEqual(report, original);
+  assert.equal(normalizeTestJson(report).allPassed, false);
+});
+test('passing file diagnostics add no failure rows or readiness authority', async () => {
+  const { createTestFileDiagnostics } = await import('./ai-release-readiness.mjs');
+  assert.deepEqual(createTestFileDiagnostics('server', jsonReporter(), ['src/first.spec.ts', 'src/second.spec.ts']), { package: 'server', fileCount: 2, allPassed: true, files: [] });
+  const client = createTestFileDiagnostics('client', createVitestFileReport(vitestModules()), ['src/first.test.ts']);
+  assert.deepEqual(client, { package: 'client', fileCount: 1, allPassed: true, files: [] });
+  assert.ok(!/VERIFIED|certified|approved|deploymentAuthorized|manifestSha256/.test(JSON.stringify(client)));
+});
+test('diagnostics retain focused and unexecuted tests as skipped', async () => {
+  const { createTestFileDiagnostics } = await import('./ai-release-readiness.mjs');
+  const report = jsonReporter();
+  report.testResults[0].status = 'focused'; report.testResults[0].assertionResults[0].status = 'pending';
+  report.numPassedTests--; report.numPendingTests++;
+  const result = createTestFileDiagnostics('server', report, ['src/first.spec.ts', 'src/second.spec.ts']);
+  assert.equal(result.allPassed, false);
+  assert.deepEqual(result.files, [{ id: 'server/src/first.spec.ts', status: 'skipped', results: { total: 1, passed: 0, failed: 0, skipped: 1, todo: 0 } }]);
+});
+test('diagnostics retain a failed file with zero executed assertions', async () => {
+  const { createTestFileDiagnostics } = await import('./ai-release-readiness.mjs');
+  const report = jsonReporter();
+  Object.assign(report, { success: false, numTotalTests: 1, numPassedTests: 1, numPassedTestSuites: 1, numFailedTestSuites: 1 });
+  report.testResults[0].status = 'failed'; report.testResults[0].assertionResults = [];
+  const result = createTestFileDiagnostics('server', report, ['src/first.spec.ts', 'src/second.spec.ts']);
+  assert.deepEqual(result.files, [{ id: 'server/src/first.spec.ts', status: 'failed', results: { total: 0, passed: 0, failed: 0, skipped: 0, todo: 0 } }]);
+});
+for (const [packageId, expected] of [
+  ['unknown', ['src/first.spec.ts', 'src/second.spec.ts']],
+  ['server', null], ['server', []],
+  ['server', ['/private/src/first.spec.ts', 'src/second.spec.ts']],
+  ['server', ['src/../first.spec.ts', 'src/second.spec.ts']],
+  ['server', ['src/private\nfirst.spec.ts', 'src/second.spec.ts']],
+  ['server', ['src/first.spec.ts', 'src/first.spec.ts']],
+  ['server', ['src/first.spec.ts']],
+  ['server', ['src/first.test.ts', 'src/second.test.ts']],
+  ['client', ['src/first.spec.ts', 'src/second.spec.ts']],
+  ['server', [`src/${'x'.repeat(241)}.spec.ts`, 'src/second.spec.ts']],
+  ['server', [`src/${'x'.repeat(256)}.spec.ts`, 'src/second.spec.ts']],
+  ['server', Array.from({ length: 1001 }, (_, index) => `src/file-${index}.spec.ts`)],
+]) test('diagnostics refuse missing, unsafe, mismatched or unbounded inventory', async () => {
+  const { createTestFileDiagnostics } = await import('./ai-release-readiness.mjs');
+  assert.equal(typeof createTestFileDiagnostics, 'function');
+  assert.throws(() => createTestFileDiagnostics(packageId, jsonReporter(), expected), /INVALID_DIAGNOSTIC_INVENTORY|INVALID_EXPECTED_INVENTORY|TEST_FILE_INVENTORY_MISMATCH/);
+});
+test('diagnostics bound the complete published ID to 256 characters', async () => {
+  const { createTestFileDiagnostics } = await import('./ai-release-readiness.mjs');
+  for (const length of [237, 238]) {
+    const expected = `src/${'x'.repeat(length)}.spec.ts`;
+    const report = jsonReporter();
+    Object.assign(report, { success: false, numPassedTests: 1, numFailedTests: 1, numPassedTestSuites: 1, numFailedTestSuites: 1 });
+    report.testResults[0].name = `/private/repo/${expected}`;
+    report.testResults[0].status = 'failed'; report.testResults[0].assertionResults[0].status = 'failed';
+    if (length === 237) assert.equal(createTestFileDiagnostics('server', report, [expected, 'src/second.spec.ts']).files[0].id.length, 256);
+    else assert.throws(() => createTestFileDiagnostics('server', report, [expected, 'src/second.spec.ts']), /INVALID_DIAGNOSTIC_INVENTORY/);
+  }
+});
+test('invalid reporter counts cannot be republished as trusted diagnostics', async () => {
+  const { createTestFileDiagnostics } = await import('./ai-release-readiness.mjs');
+  const report = jsonReporter(); report.numFailedTests++;
+  assert.throws(() => createTestFileDiagnostics('server', report, ['src/first.spec.ts', 'src/second.spec.ts']), /CONTRADICTORY_TEST_COUNTS/);
+});
+test('diagnostics reject ambiguous source-inventory aliases instead of selecting a reporter name', async () => {
+  const { createTestFileDiagnostics } = await import('./ai-release-readiness.mjs');
+  const report = jsonReporter();
+  report.testResults[0].name = '/private/repo/src/nested/src/first.spec.ts';
+  report.testResults[1].name = '/private/repo/src/first.spec.ts';
+  assert.throws(() => createTestFileDiagnostics('server', report, ['src/first.spec.ts', 'src/nested/src/first.spec.ts']), /TEST_FILE_INVENTORY_MISMATCH/);
+});
+test('diagnostics emit deterministic inventory order without mutating reporter order', async () => {
+  const { createTestFileDiagnostics } = await import('./ai-release-readiness.mjs');
+  const report = jsonReporter();
+  Object.assign(report, { success: false, numPassedTests: 0, numFailedTests: 2, numPassedTestSuites: 0, numFailedTestSuites: 2 });
+  for (const suite of report.testResults) { suite.status = 'failed'; suite.assertionResults[0].status = 'failed'; }
+  report.testResults.reverse();
+  const original = structuredClone(report);
+  const result = createTestFileDiagnostics('server', report, ['src/second.spec.ts', 'src/first.spec.ts']);
+  assert.deepEqual(result.files.map((file) => file.id), ['server/src/first.spec.ts', 'server/src/second.spec.ts']);
+  assert.deepEqual(report, original);
+});
 for (const [name, change] of [
   ['zero declared suites with passing file inventory', (r) => { r.numTotalTestSuites = 0; r.numPassedTestSuites = 0; }],
   ['too many declared suites', (r) => { r.numTotalTestSuites++; r.numPassedTestSuites++; }],
@@ -389,6 +481,19 @@ test('blocked collector lists all skips and publishes only redacted failure meta
     assert.deepEqual(JSON.parse(published), report);
     assert.ok(!published.includes(folder) && !/Data Explorer|Admin|postgres:|sk-secret/.test(published));
     await assert.rejects(readFile(join(folder, 'manifest.json')));
+    await assert.rejects(readFile(join(folder, 'diagnostics.json')));
+  } finally { await rm(folder, { recursive: true, force: true }); }
+});
+test('diagnostic artifact writes are best-effort and never overwrite existing output', async () => {
+  const { writeTestFileDiagnostics } = await import('./ai-release-readiness.mjs');
+  const folder = await mkdtemp(join(tmpdir(), 'ai-a16-diagnostic-output-'));
+  const payload = { kind: 'test-file-diagnostics', checks: [] };
+  try {
+    assert.equal(await writeTestFileDiagnostics(join(folder, 'missing'), payload), false);
+    assert.equal(await writeTestFileDiagnostics(folder, payload), true);
+    assert.deepEqual(JSON.parse(await readFile(join(folder, 'diagnostics.json'), 'utf8')), payload);
+    assert.equal(await writeTestFileDiagnostics(folder, { checks: ['replacement'] }), false);
+    assert.deepEqual(JSON.parse(await readFile(join(folder, 'diagnostics.json'), 'utf8')), payload);
   } finally { await rm(folder, { recursive: true, force: true }); }
 });
 test('workflow enables only bounded loopback inside its fail-closed root-created network namespace', async () => {
@@ -423,7 +528,8 @@ test('workflow has scoped verification triggers and metadata-only artifact publi
   assert.match(workflow, /--ignore-scripts/); assert.match(workflow, /AI_KILL_SWITCH: 'true'/);
   assert.match(workflow, /AI_EGRESS_POLICY_JSON: '\{"enabled":false\}'/);
   assert.match(workflow, /ai-hardening-\$\{\{ github\.sha \}\}/);
-  assert.match(workflow, /readiness\.json/); assert.match(workflow, /manifest\.json/);
+  assert.match(workflow, /readiness\.json/); assert.match(workflow, /manifest\.json/); assert.match(workflow, /diagnostics\.json/);
+  assert.match(workflow, /ai-hardening-diagnostics-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/);
   assert.ok(!/secrets\.|pull_request_target|workflow_run:|schedule:|id-token:\s*write|packages:\s*write|environment:\s*production|deploy-render|migrate deploy|playwright install/.test(workflow));
   const uploads = workflow.split(/- name: Upload /).slice(1).join('\n');
   assert.ok(!/path:\s*\||coverage\/|\.log\b|test-results\/|\*\.json/.test(uploads));
