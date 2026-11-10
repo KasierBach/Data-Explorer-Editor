@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { resolve } from 'node:path';
@@ -49,6 +50,35 @@ test('CI installs a checksum-pinned Syft with bounded retries before publishing 
   assert.equal((workflow.match(/if-no-files-found: error/g) ?? []).length, 2);
   assert.equal((workflow.match(/retention-days: 30/g) ?? []).length, 2);
   assert.ok(workflow.indexOf('name: Generate SBOM files') < workflow.indexOf('name: Publish images'));
+});
+
+test('logged E2E pipelines explicitly preserve a failed runner exit code', () => {
+  const workflow = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8');
+  const lines = workflow.split('\n');
+  for (const [job, command] of [
+    ['server', 'npm run test:e2e -- --detectOpenHandles --json --outputFile=e2e-results.json 2>&1 | tee e2e.log'],
+    ['full-stack', 'npm run test:full-stack 2>&1 | tee full-stack.log'],
+  ]) {
+    const jobStart = lines.findIndex((line) => line === `  ${job}:`);
+    assert.ok(jobStart >= 0, 'Logged test job is declared');
+    const nextJob = lines.findIndex((line, index) => index > jobStart && /^  [a-z][a-z-]*:$/.test(line));
+    const jobLines = lines.slice(jobStart, nextJob < 0 ? lines.length : nextJob);
+    assert.ok(jobLines.every((line) => !/^    continue-on-error:/.test(line)));
+    const at = jobLines.findIndex((line) => line.trim() === command);
+    assert.ok(at >= 0, 'Logged test runner is declared as an explicit script');
+    const stepStart = jobLines.findLastIndex((line, index) => index < at && /^      - /.test(line));
+    const nextStep = jobLines.findIndex((line, index) => index > at && /^      - /.test(line));
+    assert.ok(stepStart >= 0);
+    const block = jobLines.slice(stepStart, nextStep < 0 ? jobLines.length : nextStep).join('\n');
+    assert.match(block, /shell: bash/);
+    assert.match(block, /run: \|\n\s+set -euo pipefail/);
+    assert.doesNotMatch(block, /continue-on-error|\|\|\s*true/);
+  }
+  for (const exitCode of [0, 7]) {
+    const result = spawnSync('bash', ['--noprofile', '--norc', '-c', `set -euo pipefail; (exit ${exitCode}) 2>&1 | tee /dev/null`], { encoding: 'utf8', timeout: 10000 });
+    assert.ifError(result.error);
+    assert.equal(result.status, exitCode);
+  }
 });
 
 test('Vercel clean URLs keep application rewrites on the extensionless SPA shell', () => {

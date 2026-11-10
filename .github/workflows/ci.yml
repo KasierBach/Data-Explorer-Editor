@@ -81,7 +81,11 @@ jobs:
       - run: npm run lint
       - run: npm run test:cov
       - run: npm run build
-      - run: npm run test:e2e -- --detectOpenHandles --json --outputFile=e2e-results.json 2>&1 | tee e2e.log
+      - name: Run server E2E checks with failure-preserving logs
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:e2e -- --detectOpenHandles --json --outputFile=e2e-results.json 2>&1 | tee e2e.log
       - name: Capture fixture logs
         if: always()
         run: docker compose -f test/compose.e2e.yml -f test/compose.r03.yml logs --no-color > fixture.log
@@ -130,7 +134,11 @@ jobs:
         working-directory: server
       - run: npx playwright install --with-deps chromium
         working-directory: client
-      - run: npm run test:full-stack 2>&1 | tee full-stack.log
+      - name: Run full-stack browser checks with failure-preserving logs
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:full-stack 2>&1 | tee full-stack.log
         working-directory: client
       - name: Capture fixture logs
         if: always()
