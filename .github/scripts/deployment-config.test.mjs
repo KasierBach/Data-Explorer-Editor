@@ -88,8 +88,15 @@ test('native replay CI keeps a separate network-none fixture and bounded ownersh
   assert.match(workflow, /scripts\/ai-eval\/model-role-assessment\.test\.mjs/);
   assert.match(workflow, /test\/ai-model-role-adapter\.test\.cjs/);
   assert.match(workflow, /test\/ai-model-role-live\.test\.cjs/);
+  const serverJob = /\n  server:\n([\s\S]*?)(?=\n  full-stack:)/.exec(workflow)?.[1];
+  assert.ok(serverJob);
+  const serverJobEnv = /\n    env:\n([\s\S]*?)(?=\n    steps:)/.exec(serverJob)?.[1];
+  assert.ok(serverJobEnv);
+  assert.doesNotMatch(serverJobEnv, /runner\.temp|TMPDIR/);
   assert.match(workflow, /AI_EVAL_RUNNER_CONTAINER: ai-eval-ci-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}-eval-runner-1/);
-  assert.match(workflow, /TMPDIR: \$\{\{ runner\.temp \}\}/);
+  const e2eStep = /- name: Run server E2E checks with failure-preserving logs[\s\S]*?(?=      - name: Capture fixture logs)/.exec(workflow)?.[0];
+  assert.ok(e2eStep);
+  assert.match(e2eStep, /env:\n\s+TMPDIR: \$\{\{ runner\.temp \}\}/);
   const startup = /- name: Start network-isolated native evaluation fixtures[\s\S]*?(?=      - name: Run server E2E)/.exec(workflow)?.[0];
   assert.ok(startup);
   assert.match(startup, /timeout-minutes: 4/);

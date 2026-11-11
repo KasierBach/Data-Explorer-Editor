@@ -60,7 +60,6 @@ jobs:
       E2E_REDIS_URL: redis://127.0.0.1:16379/15
       COMPOSE_PROJECT_NAME: data-explorer-server-${{ github.run_id }}
       AI_EVAL_RUNNER_CONTAINER: ai-eval-ci-${{ github.run_id }}-${{ github.run_attempt }}-eval-runner-1
-      TMPDIR: ${{ runner.temp }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -95,6 +94,8 @@ jobs:
           docker compose --project-name "$project" -f test/compose.ai-eval.yml up --detach --wait --wait-timeout 150
       - name: Run server E2E checks with failure-preserving logs
         shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
         run: |
           set -euo pipefail
           npm run test:e2e -- --detectOpenHandles --json --outputFile=e2e-results.json 2>&1 | tee e2e.log
