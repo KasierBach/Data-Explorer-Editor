@@ -24,6 +24,82 @@ function createConfig(
 }
 
 describe('AiRoutingService', () => {
+  const beeknoeeModels = [
+    'bee/gemini-3.8-flash',
+    'bee-tok/claude-sonnet-5-5',
+    'gemini-3.1-pro-preview',
+    'claude-sonnet-4-6',
+    'bee-tok/claude-opus-5-5',
+    'bee/gemini-4-argon',
+    'claude-opus-4-6',
+    'claude-opus-4-6-thinking',
+  ];
+
+  it.each(beeknoeeModels)(
+    'keeps Beeknoee API model %s in its selected lane',
+    (model) => {
+      const service = new AiRoutingService(createConfig());
+      const result = service.buildPlanChain(
+        {
+          prompt: 'Return a read-only query',
+          model: `beeknoee:${model}`,
+          fallbackProvider: 'none',
+        },
+        true,
+      );
+      expect(result.plans).toEqual([
+        {
+          provider: 'beeknoee',
+          apiKey: 'sk-bee-test',
+          baseUrl: 'https://platform.beeknoee.com/api/v1',
+          model,
+        },
+      ]);
+    },
+  );
+
+  it.each(beeknoeeModels)(
+    'refuses unconfigured or disabled Beeknoee model %s',
+    (model) => {
+      const request = {
+        prompt: 'Return a query',
+        model: `beeknoee:${model}`,
+        fallbackProvider: 'none',
+      };
+      expect(() =>
+        new AiRoutingService(
+          createConfig({ BEEKNOEE_API_KEY: undefined }),
+        ).buildPlanChain(request, true),
+      ).toThrow(/Beeknoee provider is not configured/);
+      expect(() =>
+        new AiRoutingService(createConfig()).buildPlanChain(
+          { ...request, disabledProviders: ['beeknoee'] },
+          true,
+        ),
+      ).toThrow(/disabled/i);
+    },
+  );
+
+  it.each([
+    'bee-tok/claude-sonnet-5-5',
+    'bee-tok/claude-opus-5-5',
+    'bee/gemini-4-argon',
+    'claude-opus-4-6',
+  ])('does not route unverified image capability for %s', (model) => {
+    const service = new AiRoutingService(createConfig());
+    expect(() =>
+      service.buildPlanChain(
+        {
+          prompt: 'Describe the image',
+          image: 'data:image/png;base64,fixture',
+          model: `beeknoee:${model}`,
+          fallbackProvider: 'none',
+        },
+        true,
+      ),
+    ).toThrow(/vision-capable/);
+  });
+
   it.each([
     ['groq:openai/gpt-oss-120b', 'groq'],
     ['gemini-2.5-flash', 'gemini'],

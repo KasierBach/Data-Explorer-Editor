@@ -37,6 +37,7 @@ import { Switch } from '@/presentation/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/presentation/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/presentation/components/ui/tooltip';
 import { getAssistantModelCatalog, BUILT_IN_PROVIDERS } from '@/presentation/modules/Query/assistantModelCatalog';
+import { getBeeknoeeRoleGuidance } from '@/presentation/modules/Query/modelRoleEvidence';
 import { filterSearchableGroups, normalizeProviderBaseUrl, type SearchableGroup } from './AiConfigTab.utils';
 
 interface AiConfigTabProps {
@@ -756,17 +757,23 @@ export const AiConfigTab: React.FC<AiConfigTabProps> = ({ t }) => {
         },
     ];
 
-    const renderModelSelect = (value: string, onChange: (value: string) => void, includeInherit: boolean) => (
-        <SearchableModelSelect
-            value={value}
-            onChange={onChange}
-            groups={getRoleModelGroups(includeInherit)}
-            minContentWidth={360}
-            placeholder={labels.roleModelPlaceholder}
-            searchPlaceholder={labels.searchRoleModels}
-            emptyLabel={labels.noRoleModelMatch}
-        />
-    );
+    const renderModelSelect = (value: string, onChange: (value: string) => void, includeInherit: boolean) => {
+        const guidance = getBeeknoeeRoleGuidance(value === INHERIT_ASSISTANT_MODEL ? assistantSelection : value, isVi ? 'vi' : 'en');
+        return (
+            <>
+                <SearchableModelSelect
+                    value={value}
+                    onChange={onChange}
+                    groups={getRoleModelGroups(includeInherit)}
+                    minContentWidth={360}
+                    placeholder={labels.roleModelPlaceholder}
+                    searchPlaceholder={labels.searchRoleModels}
+                    emptyLabel={labels.noRoleModelMatch}
+                />
+                {guidance && <p className="text-xs text-muted-foreground">{guidance.note}</p>}
+            </>
+        );
+    };
 
     const handleToggleMasterEnabled = async (enabled: boolean) => {
         try {

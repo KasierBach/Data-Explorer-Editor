@@ -37,6 +37,7 @@ export const NATIVE_SCENARIOS = Object.freeze([
   'lock-deadline',
   'cleanup-refusal',
   'mongo-marker-ack-loss',
+  'close-seed-phase',
 ]);
 const catalogPath = fileURLToPath(
   new URL('../../scripts/ai-eval/synthetic-catalog.v1.json', import.meta.url),
@@ -366,6 +367,59 @@ async function runScenario(scenario) {
         fixture.execute('sql', catalog.cases[0].expected.response.query),
         (error) => error.code === 'NATIVE_FIXTURE_CLOSED',
       );
+    } else if (scenario === 'close-seed-phase') {
+      const role = `a12_reader_${runId.slice(4)}`;
+      const end = Client.prototype.end;
+      const connect = MongoClient.prototype.connect;
+      let armed = true;
+      let closing = false;
+      let closePromise;
+      let closeOutcome;
+      let lateReaderConnections = 0;
+      Client.prototype.end = function (...args) {
+        const operation = end.apply(this, args);
+        if (args.length) return operation;
+        return Promise.resolve(operation).then((value) => {
+          if (armed && this.connectionParameters.user === role) {
+            armed = false;
+            closing = true;
+            closePromise = fixture.close().then(
+              () => {
+                closeOutcome = 'CLOSED';
+              },
+              (error) => {
+                closeOutcome = error.code ?? 'CLEANUP_FAILED';
+              },
+            );
+          }
+          return value;
+        });
+      };
+      MongoClient.prototype.connect = function (...args) {
+        if (closing && this.options.credentials?.username === role)
+          lateReaderConnections++;
+        return connect.apply(this, args);
+      };
+      try {
+        const outcome = await fixture.verifySeed().then(
+          () => 'FULFILLED',
+          (error) => error.code,
+        );
+        await closePromise;
+        assert.equal(closing, true);
+        assert.equal(lateReaderConnections, 0);
+        assert.equal(outcome, 'NATIVE_FIXTURE_CLOSED');
+        assert.equal(closeOutcome, 'CLOSED');
+        await assert.rejects(
+          fixture.verifySeed(),
+          (error) => error.code === 'NATIVE_FIXTURE_CLOSED',
+        );
+        assert.equal(lateReaderConnections, 0);
+      } finally {
+        Client.prototype.end = end;
+        MongoClient.prototype.connect = connect;
+        await closePromise;
+      }
     } else if (scenario === 'cleanup-readback') {
       await fixture.close();
       await fixture.close();

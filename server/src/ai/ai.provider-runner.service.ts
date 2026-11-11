@@ -79,6 +79,7 @@ const STREAM_CLEANUP_TIMEOUT_MS = 100;
 const MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024;
 
 type OpenAiResponsePayload = {
+  model?: unknown;
   choices?: Array<{ message?: { content?: unknown } }>;
 };
 
@@ -790,6 +791,13 @@ export class AiProviderRunnerService {
       : AI_CONSTANTS.MAX_OUTPUT_TOKENS;
   }
 
+  private providerReportedModel(value: unknown): string | undefined {
+    return typeof value === 'string' &&
+      /^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,199}$/.test(value)
+      ? value
+      : undefined;
+  }
+
   private extractOpenAiUsage(payload: unknown): TokenUsage | undefined {
     if (!payload || typeof payload !== 'object') return undefined;
     const usage = (payload as { usage?: unknown }).usage;
@@ -1471,6 +1479,7 @@ export class AiProviderRunnerService {
         provider: plan.provider,
         providerLabel: plan.displayName || plan.provider,
         model: modelToUse,
+        providerReportedModel: this.providerReportedModel(result.model),
         routingMode,
         contractVersion: 1,
         usage: this.extractOpenAiUsage(result),
@@ -1882,6 +1891,7 @@ export class AiProviderRunnerService {
     const decoder = new TextDecoder('utf-8', { fatal: true });
     let fullText = '';
     let usage: TokenUsage | undefined;
+    let providerReportedModel: string | undefined;
     const providerSources: string[] = [];
     let doneStream = false;
     const readEvent = (line: string): string => {
@@ -1907,6 +1917,16 @@ export class AiProviderRunnerService {
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
         return '';
       usage = this.extractOpenAiUsage(parsed) ?? usage;
+      const eventModel = this.providerReportedModel(
+        (parsed as { model?: unknown }).model,
+      );
+      if (eventModel) {
+        if (providerReportedModel && providerReportedModel !== eventModel)
+          throw new Error(
+            'Provider stream changed its provider-reported model identity',
+          );
+        providerReportedModel = eventModel;
+      }
       this.assertOpenAiResponseAllowed(parsed);
       providerSources.push(...this.extractOpenAiSources(parsed));
       const text = this.promptBuilder.extractOpenAiStreamText(parsed);
@@ -1989,6 +2009,7 @@ export class AiProviderRunnerService {
           provider,
           providerLabel,
           model,
+          providerReportedModel,
           routingMode,
           contractVersion: 1,
           usage,

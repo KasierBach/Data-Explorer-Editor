@@ -85,6 +85,9 @@ test('native replay CI keeps a separate network-none fixture and bounded ownersh
   const workflow = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8');
   const compose = readFileSync(resolve(root, 'server/test/compose.ai-eval.yml'), 'utf8');
   assert.match(workflow, /scripts\/ai-eval\/native-replay\.test\.mjs/);
+  assert.match(workflow, /scripts\/ai-eval\/model-role-assessment\.test\.mjs/);
+  assert.match(workflow, /test\/ai-model-role-adapter\.test\.cjs/);
+  assert.match(workflow, /test\/ai-model-role-live\.test\.cjs/);
   assert.match(workflow, /AI_EVAL_RUNNER_CONTAINER: ai-eval-ci-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}-eval-runner-1/);
   assert.match(workflow, /TMPDIR: \$\{\{ runner\.temp \}\}/);
   const startup = /- name: Start network-isolated native evaluation fixtures[\s\S]*?(?=      - name: Run server E2E)/.exec(workflow)?.[0];

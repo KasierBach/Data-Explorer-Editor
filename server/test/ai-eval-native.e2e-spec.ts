@@ -21,6 +21,7 @@ const scenarios = [
   'lock-deadline',
   'cleanup-refusal',
   'mongo-marker-ack-loss',
+  'close-seed-phase',
 ];
 
 /** Native drivers run in a fresh Node process, not Jest's ESM/module facade. */

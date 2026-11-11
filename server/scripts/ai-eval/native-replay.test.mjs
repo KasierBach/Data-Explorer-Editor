@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
@@ -274,6 +277,59 @@ test('native assessment catches forged provided bundles independently of expecte
   );
   assert.equal(drift.outcome, 'fail');
   assert.ok(drift.reasons.includes('SUPPLIED_RESULT_DRIFT'));
+});
+test('native result equality remains independent of response metadata failures', async () => {
+  const { assessNativeResult } = await replay();
+  const item = catalog.cases.find((entry) => entry.id === 'sql-null-note');
+  const output = structuredClone(
+    outputs.outputs.find((entry) => entry.caseId === item.id),
+  );
+  output.response.metadata.execution = 'OTHER_OFFLINE_METADATA';
+  const result = assessNativeResult(
+    item,
+    output,
+    catalog,
+    item.expected.result,
+  );
+  assert.equal(result.outcome, 'fail');
+  assert.deepEqual(result.reasons, ['METADATA_CONTRACT_MISMATCH']);
+  assert.equal(result.resultAssessment, 'MEASURED_NATIVE_RESULT_MATCH');
+  assert.equal(
+    result.suppliedResultAssessment,
+    'SUPPLIED_BUNDLE_MATCHES_EXECUTION',
+  );
+});
+test('empty split selection is refused before acquiring any fixture capability', async () => {
+  const { runNativeReplay } = await replay();
+  const directory = await mkdtemp(
+    join(tmpdir(), 'data-explorer-native-preflight-'),
+  );
+  try {
+    for (const split of ['dev', 'calibration', 'holdout']) {
+      const empty = structuredClone(catalog);
+      for (const item of empty.cases)
+        item.split = split === 'dev' ? 'holdout' : 'dev';
+      assertNativeProfile(validateCatalog(empty));
+      const path = join(directory, `catalog-${split}.json`);
+      await writeFile(path, JSON.stringify(empty), {
+        flag: 'wx',
+        mode: 0o600,
+      });
+      await assert.rejects(
+        runNativeReplay({
+          catalogPath: path,
+          outputsPath,
+          runId: config.runId,
+          split,
+          allowHoldout: split === 'holdout',
+          fixture: Object.freeze({}),
+        }),
+        (error) => error.code === 'EMPTY_SELECTED_SPLIT',
+      );
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 test('query validation refuses serialization hooks and snapshots plain data once', async () => {
   const { assertReadReplayQuery } = await replay();

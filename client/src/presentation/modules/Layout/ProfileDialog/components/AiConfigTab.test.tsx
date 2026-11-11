@@ -168,6 +168,16 @@ describe("AiConfigTab", () => {
     );
   });
 
+  it("shows unassessed Beeknoee role guidance without overwriting role selections", async () => {
+    mockPreferences.assistantModel = "beeknoee:bee-tok/claude-sonnet-5-5";
+    render(<AiConfigTab t={(key) => key} />);
+    expect(screen.getAllByText(/Vai trò Beeknoee chưa được đánh giá bằng test thực tế/).length).toBeGreaterThan(0);
+    expect(mockPreferences.assistantModel).toBe("beeknoee:bee-tok/claude-sonnet-5-5");
+    expect(mockPreferences.sqlModel).toBe(INHERIT_ASSISTANT_MODEL);
+    expect(aiConfigTabMocks.setAiModel).not.toHaveBeenCalled();
+    expect(aiConfigTabMocks.post).not.toHaveBeenCalled();
+  });
+
   it("blocks saved-provider external testing after a fresh account disable", async () => {
     aiConfigTabMocks.post.mockResolvedValue({ ok: true, models: ["fixture-model"], latencyMs: 1 });
     render(<AiConfigTab t={(key) => key} />);

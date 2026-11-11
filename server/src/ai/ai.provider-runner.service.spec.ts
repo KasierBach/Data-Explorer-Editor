@@ -78,6 +78,147 @@ describe('AiProviderRunnerService streaming', () => {
     );
   });
 
+  describe('Beeknoee model identity contract', () => {
+    const models = [
+      'bee/gemini-3.8-flash',
+      'bee-tok/claude-sonnet-5-5',
+      'gemini-3.1-pro-preview',
+      'claude-sonnet-4-6',
+      'bee-tok/claude-opus-5-5',
+      'bee/gemini-4-argon',
+      'claude-opus-4-6',
+      'claude-opus-4-6-thinking',
+    ];
+    it.each(models)(
+      'sends the exact %s API ID in a non-stream request',
+      async (model) => {
+        const complete = jest.fn().mockResolvedValue(undefined);
+        const fail = jest.fn().mockResolvedValue(undefined);
+        const beforeAttempt = jest
+          .fn()
+          .mockResolvedValue({ attemptId: 'fixture-attempt', complete, fail });
+        mockFetch.mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              model,
+              choices: [
+                {
+                  message: { content: '{"message":"Fixture ready"}' },
+                  finish_reason: 'stop',
+                },
+              ],
+              usage: {
+                prompt_tokens: 2,
+                completion_tokens: 3,
+                total_tokens: 5,
+              },
+            }),
+          ),
+        );
+        const result = await service.runOpenAiCompatible(
+          {
+            provider: 'beeknoee',
+            model,
+            apiKey: 'fixture-key',
+            baseUrl: 'https://platform.beeknoee.com/api/v1',
+          },
+          {
+            prompt: 'Hello',
+            execution: { generationId: 'fixture-generation', beforeAttempt },
+          },
+          'auto',
+          structuredDbDecision,
+        );
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+        expect(mockFetch.mock.calls[0][0]).toBe(
+          'https://platform.beeknoee.com/api/v1/chat/completions',
+        );
+        expect(
+          JSON.parse(String(mockFetch.mock.calls[0][1].body)),
+        ).toMatchObject({ model });
+        expect(result).toMatchObject({
+          provider: 'beeknoee',
+          model,
+          providerReportedModel: model,
+          contractVersion: 1,
+          usage: { promptTokens: 2, completionTokens: 3, totalTokens: 5 },
+        });
+        expect(
+          (result as { providerReportedModel?: string }).providerReportedModel,
+        ).toBe(model);
+        expect(beforeAttempt).toHaveBeenCalledWith({
+          provider: 'beeknoee',
+          model,
+        });
+        expect(complete).toHaveBeenCalledWith(
+          expect.objectContaining({ provider: 'beeknoee', model }),
+        );
+        expect(fail).not.toHaveBeenCalled();
+      },
+    );
+    it.each(models)(
+      'preserves %s identity through a terminal stream',
+      async (model) => {
+        mockFetch.mockResolvedValue(
+          createSseResponse([
+            `data: ${JSON.stringify({ model, choices: [{ delta: { content: '{"message":"Fixture streamed"}' } }] })}\n\n`,
+            `data: ${JSON.stringify({ model, choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`,
+            'data: [DONE]\n\n',
+          ]),
+        );
+        const events: StreamEvent[] = [];
+        for await (const event of service.streamOpenAiCompatible(
+          {
+            provider: 'beeknoee',
+            model,
+            apiKey: 'fixture-key',
+            baseUrl: 'https://platform.beeknoee.com/api/v1',
+          },
+          { prompt: 'Hello' },
+          'auto',
+          structuredDbDecision,
+        ))
+          events.push(event);
+        expect(
+          JSON.parse(String(mockFetch.mock.calls[0][1].body)),
+        ).toMatchObject({ model, stream: true });
+        expect(events.find((event) => event.type === 'done')).toMatchObject({
+          type: 'done',
+          data: {
+            provider: 'beeknoee',
+            model,
+            providerReportedModel: model,
+            message: 'Fixture streamed',
+          },
+        });
+        expect(events.some((event) => event.type === 'error')).toBe(false);
+      },
+    );
+    it('refuses conflicting provider-reported model identities in one stream', async () => {
+      mockFetch.mockResolvedValue(
+        createSseResponse([
+          'data: {"model":"bee/first","choices":[{"delta":{"content":"{\\"message\\":\\"partial"}}]}\n\n',
+          'data: {"model":"bee/second","choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ]),
+      );
+      const stream = service.streamOpenAiCompatible(
+        {
+          provider: 'beeknoee',
+          model: 'bee/first',
+          apiKey: 'fixture-key',
+          baseUrl: 'https://platform.beeknoee.com/api/v1',
+        },
+        { prompt: 'Hello' },
+        'auto',
+        structuredDbDecision,
+      );
+      await expect(async () => {
+        for await (const _event of stream) void _event;
+      }).rejects.toThrow(/provider-reported model identity/i);
+    });
+  });
+
   describe('bounded retry reliability', () => {
     afterEach(() => {
       jest.useRealTimers();

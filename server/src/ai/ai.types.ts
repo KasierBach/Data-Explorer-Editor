@@ -51,6 +51,8 @@ export interface AiMessageAttachment {
 
 export interface AiExecutionResponseMetadata {
   generationId?: string;
+  /** Upstream alias observed in a provider payload; requested model remains `model`. */
+  providerReportedModel?: string;
   usageCoverage?: AiUsageCoverage;
   attemptCount?: number;
   measuredAttemptCount?: number;

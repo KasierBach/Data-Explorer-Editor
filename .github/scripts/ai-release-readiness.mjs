@@ -31,6 +31,8 @@ const CLIENT_SUITES = Object.freeze([
   'src/presentation/modules/Layout/AppShell.ai-actions.test.tsx',
   'src/presentation/modules/Layout/NoSqlShell.ai-actions.test.tsx',
   'src/presentation/modules/Layout/ProfileDialog/components/AiConfigTab.test.tsx',
+  'src/presentation/modules/Query/assistantModelCatalog.test.ts',
+  'src/presentation/modules/Query/modelRoleEvidence.test.ts',
   'src/presentation/modules/Query/AiAssistant.test.tsx',
   'src/presentation/modules/Query/AiMessageBubble.test.tsx',
   'src/presentation/modules/Query/QueryEditor.ai-policy.test.tsx',
@@ -55,7 +57,7 @@ const SERVER_SUITES = Object.freeze([
 // Fixed commands only: manifests cannot supply commands, test filters or paths.
 export const CHECKS = Object.freeze([
   { id: 'readiness-node', package: null, kind: 'tap', args: ['--test', '--test-reporter=tap', '.github/scripts/ai-release-readiness.test.mjs'] },
-  { id: 'offline-evaluator', package: null, kind: 'tap', args: ['--test', '--test-reporter=tap', 'server/scripts/ai-eval/evaluator.test.mjs'] },
+  { id: 'offline-evaluator', package: null, kind: 'tap', args: ['--test', '--test-reporter=tap', 'server/scripts/ai-eval/evaluator.test.mjs', 'server/scripts/ai-eval/native-replay.test.mjs', 'server/scripts/ai-eval/model-role-assessment.test.mjs', 'server/test/ai-model-role-adapter.test.cjs', 'server/test/ai-model-role-live.test.cjs'] },
   { id: 'server-prisma-generate', package: 'server', kind: 'command', args: ['run', 'prisma:generate'] },
   { id: 'server-typecheck', package: 'server', kind: 'command', args: ['run', 'typecheck'] },
   { id: 'server-lint', package: 'server', kind: 'command', args: ['run', 'lint'] },

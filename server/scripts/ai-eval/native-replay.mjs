@@ -313,7 +313,7 @@ export function assessNativeResult(item, output, catalog, nativeResult) {
     reasons,
     queryAssessment: 'PINNED_QUERY_EXECUTED_NOT_MODEL_ACCURACY',
     resultAssessment:
-      assessed.outcome === 'pass'
+      assessed.resultAssessment === 'PROVIDED_FIXTURE_BUNDLES_MATCH'
         ? 'MEASURED_NATIVE_RESULT_MATCH'
         : 'MEASURED_NATIVE_RESULT_DIFFER',
     suppliedResultAssessment: supplied.equal
@@ -879,6 +879,7 @@ export async function createNativeFixtures(input, runId) {
           return { customers, orders, line_items };
         },
       );
+      requireValue(!state.closed, 'NATIVE_FIXTURE_CLOSED');
       const invoices = await withMongoConnection(
         MongoClient,
         config.mongoUrl,
@@ -904,10 +905,10 @@ export async function createNativeFixtures(input, runId) {
           }
         },
       );
+      requireValue(!state.closed, 'NATIVE_FIXTURE_CLOSED');
       requireValue(
-        !state.closed &&
-          digest(canonicalJson({ sql, mongo: { invoices } })) ===
-            NATIVE_SEED_SHA256,
+        digest(canonicalJson({ sql, mongo: { invoices } })) ===
+          NATIVE_SEED_SHA256,
         'NATIVE_SEED_READBACK_MISMATCH',
       );
       return NATIVE_SEED_SHA256;
@@ -1044,6 +1045,8 @@ export async function runNativeReplay({
   const catalog = assertNativeProfile(validateCatalog(catalogArtifact.data));
   const outputsArtifact = await readJsonArtifact(outputsPath);
   const outputs = validateOutputs(outputsArtifact.data, catalog);
+  const selected = catalog.cases.filter((item) => item.split === split);
+  requireValue(selected.length > 0, 'EMPTY_SELECTED_SPLIT');
   const session = fixture ?? (await createNativeFixtures(catalog, runId));
   const capabilities = fixtureStates.get(session);
   requireValue(
@@ -1054,7 +1057,6 @@ export async function runNativeReplay({
     'NATIVE_FIXTURE_NOT_OWNED',
   );
   capabilities.state.replaying = true;
-  const selected = catalog.cases.filter((item) => item.split === split);
   const results = [];
   try {
     await capabilities.verifySeed();
@@ -1156,7 +1158,8 @@ export async function runNativeReplay({
           new URL('./native-fixture-profile.mjs', import.meta.url),
         ),
       ),
-      allPassed: totals.fail === 0 && totals.unevaluated === 0,
+      allPassed:
+        totals.total > 0 && totals.fail === 0 && totals.unevaluated === 0,
       totals,
       caseResults: results,
       usageCoverage: {
