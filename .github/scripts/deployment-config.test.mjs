@@ -81,6 +81,37 @@ test('logged E2E pipelines explicitly preserve a failed runner exit code', () =>
   }
 });
 
+test('native replay CI keeps a separate network-none fixture and bounded ownership-aware cleanup', () => {
+  const workflow = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8');
+  const compose = readFileSync(resolve(root, 'server/test/compose.ai-eval.yml'), 'utf8');
+  assert.match(workflow, /scripts\/ai-eval\/native-replay\.test\.mjs/);
+  assert.match(workflow, /AI_EVAL_RUNNER_CONTAINER: ai-eval-ci-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}-eval-runner-1/);
+  assert.match(workflow, /TMPDIR: \$\{\{ runner\.temp \}\}/);
+  const startup = /- name: Start network-isolated native evaluation fixtures[\s\S]*?(?=      - name: Run server E2E)/.exec(workflow)?.[0];
+  assert.ok(startup);
+  assert.match(startup, /timeout-minutes: 4/);
+  assert.match(startup, /id: native-eval-fixtures/);
+  assert.match(startup, /owned=true/);
+  assert.ok(startup.indexOf('test -z') < startup.indexOf('owned=true'));
+  assert.ok(startup.indexOf('owned=true') < startup.indexOf('up --detach'));
+  assert.match(startup, /docker compose --project-name "\$project" -f test\/compose\.ai-eval\.yml up --detach --wait --wait-timeout 150/);
+  assert.match(startup, /test -z "\$\(docker ps -a/);
+  const cleanup = /- name: Remove native evaluation fixtures[\s\S]*?(?=\n  full-stack:)/.exec(workflow)?.[0];
+  assert.ok(cleanup);
+  assert.match(cleanup, /if: always\(\) && steps\.native-eval-fixtures\.outputs\.owned == 'true'/);
+  assert.match(cleanup, /timeout-minutes: 3/);
+  assert.match(cleanup, /down --volumes --remove-orphans/);
+  assert.match(workflow, /ai-eval-ci-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}-native-results\.json/);
+  assert.match(compose, /network_mode: none/);
+  assert.equal((compose.match(/network_mode: 'service:eval-runner'/g) ?? []).length, 2);
+  assert.match(compose, /read_only: true/);
+  assert.match(compose, /cap_drop: \[ALL\]/);
+  assert.match(compose, /no-new-privileges:true/);
+  assert.doesNotMatch(compose, /ports:|privileged:|network_mode: host|secrets:/);
+  assert.match(compose, /--auth/);
+  assert.match(compose, /--noscripting/);
+});
+
 test('Vercel clean URLs keep application rewrites on the extensionless SPA shell', () => {
   const config = JSON.parse(readFileSync(resolve(root, 'client/vercel.json'), 'utf8'));
 

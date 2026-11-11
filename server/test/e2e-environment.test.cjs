@@ -33,6 +33,32 @@ test('only explicit local fixture endpoints are accepted; ordinary env is never 
   }
 });
 
+test('native runner identity is optional, bounded and never grants a host-network fallback', () => {
+  const name = 'ai-eval-82d7308f7e2e45a08ad826f5863f9e6d-eval-runner-1';
+  assert.equal(
+    createE2eEnvironment(fixture).AI_EVAL_RUNNER_CONTAINER,
+    undefined,
+  );
+  assert.equal(
+    createE2eEnvironment({ ...fixture, AI_EVAL_RUNNER_CONTAINER: name })
+      .AI_EVAL_RUNNER_CONTAINER,
+    name,
+  );
+  for (const invalid of [
+    '',
+    'production-db',
+    'ai-eval-123-eval-runner-1;curl',
+    '../runner',
+    `ai-eval-${'a'.repeat(81)}-eval-runner-1`,
+  ]) {
+    assert.throws(
+      () =>
+        createE2eEnvironment({ ...fixture, AI_EVAL_RUNNER_CONTAINER: invalid }),
+      /AI_EVAL_RUNNER_CONTAINER/,
+    );
+  }
+});
+
 test('drops inherited provider credentials, preload options and production config', () => {
   const env = createE2eEnvironment({
     ...fixture,

@@ -59,6 +59,8 @@ jobs:
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:15432/data_explorer_e2e
       E2E_REDIS_URL: redis://127.0.0.1:16379/15
       COMPOSE_PROJECT_NAME: data-explorer-server-${{ github.run_id }}
+      AI_EVAL_RUNNER_CONTAINER: ai-eval-ci-${{ github.run_id }}-${{ github.run_attempt }}-eval-runner-1
+      TMPDIR: ${{ runner.temp }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -74,13 +76,23 @@ jobs:
           NPM_AUDIT_ALLOW_GHSA: GHSA-GGR8-5VV4-36MX
       - run: npm run prisma:generate
       - run: npm run typecheck
-      - run: node --test scripts/prisma-generate-safe.test.mjs test/ai-execution-ledger-worker.test.cjs
+      - run: node --test scripts/prisma-generate-safe.test.mjs test/ai-execution-ledger-worker.test.cjs scripts/ai-eval/native-replay.test.mjs
       - name: Start owned PostgreSQL, Redis, MongoDB and MySQL fixtures
         run: docker compose -f test/compose.e2e.yml -f test/compose.r03.yml up -d --wait
       - run: npx prisma migrate deploy
       - run: npm run lint
       - run: npm run test:cov
       - run: npm run build
+      - name: Start network-isolated native evaluation fixtures
+        id: native-eval-fixtures
+        timeout-minutes: 4
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="ai-eval-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          test -z "$(docker ps -a --filter "label=com.docker.compose.project=$project" --format '{{.ID}}')"
+          printf 'owned=true\n' >> "$GITHUB_OUTPUT"
+          docker compose --project-name "$project" -f test/compose.ai-eval.yml up --detach --wait --wait-timeout 150
       - name: Run server E2E checks with failure-preserving logs
         shell: bash
         run: |
@@ -98,9 +110,18 @@ jobs:
             server/e2e-results.json
             server/e2e.log
             server/fixture.log
+            ${{ runner.temp }}/ai-eval-ci-${{ github.run_id }}-${{ github.run_attempt }}-native-results.json
       - name: Remove owned fixtures
         if: always()
         run: docker compose -f test/compose.e2e.yml -f test/compose.r03.yml down --volumes --remove-orphans
+      - name: Remove native evaluation fixtures
+        if: always() && steps.native-eval-fixtures.outputs.owned == 'true'
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          set -euo pipefail
+          project="ai-eval-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker compose --project-name "$project" -f test/compose.ai-eval.yml down --volumes --remove-orphans
 
   full-stack:
     name: Full-stack browser

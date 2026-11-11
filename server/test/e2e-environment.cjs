@@ -20,7 +20,18 @@ function createE2eEnvironment(source) {
     }
   }
 
+  const runner = source.AI_EVAL_RUNNER_CONTAINER;
+  if (
+    runner !== undefined &&
+    (typeof runner !== 'string' ||
+      !/^ai-eval-[a-z0-9-]{8,80}-eval-runner-1$/.test(runner))
+  ) {
+    throw new Error(
+      'AI_EVAL_RUNNER_CONTAINER must name the owned native fixture.',
+    );
+  }
   const env = {};
+  if (runner !== undefined) env.AI_EVAL_RUNNER_CONTAINER = runner;
   for (const key of [
     'PATH',
     'Path',
