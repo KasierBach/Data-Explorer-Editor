@@ -19,10 +19,17 @@ const beginExecution = async () => ({
   release: async () => {},
 });
 
+const services = {
+  beginExecution,
+  assertProvider: () => {},
+  chat: { chat: async () => ({}), chatStream: async function* () {} },
+  autocomplete: { autocomplete: async () => '' },
+};
+
 const roster = [{ selectionId: 'beeknoee:fixture', apiModel: 'fixture', label: 'Fixture' }];
 
 test('live bootstrap requires a bounded authority file and never discovers credentials', () => {
-  assert.throws(() => createLiveModelRoleAdapter({ root: join(__dirname, '..'), roster, apiKey: 'fixture', baseUrl: 'https://platform.beeknoee.com/api/v1' }), /MODEL_EVAL_AUTHORITY_FILE_REQUIRED/);
+  assert.throws(() => createLiveModelRoleAdapter({ roster, apiKey: 'fixture', baseUrl: 'https://platform.beeknoee.com/api/v1' }), /MODEL_EVAL_AUTHORITY_FILE_REQUIRED/);
 });
 
 test('live bootstrap binds exact authority bytes, roster, recipient and deadline', () => {
@@ -40,9 +47,9 @@ test('live bootstrap binds exact authority bytes, roster, recipient and deadline
   }), { flag: 'wx', mode: 0o600 });
   try {
     const value = createLiveModelRoleAdapter({
-      root: join(__dirname, '..'), roster, apiKey: 'fixture-key',
+      roster, apiKey: 'fixture-key',
       baseUrl: 'https://platform.beeknoee.com/api/v1', authorizationPath: path,
-      beginExecution,
+      services,
       now: () => now,
     });
     assert.equal(value.authorization.provider, 'beeknoee');
@@ -66,7 +73,7 @@ test('live bootstrap refuses an absent durable ledger capability', () => {
   }));
   try {
     assert.throws(() => createLiveModelRoleAdapter({
-      root: join(__dirname, '..'), roster, apiKey: 'fixture-key',
+      roster, apiKey: 'fixture-key',
       baseUrl: 'https://platform.beeknoee.com/api/v1', authorizationPath: path,
       now: () => now,
     }), /MODEL_EVAL_LEDGER_CAPABILITY_REQUIRED/);
@@ -75,7 +82,7 @@ test('live bootstrap refuses an absent durable ledger capability', () => {
   }
 });
 
-test('live bootstrap refuses another endpoint before any service is constructed', () => {
+test('live bootstrap refuses absent application policy capability', () => {
   const directory = mkdtempSync(join(tmpdir(), 'data-explorer-model-live-'));
   const path = join(directory, 'authority.json');
   const now = Date.now();
@@ -86,9 +93,29 @@ test('live bootstrap refuses another endpoint before any service is constructed'
   }));
   try {
     assert.throws(() => createLiveModelRoleAdapter({
-      root: join(__dirname, '..'), roster, apiKey: 'fixture-key',
+      roster, apiKey: 'fixture-key',
+      baseUrl: 'https://platform.beeknoee.com/api/v1', authorizationPath: path,
+      services: { ...services, assertProvider: undefined }, now: () => now,
+    }), /MODEL_EVAL_POLICY_CAPABILITY_REQUIRED/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('live bootstrap refuses another endpoint before application dispatch', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'data-explorer-model-live-'));
+  const path = join(directory, 'authority.json');
+  const now = Date.now();
+  writeFileSync(path, JSON.stringify({
+    authorizationId: 'approved-fixture', zeroCostAuthorityVerified: true,
+    zeroCostEvidenceSha256: 'a'.repeat(64), policyVerified: true,
+    ledgerVerified: true, expiresAt: now + 30_000, deadlineAt: now + 20_000,
+  }));
+  try {
+    assert.throws(() => createLiveModelRoleAdapter({
+      roster, apiKey: 'fixture-key',
       baseUrl: 'https://generativelanguage.googleapis.com/v1', authorizationPath: path,
-      beginExecution,
+      services,
       now: () => now,
     }), /MODEL_EVAL_RECIPIENT_MISMATCH/);
   } finally {
