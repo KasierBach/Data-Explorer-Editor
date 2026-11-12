@@ -45,12 +45,14 @@ function blocked(change, source = 'local') {
 test('model role assessment and adapter guards are mandatory offline checks', () => {
   const evaluator = CHECKS.find((check) => check.id === 'offline-evaluator');
   assert.ok(evaluator);
-  assert.deepEqual(evaluator.args.slice(-5), [
+  assert.deepEqual(evaluator.args.slice(-7), [
     'server/scripts/ai-eval/evaluator.test.mjs',
     'server/scripts/ai-eval/native-replay.test.mjs',
     'server/scripts/ai-eval/model-role-assessment.test.mjs',
+    'server/scripts/ai-eval/model-native-worker.test.mjs',
     'server/test/ai-model-role-adapter.test.cjs',
     'server/test/ai-model-role-live.test.cjs',
+    'server/test/ai-model-role-runner.test.cjs',
   ]);
   const client = CHECKS.find((check) => check.id === 'client-ai-vitest');
   assert.ok(client.suites.includes('src/presentation/modules/Query/assistantModelCatalog.test.ts'));

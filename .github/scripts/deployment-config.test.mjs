@@ -88,6 +88,8 @@ test('native replay CI keeps a separate network-none fixture and bounded ownersh
   assert.match(workflow, /scripts\/ai-eval\/model-role-assessment\.test\.mjs/);
   assert.match(workflow, /test\/ai-model-role-adapter\.test\.cjs/);
   assert.match(workflow, /test\/ai-model-role-live\.test\.cjs/);
+  assert.match(workflow, /scripts\/ai-eval\/model-native-worker\.test\.mjs/);
+  assert.match(workflow, /test\/ai-model-role-runner\.test\.cjs/);
   const serverJob = /\n  server:\n([\s\S]*?)(?=\n  full-stack:)/.exec(workflow)?.[1];
   assert.ok(serverJob);
   const serverJobEnv = /\n    env:\n([\s\S]*?)(?=\n    steps:)/.exec(serverJob)?.[1];

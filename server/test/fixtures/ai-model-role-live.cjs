@@ -1,13 +1,40 @@
 'use strict';
 
 const { createHash } = require('node:crypto');
-const { readFileSync } = require('node:fs');
+const { lstatSync, readFileSync } = require('node:fs');
 const { createAppModelRoleAdapter } = require('./ai-model-role-adapter.cjs');
+const forbiddenAuthorityKey = /"((?:\\.|[^"\\])*)"\s*:/g;
+
+function parseAuthority(bytes) {
+  const input = bytes.toString('utf8');
+  const keys = [];
+  try {
+    input.replace(forbiddenAuthorityKey, (_match, key) => {
+      const decoded = JSON.parse(`"${key}"`);
+      if (
+        keys.includes(decoded) ||
+        ['__proto__', 'prototype', 'constructor'].includes(decoded)
+      )
+        throw new Error('MODEL_EVAL_AUTHORITY_INVALID');
+      keys.push(decoded);
+      return _match;
+    });
+    const value = JSON.parse(input);
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      throw new Error('MODEL_EVAL_AUTHORITY_INVALID');
+    return value;
+  } catch (error) {
+    if (error?.message === 'MODEL_EVAL_AUTHORITY_INVALID') throw error;
+    throw new Error('MODEL_EVAL_AUTHORITY_INVALID');
+  }
+}
 
 function readAuthorization(path, roster, now) {
+  const stat = lstatSync(path);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 32 * 1024)
+    throw new Error('MODEL_EVAL_AUTHORITY_INVALID');
   const bytes = readFileSync(path);
-  if (bytes.length > 32 * 1024) throw new Error('MODEL_EVAL_AUTHORITY_TOO_LARGE');
-  const value = JSON.parse(bytes.toString('utf8'));
+  const value = parseAuthority(bytes);
   return {
     ...value,
     credentialPresent: true,
@@ -15,7 +42,6 @@ function readAuthorization(path, roster, now) {
     recipient: 'https://platform.beeknoee.com',
     modelIds: roster.map((item) => item.apiModel),
     authorizationSha256: createHash('sha256').update(bytes).digest('hex'),
-    loadedAt: now,
   };
 }
 

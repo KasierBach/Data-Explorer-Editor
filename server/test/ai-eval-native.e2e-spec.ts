@@ -22,6 +22,7 @@ const scenarios = [
   'cleanup-refusal',
   'mongo-marker-ack-loss',
   'close-seed-phase',
+  'model-native-worker',
 ];
 
 /** Native drivers run in a fresh Node process, not Jest's ESM/module facade. */

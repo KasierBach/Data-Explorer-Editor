@@ -110,6 +110,34 @@ test('attempt admission is shared, sequential, finite and never renewed', () => 
   );
 });
 
+test('attempt journal records every admitted ordinal before dispatch', () => {
+  const journal = [];
+  const budget = createModelAttemptBudget({
+    maxAttempts: 2,
+    deadlineAt: now + 50,
+    now: () => now,
+    onAcquire: (ordinal) => journal.push(ordinal),
+  });
+  const first = budget.acquire();
+  assert.deepEqual(journal, [1]);
+  first.release();
+  budget.acquire().release();
+  assert.deepEqual(journal, [1, 2]);
+});
+
+test('attempt admission fails closed when the durable journal cannot record it', () => {
+  const budget = createModelAttemptBudget({
+    maxAttempts: 1,
+    deadlineAt: now + 50,
+    now: () => now,
+    onAcquire: () => {
+      throw new Error('journal unavailable');
+    },
+  });
+  assert.throws(() => budget.acquire(), /journal unavailable/);
+  assert.equal(budget.attempts, 0);
+  assert.equal(budget.active, false);
+});
 test('model operation failure reasons do not imply task incapability', () => {
   assert.equal(classifyModelOperation({ status: 401 }), 'auth-denied');
   assert.equal(classifyModelOperation({ status: 403 }), 'auth-denied');
@@ -119,6 +147,14 @@ test('model operation failure reasons do not imply task incapability', () => {
   assert.equal(
     classifyModelOperation({ code: 'AI_REQUEST_TIMEOUT' }),
     'timeout',
+  );
+  assert.equal(
+    classifyModelOperation({ code: 'MODEL_EVAL_POLICY_DENIED' }),
+    'policy-denied',
+  );
+  assert.equal(
+    classifyModelOperation({ code: 'MODEL_EVAL_STREAM_TERMINAL_MISSING' }),
+    'invalid-output',
   );
   assert.equal(
     classifyModelOperation(new Error('API key SECRET customer query')),
@@ -190,6 +226,28 @@ test('a model auth/quota failure stops its probes and retains unknown capability
   assert.ok(!JSON.stringify(report).includes('SECRET'));
 });
 
+test('fatal adapter control failures abort the run instead of becoming model evidence', async () => {
+  await assert.rejects(
+    runModelRoleAssessment({
+      roster: roster.slice(0, 1),
+      authorization: { ...authorization, modelIds: [roster[0].apiModel] },
+      now: () => now,
+      adapter: {
+        runProbe: async (_request, budget) => {
+          budget.acquire().release();
+          throw Object.assign(new Error('private ledger failure'), {
+            code: 'MODEL_EVAL_LEDGER_SETTLEMENT_FAILED',
+          });
+        },
+        isFatalError: (error) =>
+          error.code === 'MODEL_EVAL_LEDGER_SETTLEMENT_FAILED',
+      },
+    }),
+    (error) =>
+      error.code === 'MODEL_EVAL_LEDGER_SETTLEMENT_FAILED' &&
+      error.message === 'private ledger failure',
+  );
+});
 test('quality and identity require evidence, not a producer score or requested-model echo', async () => {
   const report = await runModelRoleAssessment({
     roster: roster.slice(0, 1),
@@ -223,6 +281,41 @@ test('quality and identity require evidence, not a producer score or requested-m
   assert.equal(report.semanticModelAccuracy, 'NOT_ASSESSED');
 });
 
+test('native infrastructure failures abort instead of becoming model quality failures', async () => {
+  const first = roster[0];
+  await assert.rejects(
+    runModelRoleAssessment({
+      roster: [first],
+      authorization: { ...authorization, modelIds: [first.apiModel] },
+      now: () => now,
+      nativeExecutor: async () => {
+        throw Object.assign(new Error('private native failure'), {
+          code: 'MODEL_NATIVE_EXECUTION_FAILED',
+        });
+      },
+      adapter: {
+        runProbe: async ({ probe }, budget) => {
+          budget.acquire().release();
+          if (probe.id === 'availability')
+            return {
+              message: 'SMOKE_ACK',
+              terminalVerified: true,
+              reportedModel: first.apiModel,
+            };
+          return {
+            message: 'SQL',
+            sql: 'SELECT COUNT(*) AS total_rows, COUNT(amount) AS known_amounts FROM orders',
+            terminalVerified: true,
+            reportedModel: first.apiModel,
+          };
+        },
+      },
+    }),
+    (error) =>
+      error.code === 'MODEL_NATIVE_EXECUTION_FAILED' &&
+      error.message === 'private native failure',
+  );
+});
 test('role recommendations require observed native matches and remain provisional', async () => {
   const first = roster[0];
   const expectedSql =

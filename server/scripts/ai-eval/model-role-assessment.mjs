@@ -30,7 +30,7 @@ export const MODEL_ROLE_PROBES = snapshotPlainJson([
     role: 'assistant',
     operation: 'chat',
     prompt:
-      'Reply with exactly SMOKE_ACK. Do not use tools or include a query.',
+      'Reply with exactly SMOKE_ACK. Do not use tools or include database commands.',
     language: 'en',
     databaseType: 'postgres',
     rubric: 'format-only-not-task-quality',
@@ -99,7 +99,7 @@ export const MODEL_ROLE_PROBES = snapshotPlainJson([
     role: 'assistant',
     operation: 'stream',
     prompt:
-      'Reply with exactly SMOKE_ACK. Do not use tools or include a query.',
+      'Reply with exactly SMOKE_ACK. Do not use tools or include database commands.',
     language: 'en',
     databaseType: 'postgres',
     rubric: 'format-only-not-task-quality',
@@ -224,6 +224,7 @@ export function createModelAttemptBudget({
   maxAttempts = 80,
   deadlineAt,
   now = Date.now,
+  onAcquire,
 }) {
   requireValue(
     Number.isSafeInteger(maxAttempts) && maxAttempts >= 1 && maxAttempts <= 80,
@@ -246,7 +247,9 @@ export function createModelAttemptBudget({
       requireValue(now() < deadlineAt, 'MODEL_EVALUATION_DEADLINE');
       requireValue(!active, 'MODEL_EVALUATION_BUSY');
       requireValue(attempts < maxAttempts, 'MODEL_EVALUATION_ATTEMPT_LIMIT');
-      attempts++;
+      const ordinal = attempts + 1;
+      if (onAcquire) onAcquire(ordinal);
+      attempts = ordinal;
       active = true;
       let released = false;
       return Object.freeze({
@@ -264,17 +267,23 @@ export function createModelAttemptBudget({
 
 export function classifyModelOperation(error) {
   const status = error?.status ?? error?.statusCode;
+  const code = error?.code;
+  if (code === 'MODEL_EVAL_POLICY_DENIED') return 'policy-denied';
   if ([401, 403].includes(status)) return 'auth-denied';
   if (status === 429) return 'rate-limited';
   if (status === 402) return 'credits-required';
   if (status === 404) return 'unavailable';
-  if (
-    ['AI_REQUEST_TIMEOUT', 'NATIVE_DEADLINE', 'TIMEOUT'].includes(error?.code)
-  )
+  if (['AI_REQUEST_TIMEOUT', 'NATIVE_DEADLINE', 'TIMEOUT'].includes(code))
     return 'timeout';
-  if (error?.code === 'MODEL_EVALUATION_ATTEMPT_LIMIT') return 'attempt-limit';
-  if (error?.code === 'MODEL_EVALUATION_DEADLINE') return 'timeout';
-  if (error?.code === 'MODEL_EVALUATION_BUSY') return 'operation-failed';
+  if (
+    code === 'MODEL_EVAL_STREAM_ERROR' ||
+    code === 'MODEL_EVAL_STREAM_TERMINAL_MISSING' ||
+    code === 'MODEL_EVAL_RESULT_IDENTITY_MISMATCH'
+  )
+    return 'invalid-output';
+  if (code === 'MODEL_EVALUATION_ATTEMPT_LIMIT') return 'attempt-limit';
+  if (code === 'MODEL_EVALUATION_DEADLINE') return 'timeout';
+  if (code === 'MODEL_EVALUATION_BUSY') return 'operation-failed';
   return 'operation-failed';
 }
 
@@ -445,7 +454,13 @@ export async function assessModelProbe(probe, result, catalog, nativeExecutor) {
       querySha256: digest(query),
       nativeResultSha256: digest(native),
     };
-  } catch {
+  } catch (error) {
+    if (
+      typeof error?.code === 'string' &&
+      (error.code.startsWith('MODEL_NATIVE_') ||
+        error.code.startsWith('NATIVE_'))
+    )
+      throw error;
     return {
       verdict: 'observed-failure',
       reasons: ['NATIVE_EXECUTION_FAILED'],
@@ -462,6 +477,7 @@ export async function runModelRoleAssessment({
   nativeExecutor,
   now = Date.now,
   maxAttempts = 80,
+  onAttempt,
 }) {
   const models = snapshotPlainJson(roster).map(unknownModel);
   const preflight = assessModelEvaluationPreflight(
@@ -476,6 +492,7 @@ export async function runModelRoleAssessment({
         maxAttempts,
         deadlineAt: authorization.deadlineAt,
         now,
+        onAcquire: onAttempt,
       })
     : null;
   if (preflight.allowed)
@@ -553,6 +570,13 @@ export async function runModelRoleAssessment({
           )
             model.capabilities.stream.live = 'terminal-tested';
         } catch (error) {
+          if (
+            adapter.isFatalError?.(error) ||
+            (typeof error?.code === 'string' &&
+              (error.code.startsWith('MODEL_NATIVE_') ||
+                error.code.startsWith('NATIVE_')))
+          )
+            throw error;
           model.operationalStatus = classifyModelOperation(error);
           model.probes.push({
             id: probe.id,

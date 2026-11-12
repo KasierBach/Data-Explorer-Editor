@@ -5,7 +5,9 @@ const test = require('node:test');
 const { mkdtempSync, writeFileSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join } = require('node:path');
-const { createLiveModelRoleAdapter } = require('./fixtures/ai-model-role-live.cjs');
+const {
+  createLiveModelRoleAdapter,
+} = require('./fixtures/ai-model-role-live.cjs');
 
 const beginExecution = async () => ({
   generationId: 'fixture-generation',
@@ -26,34 +28,79 @@ const services = {
   autocomplete: { autocomplete: async () => '' },
 };
 
-const roster = [{ selectionId: 'beeknoee:fixture', apiModel: 'fixture', label: 'Fixture' }];
+const roster = [
+  { selectionId: 'beeknoee:fixture', apiModel: 'fixture', label: 'Fixture' },
+];
 
 test('live bootstrap requires a bounded authority file and never discovers credentials', () => {
-  assert.throws(() => createLiveModelRoleAdapter({ roster, apiKey: 'fixture', baseUrl: 'https://platform.beeknoee.com/api/v1' }), /MODEL_EVAL_AUTHORITY_FILE_REQUIRED/);
+  assert.throws(
+    () =>
+      createLiveModelRoleAdapter({
+        roster,
+        apiKey: 'fixture',
+        baseUrl: 'https://platform.beeknoee.com/api/v1',
+      }),
+    /MODEL_EVAL_AUTHORITY_FILE_REQUIRED/,
+  );
 });
 
+test('live bootstrap rejects duplicate and prototype authority keys', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'data-explorer-model-live-'));
+  try {
+    for (const [index, source] of [
+      '{"authorizationId":"first","authorizationId":"second"}',
+      '{"__proto__":{"zeroCostAuthorityVerified":true}}',
+      '{"constr\\u0075ctor":true}',
+    ].entries()) {
+      const path = join(directory, `authority-${index}.json`);
+      writeFileSync(path, source, { flag: 'wx', mode: 0o600 });
+      assert.throws(
+        () =>
+          createLiveModelRoleAdapter({
+            roster,
+            apiKey: 'fixture-key',
+            baseUrl: 'https://platform.beeknoee.com/api/v1',
+            authorizationPath: path,
+            services,
+          }),
+        /MODEL_EVAL_AUTHORITY_INVALID/,
+      );
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 test('live bootstrap binds exact authority bytes, roster, recipient and deadline', () => {
   const directory = mkdtempSync(join(tmpdir(), 'data-explorer-model-live-'));
   const path = join(directory, 'authority.json');
   const now = Date.parse('2026-11-11T12:00:00.000Z');
-  writeFileSync(path, JSON.stringify({
-    authorizationId: 'approved-fixture',
-    zeroCostAuthorityVerified: true,
-    zeroCostEvidenceSha256: 'a'.repeat(64),
-    policyVerified: true,
-    ledgerVerified: true,
-    expiresAt: now + 30_000,
-    deadlineAt: now + 20_000,
-  }), { flag: 'wx', mode: 0o600 });
+  writeFileSync(
+    path,
+    JSON.stringify({
+      authorizationId: 'approved-fixture',
+      zeroCostAuthorityVerified: true,
+      zeroCostEvidenceSha256: 'a'.repeat(64),
+      policyVerified: true,
+      ledgerVerified: true,
+      expiresAt: now + 30_000,
+      deadlineAt: now + 20_000,
+    }),
+    { flag: 'wx', mode: 0o600 },
+  );
   try {
     const value = createLiveModelRoleAdapter({
-      roster, apiKey: 'fixture-key',
-      baseUrl: 'https://platform.beeknoee.com/api/v1', authorizationPath: path,
+      roster,
+      apiKey: 'fixture-key',
+      baseUrl: 'https://platform.beeknoee.com/api/v1',
+      authorizationPath: path,
       services,
       now: () => now,
     });
     assert.equal(value.authorization.provider, 'beeknoee');
-    assert.equal(value.authorization.recipient, 'https://platform.beeknoee.com');
+    assert.equal(
+      value.authorization.recipient,
+      'https://platform.beeknoee.com',
+    );
     assert.deepEqual(value.authorization.modelIds, ['fixture']);
     assert.match(value.authorization.authorizationSha256, /^[0-9a-f]{64}$/);
     assert.equal(typeof value.adapter.runProbe, 'function');
@@ -66,17 +113,30 @@ test('live bootstrap refuses an absent durable ledger capability', () => {
   const directory = mkdtempSync(join(tmpdir(), 'data-explorer-model-live-'));
   const path = join(directory, 'authority.json');
   const now = Date.now();
-  writeFileSync(path, JSON.stringify({
-    authorizationId: 'approved-fixture', zeroCostAuthorityVerified: true,
-    zeroCostEvidenceSha256: 'a'.repeat(64), policyVerified: true,
-    ledgerVerified: true, expiresAt: now + 30_000, deadlineAt: now + 20_000,
-  }));
+  writeFileSync(
+    path,
+    JSON.stringify({
+      authorizationId: 'approved-fixture',
+      zeroCostAuthorityVerified: true,
+      zeroCostEvidenceSha256: 'a'.repeat(64),
+      policyVerified: true,
+      ledgerVerified: true,
+      expiresAt: now + 30_000,
+      deadlineAt: now + 20_000,
+    }),
+  );
   try {
-    assert.throws(() => createLiveModelRoleAdapter({
-      roster, apiKey: 'fixture-key',
-      baseUrl: 'https://platform.beeknoee.com/api/v1', authorizationPath: path,
-      now: () => now,
-    }), /MODEL_EVAL_LEDGER_CAPABILITY_REQUIRED/);
+    assert.throws(
+      () =>
+        createLiveModelRoleAdapter({
+          roster,
+          apiKey: 'fixture-key',
+          baseUrl: 'https://platform.beeknoee.com/api/v1',
+          authorizationPath: path,
+          now: () => now,
+        }),
+      /MODEL_EVAL_LEDGER_CAPABILITY_REQUIRED/,
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -86,17 +146,31 @@ test('live bootstrap refuses absent application policy capability', () => {
   const directory = mkdtempSync(join(tmpdir(), 'data-explorer-model-live-'));
   const path = join(directory, 'authority.json');
   const now = Date.now();
-  writeFileSync(path, JSON.stringify({
-    authorizationId: 'approved-fixture', zeroCostAuthorityVerified: true,
-    zeroCostEvidenceSha256: 'a'.repeat(64), policyVerified: true,
-    ledgerVerified: true, expiresAt: now + 30_000, deadlineAt: now + 20_000,
-  }));
+  writeFileSync(
+    path,
+    JSON.stringify({
+      authorizationId: 'approved-fixture',
+      zeroCostAuthorityVerified: true,
+      zeroCostEvidenceSha256: 'a'.repeat(64),
+      policyVerified: true,
+      ledgerVerified: true,
+      expiresAt: now + 30_000,
+      deadlineAt: now + 20_000,
+    }),
+  );
   try {
-    assert.throws(() => createLiveModelRoleAdapter({
-      roster, apiKey: 'fixture-key',
-      baseUrl: 'https://platform.beeknoee.com/api/v1', authorizationPath: path,
-      services: { ...services, assertProvider: undefined }, now: () => now,
-    }), /MODEL_EVAL_POLICY_CAPABILITY_REQUIRED/);
+    assert.throws(
+      () =>
+        createLiveModelRoleAdapter({
+          roster,
+          apiKey: 'fixture-key',
+          baseUrl: 'https://platform.beeknoee.com/api/v1',
+          authorizationPath: path,
+          services: { ...services, assertProvider: undefined },
+          now: () => now,
+        }),
+      /MODEL_EVAL_POLICY_CAPABILITY_REQUIRED/,
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -106,18 +180,31 @@ test('live bootstrap refuses another endpoint before application dispatch', () =
   const directory = mkdtempSync(join(tmpdir(), 'data-explorer-model-live-'));
   const path = join(directory, 'authority.json');
   const now = Date.now();
-  writeFileSync(path, JSON.stringify({
-    authorizationId: 'approved-fixture', zeroCostAuthorityVerified: true,
-    zeroCostEvidenceSha256: 'a'.repeat(64), policyVerified: true,
-    ledgerVerified: true, expiresAt: now + 30_000, deadlineAt: now + 20_000,
-  }));
+  writeFileSync(
+    path,
+    JSON.stringify({
+      authorizationId: 'approved-fixture',
+      zeroCostAuthorityVerified: true,
+      zeroCostEvidenceSha256: 'a'.repeat(64),
+      policyVerified: true,
+      ledgerVerified: true,
+      expiresAt: now + 30_000,
+      deadlineAt: now + 20_000,
+    }),
+  );
   try {
-    assert.throws(() => createLiveModelRoleAdapter({
-      roster, apiKey: 'fixture-key',
-      baseUrl: 'https://generativelanguage.googleapis.com/v1', authorizationPath: path,
-      services,
-      now: () => now,
-    }), /MODEL_EVAL_RECIPIENT_MISMATCH/);
+    assert.throws(
+      () =>
+        createLiveModelRoleAdapter({
+          roster,
+          apiKey: 'fixture-key',
+          baseUrl: 'https://generativelanguage.googleapis.com/v1',
+          authorizationPath: path,
+          services,
+          now: () => now,
+        }),
+      /MODEL_EVAL_RECIPIENT_MISMATCH/,
+    );
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
@@ -38,6 +39,7 @@ export const NATIVE_SCENARIOS = Object.freeze([
   'cleanup-refusal',
   'mongo-marker-ack-loss',
   'close-seed-phase',
+  'model-native-worker',
 ]);
 const catalogPath = fileURLToPath(
   new URL('../../scripts/ai-eval/synthetic-catalog.v1.json', import.meta.url),
@@ -420,6 +422,41 @@ async function runScenario(scenario) {
         MongoClient.prototype.connect = connect;
         await closePromise;
       }
+    } else if (scenario === 'model-native-worker') {
+      await fixture.close();
+      const worker = spawnSync(
+        process.execPath,
+        [
+          fileURLToPath(
+            new URL(
+              '../../scripts/ai-eval/model-native-worker.mjs',
+              import.meta.url,
+            ),
+          ),
+        ],
+        {
+          input: [
+            ...['sql-count-null', 'mongo-null-or-missing', 'sql-null-note'].map(
+              (caseId, index) =>
+                JSON.stringify({ id: index + 1, action: 'execute', caseId }),
+            ),
+            JSON.stringify({ id: 4, action: 'close' }),
+            '',
+          ].join('\n'),
+          encoding: 'utf8',
+          timeout: 20000,
+          maxBuffer: 1024 * 1024,
+        },
+      );
+      assert.ifError(worker.error);
+      assert.equal(worker.status, 0);
+      assert.equal(worker.stderr, '');
+      const messages = worker.stdout.trim().split(/\r?\n/).map(JSON.parse);
+      assert.deepEqual(messages[0], { type: 'ready' });
+      assert.deepEqual(messages[1].value.rows, [[6, 5]]);
+      assert.deepEqual(messages[2].value.rows, [[1], [2]]);
+      assert.deepEqual(messages[3].value.rows, [[10], [13], [14]]);
+      assert.deepEqual(messages[4], { id: 4, ok: true, value: null });
     } else if (scenario === 'cleanup-readback') {
       await fixture.close();
       await fixture.close();

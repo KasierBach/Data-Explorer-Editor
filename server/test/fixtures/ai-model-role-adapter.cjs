@@ -1,11 +1,36 @@
 'use strict';
 
-const { createHash, randomUUID } = require('node:crypto');
+const { createHash } = require('node:crypto');
 const BEEKNOEE_ORIGIN = 'https://platform.beeknoee.com';
+const FATAL_EVALUATION_CODES = new Set([
+  'MODEL_EVAL_ATTEMPT_ALREADY_SETTLED',
+  'MODEL_EVAL_DEADLINE',
+  'MODEL_EVAL_DURABLE_ATTEMPT_INVALID',
+  'MODEL_EVAL_DURABLE_EXECUTION_INVALID',
+  'MODEL_EVAL_GENERATION_NOT_COMPLETED',
+  'MODEL_EVAL_PLAN_MISMATCH',
+  'MODEL_EVAL_PROVIDER_NOT_DISPATCHED',
+  'MODEL_EVAL_STREAM_ERROR',
+  'MODEL_EVAL_ATTEMPT_UNSETTLED',
+  'MODEL_EVALUATION_ATTEMPT_LIMIT',
+  'MODEL_EVALUATION_BUSY',
+  'MODEL_EVALUATION_DEADLINE',
+]);
+const OPERATION_EVIDENCE_CODES = new Set([
+  'MODEL_EVAL_POLICY_DENIED',
+  'MODEL_EVAL_RESULT_IDENTITY_MISMATCH',
+  'MODEL_EVAL_STREAM_TERMINAL_MISSING',
+]);
+const controlError = (code) => Object.assign(new Error(code), { code });
+const wrapControl = (code, error) => {
+  if (isFatalModelEvaluationError(error)) return error;
+  return controlError(code);
+};
 const requireValue = (value, code) => {
   if (!value) throw Object.assign(new Error(code), { code });
 };
-const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const hash = (value) =>
+  createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 function providerFromModel(model) {
   return {
@@ -15,10 +40,28 @@ function providerFromModel(model) {
   };
 }
 
-async function createAttemptExecution(model, budget, services, probe, deadlineAt) {
-  const durable = typeof services.beginExecution === 'function'
-    ? await services.beginExecution(model, probe, deadlineAt)
-    : null;
+async function createAttemptExecution(
+  model,
+  budget,
+  services,
+  probe,
+  deadlineAt,
+) {
+  let durable;
+  try {
+    durable = await services.beginExecution(model, probe, deadlineAt);
+  } catch (error) {
+    throw wrapControl('MODEL_EVAL_LEDGER_BEGIN_FAILED', error);
+  }
+  requireValue(
+    durable &&
+      typeof durable.generationId === 'string' &&
+      typeof durable.beforeAttempt === 'function' &&
+      typeof durable.complete === 'function' &&
+      typeof durable.fail === 'function' &&
+      typeof durable.release === 'function',
+    'MODEL_EVAL_DURABLE_EXECUTION_INVALID',
+  );
   const active = new Set();
   let opened = 0;
   let usage = null;
@@ -27,27 +70,49 @@ async function createAttemptExecution(model, budget, services, probe, deadlineAt
   const releaseGeneration = async () => {
     if (!released) {
       released = true;
-      await durable?.release();
+      try {
+        await durable.release();
+      } catch (error) {
+        released = false;
+        throw wrapControl('MODEL_EVAL_LEDGER_RELEASE_FAILED', error);
+      }
     }
   };
   const beforeAttempt = async (plan) => {
-    requireValue(plan.provider === 'beeknoee' && plan.model === model.apiModel, 'MODEL_EVAL_PLAN_MISMATCH');
+    requireValue(
+      plan.provider === 'beeknoee' && plan.model === model.apiModel,
+      'MODEL_EVAL_PLAN_MISMATCH',
+    );
     const lease = budget.acquire();
     let handle;
     try {
-      handle = durable ? await durable.beforeAttempt(plan) : null;
+      handle = await durable.beforeAttempt(plan);
+      requireValue(
+        handle &&
+          typeof handle.attemptId === 'string' &&
+          typeof handle.complete === 'function' &&
+          typeof handle.fail === 'function',
+        'MODEL_EVAL_DURABLE_ATTEMPT_INVALID',
+      );
     } catch (error) {
       lease.release();
-      throw error;
+      throw wrapControl('MODEL_EVAL_LEDGER_ATTEMPT_BEGIN_FAILED', error);
     }
     opened++;
     let settled = false;
     const attempt = {
-      attemptId: handle?.attemptId ?? randomUUID(),
+      attemptId: handle.attemptId,
       async complete(result = {}) {
         requireValue(!settled, 'MODEL_EVAL_ATTEMPT_ALREADY_SETTLED');
-        requireValue(result.provider === 'beeknoee' && result.model === model.apiModel, 'MODEL_EVAL_PLAN_MISMATCH');
-        await handle?.complete(result);
+        requireValue(
+          result.provider === 'beeknoee' && result.model === model.apiModel,
+          'MODEL_EVAL_PLAN_MISMATCH',
+        );
+        try {
+          await handle.complete(result);
+        } catch (error) {
+          throw wrapControl('MODEL_EVAL_LEDGER_ATTEMPT_COMPLETE_FAILED', error);
+        }
         usage = result.usage ?? usage;
         settled = true;
         active.delete(attempt);
@@ -55,7 +120,11 @@ async function createAttemptExecution(model, budget, services, probe, deadlineAt
       },
       async fail(outcome = 'failed', result = {}) {
         if (!settled) {
-          await handle?.fail(outcome, result);
+          try {
+            await handle.fail(outcome, result);
+          } catch (error) {
+            throw wrapControl('MODEL_EVAL_LEDGER_ATTEMPT_FAIL_FAILED', error);
+          }
           usage = result.usage ?? usage;
           settled = true;
           active.delete(attempt);
@@ -71,18 +140,27 @@ async function createAttemptExecution(model, budget, services, probe, deadlineAt
   };
   return {
     execution: {
-      generationId: durable?.generationId ?? randomUUID(),
+      generationId: durable.generationId,
       beforeAttempt,
     },
     async succeed() {
       requireValue(opened > 0, 'MODEL_EVAL_PROVIDER_NOT_DISPATCHED');
       requireValue(active.size === 0, 'MODEL_EVAL_ATTEMPT_UNSETTLED');
       try {
-        if (durable) {
-          const summary = await durable.complete({ provider: 'beeknoee', model: model.apiModel });
-          requireValue(summary.outcome === 'succeeded', 'MODEL_EVAL_GENERATION_NOT_COMPLETED');
-          usage = summary.usage ?? usage;
+        let summary;
+        try {
+          summary = await durable.complete({
+            provider: 'beeknoee',
+            model: model.apiModel,
+          });
+        } catch (error) {
+          throw wrapControl('MODEL_EVAL_LEDGER_COMPLETE_FAILED', error);
         }
+        requireValue(
+          summary.outcome === 'succeeded',
+          'MODEL_EVAL_GENERATION_NOT_COMPLETED',
+        );
+        usage = summary.usage ?? usage;
         generationSettled = true;
         return usage;
       } finally {
@@ -90,14 +168,20 @@ async function createAttemptExecution(model, budget, services, probe, deadlineAt
       }
     },
     async fail(error) {
-      const outcome = error?.code === 'AI_REQUEST_TIMEOUT' || error?.name === 'TimeoutError'
-        ? 'timed_out'
-        : error?.name === 'AbortError'
-          ? 'cancelled'
-          : 'failed';
+      const outcome =
+        error?.code === 'AI_REQUEST_TIMEOUT' || error?.name === 'TimeoutError'
+          ? 'timed_out'
+          : error?.name === 'AbortError'
+            ? 'cancelled'
+            : 'failed';
       try {
         await failActive(outcome);
-        if (durable && !generationSettled) await durable.fail(outcome);
+        if (!generationSettled)
+          try {
+            await durable.fail(outcome);
+          } catch (error) {
+            throw wrapControl('MODEL_EVAL_LEDGER_FAIL_FAILED', error);
+          }
         generationSettled = true;
       } finally {
         await releaseGeneration();
@@ -106,18 +190,45 @@ async function createAttemptExecution(model, budget, services, probe, deadlineAt
   };
 }
 
-function createAppModelRoleAdapter({ apiKey, baseUrl, deadlineAt, services, now = Date.now }) {
-  requireValue(typeof apiKey === 'string' && apiKey.trim(), 'MODEL_EVAL_CREDENTIAL_MISSING');
+function isFatalModelEvaluationError(error) {
+  return (
+    typeof error?.code === 'string' &&
+    !OPERATION_EVIDENCE_CODES.has(error.code) &&
+    (FATAL_EVALUATION_CODES.has(error.code) ||
+      error.code.startsWith('MODEL_EVAL_LEDGER_'))
+  );
+}
+
+function createAppModelRoleAdapter({
+  apiKey,
+  baseUrl,
+  deadlineAt,
+  services,
+  now = Date.now,
+}) {
+  requireValue(
+    typeof apiKey === 'string' && apiKey.trim(),
+    'MODEL_EVAL_CREDENTIAL_MISSING',
+  );
   let origin;
   try {
     const url = new URL(baseUrl);
     origin = url.origin;
-    requireValue(origin === BEEKNOEE_ORIGIN && url.pathname.replace(/\/$/, '') === '/api/v1', 'MODEL_EVAL_RECIPIENT_MISMATCH');
+    requireValue(
+      origin === BEEKNOEE_ORIGIN &&
+        url.pathname.replace(/\/$/, '') === '/api/v1',
+      'MODEL_EVAL_RECIPIENT_MISMATCH',
+    );
   } catch (error) {
     if (error?.code) throw error;
-    throw Object.assign(new Error('MODEL_EVAL_RECIPIENT_MISMATCH'), { code: 'MODEL_EVAL_RECIPIENT_MISMATCH' });
+    throw Object.assign(new Error('MODEL_EVAL_RECIPIENT_MISMATCH'), {
+      code: 'MODEL_EVAL_RECIPIENT_MISMATCH',
+    });
   }
-  requireValue(Number.isSafeInteger(deadlineAt) && deadlineAt > now(), 'MODEL_EVAL_DEADLINE');
+  requireValue(
+    Number.isSafeInteger(deadlineAt) && deadlineAt > now(),
+    'MODEL_EVAL_DEADLINE',
+  );
   requireValue(
     services &&
       typeof services.assertProvider === 'function' &&
@@ -129,23 +240,54 @@ function createAppModelRoleAdapter({ apiKey, baseUrl, deadlineAt, services, now 
 
   const runProbe = async ({ model, probe }, budget) => {
     requireValue(now() < deadlineAt, 'MODEL_EVAL_DEADLINE');
-    requireValue(/^beeknoee:[a-z0-9][a-z0-9./-]{0,160}$/.test(model.selectionId) && model.selectionId === `beeknoee:${model.apiModel}`, 'MODEL_EVAL_MODEL_INVALID');
+    requireValue(
+      /^beeknoee:[a-z0-9][a-z0-9./-]{0,160}$/.test(model.selectionId) &&
+        model.selectionId === `beeknoee:${model.apiModel}`,
+      'MODEL_EVAL_MODEL_INVALID',
+    );
     const plan = providerFromModel(model);
-    services.assertProvider(plan);
-    const attempt = await createAttemptExecution(model, budget, services, probe, deadlineAt);
+    try {
+      await services.assertProvider(plan);
+    } catch (error) {
+      throw wrapControl('MODEL_EVAL_POLICY_DENIED', error);
+    }
+    const attempt = await createAttemptExecution(
+      model,
+      budget,
+      services,
+      probe,
+      deadlineAt,
+    );
     const requestBase = {
       model: model.selectionId,
       fallbackProvider: 'none',
       disabledProviders: ['gemini', 'groq', 'cerebras', 'openrouter'],
       deadlineAt,
-      requestScopeKey: JSON.stringify(['model-evaluation', model.apiModel, probe.id]),
+      requestScopeKey: JSON.stringify([
+        'model-evaluation',
+        model.apiModel,
+        probe.id,
+      ]),
       beforeProviderRequest: async () => {
         requireValue(now() < deadlineAt, 'MODEL_EVAL_DEADLINE');
-        services.assertProvider(plan);
+        try {
+          await services.assertProvider(plan);
+        } catch (error) {
+          throw wrapControl('MODEL_EVAL_POLICY_DENIED', error);
+        }
       },
       beforeProviderAttempt: async (actual) => {
-        requireValue(actual.provider === plan.provider && actual.model === plan.model && actual.baseUrl === plan.baseUrl, 'MODEL_EVAL_PLAN_MISMATCH');
-        services.assertProvider(actual);
+        requireValue(
+          actual.provider === plan.provider &&
+            actual.model === plan.model &&
+            actual.baseUrl === plan.baseUrl,
+          'MODEL_EVAL_PLAN_MISMATCH',
+        );
+        try {
+          await services.assertProvider(actual);
+        } catch (error) {
+          throw wrapControl('MODEL_EVAL_POLICY_DENIED', error);
+        }
       },
       execution: attempt.execution,
     };
@@ -177,11 +319,24 @@ function createAppModelRoleAdapter({ apiKey, baseUrl, deadlineAt, services, now 
             if (firstChunkAt === null) firstChunkAt = now();
             accumulated += event.text;
           } else if (event.type === 'error') {
-            throw Object.assign(new Error('MODEL_EVAL_STREAM_ERROR'), { code: 'MODEL_EVAL_STREAM_ERROR' });
+            throw Object.assign(new Error('MODEL_EVAL_STREAM_ERROR'), {
+              code: 'MODEL_EVAL_STREAM_ERROR',
+            });
           } else if (event.type === 'done') done = event.data;
         }
-        requireValue(done && typeof done.message === 'string' && done.provider === 'beeknoee' && done.model === model.apiModel, 'MODEL_EVAL_STREAM_TERMINAL_MISSING');
-        response = { message: done.message || accumulated, sql: done.sql, terminalVerified: true, reportedModel: done.providerReportedModel ?? null };
+        requireValue(
+          done &&
+            typeof done.message === 'string' &&
+            done.provider === 'beeknoee' &&
+            done.model === model.apiModel,
+          'MODEL_EVAL_STREAM_TERMINAL_MISSING',
+        );
+        response = {
+          message: done.message || accumulated,
+          sql: done.sql,
+          terminalVerified: true,
+          reportedModel: done.providerReportedModel ?? null,
+        };
       } else {
         const result = await services.chat.chat({
           ...requestBase,
@@ -190,24 +345,50 @@ function createAppModelRoleAdapter({ apiKey, baseUrl, deadlineAt, services, now 
           databaseType: probe.databaseType,
           mode: 'fast',
         });
-        requireValue(result && result.provider === 'beeknoee' && result.model === model.apiModel, 'MODEL_EVAL_RESULT_IDENTITY_MISMATCH');
-        response = { message: result.message, sql: result.sql, terminalVerified: true, reportedModel: result.providerReportedModel ?? null };
+        requireValue(
+          result &&
+            result.provider === 'beeknoee' &&
+            result.model === model.apiModel,
+          'MODEL_EVAL_RESULT_IDENTITY_MISMATCH',
+        );
+        response = {
+          message: result.message,
+          sql: result.sql,
+          terminalVerified: true,
+          reportedModel: result.providerReportedModel ?? null,
+        };
       }
       const usage = await attempt.succeed();
       return {
         ...response,
         usage,
         elapsedMs: Math.max(0, now() - startedAt),
-        ttftMs: firstChunkAt === null ? null : Math.max(0, firstChunkAt - startedAt),
-        requestSha256: hash({ version: 1, model: model.apiModel, probe, endpoint: plan.baseUrl }),
+        ttftMs:
+          firstChunkAt === null ? null : Math.max(0, firstChunkAt - startedAt),
+        requestSha256: hash({
+          version: 1,
+          model: model.apiModel,
+          probe,
+          endpoint: plan.baseUrl,
+        }),
       };
     } catch (error) {
-      await attempt.fail(error);
+      try {
+        await attempt.fail(error);
+      } catch (settlementError) {
+        if (
+          settlementError &&
+          typeof settlementError === 'object' &&
+          !settlementError.code
+        )
+          settlementError.code = 'MODEL_EVAL_LEDGER_SETTLEMENT_FAILED';
+        throw settlementError;
+      }
       throw error;
     }
   };
 
-  return Object.freeze({ runProbe });
+  return Object.freeze({ runProbe, isFatalError: isFatalModelEvaluationError });
 }
 
 module.exports = { createAppModelRoleAdapter };
