@@ -18,6 +18,11 @@ const rosterUrl = new URL(
   import.meta.url,
 );
 const roles = ['assistant', 'sql', 'nosql', 'explain', 'autocomplete'];
+const recommendationProbes = Object.freeze({
+  sql: Object.freeze(['sql-count', 'repair-null']),
+  nosql: Object.freeze(['mongo-null']),
+  autocomplete: Object.freeze(['autocomplete-null']),
+});
 const safeError = (code) => Object.assign(new Error(code), { code });
 const requireValue = (value, code) => {
   if (!value) throw safeError(code);
@@ -248,9 +253,20 @@ export function createModelAttemptBudget({
       requireValue(!active, 'MODEL_EVALUATION_BUSY');
       requireValue(attempts < maxAttempts, 'MODEL_EVALUATION_ATTEMPT_LIMIT');
       const ordinal = attempts + 1;
-      if (onAcquire) onAcquire(ordinal);
-      attempts = ordinal;
       active = true;
+      try {
+        if (onAcquire) {
+          const recorded = onAcquire(ordinal);
+          requireValue(
+            !recorded || typeof recorded.then !== 'function',
+            'MODEL_EVALUATION_ATTEMPT_JOURNAL_ASYNC',
+          );
+        }
+        attempts = ordinal;
+      } catch (error) {
+        active = false;
+        throw error;
+      }
       let released = false;
       return Object.freeze({
         ordinal: attempts,
@@ -589,6 +605,7 @@ export async function runModelRoleAssessment({
           break;
         }
       }
+      const identityMismatch = model.operationalStatus === 'identity-mismatch';
       model.roles = roles.map((role) => {
         const observed = model.probes.filter(
           (probe) =>
@@ -597,6 +614,14 @@ export async function runModelRoleAssessment({
               probe.verdict,
             ),
         );
+        const required = recommendationProbes[role] ?? [];
+        const complete =
+          required.length > 0 &&
+          required.every((id) =>
+            model.probes.some(
+              (probe) => probe.id === id && probe.verdict === 'observed-match',
+            ),
+          );
         return {
           role,
           samples: observed.length,
@@ -604,16 +629,24 @@ export async function runModelRoleAssessment({
             (probe) => probe.verdict === 'observed-failure',
           )
             ? 'observed-failure'
-            : observed.some((probe) => probe.verdict === 'requires-review')
+            : identityMismatch && observed.length
               ? 'requires-review'
-              : observed.length
-                ? 'observed-match'
-                : 'not-assessed',
+              : observed.some((probe) => probe.verdict === 'requires-review') ||
+                  (observed.some(
+                    (probe) => probe.verdict === 'observed-match',
+                  ) &&
+                    !complete)
+                ? 'requires-review'
+                : complete
+                  ? 'observed-match'
+                  : 'not-assessed',
         };
       });
-      model.recommendedRoles = model.roles
-        .filter((role) => role.verdict === 'observed-match')
-        .map((role) => role.role);
+      model.recommendedRoles = identityMismatch
+        ? []
+        : model.roles
+            .filter((role) => role.verdict === 'observed-match')
+            .map((role) => role.role);
       model.recommendationLevel = model.recommendedRoles.length
         ? 'provisional-small-sample'
         : 'not-assessed';

@@ -29,18 +29,25 @@ function parseAuthority(bytes) {
   }
 }
 
-function readAuthorization(path, roster, now) {
+function readAuthorization(path, roster) {
   const stat = lstatSync(path);
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 32 * 1024)
     throw new Error('MODEL_EVAL_AUTHORITY_INVALID');
   const bytes = readFileSync(path);
   const value = parseAuthority(bytes);
+  const modelIds = roster.map((item) => item.apiModel);
+  if (
+    value.provider !== 'beeknoee' ||
+    value.recipient !== 'https://platform.beeknoee.com' ||
+    !Array.isArray(value.modelIds) ||
+    value.modelIds.length !== modelIds.length ||
+    new Set(value.modelIds).size !== modelIds.length ||
+    modelIds.some((model) => !value.modelIds.includes(model))
+  )
+    throw new Error('MODEL_EVAL_AUTHORITY_SCOPE_MISMATCH');
   return {
     ...value,
     credentialPresent: true,
-    provider: 'beeknoee',
-    recipient: 'https://platform.beeknoee.com',
-    modelIds: roster.map((item) => item.apiModel),
     authorizationSha256: createHash('sha256').update(bytes).digest('hex'),
   };
 }
@@ -54,7 +61,7 @@ function createLiveModelRoleAdapter({
   now = Date.now,
 }) {
   if (!authorizationPath) throw new Error('MODEL_EVAL_AUTHORITY_FILE_REQUIRED');
-  const authorization = readAuthorization(authorizationPath, roster, now());
+  const authorization = readAuthorization(authorizationPath, roster);
   if (!services || typeof services.beginExecution !== 'function')
     throw new Error('MODEL_EVAL_LEDGER_CAPABILITY_REQUIRED');
   if (typeof services.assertProvider !== 'function')

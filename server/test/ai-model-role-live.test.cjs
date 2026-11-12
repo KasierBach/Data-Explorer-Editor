@@ -70,6 +70,54 @@ test('live bootstrap rejects duplicate and prototype authority keys', () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+test('live bootstrap refuses missing or conflicting authority scope', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'data-explorer-model-live-'));
+  const now = Date.parse('2026-11-11T12:00:00.000Z');
+  const base = {
+    authorizationId: 'approved-fixture',
+    zeroCostAuthorityVerified: true,
+    zeroCostEvidenceSha256: 'a'.repeat(64),
+    policyVerified: true,
+    ledgerVerified: true,
+    expiresAt: now + 30_000,
+    deadlineAt: now + 20_000,
+  };
+  try {
+    for (const [index, patch] of [
+      {},
+      {
+        provider: 'gemini',
+        recipient: 'https://generativelanguage.googleapis.com',
+        modelIds: ['fixture'],
+      },
+      {
+        provider: 'beeknoee',
+        recipient: 'https://platform.beeknoee.com',
+        modelIds: ['different-model'],
+      },
+    ].entries()) {
+      const path = join(directory, `scope-${index}.json`);
+      writeFileSync(path, JSON.stringify({ ...base, ...patch }), {
+        flag: 'wx',
+        mode: 0o600,
+      });
+      assert.throws(
+        () =>
+          createLiveModelRoleAdapter({
+            roster,
+            apiKey: 'fixture-key',
+            baseUrl: 'https://platform.beeknoee.com/api/v1',
+            authorizationPath: path,
+            services,
+            now: () => now,
+          }),
+        /MODEL_EVAL_AUTHORITY_SCOPE_MISMATCH/,
+      );
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 test('live bootstrap binds exact authority bytes, roster, recipient and deadline', () => {
   const directory = mkdtempSync(join(tmpdir(), 'data-explorer-model-live-'));
   const path = join(directory, 'authority.json');
@@ -82,6 +130,9 @@ test('live bootstrap binds exact authority bytes, roster, recipient and deadline
       zeroCostEvidenceSha256: 'a'.repeat(64),
       policyVerified: true,
       ledgerVerified: true,
+      provider: 'beeknoee',
+      recipient: 'https://platform.beeknoee.com',
+      modelIds: ['fixture'],
       expiresAt: now + 30_000,
       deadlineAt: now + 20_000,
     }),
@@ -121,6 +172,9 @@ test('live bootstrap refuses an absent durable ledger capability', () => {
       zeroCostEvidenceSha256: 'a'.repeat(64),
       policyVerified: true,
       ledgerVerified: true,
+      provider: 'beeknoee',
+      recipient: 'https://platform.beeknoee.com',
+      modelIds: ['fixture'],
       expiresAt: now + 30_000,
       deadlineAt: now + 20_000,
     }),
@@ -154,6 +208,9 @@ test('live bootstrap refuses absent application policy capability', () => {
       zeroCostEvidenceSha256: 'a'.repeat(64),
       policyVerified: true,
       ledgerVerified: true,
+      provider: 'beeknoee',
+      recipient: 'https://platform.beeknoee.com',
+      modelIds: ['fixture'],
       expiresAt: now + 30_000,
       deadlineAt: now + 20_000,
     }),
@@ -188,6 +245,9 @@ test('live bootstrap refuses another endpoint before application dispatch', () =
       zeroCostEvidenceSha256: 'a'.repeat(64),
       policyVerified: true,
       ledgerVerified: true,
+      provider: 'beeknoee',
+      recipient: 'https://platform.beeknoee.com',
+      modelIds: ['fixture'],
       expiresAt: now + 30_000,
       deadlineAt: now + 20_000,
     }),

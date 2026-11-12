@@ -1,7 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const { createHash, randomUUID } = require('node:crypto');
 const {
   appendFileSync,
@@ -13,6 +13,7 @@ const {
 const { createInterface } = require('node:readline');
 const { join, resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { createE2eEnvironment } = require('../e2e-environment.cjs');
 
 const root = resolve(__dirname, '../..');
 let modelEvalStage = 'arguments';
@@ -163,64 +164,130 @@ function readEnvFile(path) {
   return result;
 }
 
-function installRuntimeEnvironment(values) {
-  const allowed = {
-    NODE_ENV: 'test',
-    DATABASE_URL: process.env.E2E_DATABASE_URL,
-    REDIS_URL: process.env.E2E_REDIS_URL,
-    E2E_DATABASE_URL: process.env.E2E_DATABASE_URL,
-    E2E_REDIS_URL: process.env.E2E_REDIS_URL,
-    AI_KILL_SWITCH: 'false',
-    AI_EGRESS_POLICY_JSON: JSON.stringify({
-      enabled: true,
-      providers: ['beeknoee'],
-      origins: ['https://platform.beeknoee.com'],
-    }),
-    BEEKNOEE_API_KEY: values.BEEKNOEE_API_KEY,
-    BEEKNOEE_BASE_URL: values.BEEKNOEE_BASE_URL,
-    BEEKNOEE_CHAT_MODEL: values.BEEKNOEE_CHAT_MODEL,
-    AI_EVAL_RUNNER_CONTAINER: process.env.AI_EVAL_RUNNER_CONTAINER,
-    AI_EXECUTION_PER_USER_CONCURRENCY: '1',
-    AI_EXECUTION_GLOBAL_CONCURRENCY: '1',
-    AI_EXECUTION_MAX_ATTEMPTS: '8',
-    AI_PROVIDER_TIMEOUT_MS: '30000',
-    AI_STREAM_IDLE_TIMEOUT_MS: '30000',
-    PRISMA_HIDE_UPDATE_MESSAGE: 'true',
-    CHECKPOINT_DISABLE: '1',
-  };
-  for (const key of [
-    'PATH',
-    'Path',
-    'SystemRoot',
-    'SYSTEMROOT',
-    'WINDIR',
-    'ComSpec',
-    'COMSPEC',
-    'TEMP',
-    'TMP',
-    'TMPDIR',
-    'HOME',
-    'USERPROFILE',
-    'LOCALAPPDATA',
-    'APPDATA',
-  ]) {
-    if (process.env[key] !== undefined) allowed[key] = process.env[key];
+function createModelEvaluationEnvironment(source, values) {
+  try {
+    const base = createE2eEnvironment(source);
+    const postgres = new URL(base.E2E_DATABASE_URL);
+    const redis = new URL(base.E2E_REDIS_URL);
+    requireValue(
+      postgres.port === '15432' &&
+        postgres.username === 'e2e' &&
+        postgres.password === 'e2e-local-only' &&
+        redis.port === '16379' &&
+        !redis.username &&
+        !redis.password &&
+        typeof base.AI_EVAL_RUNNER_CONTAINER === 'string',
+      'MODEL_EVAL_FIXTURE_INVALID',
+    );
+    delete base.ALLOW_INTERNAL_IPS;
+    return {
+      ...base,
+      AI_KILL_SWITCH: 'false',
+      AI_EGRESS_POLICY_JSON: JSON.stringify({
+        enabled: true,
+        providers: ['beeknoee'],
+        origins: ['https://platform.beeknoee.com'],
+      }),
+      BEEKNOEE_API_KEY: values.BEEKNOEE_API_KEY,
+      BEEKNOEE_BASE_URL: values.BEEKNOEE_BASE_URL,
+      BEEKNOEE_CHAT_MODEL: values.BEEKNOEE_CHAT_MODEL,
+      AI_EXECUTION_PER_USER_CONCURRENCY: '1',
+      AI_EXECUTION_GLOBAL_CONCURRENCY: '1',
+      AI_EXECUTION_MAX_ATTEMPTS: '8',
+      AI_PROVIDER_TIMEOUT_MS: '30000',
+      AI_STREAM_IDLE_TIMEOUT_MS: '30000',
+      PRISMA_HIDE_UPDATE_MESSAGE: 'true',
+      CHECKPOINT_DISABLE: '1',
+    };
+  } catch (error) {
+    if (error?.code === 'MODEL_EVAL_FIXTURE_INVALID') throw error;
+    throw Object.assign(new Error('MODEL_EVAL_FIXTURE_INVALID'), {
+      code: 'MODEL_EVAL_FIXTURE_INVALID',
+    });
   }
-  process.env = allowed;
 }
 
-function createDockerNativeExecutor(containerName) {
+function installRuntimeEnvironment(values) {
+  process.env = createModelEvaluationEnvironment(process.env, values);
+}
+
+function validateNativeContainer(containerName, inspected) {
+  const project = containerName.slice(0, -'-eval-runner-1'.length);
+  requireValue(
+    Array.isArray(inspected) &&
+      inspected.length === 1 &&
+      inspected[0]?.State?.Running === true &&
+      inspected[0]?.Config?.Labels?.['ai.eval.profile'] ===
+        'a12-native-fixture-v1' &&
+      inspected[0]?.Config?.Labels?.['com.docker.compose.service'] ===
+        'eval-runner' &&
+      inspected[0]?.Config?.Labels?.['com.docker.compose.project'] ===
+        project &&
+      inspected[0]?.Config?.User === 'node' &&
+      inspected[0]?.HostConfig?.NetworkMode === 'none' &&
+      inspected[0]?.HostConfig?.ReadonlyRootfs === true &&
+      inspected[0]?.HostConfig?.CapDrop?.includes('ALL') &&
+      inspected[0]?.HostConfig?.SecurityOpt?.includes(
+        'no-new-privileges:true',
+      ) &&
+      Array.isArray(inspected[0]?.Mounts) &&
+      inspected[0].Mounts.length === 3 &&
+      inspected[0].Mounts.every(
+        (mount) =>
+          mount?.RW === false &&
+          typeof mount.Destination === 'string' &&
+          mount.Destination.startsWith('/workspace/server/'),
+      ),
+    'MODEL_NATIVE_CONTAINER_INVALID',
+  );
+  return inspected[0].Id;
+}
+
+function createDockerNativeExecutor(
+  containerName,
+  inspect = (name) =>
+    spawnSync('docker', ['inspect', name], {
+      cwd: root,
+      env: {
+        PATH: process.env.PATH,
+        SystemRoot: process.env.SystemRoot,
+        WINDIR: process.env.WINDIR,
+      },
+      encoding: 'utf8',
+      timeout: 10_000,
+      maxBuffer: 128 * 1024,
+      windowsHide: true,
+    }),
+) {
   requireValue(
     typeof containerName === 'string' &&
       /^ai-eval-[a-z0-9-]{8,80}-eval-runner-1$/.test(containerName),
     'MODEL_NATIVE_CONTAINER_INVALID',
   );
+  const inspected = inspect(containerName);
+  requireValue(
+    inspected &&
+      inspected.status === 0 &&
+      inspected.error == null &&
+      typeof inspected.stdout === 'string' &&
+      Buffer.byteLength(inspected.stdout) <= 128 * 1024,
+    'MODEL_NATIVE_CONTAINER_INVALID',
+  );
+  let container;
+  try {
+    container = JSON.parse(inspected.stdout);
+  } catch {
+    throw Object.assign(new Error('MODEL_NATIVE_CONTAINER_INVALID'), {
+      code: 'MODEL_NATIVE_CONTAINER_INVALID',
+    });
+  }
+  const containerId = validateNativeContainer(containerName, container);
   const child = spawn(
     'docker',
     [
       'exec',
       '-i',
-      containerName,
+      containerId,
       'node',
       '/workspace/server/scripts/ai-eval/model-native-worker.mjs',
     ],
@@ -383,6 +450,11 @@ async function main() {
     'MODEL_EVAL_RUN_ARGUMENTS_INVALID',
   );
   modelEvalStage = 'config';
+  const sourceEnvironment = process.env;
+  requireValue(
+    createModelEvaluationEnvironment(sourceEnvironment, {}).NODE_ENV === 'test',
+    'MODEL_EVAL_FIXTURE_INVALID',
+  );
   const { journalPath } = prepareReportOutput(reportPath);
   const values = readEnvFile(envPath);
   requireValue(
@@ -612,6 +684,8 @@ async function main() {
 module.exports = {
   appendAttemptJournal,
   cleanupRunResources,
+  createDockerNativeExecutor,
+  createModelEvaluationEnvironment,
   prepareReportOutput,
   publishReport,
   selectFailureStage,

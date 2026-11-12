@@ -138,6 +138,45 @@ test('attempt admission fails closed when the durable journal cannot record it',
   assert.equal(budget.attempts, 0);
   assert.equal(budget.active, false);
 });
+
+test('attempt admission refuses reentrant and asynchronous journals', () => {
+  let budget;
+  let nested = false;
+  const admissions = [];
+  budget = createModelAttemptBudget({
+    maxAttempts: 1,
+    deadlineAt: now + 50,
+    now: () => now,
+    onAcquire: (ordinal) => {
+      admissions.push(ordinal);
+      if (!nested) {
+        nested = true;
+        budget.acquire().release();
+      }
+    },
+  });
+  assert.throws(() => budget.acquire(), /MODEL_EVALUATION_BUSY/);
+  assert.deepEqual(admissions, [1]);
+  assert.equal(budget.attempts, 0);
+  assert.equal(budget.active, false);
+
+  const thenable = {
+    then() {},
+  };
+  const asynchronous = createModelAttemptBudget({
+    maxAttempts: 1,
+    deadlineAt: now + 50,
+    now: () => now,
+    onAcquire: () => thenable,
+  });
+  assert.throws(
+    () => asynchronous.acquire(),
+    /MODEL_EVALUATION_ATTEMPT_JOURNAL_ASYNC/,
+  );
+  assert.equal(asynchronous.attempts, 0);
+  assert.equal(asynchronous.active, false);
+});
+
 test('model operation failure reasons do not imply task incapability', () => {
   assert.equal(classifyModelOperation({ status: 401 }), 'auth-denied');
   assert.equal(classifyModelOperation({ status: 403 }), 'auth-denied');
@@ -421,6 +460,96 @@ test('role recommendations require observed native matches and remain provisiona
     'requires-review',
   );
   assert.equal(report.semanticModelAccuracy, 'NOT_ASSESSED');
+});
+
+test('partial role samples never become recommendations', async () => {
+  const first = roster[0];
+  const sql =
+    'SELECT COUNT(*) AS total_rows, COUNT(amount) AS known_amounts FROM orders';
+  const report = await runModelRoleAssessment({
+    roster: [first],
+    authorization: { ...authorization, modelIds: [first.apiModel] },
+    maxAttempts: 2,
+    now: () => now,
+    nativeExecutor: async () => ({
+      columns: [
+        { name: 'total_rows', type: 'integer', nullable: false },
+        { name: 'known_amounts', type: 'integer', nullable: false },
+      ],
+      rows: [[6, 5]],
+    }),
+    adapter: {
+      runProbe: async ({ probe }, budget) => {
+        budget.acquire().release();
+        return probe.id === 'availability'
+          ? {
+              message: 'SMOKE_ACK',
+              terminalVerified: true,
+              reportedModel: first.apiModel,
+            }
+          : {
+              message: 'SQL',
+              sql,
+              terminalVerified: true,
+              reportedModel: first.apiModel,
+            };
+      },
+    },
+  });
+  assert.equal(report.providerAttempts, 2);
+  assert.deepEqual(report.models[0].recommendedRoles, []);
+  assert.equal(
+    report.models[0].roles.find((role) => role.role === 'sql').verdict,
+    'requires-review',
+  );
+});
+
+test('identity drift invalidates every earlier role recommendation', async () => {
+  const first = roster[0];
+  const sql =
+    'SELECT COUNT(*) AS total_rows, COUNT(amount) AS known_amounts FROM orders';
+  const report = await runModelRoleAssessment({
+    roster: [first],
+    authorization: { ...authorization, modelIds: [first.apiModel] },
+    now: () => now,
+    nativeExecutor: async () => ({
+      columns: [
+        { name: 'total_rows', type: 'integer', nullable: false },
+        { name: 'known_amounts', type: 'integer', nullable: false },
+      ],
+      rows: [[6, 5]],
+    }),
+    adapter: {
+      runProbe: async ({ probe }, budget) => {
+        budget.acquire().release();
+        if (probe.id === 'availability')
+          return {
+            message: 'SMOKE_ACK',
+            terminalVerified: true,
+            reportedModel: first.apiModel,
+          };
+        if (probe.id === 'sql-count')
+          return {
+            message: 'SQL',
+            sql,
+            terminalVerified: true,
+            reportedModel: first.apiModel,
+          };
+        return {
+          message: 'MQL',
+          terminalVerified: true,
+          reportedModel: 'different-model',
+        };
+      },
+    },
+  });
+  assert.equal(report.models[0].operationalStatus, 'identity-mismatch');
+  assert.deepEqual(report.models[0].recommendedRoles, []);
+  assert.equal(report.models[0].recommendationLevel, 'not-assessed');
+  assert.equal(
+    report.models[0].roles.find((role) => role.role === 'sql').verdict,
+    'requires-review',
+  );
 });
 
 test('a mismatched reported model is not credited to the requested model', async () => {
