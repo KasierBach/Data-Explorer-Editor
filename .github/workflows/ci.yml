@@ -93,6 +93,7 @@ jobs:
           printf 'owned=true\n' >> "$GITHUB_OUTPUT"
           docker compose --project-name "$project" -f test/compose.ai-eval.yml up --detach --wait --wait-timeout 150
       - name: Run server E2E checks with failure-preserving logs
+        timeout-minutes: 10
         shell: bash
         env:
           TMPDIR: ${{ runner.temp }}

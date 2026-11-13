@@ -71,6 +71,7 @@ test('logged E2E pipelines explicitly preserve a failed runner exit code', () =>
     assert.ok(stepStart >= 0);
     const block = jobLines.slice(stepStart, nextStep < 0 ? jobLines.length : nextStep).join('\n');
     assert.match(block, /shell: bash/);
+    if (job === 'server') assert.match(block, /timeout-minutes: 10/);
     assert.match(block, /run: \|\n\s+set -euo pipefail/);
     assert.doesNotMatch(block, /continue-on-error|\|\|\s*true/);
   }
