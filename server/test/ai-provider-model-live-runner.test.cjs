@@ -20,6 +20,7 @@ const {
   runProviderEvaluationProbe,
   runProviderEvaluationLedger,
   isProviderEvaluationFatal,
+  createProviderEvaluationDiscoveryScope,
   runProviderEvaluationProbes,
   createProviderEvaluationChat,
   cleanupProviderEvaluationResources,
@@ -419,6 +420,89 @@ test('ordinary HTTP quota and credit failures remain operational evidence', asyn
     );
   }
   assert.deepEqual(failures, [402, 429, 404]);
+});
+
+test('adapter-only fatal errors win over old HTTP failures before subsequent dispatch', async () => {
+  const fatal = Object.assign(new Error('synthetic unsettled attempt'), {
+    code: 'MODEL_EVAL_DURABLE_ATTEMPT_INVALID',
+  });
+  const old = Object.assign(new Error('old provider failure'), { status: 429 });
+  const chat = chatServices(
+    {
+      chat: async () => {
+        throw fatal;
+      },
+    },
+    { providerError: old },
+  );
+  const calls = [];
+  await assert.rejects(
+    runProviderEvaluationProbes(
+      [model, { ...model, selectionId: 'groq:other' }],
+      [{ id: 'availability' }],
+      async (entry) => {
+        calls.push(entry.selectionId);
+        await runProviderEvaluationProbe(
+          () => chat.chat({}),
+          () => {},
+        );
+      },
+    ),
+    (error) => error === fatal,
+  );
+  assert.deepEqual(calls, [model.selectionId]);
+});
+
+test('discovery shares the absolute scope deadline after slow ledger admission', () => {
+  let clock = now;
+  const received = [];
+  const controller = new AbortController();
+  const scope = createProviderEvaluationDiscoveryScope(
+    now + 500,
+    (options) => {
+      received.push(options);
+      return {
+        signal: controller.signal,
+        deadlineAt: Math.min(
+          options.deadlineAt ?? Infinity,
+          clock + options.timeoutMs,
+        ),
+        dispose() {},
+      };
+    },
+    () => clock,
+  );
+  assert.deepEqual(received, [{ timeoutMs: 15000, deadlineAt: now + 500 }]);
+  assert.equal(scope.deadlineAt, now + 500);
+  clock += 300;
+  assert.equal(scope.transportTimeoutMs(), 200);
+  clock += 200;
+  assert.throws(() => scope.transportTimeoutMs(), /MODEL_EVAL_DEADLINE/);
+});
+
+test('discovery cancellation fires at authority expiry instead of a renewed 15-second timeout', async () => {
+  const { mock } = require('node:test');
+  mock.timers.enable({ apis: ['Date', 'setTimeout'], now });
+  try {
+    require('ts-node').register({
+      transpileOnly: true,
+      project: join(__dirname, '../tsconfig.json'),
+    });
+    const { createAiRequestScope } = require('../src/ai/ai-request-lifecycle');
+    const scope = createProviderEvaluationDiscoveryScope(
+      now + 500,
+      createAiRequestScope,
+    );
+    assert.equal(scope.signal.aborted, false);
+    mock.timers.tick(499);
+    assert.equal(scope.signal.aborted, false);
+    mock.timers.tick(1);
+    assert.equal(scope.signal.aborted, true);
+    assert.throws(() => scope.transportTimeoutMs(), /MODEL_EVAL_DEADLINE/);
+    scope.dispose();
+  } finally {
+    mock.timers.reset();
+  }
 });
 
 test('current fatal failure cannot be replaced by a stale provider error', async () => {

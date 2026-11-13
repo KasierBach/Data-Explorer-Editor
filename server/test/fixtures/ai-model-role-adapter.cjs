@@ -435,4 +435,8 @@ function createAppModelRoleAdapter({
   return Object.freeze({ runProbe, isFatalError: isFatalModelEvaluationError });
 }
 
-module.exports = { createAppModelRoleAdapter, MODEL_EVALUATION_ENDPOINTS };
+module.exports = {
+  createAppModelRoleAdapter,
+  isFatalModelEvaluationError,
+  MODEL_EVALUATION_ENDPOINTS,
+};

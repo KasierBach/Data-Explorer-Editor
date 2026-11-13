@@ -14,6 +14,7 @@ const { join, resolve } = require('node:path');
 const { pathToFileURL } = require('node:url');
 const {
   createAppModelRoleAdapter,
+  isFatalModelEvaluationError,
   MODEL_EVALUATION_ENDPOINTS,
 } = require('./ai-model-role-adapter.cjs');
 const {
@@ -276,7 +277,10 @@ function readProviderEvaluationContinuation(authority, parseJson) {
   return { previousReport, initialAttempts: previousCount };
 }
 
-function isProviderEvaluationFatal(error, isAdapterFatal = () => false) {
+function isProviderEvaluationFatal(
+  error,
+  isAdapterFatal = isFatalModelEvaluationError,
+) {
   const seen = new Set();
   let current = error;
   while (current && typeof current === 'object' && !seen.has(current)) {
@@ -306,6 +310,29 @@ async function runProviderEvaluationProbe(run, onFailure, isAdapterFatal) {
     if (isProviderEvaluationFatal(error, isAdapterFatal)) throw error;
     await onFailure(error);
   }
+}
+
+function createProviderEvaluationDiscoveryScope(
+  deadlineAt,
+  createScope,
+  now = Date.now,
+) {
+  requireValue(
+    Number.isSafeInteger(deadlineAt) && deadlineAt > now(),
+    'MODEL_EVAL_DEADLINE',
+  );
+  const scope = createScope({ timeoutMs: 15000, deadlineAt });
+  return {
+    ...scope,
+    transportTimeoutMs() {
+      const remaining = scope.deadlineAt - now();
+      requireValue(
+        !scope.signal.aborted && remaining > 0,
+        'MODEL_EVAL_DEADLINE',
+      );
+      return remaining;
+    },
+  };
 }
 
 async function runProviderEvaluationLedger(code, operation) {
@@ -619,6 +646,7 @@ async function main() {
     fetchAiProvider,
     readAiProviderJson,
   } = require('../../src/ai/ai-provider-transport');
+  const { createAiRequestScope } = require('../../src/ai/ai-request-lifecycle');
   const evaluation = await import(
     pathToFileURL(join(root, 'scripts/ai-eval/model-role-assessment.mjs')).href
   );
@@ -738,8 +766,10 @@ async function main() {
           model: 'discovery',
           baseUrl: MODEL_EVALUATION_ENDPOINTS[provider],
         };
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 15000);
+        const discoveryScope = createProviderEvaluationDiscoveryScope(
+          authority.deadlineAt,
+          createAiRequestScope,
+        );
         let context;
         let lease, handle, response;
         try {
@@ -748,7 +778,7 @@ async function main() {
             () =>
               ledger.begin(actorId, 'provider_discovery', {
                 requestedModel: 'discovery',
-                deadlineAt: Math.min(authority.deadlineAt, Date.now() + 15000),
+                deadlineAt: discoveryScope.deadlineAt,
               }),
           );
           ledgerContexts.add(context);
@@ -766,11 +796,11 @@ async function main() {
               headers: {
                 Authorization: `Bearer ${values[`${provider.toUpperCase()}_API_KEY`]}`,
               },
-              signal: controller.signal,
+              signal: discoveryScope.signal,
               redirect: 'manual',
             },
             {
-              timeoutMs: 15000,
+              timeoutMs: discoveryScope.transportTimeoutMs(),
               maxResponseBytes: 512 * 1024,
               beforeDispatch: () => assertProvider(plan),
             },
@@ -867,7 +897,7 @@ async function main() {
             );
           }
         } finally {
-          clearTimeout(timer);
+          discoveryScope.dispose();
           lease?.release();
           try {
             if (context)
@@ -1414,6 +1444,7 @@ module.exports = {
   runProviderEvaluationProbe,
   runProviderEvaluationLedger,
   isProviderEvaluationFatal,
+  createProviderEvaluationDiscoveryScope,
   runProviderEvaluationProbes,
   createProviderEvaluationChat,
   cleanupProviderEvaluationResources,
