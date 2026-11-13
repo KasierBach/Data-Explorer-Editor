@@ -1,7 +1,12 @@
 'use strict';
 
 const { createHash } = require('node:crypto');
-const BEEKNOEE_ORIGIN = 'https://platform.beeknoee.com';
+const MODEL_EVALUATION_ENDPOINTS = Object.freeze({
+  beeknoee: 'https://platform.beeknoee.com/api/v1',
+  groq: 'https://api.groq.com/openai/v1',
+  openrouter: 'https://openrouter.ai/api/v1',
+  cerebras: 'https://api.cerebras.ai/v1',
+});
 const FATAL_EVALUATION_CODES = new Set([
   'MODEL_EVAL_ATTEMPT_ALREADY_SETTLED',
   'MODEL_EVAL_DEADLINE',
@@ -33,10 +38,15 @@ const hash = (value) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 function providerFromModel(model) {
+  const provider = model.provider ?? 'beeknoee';
+  requireValue(
+    Object.hasOwn(MODEL_EVALUATION_ENDPOINTS, provider),
+    'MODEL_EVAL_PROVIDER_INVALID',
+  );
   return {
-    provider: 'beeknoee',
+    provider,
     model: model.apiModel,
-    baseUrl: `${BEEKNOEE_ORIGIN}/api/v1`,
+    baseUrl: MODEL_EVALUATION_ENDPOINTS[provider],
   };
 }
 
@@ -47,6 +57,7 @@ async function createAttemptExecution(
   probe,
   deadlineAt,
 ) {
+  const expectedProvider = model.provider ?? 'beeknoee';
   let durable;
   try {
     durable = await services.beginExecution(model, probe, deadlineAt);
@@ -80,7 +91,7 @@ async function createAttemptExecution(
   };
   const beforeAttempt = async (plan) => {
     requireValue(
-      plan.provider === 'beeknoee' && plan.model === model.apiModel,
+      plan.provider === expectedProvider && plan.model === model.apiModel,
       'MODEL_EVAL_PLAN_MISMATCH',
     );
     const lease = budget.acquire();
@@ -105,7 +116,8 @@ async function createAttemptExecution(
       async complete(result = {}) {
         requireValue(!settled, 'MODEL_EVAL_ATTEMPT_ALREADY_SETTLED');
         requireValue(
-          result.provider === 'beeknoee' && result.model === model.apiModel,
+          result.provider === expectedProvider &&
+            result.model === model.apiModel,
           'MODEL_EVAL_PLAN_MISMATCH',
         );
         try {
@@ -150,7 +162,7 @@ async function createAttemptExecution(
         let summary;
         try {
           summary = await durable.complete({
-            provider: 'beeknoee',
+            provider: expectedProvider,
             model: model.apiModel,
           });
         } catch (error) {
@@ -191,12 +203,23 @@ async function createAttemptExecution(
 }
 
 function isFatalModelEvaluationError(error) {
-  return (
-    typeof error?.code === 'string' &&
-    !OPERATION_EVIDENCE_CODES.has(error.code) &&
-    (FATAL_EVALUATION_CODES.has(error.code) ||
-      error.code.startsWith('MODEL_EVAL_LEDGER_'))
-  );
+  const seen = new Set();
+  let current = error;
+  while (current && typeof current === 'object' && !seen.has(current)) {
+    if (seen.size >= 16) return true;
+    seen.add(current);
+    if (
+      current.aiRequestFatal === true ||
+      (typeof current.code === 'string' &&
+        !OPERATION_EVIDENCE_CODES.has(current.code) &&
+        (FATAL_EVALUATION_CODES.has(current.code) ||
+          current.code.startsWith('MODEL_EVAL_LEDGER_') ||
+          current.code.startsWith('MODEL_EVAL_JOURNAL_')))
+    )
+      return true;
+    current = current.cause;
+  }
+  return Boolean(current && typeof current === 'object');
 }
 
 function createAppModelRoleAdapter({
@@ -204,19 +227,19 @@ function createAppModelRoleAdapter({
   baseUrl,
   deadlineAt,
   services,
+  provider = 'beeknoee',
   now = Date.now,
 }) {
   requireValue(
     typeof apiKey === 'string' && apiKey.trim(),
     'MODEL_EVAL_CREDENTIAL_MISSING',
   );
-  let origin;
   try {
     const url = new URL(baseUrl);
-    origin = url.origin;
     requireValue(
-      origin === BEEKNOEE_ORIGIN &&
-        url.pathname.replace(/\/$/, '') === '/api/v1',
+      Object.hasOwn(MODEL_EVALUATION_ENDPOINTS, provider) &&
+        url.toString().replace(/\/$/, '') ===
+          MODEL_EVALUATION_ENDPOINTS[provider],
       'MODEL_EVAL_RECIPIENT_MISMATCH',
     );
   } catch (error) {
@@ -241,8 +264,18 @@ function createAppModelRoleAdapter({
   const runProbe = async ({ model, probe }, budget) => {
     requireValue(now() < deadlineAt, 'MODEL_EVAL_DEADLINE');
     requireValue(
-      /^beeknoee:[a-z0-9][a-z0-9./-]{0,160}$/.test(model.selectionId) &&
-        model.selectionId === `beeknoee:${model.apiModel}`,
+      typeof model.apiModel === 'string' &&
+        /^[A-Za-z0-9][A-Za-z0-9._/:@-]{0,199}$/.test(model.apiModel) &&
+        (model.provider ?? 'beeknoee') === provider &&
+        typeof model.selectionId === 'string' &&
+        (provider === 'beeknoee'
+          ? model.selectionId === `beeknoee:${model.apiModel}`
+          : provider === 'groq'
+            ? model.selectionId === `groq:${model.apiModel}`
+            : provider === 'openrouter'
+              ? model.selectionId === model.apiModel &&
+                model.apiModel.endsWith(':free')
+              : model.selectionId === `cerebras:${model.apiModel}`),
       'MODEL_EVAL_MODEL_INVALID',
     );
     const plan = providerFromModel(model);
@@ -261,10 +294,17 @@ function createAppModelRoleAdapter({
     const requestBase = {
       model: model.selectionId,
       fallbackProvider: 'none',
-      disabledProviders: ['gemini', 'groq', 'cerebras', 'openrouter'],
+      disabledProviders: [
+        'gemini',
+        'groq',
+        'cerebras',
+        'openrouter',
+        'beeknoee',
+      ].filter((value) => value !== provider),
       deadlineAt,
       requestScopeKey: JSON.stringify([
         'model-evaluation',
+        provider,
         model.apiModel,
         probe.id,
       ]),
@@ -313,6 +353,8 @@ function createAppModelRoleAdapter({
           prompt: probe.prompt,
           schemaContext: JSON.stringify(probe.schema),
           databaseType: probe.databaseType,
+          image: probe.image,
+          document: probe.document,
           mode: 'fast',
         })) {
           if (event.type === 'chunk') {
@@ -327,7 +369,7 @@ function createAppModelRoleAdapter({
         requireValue(
           done &&
             typeof done.message === 'string' &&
-            done.provider === 'beeknoee' &&
+            done.provider === provider &&
             done.model === model.apiModel,
           'MODEL_EVAL_STREAM_TERMINAL_MISSING',
         );
@@ -343,11 +385,13 @@ function createAppModelRoleAdapter({
           prompt: probe.prompt,
           schemaContext: JSON.stringify(probe.schema),
           databaseType: probe.databaseType,
+          image: probe.image,
+          document: probe.document,
           mode: 'fast',
         });
         requireValue(
           result &&
-            result.provider === 'beeknoee' &&
+            result.provider === provider &&
             result.model === model.apiModel,
           'MODEL_EVAL_RESULT_IDENTITY_MISMATCH',
         );
@@ -391,4 +435,4 @@ function createAppModelRoleAdapter({
   return Object.freeze({ runProbe, isFatalError: isFatalModelEvaluationError });
 }
 
-module.exports = { createAppModelRoleAdapter };
+module.exports = { createAppModelRoleAdapter, MODEL_EVALUATION_ENDPOINTS };

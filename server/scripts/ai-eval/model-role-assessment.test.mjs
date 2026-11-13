@@ -125,6 +125,43 @@ test('attempt journal records every admitted ordinal before dispatch', () => {
   assert.deepEqual(journal, [1, 2]);
 });
 
+test('multi-provider budget continues exact prior attempts without renewing its ceiling', () => {
+  const ordinals = [];
+  const budget = createModelAttemptBudget({
+    maxAttempts: 320,
+    authorizedMaxAttempts: 320,
+    initialAttempts: 318,
+    deadlineAt: now + 50,
+    now: () => now,
+    onAcquire: (ordinal) => ordinals.push(ordinal),
+  });
+  budget.acquire().release();
+  budget.acquire().release();
+  assert.equal(budget.attempts, 320);
+  assert.deepEqual(ordinals, [319, 320]);
+  assert.throws(() => budget.acquire(), /MODEL_EVALUATION_ATTEMPT_LIMIT/);
+  assert.throws(
+    () =>
+      createModelAttemptBudget({
+        maxAttempts: 320,
+        deadlineAt: now + 50,
+        now: () => now,
+      }),
+    /MODEL_EVALUATION_LIMIT_INVALID/,
+  );
+  assert.throws(
+    () =>
+      createModelAttemptBudget({
+        maxAttempts: 320,
+        authorizedMaxAttempts: 320,
+        initialAttempts: 321,
+        deadlineAt: now + 50,
+        now: () => now,
+      }),
+    /MODEL_EVALUATION_LIMIT_INVALID/,
+  );
+});
+
 test('attempt admission fails closed when the durable journal cannot record it', () => {
   const budget = createModelAttemptBudget({
     maxAttempts: 1,

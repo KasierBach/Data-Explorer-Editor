@@ -75,7 +75,7 @@ jobs:
           NPM_AUDIT_ALLOW_GHSA: GHSA-GGR8-5VV4-36MX
       - run: npm run prisma:generate
       - run: npm run typecheck
-      - run: node --test scripts/prisma-generate-safe.test.mjs test/ai-execution-ledger-worker.test.cjs scripts/ai-eval/native-replay.test.mjs scripts/ai-eval/model-role-assessment.test.mjs scripts/ai-eval/model-native-worker.test.mjs test/ai-model-role-adapter.test.cjs test/ai-model-role-live.test.cjs test/ai-model-role-runner.test.cjs
+      - run: node --test scripts/prisma-generate-safe.test.mjs test/ai-execution-ledger-worker.test.cjs scripts/ai-eval/native-replay.test.mjs scripts/ai-eval/model-role-assessment.test.mjs scripts/ai-eval/model-native-worker.test.mjs test/ai-model-role-adapter.test.cjs test/ai-model-role-live.test.cjs test/ai-model-role-runner.test.cjs test/ai-provider-model-catalog.test.cjs test/ai-provider-model-live-runner.test.cjs
       - name: Start owned PostgreSQL, Redis, MongoDB and MySQL fixtures
         run: docker compose -f test/compose.e2e.yml -f test/compose.r03.yml up -d --wait
       - run: npx prisma migrate deploy

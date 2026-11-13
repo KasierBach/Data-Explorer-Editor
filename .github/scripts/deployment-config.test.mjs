@@ -93,6 +93,13 @@ test('native replay CI keeps a separate network-none fixture and bounded ownersh
   assert.match(workflow, /test\/ai-model-role-runner\.test\.cjs/);
   const serverJob = /\n  server:\n([\s\S]*?)(?=\n  full-stack:)/.exec(workflow)?.[1];
   assert.ok(serverJob);
+  const offlineCommand = /- run: (node --test [^\n]+)/.exec(serverJob)?.[1];
+  assert.ok(offlineCommand);
+  for (const path of ['test/ai-provider-model-catalog.test.cjs', 'test/ai-provider-model-live-runner.test.cjs']) assert.ok(offlineCommand.split(' ').includes(path));
+  assert.doesNotMatch(offlineCommand, /test\/fixtures\/ai-provider-model-live-runner\.cjs/);
+  assert.ok(serverJob.indexOf(offlineCommand) < serverJob.indexOf('Start owned PostgreSQL'));
+  const hardening = readFileSync(resolve(root, '.github/workflows/ai-hardening.yml'), 'utf8');
+  assert.equal((hardening.match(/- 'server\/test\/\*\*'/g) ?? []).length, 2);
   const serverJobEnv = /\n    env:\n([\s\S]*?)(?=\n    steps:)/.exec(serverJob)?.[1];
   assert.ok(serverJobEnv);
   assert.doesNotMatch(serverJobEnv, /runner\.temp|TMPDIR/);

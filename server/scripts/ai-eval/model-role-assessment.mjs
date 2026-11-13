@@ -230,16 +230,25 @@ export function createModelAttemptBudget({
   deadlineAt,
   now = Date.now,
   onAcquire,
+  authorizedMaxAttempts = 80,
+  initialAttempts = 0,
 }) {
   requireValue(
-    Number.isSafeInteger(maxAttempts) && maxAttempts >= 1 && maxAttempts <= 80,
+    Number.isSafeInteger(authorizedMaxAttempts) &&
+      [80, 320].includes(authorizedMaxAttempts) &&
+      Number.isSafeInteger(maxAttempts) &&
+      maxAttempts >= 1 &&
+      maxAttempts <= authorizedMaxAttempts &&
+      Number.isSafeInteger(initialAttempts) &&
+      initialAttempts >= 0 &&
+      initialAttempts <= maxAttempts,
     'MODEL_EVALUATION_LIMIT_INVALID',
   );
   requireValue(
     Number.isSafeInteger(deadlineAt) && deadlineAt > now(),
     'MODEL_EVALUATION_DEADLINE',
   );
-  let attempts = 0;
+  let attempts = initialAttempts;
   let active = false;
   return Object.freeze({
     get attempts() {
@@ -328,7 +337,7 @@ function unknownModel(model) {
   };
 }
 
-function requestForProbe(probe, catalog) {
+export function requestForProbe(probe, catalog) {
   const reference = probe.referenceCase
     ? catalog.cases.find((entry) => entry.id === probe.referenceCase)
     : null;
