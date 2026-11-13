@@ -8,6 +8,7 @@ import {
   resolveAiSelection,
   useAiPreferences,
 } from "@/core/services/aiPreferences";
+import { assertAiEnabled, isAiEnabled } from "@/core/services/aiAccountPolicy";
 import { getWorkspaceText } from "@/core/utils/workspaceText";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -180,11 +181,13 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
   };
 
   const handleGenerate = async () => {
-    if (!query.trim() || !currentConnectionId) return;
+    if (!isAiEnabled() || !query.trim() || !currentConnectionId || isLoading) return;
+    assertAiEnabled();
 
     setIsLoading(true);
     setExplanation(null);
     try {
+      assertAiEnabled();
       const result = await apiService.post<{
         sql: string;
         explanation: string;
@@ -204,6 +207,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
         fallbackProvider: preferences.fallbackProvider,
       });
 
+      if (!isAiEnabled()) return;
       const generatedCommand = result.sql?.trim() || "";
       const mutationAction = getMutationAction(generatedCommand);
       const explicitMutationIntent =
@@ -307,6 +311,7 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
                 <Sparkles className="w-3.5 h-3.5 text-green-400" />
                 <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
                   {generatorLabel}
+                  {preferences.enabled !== true && ` · ${text.aiAssistant.disabledTitle}`}
                 </h4>
               </div>
               <button
@@ -417,7 +422,8 @@ export const NoSqlAiQueryBox: React.FC<NoSqlAiQueryBoxProps> = ({
                 <Button
                   size="sm"
                   className="h-8 px-4 rounded-lg text-xs bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/20 space-x-2 text-white"
-                  disabled={isLoading || !query.trim()}
+                  disabled={preferences.enabled !== true || isLoading || !query.trim()}
+                  title={preferences.enabled === true ? undefined : text.aiAssistant.disabledTitle}
                   onClick={handleGenerate}
                 >
                   {isLoading ? (

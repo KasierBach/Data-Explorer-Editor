@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConnectionsService } from '../connections/connections.service';
+import { AiAccountPolicyService } from './ai-account-policy.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
 import type { IDatabaseStrategy } from '../database-strategies/database-strategy.interface';
 
@@ -25,6 +26,7 @@ export class AiConnectionService {
   constructor(
     private readonly connectionsService: ConnectionsService,
     private readonly strategyFactory: DatabaseStrategyFactory,
+    private readonly accountPolicy: AiAccountPolicyService,
   ) {}
 
   async getConnectionContext(
@@ -33,6 +35,12 @@ export class AiConnectionService {
     userId: string,
     gatherSchemaContext: SchemaContextGatherer,
   ): Promise<ConnectionContext> {
+    await this.accountPolicy.assertEnabled(userId);
+    await this.accountPolicy.assertConnectionEnabled(
+      userId,
+      connectionId,
+      database,
+    );
     const connection = await this.connectionsService.findOne(
       connectionId,
       userId,

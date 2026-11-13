@@ -1,4 +1,5 @@
 import type { CustomAiProvider } from "@/core/services/aiPreferences";
+import { BEEKNOEE_MODELS, UNVERIFIED_BEEKNOEE_CAPABILITY_IDS } from "./beeknoeeModelCatalog";
 import {
   CUSTOM_PROVIDER_MODEL_PREFIX,
   getCustomProviderModelId,
@@ -66,18 +67,7 @@ const BUILT_IN_MODEL_GROUPS: AssistantModelGroup[] = [
   },
   {
     group: "Beeknoee",
-    items: [
-      { id: "beeknoee:bee/gemini-3.8-flash", label: "Gemini 3.8 Flash (Bee)", isNew: true, },
-      { id: "beeknoee:bee/gemini-3.6-flash", label: "Gemini 3.6 Flash (Bee)", isNew: true, },
-      { id: "beeknoee:bee-tok/gemini-3.6-flash", label: "Gemini 3.6 Flash (Bee Token)", isNew: true, },
-      { id: "beeknoee:gemini-3.1-pro-preview", label: "Gemini 3.1 Pro (Reasoning)" },
-
-      { id: "beeknoee:claude-opus-4-6-thinking", label: "Claude Opus 4.6 Thinking" },
-      { id: "beeknoee:claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
-
-      { id: "beeknoee:minimax/minimax-m2.7", label: "MiniMax M2.7" },
-      { id: "beeknoee:glm-4.7-flash", label: "GLM 4.7 Flash" },    
-    ],
+    items: BEEKNOEE_MODELS.map((model) => ({ ...model })),
   },
   {
     group: "Groq (Fast & Free)",
@@ -155,6 +145,7 @@ const BUILT_IN_MODEL_GROUPS: AssistantModelGroup[] = [
 function getBuiltInCapabilities(modelId: string) {
   if (modelId.startsWith("gemini-")) return ALL_CAPABILITIES;
   if (modelId.startsWith("beeknoee:")) {
+    if (UNVERIFIED_BEEKNOEE_CAPABILITY_IDS.has(modelId)) return undefined;
     return /^beeknoee:(?:minimax\/|gemini-|bee(?:-tok)?\/gemini-|claude-)/i.test(modelId)
       ? VISION
       : undefined;
@@ -187,7 +178,7 @@ export const BUILT_IN_PROVIDERS: BuiltInProviderConfig[] = [
     id: "beeknoee",
     name: "Beeknoee",
     groupName: "Beeknoee",
-    description: "Gemini 3.8/3.6 Flash Bee, GLM 4.7, MiniMax M2.7 & Claude 4.6",
+    description: "Gemini Flash/Argon, Claude Sonnet/Opus 5.5/4.6, GLM 4.7 & MiniMax M2.7",
   },
   {
     id: "groq",

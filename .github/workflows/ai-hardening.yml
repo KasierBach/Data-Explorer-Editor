@@ -1,0 +1,183 @@
+name: AI hardening (offline readiness)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/scripts/ai-release-readiness*.mjs'
+      - '.github/workflows/ai-hardening.yml'
+      - 'docs/roadmap/evidence/ai-a16-local-readiness.md'
+      - 'server/src/**'
+      - 'server/scripts/**'
+      - 'server/test/**'
+      - 'server/prisma/**'
+      - 'server/package*.json'
+      - 'server/*config*'
+      - 'client/src/**'
+      - 'client/e2e/**'
+      - 'client/scripts/**'
+      - 'client/package*.json'
+      - 'client/*config*'
+      - 'client/vendor/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/ai-release-readiness*.mjs'
+      - '.github/workflows/ai-hardening.yml'
+      - 'docs/roadmap/evidence/ai-a16-local-readiness.md'
+      - 'server/src/**'
+      - 'server/scripts/**'
+      - 'server/test/**'
+      - 'server/prisma/**'
+      - 'server/package*.json'
+      - 'server/*config*'
+      - 'client/src/**'
+      - 'client/e2e/**'
+      - 'client/scripts/**'
+      - 'client/package*.json'
+      - 'client/*config*'
+      - 'client/vendor/**'
+  # Manual verification of the selected ref only. No inputs, approvals or release action.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-hardening-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-readiness:
+    name: AI offline checks (not a release approval)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CI: 'true'
+      AI_KILL_SWITCH: 'true'
+      AI_EGRESS_POLICY_JSON: '{"enabled":false}'
+      PRISMA_HIDE_UPDATE_MESSAGE: 'true'
+      CHECKPOINT_DISABLE: '1'
+      PRISMA_GENERATE_SKIP_AUTOINSTALL: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+      # Registry/tool downloads only; dependency lifecycle scripts are suppressed.
+      # There are no provider, database, cloud or deployment credentials in this job.
+      - name: Install server dependencies from the existing lockfile
+        id: server-install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: server
+      - name: Install client dependencies from the existing lockfile
+        id: client-install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: client
+      - name: Prepare installed Prisma tool engines (no database connection)
+        id: prisma-tools
+        run: node node_modules/@prisma/engines/scripts/postinstall.js
+        working-directory: server
+      - name: Prepare installed SQLite native addon (no external database connection)
+        id: sqlite-tools
+        timeout-minutes: 5
+        # Only this lockfile-installed native dependency is rebuilt. Do not run
+        # general lifecycle scripts or download anything inside the namespace.
+        run: |
+          npm rebuild better-sqlite3 --foreground-scripts --no-audit --no-fund
+          node -e "const Database = require('better-sqlite3'); const db = new Database(':memory:'); try { if (db.prepare('SELECT 1 AS ready').get().ready !== 1) process.exitCode = 1; } finally { db.close(); }"
+        working-directory: server
+      - name: Collect exact-SHA offline verification metadata
+        if: always()
+        timeout-minutes: 55
+        shell: bash
+        env:
+          AI_A16_SERVER_SETUP: ${{ steps.server-install.outcome }}
+          AI_A16_CLIENT_SETUP: ${{ steps.client-install.outcome }}
+          AI_A16_PRISMA_SETUP: ${{ steps.prisma-tools.outcome }}
+          AI_A16_SQLITE_SETUP: ${{ steps.sqlite-tools.outcome }}
+        run: |
+          set -euo pipefail
+          # Hosted runners can block unprivileged user namespaces. Root creates
+          # only the network namespace and enables loopback. The verifier then
+          # runs as the original runner identity with no groups, capabilities or
+          # privilege regain path and an explicit non-secret environment.
+          # If any isolation/setup step fails, do not retry on the host network.
+          node_bin="$(command -v node)"
+          test -x "$node_bin"
+          entrypoint="$RUNNER_TEMP/ai-a16-entrypoint-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sh"
+          trap 'rm -f "$entrypoint"' EXIT
+          cat > "$entrypoint" <<'AI_A16_ENTRYPOINT'
+          #!/bin/sh
+          set -eu
+          test "$(/usr/bin/id -u)" = "$AI_A16_EXPECTED_UID"
+          test "$(/usr/bin/id -g)" = "$AI_A16_EXPECTED_GID"
+          test "$(/usr/bin/id -G)" = "$AI_A16_EXPECTED_GID"
+          /usr/bin/grep -Eq '^NoNewPrivs:[[:space:]]+1$' /proc/self/status
+          for field in CapBnd CapInh CapAmb; do
+            /usr/bin/grep -Eq "^${field}:[[:space:]]+0+$" /proc/self/status
+          done
+          if /usr/bin/sudo -n true >/dev/null 2>&1; then
+            exit 1
+          fi
+          exec "$AI_A16_NODE_BIN" .github/scripts/ai-release-readiness.mjs run \
+            --release-sha "$GITHUB_SHA" --out-dir "$AI_A16_OUT_DIR"
+          AI_A16_ENTRYPOINT
+          chmod 0500 "$entrypoint"
+          sudo unshare --net sh -eu -c '
+            timeout 5s ip link set dev lo up
+            exec setpriv --reuid="$1" --regid="$2" --clear-groups \
+              --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all \
+              env -i \
+                PATH="$3" HOME="$4" XDG_CONFIG_HOME="$4" \
+                TMPDIR="$4" TMP="$4" TEMP="$4" \
+                CI=true GITHUB_ACTIONS=true \
+                AI_A16_EXPECTED_UID="$1" AI_A16_EXPECTED_GID="$2" \
+                AI_A16_NODE_BIN="$5" AI_A16_OUT_DIR="${12}" \
+                GITHUB_SHA="$6" GITHUB_RUN_ID="$7" GITHUB_RUN_ATTEMPT="$8" \
+                AI_KILL_SWITCH=true AI_EGRESS_POLICY_JSON="{\"enabled\":false}" \
+                PRISMA_HIDE_UPDATE_MESSAGE=true CHECKPOINT_DISABLE=1 \
+                PRISMA_GENERATE_SKIP_AUTOINSTALL=1 \
+                AI_A16_SERVER_SETUP="$9" AI_A16_CLIENT_SETUP="${10}" \
+                AI_A16_PRISMA_SETUP="${11}" AI_A16_SQLITE_SETUP="${14}" \
+                /bin/sh "${13}"
+          ' ai-a16 "$(id -u)" "$(id -g)" "$PATH" "$RUNNER_TEMP" \
+            "$node_bin" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" \
+            "$AI_A16_SERVER_SETUP" "$AI_A16_CLIENT_SETUP" \
+            "$AI_A16_PRISMA_SETUP" \
+            "$RUNNER_TEMP/ai-a16-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            "$entrypoint" "$AI_A16_SQLITE_SETUP"
+      - name: Upload redacted readiness metadata only
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ai-hardening-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ai-a16-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}/readiness.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload validated results manifest only
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ai-hardening-manifest-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ai-a16-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}/manifest.json
+          # Invalid/dirty/unisolated evidence is not copied as a validated manifest.
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Upload bounded test-file diagnostics only
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: ai-hardening-diagnostics-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ai-a16-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}/diagnostics.json
+          # Trusted inventory IDs and status/counts only, never raw test output.
+          # Invalid/dirty/unisolated runs do not publish diagnostic evidence.
+          if-no-files-found: ignore
+          retention-days: 7

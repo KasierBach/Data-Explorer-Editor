@@ -15,6 +15,12 @@ import type {
   Relationship,
 } from '../database-strategies/database-strategy.interface';
 import { validateMongoExecutableCommand } from './mongo-payload-validator';
+import { AI_CONSTANTS } from './ai.constants';
+import {
+  createAiRequestScope,
+  assertAiRequestActive,
+  waitForAiResult,
+} from './ai-request-lifecycle';
 
 interface SchemaTable {
   name: string;
@@ -30,11 +36,47 @@ export class AiService {
   ) {}
 
   async chat(params: ChatParams): Promise<ChatResult> {
-    return this.chatService.chat(params);
+    const result = await this.chatService.chat(params);
+    return this.normalizeChatCommand(result, params);
   }
 
   async *chatStream(params: ChatParams): AsyncGenerator<StreamEvent> {
-    yield* this.chatService.chatStream(params);
+    for await (const event of this.chatService.chatStream(params)) {
+      yield event.type === 'done'
+        ? { ...event, data: this.normalizeChatCommand(event.data, params) }
+        : event;
+    }
+  }
+
+  private normalizeChatCommand(
+    result: ChatResult,
+    params: ChatParams,
+  ): ChatResult {
+    if (
+      !params.databaseType?.toLowerCase().includes('mongodb') ||
+      result.sql === undefined ||
+      result.sql === null ||
+      result.sql === ''
+    ) {
+      return result;
+    }
+
+    const sql = this.normalizeGeneratedCommand(
+      result.sql,
+      params.databaseType,
+      params.prompt,
+    );
+    const validationIssues = validateMongoExecutableCommand(sql);
+    if (validationIssues.length === 0) {
+      return { ...result, sql };
+    }
+
+    const warning = `The AI response could not be converted into a safe executable MongoDB payload: ${validationIssues[0]}`;
+    return {
+      ...result,
+      sql: undefined,
+      explanation: [result.explanation, warning].filter(Boolean).join('\n\n'),
+    };
   }
 
   async gatherSchemaContext(
@@ -43,6 +85,10 @@ export class AiService {
     database?: string,
     connectionId?: string,
     searchTerm?: string,
+    request: Pick<
+      ChatParams,
+      'signal' | 'deadlineAt' | 'beforeProviderRequest'
+    > = {},
   ): Promise<string> {
     return this.schemaService.gatherSchemaContext(
       pool,
@@ -50,6 +96,7 @@ export class AiService {
       database,
       connectionId,
       searchTerm,
+      request,
     );
   }
 
@@ -72,11 +119,28 @@ export class AiService {
   async suggestTablesBySemantic(
     searchTerm: string,
     tableNames: string[],
+    beforeProviderRequest?: ChatParams['beforeProviderRequest'],
+    request: Pick<ChatParams, 'signal' | 'deadlineAt'> = {},
   ): Promise<string[]> {
-    return this.schemaService.suggestTablesBySemantic(searchTerm, tableNames);
+    return this.schemaService.suggestTablesBySemantic(
+      searchTerm,
+      tableNames,
+      beforeProviderRequest,
+      request,
+    );
   }
 
   async autocomplete(params: {
+    execution?: ChatParams['execution'];
+    beforeProviderAttempt?: ChatParams['beforeProviderAttempt'];
+    cacheScope?: string;
+    connectionId?: string;
+    database?: string;
+    signal?: AbortSignal;
+    deadlineAt?: number;
+    beforeProviderRequest?: ChatParams['beforeProviderRequest'];
+    disabledProviders?: string[];
+    fallbackProvider?: string;
     beforeCursor: string;
     afterCursor?: string;
     schemaContext?: string;
@@ -88,6 +152,12 @@ export class AiService {
   }
 
   async generateSql(params: {
+    requestScopeKey?: ChatParams['requestScopeKey'];
+    execution?: ChatParams['execution'];
+    beforeProviderAttempt?: ChatParams['beforeProviderAttempt'];
+    signal?: AbortSignal;
+    deadlineAt?: number;
+    beforeProviderRequest?: ChatParams['beforeProviderRequest'];
     query: string;
     databaseType?: string;
     schemaContext?: string;
@@ -103,77 +173,112 @@ export class AiService {
       explanation: string;
     }
   > {
-    const {
-      query,
-      databaseType = 'postgres',
-      schemaContext,
-      model,
-      mode = 'fast',
-      routingMode,
-      providerOverride,
-      disabledProviders,
-      fallbackProvider,
-    } = params;
-
-    let result = await this.chatService.chat({
-      model,
-      mode,
-      prompt: this.buildCommandGenerationPrompt(query, databaseType),
-      schemaContext,
-      databaseType,
-      routingMode,
-      providerOverride,
-      disabledProviders,
-      fallbackProvider,
+    const scope = createAiRequestScope({
+      ...params,
+      timeoutMs: AI_CONSTANTS.DEFAULT_PROVIDER_TIMEOUT_MS,
     });
+    const request = {
+      ...params,
+      signal: scope.signal,
+      deadlineAt: scope.deadlineAt,
+    };
+    try {
+      assertAiRequestActive(request);
+      const {
+        query,
+        databaseType = 'postgres',
+        schemaContext,
+        model,
+        mode = 'fast',
+        routingMode,
+        providerOverride,
+        disabledProviders,
+        fallbackProvider,
+      } = params;
 
-    let sql = this.normalizeGeneratedCommand(result.sql, databaseType, query);
-    let explanation =
-      result.explanation?.trim() || result.message?.trim() || 'Done.';
-
-    if (databaseType.toLowerCase().includes('mongodb')) {
-      const validationIssues = validateMongoExecutableCommand(sql);
-      if (validationIssues.length > 0) {
-        const repairResult = await this.chatService.chat({
+      let result = await waitForAiResult(
+        this.chatService.chat({
+          requestScopeKey: params.requestScopeKey,
+          execution: params.execution,
+          beforeProviderAttempt: params.beforeProviderAttempt,
+          signal: request.signal,
+          deadlineAt: request.deadlineAt,
+          beforeProviderRequest: params.beforeProviderRequest,
           model,
           mode,
-          prompt: this.buildMongoRepairPrompt(query, sql, validationIssues),
+          prompt: this.buildCommandGenerationPrompt(query, databaseType),
           schemaContext,
           databaseType,
           routingMode,
           providerOverride,
           disabledProviders,
           fallbackProvider,
-        });
-        const repairedSql = this.normalizeGeneratedCommand(
-          repairResult.sql,
-          databaseType,
-          query,
-        );
-        const repairIssues = validateMongoExecutableCommand(repairedSql);
+        }),
+        request.signal,
+      );
+      assertAiRequestActive(request);
 
-        result = repairResult;
-        if (repairIssues.length === 0) {
-          sql = repairedSql;
-          explanation =
-            repairResult.explanation?.trim() ||
-            repairResult.message?.trim() ||
-            'Generated and validated a MongoDB command.';
-        } else {
-          sql = '';
-          explanation = `The AI response could not be converted into a safe executable MongoDB payload: ${repairIssues[0]}`;
+      let sql = this.normalizeGeneratedCommand(result.sql, databaseType, query);
+      let explanation =
+        result.explanation?.trim() || result.message?.trim() || 'Done.';
+
+      if (databaseType.toLowerCase().includes('mongodb')) {
+        const validationIssues = validateMongoExecutableCommand(sql);
+        if (validationIssues.length > 0) {
+          assertAiRequestActive(request);
+          const repairResult = await waitForAiResult(
+            this.chatService.chat({
+              requestScopeKey: params.requestScopeKey,
+              execution: params.execution,
+              beforeProviderAttempt: params.beforeProviderAttempt,
+              signal: request.signal,
+              deadlineAt: request.deadlineAt,
+              beforeProviderRequest: params.beforeProviderRequest,
+              model,
+              mode,
+              prompt: this.buildMongoRepairPrompt(query, sql, validationIssues),
+              schemaContext,
+              databaseType,
+              routingMode,
+              providerOverride,
+              disabledProviders,
+              fallbackProvider,
+            }),
+            request.signal,
+          );
+          assertAiRequestActive(request);
+          const repairedSql = this.normalizeGeneratedCommand(
+            repairResult.sql,
+            databaseType,
+            query,
+          );
+          const repairIssues = validateMongoExecutableCommand(repairedSql);
+
+          result = repairResult;
+          if (repairIssues.length === 0) {
+            sql = repairedSql;
+            explanation =
+              repairResult.explanation?.trim() ||
+              repairResult.message?.trim() ||
+              'Generated and validated a MongoDB command.';
+          } else {
+            sql = '';
+            explanation = `The AI response could not be converted into a safe executable MongoDB payload: ${repairIssues[0]}`;
+          }
         }
       }
-    }
 
-    return {
-      sql,
-      explanation,
-      provider: result.provider,
-      model: result.model,
-      routingMode: result.routingMode,
-      usage: result.usage,
-    };
+      return {
+        sql,
+        explanation,
+        provider: result.provider,
+        model: result.model,
+        routingMode: result.routingMode,
+        usage: result.usage,
+      };
+    } finally {
+      scope.dispose();
+    }
   }
 
   private buildCommandGenerationPrompt(
@@ -332,6 +437,10 @@ Do not return Markdown, commentary, or Mongo shell syntax.`;
       typeof payload.collection === 'string' && payload.collection.trim().length
         ? payload.collection.trim()
         : fallbackCollection;
+
+    if ('action' in payload && (!action || !mongoActions.has(action))) {
+      return payload;
+    }
 
     if (action && mongoActions.has(action)) {
       const normalized: Record<string, unknown> = {

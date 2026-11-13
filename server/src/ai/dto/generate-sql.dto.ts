@@ -3,7 +3,10 @@ import {
   IsArray,
   IsIn,
   IsNotEmpty,
-  Matches,
+  IsInt,
+  Min,
+  Max,
+  Validate,
   MaxLength,
   IsOptional,
   IsString,
@@ -16,6 +19,12 @@ import type {
   ChatHistoryMessage,
 } from '../ai.types';
 import { AiProviderCapabilitiesDto } from './ai-provider-connection.dto';
+import {
+  AI_INPUT_BOUNDS,
+  AiImageBoundsConstraint,
+  AiInputBoundsConstraint,
+  AiPdfBoundsConstraint,
+} from '../ai-input-bounds';
 
 class ChatHistoryMessageDto implements ChatHistoryMessage {
   @IsString()
@@ -37,9 +46,15 @@ class AiDocumentDto {
   mimeType: 'application/pdf';
 
   @IsString()
-  @MaxLength(7_000_000)
-  @Matches(/^data:application\/pdf;base64,[A-Za-z0-9+/=]+$/)
+  @MaxLength(AI_INPUT_BOUNDS.maxPdfDataUrlCharacters)
+  @Validate(AiPdfBoundsConstraint)
   data: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(AI_INPUT_BOUNDS.maxPdfBytes)
+  size?: number;
 }
 
 export class AiProviderOverrideDto {
@@ -82,6 +97,7 @@ export class AiProviderOverrideDto {
 export class GenerateSqlDto {
   @IsNotEmpty()
   @IsString()
+  @Validate(AiInputBoundsConstraint)
   connectionId: string;
 
   @IsOptional()
@@ -94,6 +110,8 @@ export class GenerateSqlDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(AI_INPUT_BOUNDS.maxImageDataUrlCharacters)
+  @Validate(AiImageBoundsConstraint)
   image?: string;
 
   @IsOptional()

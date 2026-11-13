@@ -34,6 +34,15 @@ export function supportsVision(
     case 'gemini':
       return true;
     case 'beeknoee':
+      if (
+        [
+          'bee-tok/claude-sonnet-5-5',
+          'bee-tok/claude-opus-5-5',
+          'bee/gemini-4-argon',
+          'claude-opus-4-6',
+        ].includes(plan.model)
+      )
+        return false;
       return matchesAnyPattern(plan.model, BEEKNOEE_VISION_PATTERNS);
     case 'groq':
       return matchesAnyPattern(plan.model, GROQ_VISION_PATTERNS);

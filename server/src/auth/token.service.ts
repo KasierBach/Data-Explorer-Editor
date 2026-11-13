@@ -54,6 +54,7 @@ export class TokenService {
       address: user.address,
       theme: user.theme,
       language: user.language,
+      aiEnabled: user.aiEnabled === true,
       legalAcceptedAt: user.legalAcceptedAt,
       emailNotifications: user.emailNotifications,
       failedQueryAlerts: user.failedQueryAlerts,

@@ -8,6 +8,13 @@ import type {
   Relationship,
 } from '../database-strategies/database-strategy.interface';
 import { FreshnessService } from '../common/freshness/freshness.service';
+import type { ChatParams } from './ai.types';
+import {
+  assertAiRequestActive,
+  isAiRequestStoppedError,
+  waitForAiResult,
+} from './ai-request-lifecycle';
+import { isAiDisabledError } from './ai-account-policy.service';
 
 interface SchemaTable {
   name: string;
@@ -17,8 +24,11 @@ interface SchemaTable {
 interface SchemaInventory {
   tables: SchemaTable[];
   relationships: Relationship[];
+  truncated?: boolean;
 }
 
+const MAX_SCHEMA_INVENTORY_TABLES = 5_000;
+const MAX_SCHEMA_INVENTORY_RELATIONSHIPS = 10_000;
 const MAX_DETAILED_TABLES = 24;
 const MAX_SCHEMA_CONTEXT_CHARACTERS = 32_000;
 
@@ -113,34 +123,59 @@ export class AiSchemaContextService {
     database?: string,
     connectionId?: string,
     searchTerm = '',
+    request: Pick<
+      ChatParams,
+      'signal' | 'deadlineAt' | 'beforeProviderRequest'
+    > = {},
   ): Promise<string> {
+    const run = async <T>(operation: () => Promise<T>): Promise<T> => {
+      assertAiRequestActive(request);
+      await waitForAiResult(
+        Promise.resolve().then(() => request.beforeProviderRequest?.()),
+        request.signal,
+      );
+      assertAiRequestActive(request);
+      const result = await waitForAiResult(operation(), request.signal);
+      assertAiRequestActive(request);
+      return result;
+    };
+    assertAiRequestActive(request);
     const scope = [connectionId, database ?? null];
     const relevanceKey = tokenize(searchTerm).join('|') || 'default';
     const inventoryCacheKey = connectionId
-      ? await this.freshnessService.buildKey('ai-schema', scope, [
-          'schema-inventory-v4',
-        ])
+      ? await run(() =>
+          this.freshnessService.buildKey('ai-schema', scope, [
+            'schema-inventory-v4',
+          ]),
+        )
       : null;
     const contextCacheKey = connectionId
-      ? await this.freshnessService.buildKey('ai-schema', scope, [
-          'schema-context-v4-relevant',
-          relevanceKey,
-        ])
+      ? await run(() =>
+          this.freshnessService.buildKey('ai-schema', scope, [
+            'schema-context-v4-relevant',
+            relevanceKey,
+          ]),
+        )
       : null;
 
     if (contextCacheKey) {
-      const cached = await this.cacheManager.get<string>(contextCacheKey);
+      const cached = await run(() =>
+        this.cacheManager.get<string>(contextCacheKey),
+      );
       if (cached !== undefined && cached !== null) return cached;
     }
 
     let schemaContext = '';
     try {
       let inventory = inventoryCacheKey
-        ? await this.cacheManager.get<SchemaInventory>(inventoryCacheKey)
+        ? await run(() =>
+            this.cacheManager.get<SchemaInventory>(inventoryCacheKey),
+          )
         : undefined;
       if (!inventory) {
-        const schemas = await strategy.getSchemas(pool, database);
+        const schemas = await run(() => strategy.getSchemas(pool, database));
         const allTables: SchemaTable[] = [];
+        let inventoryTruncated = false;
         const skipSchemas = [
           'pg_catalog',
           'information_schema',
@@ -158,7 +193,9 @@ export class AiSchemaContextService {
           if (!schemaName || skipSchemas.includes(schemaName)) continue;
 
           try {
-            const tables = await strategy.getTables(pool, schemaName, database);
+            const tables = await run(() =>
+              strategy.getTables(pool, schemaName, database),
+            );
             for (const table of tables) {
               const tableName =
                 typeof table === 'string'
@@ -166,26 +203,58 @@ export class AiSchemaContextService {
                   : (table as { name?: string }).name;
               if (tableName) {
                 allTables.push({ name: tableName, schema: schemaName });
+                if (allTables.length >= MAX_SCHEMA_INVENTORY_TABLES) {
+                  inventoryTruncated = true;
+                  break;
+                }
               }
             }
-          } catch {
+            if (inventoryTruncated) break;
+          } catch (error) {
+            if (
+              request.signal?.aborted ||
+              isAiRequestStoppedError(error) ||
+              isAiDisabledError(error)
+            )
+              throw error;
             // Continue building a partial inventory.
           }
         }
 
         let relationships: Relationship[] = [];
         try {
-          relationships = await strategy.getRelationships(pool, database);
-        } catch {
+          const discoveredRelationships = await run(() =>
+            strategy.getRelationships(pool, database),
+          );
+          relationships = discoveredRelationships.slice(
+            0,
+            MAX_SCHEMA_INVENTORY_RELATIONSHIPS,
+          );
+          if (discoveredRelationships.length > relationships.length) {
+            inventoryTruncated = true;
+          }
+        } catch (error) {
+          if (
+            request.signal?.aborted ||
+            isAiRequestStoppedError(error) ||
+            isAiDisabledError(error)
+          )
+            throw error;
           // Relationships are optional for some engines.
         }
-        inventory = { tables: allTables, relationships };
+        inventory = {
+          tables: allTables,
+          relationships,
+          ...(inventoryTruncated ? { truncated: true } : {}),
+        };
 
         if (inventoryCacheKey) {
-          await this.cacheManager.set(
-            inventoryCacheKey,
-            inventory,
-            AI_CONSTANTS.SCHEMA_CACHE_TTL_MS,
+          await run(() =>
+            this.cacheManager.set(
+              inventoryCacheKey,
+              inventory,
+              AI_CONSTANTS.SCHEMA_CACHE_TTL_MS,
+            ),
           );
         }
       }
@@ -198,14 +267,17 @@ export class AiSchemaContextService {
       const columnMap = new Map<string, ColumnInfo[]>();
       for (const table of selectedTables) {
         try {
-          const columns = await strategy.getColumns(
-            pool,
-            table.schema,
-            table.name,
-            database,
+          const columns = await run(() =>
+            strategy.getColumns(pool, table.schema, table.name, database),
           );
           columnMap.set(`${table.schema}.${table.name}`, columns);
-        } catch {
+        } catch (error) {
+          if (
+            request.signal?.aborted ||
+            isAiRequestStoppedError(error) ||
+            isAiDisabledError(error)
+          )
+            throw error;
           // Continue building partial schema context.
         }
       }
@@ -226,6 +298,11 @@ export class AiSchemaContextService {
         columnMap,
         relationships,
       );
+      if (inventory.truncated) {
+        schemaContext =
+          '[Schema inventory truncated to operational limits; omitted objects may exist]\n' +
+          schemaContext;
+      }
       if (schemaContext.length > MAX_SCHEMA_CONTEXT_CHARACTERS) {
         schemaContext =
           schemaContext.slice(0, MAX_SCHEMA_CONTEXT_CHARACTERS) +
@@ -237,10 +314,12 @@ export class AiSchemaContextService {
         schemaContext &&
         !schemaContext.includes('Could not load')
       ) {
-        await this.cacheManager.set(
-          contextCacheKey,
-          schemaContext,
-          AI_CONSTANTS.SCHEMA_CACHE_TTL_MS,
+        await run(() =>
+          this.cacheManager.set(
+            contextCacheKey,
+            schemaContext,
+            AI_CONSTANTS.SCHEMA_CACHE_TTL_MS,
+          ),
         );
       }
 
@@ -248,6 +327,12 @@ export class AiSchemaContextService {
         `[AiSchemaContextService] Relevant schema context built: ${selectedTables.length}/${inventory.tables.length} tables`,
       );
     } catch (error) {
+      if (
+        request.signal?.aborted ||
+        isAiRequestStoppedError(error) ||
+        isAiDisabledError(error)
+      )
+        throw error;
       this.logger.error(
         '[AiSchemaContextService] Schema gathering failed:',
         error instanceof Error ? error.message : 'Unknown error',

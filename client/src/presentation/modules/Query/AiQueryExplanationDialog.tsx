@@ -25,6 +25,7 @@ import { Badge } from '@/presentation/components/ui/badge';
 import { AiMarkdownContent } from './AiMarkdownContent';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { toast } from 'sonner';
+import { assertAiEnabled, isAiEnabled } from '@/core/services/aiAccountPolicy';
 
 interface AiQueryExplanationDialogProps {
     open: boolean;
@@ -33,6 +34,7 @@ interface AiQueryExplanationDialogProps {
     sql: string;
     explanation: string | null;
     isLoading: boolean;
+    aiEnabled?: boolean;
     error: string | null;
     onRegenerate?: (customPrompt?: string) => Promise<void> | void;
 }
@@ -44,11 +46,13 @@ export const AiQueryExplanationDialog: React.FC<AiQueryExplanationDialogProps> =
     sql,
     explanation,
     isLoading,
+    aiEnabled = false,
     error,
     onRegenerate,
 }) => {
     const lines = sql.split('\n');
     const text = getWorkspaceText(lang).aiQueryExplanation;
+    const disabledTitle = getWorkspaceText(lang).aiAssistant.disabledTitle;
     const [customPrompt, setCustomPrompt] = useState('');
     const [hasCopied, setHasCopied] = useState(false);
 
@@ -61,6 +65,8 @@ export const AiQueryExplanationDialog: React.FC<AiQueryExplanationDialogProps> =
     };
 
     const handleSendCustomPrompt = (promptToSend?: string) => {
+        if (!isAiEnabled() || isLoading) return;
+        assertAiEnabled();
         const queryPrompt = (promptToSend ?? customPrompt).trim();
         if (!queryPrompt && !promptToSend) return;
         if (onRegenerate) {
@@ -92,10 +98,10 @@ export const AiQueryExplanationDialog: React.FC<AiQueryExplanationDialogProps> =
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => void onRegenerate()}
-                                disabled={isLoading}
+                                onClick={() => { if (!isAiEnabled()) return; assertAiEnabled(); void onRegenerate(); }}
+                                disabled={!aiEnabled || isLoading}
                                 className="h-8 px-3 text-xs gap-1.5 mr-6 border-blue-500/30 text-blue-600 hover:bg-blue-500/10"
-                                title={text.regenerate}
+                                title={aiEnabled ? text.regenerate : disabledTitle}
                             >
                                 <RotateCcw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
                                 <span className="hidden sm:inline">{text.regenerate}</span>
@@ -146,7 +152,9 @@ export const AiQueryExplanationDialog: React.FC<AiQueryExplanationDialogProps> =
                                             <Badge
                                                 key={idx}
                                                 variant="outline"
-                                                onClick={() => !isLoading && handleSendCustomPrompt(chip.prompt)}
+                                                onClick={() => !isLoading && isAiEnabled() && handleSendCustomPrompt(chip.prompt)}
+                                                aria-disabled={!aiEnabled || isLoading}
+                                                title={aiEnabled ? undefined : disabledTitle}
                                                 className="cursor-pointer hover:bg-accent hover:text-foreground text-[11px] py-1 px-2.5 gap-1.5 transition-colors border-border/70 bg-background/80"
                                             >
                                                 <Icon className="w-3 h-3 text-purple-500" />
@@ -166,13 +174,14 @@ export const AiQueryExplanationDialog: React.FC<AiQueryExplanationDialogProps> =
                                         value={customPrompt}
                                         onChange={(e) => setCustomPrompt(e.target.value)}
                                         placeholder={text.customPromptPlaceholder}
-                                        disabled={isLoading}
+                                        disabled={!aiEnabled || isLoading}
                                         className="h-8 text-xs bg-background flex-1"
                                     />
                                     <Button
                                         type="submit"
                                         size="sm"
-                                        disabled={isLoading || !customPrompt.trim()}
+                                        disabled={!aiEnabled || isLoading || !customPrompt.trim()}
+                                        title={aiEnabled ? undefined : disabledTitle}
                                         className="h-8 px-3 text-xs gap-1.5 shrink-0"
                                     >
                                         {isLoading ? (

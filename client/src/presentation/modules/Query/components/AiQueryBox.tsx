@@ -5,6 +5,7 @@ import { Textarea } from '@/presentation/components/ui/textarea';
 import { apiService } from '@/core/services/api.service';
 import { useAppStore } from '@/core/services/store';
 import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
+import { assertAiEnabled, isAiEnabled } from '@/core/services/aiAccountPolicy';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -31,7 +32,8 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const handleGenerate = async () => {
-        if (!query.trim() || !currentConnectionId) return;
+        if (!isAiEnabled() || !query.trim() || !currentConnectionId || isLoading) return;
+        assertAiEnabled();
 
         setIsLoading(true);
         setExplanation(null);
@@ -39,6 +41,7 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
         setGenerationId(null);
         setFeedbackRating(null);
         try {
+            assertAiEnabled();
             const result = await apiService.post<{ sql: string, explanation: string, generationId?: string }>('/ai/nlp-to-sql', {
                 connectionId: currentConnectionId,
                 database: currentDatabase,
@@ -51,6 +54,7 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                 fallbackProvider: preferences.fallbackProvider,
             });
 
+            if (!isAiEnabled()) return;
             const generatedSql = result.sql?.trim() || '';
             setGenerationId(result.generationId || null);
             const explicitSchemaIntent = /\b(create|alter|drop|truncate|migrate|migration|schema|table|column|ddl)\b/i.test(query);
@@ -132,8 +136,9 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                         <div className="flex items-center justify-between px-1">
                             <div className="flex items-center space-x-2">
                                 <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50">
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/50" title={preferences.enabled === true ? undefined : text.aiAssistant.disabledTitle}>
                                     {text.aiQuery.title}
+                                    {preferences.enabled !== true && ` · ${text.aiAssistant.disabledTitle}`}
                                 </h4>
                             </div>
                             <button 
@@ -147,6 +152,7 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                         <div className="relative">
                             <Textarea
                                 ref={textareaRef}
+                                data-ai-query-input
                                 autoFocus
                                 placeholder={text.aiQuery.expandedPlaceholder}
                                 className="min-h-[100px] bg-muted/40 border-none ring-1 ring-white/5 focus-visible:ring-blue-500/30 text-sm resize-none pr-10 rounded-xl leading-relaxed"
@@ -234,7 +240,8 @@ export const AiQueryBox: React.FC<AiQueryBoxProps> = ({ onGenerate, currentConne
                                 <Button 
                                     size="sm" 
                                     className="h-8 px-4 rounded-lg text-xs bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/20 space-x-2"
-                                    disabled={isLoading || !query.trim()}
+                                    disabled={preferences.enabled !== true || isLoading || !query.trim()}
+                                    title={preferences.enabled === true ? undefined : text.aiAssistant.disabledTitle}
                                     onClick={handleGenerate}
                                 >
                                     {isLoading ? (

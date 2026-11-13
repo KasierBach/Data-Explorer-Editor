@@ -1,0 +1,198 @@
+{
+  "formatVersion": 1,
+  "datasetVersion": "synthetic-curated-24.en-vi.v2",
+  "schemaVersion": "synthetic-commerce.v1",
+  "promptVersion": "author-fixture-prompts.en-vi.v2",
+  "reviewStatus": "AUTHOR_DRAFT_NOT_EXPERT_REVIEWED",
+  "evidenceStatus": "INSUFFICIENT_EVIDENCE",
+  "declaredSupportedCohorts": ["sql/en", "sql/vi", "mongo/en", "mongo/vi"],
+  "splitPolicy": {"default": "dev", "holdoutUse": "EXPLICIT_EVALUATION_ONLY_NO_TUNING", "blind": false},
+  "responseMetadata": {"datasetVersion": "synthetic-curated-24.en-vi.v2", "schemaVersion": "synthetic-commerce.v1", "promptVersion": "author-fixture-prompts.en-vi.v2", "execution": "NOT_EXECUTED"},
+  "numericPolicy": {"absolute": 0, "relative": 0, "rationale": "Exact comparison by default. Small fixture integers and binary-exact amounts need no tolerance. Counts/identifiers, nulls and strings are never coerced."},
+  "schema": {
+    "sql": {
+      "dialect": "Authored PostgreSQL SELECT subset; not executed or engine-validated",
+      "entities": {
+        "customers": {"id": "integer primary key", "name": "text", "region": "text"},
+        "orders": {"id": "integer primary key", "customer_id": "integer references customers.id", "amount": "numeric nullable", "note": "text nullable", "status": "text", "created_at": "timestamptz UTC"},
+        "line_items": {"order_id": "integer references orders.id", "sku": "text", "quantity": "integer"}
+      }
+    },
+    "mongo": {
+      "dialect": "Authored MongoDB aggregation subset; dates represented as UTC strings in these fixtures only",
+      "entities": {"invoices": {"id": "integer unique", "region": "string", "amount": "number nullable", "label": "string nullable or missing", "tags": "array of strings", "state": "string", "created_at": "UTC ISO string"}}
+    }
+  },
+  "sourceFixtures": {
+    "sql": {
+      "customers": [{"id": 1, "name": "Ada", "region": "EU"}, {"id": 2, "name": "林", "region": "APAC"}, {"id": 3, "name": "Mina", "region": "EU"}, {"id": 4, "name": "Noor", "region": "NA"}],
+      "orders": [
+        {"id": 10, "customer_id": 1, "amount": 12.5, "note": null, "status": "paid", "created_at": "2025-01-01T00:15:00.000Z"},
+        {"id": 11, "customer_id": 2, "amount": 0, "note": "", "status": "refunded", "created_at": "2024-12-31T23:45:00.000Z"},
+        {"id": 12, "customer_id": 1, "amount": 7.5, "note": "gift", "status": "paid", "created_at": "2025-01-02T10:00:00.000Z"},
+        {"id": 13, "customer_id": 3, "amount": null, "note": null, "status": "pending", "created_at": "2025-01-03T00:00:00.000Z"},
+        {"id": 14, "customer_id": 2, "amount": 12.5, "note": null, "status": "paid", "created_at": "2025-01-01T12:00:00.000Z"},
+        {"id": 15, "customer_id": 3, "amount": -2.5, "note": "return", "status": "refunded", "created_at": "2025-01-01T08:00:00.000Z"}
+      ],
+      "line_items": [{"order_id": 10, "sku": "A", "quantity": 2}, {"order_id": 10, "sku": "B", "quantity": 1}, {"order_id": 12, "sku": "A", "quantity": 3}, {"order_id": 14, "sku": "C", "quantity": 1}]
+    },
+    "mongo": {
+      "invoices": [
+        {"id": 1, "region": "EU", "amount": 10, "label": null, "tags": ["red", "blue"], "state": "paid", "created_at": "2025-01-01T00:15:00.000Z"},
+        {"id": 2, "region": "EU", "amount": 5, "tags": [], "state": "paid", "created_at": "2024-12-31T23:45:00.000Z"},
+        {"id": 3, "region": "APAC", "amount": 0, "label": "", "tags": ["red"], "state": "refunded", "created_at": "2025-01-01T08:00:00.000Z"},
+        {"id": 4, "region": "APAC", "amount": null, "label": "hold", "tags": ["blue"], "state": "pending", "created_at": "2025-01-02T10:00:00.000Z"},
+        {"id": 5, "region": "EU", "amount": -2, "label": "return", "tags": ["red", "red"], "state": "refunded", "created_at": "2025-01-01T12:00:00.000Z"},
+        {"id": 6, "region": "NA", "amount": 3, "label": "ok", "tags": [], "state": "paid", "created_at": "2025-01-03T00:00:00.000Z"}
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "sql-null-note", "semanticId": "sql-null-versus-empty", "engine": "sql", "language": "en", "split": "dev",
+      "prompt": "Return order ids whose note is SQL NULL, ordered by id ascending. Empty strings do not count as NULL.",
+      "conditions": ["Use IS NULL, not equality to NULL or empty string.", "Return ids 10, 13, 14 in ascending order; no duplicated ids."],
+      "expected": {"response": {"kind": "answer", "query": "SELECT id FROM orders WHERE note IS NULL ORDER BY id ASC", "sources": ["orders.id", "orders.note"], "reasonCode": null}, "result": {"columns": [{"name": "id", "type": "integer", "nullable": false}], "rows": [[10], [13], [14]]}}
+    },
+    {
+      "id": "sql-count-null", "semanticId": "sql-count-column-versus-star", "engine": "sql", "language": "vi", "split": "dev",
+      "prompt": "Đếm tổng số dòng của orders thành total_rows và số dòng có amount khác NULL thành known_amounts, trả về một dòng. Giá trị amount bằng 0 vẫn được tính.",
+      "conditions": ["COUNT(*) is 6; COUNT(amount) is 5.", "Zero and negative amounts count; the NULL amount does not."],
+      "expected": {"response": {"kind": "answer", "query": "SELECT COUNT(*) AS total_rows, COUNT(amount) AS known_amounts FROM orders", "sources": ["orders.amount"], "reasonCode": null}, "result": {"columns": [{"name": "total_rows", "type": "integer", "nullable": false}, {"name": "known_amounts", "type": "integer", "nullable": false}], "rows": [[6, 5]]}}
+    },
+    {
+      "id": "sql-utc-window", "semanticId": "sql-half-open-utc-day", "engine": "sql", "language": "en", "split": "dev",
+      "prompt": "List order ids created during 2025-01-01 in UTC, from midnight inclusive to the next midnight exclusive, ascending id.",
+      "conditions": ["Use explicit UTC half-open bounds, not server-local current date.", "Include 10, 14, 15; exclude the prior UTC day and Jan 2/3."],
+      "expected": {"response": {"kind": "answer", "query": "SELECT id FROM orders WHERE created_at >= TIMESTAMPTZ '2025-01-01 00:00:00+00' AND created_at < TIMESTAMPTZ '2025-01-02 00:00:00+00' ORDER BY id ASC", "sources": ["orders.id", "orders.created_at"], "reasonCode": null}, "result": {"columns": [{"name": "id", "type": "integer", "nullable": false}], "rows": [[10], [14], [15]]}}
+    },
+    {
+      "id": "sql-region-multiset", "semanticId": "sql-bag-semantics-no-distinct", "engine": "sql", "language": "vi", "split": "dev",
+      "prompt": "Trả về region của từng khách hàng trong customers, không loại bỏ giá trị trùng lặp và không yêu cầu sắp xếp.",
+      "conditions": ["Two EU rows must remain; DISTINCT is wrong.", "Unordered comparison is a multiset, not a set; APAC and NA each appear once."],
+      "comparison": {"ordering": "unordered", "numericTolerance": {"absolute": 0, "relative": 0, "rationale": "No ORDER BY requested. Preserve every duplicate; string regions compare exactly."}},
+      "expected": {"response": {"kind": "answer", "query": "SELECT region FROM customers", "sources": ["customers.region"], "reasonCode": null}, "result": {"columns": [{"name": "region", "type": "string", "nullable": false}], "rows": [["EU"], ["APAC"], ["EU"], ["NA"]]}}
+    },
+    {
+      "id": "mongo-null-or-missing", "semanticId": "mongo-null-equality-matches-missing", "engine": "mongo", "language": "en", "split": "dev",
+      "prompt": "Return invoice ids whose label is null OR absent, using Mongo's equality-to-null semantics, ascending id. Do not include empty strings.",
+      "conditions": ["{label:null} matches explicit null and missing label.", "Only ids 1 and 2 match; id 3's empty string does not."],
+      "expected": {"response": {"kind": "answer", "query": {"collection": "invoices", "pipeline": [{"$match": {"label": null}}, {"$sort": {"id": 1}}, {"$project": {"_id": 0, "id": 1}}]}, "sources": ["invoices.id", "invoices.label"], "reasonCode": null}, "result": {"columns": [{"name": "id", "type": "integer", "nullable": false}], "rows": [[1], [2]]}}
+    },
+    {
+      "id": "mongo-tag-membership", "semanticId": "mongo-array-membership-not-unwind", "engine": "mongo", "language": "vi", "split": "dev",
+      "prompt": "Tìm các invoices có mảng tags chứa red, chỉ trả về id theo thứ tự tăng dần. Mỗi tài liệu chỉ được trả về một lần, ngay cả khi tags chứa nhiều phần tử red.",
+      "conditions": ["Array membership is per document; do not unwind into repeated ids.", "Return 1, 3, 5 exactly once each."],
+      "expected": {"response": {"kind": "answer", "query": {"collection": "invoices", "pipeline": [{"$match": {"tags": "red"}}, {"$sort": {"id": 1}}, {"$project": {"_id": 0, "id": 1}}]}, "sources": ["invoices.id", "invoices.tags"], "reasonCode": null}, "result": {"columns": [{"name": "id", "type": "integer", "nullable": false}], "rows": [[1], [3], [5]]}}
+    },
+    {
+      "id": "mongo-region-sum", "semanticId": "mongo-group-sum-null-and-negative", "engine": "mongo", "language": "en", "split": "dev",
+      "prompt": "Sum invoice amount by region as total, including negatives and treating Mongo $sum's null input as ignored. Return region and total, sorted region ascending.",
+      "conditions": ["APAC total is 0, EU is 13, NA is 3.", "Do not filter only paid records or drop the APAC group."],
+      "expected": {"response": {"kind": "answer", "query": {"collection": "invoices", "pipeline": [{"$group": {"_id": "$region", "total": {"$sum": "$amount"}}}, {"$project": {"_id": 0, "region": "$_id", "total": 1}}, {"$sort": {"region": 1}}]}, "sources": ["invoices.region", "invoices.amount"], "reasonCode": null}, "result": {"columns": [{"name": "region", "type": "string", "nullable": false}, {"name": "total", "type": "number", "nullable": false}], "rows": [["APAC", 0], ["EU", 13], ["NA", 3]]}}
+    },
+    {
+      "id": "mongo-tag-occurrences", "semanticId": "mongo-unwind-occurrence-count", "engine": "mongo", "language": "vi", "split": "dev",
+      "prompt": "Tách từng phần tử trong mảng tags và đếm số lần xuất hiện của mỗi tag thành occurrences, không phải số tài liệu, rồi sắp xếp theo tag tăng dần. Mảng rỗng không đóng góp bản ghi nào.",
+      "conditions": ["Blue occurs twice and red four times.", "The two red entries in invoice 5 count separately; empty arrays contribute zero."],
+      "expected": {"response": {"kind": "answer", "query": {"collection": "invoices", "pipeline": [{"$unwind": "$tags"}, {"$group": {"_id": "$tags", "occurrences": {"$sum": 1}}}, {"$project": {"_id": 0, "tag": "$_id", "occurrences": 1}}, {"$sort": {"tag": 1}}]}, "sources": ["invoices.tags"], "reasonCode": null}, "result": {"columns": [{"name": "tag", "type": "string", "nullable": false}, {"name": "occurrences", "type": "integer", "nullable": false}], "rows": [["blue", 2], ["red", 4]]}}
+    },
+    {
+      "id": "sql-missing-phone", "semanticId": "sql-schema-grounding-no-phone", "engine": "sql", "language": "en", "split": "dev",
+      "prompt": "List customers' phone numbers. The supplied schema has no phone field or alternate phone table.",
+      "conditions": ["Abstain with MISSING_SCHEMA_FIELD; invent no column or query.", "An abstention has null query/result and empty sources."],
+      "expected": {"response": {"kind": "abstain", "query": null, "sources": [], "reasonCode": "MISSING_SCHEMA_FIELD"}, "result": null}
+    },
+    {
+      "id": "sql-write-refusal", "semanticId": "sql-destructive-operation-abstention", "engine": "sql", "language": "vi", "split": "dev",
+      "prompt": "Xóa tất cả đơn hàng có status là refunded. Phạm vi hỗ trợ hiện tại chỉ gồm truy vấn SELECT chỉ đọc, không cho phép ghi hoặc xóa.",
+      "conditions": ["Abstain with UNSUPPORTED_OPERATION rather than drafting DELETE or silently returning a read query."],
+      "expected": {"response": {"kind": "abstain", "query": null, "sources": [], "reasonCode": "UNSUPPORTED_OPERATION"}, "result": null}
+    },
+    {
+      "id": "mongo-missing-time-context", "semanticId": "mongo-relative-date-needs-reference", "engine": "mongo", "language": "en", "split": "dev",
+      "prompt": "Show invoices created today. No reference date, current time, or user timezone has been supplied; do not guess from the machine clock.",
+      "conditions": ["Abstain with MISSING_TIME_CONTEXT; no live clock or implicit UTC assumption."],
+      "expected": {"response": {"kind": "abstain", "query": null, "sources": [], "reasonCode": "MISSING_TIME_CONTEXT"}, "result": null}
+    },
+    {
+      "id": "mongo-missing-profit", "semanticId": "mongo-unavailable-business-metric", "engine": "mongo", "language": "vi", "split": "dev",
+      "prompt": "Tính lợi nhuận theo region. Schema chỉ có amount, không có trường chi phí hoặc lợi nhuận; không được coi doanh thu là lợi nhuận.",
+      "conditions": ["Abstain with MISSING_SCHEMA_FIELD; do not mislabel sum(amount) as profit."],
+      "expected": {"response": {"kind": "abstain", "query": null, "sources": [], "reasonCode": "MISSING_SCHEMA_FIELD"}, "result": null}
+    },
+    {
+      "id": "sql-join-quantity", "semanticId": "sql-three-table-join-grain", "engine": "sql", "language": "en", "split": "calibration",
+      "prompt": "Sum line-item quantity by customer region, joining customers to orders to line_items. Return region and units, ascending region. Count units, not orders or revenue.",
+      "conditions": ["Join on customer and order keys; inner join omits orders without items.", "APAC has 1 unit; EU has 6. Two items for order 10 must both contribute."],
+      "expected": {"response": {"kind": "answer", "query": "SELECT c.region, SUM(li.quantity) AS units FROM customers c JOIN orders o ON o.customer_id = c.id JOIN line_items li ON li.order_id = o.id GROUP BY c.region ORDER BY c.region ASC", "sources": ["customers.id", "customers.region", "orders.id", "orders.customer_id", "line_items.order_id", "line_items.quantity"], "reasonCode": null}, "result": {"columns": [{"name": "region", "type": "string", "nullable": false}, {"name": "units", "type": "integer", "nullable": false}], "rows": [["APAC", 1], ["EU", 6]]}}
+    },
+    {
+      "id": "sql-left-join-count", "semanticId": "sql-left-join-empty-customer-count", "engine": "sql", "language": "vi", "split": "calibration",
+      "prompt": "Liệt kê id và số đơn hàng order_count của tất cả khách hàng trong customers, bao gồm cả khách hàng không có đơn hàng, sắp xếp theo id khách hàng tăng dần.",
+      "conditions": ["Use LEFT JOIN and COUNT(o.id), not COUNT(*).", "Customer 4 remains with 0; customers 1, 2, 3 each have 2."],
+      "expected": {"response": {"kind": "answer", "query": "SELECT c.id, COUNT(o.id) AS order_count FROM customers c LEFT JOIN orders o ON o.customer_id = c.id GROUP BY c.id ORDER BY c.id ASC", "sources": ["customers.id", "orders.id", "orders.customer_id"], "reasonCode": null}, "result": {"columns": [{"name": "id", "type": "integer", "nullable": false}, {"name": "order_count", "type": "integer", "nullable": false}], "rows": [[1, 2], [2, 2], [3, 2], [4, 0]]}}
+    },
+    {
+      "id": "sql-average-known", "semanticId": "sql-average-non-null-denominator", "engine": "sql", "language": "en", "split": "calibration",
+      "prompt": "Return AVG(amount) across all orders as average_amount. Ignore NULL in the denominator, but include zero and negative values.",
+      "conditions": ["Known amounts total 30 across 5 records, giving 6, not 5 from a six-row denominator.", "Tiny numeric-only tolerance is for potential local serialized floating-point differences, not wrong arithmetic."],
+      "comparison": {"ordering": "ordered", "numericTolerance": {"absolute": 1e-9, "relative": 1e-12, "rationale": "For the number-typed average only: |a-b| <= 1e-9 + 1e-12*max(|a|,|b|). Small rounding differences may pass; wrong denominators cannot. No tolerance for counts, ids, strings or NULL."}},
+      "expected": {"response": {"kind": "answer", "query": "SELECT AVG(amount) AS average_amount FROM orders", "sources": ["orders.amount"], "reasonCode": null}, "result": {"columns": [{"name": "average_amount", "type": "number", "nullable": true}], "rows": [[6]]}}
+    },
+    {
+      "id": "mongo-missing-only", "semanticId": "mongo-field-exists-false", "engine": "mongo", "language": "vi", "split": "calibration",
+      "prompt": "Chỉ trả về id của các invoices không có trường label, theo thứ tự id tăng dần. Trường label có giá trị null được khai báo rõ ràng không được coi là thiếu.",
+      "conditions": ["Use $exists:false; only id 2 matches.", "Do not include explicit null on invoice 1."],
+      "expected": {"response": {"kind": "answer", "query": {"collection": "invoices", "pipeline": [{"$match": {"label": {"$exists": false}}}, {"$sort": {"id": 1}}, {"$project": {"_id": 0, "id": 1}}]}, "sources": ["invoices.id", "invoices.label"], "reasonCode": null}, "result": {"columns": [{"name": "id", "type": "integer", "nullable": false}], "rows": [[2]]}}
+    },
+    {
+      "id": "mongo-numeric-range", "semanticId": "mongo-numeric-range-boundaries", "engine": "mongo", "language": "en", "split": "calibration",
+      "prompt": "List invoice ids with numeric amount >= 0 and < 10, ascending id. Include zero; exclude null and negative amounts.",
+      "conditions": ["Lower bound is inclusive and upper bound exclusive.", "Return ids 2, 3, 6; exclude 1 at exactly 10, 4 null and 5 negative."],
+      "expected": {"response": {"kind": "answer", "query": {"collection": "invoices", "pipeline": [{"$match": {"amount": {"$gte": 0, "$lt": 10}}}, {"$sort": {"id": 1}}, {"$project": {"_id": 0, "id": 1}}]}, "sources": ["invoices.id", "invoices.amount"], "reasonCode": null}, "result": {"columns": [{"name": "id", "type": "integer", "nullable": false}], "rows": [[2], [3], [6]]}}
+    },
+    {
+      "id": "mongo-compound-sort-limit", "semanticId": "mongo-deterministic-tie-break-limit", "engine": "mongo", "language": "vi", "split": "calibration",
+      "prompt": "Sắp xếp invoices theo region tăng dần; khi region giống nhau thì sắp xếp theo id giảm dần. Lấy ba tài liệu đầu tiên và chỉ trả về id.",
+      "conditions": ["Sort before limit, with explicit id tie-breaker.", "Ordered result is 4, 3, 5; APAC rows precede EU."],
+      "expected": {"response": {"kind": "answer", "query": {"collection": "invoices", "pipeline": [{"$sort": {"region": 1, "id": -1}}, {"$limit": 3}, {"$project": {"_id": 0, "id": 1}}]}, "sources": ["invoices.region", "invoices.id"], "reasonCode": null}, "result": {"columns": [{"name": "id", "type": "integer", "nullable": false}], "rows": [[4], [3], [5]]}}
+    },
+    {
+      "id": "sql-new-york-day", "semanticId": "sql-named-timezone-crosses-utc-midnight", "engine": "sql", "language": "vi", "split": "holdout",
+      "prompt": "Trả về id của các orders được tạo trong ngày 2024-12-31 theo múi giờ America/New_York, sắp xếp theo id tăng dần. Độ lệch múi giờ của ngày đó là UTC-05:00; khoảng thời gian từ 2024-12-31T05:00Z đến 2025-01-01T05:00Z, bao gồm mốc đầu và không bao gồm mốc cuối.",
+      "conditions": ["Use the supplied local-day UTC bounds; do not replace them with a UTC calendar day.", "Return 10 and 11 only; 15 is after the local day."],
+      "expected": {"response": {"kind": "answer", "query": "SELECT id FROM orders WHERE created_at >= TIMESTAMPTZ '2024-12-31 05:00:00+00' AND created_at < TIMESTAMPTZ '2025-01-01 05:00:00+00' ORDER BY id ASC", "sources": ["orders.id", "orders.created_at"], "reasonCode": null}, "result": {"columns": [{"name": "id", "type": "integer", "nullable": false}], "rows": [[10], [11]]}}
+    },
+    {
+      "id": "sql-empty-sum", "semanticId": "sql-empty-aggregate-is-null-not-zero", "engine": "sql", "language": "en", "split": "holdout",
+      "prompt": "Return SUM(amount) as total for paid orders with amount > 100, without COALESCE. There are no matching records.",
+      "conditions": ["SQL SUM over empty input returns one row with NULL, not zero and not zero rows.", "The result column must be nullable number."],
+      "expected": {"response": {"kind": "answer", "query": "SELECT SUM(amount) AS total FROM orders WHERE status = 'paid' AND amount > 100", "sources": ["orders.amount", "orders.status"], "reasonCode": null}, "result": {"columns": [{"name": "total", "type": "number", "nullable": true}], "rows": [[null]]}}
+    },
+    {
+      "id": "sql-having-distinct", "semanticId": "sql-having-paid-distinct-order-count", "engine": "sql", "language": "vi", "split": "holdout",
+      "prompt": "Tìm các customer_id có ít nhất hai đơn hàng paid khác nhau, trả về customer_id và paid_orders, sắp xếp theo customer_id tăng dần.",
+      "conditions": ["Filter paid before grouping, use COUNT(DISTINCT id) and HAVING >= 2.", "Only customer 1 qualifies with 2; refunded or pending orders do not count."],
+      "expected": {"response": {"kind": "answer", "query": "SELECT customer_id, COUNT(DISTINCT id) AS paid_orders FROM orders WHERE status = 'paid' GROUP BY customer_id HAVING COUNT(DISTINCT id) >= 2 ORDER BY customer_id ASC", "sources": ["orders.customer_id", "orders.id", "orders.status"], "reasonCode": null}, "result": {"columns": [{"name": "customer_id", "type": "integer", "nullable": false}, {"name": "paid_orders", "type": "integer", "nullable": false}], "rows": [[1, 2]]}}
+    },
+    {
+      "id": "mongo-explicit-null", "semanticId": "mongo-bson-null-type-not-missing", "engine": "mongo", "language": "en", "split": "holdout",
+      "prompt": "Return ids whose label is explicitly BSON null, not missing. Use $type:10 and sort ascending id.",
+      "conditions": ["Only invoice 1 qualifies; missing label on 2 must not match.", "No database is used to verify this author-drafted Mongo expectation."],
+      "expected": {"response": {"kind": "answer", "query": {"collection": "invoices", "pipeline": [{"$match": {"label": {"$type": 10}}}, {"$sort": {"id": 1}}, {"$project": {"_id": 0, "id": 1}}]}, "sources": ["invoices.id", "invoices.label"], "reasonCode": null}, "result": {"columns": [{"name": "id", "type": "integer", "nullable": false}], "rows": [[1]]}}
+    },
+    {
+      "id": "mongo-paid-projection", "semanticId": "mongo-filter-project-no-implicit-id", "engine": "mongo", "language": "vi", "split": "holdout",
+      "prompt": "Chỉ trả về id và amount của các invoices có state là paid, theo thứ tự id tăng dần; không trả về trường _id mặc định hoặc bất kỳ cột nào khác.",
+      "conditions": ["Projection excludes _id; ordered columns are id integer and amount number.", "Return (1,10), (2,5), (6,3); pending/refunded records are excluded."],
+      "expected": {"response": {"kind": "answer", "query": {"collection": "invoices", "pipeline": [{"$match": {"state": "paid"}}, {"$sort": {"id": 1}}, {"$project": {"_id": 0, "id": 1, "amount": 1}}]}, "sources": ["invoices.state", "invoices.id", "invoices.amount"], "reasonCode": null}, "result": {"columns": [{"name": "id", "type": "integer", "nullable": false}, {"name": "amount", "type": "number", "nullable": false}], "rows": [[1, 10], [2, 5], [6, 3]]}}
+    },
+    {
+      "id": "mongo-write-stage-refusal", "semanticId": "mongo-output-collection-write-abstention", "engine": "mongo", "language": "en", "split": "holdout",
+      "prompt": "Aggregate invoices into a new persisted collection using $out. Only read-only pipelines are supported; writes are not allowed.",
+      "conditions": ["Abstain with UNSUPPORTED_OPERATION; never provide $out or $merge.", "Null query/result, empty sources, and the declared offline metadata contract are required."],
+      "expected": {"response": {"kind": "abstain", "query": null, "sources": [], "reasonCode": "UNSUPPORTED_OPERATION"}, "result": null}
+    }
+  ]
+}

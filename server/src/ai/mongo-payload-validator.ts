@@ -204,7 +204,25 @@ export function validateMongoExecutablePayload(value: unknown): string[] {
 
 export function validateMongoExecutableCommand(command: string): string[] {
   try {
-    return validateMongoExecutablePayload(JSON.parse(command) as unknown);
+    const payload: unknown = JSON.parse(command);
+    const issues = validateMongoExecutablePayload(payload);
+    if (issues.length > 0 || !isPlainObject(payload)) return issues;
+
+    const supportedActions = new Set([
+      'find',
+      'aggregate',
+      'count',
+      'distinct',
+      'insertOne',
+      'insertMany',
+      'updateOne',
+      'updateMany',
+      'deleteOne',
+      'deleteMany',
+    ]);
+    return supportedActions.has(payload.action as string)
+      ? []
+      : [`MongoDB payload uses unsupported action ${String(payload.action)}.`];
   } catch {
     return ['MongoDB payload must be valid JSON.'];
   }

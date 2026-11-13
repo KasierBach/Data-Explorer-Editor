@@ -7,6 +7,11 @@ import { MongoClient } from 'mongodb';
 import Redis from 'ioredis';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { ConnectionsService } from '../src/connections/connections.service';
+import { AiConnectionService } from '../src/ai/ai.connection-service';
+import { AiExecutionLedgerService } from '../src/ai/ai-execution-ledger.service';
+import { AiProviderConnectionService } from '../src/ai/ai-provider-connection.service';
+import { AiService } from '../src/ai/ai.service';
 import { encryptAttribute } from '../src/utils/crypto.util';
 import { createE2eApp, closeE2eApp } from './e2e-app';
 
@@ -60,6 +65,7 @@ describe('R10 native query errors through HTTP', () => {
     const user = await prisma.user.create({
       data: {
         email: `r10-${suffix}@example.com`,
+        aiEnabled: false,
         isEmailVerified: true,
         isOnboarded: true,
         securityAlerts: false,
@@ -165,11 +171,89 @@ describe('R10 native query errors through HTTP', () => {
   });
 
   it.each(['generate-sql', 'generate-sql-stream'])(
+    'AI %s rejects a disabled owner before pool, schema, ledger or provider activity',
+    async (endpoint) => {
+      const connections = app.get(ConnectionsService);
+      const aiConnections = app.get(AiConnectionService);
+      const ai = app.get(AiService);
+      const providers = app.get(AiProviderConnectionService);
+      const ledger = app.get(AiExecutionLedgerService);
+      const rejectUnexpectedDispatch = async (): Promise<never> => {
+        throw new Error('Unexpected disabled-account AI dispatch');
+      };
+      const spies: jest.SpyInstance[] = [];
+      try {
+        spies.push(
+          jest
+            .spyOn(connections, 'findOne')
+            .mockImplementation(rejectUnexpectedDispatch),
+        );
+        spies.push(
+          jest
+            .spyOn(connections, 'getPool')
+            .mockImplementation(rejectUnexpectedDispatch),
+        );
+        spies.push(
+          jest
+            .spyOn(aiConnections, 'getConnectionContext')
+            .mockImplementation(rejectUnexpectedDispatch),
+        );
+        spies.push(
+          jest
+            .spyOn(aiConnections, 'getConnectionContextForStream')
+            .mockImplementation(rejectUnexpectedDispatch),
+        );
+        spies.push(
+          jest
+            .spyOn(ai, 'gatherSchemaContext')
+            .mockImplementation(rejectUnexpectedDispatch),
+        );
+        spies.push(
+          jest.spyOn(ai, 'chat').mockImplementation(rejectUnexpectedDispatch),
+        );
+        spies.push(
+          jest.spyOn(ai, 'chatStream').mockImplementation(() => {
+            throw new Error('Unexpected disabled-account AI stream');
+          }),
+        );
+        spies.push(
+          jest
+            .spyOn(providers, 'resolveOverride')
+            .mockImplementation(rejectUnexpectedDispatch),
+        );
+        spies.push(
+          jest
+            .spyOn(ledger, 'begin')
+            .mockImplementation(rejectUnexpectedDispatch),
+        );
+        const response = await auth(
+          request(app.getHttpServer()).post(`/api/ai/${endpoint}`),
+        ).send({
+          connectionId: ids.postgres,
+          prompt: 'Show the available tables',
+        });
+        expect(response.status).toBe(403);
+        expect(response.headers['content-type']).toContain('application/json');
+        expect(response.body).toMatchObject({
+          success: false,
+          statusCode: 403,
+          reason: 'AI_DISABLED',
+        });
+        for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+        expect(await prisma.aiGeneration.count({ where: { userId } })).toBe(0);
+      } finally {
+        for (const spy of spies) spy.mockRestore();
+      }
+    },
+  );
+
+  it.each(['generate-sql', 'generate-sql-stream'])(
     'AI %s denies another user before opening a stream or invoking a provider',
     async (endpoint) => {
       const outsider = await prisma.user.create({
         data: {
           email: `r10-ai-${endpoint}-${suffix}@example.com`,
+          aiEnabled: true,
           isEmailVerified: true,
           isOnboarded: true,
           securityAlerts: false,

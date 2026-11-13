@@ -7,6 +7,8 @@ import {
   Body,
   Param,
   UseGuards,
+  UsePipes,
+  ValidationPipe,
   Request,
 } from '@nestjs/common';
 import { AiChatService } from './ai.chat.service';
@@ -15,11 +17,13 @@ import {
   CreateAiChatDto,
   UpdateAiChatDto,
   AddMessageDto,
+  EditMessageAndTruncateDto,
 } from './dto/ai-chat.dto';
 import type { AuthenticatedRequest } from '../auth/auth-request.types';
 
 @Controller('ai/chats')
 @UseGuards(JwtAuthGuard)
+@UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
 export class AiChatController {
   constructor(private readonly aiChatService: AiChatService) {}
 
@@ -72,6 +76,21 @@ export class AiChatController {
     @Body() dto: AddMessageDto,
   ) {
     return this.aiChatService.updateMessage(req.user.id, id, messageId, dto);
+  }
+
+  @Patch(':id/messages/:messageId/edit-and-truncate')
+  editMessageAndTruncate(
+    @Request() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Param('messageId') messageId: string,
+    @Body() dto: EditMessageAndTruncateDto,
+  ) {
+    return this.aiChatService.editMessageAndTruncate(
+      req.user.id,
+      id,
+      messageId,
+      dto,
+    );
   }
 
   @Delete(':id/messages/after/:messageId')

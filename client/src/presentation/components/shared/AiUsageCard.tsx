@@ -8,7 +8,8 @@ interface AiUsageCardProps {
     scope: 'me' | 'admin';
 }
 
-function formatTokens(value: number): string {
+function formatTokens(value: number | null | undefined): string {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return '—';
     if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
     if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
     return String(value);
@@ -27,11 +28,16 @@ export function AiUsageCard({ scope }: AiUsageCardProps) {
         staleTime: 5 * 60 * 1000,
     });
 
-    const tokens: AiTokenUsage | undefined = data?.tokens;
-    const title = isVi ? 'Token usage (30 ngày)' : 'Token usage (30 days)';
+    const tokens: AiTokenUsage | null | undefined = data?.tokens;
+    const observed = tokens?.observedOnly === true &&
+        (tokens.usageCoverage === 'complete' || tokens.usageCoverage === 'partial');
+    const coverage = observed
+        ? tokens.usageCoverage === 'complete' ? (isVi ? 'đầy đủ' : 'complete') : (isVi ? 'một phần' : 'partial')
+        : (isVi ? 'không khả dụng' : 'unavailable');
+    const title = isVi ? 'Token quan sát (30 ngày)' : 'Observed tokens (30 days)';
     const subtitle = isVi
-        ? 'Tổng token các yêu cầu AI của bạn đã tiêu thụ.'
-        : 'Total tokens consumed by your AI requests.';
+        ? `Chỉ tổng quan sát; thiếu usage ≠ 0. Độ phủ: ${coverage}. Chi phí: không khả dụng.`
+        : `Observed subtotal only; missing usage ≠ 0. Coverage: ${coverage}. Cost: unavailable.`;
 
     return (
         <div className="rounded-2xl border border-border/60 bg-card/50 p-5 space-y-4">
@@ -51,7 +57,7 @@ export function AiUsageCard({ scope }: AiUsageCardProps) {
                             {isVi ? 'Prompt' : 'Prompt'}
                         </div>
                         <div className="text-lg font-bold tabular-nums">
-                            {formatTokens(tokens.promptTokens)}
+                            {formatTokens(observed ? tokens.promptTokens : null)}
                         </div>
                     </div>
                     <div className="rounded-xl border border-border/50 bg-background/60 p-3 space-y-1">
@@ -59,38 +65,39 @@ export function AiUsageCard({ scope }: AiUsageCardProps) {
                             {isVi ? 'Output' : 'Output'}
                         </div>
                         <div className="text-lg font-bold tabular-nums">
-                            {formatTokens(tokens.completionTokens)}
+                            {formatTokens(observed ? tokens.completionTokens : null)}
                         </div>
                     </div>
                     <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-1">
                         <div className="text-[10px] uppercase tracking-wide text-amber-500/80">
-                            {isVi ? 'Tổng' : 'Total'}
+                            {isVi ? 'Tổng quan sát' : 'Observed subtotal'}
                         </div>
                         <div className="text-lg font-bold tabular-nums text-amber-500">
-                            {formatTokens(tokens.totalTokens)}
+                            {formatTokens(observed ? tokens.totalTokens : null)}
                         </div>
                     </div>
                 </div>
             ) : !isLoading ? (
                 <p className="text-xs text-muted-foreground">
                     {isVi
-                        ? 'Chưa có dữ liệu usage trong 30 ngày qua.'
-                        : 'No usage data in the last 30 days.'}
+                        ? 'Usage không khả dụng; không phải 0 token.'
+                        : 'Usage unavailable; not zero tokens.'}
                 </p>
             ) : null}
 
-            {tokens && tokens.trackedRequests > 0 && (
+            {tokens && (
                 <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                         <Activity className="h-3 w-3" />
-                        {tokens.trackedRequests}{' '}
-                        {isVi ? 'yêu cầu được theo dõi' : 'tracked requests'}
+                        {formatTokens(tokens.measuredAttempts)}/{formatTokens(tokens.attempts)}{' '}
+                        {isVi ? 'lượt thử đã đo' : 'measured attempts'} · {formatTokens(tokens.unmeasuredAttempts)}{' '}
+                        {isVi ? 'chưa đo' : 'unmeasured'}
                     </span>
                     {data && 'generations' in data && (
                         <span className="inline-flex items-center gap-1">
                             <TrendingUp className="h-3 w-3" />
-                            {data.generations}{' '}
-                            {isVi ? 'lần sinh SQL' : 'generations'}
+                            {formatTokens(data.generations)}{' '}
+                            {isVi ? 'lượt AI' : 'AI generations'}
                         </span>
                     )}
                 </div>

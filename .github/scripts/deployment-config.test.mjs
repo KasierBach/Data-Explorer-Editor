@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { resolve } from 'node:path';
@@ -49,6 +50,86 @@ test('CI installs a checksum-pinned Syft with bounded retries before publishing 
   assert.equal((workflow.match(/if-no-files-found: error/g) ?? []).length, 2);
   assert.equal((workflow.match(/retention-days: 30/g) ?? []).length, 2);
   assert.ok(workflow.indexOf('name: Generate SBOM files') < workflow.indexOf('name: Publish images'));
+});
+
+test('logged E2E pipelines explicitly preserve a failed runner exit code', () => {
+  const workflow = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8');
+  const lines = workflow.split('\n');
+  for (const [job, command] of [
+    ['server', 'npm run test:e2e -- --detectOpenHandles --json --outputFile=e2e-results.json 2>&1 | tee e2e.log'],
+    ['full-stack', 'npm run test:full-stack 2>&1 | tee full-stack.log'],
+  ]) {
+    const jobStart = lines.findIndex((line) => line === `  ${job}:`);
+    assert.ok(jobStart >= 0, 'Logged test job is declared');
+    const nextJob = lines.findIndex((line, index) => index > jobStart && /^  [a-z][a-z-]*:$/.test(line));
+    const jobLines = lines.slice(jobStart, nextJob < 0 ? lines.length : nextJob);
+    assert.ok(jobLines.every((line) => !/^    continue-on-error:/.test(line)));
+    const at = jobLines.findIndex((line) => line.trim() === command);
+    assert.ok(at >= 0, 'Logged test runner is declared as an explicit script');
+    const stepStart = jobLines.findLastIndex((line, index) => index < at && /^      - /.test(line));
+    const nextStep = jobLines.findIndex((line, index) => index > at && /^      - /.test(line));
+    assert.ok(stepStart >= 0);
+    const block = jobLines.slice(stepStart, nextStep < 0 ? jobLines.length : nextStep).join('\n');
+    assert.match(block, /shell: bash/);
+    if (job === 'server') assert.match(block, /timeout-minutes: 10/);
+    assert.match(block, /run: \|\n\s+set -euo pipefail/);
+    assert.doesNotMatch(block, /continue-on-error|\|\|\s*true/);
+  }
+  for (const exitCode of [0, 7]) {
+    const result = spawnSync('bash', ['--noprofile', '--norc', '-c', `set -euo pipefail; (exit ${exitCode}) 2>&1 | tee /dev/null`], { encoding: 'utf8', timeout: 10000 });
+    assert.ifError(result.error);
+    assert.equal(result.status, exitCode);
+  }
+});
+
+test('native replay CI keeps a separate network-none fixture and bounded ownership-aware cleanup', () => {
+  const workflow = readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8');
+  const compose = readFileSync(resolve(root, 'server/test/compose.ai-eval.yml'), 'utf8');
+  assert.match(workflow, /scripts\/ai-eval\/native-replay\.test\.mjs/);
+  assert.match(workflow, /scripts\/ai-eval\/model-role-assessment\.test\.mjs/);
+  assert.match(workflow, /test\/ai-model-role-adapter\.test\.cjs/);
+  assert.match(workflow, /test\/ai-model-role-live\.test\.cjs/);
+  assert.match(workflow, /scripts\/ai-eval\/model-native-worker\.test\.mjs/);
+  assert.match(workflow, /test\/ai-model-role-runner\.test\.cjs/);
+  const serverJob = /\n  server:\n([\s\S]*?)(?=\n  full-stack:)/.exec(workflow)?.[1];
+  assert.ok(serverJob);
+  const offlineCommand = /- run: (node --test [^\n]+)/.exec(serverJob)?.[1];
+  assert.ok(offlineCommand);
+  for (const path of ['test/ai-provider-model-catalog.test.cjs', 'test/ai-provider-model-live-runner.test.cjs']) assert.ok(offlineCommand.split(' ').includes(path));
+  assert.doesNotMatch(offlineCommand, /test\/fixtures\/ai-provider-model-live-runner\.cjs/);
+  assert.ok(serverJob.indexOf(offlineCommand) < serverJob.indexOf('Start owned PostgreSQL'));
+  const hardening = readFileSync(resolve(root, '.github/workflows/ai-hardening.yml'), 'utf8');
+  assert.equal((hardening.match(/- 'server\/test\/\*\*'/g) ?? []).length, 2);
+  const serverJobEnv = /\n    env:\n([\s\S]*?)(?=\n    steps:)/.exec(serverJob)?.[1];
+  assert.ok(serverJobEnv);
+  assert.doesNotMatch(serverJobEnv, /runner\.temp|TMPDIR/);
+  assert.match(workflow, /AI_EVAL_RUNNER_CONTAINER: ai-eval-ci-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}-eval-runner-1/);
+  const e2eStep = /- name: Run server E2E checks with failure-preserving logs[\s\S]*?(?=      - name: Capture fixture logs)/.exec(workflow)?.[0];
+  assert.ok(e2eStep);
+  assert.match(e2eStep, /env:\n\s+TMPDIR: \$\{\{ runner\.temp \}\}/);
+  const startup = /- name: Start network-isolated native evaluation fixtures[\s\S]*?(?=      - name: Run server E2E)/.exec(workflow)?.[0];
+  assert.ok(startup);
+  assert.match(startup, /timeout-minutes: 4/);
+  assert.match(startup, /id: native-eval-fixtures/);
+  assert.match(startup, /owned=true/);
+  assert.ok(startup.indexOf('test -z') < startup.indexOf('owned=true'));
+  assert.ok(startup.indexOf('owned=true') < startup.indexOf('up --detach'));
+  assert.match(startup, /docker compose --project-name "\$project" -f test\/compose\.ai-eval\.yml up --detach --wait --wait-timeout 150/);
+  assert.match(startup, /test -z "\$\(docker ps -a/);
+  const cleanup = /- name: Remove native evaluation fixtures[\s\S]*?(?=\n  full-stack:)/.exec(workflow)?.[0];
+  assert.ok(cleanup);
+  assert.match(cleanup, /if: always\(\) && steps\.native-eval-fixtures\.outputs\.owned == 'true'/);
+  assert.match(cleanup, /timeout-minutes: 3/);
+  assert.match(cleanup, /down --volumes --remove-orphans/);
+  assert.match(workflow, /ai-eval-ci-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}-native-results\.json/);
+  assert.match(compose, /network_mode: none/);
+  assert.equal((compose.match(/network_mode: 'service:eval-runner'/g) ?? []).length, 2);
+  assert.match(compose, /read_only: true/);
+  assert.match(compose, /cap_drop: \[ALL\]/);
+  assert.match(compose, /no-new-privileges:true/);
+  assert.doesNotMatch(compose, /ports:|privileged:|network_mode: host|secrets:/);
+  assert.match(compose, /--auth/);
+  assert.match(compose, /--noscripting/);
 });
 
 test('Vercel clean URLs keep application rewrites on the extensionless SPA shell', () => {

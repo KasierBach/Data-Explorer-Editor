@@ -4,6 +4,7 @@ import Editor, { useMonaco, type Monaco, type OnMount } from '@monaco-editor/rea
 import { createSqlCompletionProvider, type SchemaInfo } from './sqlAutocomplete';
 import { useAppStore } from '@/core/services/store';
 import { useAiGhostText } from './useAiGhostText';
+import type { editor as MonacoEditor } from 'monaco-editor';
 
 interface SqlEditorProps {
     value: string;
@@ -25,6 +26,9 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = 
     const [theme, setTheme] = React.useState<EditorTheme>(() => getEditorTheme());
     const { activeConnectionId, activeDatabase } = useAppStore();
     const disposableRef = useRef<Disposable | null>(null);
+    const modelSubscriptionRef = useRef<Disposable | null>(null);
+    const [owningModel, setOwningModel] = React.useState<MonacoEditor.ITextModel | null>(null);
+    useEffect(() => () => modelSubscriptionRef.current?.dispose(), []);
 
     useEffect(() => {
         const observer = new MutationObserver((mutations) => {
@@ -63,9 +67,12 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({ value, onChange, height = 
     }, [monaco, schemaInfo]);
 
     // AI Ghost Text (uses Monaco's InlineCompletionsProvider)
-    useAiGhostText(monaco, activeConnectionId, activeDatabase || undefined);
+    useAiGhostText(monaco, activeConnectionId, activeDatabase || undefined, 'sql', owningModel);
 
     const handleEditorMount: OnMount = (editor, monacoInstance: Monaco) => {
+        modelSubscriptionRef.current?.dispose();
+        setOwningModel(editor.getModel());
+        modelSubscriptionRef.current = editor.onDidChangeModel(() => setOwningModel(editor.getModel()));
         onMount?.(editor, monacoInstance);
     };
 

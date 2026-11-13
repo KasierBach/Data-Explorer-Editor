@@ -7,6 +7,8 @@ import {
 import { useAiChat } from '@/presentation/hooks/useAiChat';
 import { useAppStore } from '@/core/services/store';
 import { updateAiPreferences, useAiPreferences } from '@/core/services/aiPreferences';
+import { useAiAccountPolicy } from '@/core/services/aiAccountPolicy';
+import { toast } from 'sonner';
 import { getWorkspaceText } from '@/core/utils/workspaceText';
 import { AiChatList } from './AiChatList';
 import { AiMessageBubble } from './AiMessageBubble';
@@ -16,12 +18,14 @@ import { getAssistantModelCatalog } from './assistantModelCatalog';
 interface AiAssistantProps {
     onInsertQuery: (sql: string) => void;
     onRunQuery: (sql: string) => void;
+    runActionLabel?: string;
     onClose: () => void;
 }
 
 export const AiAssistant: React.FC<AiAssistantProps> = ({
     onInsertQuery,
     onRunQuery,
+    runActionLabel,
     onClose,
 }) => {
     const {
@@ -73,6 +77,17 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
     ], []);
 
     const preferences = useAiPreferences();
+    const { enabled, isSaving, setEnabled } = useAiAccountPolicy();
+    const handleMasterEnabledChange = async (value: boolean) => {
+        try {
+            await setEnabled(value);
+            toast.success(lang === 'vi'
+                ? (value ? 'Đã bật hệ thống AI.' : 'Đã tắt hệ thống AI.')
+                : (value ? 'AI features enabled.' : 'AI features disabled.'));
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : (lang === 'vi' ? 'Không thể lưu trạng thái AI.' : 'Failed to save AI settings.'));
+        }
+    };
     const MODELS = useMemo(() => getAssistantModelCatalog(preferences.customProviders, preferences.disabledProviders), [preferences.customProviders, preferences.disabledProviders]);
     const assistantSelection = preferences.assistantModel || aiModel;
     const handleAssistantModelChange = React.useCallback((value: string) => {
@@ -132,11 +147,11 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
 
     // Stable handlers to prevent re-rendering all bubbles on every keystroke
     const handleMessageRegenerate = React.useCallback((messageId: string) => {
-        if (activeAiChatId) handleRegenerate(activeAiChatId, messageId);
+        return activeAiChatId ? handleRegenerate(activeAiChatId, messageId) : Promise.resolve(false);
     }, [activeAiChatId, handleRegenerate]);
 
     const handleMessageEdit = React.useCallback((messageId: string, content: string) => {
-        if (activeAiChatId) handleEditSubmit(activeAiChatId, messageId, content);
+        return activeAiChatId ? handleEditSubmit(activeAiChatId, messageId, content) : Promise.resolve(false);
     }, [activeAiChatId, handleEditSubmit]);
 
     // --- Chat History View ---
@@ -152,12 +167,14 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                     <Sparkles className="w-4 h-4 text-violet-400" />
                     <span className="text-xs font-bold text-foreground">AI Assistant</span>
                     <Switch
-                        checked={preferences.enabled !== false}
-                        onCheckedChange={(checked) => {
-                            updateAiPreferences((current) => ({ ...current, enabled: checked }));
-                        }}
-                        title={preferences.enabled !== false ? text.aiAssistant.enabledTitle : text.aiAssistant.disabledTitle}
+                        checked={enabled}
+                        disabled={isSaving}
+                        onCheckedChange={(value) => { void handleMasterEnabledChange(value); }}
+                        label={lang === 'vi' ? 'Bật/Tắt AI' : 'Toggle AI'}
+                        aria-busy={isSaving}
+                        title={isSaving ? (lang === 'vi' ? 'Đang lưu...' : 'Saving...') : enabled ? text.aiAssistant.enabledTitle : text.aiAssistant.disabledTitle}
                     />
+                    {isSaving && <Loader2 className="h-3 w-3 animate-spin" aria-label={lang === 'vi' ? 'Đang lưu...' : 'Saving...'} />}
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-400 font-medium">
                         {ROUTING_MODES.find(m => m.id === aiRoutingMode)?.label || 'Auto'}
                     </span>
@@ -202,6 +219,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                         msg={msg}
                         onInsertQuery={onInsertQuery}
                         onRunQuery={onRunQuery}
+                        runActionLabel={runActionLabel}
                         onRegenerate={handleMessageRegenerate}
                         onEditSubmit={handleMessageEdit}
                     />

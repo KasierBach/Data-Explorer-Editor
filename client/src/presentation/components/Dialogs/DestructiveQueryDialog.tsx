@@ -12,6 +12,7 @@ import { Button } from '@/presentation/components/ui/button';
 import type { DatabaseRelationship } from '@/core/domain/database-adapter.interface';
 import { apiService } from '@/core/services/api.service';
 import { resolveAiSelection, useAiPreferences } from '@/core/services/aiPreferences';
+import { assertAiEnabled, isAiEnabled } from '@/core/services/aiAccountPolicy';
 import { connectionService } from '@/core/services/ConnectionService';
 import { useAppStore } from '@/core/services/store';
 import {
@@ -320,12 +321,14 @@ export function DestructiveQueryDialog() {
     };
 
     const handleExplainWithAi = async () => {
-        if (!activeConnectionId || !analysis.statement || isExplaining) return;
+        if (!isAiEnabled() || !activeConnectionId || !analysis.statement || isExplaining) return;
+        assertAiEnabled();
 
         setIsExplaining(true);
         setAiError(null);
 
         try {
+            assertAiEnabled();
             const result = await apiService.post<AiWarningResponse>('/ai/generate-sql', {
                 connectionId: activeConnectionId,
                 database: resolvedDatabase || undefined,
@@ -356,6 +359,7 @@ export function DestructiveQueryDialog() {
                 fallbackProvider: preferences.fallbackProvider,
             });
 
+            if (!isAiEnabled()) return;
             setAiExplanation(result.message?.trim() || result.explanation?.trim() || t.aiFallback);
         } catch {
             setAiError(t.aiError);
@@ -465,7 +469,8 @@ export function DestructiveQueryDialog() {
                             type="button"
                             variant="outline"
                             onClick={() => void handleExplainWithAi()}
-                            disabled={isExplaining}
+                            disabled={preferences.enabled !== true || isExplaining}
+                            title={preferences.enabled === true ? undefined : (lang === 'vi' ? 'AI đã tắt cho tài khoản này.' : 'AI is disabled for this account.')}
                             className="gap-2 sm:mr-auto"
                         >
                             {isExplaining ? (

@@ -3,11 +3,14 @@ import { Test } from '@nestjs/testing';
 import { AiConnectionService } from './ai.connection-service';
 import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies';
+import { AiAccountPolicyService } from './ai-account-policy.service';
 
 describe('R10 AI connection error contract', () => {
   const connections = { findOne: jest.fn(), getPool: jest.fn() };
   const factory = { getStrategy: jest.fn() };
   const gather = jest.fn();
+  const assertEnabled = jest.fn().mockResolvedValue(undefined);
+  const assertConnectionEnabled = jest.fn().mockResolvedValue(undefined);
   let service: AiConnectionService;
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -20,9 +23,27 @@ describe('R10 AI connection error contract', () => {
         AiConnectionService,
         { provide: ConnectionsService, useValue: connections },
         { provide: DatabaseStrategyFactory, useValue: factory },
+        {
+          provide: AiAccountPolicyService,
+          useValue: { assertEnabled, assertConnectionEnabled },
+        },
       ],
     }).compile();
     service = module.get(AiConnectionService);
+  });
+
+  it('rejects disabled AI before looking up or gathering connection data', async () => {
+    const denied = new ForbiddenException({
+      reason: 'AI_DISABLED',
+      message: 'AI is disabled',
+    });
+    assertEnabled.mockRejectedValueOnce(denied);
+    await expect(
+      service.getConnectionContext('fixture', 'db', 'user', gather),
+    ).rejects.toBe(denied);
+    expect(connections.findOne).not.toHaveBeenCalled();
+    expect(connections.getPool).not.toHaveBeenCalled();
+    expect(gather).not.toHaveBeenCalled();
   });
 
   for (const method of [

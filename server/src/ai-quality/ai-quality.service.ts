@@ -1,18 +1,32 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditAction } from '../audit/audit.service';
 
-type AiAuditDetails = {
-  provider?: string | null;
-  model?: string | null;
-  latencyMs?: number;
-  rating?: 'up' | 'down';
-  usage?: {
-    promptTokens?: number;
-    completionTokens?: number;
-    totalTokens?: number;
-  } | null;
+type GenerationMetadata = {
+  outcome: string;
+  provider: string | null;
+  model: string | null;
+  latencyMs: number | null;
+  attemptCount: number;
+  measuredAttemptCount: number;
+  usageCoverage: string;
+  promptTokens: bigint | null;
+  completionTokens: bigint | null;
+  totalTokens: bigint | null;
 };
+
+const GENERATION_SELECT = {
+  outcome: true,
+  provider: true,
+  model: true,
+  latencyMs: true,
+  attemptCount: true,
+  measuredAttemptCount: true,
+  usageCoverage: true,
+  promptTokens: true,
+  completionTokens: true,
+  totalTokens: true,
+} as const;
+const TERMINAL_OUTCOMES = ['succeeded', 'failed', 'cancelled', 'timed_out'];
 
 @Injectable()
 export class AiQualityService {
@@ -20,65 +34,46 @@ export class AiQualityService {
 
   async getMetrics(days: number, now = new Date()) {
     const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    const logs = await this.prisma.auditLog.findMany({
-      where: {
-        action: {
-          in: [
-            AuditAction.AI_SQL_GENERATED,
-            AuditAction.AI_SQL_GENERATION_FAILED,
-            AuditAction.AI_SQL_FEEDBACK,
-          ],
+    const [generations, votes] = await Promise.all([
+      this.prisma.aiGeneration.findMany({
+        where: {
+          outcome: { in: TERMINAL_OUTCOMES },
+          createdAt: { gte: since },
         },
-        createdAt: { gte: since },
-      },
-      select: { action: true, details: true },
-    });
-    const latencies: number[] = [];
+        select: GENERATION_SELECT,
+      }),
+      // Current unique votes for generations in the window, not vote/audit events.
+      this.prisma.aiGenerationFeedback.findMany({
+        where: { generation: { createdAt: { gte: since } } },
+        select: { rating: true },
+      }),
+    ]);
+    const latencies = generations
+      .map((generation) => generation.latencyMs)
+      .filter((value): value is number => value !== null && value >= 0)
+      .sort((a, b) => a - b);
     const models = new Map<string, { success: number; failed: number }>();
-    let success = 0;
-    let failed = 0;
-    let feedbackUp = 0;
-    let feedbackDown = 0;
-
-    for (const log of logs) {
-      const details = this.parseDetails(log.details);
-      if (log.action === String(AuditAction.AI_SQL_FEEDBACK)) {
-        if (details.rating === 'up') feedbackUp += 1;
-        if (details.rating === 'down') feedbackDown += 1;
-        continue;
-      }
-
-      if (typeof details.latencyMs === 'number' && details.latencyMs >= 0) {
-        latencies.push(details.latencyMs);
-      }
+    for (const generation of generations) {
       const model =
-        [details.provider?.trim(), details.model?.trim()]
-          .filter(Boolean)
-          .join('/') || 'default';
-      const modelMetrics = models.get(model) ?? { success: 0, failed: 0 };
-      if (log.action === String(AuditAction.AI_SQL_GENERATED)) {
-        success += 1;
-        modelMetrics.success += 1;
-      } else {
-        failed += 1;
-        modelMetrics.failed += 1;
-      }
-      models.set(model, modelMetrics);
+        [generation.provider, generation.model].filter(Boolean).join('/') ||
+        'unavailable';
+      const metrics = models.get(model) ?? { success: 0, failed: 0 };
+      if (generation.outcome === 'succeeded') metrics.success++;
+      else metrics.failed++;
+      models.set(model, metrics);
     }
-
-    latencies.sort((a, b) => a - b);
-    const generations = success + failed;
-    const feedback = feedbackUp + feedbackDown;
-    const tokens = this.sumTokenUsage(
-      logs.map((log) => this.parseDetails(log.details)),
-    );
+    const success = generations.filter(
+      (generation) => generation.outcome === 'succeeded',
+    ).length;
+    const up = votes.filter((vote) => vote.rating === 'up').length;
+    const down = votes.filter((vote) => vote.rating === 'down').length;
     return {
       days,
-      generations,
+      generations: generations.length,
       success,
-      failed,
-      successRate: generations
-        ? Math.round((success / generations) * 1000) / 10
+      failed: generations.length - success,
+      successRate: generations.length
+        ? Math.round((success / generations.length) * 1000) / 10
         : 0,
       averageLatencyMs: latencies.length
         ? Math.round(
@@ -88,80 +83,83 @@ export class AiQualityService {
       p95LatencyMs: latencies.length
         ? latencies[Math.ceil(latencies.length * 0.95) - 1]
         : 0,
-      feedback: { up: feedbackUp, down: feedbackDown, total: feedback },
-      tokens,
+      feedback: { up, down, total: up + down },
+      tokens: this.sumTokenUsage(generations),
       models: [...models.entries()]
-        .map(([model, values]) => ({
+        .map(([model, metrics]) => ({
           model,
-          ...values,
-          total: values.success + values.failed,
+          ...metrics,
+          total: metrics.success + metrics.failed,
         }))
         .sort((a, b) => b.total - a.total),
     };
   }
 
-  /** Token usage for the requesting user only (no admin role needed). */
+  /** Actor-scoped metadata only. Historical audit logs are not usage evidence. */
   async getUserUsage(userId: string, days: number, now = new Date()) {
     const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-    const logs = await this.prisma.auditLog.findMany({
+    const generations = await this.prisma.aiGeneration.findMany({
       where: {
         userId,
-        action: {
-          in: [
-            AuditAction.AI_SQL_GENERATED,
-            AuditAction.AI_SQL_GENERATION_FAILED,
-          ],
-        },
+        outcome: { in: TERMINAL_OUTCOMES },
         createdAt: { gte: since },
       },
-      select: { action: true, details: true },
+      select: GENERATION_SELECT,
     });
-
-    const tokens = this.sumTokenUsage(
-      logs.map((log) => this.parseDetails(log.details)),
-    );
-    const success = logs.filter(
-      (log) => log.action === String(AuditAction.AI_SQL_GENERATED),
+    const success = generations.filter(
+      (generation) => generation.outcome === 'succeeded',
     ).length;
-
     return {
       days,
-      generations: logs.length,
+      generations: generations.length,
       success,
-      failed: logs.length - success,
-      tokens,
+      failed: generations.length - success,
+      tokens: this.sumTokenUsage(generations),
     };
   }
 
-  private sumTokenUsage(detailsList: AiAuditDetails[]) {
-    let promptTokens = 0;
-    let completionTokens = 0;
-    let totalTokens = 0;
-    let trackedRequests = 0;
-
-    for (const details of detailsList) {
-      if (!details.usage) continue;
-      trackedRequests += 1;
-      promptTokens += details.usage.promptTokens ?? 0;
-      completionTokens += details.usage.completionTokens ?? 0;
-      totalTokens += details.usage.totalTokens ?? 0;
-    }
-
+  private sumTokenUsage(generations: GenerationMetadata[]) {
+    const observed = (
+      key: 'promptTokens' | 'completionTokens' | 'totalTokens',
+    ): number | null => {
+      const total = generations.reduce<bigint | null>((sum, generation) => {
+        const value = generation[key];
+        return value === null ? sum : (sum ?? 0n) + value;
+      }, null);
+      return total !== null && total <= BigInt(Number.MAX_SAFE_INTEGER)
+        ? Number(total)
+        : null;
+    };
+    const attempts = generations.reduce(
+      (sum, generation) => sum + generation.attemptCount,
+      0,
+    );
+    const measuredAttempts = generations.reduce(
+      (sum, generation) => sum + generation.measuredAttemptCount,
+      0,
+    );
+    // Numeric fields retain the existing observed-subtotal contract. Coverage is
+    // mandatory alongside them: unavailable attempts are not free or measured zero.
+    const usageCoverage =
+      generations.length &&
+      generations.every((generation) => generation.usageCoverage === 'complete')
+        ? 'complete'
+        : measuredAttempts
+          ? 'partial'
+          : 'unavailable';
     return {
-      promptTokens,
-      completionTokens,
-      totalTokens,
-      trackedRequests,
+      promptTokens: observed('promptTokens'),
+      completionTokens: observed('completionTokens'),
+      totalTokens: observed('totalTokens'),
+      trackedRequests: generations.filter(
+        (generation) => generation.measuredAttemptCount > 0,
+      ).length,
+      attempts,
+      measuredAttempts,
+      unmeasuredAttempts: attempts - measuredAttempts,
+      usageCoverage,
+      observedOnly: true,
+      costCoverage: 'unavailable',
     };
-  }
-
-  private parseDetails(details: string | null): AiAuditDetails {
-    if (!details) return {};
-    try {
-      const parsed = JSON.parse(details);
-      return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch {
-      return {};
-    }
   }
 }

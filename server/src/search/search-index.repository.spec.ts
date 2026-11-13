@@ -156,6 +156,59 @@ describe('SearchIndexRepository', () => {
     expect(results[0].name).toBe('users');
   });
 
+  it('default-denies semantic reads without explicit approved connection/database pairs', async () => {
+    await expect(
+      repository.getSemanticFallbackNames('user-1'),
+    ).resolves.toEqual([]);
+    await expect(
+      repository.getSemanticFallbackNames('user-1', []),
+    ).resolves.toEqual([]);
+    await expect(
+      repository.getSemanticFallbackNames('user-1', [
+        { connectionId: 'conn-1', database: '' },
+      ]),
+    ).resolves.toEqual([]);
+    expect(client.hscanCalls).toBe(0);
+  });
+
+  it('filters semantic names and same-name lookups by exact actor/connection/database scope', async () => {
+    const approved = { connectionId: 'conn-1', database: 'main' };
+    const item = {
+      name: 'users',
+      type: 'table',
+      connectionName: 'Primary',
+      schema: 'public',
+      ...approved,
+    };
+    await repository.replaceUserIndex('user-1', [
+      { ...item, id: 'approved' },
+      {
+        ...item,
+        id: 'foreign-connection',
+        connectionId: 'conn-2',
+        name: 'private_users',
+      },
+      { ...item, id: 'foreign-database', database: 'secret', name: 'secrets' },
+      { ...item, id: 'same-name-connection', connectionId: 'conn-2' },
+      { ...item, id: 'same-name-database', database: 'secret' },
+    ]);
+    await repository.replaceUserIndex('other-user', [
+      { ...item, id: 'other-actor', name: 'other_private' },
+    ]);
+    await expect(
+      repository.getSemanticFallbackNames('user-1', [approved]),
+    ).resolves.toEqual(['users']);
+    const matches = await repository.getItemsByNames('user-1', ['users'], 50, [
+      approved,
+    ]);
+    expect(matches.map((entry) => entry.id)).toEqual(['approved']);
+    const scans = client.hscanCalls;
+    await expect(
+      repository.getItemsByNames('user-1', ['users'], 50, []),
+    ).resolves.toEqual([]);
+    expect(client.hscanCalls).toBe(scans);
+  });
+
   it('can rebuild semantic fallback names and lookup items by suggested names', async () => {
     await repository.replaceUserIndex('user-1', [
       {
@@ -178,7 +231,9 @@ describe('SearchIndexRepository', () => {
       },
     ]);
 
-    const names = await repository.getSemanticFallbackNames('user-1');
+    const names = await repository.getSemanticFallbackNames('user-1', [
+      { connectionId: 'conn-1', database: 'main' },
+    ]);
     const results = await repository.getItemsByNames('user-1', ['orders']);
 
     expect(names).toEqual(expect.arrayContaining(['users', 'orders']));

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/presentation/components/ui/button';
 import {
     ChevronDown, Play, Copy, Database, LineChart, Wrench,
@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import type { AiMessage } from '@/core/services/store';
 import { useAppStore } from '@/core/services/store';
+import { useAiPreferences } from '@/core/services/aiPreferences';
+import { assertAiEnabled, isAiEnabled } from '@/core/services/aiAccountPolicy';
 import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AiMarkdownContent } from './AiMarkdownContent';
@@ -20,8 +22,9 @@ interface AiMessageBubbleProps {
     msg: AiMessage;
     onInsertQuery: (sql: string) => void;
     onRunQuery: (sql: string) => void;
-    onRegenerate?: (messageId: string) => void;
-    onEditSubmit?: (messageId: string, newContent: string) => void;
+    runActionLabel?: string;
+    onRegenerate?: (messageId: string) => void | Promise<boolean | void>;
+    onEditSubmit?: (messageId: string, newContent: string) => void | Promise<boolean | void>;
 }
 
 const getVisibleUserContent = (msg: AiMessage) => {
@@ -38,12 +41,14 @@ const getVisibleUserContent = (msg: AiMessage) => {
 };
 
 export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
-    msg, onInsertQuery, onRunQuery, onRegenerate, onEditSubmit
+    msg, onInsertQuery, onRunQuery, runActionLabel, onRegenerate, onEditSubmit
 }) => {
     const { user, activeConnectionId, connections, deleteAiMessage, activeAiChatId, lang } = useAppStore();
     const activeConnection = connections.find(c => c.id === activeConnectionId);
     const isNoSql = activeConnection?.type === 'mongodb' || activeConnection?.type === 'mongodb+srv';
     const text = getWorkspaceText(lang).aiMessageBubble;
+    const aiEnabled = useAiPreferences().enabled === true;
+    const disabledTitle = getWorkspaceText(lang).aiAssistant.disabledTitle;
     const messageContent = msg.id === 'welcome'
         ? getWorkspaceText(lang).aiAssistant.welcome
         : msg.content;
@@ -53,12 +58,59 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
 
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(userContent);
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
+    const [isRetrying, setIsRetrying] = useState(false);
+    const [actionError, setActionError] = useState<string | null>(null);
+    const mounted = useRef(true);
+    const contextKey = `${user?.id || user?.email || ''}:${activeAiChatId || ''}:${msg.clientId || msg.id}`;
+    const context = useRef(contextKey);
+    context.current = contextKey;
+    useEffect(() => {
+        mounted.current = true;
+        return () => { mounted.current = false; };
+    }, []);
+    const deliveryLabels = lang === 'vi'
+        ? { local: 'Chỉ trên thiết bị', pending: 'Đang lưu…', saved: 'Đã lưu', failed: 'Chưa lưu', interrupted: 'Đã dừng', retry: 'Thử lưu lại', editFailed: 'Không thể lưu chỉnh sửa. Lịch sử không thay đổi.', retryFailed: 'Không thể lưu tin nhắn.' }
+        : { local: 'Local only', pending: 'Saving…', saved: 'Saved', failed: 'Not saved', interrupted: 'Interrupted', retry: 'Retry save', editFailed: 'Could not save edit. History is unchanged.', retryFailed: 'Could not save message.' };
+    const delivery = actionError ? 'failed' : msg.deliveryError ? (msg.delivery === 'interrupted' ? 'interrupted' : 'failed') : msg.delivery;
 
-    const handleEditSave = () => {
-        if (editContent.trim() && editContent !== msg.content) {
-            onEditSubmit?.(msg.id, editContent);
+    const handleEditSave = async () => {
+        if (!isAiEnabled() || isSavingEdit) return;
+        assertAiEnabled();
+        const owner = contextKey;
+        setActionError(null);
+        setIsSavingEdit(true);
+        try {
+            if (editContent.trim() && editContent !== msg.content) {
+                const result = await onEditSubmit?.(msg.id, editContent);
+                if (!mounted.current || context.current !== owner) return;
+                if (result === false) {
+                    setActionError(deliveryLabels.editFailed);
+                    return;
+                }
+            }
+            if (mounted.current && context.current === owner) setIsEditing(false);
+        } catch (error) {
+            if (mounted.current && context.current === owner) setActionError(error instanceof Error ? error.message : deliveryLabels.editFailed);
+        } finally {
+            if (mounted.current && context.current === owner) setIsSavingEdit(false);
         }
-        setIsEditing(false);
+    };
+
+    const handleRegenerate = async () => {
+        if (!isAiEnabled() || isRetrying || !onRegenerate) return;
+        assertAiEnabled();
+        const owner = contextKey;
+        setIsRetrying(true);
+        setActionError(null);
+        try {
+            const result = await onRegenerate(msg.id);
+            if (result === false && mounted.current && context.current === owner) setActionError(deliveryLabels.retryFailed);
+        } catch (error) {
+            if (mounted.current && context.current === owner) setActionError(error instanceof Error ? error.message : deliveryLabels.retryFailed);
+        } finally {
+            if (mounted.current && context.current === owner) setIsRetrying(false);
+        }
     };
 
     const handleCopy = async (text: string) => {
@@ -152,11 +204,11 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                                 style={{ fieldSizing: "content" } satisfies FieldSizingStyle}
                             />
                             <div className="flex justify-end gap-2">
-                                <Button variant="ghost" size="sm" className="h-8 px-3 text-xs font-medium hover:bg-muted/50" onClick={() => setIsEditing(false)}>
+                                <Button variant="ghost" size="sm" className="h-8 px-3 text-xs font-medium hover:bg-muted/50" onClick={() => setIsEditing(false)} disabled={isSavingEdit}>
                                     <CloseIcon className="w-3.5 h-3.5 mr-1.5" /> {text.cancelEdit}
                                 </Button>
-                                <Button variant="default" size="sm" className="h-8 px-4 text-xs font-semibold bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-500/20" onClick={handleEditSave}>
-                                    <Check className="w-3.5 h-3.5 mr-1.5" /> {text.saveAndSend}
+                                <Button variant="default" size="sm" className="h-8 px-4 text-xs font-semibold bg-violet-600 hover:bg-violet-700 shadow-lg shadow-violet-500/20" onClick={handleEditSave} disabled={!aiEnabled || isSavingEdit} aria-busy={isSavingEdit} title={aiEnabled ? undefined : disabledTitle}>
+                                    <Check className="w-3.5 h-3.5 mr-1.5" /> {isSavingEdit ? deliveryLabels.pending : text.saveAndSend}
                                 </Button>
                             </div>
                         </div>
@@ -199,7 +251,7 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                                     <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-green-500/20" onClick={() => onInsertQuery(msg.sql!)} title={text.insertToEditor}>
                                         <ChevronDown className="w-3 h-3 text-green-400" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-blue-500/20" onClick={() => { onInsertQuery(msg.sql!); onRunQuery(msg.sql!); }} title={text.runNow}>
+                                    <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-blue-500/20" onClick={() => onRunQuery(msg.sql!)} title={runActionLabel ?? text.runNow} aria-label={runActionLabel ?? text.runNow}>
                                         <Play className="w-3 h-3 text-blue-400" />
                                     </Button>
                                     <Button variant="ghost" size="icon" className="h-5 w-5 hover:bg-muted/50" onClick={() => handleCopy(msg.sql!)} title={isNoSql ? text.copyMql : text.copySql} aria-label={isNoSql ? text.copyMql : text.copySql}>
@@ -250,7 +302,7 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                                                     <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-green-500/20" onClick={() => onInsertQuery(recommendation.sql!)} title={text.insertSuggestion}>
                                                         <ChevronDown className="w-3 h-3 text-green-400" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-blue-500/20" onClick={() => { onInsertQuery(recommendation.sql!); onRunQuery(recommendation.sql!); }} title={text.runSuggestion}>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-blue-500/20" onClick={() => onRunQuery(recommendation.sql!)} title={runActionLabel ?? text.runSuggestion} aria-label={runActionLabel ?? text.runSuggestion}>
                                                         <Play className="w-3 h-3 text-blue-400" />
                                                     </Button>
                                                     <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted/50" onClick={() => handleCopy(recommendation.sql!)} title={text.copySuggestion} aria-label={text.copySuggestion}>
@@ -266,21 +318,33 @@ export const AiMessageBubble: React.FC<AiMessageBubbleProps> = React.memo(({
                     )}
                 </div>
 
+                {msg.id !== 'welcome' && (delivery || actionError) && (
+                    <div role={delivery === 'failed' || actionError ? 'alert' : 'status'} aria-live="polite" className={cn(
+                        'flex max-w-full items-center gap-1 text-[10px]',
+                        delivery === 'failed' || actionError ? 'text-red-400' : 'text-muted-foreground',
+                    )}>
+                        {delivery && <span>{deliveryLabels[delivery]}</span>}
+                        {(actionError || msg.deliveryError?.message) && <span className="truncate" title={actionError || msg.deliveryError?.message}>
+                            {actionError || msg.deliveryError?.message}
+                        </span>}
+                    </div>
+                )}
+
                 <div className={cn(
                     "flex items-center gap-0.5 mt-1 transition-opacity duration-200",
                     "opacity-0 group-hover/bubble:opacity-100",
                     msg.role === 'user' ? "justify-end mr-1" : "justify-start ml-1"
                 )}>
                     {msg.role === 'user' && !isEditing && !!onEditSubmit && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => { setIsEditing(true); setEditContent(userContent); }} title={text.editMessage} aria-label={text.editMessage}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => { if (!isAiEnabled()) return; assertAiEnabled(); setIsEditing(true); setEditContent(userContent); }} disabled={!aiEnabled} title={aiEnabled ? text.editMessage : disabledTitle} aria-label={text.editMessage}>
                             <Pencil className="w-3.5 h-3.5" />
                         </Button>
                     )}
                     <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => handleCopy(msg.role === 'user' ? userContent : messageContent)} title={text.copyMessage} aria-label={text.copyMessage}>
                         <Copy className="w-3.5 h-3.5" />
                     </Button>
-                    {msg.role === 'ai' && !msg.error && onRegenerate && (
-                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={() => onRegenerate(msg.id)} title={text.retryTitle} aria-label="Regenerate message">
+                    {onRegenerate && ((msg.role === 'ai' && !msg.error) || delivery === 'failed') && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6 rounded-md hover:bg-muted text-muted-foreground/60 hover:text-foreground" onClick={handleRegenerate} disabled={!aiEnabled || isRetrying || isSavingEdit || delivery === 'pending'} title={aiEnabled ? delivery === 'failed' ? deliveryLabels.retry : text.retryTitle : disabledTitle} aria-label={delivery === 'failed' ? deliveryLabels.retry : 'Regenerate message'} aria-busy={isRetrying}>
                             <RotateCcw className="w-3.5 h-3.5" />
                         </Button>
                     )}

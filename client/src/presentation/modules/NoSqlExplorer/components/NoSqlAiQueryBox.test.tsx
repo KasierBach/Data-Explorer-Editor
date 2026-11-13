@@ -4,6 +4,15 @@ import { NoSqlAiQueryBox } from "./NoSqlAiQueryBox";
 import { apiService } from "@/core/services/api.service";
 import { useAppStore } from "@/core/services/store";
 
+const accountPolicy = vi.hoisted(() => ({ enabled: true }));
+
+vi.mock("@/core/services/aiAccountPolicy", () => ({
+  isAiEnabled: () => accountPolicy.enabled,
+  assertAiEnabled: () => {
+    if (!accountPolicy.enabled) throw new Error("AI is disabled for this account.");
+  },
+}));
+
 vi.mock("@/core/services/api.service", () => ({
   apiService: {
     post: vi.fn(),
@@ -16,9 +25,12 @@ vi.mock("@/core/services/store", () => ({
 
 vi.mock("@/core/services/aiPreferences", () => ({
   useAiPreferences: () => ({
+    enabled: accountPolicy.enabled,
     assistantModel: "test-model",
     nosqlModel: "test-model",
     customProviders: [],
+    disabledProviders: ["cerebras"],
+    fallbackProvider: "none",
   }),
   resolveAiSelection: () => ({
     model: "test-model",
@@ -40,12 +52,44 @@ const mockPost = vi.mocked(apiService.post);
 describe("NoSqlAiQueryBox aggregation mode", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    accountPolicy.enabled = true;
     mockUseAppStore.mockReturnValue({
       lang: "en",
       aiModel: "test-model",
       aiRoutingMode: "auto",
       connections: [{ id: "mongo-1", type: "mongodb", readOnly: true }],
     } as never);
+  });
+
+  it.each([false, true])("blocks fresh-off keyboard dispatch in aggregation mode %s", async (aggregateOnly) => {
+    const onGenerate = vi.fn();
+    mockPost.mockResolvedValue({ sql: '{"action":"aggregate","pipeline":[]}', explanation: "Pipeline." });
+    render(<NoSqlAiQueryBox aggregateOnly={aggregateOnly} initiallyExpanded currentConnectionId="mongo-1" onGenerate={onGenerate} />);
+    const prompt = screen.getByRole("textbox");
+    fireEvent.change(prompt, { target: { value: "Show top genres" } });
+    accountPolicy.enabled = false;
+    fireEvent.keyDown(prompt, { key: "Enter", ctrlKey: true });
+    await waitFor(() => expect(mockPost).not.toHaveBeenCalled());
+    expect(onGenerate).not.toHaveBeenCalled();
+    expect(prompt).toHaveValue("Show top genres");
+  });
+
+  it("disables pipeline generation for an AI-off account", () => {
+    accountPolicy.enabled = false;
+    render(<NoSqlAiQueryBox aggregateOnly initiallyExpanded currentConnectionId="mongo-1" onGenerate={vi.fn()} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Show top genres" } });
+    expect(screen.getByRole("button", { name: /generate pipeline/i })).toBeDisabled();
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it("forwards disabled providers and strict fallback for aggregation", async () => {
+    mockPost.mockResolvedValue({ sql: '{"action":"aggregate","pipeline":[]}', explanation: "Pipeline." });
+    render(<NoSqlAiQueryBox aggregateOnly initiallyExpanded currentConnectionId="mongo-1" onGenerate={vi.fn()} />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Show top genres" } });
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter", ctrlKey: true });
+    await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/ai/nlp-to-sql", expect.objectContaining({
+      disabledProviders: ["cerebras"], fallbackProvider: "none",
+    })));
   });
 
   it("shows novice-friendly pipeline prompts when opened in aggregation mode", () => {

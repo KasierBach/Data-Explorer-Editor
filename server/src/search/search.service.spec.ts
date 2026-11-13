@@ -4,6 +4,9 @@ import { ConnectionsService } from '../connections/connections.service';
 import { DatabaseStrategyFactory } from '../database-strategies/strategy.factory';
 import { AiService } from '../ai/ai.service';
 import { SearchIndexRepository } from './search-index.repository';
+import { AiAccountPolicyService } from '../ai/ai-account-policy.service';
+import { AiExecutionLedgerService } from '../ai/ai-execution-ledger.service';
+import { ForbiddenException } from '@nestjs/common';
 
 describe('SearchService', () => {
   let service: SearchService;
@@ -18,8 +21,48 @@ describe('SearchService', () => {
   let aiService: {
     suggestTablesBySemantic: jest.Mock;
   };
+  const beforeProviderRequest = jest.fn().mockResolvedValue(undefined);
+  const beforeProviderAttempt = jest.fn().mockResolvedValue(undefined);
+  const accountPolicy = {
+    isEnabled: jest.fn().mockResolvedValue(true),
+    assertEnabled: jest.fn().mockResolvedValue(undefined),
+    assertConnectionEnabled: jest.fn().mockResolvedValue(undefined),
+    beforeProviderRequest: jest.fn(() => beforeProviderRequest),
+    beforeProviderAttempt: jest.fn(() => beforeProviderAttempt),
+  };
+  const execution = {
+    generationId: 'semantic-generation',
+    deadlineAt: Date.now() + 1_500,
+    beforeAttempt: jest.fn(),
+    complete: jest.fn().mockResolvedValue({ outcome: 'succeeded' }),
+    fail: jest.fn().mockResolvedValue({ outcome: 'failed' }),
+    release: jest.fn().mockResolvedValue(undefined),
+  };
+  const executionLedger = {
+    begin: jest.fn().mockImplementation(async (_actor, _task, metadata) => {
+      execution.deadlineAt = metadata.deadlineAt;
+      return execution;
+    }),
+  };
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    accountPolicy.isEnabled.mockReset().mockResolvedValue(true);
+    accountPolicy.assertEnabled.mockReset().mockResolvedValue(undefined);
+    accountPolicy.assertConnectionEnabled
+      .mockReset()
+      .mockResolvedValue(undefined);
+    beforeProviderRequest.mockReset().mockResolvedValue(undefined);
+    beforeProviderAttempt.mockReset().mockResolvedValue(undefined);
+    executionLedger.begin
+      .mockReset()
+      .mockImplementation(async (_actor, _task, metadata) => {
+        execution.deadlineAt = metadata.deadlineAt;
+        return execution;
+      });
+    execution.complete.mockReset().mockResolvedValue({ outcome: 'succeeded' });
+    execution.fail.mockReset().mockResolvedValue({ outcome: 'failed' });
+    execution.release.mockReset().mockResolvedValue(undefined);
     searchIndexRepository = {
       search: jest.fn(),
       replaceUserIndex: jest.fn(),
@@ -35,7 +78,14 @@ describe('SearchService', () => {
         SearchService,
         {
           provide: ConnectionsService,
-          useValue: { findAll: jest.fn(), getPool: jest.fn() },
+          useValue: {
+            findAll: jest
+              .fn()
+              .mockResolvedValue([
+                { id: 'conn-1', database: 'app', name: 'Primary' },
+              ]),
+            getPool: jest.fn(),
+          },
         },
         {
           provide: DatabaseStrategyFactory,
@@ -45,6 +95,8 @@ describe('SearchService', () => {
           provide: AiService,
           useValue: aiService,
         },
+        { provide: AiAccountPolicyService, useValue: accountPolicy },
+        { provide: AiExecutionLedgerService, useValue: executionLedger },
         {
           provide: SearchIndexRepository,
           useValue: searchIndexRepository,
@@ -62,6 +114,248 @@ describe('SearchService', () => {
   });
 
   describe('search', () => {
+    it('keeps keyword results and does not gather semantic names while AI is disabled', async () => {
+      accountPolicy.isEnabled.mockResolvedValue(false);
+      const keyword = [
+        { id: '1', name: 'users', type: 'table', connectionName: 'DB1' },
+      ];
+      searchIndexRepository.search.mockResolvedValue(keyword);
+      await expect(service.search('user-1', 'users')).resolves.toEqual(keyword);
+      expect(aiService.suggestTablesBySemantic).not.toHaveBeenCalled();
+      expect(
+        searchIndexRepository.getSemanticFallbackNames,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('keeps keyword results when the optional account policy lookup fails', async () => {
+      accountPolicy.isEnabled.mockRejectedValue(
+        new Error('Policy database unavailable'),
+      );
+      const keyword = [
+        { id: '1', name: 'users', type: 'table', connectionName: 'DB1' },
+      ];
+      searchIndexRepository.search.mockResolvedValue(keyword);
+
+      await expect(service.search('user-1', 'users')).resolves.toEqual(keyword);
+      expect(aiService.suggestTablesBySemantic).not.toHaveBeenCalled();
+      expect(
+        searchIndexRepository.getSemanticFallbackNames,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('keeps keyword results when optional semantic fallback fails', async () => {
+      const keyword = [
+        { id: '1', name: 'audit_logs', type: 'table', connectionName: 'DB1' },
+      ];
+      searchIndexRepository.search.mockResolvedValue(keyword);
+      searchIndexRepository.getSemanticFallbackNames.mockResolvedValue([
+        'audit_logs',
+        'users',
+      ]);
+      aiService.suggestTablesBySemantic.mockRejectedValue(
+        new Error('Semantic provider unavailable'),
+      );
+
+      await expect(service.search('user-1', 'login history')).resolves.toEqual(
+        keyword,
+      );
+    });
+
+    it('aborts a stalled semantic request after its finite deadline and keeps keyword results', async () => {
+      jest.useFakeTimers();
+      try {
+        const keyword = [
+          { id: '1', name: 'audit_logs', type: 'table', connectionName: 'DB1' },
+        ];
+        searchIndexRepository.search.mockResolvedValue(keyword);
+        searchIndexRepository.getSemanticFallbackNames.mockResolvedValue([
+          'audit_logs',
+          'users',
+        ]);
+        let signal: AbortSignal | undefined;
+        aiService.suggestTablesBySemantic.mockImplementation(
+          (_query, _names, _policy, request: { signal: AbortSignal }) => {
+            signal = request.signal;
+            return new Promise<string[]>(() => undefined);
+          },
+        );
+        const pending = service.search('user-1', 'login history');
+        await jest.advanceTimersByTimeAsync(0);
+        expect(signal?.aborted).toBe(false);
+        await jest.advanceTimersByTimeAsync(1_500);
+        await expect(pending).resolves.toEqual(keyword);
+        expect(signal?.aborted).toBe(true);
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('uses only server-derived approved exact database scopes and filters same-name foreign matches', async () => {
+      connectionsService.findAll.mockResolvedValue([
+        { id: 'approved', database: 'app' },
+        { id: 'denied', database: 'secret-db' },
+        { id: 'unspecified', database: null },
+      ] as any);
+      accountPolicy.assertConnectionEnabled.mockImplementation(
+        async (_actor, connectionId) => {
+          if (connectionId === 'denied')
+            throw new ForbiddenException({ reason: 'AI_EGRESS_DENIED' });
+        },
+      );
+      searchIndexRepository.search.mockResolvedValue([]);
+      searchIndexRepository.getSemanticFallbackNames.mockImplementation(
+        async (_actor, scopes) =>
+          scopes[0].connectionId === 'approved' ? ['users'] : ['private_users'],
+      );
+      aiService.suggestTablesBySemantic.mockResolvedValue([
+        'users',
+        'invented',
+      ]);
+      searchIndexRepository.getItemsByNames.mockResolvedValue([
+        { id: '1', name: 'users', connectionId: 'approved', database: 'app' },
+        {
+          id: '2',
+          name: 'users',
+          connectionId: 'denied',
+          database: 'secret-db',
+        },
+        {
+          id: '3',
+          name: 'users',
+          connectionId: 'approved',
+          database: 'other-db',
+        },
+      ]);
+      const results = await service.search('user-1', 'people');
+      expect(results.map((item) => item.id)).toEqual(['1']);
+      expect(
+        searchIndexRepository.getSemanticFallbackNames,
+      ).toHaveBeenCalledTimes(1);
+      expect(
+        searchIndexRepository.getSemanticFallbackNames,
+      ).toHaveBeenCalledWith('user-1', [
+        { connectionId: 'approved', database: 'app' },
+      ]);
+      expect(searchIndexRepository.getItemsByNames).toHaveBeenCalledWith(
+        'user-1',
+        ['users'],
+        50,
+        [{ connectionId: 'approved', database: 'app' }],
+      );
+      expect(accountPolicy.beforeProviderAttempt).toHaveBeenCalledWith(
+        'user-1',
+        'approved',
+        'app',
+      );
+      expect(
+        accountPolicy.assertConnectionEnabled.mock.invocationCallOrder[0],
+      ).toBeLessThan(
+        searchIndexRepository.getSemanticFallbackNames.mock
+          .invocationCallOrder[0],
+      );
+      expect(connectionsService.getPool).not.toHaveBeenCalled();
+      expect(strategyFactory.getStrategy).not.toHaveBeenCalled();
+    });
+
+    it('keeps keyword results with zero semantic schema reads or budget for default-denied scopes', async () => {
+      const keyword = [{ id: '1', name: 'users' }];
+      searchIndexRepository.search.mockResolvedValue(keyword);
+      accountPolicy.assertConnectionEnabled.mockRejectedValue(
+        new ForbiddenException({ reason: 'AI_EGRESS_DENIED' }),
+      );
+      await expect(service.search('user-1', 'people')).resolves.toEqual(
+        keyword,
+      );
+      expect(
+        searchIndexRepository.getSemanticFallbackNames,
+      ).not.toHaveBeenCalled();
+      expect(executionLedger.begin).not.toHaveBeenCalled();
+      expect(aiService.suggestTablesBySemantic).not.toHaveBeenCalled();
+    });
+
+    it('keeps keyword results when semantic accounting is unavailable', async () => {
+      const keyword = [{ id: '1', name: 'users' }];
+      searchIndexRepository.search.mockResolvedValue(keyword);
+      const withoutLedger = new SearchService(
+        connectionsService,
+        strategyFactory,
+        aiService as any,
+        searchIndexRepository as any,
+        accountPolicy as any,
+      );
+      await expect(withoutLedger.search('user-1', 'people')).resolves.toEqual(
+        keyword,
+      );
+      expect(
+        searchIndexRepository.getSemanticFallbackNames,
+      ).not.toHaveBeenCalled();
+      expect(aiService.suggestTablesBySemantic).not.toHaveBeenCalled();
+    });
+
+    it('releases a late-created semantic reservation after the search deadline', async () => {
+      jest.useFakeTimers();
+      try {
+        searchIndexRepository.search.mockResolvedValue([]);
+        searchIndexRepository.getSemanticFallbackNames.mockResolvedValue([
+          'users',
+        ]);
+        let resolve!: (value: typeof execution) => void;
+        executionLedger.begin.mockReturnValueOnce(
+          new Promise((done) => {
+            resolve = done;
+          }),
+        );
+        const pending = service.search('user-1', 'people');
+        await jest.advanceTimersByTimeAsync(0);
+        await jest.advanceTimersByTimeAsync(1_500);
+        await expect(pending).resolves.toEqual([]);
+        resolve(execution);
+        for (let index = 0; index < 30; index++) await Promise.resolve();
+        expect(execution.fail).toHaveBeenCalledWith('timed_out');
+        expect(execution.release).toHaveBeenCalledTimes(1);
+        expect(aiService.suggestTablesBySemantic).not.toHaveBeenCalled();
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('discards enrichment on durable completion failure and releases the reservation', async () => {
+      const keyword = [{ id: '1', name: 'audit' }];
+      searchIndexRepository.search.mockResolvedValue(keyword);
+      searchIndexRepository.getSemanticFallbackNames.mockResolvedValue([
+        'users',
+      ]);
+      aiService.suggestTablesBySemantic.mockResolvedValue(['users']);
+      execution.complete.mockRejectedValueOnce(new Error('ledger unavailable'));
+      await expect(service.search('user-1', 'people')).resolves.toEqual(
+        keyword,
+      );
+      expect(execution.fail).toHaveBeenCalledWith('failed');
+      expect(execution.release).toHaveBeenCalledTimes(1);
+      expect(searchIndexRepository.getItemsByNames).not.toHaveBeenCalled();
+    });
+
+    it('rechecks authorization before semantic enrichment is merged', async () => {
+      const keyword = [{ id: '1', name: 'audit' }];
+      searchIndexRepository.search.mockResolvedValue(keyword);
+      searchIndexRepository.getSemanticFallbackNames.mockResolvedValue([
+        'users',
+      ]);
+      aiService.suggestTablesBySemantic.mockResolvedValue(['users']);
+      accountPolicy.assertConnectionEnabled
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(
+          new ForbiddenException({ reason: 'AI_EGRESS_DENIED' }),
+        );
+      await expect(service.search('user-1', 'people')).resolves.toEqual(
+        keyword,
+      );
+      expect(searchIndexRepository.getItemsByNames).not.toHaveBeenCalled();
+      expect(execution.release).toHaveBeenCalledTimes(1);
+    });
+
     it('returns indexed keyword matches without triggering semantic fallback when the hit set is already strong', async () => {
       searchIndexRepository.search.mockResolvedValue([
         { id: '1', name: 'users', type: 'table', connectionName: 'DB1' },
@@ -102,12 +396,21 @@ describe('SearchService', () => {
         'user_sessions',
       ]);
       searchIndexRepository.getItemsByNames.mockResolvedValue([
-        { id: '2', name: 'users', type: 'table', connectionName: 'DB1' },
+        {
+          id: '2',
+          name: 'users',
+          type: 'table',
+          connectionName: 'DB1',
+          connectionId: 'conn-1',
+          database: 'app',
+        },
         {
           id: '3',
           name: 'user_sessions',
           type: 'table',
           connectionName: 'DB1',
+          connectionId: 'conn-1',
+          database: 'app',
         },
       ]);
 
@@ -121,6 +424,14 @@ describe('SearchService', () => {
       expect(aiService.suggestTablesBySemantic).toHaveBeenCalledWith(
         'login history',
         ['audit_logs', 'users', 'user_sessions'],
+        beforeProviderRequest,
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+          deadlineAt: expect.any(Number),
+          requestScopeKey: JSON.stringify(['user-1', 'conn-1', 'app']),
+          execution,
+          beforeProviderAttempt,
+        }),
       );
     });
   });

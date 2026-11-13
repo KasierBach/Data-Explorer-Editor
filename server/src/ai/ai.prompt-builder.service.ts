@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import * as Prompts from './ai.prompts';
 import { AI_CONSTANTS } from './ai.constants';
+import { extractJsonObject, stripCodeFences } from './ai-response-json';
 import type {
   AiDocument,
   AiChatMode,
@@ -258,50 +259,69 @@ export class AiPromptBuilderService {
     }
     return parts;
   }
-  parseAiResponse(fullText: string): {
+  parseAiResponse(
+    fullText: string,
+    responseFormat: AiResponseFormat = 'chat',
+  ): {
     message: string;
     sql?: string;
     explanation?: string;
     recommendations?: AiRecommendation[];
-
     sources?: string[];
   } {
-    try {
-      const remainingText = this.stripHiddenReasoningBlocks(fullText).trim();
-
-      let cleanJsonStr = remainingText;
-      const matchIndex = remainingText.indexOf('{');
-      if (matchIndex !== -1) {
-        let braceCount = 0;
-        let jsonEnd = -1;
-        for (let i = matchIndex; i < remainingText.length; i++) {
-          if (remainingText[i] === '{') braceCount++;
-          else if (remainingText[i] === '}') {
-            braceCount--;
-            if (braceCount === 0) {
-              jsonEnd = i;
-              break;
-            }
-          }
-        }
-        if (jsonEnd !== -1) {
-          cleanJsonStr = remainingText.substring(matchIndex, jsonEnd + 1);
-        }
-      }
-      const parsed = JSON.parse(cleanJsonStr);
-
-      return {
-        message: parsed.message || (matchIndex !== -1 ? '' : remainingText),
-        sql: parsed.sql || undefined,
-        explanation: parsed.explanation || undefined,
-        recommendations: this.normalizeRecommendations(parsed.recommendations),
-        sources: this.normalizeSources(parsed.sources),
-      };
-    } catch {
-      return {
-        message: this.stripHiddenReasoningBlocks(fullText).trim(),
-      };
+    if (fullText.length > AI_CONSTANTS.MAX_OUTPUT_TOKENS * 16) {
+      throw new Error('AI response exceeded the parsing size limit');
     }
+    const remainingText = this.stripHiddenReasoningBlocks(fullText).trim();
+    const cleaned = stripCodeFences(remainingText);
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      const extracted = extractJsonObject(cleaned);
+      try {
+        parsed = JSON.parse(extracted);
+      } catch {
+        if (responseFormat === 'structured') {
+          throw new Error('AI provider returned malformed structured output');
+        }
+        return { message: remainingText };
+      }
+    }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      if (responseFormat === 'structured') {
+        throw new Error('AI structured output must be a JSON object');
+      }
+      return { message: remainingText };
+    }
+
+    const response = parsed as Record<string, unknown>;
+    for (const field of ['message', 'sql', 'explanation']) {
+      if (response[field] != null && typeof response[field] !== 'string') {
+        if (responseFormat === 'structured') {
+          throw new Error(
+            `AI structured output contains an invalid ${field} field`,
+          );
+        }
+        return { message: remainingText };
+      }
+    }
+
+    return {
+      message: typeof response.message === 'string' ? response.message : '',
+      sql:
+        typeof response.sql === 'string' && response.sql.trim()
+          ? response.sql
+          : undefined,
+      explanation:
+        typeof response.explanation === 'string' && response.explanation.trim()
+          ? response.explanation
+          : undefined,
+      recommendations: this.normalizeRecommendations(response.recommendations),
+      sources: this.normalizeSources(response.sources),
+    };
   }
 
   private stripHiddenReasoningBlocks(fullText: string): string {
@@ -315,6 +335,7 @@ export class AiPromptBuilderService {
     parsed: { message: string; sql?: string; explanation?: string },
     rawText: string,
     providerLabel: string,
+    responseFormat: AiResponseFormat = 'chat',
   ) {
     const hasMessage =
       typeof parsed.message === 'string' && parsed.message.trim().length > 0;
@@ -332,7 +353,12 @@ export class AiPromptBuilderService {
       /^\s*\{\s*"message"\s*:\s*""\s*,\s*"sql"\s*:\s*""\s*,\s*"explanation"\s*:\s*""\s*\}\s*$/s.test(
         rawText,
       );
-    if (looksLikeEmptyJsonShell || rawText.trim().startsWith('{')) {
+    if (
+      responseFormat === 'structured' ||
+      !this.stripHiddenReasoningBlocks(rawText).trim() ||
+      looksLikeEmptyJsonShell ||
+      rawText.trim().startsWith('{')
+    ) {
       throw new Error(`${providerLabel} returned an empty structured response`);
     }
   }
@@ -496,13 +522,22 @@ export class AiPromptBuilderService {
         }
 
         const candidate = entry.trim();
-        if (!candidate) {
+        if (
+          !candidate ||
+          Array.from(entry).some(
+            (char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127,
+          )
+        ) {
           return [];
         }
 
         try {
           const url = new URL(candidate);
-          if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+          if (
+            (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+            url.username ||
+            url.password
+          ) {
             return [];
           }
           return [url.toString()];

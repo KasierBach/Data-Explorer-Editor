@@ -1,0 +1,93 @@
+services:
+  eval-runner:
+    image: node:22-alpine
+    user: node
+    init: true
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    command: ['node', '-e', 'setInterval(() => {}, 2147483647)']
+    working_dir: /workspace/server
+    tmpfs: ['/tmp:mode=1777']
+    volumes:
+      - ../node_modules:/workspace/server/node_modules:ro
+      - ../scripts/ai-eval:/workspace/server/scripts/ai-eval:ro
+      - ./fixtures/ai-eval-native-runner.mjs:/workspace/server/test/fixtures/ai-eval-native-runner.mjs:ro
+    labels:
+      ai.eval.profile: a12-native-fixture-v1
+    healthcheck:
+      test: ['CMD', 'node', '-e', 'process.exit(0)']
+      interval: 2s
+      timeout: 2s
+      retries: 10
+  postgres-eval:
+    image: postgres:16-alpine
+    network_mode: 'service:eval-runner'
+    depends_on:
+      eval-runner:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: a12_bootstrap
+      POSTGRES_PASSWORD: a12-fixture-bootstrap-only
+      POSTGRES_DB: data_explorer_ai_eval
+    command:
+      [
+        'postgres',
+        '-p',
+        '18432',
+        '-c',
+        'listen_addresses=127.0.0.1',
+        '-c',
+        'a12.fixture=synthetic-commerce.v1',
+      ]
+    tmpfs: ['/var/lib/postgresql/data']
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -h 127.0.0.1 -p 18432 -U a12_bootstrap -d data_explorer_ai_eval',
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+  mongo-eval:
+    image: mongo:7
+    network_mode: 'service:eval-runner'
+    depends_on:
+      eval-runner:
+        condition: service_healthy
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: a12_bootstrap
+      MONGO_INITDB_ROOT_PASSWORD: a12-fixture-bootstrap-only
+    command:
+      [
+        'mongod',
+        '--bind_ip',
+        '127.0.0.1',
+        '--port',
+        '18017',
+        '--auth',
+        '--noscripting',
+      ]
+    tmpfs: ['/data/db', '/data/configdb']
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--port',
+          '18017',
+          '--quiet',
+          '--username',
+          'a12_bootstrap',
+          '--password',
+          'a12-fixture-bootstrap-only',
+          '--authenticationDatabase',
+          'admin',
+          '--eval',
+          "db.adminCommand('ping').ok",
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 30

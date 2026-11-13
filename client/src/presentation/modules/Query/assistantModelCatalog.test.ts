@@ -60,9 +60,13 @@ describe("assistantModelCatalog", () => {
     ]);
     expect(ids("Beeknoee")).toEqual([
       "beeknoee:bee/gemini-3.8-flash",
+      "beeknoee:bee-tok/claude-sonnet-5-5",
+      "beeknoee:bee-tok/claude-opus-5-5",
+      "beeknoee:bee/gemini-4-argon",
       "beeknoee:bee/gemini-3.6-flash",
       "beeknoee:bee-tok/gemini-3.6-flash",
       "beeknoee:gemini-3.1-pro-preview",
+      "beeknoee:claude-opus-4-6",
       "beeknoee:claude-opus-4-6-thinking",
       "beeknoee:claude-sonnet-4-6",
       "beeknoee:minimax/minimax-m2.7",
@@ -90,6 +94,40 @@ describe("assistantModelCatalog", () => {
       "poolside/laguna-xs-2.1:free",
       "cohere/north-mini-code:free",
     ]);
+  });
+
+  it("keeps the eight requested Beeknoee models unique and provider-scoped", () => {
+    const requested = [
+      "bee/gemini-3.8-flash",
+      "bee-tok/claude-sonnet-5-5",
+      "gemini-3.1-pro-preview",
+      "claude-sonnet-4-6",
+      "bee-tok/claude-opus-5-5",
+      "bee/gemini-4-argon",
+      "claude-opus-4-6",
+      "claude-opus-4-6-thinking",
+    ];
+    const group = getAssistantModelCatalog().find((item) => item.group === "Beeknoee");
+    for (const model of requested) {
+      const selection = `beeknoee:${model}`;
+      expect(group?.items.filter((item) => item.id === selection)).toHaveLength(1);
+      expect(getAssistantModelProvider(selection)).toBe("beeknoee");
+    }
+    expect(new Set(group?.items.map((item) => item.id)).size).toBe(group?.items.length);
+    expect(getAssistantModelCatalog([], ["beeknoee"]).some((item) => item.group === "Beeknoee")).toBe(false);
+  });
+
+  it("does not assign capabilities to newly requested models by name", () => {
+    const models = getAssistantModelCatalog().flatMap((group) => group.items);
+    for (const id of [
+      "beeknoee:bee-tok/claude-sonnet-5-5",
+      "beeknoee:bee-tok/claude-opus-5-5",
+      "beeknoee:bee/gemini-4-argon",
+      "beeknoee:claude-opus-4-6",
+    ]) {
+      expect(models.find((item) => item.id === id)).toBeDefined();
+      expect(models.find((item) => item.id === id)?.capabilities).toBeUndefined();
+    }
   });
 
   it("does not expose the removed TokenRouter provider group", () => {
