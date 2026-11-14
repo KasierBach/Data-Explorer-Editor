@@ -8,6 +8,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export const SHARD_TOTAL = 4;
 export const BROWSER_API_URL = 'http://localhost:3001/api';
 export const BROWSER_PROJECTS = Object.freeze(['chromium', 'firefox', 'mobile-chrome', 'mobile-webkit']);
+export const PROJECT_LEG_TOTAL = SHARD_TOTAL * BROWSER_PROJECTS.length;
+export const PARTITION_STRATEGY = 'cyclic-project-shards-v1';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const CLIENT = join(ROOT, 'client');
 const JSON_LIMIT = 32 * 1024 * 1024;
@@ -19,6 +21,22 @@ const RUN = /^(?:[1-9][0-9]{0,19}|local)$/;
 const REQUIRED_DIST = ['app.html', 'index.html', '.vite/manifest.json', 'public-routes.json', 'sitemap.xml'];
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const requireValue = (value, code) => { if (!value) throw new Error(code); };
+
+export function projectShardIndex(shard, project) {
+  requireValue(Number.isInteger(shard) && shard >= 1 && shard <= SHARD_TOTAL, 'INVALID_SHARD_INDEX');
+  const ordinal = BROWSER_PROJECTS.indexOf(project);
+  requireValue(ordinal >= 0, 'INVALID_BROWSER_PROJECT');
+  return (shard - 1 + ordinal) % SHARD_TOTAL + 1;
+}
+
+function projectLegs() {
+  return Array.from({ length: SHARD_TOTAL }, (_, index) => BROWSER_PROJECTS.map((project) => ({ shard: index + 1, project, nativeShard: projectShardIndex(index + 1, project) }))).flat();
+}
+
+function inventoryName(shard, project) {
+  projectShardIndex(shard, project);
+  return `inventory-${shard}-${project}.json`;
+}
 
 function safeRelative(value) {
   requireValue(typeof value === 'string' && value.length <= 512 && !isAbsolute(value) && !/[\\\u0000-\u001f<>:"|?*]/.test(value) && value.split('/').every((part) => part && part !== '.' && part !== '..'), 'UNSAFE_ARTIFACT_PATH');
@@ -173,13 +191,14 @@ export function flattenBrowserReport(report) {
   return rows.sort((left, right) => left.key.localeCompare(right.key));
 }
 
-function assertBrowserInventory(report, context, shard = null) {
+function assertBrowserInventory(report, context, shard = null, project = null) {
   requireValue(report.errors.length === 0 && report.config?.fullyParallel === true && report.config.workers === 1 && report.config.forbidOnly === true && report.config.maxFailures === 0 && report.config.repeatEach === undefined && !report.config.grepInvert, 'UNSAFE_BROWSER_INVENTORY_CONFIG');
   const actualShard = report.config.shard;
-  requireValue(shard === null ? actualShard === null : actualShard?.current === shard && actualShard.total === SHARD_TOTAL, 'WRONG_BROWSER_SHARD');
+  requireValue(shard === null ? actualShard === null && project === null : actualShard?.current === projectShardIndex(shard, project) && actualShard.total === SHARD_TOTAL, 'WRONG_BROWSER_SHARD');
   requireValue(Array.isArray(report.config.projects) && JSON.stringify(report.config.projects.map((project) => project.name).sort()) === JSON.stringify([...BROWSER_PROJECTS].sort()), 'BROWSER_PROJECT_INVENTORY_MISMATCH');
   requireValue(report.config.projects.every((project) => project.repeatEach === 1 && project.retries === 2 && project.timeout === 60000), 'BROWSER_PROJECT_LIMITS_MISMATCH');
   const rows = flattenBrowserReport(report);
+  requireValue(project === null || rows.every((row) => row.project === project), 'BROWSER_PROJECT_SELECTION_MISMATCH');
   requireValue(rows.every((row) => row.results.length === 0 && ['passed', 'skipped'].includes(row.expectedStatus)), 'INVALID_LIST_REPORT');
   assertBinding(context);
   return rows;
@@ -292,16 +311,23 @@ export function assertUpstreamSuccess(buildResult, shardResult) {
   requireValue(buildResult === 'success' && shardResult === 'success', 'CLIENT_UPSTREAM_NOT_SUCCESSFUL');
 }
 
+async function browserInventories(directory, context) {
+  const inventory = assertBrowserInventory(await json(join(directory, 'inventory.json')), context);
+  const legs = await Promise.all(projectLegs().map(async (leg) => ({ ...leg, rows: assertBrowserInventory(await json(join(directory, inventoryName(leg.shard, leg.project))), context, leg.shard, leg.project) })));
+  for (const project of BROWSER_PROJECTS) assertShardPartition(inventory.filter((row) => row.project === project), legs.filter((leg) => leg.project === project).map((leg) => leg.rows));
+  const shards = Array.from({ length: SHARD_TOTAL }, (_, index) => legs.filter((leg) => leg.shard === index + 1).flatMap((leg) => leg.rows).sort((left, right) => left.key.localeCompare(right.key)));
+  assertShardPartition(inventory, shards);
+  return { inventory, legs, shards };
+}
+
 export async function sealBuild(directory, context, clientRoot = CLIENT) {
   assertBinding(context);
   requireValue(process.env.VITE_API_URL === BROWSER_API_URL, 'BUILD_API_VARIANT_NOT_EXPLICIT');
-  const inventories = await Promise.all(['inventory.json', ...Array.from({ length: SHARD_TOTAL }, (_, index) => `inventory-${index + 1}.json`)].map((name) => json(join(directory, name))));
-  const rows = inventories.map((report, index) => assertBrowserInventory(report, context, index === 0 ? null : index));
-  assertShardPartition(rows[0], rows.slice(1));
+  const { inventory } = await browserInventories(directory, context);
   for (const name of REQUIRED_DIST) requireValue((await lstat(join(clientRoot, 'dist', name))).isFile(), 'INCOMPLETE_CLIENT_BUILD');
   await cp(join(clientRoot, 'dist'), join(directory, 'dist'), { recursive: true, errorOnExist: true, force: false });
   const files = await fileInventory(directory);
-  const value = { ...context, kind: 'sealed-client-browser-build', files, skipPolicies: await skipPolicies(rows[0], clientRoot) };
+  const value = { ...context, kind: 'sealed-client-browser-build', partitionStrategy: PARTITION_STRATEGY, files, skipPolicies: await skipPolicies(inventory, clientRoot) };
   await writeJson(join(directory, 'build-manifest.json'), value);
   return value;
 }
@@ -311,9 +337,10 @@ export async function verifyBuild(directory, context, installed = false, clientR
   requireValue(!(await lstat(directory)).isSymbolicLink(), 'ARTIFACT_DIRECTORY_INVALID');
   const manifest = await json(join(requested, 'build-manifest.json'));
   assertSameBinding(manifest, context);
-  requireValue(manifest.kind === 'sealed-client-browser-build' && Array.isArray(manifest.files) && Array.isArray(manifest.skipPolicies), 'INVALID_BUILD_MANIFEST');
+  requireValue(manifest.kind === 'sealed-client-browser-build' && manifest.partitionStrategy === PARTITION_STRATEGY && Array.isArray(manifest.files) && Array.isArray(manifest.skipPolicies), 'INVALID_BUILD_MANIFEST');
   const actual = (await fileInventory(requested)).filter((file) => file.path !== 'build-manifest.json');
   requireValue(JSON.stringify(actual) === JSON.stringify(manifest.files), 'BUILD_CHECKSUM_OR_INVENTORY_MISMATCH');
+  for (const name of ['inventory.json', ...projectLegs().map((leg) => inventoryName(leg.shard, leg.project))]) requireValue(actual.some((file) => file.path === name), 'INCOMPLETE_BROWSER_INVENTORY');
   for (const name of REQUIRED_DIST) requireValue(actual.some((file) => file.path === `dist/${name}`), 'INCOMPLETE_CLIENT_BUILD');
   if (installed) {
     const dist = await fileInventory(join(clientRoot, 'dist'));
@@ -323,67 +350,77 @@ export async function verifyBuild(directory, context, installed = false, clientR
   return manifest;
 }
 
-export async function recordShard(directory, buildDirectory, context, shard, clientRoot = CLIENT) {
+export async function recordShard(directory, buildDirectory, context, shard, project, clientRoot = CLIENT) {
+  const nativeShard = projectShardIndex(shard, project);
   const build = await verifyBuild(buildDirectory, context, true, clientRoot);
-  requireValue(Number.isInteger(shard) && shard >= 1 && shard <= SHARD_TOTAL, 'INVALID_SHARD_INDEX');
-  const report = await json(join(directory, 'results.json'));
-  requireValue(report.config?.shard?.current === shard && report.config.shard.total === SHARD_TOTAL && report.config.workers === 1, 'WRONG_BROWSER_SHARD');
+  const reportBytes = await boundedBytes(join(directory, 'results.json'));
+  const report = parseBrowserJson(reportBytes.toString('utf8'));
+  requireValue(report.config?.shard?.current === nativeShard && report.config.shard.total === SHARD_TOTAL && report.config.workers === 1, 'WRONG_BROWSER_SHARD');
   assertSameBinding(report.config.metadata, context);
-  const expected = flattenBrowserReport(await json(join(buildDirectory, `inventory-${shard}.json`)));
+  const inventoryBytes = await boundedBytes(join(buildDirectory, inventoryName(shard, project)));
+  const expected = assertBrowserInventory(parseBrowserJson(inventoryBytes.toString('utf8')), context, shard, project);
   const assessed = assessBrowserResults(report, expected, build.skipPolicies);
   const blob = await boundedBytes(join(directory, 'blob-report.zip'));
   requireValue(blob.length > 0, 'MISSING_BLOB_REPORT');
-  const manifest = { ...context, kind: 'browser-shard-result', shard, shardTotal: SHARD_TOTAL, testStepOutcome: process.env.BROWSER_TEST_OUTCOME, reportSha256: hash(await boundedBytes(join(directory, 'results.json'))), blobSha256: hash(blob), counts: assessed.counts, durationMs: assessed.durationMs, ok: assessed.ok };
-  requireValue(['success', 'failure'].includes(manifest.testStepOutcome), 'UNEXECUTED_BROWSER_SHARD');
+  const testStepOutcome = process.env.BROWSER_TEST_OUTCOME;
+  requireValue(['success', 'failure'].includes(testStepOutcome), 'UNEXECUTED_BROWSER_SHARD');
+  requireValue(/^(?:0|[1-9][0-9]{0,2})$/.test(process.env.BROWSER_TEST_EXIT_CODE || ''), 'BROWSER_EXIT_OUTCOME_MISMATCH');
+  const exitCode = Number(process.env.BROWSER_TEST_EXIT_CODE);
+  requireValue(exitCode <= 255 && (exitCode === 0) === (testStepOutcome === 'success'), 'BROWSER_EXIT_OUTCOME_MISMATCH');
+  const manifest = { ...context, kind: 'browser-project-shard-result', partitionStrategy: PARTITION_STRATEGY, shard, shardTotal: SHARD_TOTAL, project, nativeShard, testStepOutcome, exitCode, inventorySha256: hash(inventoryBytes), reportSha256: hash(reportBytes), blobSha256: hash(blob), counts: assessed.counts, durationMs: assessed.durationMs, ok: assessed.ok };
   await writeJson(join(directory, 'shard-manifest.json'), manifest);
   return manifest;
 }
 
-function shardDirectory(directory, context, shard) {
-  return join(directory, `browser-shard-${context.releaseSha}-${context.runId}-${context.runAttempt}-${shard}`, 'ci-results');
+function shardDirectory(directory, context, shard, project) {
+  projectShardIndex(shard, project);
+  return join(directory, `browser-shard-${context.releaseSha}-${context.runId}-${context.runAttempt}-${shard}`, 'ci-results', project);
 }
 
 export async function prepareReports(directory, context, clientRoot = CLIENT) {
   await mkdir(join(clientRoot, 'all-blob-reports'), { recursive: false });
   let copied = 0;
-  for (let shard = 1; shard <= SHARD_TOTAL; shard++) {
+  for (const { shard, project, nativeShard } of projectLegs()) {
     try {
-      const source = shardDirectory(directory, context, shard);
+      const source = shardDirectory(directory, context, shard, project);
       const manifest = await json(join(source, 'shard-manifest.json'));
       assertSameBinding(manifest, context);
-      requireValue(manifest.shard === shard && manifest.shardTotal === SHARD_TOTAL, 'WRONG_BROWSER_SHARD');
+      requireValue(manifest.kind === 'browser-project-shard-result' && manifest.partitionStrategy === PARTITION_STRATEGY && manifest.shard === shard && manifest.shardTotal === SHARD_TOTAL && manifest.project === project && manifest.nativeShard === nativeShard, 'WRONG_BROWSER_SHARD');
       const bytes = await boundedBytes(join(source, 'blob-report.zip'));
-      requireValue(HASH.test(manifest.blobSha256) && hash(bytes) === manifest.blobSha256, 'BLOB_REPORT_CHECKSUM_MISMATCH');
-      await writeFile(join(clientRoot, 'all-blob-reports', `shard-${shard}.zip`), bytes, { flag: 'wx', mode: 0o600 });
+      requireValue(HASH.test(manifest.blobSha256) && bytes.length > 0 && hash(bytes) === manifest.blobSha256, 'BLOB_REPORT_CHECKSUM_MISMATCH');
+      await writeFile(join(clientRoot, 'all-blob-reports', `shard-${shard}-${project}.zip`), bytes, { flag: 'wx', mode: 0o600 });
       copied++;
     } catch (error) {
-      process.stderr.write(`Shard ${shard} unavailable for report merge: ${safeCode(error)}\n`);
+      process.stderr.write(`Shard ${shard} ${project} unavailable for report merge: ${safeCode(error)}\n`);
     }
   }
   requireValue(copied > 0, 'NO_VALID_BLOB_REPORTS');
-  return { copied, expected: SHARD_TOTAL, partial: copied !== SHARD_TOTAL };
+  return { copied, expected: PROJECT_LEG_TOTAL, partial: copied !== PROJECT_LEG_TOTAL };
 }
 
 export async function verifyGate(buildDirectory, shardRoot, mergedPath, context, clientRoot = CLIENT) {
   const build = await verifyBuild(buildDirectory, context, false, clientRoot);
-  const inventory = flattenBrowserReport(await json(join(buildDirectory, 'inventory.json')));
-  const shardRows = [];
+  const { inventory, legs } = await browserInventories(buildDirectory, context);
+  const shardRows = Array.from({ length: SHARD_TOTAL }, () => []);
   const counts = [];
-  for (let shard = 1; shard <= SHARD_TOTAL; shard++) {
-    const directory = shardDirectory(shardRoot, context, shard);
+  const projectLegDurations = [];
+  for (const { shard, project, nativeShard, rows: expected } of legs) {
+    const directory = shardDirectory(shardRoot, context, shard, project);
     const manifest = await json(join(directory, 'shard-manifest.json'));
     assertSameBinding(manifest, context);
-    requireValue(manifest.kind === 'browser-shard-result' && manifest.shard === shard && manifest.shardTotal === SHARD_TOTAL && manifest.testStepOutcome === 'success', 'MISSING_OR_FAILED_BROWSER_SHARD');
+    requireValue(manifest.kind === 'browser-project-shard-result' && manifest.partitionStrategy === PARTITION_STRATEGY && manifest.shard === shard && manifest.shardTotal === SHARD_TOTAL && manifest.project === project && manifest.nativeShard === nativeShard && manifest.testStepOutcome === 'success' && manifest.exitCode === 0, 'MISSING_OR_FAILED_BROWSER_SHARD');
+    requireValue(hash(await boundedBytes(join(buildDirectory, inventoryName(shard, project)))) === manifest.inventorySha256, 'SHARD_INVENTORY_CHECKSUM_MISMATCH');
     const reportBytes = await boundedBytes(join(directory, 'results.json'));
     requireValue(hash(reportBytes) === manifest.reportSha256 && hash(await boundedBytes(join(directory, 'blob-report.zip'))) === manifest.blobSha256, 'SHARD_REPORT_CHECKSUM_MISMATCH');
     const report = parseBrowserJson(reportBytes.toString('utf8'));
-    requireValue(report.config?.shard?.current === shard && report.config.shard.total === SHARD_TOTAL && report.config.workers === 1, 'WRONG_BROWSER_SHARD');
+    requireValue(report.config?.shard?.current === nativeShard && report.config.shard.total === SHARD_TOTAL && report.config.workers === 1, 'WRONG_BROWSER_SHARD');
     assertSameBinding(report.config.metadata, context);
-    const expected = flattenBrowserReport(await json(join(buildDirectory, `inventory-${shard}.json`)));
     const assessed = assessBrowserResults(report, expected, build.skipPolicies);
-    requireValue(assessed.ok && JSON.stringify(assessed.counts) === JSON.stringify(manifest.counts), 'BROWSER_SHARD_NOT_SUCCESSFUL');
-    shardRows.push(assessed.rows); counts.push(assessed.counts);
+    requireValue(assessed.ok && manifest.ok === true && JSON.stringify(assessed.counts) === JSON.stringify(manifest.counts) && assessed.durationMs === manifest.durationMs, 'BROWSER_SHARD_NOT_SUCCESSFUL');
+    shardRows[shard - 1].push(...assessed.rows); counts.push(assessed.counts);
+    projectLegDurations.push({ shard, project, nativeShard, durationMs: assessed.durationMs });
   }
+  for (const rows of shardRows) rows.sort((left, right) => left.key.localeCompare(right.key));
   assertShardPartition(inventory, shardRows);
   const mergedReport = await json(mergedPath);
   assertSameBinding(mergedReport.config?.metadata, context);
@@ -394,9 +431,9 @@ export async function verifyGate(buildDirectory, shardRoot, mergedPath, context,
   const completed = shardRows.flat().sort((left, right) => left.key.localeCompare(right.key));
   requireValue(merged.rows.every((row, index) => outcome(row) === outcome(completed[index])), 'MERGED_BROWSER_TEST_OUTCOME_MISMATCH');
   assertUpstreamSuccess(process.env.CLIENT_BUILD_RESULT, process.env.CLIENT_SHARDS_RESULT);
-  const summary = { ...context, kind: 'complete-client-browser-gate', shardTotal: SHARD_TOTAL, workersPerShard: 1, counts: merged.counts, durationMs: merged.durationMs, inventorySha256: hash(await boundedBytes(join(buildDirectory, 'inventory.json'))), complete: true };
+  const summary = { ...context, kind: 'complete-client-browser-gate', partitionStrategy: PARTITION_STRATEGY, shardTotal: SHARD_TOTAL, workersPerShard: 1, projectLegTotal: PROJECT_LEG_TOTAL, projectLegDurations, counts: merged.counts, durationMs: merged.durationMs, inventorySha256: hash(await boundedBytes(join(buildDirectory, 'inventory.json'))), complete: true };
   await writeJson(join(clientRoot, 'ci-results', 'summary.json'), summary);
-  if (process.env.GITHUB_STEP_SUMMARY) await writeFile(process.env.GITHUB_STEP_SUMMARY, `## Browser gate\n\n4 shards × 1 worker; complete inventory at \`${context.releaseSha}\`.\n\n${Object.entries(summary.counts).map(([key, value]) => `- ${key}: ${value}`).join('\n')}\n`, { flag: 'a' });
+  if (process.env.GITHUB_STEP_SUMMARY) await writeFile(process.env.GITHUB_STEP_SUMMARY, `## Browser gate\n\n4 shards × 1 worker; 16 cyclic project legs; complete inventory at \`${context.releaseSha}\`.\n\n${Object.entries(summary.counts).map(([key, value]) => `- ${key}: ${value}`).join('\n')}\n\n${projectLegDurations.map((leg) => `- Shard ${leg.shard}, ${leg.project}, native ${leg.nativeShard}/4: ${(leg.durationMs / 1000).toFixed(1)}s`).join('\n')}\n`, { flag: 'a' });
   return summary;
 }
 
@@ -405,7 +442,12 @@ function safeCode(error) {
 }
 
 export async function main(args = process.argv.slice(2)) {
-  const [action, directory, extra, merged] = args;
+  const [action, directory, extra, merged, project] = args;
+  if (action === 'shard-index') {
+    requireValue(args.length === 3 && /^[1-4]$/.test(directory || ''), 'INVALID_BROWSER_CI_ARGUMENTS');
+    process.stdout.write(`${projectShardIndex(Number(directory), extra)}\n`);
+    return;
+  }
   const context = await readBrowserBinding();
   requireValue(['seal-build', 'verify-build', 'install-build', 'verify-installed-build', 'record-shard', 'prepare-reports', 'verify-gate'].includes(action) && directory, 'INVALID_BROWSER_CI_ARGUMENTS');
   const path = resolve(directory);
@@ -417,7 +459,7 @@ export async function main(args = process.argv.slice(2)) {
     await cp(join(path, 'dist'), join(CLIENT, 'dist'), { recursive: true, force: false, errorOnExist: true });
     result = await verifyBuild(path, context, true);
   } else if (action === 'verify-build' || action === 'verify-installed-build') result = await verifyBuild(path, context, action === 'verify-installed-build');
-  else if (action === 'record-shard') result = await recordShard(path, resolve(extra), context, Number(merged));
+  else if (action === 'record-shard') result = await recordShard(path, resolve(extra), context, Number(merged), project);
   else if (action === 'prepare-reports') result = await prepareReports(path, context);
   else result = await verifyGate(path, resolve(extra), resolve(merged), context);
   process.stdout.write(JSON.stringify({ action, releaseSha: context.releaseSha, ...(result.counts ? { counts: result.counts } : {}), ...(result.partial !== undefined ? { partial: result.partial } : {}), verified: true }) + '\n');

@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import * as browserArtifacts from "./browser-ci-artifacts.mjs";
 import {
   BROWSER_API_URL, BROWSER_PROJECTS, SHARD_TOTAL, assertBinding,
   assertSameBinding, assertShardPartition, assertUpstreamSuccess,
@@ -12,7 +13,45 @@ import {
   recordShard, sealBuild, verifyBuild, verifyGate,
 } from "./browser-ci-artifacts.mjs";
 
+const { projectShardIndex } = browserArtifacts;
+const PARTITION_STRATEGY = "cyclic-project-shards-v1";
+const PROJECT_LEG_TOTAL = 16;
+const NATIVE_SHARDS = [[1, 2, 3, 4], [2, 3, 4, 1], [3, 4, 1, 2], [4, 1, 2, 3]];
+const nativeShardFor = (outerShard, project) => NATIVE_SHARDS[outerShard - 1][BROWSER_PROJECTS.indexOf(project)];
+
+test("cyclic project shard mapping is the exact four-by-four permutation", () => {
+  assert.equal(typeof projectShardIndex, "function", "projectShardIndex must be exported");
+  assert.deepEqual(BROWSER_PROJECTS, ["chromium", "firefox", "mobile-chrome", "mobile-webkit"]);
+  assert.equal(SHARD_TOTAL, 4);
+  assert.equal(browserArtifacts.PARTITION_STRATEGY, PARTITION_STRATEGY);
+  assert.equal(browserArtifacts.PROJECT_LEG_TOTAL, PROJECT_LEG_TOTAL);
+  const expected = NATIVE_SHARDS;
+  for (let outerShard = 1; outerShard <= SHARD_TOTAL; outerShard++) {
+    const mapped = BROWSER_PROJECTS.map((project) => projectShardIndex(outerShard, project));
+    assert.deepEqual(mapped, expected[outerShard - 1]);
+    assert.equal(new Set(mapped).size, SHARD_TOTAL);
+  }
+  for (const project of BROWSER_PROJECTS) {
+    const mapped = expected.map((_, index) => projectShardIndex(index + 1, project));
+    assert.deepEqual(mapped.toSorted((left, right) => left - right), [1, 2, 3, 4]);
+  }
+});
+
+test("cyclic project shard mapping rejects noninteger outer shards and inexact projects", () => {
+  assert.equal(typeof projectShardIndex, "function", "projectShardIndex must be exported");
+  for (const outerShard of [0, 5, -1, 1.5, "1", true, null, undefined, NaN, Infinity]) {
+    assert.throws(() => projectShardIndex(outerShard, "chromium"), /INVALID_SHARD_INDEX/);
+  }
+  for (const project of ["webkit", "chrome", "CHROMIUM", " chromium", "chromium ", "", null, undefined, 0, new String("chromium")]) {
+    assert.throws(() => projectShardIndex(1, project), /INVALID_BROWSER_PROJECT/);
+  }
+});
+
 const SKIP_REASON = "Desktop Chromium preview only";
+const ADDITIONAL_TITLES = [
+  "filters visible rows", "sorts numeric columns", "searches preview data",
+  "opens row details", "toggles column visibility", "resets the preview view",
+];
 const SOURCE = `import { test, expect } from "@playwright/test";
 
 test.describe("preview", () => {
@@ -24,8 +63,17 @@ test.describe("preview", () => {
   test("exports selection", async ({ page }) => {
     await expect(page.locator("[data-export]")).toBeVisible();
   });
+${ADDITIONAL_TITLES.map((title) => `
+  test("${title}", async ({ page }) => {
+    await expect(page.locator("[data-preview]")).toBeVisible();
+  });
+`).join("")}
 });
 `;
+const SPEC_DECLARATIONS = SOURCE.split("\n").flatMap((sourceLine, index) => {
+  const match = /^  test\("([^"]+)",/.exec(sourceLine);
+  return match ? [[match[1], index + 1]] : [];
+});
 const binding = (overrides = {}) => ({
   formatVersion: 1, releaseSha: "a".repeat(40), treeSha: "b".repeat(40),
   runId: "314159", runAttempt: "2", lockSha256: "c".repeat(64),
@@ -36,7 +84,7 @@ const attempt = (status = "passed", retry = 0) => ({
   status, retry, workerIndex: 0, parallelIndex: 0, duration: 12,
   startTime: "2026-11-14T12:00:00.000Z", stdout: [], stderr: [], attachments: [],
 });
-function browserReport(projects = BROWSER_PROJECTS) {
+function browserReport(projects = BROWSER_PROJECTS, declarations = SPEC_DECLARATIONS.slice(0, 2)) {
   return {
     config: {
       rootDir: "/fixture/client/e2e", workers: 1, shard: null, metadata: binding(),
@@ -44,7 +92,7 @@ function browserReport(projects = BROWSER_PROJECTS) {
     },
     suites: [{ title: "preview.spec.ts", file: "preview.spec.ts", specs: [], suites: [{
       title: "preview", file: "preview.spec.ts", line: 3, column: 1,
-      specs: [["renders preview", 4], ["exports selection", 9]].map(([title, line]) => ({
+      specs: declarations.map(([title, line]) => ({
         id: `preview-${line}`, title, file: "preview.spec.ts", line, column: 3, ok: true,
         tests: projects.map((projectName) => ({
           projectName, projectId: projectName, expectedStatus: "passed", status: "expected",
@@ -53,7 +101,7 @@ function browserReport(projects = BROWSER_PROJECTS) {
       })),
     }] }],
     errors: [],
-    stats: { expected: projects.length * 2, unexpected: 0, flaky: 0, skipped: 0, duration: 1250 },
+    stats: { expected: projects.length * declarations.length, unexpected: 0, flaky: 0, skipped: 0, duration: 1250 },
   };
 }
 const specsOf = (report) => report.suites[0].suites[0].specs;
@@ -65,6 +113,19 @@ function updateStats(report) {
     report.stats[status] = testsOf(report).filter((entry) => entry.status === status).length;
   }
   return report;
+}
+
+function projectShardReport(fullReport, outerShard, project) {
+  const report = structuredClone(fullReport);
+  const nativeShard = nativeShardFor(outerShard, project);
+  report.config.shard = { current: nativeShard, total: SHARD_TOTAL };
+  // Native fully-parallel lists partition eight declarations into four two-test groups.
+  // Keep ALL four config.projects, as Playwright --project reports actually do.
+  const perShard = specsOf(report).length / SHARD_TOTAL;
+  assert.equal(Number.isInteger(perShard), true);
+  report.suites[0].suites[0].specs = specsOf(report).slice((nativeShard - 1) * perShard, nativeShard * perShard);
+  for (const spec of specsOf(report)) spec.tests = spec.tests.filter((entry) => entry.projectName === project);
+  return updateStats(report);
 }
 
 async function buildFixture(t) {
@@ -101,7 +162,7 @@ async function buildFixture(t) {
     await writeFile(destination, bytes);
   }
   const context = binding({ lockSha256: createHash("sha256").update(lock).digest("hex") });
-  const inventory = browserReport();
+  const inventory = browserReport(BROWSER_PROJECTS, SPEC_DECLARATIONS);
   Object.assign(inventory.config, {
     rootDir: join(clientRoot, "e2e"), metadata: context,
     fullyParallel: true, forbidOnly: true, workers: 1, maxFailures: 0,
@@ -111,15 +172,14 @@ async function buildFixture(t) {
   }
   for (const entry of testsOf(inventory)) Object.assign(entry, { status: "skipped", results: [], timeout: 60_000 });
   updateStats(inventory);
-  const inventoryNames = ["inventory.json", ...BROWSER_PROJECTS.map((_, index) => `inventory-${index + 1}.json`)];
-  for (const [index, name] of inventoryNames.entries()) {
-    const report = structuredClone(inventory);
-    if (index) {
-      report.config.shard = { current: index, total: SHARD_TOTAL };
-      for (const spec of specsOf(report)) spec.tests = spec.tests.filter((entry) => entry.projectName === BROWSER_PROJECTS[index - 1]);
-      updateStats(report);
+  const inventoryNames = ["inventory.json"];
+  await writeFile(join(directory, "inventory.json"), JSON.stringify(inventory));
+  for (let outerShard = 1; outerShard <= SHARD_TOTAL; outerShard++) {
+    for (const project of BROWSER_PROJECTS) {
+      const name = `inventory-${outerShard}-${project}.json`;
+      inventoryNames.push(name);
+      await writeFile(join(directory, name), JSON.stringify(projectShardReport(inventory, outerShard, project)));
     }
-    await writeFile(join(directory, name), JSON.stringify(report));
   }
   return { root, clientRoot, directory, context, inventory, inventoryNames };
 }
@@ -412,12 +472,19 @@ test("seals and verifies an injected temporary client with source-scoped skip po
   assert.deepEqual(await verifyBuild(directory, context, false, clientRoot), manifest);
   assert.deepEqual(await verifyBuild(directory, context, true, clientRoot), manifest);
   assert.ok(manifest.files.some((file) => file.path === "dist/assets/app.js"));
+  assert.equal(manifest.partitionStrategy, PARTITION_STRATEGY);
+  assert.equal(manifest.variant, "browser-mock-preview-v1");
+  assert.equal(fixture.inventoryNames.length, PROJECT_LEG_TOTAL + 1);
+  for (const name of fixture.inventoryNames) {
+    const bytes = await readFile(join(directory, name));
+    assert.deepEqual(manifest.files.find((file) => file.path === name), { path: name, bytes: bytes.length, sha256: digest(bytes) });
+  }
   for (const row of flattenBrowserReport(inventory)) {
     const policy = manifest.skipPolicies.find((entry) => entry.key === row.key);
     if (row.line === 4 && row.project !== "chromium") assert.deepEqual(policy?.reasons, [SKIP_REASON]);
     else assert.equal(policy, undefined);
   }
-  const results = browserReport();
+  const results = browserReport(BROWSER_PROJECTS, SPEC_DECLARATIONS);
   for (const entry of specsOf(results)[0].tests.filter((entry) => entry.projectName !== "chromium")) {
     Object.assign(entry, { status: "skipped", expectedStatus: "skipped", results: [attempt("skipped")], annotations: [{ type: "skip", description: SKIP_REASON }] });
   }
@@ -508,7 +575,7 @@ async function gateFixture(t, { record = true } = {}) {
   const summaryPath = join(clientRoot, "ci-results", "summary.json");
   const stepSummaryPath = join(root, "step-summary.txt");
   temporaryEnv(t, {
-    BROWSER_TEST_OUTCOME: "success", CLIENT_BUILD_RESULT: "success",
+    BROWSER_TEST_OUTCOME: "success", BROWSER_TEST_EXIT_CODE: "0", CLIENT_BUILD_RESULT: "success",
     CLIENT_SHARDS_RESULT: "success", GITHUB_STEP_SUMMARY: stepSummaryPath,
   });
   await mkdir(join(clientRoot, "ci-results"));
@@ -526,56 +593,81 @@ async function gateFixture(t, { record = true } = {}) {
   Object.assign(specsOf(merged)[1].tests[0], { status: "flaky", results: [attempt("timedOut"), attempt("passed", 1)] });
   for (const entry of testsOf(merged)) delete entry.projectId;
   updateStats(merged);
-  merged.stats.duration *= SHARD_TOTAL;
-  await saveJson(mergedPath, merged);
   const shards = [];
-  for (let index = 0; index < SHARD_TOTAL; index++) {
-    const shard = index + 1;
-    // upload-artifact preserves ci-results and test-results under their common client ancestor.
+  for (let shard = 1; shard <= SHARD_TOTAL; shard++) {
+    // upload-artifact preserves ci-results/<project> and test-results under the client ancestor.
     const artifactRoot = join(shardRoot, `browser-shard-${context.releaseSha}-${context.runId}-${context.runAttempt}-${shard}`);
-    const output = join(artifactRoot, "ci-results");
-    await mkdir(output, { recursive: true });
-    await mkdir(join(artifactRoot, "test-results"));
-    await saveJson(join(artifactRoot, "test-results", ".last-run.json"), { status: "passed", failedTests: [] });
-    const report = structuredClone(merged);
-    report.config.shard = { current: shard, total: SHARD_TOTAL };
-    for (const spec of specsOf(report)) spec.tests = spec.tests.filter((entry) => entry.projectName === BROWSER_PROJECTS[index]);
-    updateStats(report); report.stats.duration = 1250;
-    const reportPath = join(output, "results.json");
-    const blobPath = join(output, "blob-report.zip");
-    const manifestPath = join(output, "shard-manifest.json");
-    await saveJson(reportPath, report);
-    // A tiny valid empty ZIP with a shard-specific comment; these APIs seal/copy opaque bytes.
-    const comment = Buffer.from(`fixture-shard-${shard}`);
-    const blob = Buffer.alloc(22 + comment.length);
-    blob.writeUInt32LE(0x06054b50, 0); blob.writeUInt16LE(comment.length, 20); comment.copy(blob, 22);
-    await writeFile(blobPath, blob);
-    const manifest = record ? await recordShard(output, directory, context, shard, clientRoot) : undefined;
-    shards.push({ shard, artifactRoot, directory: output, reportPath, blobPath, manifestPath, report, blob, manifest });
+    for (const project of BROWSER_PROJECTS) {
+      const nativeShard = nativeShardFor(shard, project);
+      const output = join(artifactRoot, "ci-results", project);
+      await mkdir(output, { recursive: true });
+      const testResults = join(artifactRoot, "test-results", project);
+      await mkdir(testResults, { recursive: true });
+      await saveJson(join(testResults, ".last-run.json"), { status: "passed", failedTests: [] });
+      const report = projectShardReport(merged, shard, project);
+      report.stats.duration = 1000 + shard * 100 + BROWSER_PROJECTS.indexOf(project) * 10;
+      const reportPath = join(output, "results.json");
+      const blobPath = join(output, "blob-report.zip");
+      const manifestPath = join(output, "shard-manifest.json");
+      const inventoryPath = join(directory, `inventory-${shard}-${project}.json`);
+      await saveJson(reportPath, report);
+      // Valid empty ZIP with a unique leg comment; the helper seals/copies opaque bytes.
+      const comment = Buffer.from(`fixture-shard-${shard}-${project}`);
+      const blob = Buffer.alloc(22 + comment.length);
+      blob.writeUInt32LE(0x06054b50, 0); blob.writeUInt16LE(comment.length, 20); comment.copy(blob, 22);
+      await writeFile(blobPath, blob);
+      const manifest = record ? await recordShard(output, directory, context, shard, project, clientRoot) : undefined;
+      shards.push({ shard, project, nativeShard, artifactRoot, directory: output, reportPath, blobPath, manifestPath, inventoryPath, report, blob, manifest });
+    }
   }
+  merged.stats.duration = shards.reduce((sum, leg) => sum + leg.report.stats.duration, 0);
+  await saveJson(mergedPath, merged);
   return { ...fixture, build, shardRoot, shards, merged, mergedPath, summaryPath, stepSummaryPath };
 }
 
-test("completes the full gate from nested downloaded shard artifacts only", async (t) => {
+test("completes the full gate from sixteen nested project legs without outer manifests", async (t) => {
   const fixture = await gateFixture(t);
+  assert.equal(fixture.shards.length, PROJECT_LEG_TOTAL);
   await assertNoGateSummary(fixture);
   const prepared = await prepareReports(fixture.shardRoot, fixture.context, fixture.clientRoot);
-  assert.deepEqual(prepared, { copied: SHARD_TOTAL, expected: SHARD_TOTAL, partial: false });
+  assert.deepEqual(prepared, { copied: PROJECT_LEG_TOTAL, expected: PROJECT_LEG_TOTAL, partial: false });
   for (const shard of fixture.shards) {
-    assert.deepEqual(await readFile(join(fixture.clientRoot, "all-blob-reports", `shard-${shard.shard}.zip`)), shard.blob);
+    assert.deepEqual(await readFile(join(fixture.clientRoot, "all-blob-reports", `shard-${shard.shard}-${shard.project}.zip`)), shard.blob);
+    assert.equal(shard.manifest.kind, "browser-project-shard-result");
+    assert.equal(shard.manifest.shard, shard.shard);
+    assert.equal(shard.manifest.shardTotal, SHARD_TOTAL);
+    assert.equal(shard.manifest.project, shard.project);
+    assert.equal(shard.manifest.nativeShard, shard.nativeShard);
+    assert.equal(shard.manifest.partitionStrategy, PARTITION_STRATEGY);
+    assert.equal(shard.manifest.testStepOutcome, "success");
+    assert.equal(shard.manifest.exitCode, 0);
+    assert.equal(shard.manifest.ok, true);
+    assert.equal(shard.manifest.reportSha256, digest(await readFile(shard.reportPath)));
+    assert.equal(shard.manifest.blobSha256, digest(shard.blob));
+    assert.equal(shard.manifest.inventorySha256, digest(await readFile(shard.inventoryPath)));
+    assert.equal(shard.manifest.counts.total, 2);
+    assert.equal(shard.manifest.durationMs, shard.report.stats.duration);
+    assert.doesNotThrow(() => assertSameBinding(shard.manifest, fixture.context));
+    await assert.rejects(() => readFile(join(shard.artifactRoot, "ci-results", "shard-manifest.json")), { code: "ENOENT" });
   }
+  assert.equal((await readdir(join(fixture.clientRoot, "all-blob-reports"))).length, PROJECT_LEG_TOTAL);
   await assertNoGateSummary(fixture);
   const summary = await verifyGate(fixture.directory, fixture.shardRoot, fixture.mergedPath, fixture.context, fixture.clientRoot);
   const total = testsOf(fixture.merged).length;
+  assert.equal(total, 32);
   assert.deepEqual(summary.counts, {
     total, expected: total - BROWSER_PROJECTS.length, unexpected: 0, flaky: 1,
     skipped: BROWSER_PROJECTS.length - 1, retries: 1, timedOutAttempts: 1, interruptedAttempts: 0,
   });
   assert.equal(summary.kind, "complete-client-browser-gate");
   assert.equal(summary.complete, true);
+  assert.equal(summary.partitionStrategy, PARTITION_STRATEGY);
+  assert.equal(summary.projectLegTotal, PROJECT_LEG_TOTAL);
   assert.equal(summary.shardTotal, SHARD_TOTAL);
   assert.equal(summary.workersPerShard, 1);
   assert.equal(summary.inventorySha256, digest(await readFile(join(fixture.directory, "inventory.json"))));
+  assert.equal(summary.durationMs, fixture.merged.stats.duration);
+  assert.deepEqual(summary.projectLegDurations, fixture.shards.map(({ shard, project, nativeShard, report }) => ({ shard, project, nativeShard, durationMs: report.stats.duration })));
   assert.deepEqual(JSON.parse(await readFile(fixture.summaryPath, "utf8")), summary);
   assert.match(await readFile(fixture.stepSummaryPath, "utf8"), /## Browser gate/);
 });
@@ -590,12 +682,13 @@ test("recordShard rejects missing, malformed, stale and wrongly routed reports",
     ["stale", (report) => { report.config.metadata.runAttempt = "3"; }, /BUILD_SOURCE_OR_RUN_MISMATCH/],
     ["wrong shard", (report) => { report.config.shard.current = 2; }, /WRONG_BROWSER_SHARD/],
     ["wrong workers", (report) => { report.config.workers = 2; }, /WRONG_BROWSER_SHARD/],
+    ["wrong project rows", (report) => { for (const entry of testsOf(report)) entry.projectName = "firefox"; }, /BROWSER_TEST_INVENTORY_MISMATCH/],
   ];
   for (const [name, change, error] of cases) {
     if (change === undefined) await rm(shard.reportPath);
     else if (typeof change === "string") await writeFile(shard.reportPath, change);
     else { const report = structuredClone(shard.report); change(report); await saveJson(shard.reportPath, report); }
-    await assert.rejects(() => recordShard(shard.directory, fixture.directory, fixture.context, shard.shard, fixture.clientRoot), error, name);
+    await assert.rejects(() => recordShard(shard.directory, fixture.directory, fixture.context, shard.shard, shard.project, fixture.clientRoot), error, name);
     await assert.rejects(() => readFile(shard.manifestPath), { code: "ENOENT" });
     await assertNoGateSummary(fixture);
     await writeFile(shard.reportPath, bytes);
@@ -606,47 +699,58 @@ test("recordShard rejects absent or empty blobs and unexecuted step outcomes", a
   const fixture = await gateFixture(t, { record: false });
   const shard = fixture.shards[0];
   await rm(shard.blobPath);
-  await assert.rejects(() => recordShard(shard.directory, fixture.directory, fixture.context, 1, fixture.clientRoot), { code: "ENOENT" });
+  await assert.rejects(() => recordShard(shard.directory, fixture.directory, fixture.context, 1, shard.project, fixture.clientRoot), { code: "ENOENT" });
   await writeFile(shard.blobPath, Buffer.alloc(0));
-  await assert.rejects(() => recordShard(shard.directory, fixture.directory, fixture.context, 1, fixture.clientRoot), /MISSING_BLOB_REPORT/);
+  await assert.rejects(() => recordShard(shard.directory, fixture.directory, fixture.context, 1, shard.project, fixture.clientRoot), /MISSING_BLOB_REPORT/);
   await writeFile(shard.blobPath, shard.blob);
   for (const outcome of ["skipped", "cancelled", undefined]) {
     if (outcome === undefined) delete process.env.BROWSER_TEST_OUTCOME;
     else process.env.BROWSER_TEST_OUTCOME = outcome;
-    await assert.rejects(() => recordShard(shard.directory, fixture.directory, fixture.context, 1, fixture.clientRoot), /UNEXECUTED_BROWSER_SHARD/);
+    await assert.rejects(() => recordShard(shard.directory, fixture.directory, fixture.context, 1, shard.project, fixture.clientRoot), /UNEXECUTED_BROWSER_SHARD/);
   }
   process.env.BROWSER_TEST_OUTCOME = "success";
   await assert.rejects(() => readFile(shard.manifestPath), { code: "ENOENT" });
   await assertNoGateSummary(fixture);
 });
 
-test("records failing shard diagnostics but never publishes a complete gate for them", async (t) => {
+test("records failing project-leg diagnostics but never publishes a complete gate for them", async (t) => {
   const fixture = await gateFixture(t, { record: false });
+  const failedLeg = fixture.shards[0];
   for (const shard of fixture.shards) {
-    if (shard.shard === 1) {
+    if (shard === failedLeg) {
       Object.assign(testsOf(shard.report)[0], { status: "unexpected", results: [attempt("failed")] });
       await saveJson(shard.reportPath, updateStats(shard.report));
     }
-    process.env.BROWSER_TEST_OUTCOME = shard.shard === 1 ? "failure" : "success";
-    shard.manifest = await recordShard(shard.directory, fixture.directory, fixture.context, shard.shard, fixture.clientRoot);
+    process.env.BROWSER_TEST_OUTCOME = shard === failedLeg ? "failure" : "success";
+    process.env.BROWSER_TEST_EXIT_CODE = shard === failedLeg ? "1" : "0";
+    shard.manifest = await recordShard(shard.directory, fixture.directory, fixture.context, shard.shard, shard.project, fixture.clientRoot);
     assert.equal(shard.manifest.reportSha256, digest(await readFile(shard.reportPath)));
     assert.equal(shard.manifest.blobSha256, digest(shard.blob));
   }
-  assert.equal(fixture.shards[0].manifest.testStepOutcome, "failure");
-  assert.equal(fixture.shards[0].manifest.ok, false);
-  assert.equal(fixture.shards[0].manifest.counts.unexpected, 1);
-  assert.deepEqual(JSON.parse(await readFile(fixture.shards[0].manifestPath, "utf8")), fixture.shards[0].manifest);
+  assert.equal(failedLeg.manifest.testStepOutcome, "failure");
+  assert.equal(failedLeg.manifest.exitCode, 1);
+  assert.equal(failedLeg.manifest.ok, false);
+  assert.equal(failedLeg.manifest.counts.unexpected, 1);
+  assert.deepEqual(JSON.parse(await readFile(failedLeg.manifestPath, "utf8")), failedLeg.manifest);
+  assert.equal(fixture.shards.at(-1).manifest.testStepOutcome, "success");
+  assert.equal(process.env.BROWSER_TEST_OUTCOME, "success");
+  assert.equal(process.env.BROWSER_TEST_EXIT_CODE, "0");
+  assert.deepEqual(await prepareReports(fixture.shardRoot, fixture.context, fixture.clientRoot), { copied: PROJECT_LEG_TOTAL, expected: PROJECT_LEG_TOTAL, partial: false });
   await assertRejectedGate(fixture, /MISSING_OR_FAILED_BROWSER_SHARD/);
 });
 
-test("prepareReports retains only valid nested blobs and marks partial diagnostics", async (t) => {
+test("prepareReports retains valid nested project blobs and marks sixteen-leg partial diagnostics", async (t) => {
   const fixture = await gateFixture(t);
   await writeFile(fixture.shards[1].blobPath, "corrupt blob");
   await saveJson(fixture.shards[2].manifestPath, { ...fixture.shards[2].manifest, runAttempt: "3" });
   await rm(fixture.shards[3].blobPath);
-  assert.deepEqual(await prepareReports(fixture.shardRoot, fixture.context, fixture.clientRoot), { copied: 1, expected: SHARD_TOTAL, partial: true });
-  assert.deepEqual(await readdir(join(fixture.clientRoot, "all-blob-reports")), ["shard-1.zip"]);
-  assert.deepEqual(await readFile(join(fixture.clientRoot, "all-blob-reports", "shard-1.zip")), fixture.shards[0].blob);
+  assert.deepEqual(await prepareReports(fixture.shardRoot, fixture.context, fixture.clientRoot), { copied: PROJECT_LEG_TOTAL - 3, expected: PROJECT_LEG_TOTAL, partial: true });
+  const valid = fixture.shards.filter((_, index) => ![1, 2, 3].includes(index));
+  const names = valid.map((shard) => `shard-${shard.shard}-${shard.project}.zip`);
+  assert.deepEqual((await readdir(join(fixture.clientRoot, "all-blob-reports"))).sort(), names.sort());
+  for (const shard of valid) {
+    assert.deepEqual(await readFile(join(fixture.clientRoot, "all-blob-reports", `shard-${shard.shard}-${shard.project}.zip`)), shard.blob);
+  }
   await assertRejectedGate(fixture, /SHARD_REPORT_CHECKSUM_MISMATCH/);
 });
 
@@ -686,7 +790,14 @@ test("verifyGate rejects corrupted bytes, stale bindings and changed shard evide
     ["stale manifest", (_, manifest) => { manifest.runAttempt = "3"; }, /BUILD_SOURCE_OR_RUN_MISMATCH/],
     ["wrong report shard", (report) => { report.config.shard.current = 2; }, /WRONG_BROWSER_SHARD/],
     ["wrong manifest shard", (_, manifest) => { manifest.shard = 2; }, /MISSING_OR_FAILED_BROWSER_SHARD/],
+    ["wrong manifest native shard", (_, manifest) => { manifest.nativeShard = 2; }, /MISSING_OR_FAILED_BROWSER_SHARD/],
+    ["wrong manifest project", (_, manifest) => { manifest.project = "firefox"; }, /MISSING_OR_FAILED_BROWSER_SHARD/],
+    ["wrong manifest kind", (_, manifest) => { manifest.kind = "browser-shard-result"; }, /MISSING_OR_FAILED_BROWSER_SHARD/],
+    ["wrong manifest partition strategy", (_, manifest) => { manifest.partitionStrategy = "project-as-shard"; }, /MISSING_OR_FAILED_BROWSER_SHARD/],
     ["manifest counts", (_, manifest) => { manifest.counts.total++; }, /BROWSER_SHARD_NOT_SUCCESSFUL/],
+    ["manifest duration", (_, manifest) => { manifest.durationMs++; }, /BROWSER_SHARD_NOT_SUCCESSFUL/],
+    ["manifest ok", (_, manifest) => { manifest.ok = false; }, /BROWSER_SHARD_NOT_SUCCESSFUL/],
+    ["manifest exit code", (_, manifest) => { manifest.exitCode = 1; }, /MISSING_OR_FAILED_BROWSER_SHARD/],
     ["unexpected execution", (report) => { Object.assign(testsOf(report)[0], { status: "unexpected", results: [attempt("failed")] }); updateStats(report); }, /BROWSER_SHARD_NOT_SUCCESSFUL/],
     ...["failure", "cancelled", "skipped"].map((outcome) => [outcome, (_, manifest) => { manifest.testStepOutcome = outcome; }, /MISSING_OR_FAILED_BROWSER_SHARD/]),
   ];
@@ -699,6 +810,259 @@ test("verifyGate rejects corrupted bytes, stale bindings and changed shard evide
     await writeFile(shard.reportPath, bytes); await saveJson(shard.manifestPath, shard.manifest);
     t.diagnostic(`case: ${name}`);
   }
+});
+test("cyclic fixture inventories partition every project and every outer shard", async (t) => {
+  const fixture = await buildFixture(t);
+  assert.equal(SPEC_DECLARATIONS.length, 8);
+  assert.deepEqual(SPEC_DECLARATIONS.slice(0, 2), [["renders preview", 4], ["exports selection", 9]]);
+  for (const [title, line] of SPEC_DECLARATIONS) {
+    assert.ok(SOURCE.split("\n")[line - 1].startsWith(`  test("${title}",`));
+  }
+  const full = flattenBrowserReport(fixture.inventory);
+  assert.equal(full.length, 32);
+  const legs = [];
+  for (let shard = 1; shard <= SHARD_TOTAL; shard++) {
+    for (const project of BROWSER_PROJECTS) {
+      const report = JSON.parse(await readFile(join(fixture.directory, `inventory-${shard}-${project}.json`), "utf8"));
+      assert.deepEqual(report.config.projects.map((entry) => entry.name), BROWSER_PROJECTS);
+      assert.deepEqual(report.config.shard, { current: nativeShardFor(shard, project), total: SHARD_TOTAL });
+      assert.equal(report.config.workers, 1);
+      const rows = flattenBrowserReport(report);
+      assert.equal(rows.length, 2);
+      assert.equal(rows.every((row) => row.project === project && row.results.length === 0), true);
+      legs.push({ shard, project, rows });
+    }
+  }
+  assert.equal(legs.length, PROJECT_LEG_TOTAL);
+  for (const project of BROWSER_PROJECTS) {
+    assert.doesNotThrow(() => assertShardPartition(full.filter((row) => row.project === project), legs.filter((leg) => leg.project === project).map((leg) => leg.rows)));
+  }
+  assert.doesNotThrow(() => assertShardPartition(full, Array.from({ length: SHARD_TOTAL }, (_, index) => legs.filter((leg) => leg.shard === index + 1).flatMap((leg) => leg.rows))));
+});
+
+test("sealBuild requires every named project inventory, mapped native shard and complete disjoint union", async (t) => {
+  const fixture = await buildFixture(t);
+  const sourceName = "inventory-1-firefox.json";
+  const cases = [
+    ["missing named project inventory", async (directory) => { await rm(join(directory, sourceName)); }, { code: "ENOENT" }],
+    ["wrong native shard", async (directory) => {
+      const report = projectShardReport(fixture.inventory, 1, "firefox"); report.config.shard.current = 1;
+      await saveJson(join(directory, sourceName), report);
+    }, /WRONG_BROWSER_SHARD/],
+    ["wrong selected project", async (directory) => {
+      const report = projectShardReport(fixture.inventory, 1, "firefox");
+      for (const entry of testsOf(report)) entry.projectName = "chromium";
+      await saveJson(join(directory, sourceName), report);
+    }, /BROWSER_PROJECT_SELECTION_MISMATCH/],
+    ["missing config projects", async (directory) => {
+      const report = projectShardReport(fixture.inventory, 1, "firefox");
+      report.config.projects = report.config.projects.filter((project) => project.name === "firefox");
+      await saveJson(join(directory, sourceName), report);
+    }, /BROWSER_PROJECT_INVENTORY_MISMATCH/],
+    ["project partition overlap", async (directory) => {
+      const report = projectShardReport(fixture.inventory, 2, "firefox");
+      report.config.shard.current = nativeShardFor(1, "firefox");
+      await saveJson(join(directory, sourceName), report);
+    }, /OVERLAPPING_BROWSER_SHARDS/],
+    ["project partition missing test", async (directory) => {
+      const report = projectShardReport(fixture.inventory, 1, "firefox"); specsOf(report).pop();
+      await saveJson(join(directory, sourceName), updateStats(report));
+    }, /BROWSER_TEST_INVENTORY_MISMATCH/],
+    ["empty project leg", async (directory) => {
+      const report = projectShardReport(fixture.inventory, 1, "firefox"); report.suites[0].suites[0].specs = [];
+      await saveJson(join(directory, sourceName), updateStats(report));
+    }, /EMPTY_BROWSER_INVENTORY/],
+  ];
+  for (const [index, [name, change, error]] of cases.entries()) {
+    const directory = join(fixture.root, `invalid-inventory-${index}`); await mkdir(directory);
+    for (const file of fixture.inventoryNames) await copyFile(join(fixture.directory, file), join(directory, file));
+    await change(directory);
+    await assert.rejects(() => sealBuild(directory, fixture.context, fixture.clientRoot), error, `case: ${name}`);
+    await assert.rejects(() => readFile(join(directory, "build-manifest.json")), { code: "ENOENT" });
+    t.diagnostic(`case: ${name}`);
+  }
+});
+
+test("verifyBuild requires cyclic strategy and sixteen inventory names even when files are rehashed", async (t) => {
+  const fixture = await buildFixture(t);
+  const manifest = await sealBuild(fixture.directory, fixture.context, fixture.clientRoot);
+  const manifestPath = join(fixture.directory, "build-manifest.json");
+  for (const strategy of [undefined, "project-as-shard", "browser-mock-preview-v1"]) {
+    const invalid = structuredClone(manifest);
+    if (strategy === undefined) delete invalid.partitionStrategy; else invalid.partitionStrategy = strategy;
+    await saveJson(manifestPath, invalid);
+    await assert.rejects(() => verifyBuild(fixture.directory, fixture.context, false, fixture.clientRoot), /INVALID_BUILD_MANIFEST/);
+  }
+  await saveJson(manifestPath, manifest);
+  for (const name of fixture.inventoryNames.slice(1)) {
+    const path = join(fixture.directory, name); const bytes = await readFile(path);
+    await writeFile(path, Buffer.concat([bytes, Buffer.from(" ")]));
+    await assert.rejects(() => verifyBuild(fixture.directory, fixture.context, false, fixture.clientRoot), /BUILD_CHECKSUM_OR_INVENTORY_MISMATCH/);
+    await writeFile(path, bytes);
+    await rm(path);
+    await saveJson(manifestPath, { ...manifest, files: manifest.files.filter((file) => file.path !== name) });
+    await assert.rejects(() => verifyBuild(fixture.directory, fixture.context, false, fixture.clientRoot), /INCOMPLETE_BROWSER_INVENTORY/);
+    await writeFile(path, bytes); await saveJson(manifestPath, manifest);
+  }
+  assert.equal((await verifyBuild(fixture.directory, fixture.context, false, fixture.clientRoot)).partitionStrategy, PARTITION_STRATEGY);
+});
+
+test("recordShard binds cyclic nonidentity native coordinates and rejects wrong outer or project arguments", async (t) => {
+  const fixture = await gateFixture(t, { record: false });
+  const leg = fixture.shards.find((shard) => shard.shard === 4 && shard.project === "firefox");
+  assert.equal(leg.nativeShard, 1);
+  assert.equal(leg.report.config.shard.current, 1);
+  for (const [outerShard, project, error] of [
+    [3, "firefox", /WRONG_BROWSER_SHARD/], [4, "chromium", /WRONG_BROWSER_SHARD/],
+    ["4", "firefox", /INVALID_SHARD_INDEX/], [4, "Firefox", /INVALID_BROWSER_PROJECT/],
+  ]) {
+    await assert.rejects(() => recordShard(leg.directory, fixture.directory, fixture.context, outerShard, project, fixture.clientRoot), error);
+    await assert.rejects(() => readFile(leg.manifestPath), { code: "ENOENT" });
+  }
+  const wrongNative = structuredClone(leg.report); wrongNative.config.shard.current = 4;
+  await saveJson(leg.reportPath, wrongNative);
+  await assert.rejects(() => recordShard(leg.directory, fixture.directory, fixture.context, 4, "firefox", fixture.clientRoot), /WRONG_BROWSER_SHARD/);
+  await saveJson(leg.reportPath, leg.report);
+  const manifest = await recordShard(leg.directory, fixture.directory, fixture.context, 4, "firefox", fixture.clientRoot);
+  assert.equal(manifest.shard, 4); assert.equal(manifest.nativeShard, 1); assert.equal(manifest.project, "firefox");
+});
+
+test("recordShard requires an actual bounded integer exit string coherent with the step outcome", async (t) => {
+  const fixture = await gateFixture(t, { record: false });
+  const leg = fixture.shards[0];
+  const cases = [
+    ["success", undefined], ["success", ""], ["success", "1"], ["failure", "0"],
+    ["failure", "-1"], ["failure", "256"], ["failure", "1.5"], ["failure", "NaN"],
+    ["success", "00"], ["success", " 0"], ["success", "0 "], ["success", "+0"],
+    ["success", "0\n"], ["failure", "0x1"], ["failure", "1e2"], ["failure", "9999999999999999999"],
+  ];
+  for (const [outcome, exitCode] of cases) {
+    process.env.BROWSER_TEST_OUTCOME = outcome;
+    if (exitCode === undefined) delete process.env.BROWSER_TEST_EXIT_CODE; else process.env.BROWSER_TEST_EXIT_CODE = exitCode;
+    await assert.rejects(() => recordShard(leg.directory, fixture.directory, fixture.context, leg.shard, leg.project, fixture.clientRoot), /BROWSER_EXIT_OUTCOME_MISMATCH/);
+    await assert.rejects(() => readFile(leg.manifestPath), { code: "ENOENT" });
+  }
+  for (const exitCode of ["1", "255"]) {
+    process.env.BROWSER_TEST_OUTCOME = "failure"; process.env.BROWSER_TEST_EXIT_CODE = exitCode;
+    const manifest = await recordShard(leg.directory, fixture.directory, fixture.context, leg.shard, leg.project, fixture.clientRoot);
+    assert.equal(manifest.exitCode, Number(exitCode)); assert.equal(manifest.testStepOutcome, "failure");
+    await rm(leg.manifestPath);
+  }
+  process.env.BROWSER_TEST_OUTCOME = "success"; process.env.BROWSER_TEST_EXIT_CODE = "0";
+  assert.equal((await recordShard(leg.directory, fixture.directory, fixture.context, leg.shard, leg.project, fixture.clientRoot)).exitCode, 0);
+  await assertNoGateSummary(fixture);
+});
+
+test("recordShard cannot overwrite an earlier failed leg with later passing reports", async (t) => {
+  const fixture = await gateFixture(t, { record: false });
+  const leg = fixture.shards[0];
+  Object.assign(testsOf(leg.report)[0], { status: "unexpected", results: [attempt("failed")] });
+  await saveJson(leg.reportPath, updateStats(leg.report));
+  process.env.BROWSER_TEST_OUTCOME = "failure"; process.env.BROWSER_TEST_EXIT_CODE = "1";
+  const failed = await recordShard(leg.directory, fixture.directory, fixture.context, leg.shard, leg.project, fixture.clientRoot);
+  const manifestBytes = await readFile(leg.manifestPath);
+  Object.assign(testsOf(leg.report)[0], { status: "expected", results: [attempt("passed")] });
+  await saveJson(leg.reportPath, updateStats(leg.report));
+  process.env.BROWSER_TEST_OUTCOME = "success"; process.env.BROWSER_TEST_EXIT_CODE = "0";
+  await assert.rejects(() => recordShard(leg.directory, fixture.directory, fixture.context, leg.shard, leg.project, fixture.clientRoot), { code: "EEXIST" });
+  assert.deepEqual(await readFile(leg.manifestPath), manifestBytes);
+  assert.equal(failed.testStepOutcome, "failure"); assert.equal(failed.ok, false); assert.equal(failed.exitCode, 1);
+  await assertRejectedGate(fixture, /MISSING_OR_FAILED_BROWSER_SHARD/);
+});
+
+test("missing one of sixteen project legs remains partial and cannot complete despite fifteen valid legs", async (t) => {
+  const fixture = await gateFixture(t);
+  const missing = fixture.shards.find((leg) => leg.shard === 3 && leg.project === "mobile-webkit");
+  await rm(missing.directory, { recursive: true });
+  assert.deepEqual(await prepareReports(fixture.shardRoot, fixture.context, fixture.clientRoot), { copied: PROJECT_LEG_TOTAL - 1, expected: PROJECT_LEG_TOTAL, partial: true });
+  assert.equal((await readdir(join(fixture.clientRoot, "all-blob-reports"))).length, PROJECT_LEG_TOTAL - 1);
+  await assertRejectedGate(fixture, { code: "ENOENT" });
+});
+
+test("gate binds each project inventory digest and rejects checksum, native and cross-project substitutions", async (t) => {
+  const fixture = await gateFixture(t);
+  const leg = fixture.shards[0];
+  const otherProject = fixture.shards[1];
+  const cases = [
+    ["missing inventory hash", (manifest) => { delete manifest.inventorySha256; }, /SHARD_INVENTORY_CHECKSUM_MISMATCH/],
+    ["other project inventory hash", (manifest) => { manifest.inventorySha256 = otherProject.manifest.inventorySha256; }, /SHARD_INVENTORY_CHECKSUM_MISMATCH/],
+    ["malformed inventory hash", (manifest) => { manifest.inventorySha256 = "x".repeat(64); }, /SHARD_INVENTORY_CHECKSUM_MISMATCH/],
+    ["wrong report digest", (manifest) => { manifest.reportSha256 = "0".repeat(64); }, /SHARD_REPORT_CHECKSUM_MISMATCH/],
+    ["wrong blob digest", (manifest) => { manifest.blobSha256 = "0".repeat(64); }, /SHARD_REPORT_CHECKSUM_MISMATCH/],
+    ["string native shard", (manifest) => { manifest.nativeShard = String(leg.nativeShard); }, /MISSING_OR_FAILED_BROWSER_SHARD/],
+    ["string exit code", (manifest) => { manifest.exitCode = "0"; }, /MISSING_OR_FAILED_BROWSER_SHARD/],
+  ];
+  for (const [name, change, error] of cases) {
+    const manifest = structuredClone(leg.manifest); change(manifest);
+    await saveJson(leg.manifestPath, manifest); await assertRejectedGate(fixture, error);
+    await saveJson(leg.manifestPath, leg.manifest); t.diagnostic(`case: ${name}`);
+  }
+  const report = structuredClone(leg.report);
+  for (const entry of testsOf(report)) entry.projectName = "firefox";
+  const reportBytes = JSON.stringify(report);
+  await writeFile(leg.reportPath, reportBytes);
+  await saveJson(leg.manifestPath, { ...leg.manifest, reportSha256: digest(reportBytes) });
+  await assertRejectedGate(fixture, /BROWSER_TEST_INVENTORY_MISMATCH/);
+});
+
+test("prepareReports rejects falsely routed project manifests without overwriting the collected directory", async (t) => {
+  const fixture = await gateFixture(t);
+  await saveJson(fixture.shards[1].manifestPath, { ...fixture.shards[1].manifest, nativeShard: 1 });
+  await saveJson(fixture.shards[2].manifestPath, { ...fixture.shards[2].manifest, project: "firefox" });
+  assert.deepEqual(await prepareReports(fixture.shardRoot, fixture.context, fixture.clientRoot), { copied: PROJECT_LEG_TOTAL - 2, expected: PROJECT_LEG_TOTAL, partial: true });
+  const firstPath = join(fixture.clientRoot, "all-blob-reports", "shard-1-chromium.zip");
+  const firstBytes = await readFile(firstPath);
+  await assert.rejects(() => prepareReports(fixture.shardRoot, fixture.context, fixture.clientRoot), { code: "EEXIST" });
+  assert.deepEqual(await readFile(firstPath), firstBytes);
+  await assertRejectedGate(fixture, /MISSING_OR_FAILED_BROWSER_SHARD/);
+});
+
+test("gate rejects static release or run substitution in reports, manifests, merged binding and artifact paths", async (t) => {
+  const fixture = await gateFixture(t);
+  const leg = fixture.shards[0];
+  for (const [key, value] of [["releaseSha", "d".repeat(40)], ["runId", "314160"], ["runAttempt", "3"]]) {
+    const report = structuredClone(leg.report); report.config.metadata[key] = value;
+    const bytes = JSON.stringify(report);
+    await writeFile(leg.reportPath, bytes); await saveJson(leg.manifestPath, { ...leg.manifest, reportSha256: digest(bytes) });
+    await assertRejectedGate(fixture, /BUILD_SOURCE_OR_RUN_MISMATCH/);
+    await saveJson(leg.reportPath, leg.report); await saveJson(leg.manifestPath, { ...leg.manifest, [key]: value });
+    await assertRejectedGate(fixture, /BUILD_SOURCE_OR_RUN_MISMATCH/);
+    await saveJson(leg.manifestPath, leg.manifest);
+    const merged = structuredClone(fixture.merged); merged.config.metadata[key] = value;
+    await saveJson(fixture.mergedPath, merged); await assertRejectedGate(fixture, /BUILD_SOURCE_OR_RUN_MISMATCH/);
+    await saveJson(fixture.mergedPath, fixture.merged);
+  }
+  const otherRoot = join(fixture.shardRoot, `browser-shard-${"d".repeat(40)}-${fixture.context.runId}-${fixture.context.runAttempt}-1`);
+  await rename(leg.artifactRoot, otherRoot);
+  await assertRejectedGate(fixture, { code: "ENOENT" });
+  await rename(otherRoot, leg.artifactRoot);
+});
+
+test("gate compares per-key retry statuses even when merged counters and final outcomes stay identical", async (t) => {
+  const fixture = await gateFixture(t);
+  const merged = structuredClone(fixture.merged);
+  const flaky = specsOf(merged)[1].tests[0];
+  assert.equal(flaky.results[0].status, "timedOut");
+  flaky.results = [attempt("failed"), attempt("timedOut", 1), attempt("passed", 2)];
+  await saveJson(fixture.mergedPath, updateStats(merged));
+  // Give a nonflaky merged test one fewer passing retry to preserve every aggregate count.
+  const passedLeg = fixture.shards.find((leg) => leg.shard === 2 && leg.project === "chromium");
+  const passedReport = structuredClone(passedLeg.report);
+  testsOf(passedReport)[0].results.push(attempt("passed", 1));
+  const passedBytes = JSON.stringify(updateStats(passedReport));
+  const assessed = assessBrowserResults(passedReport, flattenBrowserReport(projectShardReport(fixture.inventory, passedLeg.shard, passedLeg.project)), fixture.build.skipPolicies);
+  await writeFile(passedLeg.reportPath, passedBytes);
+  await saveJson(passedLeg.manifestPath, { ...passedLeg.manifest, reportSha256: digest(passedBytes), counts: assessed.counts });
+  await assertRejectedGate(fixture, /MERGED_BROWSER_TEST_OUTCOME_MISMATCH/);
+});
+
+test("gate compares exact per-key approved skip reasons rather than only skipped totals", async (t) => {
+  const fixture = await gateFixture(t);
+  const merged = structuredClone(fixture.merged);
+  const skipped = specsOf(merged)[0].tests.find((entry) => entry.projectName === "firefox");
+  skipped.annotations.push({ type: "skip", description: "Additional unsealed skip annotation" });
+  await saveJson(fixture.mergedPath, merged);
+  await assertRejectedGate(fixture, /MERGED_BROWSER_TEST_OUTCOME_MISMATCH/);
 });
 test("verifyGate requires successful upstream jobs even with complete valid evidence", async (t) => {
   const fixture = await gateFixture(t);

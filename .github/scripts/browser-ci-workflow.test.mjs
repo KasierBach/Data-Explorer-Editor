@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 // Read contracts only: never import the Playwright configs, start a server, or
-// execute the artifact CLI. Artifact/result rejection has its own unit suite.
+// execute the artifact CLI. Bounded Bash checks use builtins and stub functions
+// with an empty PATH; no real npx/node, reports, or filesystem writes run there.
+// Artifact/result rejection has its own unit suite.
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const serverRequire = createRequire(resolve(root, 'server/package.json'));
 const { load } = serverRequire('js-yaml');
@@ -20,6 +23,9 @@ const apiUrl = 'http://localhost:3001/api';
 const buildPath = '$RUNNER_TEMP/browser-build';
 const shardPath = '$RUNNER_TEMP/browser-shards';
 const runIdentity = '${{github.sha}}-${{github.run_id}}-${{github.run_attempt}}';
+const browserProjects = Object.freeze(['chromium', 'firefox', 'mobile-chrome', 'mobile-webkit']);
+// Independent oracle for all 16 native selectors, not an alternate workflow mapping.
+const cyclicNativeShards = [[1, 2, 3, 4], [2, 3, 4, 1], [3, 4, 1, 2], [4, 1, 2, 3]];
 const asArray = (value) => value === undefined ? [] : Array.isArray(value) ? value : [value];
 const sorted = (value) => [...asArray(value)].sort();
 const expressions = (value) => String(value ?? '').trim().replace(/\$\{\{\s*([\s\S]*?)\s*\}\}/g, (_, body) => `\${{${body.replace(/\s+/g, '')}}}`);
@@ -125,6 +131,96 @@ function config(path) {
   return { source, exported, call: exported.expression, object: exported.expression.arguments.at(-1) };
 }
 
+function shellLines(step) {
+  return step.run.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith('#'));
+}
+
+function fixedLoop(step, variable, values) {
+  const lines = shellLines(step);
+  const start = one(lines.map((line, index) => ({ index, words: words(line).map((word) => word.replace(/;$/, '')) }))
+    .filter((entry) => sequenceAt(entry.words, ['for', variable, 'in']) === 0), `${variable} loop`).index;
+  assert.deepEqual(words(lines[start]).map((word) => word.replace(/;$/, '')), ['for', variable, 'in', ...values, 'do'], 'Loop values must be fixed and complete');
+  let depth = 0;
+  for (let index = start; index < lines.length; index++) {
+    const tokens = words(lines[index]);
+    if (tokens[0] === 'for') depth++;
+    if (tokens[0] === 'done' && --depth === 0) return { lines, start, end: index };
+  }
+  assert.fail(`Unterminated ${variable} loop`);
+}
+
+function mappingAssignment(step, outer) {
+  const lines = shellLines(step);
+  const assignment = one(lines.map((line, index) => ({ line, index })).filter((entry) => entry.line.startsWith('native_shard=')), 'native shard assignment');
+  let expression = assignment.line.slice('native_shard='.length);
+  if (expression.startsWith('"') && expression.endsWith('"')) expression = expression.slice(1, -1);
+  assert.ok(expression.startsWith('$(') && expression.endsWith(')'), 'Use only the common mapping CLI, not independent YAML arithmetic');
+  assert.deepEqual(words(expression.slice(2, -1)), ['node', helper, 'shard-index', outer, '$project']);
+  return assignment.index;
+}
+
+function browserInvocation(job) {
+  const entry = command(job, 'playwright', 'test');
+  return { ...entry, words: words(entry.line.replace(/;\s*then\s*$/, '')) };
+}
+
+function stubRecipe(step, outer = 1, failedProject = '', recordFailure = '') {
+  const script = expressions(step.run).replaceAll('${{matrix.shardIndex}}', String(outer));
+  assert.ok(!script.includes('${{'), 'Runtime check requires a fully resolved matrix recipe');
+  const cases = cyclicNativeShards.flatMap((row, index) => row.map((native, ordinal) => `${index + 1}/${browserProjects[ordinal]}) native=${native} ;;`)).join('\n');
+  const result = spawnSync('bash', ['--noprofile', '--norc', '-c', `
+    set -euo pipefail
+    export PATH=
+    readonly RUNNER_TEMP=/browser-ci-workflow-no-files
+    readonly failed_project="$2" record_failure="$3"
+    mkdir() { [[ "$#" == 1 && "$1" == "$RUNNER_TEMP/browser-build" ]]; }
+    npx() {
+      [[ "$#" -ge 3 && "$1" == --no-install && "$2" == playwright && "$3" == test ]] || return 97
+      local arg previous='' selected=''
+      for arg in "$@"; do
+        if [[ "$previous" == --project ]]; then selected="$arg"; fi
+        case "$arg" in --project=*) selected="\${arg#*=}" ;; esac
+        previous="$arg"
+      done
+      printf 'test\\t%s\\t%s' "\${PLAYWRIGHT_JSON_OUTPUT_FILE-}" "\${PLAYWRIGHT_BLOB_OUTPUT_FILE-}"
+      printf '\\t%s' "$@"
+      printf '\\n'
+      if [[ -n "$failed_project" && "$selected" == "$failed_project" ]]; then return 7; fi
+    }
+    node() {
+      [[ "$1" == '${helper}' ]] || return 97
+      case "$2" in
+        shard-index)
+          [[ "$#" == 4 ]] || return 97
+          local native
+          case "$3/$4" in
+            ${cases}
+            *) return 97 ;;
+          esac
+          printf 'map\\t%s\\t%s\\t%s\\n' "$3" "$4" "$native" >&2
+          printf '%s\\n' "$native"
+          ;;
+        seal-build)
+          [[ "$#" == 3 && "$3" == "$RUNNER_TEMP/browser-build" ]] || return 97
+          printf 'seal\\t%s\\n' "$3"
+          ;;
+        record-shard)
+          [[ "$#" == 6 ]] || return 97
+          printf 'record\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "\${BROWSER_TEST_OUTCOME-}" "\${BROWSER_TEST_EXIT_CODE-}" "$3" "$4" "$5" "$6"
+          if [[ -n "$record_failure" && "$6" == "$record_failure" ]]; then return 9; fi
+          ;;
+        *) return 97 ;;
+      esac
+    }
+    eval "$1"
+  `, 'browser-ci-workflow', script, failedProject, recordFailure], {
+    cwd: root, env: { PATH: process.env.PATH ?? '' }, encoding: 'utf8', timeout: 10000, maxBuffer: 128 * 1024,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.signal, null, 'The bounded stub-only recipe must terminate');
+  return { status: result.status, events: result.stdout.trim().split(/\r?\n/).filter(Boolean).map((line) => line.split('\t')), mappings: result.stderr.trim().split(/\r?\n/).filter(Boolean).map((line) => line.split('\t')) };
+}
+
 const base = config('client/playwright.config.ts');
 const ci = config('client/playwright.ci.config.ts');
 const merge = config('client/playwright.merge.config.ts');
@@ -210,21 +306,55 @@ test('Client checks retain lint, full coverage, prerender and exactly one explic
   }
 });
 
-test('Four non-fail-fast browser shards run one worker and the complete default project selection', () => {
+test('Four non-fail-fast outer jobs run every fixed browser project sequentially using the common cyclic mapping', () => {
   const job = jobs['client-browser'];
   assert.deepEqual(job.strategy, { 'fail-fast': false, 'max-parallel': 4, matrix: { shardIndex: [1, 2, 3, 4] } });
   assert.deepEqual(asArray(job.needs), ['client-checks-build']);
   assert.equal(job.if, undefined);
-  const run = command(job, 'playwright', 'test');
+  const run = browserInvocation(job);
   requiredStep(run.step);
-  assert.ok(run.step.id, 'The test outcome must have a stable step identity');
-  assert.deepEqual(run.words.slice(0, 4), ['npx', '--no-install', 'playwright', 'test']);
-  assert.deepEqual(playwrightOptions(run), { config: 'playwright.ci.config.ts', shard: '${{matrix.shardIndex}}/4', workers: '1' });
+  assert.ok(run.step.id, 'The shared browser step must have a stable identity');
+  const loop = fixedLoop(run.step, 'project', browserProjects);
+  const mapped = mappingAssignment(run.step, '${{matrix.shardIndex}}');
+  const invoked = loop.lines.indexOf(run.line.trim());
+  assert.ok(loop.start < mapped && mapped < invoked && invoked < loop.end, 'Each project must map and run inside the sequential loop');
+  const runner = sequenceAt(run.words, ['npx', '--no-install', 'playwright', 'test']);
+  assert.ok(runner >= 0);
+  assert.deepEqual(playwrightOptions(run), { config: 'playwright.ci.config.ts', project: '$project', shard: '$native_shard/4', workers: '1', output: 'test-results/$project' }, 'Use native project/shard selectors only, without grep, positional narrowing or retry changes');
   const install = command(job, 'playwright', 'install');
   assert.deepEqual(install.words, ['npx', '--no-install', 'playwright', 'install', '--with-deps', 'chromium', 'firefox', 'webkit']);
   assert.ok(install.index < run.index);
   assert.equal(literal(property(ci.object, 'workers')), 1);
   assert.equal(jobs.client.strategy, undefined);
+});
+
+test('All four project legs share one required twenty-minute deadline inside the unchanged twenty-five-minute job', () => {
+  const job = jobs['client-browser'];
+  const run = browserInvocation(job);
+  assert.equal(job['timeout-minutes'], 25);
+  assert.equal(run.step['timeout-minutes'], 20, 'The GitHub Actions deadline covers the whole project loop, not twenty minutes per project');
+  assert.equal(run.step.shell, 'bash');
+  requiredStep(run.step);
+  const lines = shellLines(run.step);
+  assert.deepEqual(words(lines[0]), ['set', '-euo', 'pipefail']);
+  assert.equal(job.steps.filter((step) => matchingCommands({ steps: [step] }, 'playwright', 'test').length > 0).length, 1);
+  assert.ok(lines.every((line) => !line.includes('||') && !line.includes('&') && !words(line).includes('timeout') && !['break', 'continue', 'trap', 'set +e'].some((word) => line.startsWith(word))), 'No failure swallowing, background jobs, early loop exits or per-leg deadline resets');
+});
+
+test('Each browser project has distinct JSON, blob and test-results outputs within the unchanged outer upload roots', () => {
+  const job = jobs['client-browser'];
+  const run = browserInvocation(job);
+  const runner = sequenceAt(run.words, ['npx', '--no-install', 'playwright', 'test']);
+  assert.deepEqual(run.words.slice(0, runner), ['if', 'PLAYWRIGHT_JSON_OUTPUT_FILE=ci-results/$project/results.json', 'PLAYWRIGHT_BLOB_OUTPUT_FILE=ci-results/$project/blob-report.zip'], 'Reporter overrides must be scoped to each actual runner invocation');
+  assert.equal(playwrightOptions(run).output, 'test-results/$project');
+  for (const env of [job.env, run.step.env]) {
+    assert.equal(env?.PLAYWRIGHT_JSON_OUTPUT_FILE, undefined, 'A shared reporter file would overwrite previous projects');
+    assert.equal(env?.PLAYWRIGHT_BLOB_OUTPUT_FILE, undefined, 'A shared blob file would overwrite previous projects');
+  }
+  const upload = artifact(job, 'browser-shard');
+  assert.equal(condition(upload.if), 'always()');
+  assert.deepEqual(sorted(upload.with.path.trim().split(/\s+/)), ['client/ci-results/', 'client/test-results/']);
+  assert.equal(actions(job, 'actions/upload-artifact').length, 1, 'Keep four outer artifacts rather than creating sixteen matrix jobs or uploads');
 });
 
 test('CI inherits all four unchanged browser projects, default safety settings and browser typecheck coverage', () => {
@@ -269,30 +399,66 @@ test('CI inherits all four unchanged browser projects, default safety settings a
   assert.deepEqual(sorted(collected.map((call) => literal(call.arguments[0].arguments[1]))), ['e2e', 'full-stack']);
 });
 
-test('Every inventory is frozen from the same complete source selection before the build artifact is sealed', () => {
+test('The complete inventory and sixteen native project-leg inventories freeze before the same source-bound build is sealed', () => {
   const job = jobs['client-checks-build'];
   const inventories = matchingCommands(job, 'playwright', 'test');
-  assert.equal(inventories.length, 2, 'Freeze a full inventory and a four-way shard inventory loop, not a magic test count');
+  assert.equal(inventories.length, 2, 'Freeze one full list and a nested four-outer/four-project native list loop, not a magic test count');
   const options = inventories.map(playwrightOptions);
   for (const selection of options) {
     assert.equal(selection.list, true);
     assert.equal(selection.reporter, 'json');
     assert.ok(selection.workers === undefined || selection.workers === '1');
     assert.ok(selection.config === undefined || selection.config === 'playwright.ci.config.ts');
-    assert.ok(Object.keys(selection).every((key) => ['list', 'reporter', 'workers', 'config', 'shard'].includes(key)));
+    assert.ok(Object.keys(selection).every((key) => ['list', 'reporter', 'workers', 'config', 'project', 'shard'].includes(key)), 'No grep, test-name, retry or other inventory narrowing');
   }
+  assert.equal(options[0].project, undefined);
   assert.equal(options[0].shard, undefined);
-  assert.equal(options[1].shard, '$shard/4');
+  assert.equal(options[1].project, '$project');
+  assert.equal(options[1].shard, '$native_shard/4');
+  assert.equal(options[1].workers, '1');
   const seal = command(job, 'node', helper, 'seal-build');
   assert.ok(inventories.every((entry) => entry.index === seal.index));
-  assert.ok(seal.words.at(-1) === '$out');
-  const lines = commands({ steps: [seal.step] });
-  assert.ok(lines.some((entry) => entry.words.includes(`out=${buildPath}`)));
-  assert.ok(lines.some((entry) => entry.words.map((word) => word.replace(/;$/, '')).join(' ') === 'for shard in 1 2 3 4 do'));
-  assert.ok(inventories[0].words.includes('PLAYWRIGHT_JSON_OUTPUT_FILE=$out/inventory.json'));
-  assert.ok(inventories[1].words.includes('PLAYWRIGHT_JSON_OUTPUT_FILE=$out/inventory-$shard.json'));
+  assert.deepEqual(seal.words, ['node', helper, 'seal-build', '$out']);
+  const outer = fixedLoop(seal.step, 'shard', ['1', '2', '3', '4']);
+  const project = fixedLoop(seal.step, 'project', browserProjects);
+  const mapped = mappingAssignment(seal.step, '$shard');
+  const full = outer.lines.indexOf(inventories[0].line.trim());
+  const native = outer.lines.indexOf(inventories[1].line.trim());
+  assert.ok(full < outer.start && outer.start < project.start && project.start < mapped && mapped < native && native < project.end && project.end < outer.end, 'Every outer/project inventory must use its mapped native selector inside both fixed loops');
+  assert.ok(outer.end < outer.lines.indexOf(seal.line.trim()), 'Seal only after all sixteen leg inventories exist');
+  assert.ok(outer.lines.some((line) => words(line).includes(`out=${buildPath}`)));
+  for (const entry of inventories) assert.ok(sequenceAt(entry.words, ['npx', '--no-install', 'playwright', 'test']) > 0);
+  assert.deepEqual(inventories[0].words.slice(0, sequenceAt(inventories[0].words, ['npx'])), ['PLAYWRIGHT_JSON_OUTPUT_FILE=$out/inventory.json']);
+  assert.deepEqual(inventories[1].words.slice(0, sequenceAt(inventories[1].words, ['npx'])), ['PLAYWRIGHT_JSON_OUTPUT_FILE=$out/inventory-${shard}-${project}.json'], 'Use outer/project identity in the sealed filenames, not only the native index');
   assert.equal(seal.step.shell, 'bash');
-  assert.ok(lines.some((entry) => sequenceAt(entry.words, ['set', '-euo', 'pipefail']) === 0));
+  assert.deepEqual(words(outer.lines[0]), ['set', '-euo', 'pipefail']);
+  requiredStep(seal.step);
+});
+
+test('Stub-only inventory execution enumerates all sixteen native selectors and distinct frozen files before sealing', () => {
+  const seal = command(jobs['client-checks-build'], 'node', helper, 'seal-build');
+  const actual = stubRecipe(seal.step);
+  assert.equal(actual.status, 0);
+  const expected = [{ outer: null, project: null, native: null }, ...cyclicNativeShards.flatMap((row, index) => row.map((native, ordinal) => ({ outer: index + 1, project: browserProjects[ordinal], native })))];
+  const listed = actual.events.filter((event) => event[0] === 'test');
+  assert.equal(listed.length, 17, 'One full source inventory plus sixteen nonempty native project lists');
+  expected.forEach((leg, index) => {
+    const [kind, json, blob, ...argv] = listed[index];
+    assert.equal(kind, 'test');
+    assert.equal(json, `/browser-ci-workflow-no-files/browser-build/inventory${leg.outer === null ? '' : `-${leg.outer}-${leg.project}`}.json`);
+    assert.equal(blob, '');
+    assert.deepEqual(argv.slice(0, 3), ['--no-install', 'playwright', 'test']);
+    const selection = playwrightOptions({ words: argv });
+    assert.equal(selection.list, true);
+    assert.equal(selection.reporter, 'json');
+    assert.equal(selection.project, leg.project ?? undefined);
+    assert.equal(selection.shard, leg.native === null ? undefined : `${leg.native}/4`);
+    if (leg.outer !== null) assert.equal(selection.workers, '1');
+  });
+  assert.equal(new Set(listed.map((event) => event[1])).size, 17);
+  assert.deepEqual(actual.mappings, expected.slice(1).map((leg) => ['map', String(leg.outer), leg.project, String(leg.native)]));
+  assert.deepEqual(actual.events.at(-1), ['seal', '/browser-ci-workflow-no-files/browser-build']);
+  assert.equal(actual.events.length, 18, 'No alternate CLI or extra test pass may replace the frozen inventory');
 });
 
 test('Preview verifies the installed sealed source binding and never rebuilds or changes the mock API variant', () => {
@@ -358,21 +524,37 @@ test('Build and report artifacts are SHA/run/attempt scoped and downloads cannot
   assert.ok(Object.keys(reports.with).every((key) => ['pattern', 'path', 'merge-multiple'].includes(key)), 'No cross-repository, token, run-id or artifact-id fallback');
 });
 
-test('Each shard records its actual outcome with source-bound JSON/blob evidence and merge is diagnostics-only', () => {
+test('Each project leg records its actual exit and outcome inside the shared step before diagnostics-only merge', () => {
   const reporters = literal(property(ci.object, 'reporter'));
   assert.deepEqual(reporters, [['github'], ['json', { outputFile: 'ci-results/results.json' }], ['blob', { outputFile: 'ci-results/blob-report.zip' }]]);
   const job = jobs['client-browser'];
-  const run = command(job, 'playwright', 'test');
+  const run = browserInvocation(job);
   const record = command(job, 'node', helper, 'record-shard');
-  assert.ok(run.index < record.index);
-  assert.deepEqual(record.words, ['node', helper, 'record-shard', dirname(reporters[1][1].outputFile).replaceAll('\\', '/'), buildPath, '${{matrix.shardIndex}}']);
-  assert.equal(condition(record.step.if), `always()&&steps.${run.step.id}.outcome!='skipped'`);
-  assert.equal(expressions(record.step.env.BROWSER_TEST_OUTCOME), `\${{steps.${run.step.id}.outcome}}`);
+  assert.equal(record.index, run.index, 'Every project must record in-loop; a post-test step cannot recover individual exits');
+  assert.equal(record.step, run.step);
+  requiredStep(record.step);
+  assert.equal(record.step.env.BROWSER_TEST_OUTCOME, undefined, 'Record each invocation, not the eventual aggregate step outcome');
+  assert.equal(record.step.env.BROWSER_TEST_EXIT_CODE, undefined);
+  const recordWords = words(record.line.replace(/;\s*then\s*$/, ''));
+  assert.deepEqual(recordWords, ['if', '!', 'BROWSER_TEST_OUTCOME=$test_outcome', 'BROWSER_TEST_EXIT_CODE=$test_exit', 'node', helper, 'record-shard', 'ci-results/$project', buildPath, '${{matrix.shardIndex}}', '$project']);
+  const loop = fixedLoop(run.step, 'project', browserProjects);
+  const invoked = loop.lines.indexOf(run.line.trim());
+  const recorded = loop.lines.indexOf(record.line.trim());
+  assert.ok(invoked > loop.start && recorded > invoked && recorded < loop.end);
+  assert.deepEqual(loop.lines.slice(invoked + 1, recorded), ['test_exit=0', 'test_outcome=success', 'else', 'test_exit=$?', 'test_outcome=failure', 'failed=1', 'fi'], 'Capture the actual nonzero npx status before any later command can overwrite $?');
+  assert.deepEqual(loop.lines.slice(recorded + 1, loop.end), ['failed=1', 'fi'], 'A record error must fail the outer job without stopping later projects');
+  assert.deepEqual(loop.lines.slice(0, loop.start), ['set -euo pipefail', 'failed=0']);
+  assert.deepEqual(loop.lines.slice(loop.end + 1), ['exit "$failed"'], 'A later successful project cannot clear an earlier failure');
   const upload = artifact(job, 'browser-shard');
   assert.equal(condition(upload.if), 'always()');
   assert.deepEqual(sorted(upload.with.path.trim().split(/\s+/)), ['client/ci-results/', 'client/test-results/']);
-  assert.ok(read('.github/scripts/browser-ci-artifacts.mjs').includes('`browser-shard-${context.releaseSha}-${context.runId}-${context.runAttempt}-${shard}`, \'ci-results\''), 'Consumers must read the ci-results directory retained by the upload common ancestor');
   assert.ok(record.index < job.steps.indexOf(upload));
+  const artifactSource = parseSource('.github/scripts/browser-ci-artifacts.mjs');
+  const retainedPath = one(nodes(artifactSource, (node) => ts.isFunctionDeclaration(node) && node.name?.text === 'shardDirectory'), 'retained shard directory');
+  const joined = one(nodes(retainedPath, (node) => ts.isCallExpression(node) && member(node.expression) === 'join'), 'retained artifact path');
+  assert.equal(joined.arguments[1].getText(artifactSource), '`browser-shard-${context.releaseSha}-${context.runId}-${context.runAttempt}-${shard}`');
+  assert.equal(literal(joined.arguments[2]), 'ci-results');
+  assert.equal(member(joined.arguments[3]), 'project', 'Consumers must retain each project subdirectory under the outer artifact common ancestor');
   assert.equal(merge.call.arguments.length, 1);
   assert.deepEqual(merge.object.properties.map((entry) => entry.name.text), ['reporter']);
   assert.deepEqual(literal(property(merge.object, 'reporter')), [['html', { outputFolder: 'playwright-report', open: 'never' }], ['json', { outputFile: 'ci-results/merged-results.json' }]]);
@@ -382,6 +564,44 @@ test('Each shard records its actual outcome with source-bound JSON/blob evidence
   assert.deepEqual(merged.words, ['npx', '--no-install', 'playwright', 'merge-reports', '--config=playwright.merge.config.ts', 'all-blob-reports']);
   assert.ok(prepare.index < merged.index);
   assert.equal(matchingCommands(jobs.client, 'playwright', 'test').length, 0, 'The stable gate must not replace missing reports with a rerun');
+});
+
+test('Stub-only browser execution covers every cyclic native selector with separated evidence and coherent successful exits', () => {
+  const run = browserInvocation(jobs['client-browser']);
+  const selectors = [];
+  for (let outer = 1; outer <= 4; outer++) {
+    const actual = stubRecipe(run.step, outer);
+    assert.equal(actual.status, 0, `Outer job ${outer} must succeed only when all four test and record invocations succeed`);
+    assert.equal(actual.events.length, 8, 'Four sequential runner/record pairs, no parallel background work');
+    assert.deepEqual(actual.mappings, browserProjects.map((project, index) => ['map', String(outer), project, String(cyclicNativeShards[outer - 1][index])]));
+    browserProjects.forEach((project, index) => {
+      const native = cyclicNativeShards[outer - 1][index];
+      const [kind, json, blob, ...argv] = actual.events[index * 2];
+      assert.equal(kind, 'test');
+      assert.equal(json, `ci-results/${project}/results.json`);
+      assert.equal(blob, `ci-results/${project}/blob-report.zip`);
+      assert.deepEqual(argv, ['--no-install', 'playwright', 'test', '--config=playwright.ci.config.ts', `--project=${project}`, `--shard=${native}/4`, '--workers=1', `--output=test-results/${project}`]);
+      assert.deepEqual(actual.events[index * 2 + 1], ['record', 'success', '0', `ci-results/${project}`, '/browser-ci-workflow-no-files/browser-build', String(outer), project]);
+      selectors.push(`${project}:${native}`);
+    });
+  }
+  assert.equal(selectors.length, 16);
+  assert.equal(new Set(selectors).size, 16, 'Every project must cover native shards 1..4 exactly once across the four outer artifacts');
+});
+
+test('A failed early browser leg or record error cannot turn green after later passing projects', () => {
+  const run = browserInvocation(jobs['client-browser']);
+  for (const [failedProject, recordFailure] of [['chromium', ''], ['', 'chromium'], ['firefox', 'mobile-chrome']]) {
+    const actual = stubRecipe(run.step, 1, failedProject, recordFailure);
+    assert.equal(actual.status, 1, 'An ordinary runner failure or record error must survive to the final exit "$failed"');
+    assert.equal(actual.events.length, 8, 'A failed test or record call must not prevent later projects from producing evidence');
+    browserProjects.forEach((project, index) => {
+      assert.equal(actual.events[index * 2][0], 'test');
+      assert.deepEqual(actual.events[index * 2 + 1], ['record', project === failedProject ? 'failure' : 'success', project === failedProject ? '7' : '0', `ci-results/${project}`, '/browser-ci-workflow-no-files/browser-build', '1', project], 'Record the actual runner status, not the record status or aggregate step result');
+    });
+    assert.deepEqual(actual.events.at(-1).slice(0, 3), ['record', 'success', '0'], 'A later successful leg must not mask the earlier failure');
+    assert.equal(actual.mappings.length, 4);
+  }
 });
 
 test('Stable Client always runs an unskippable strict final gate with both producer results and complete report inputs', () => {

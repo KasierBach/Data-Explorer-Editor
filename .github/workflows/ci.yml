@@ -53,7 +53,10 @@ jobs:
           mkdir "$out"
           PLAYWRIGHT_JSON_OUTPUT_FILE="$out/inventory.json" npx --no-install playwright test --list --reporter=json
           for shard in 1 2 3 4; do
-            PLAYWRIGHT_JSON_OUTPUT_FILE="$out/inventory-$shard.json" npx --no-install playwright test --list --shard="$shard/4" --workers=1 --reporter=json
+            for project in chromium firefox mobile-chrome mobile-webkit; do
+              native_shard=$(node ../.github/scripts/browser-ci-artifacts.mjs shard-index "$shard" "$project")
+              PLAYWRIGHT_JSON_OUTPUT_FILE="$out/inventory-${shard}-${project}.json" npx --no-install playwright test --list --project="$project" --shard="$native_shard/4" --workers=1 --reporter=json
+            done
           done
           node ../.github/scripts/browser-ci-artifacts.mjs seal-build "$out"
       - name: Upload the sealed browser build
@@ -103,19 +106,30 @@ jobs:
       - name: Verify and install the browser build
         run: node ../.github/scripts/browser-ci-artifacts.mjs install-build "$RUNNER_TEMP/browser-build"
       - run: npx --no-install playwright install --with-deps chromium firefox webkit
-      - name: Run one complete browser shard
+      - name: Run four cyclic project shards
         id: browser-tests
+        timeout-minutes: 20
         shell: bash
         env:
           BROWSER_BUILD_ARTIFACT: ${{ runner.temp }}/browser-build
         run: |
           set -euo pipefail
-          npx --no-install playwright test --config=playwright.ci.config.ts --shard=${{ matrix.shardIndex }}/4 --workers=1
-      - name: Verify post-test build and record shard evidence
-        if: always() && steps.browser-tests.outcome != 'skipped'
-        env:
-          BROWSER_TEST_OUTCOME: ${{ steps.browser-tests.outcome }}
-        run: node ../.github/scripts/browser-ci-artifacts.mjs record-shard ci-results "$RUNNER_TEMP/browser-build" ${{ matrix.shardIndex }}
+          failed=0
+          for project in chromium firefox mobile-chrome mobile-webkit; do
+            native_shard=$(node ../.github/scripts/browser-ci-artifacts.mjs shard-index ${{ matrix.shardIndex }} "$project")
+            if PLAYWRIGHT_JSON_OUTPUT_FILE="ci-results/$project/results.json" PLAYWRIGHT_BLOB_OUTPUT_FILE="ci-results/$project/blob-report.zip" npx --no-install playwright test --config=playwright.ci.config.ts --project="$project" --shard="$native_shard/4" --workers=1 --output="test-results/$project"; then
+              test_exit=0
+              test_outcome=success
+            else
+              test_exit=$?
+              test_outcome=failure
+              failed=1
+            fi
+            if ! BROWSER_TEST_OUTCOME="$test_outcome" BROWSER_TEST_EXIT_CODE="$test_exit" node ../.github/scripts/browser-ci-artifacts.mjs record-shard "ci-results/$project" "$RUNNER_TEMP/browser-build" ${{ matrix.shardIndex }} "$project"; then
+              failed=1
+            fi
+          done
+          exit "$failed"
       - name: Upload this shard's reports
         if: always()
         uses: actions/upload-artifact@v6
