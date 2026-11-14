@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import childProcess, { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import fs from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -110,6 +112,61 @@ test('server artifact helper exports the required pure API', () => {
 });
 
 if (api) {
+  test('accepts Prisma-generated field-alignment normalization while binding the exact raw checkout schema', async (t) => {
+    const f = await fixture(t);
+    // Mirrors the real Prisma 6.19.3 source/generated difference: whitespace, not schema drift.
+    const source = 'model FixtureRecord {\n  id String @id\n  environment String?   @default("none")\n}\n';
+    const generated = 'model FixtureRecord {\n  id          String  @id\n  environment String? @default("none")\n}\n';
+    assert.notEqual(hash(source), hash(generated));
+    await fs.writeFile(join(f.serverRoot, 'prisma/schema.prisma'), source);
+    await fs.writeFile(join(f.generated, 'schema.prisma'), generated);
+    f.context.schemaSha256 = hash(source);
+    const formatter = join(f.serverRoot, 'node_modules/prisma/build/index.js');
+    await fs.mkdir(dirname(formatter), { recursive: true });
+    await fs.writeFile(formatter, INERT); // Never execute dependency/artifact code in this unit test.
+    const formattedPaths = [];
+    let expectedSource = source;
+    const originalExec = childProcess.execFileSync;
+    const mock = t.mock.method(childProcess, 'execFileSync', (command, args, options) => {
+      if (command === 'git') return originalExec(command, args, options);
+      assert.equal(command, process.execPath);
+      assert.deepEqual(args.slice(0, 3), [formatter, 'format', '--schema']);
+      assert.equal(args.length, 4);
+      assert.equal(options.cwd, dirname(args[3]));
+      assert.notEqual(resolve(options.cwd), resolve(f.serverRoot));
+      assert.ok(resolve(options.cwd).startsWith(resolve(tmpdir())));
+      assert.equal(readFileSync(args[3], 'utf8'), readFileSync(join(f.serverRoot, 'prisma/schema.prisma'), 'utf8'));
+      assert.notEqual(resolve(args[3]), resolve(join(f.generated, 'schema.prisma')));
+      assert.equal(readFileSync(join(f.serverRoot, 'prisma/schema.prisma'), 'utf8'), expectedSource);
+      assert.equal(options.env.CI, 'true');
+      assert.ok(Object.keys(options.env).every((key) => /^(?:PATH|PATHEXT|SYSTEMROOT|COMSPEC|TEMP|TMP|TMPDIR|HOME|USERPROFILE|LOCALAPPDATA|APPDATA|CI|PRISMA_HIDE_UPDATE_MESSAGE|CHECKPOINT_DISABLE)$/i.test(key)));
+      for (const key of ['DATABASE_URL', 'OPENAI_API_KEY', 'GOOGLE_API_KEY', 'NODE_OPTIONS']) assert.equal(options.env[key], undefined);
+      formattedPaths.push(args[3]);
+      writeFileSync(args[3], generated);
+      return '';
+    });
+    syncBuiltinESMExports();
+    t.after(() => { mock.mock.restore(); syncBuiltinESMExports(); });
+    await temporaryEnv({ DATABASE_URL: 'inert-unit-marker', OPENAI_API_KEY: 'inert-unit-marker', GOOGLE_API_KEY: 'inert-unit-marker', NODE_OPTIONS: '--trace-warnings' }, async () => {
+      const sealed = await api.sealServerBuild(f.artifact, f.context, f.serverRoot);
+      assert.equal(sealed.schemaSha256, hash(source));
+      assert.notEqual(sealed.schemaSha256, hash(generated));
+      assert.deepEqual(await api.verifyServerBuild(f.artifact, f.context, false, f.serverRoot), sealed);
+      await fs.rm(join(f.serverRoot, 'dist'), { recursive: true });
+      await api.installServerBuild(f.artifact, f.context, f.serverRoot);
+      assert.equal((await api.verifyServerBuild(f.artifact, f.context, true, f.serverRoot)).schemaSha256, hash(source));
+      await fs.writeFile(join(f.generated, 'schema.prisma'), generated.replace('@default("none")', '@default("other")'));
+      await assert.rejects(api.verifyServerBuild(f.artifact, f.context, true, f.serverRoot), /GENERATED_PRISMA_SCHEMA_MISMATCH/);
+      await fs.writeFile(join(f.generated, 'schema.prisma'), generated);
+      expectedSource = `${source}\n`;
+      await fs.writeFile(join(f.serverRoot, 'prisma/schema.prisma'), expectedSource);
+      await assert.rejects(api.verifyServerBuild(f.artifact, f.context, true, f.serverRoot), /SERVER_DEPENDENCY_OR_SCHEMA_MISMATCH/);
+    });
+    assert.equal(formattedPaths.length, 8);
+    assert.equal(new Set(formattedPaths).size, formattedPaths.length);
+    for (const path of formattedPaths) await assert.rejects(fs.lstat(dirname(path)), { code: 'ENOENT' });
+  });
+
   test('seals complete emitted JS/maps/declarations, excludes build info, installs and rehashes without executing code', async (t) => {
     const f = await fixture(t);
     const sealed = await api.sealServerBuild(f.artifact, f.context, f.serverRoot);

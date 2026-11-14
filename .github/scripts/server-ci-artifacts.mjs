@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseBrowserJson } from './browser-ci-artifacts.mjs';
@@ -71,6 +72,25 @@ async function boundedBytes(path, maximum = FILE_LIMIT) {
 
 const readJson = async (path) => parseBrowserJson((await boundedBytes(path, JSON_LIMIT)).toString('utf8'));
 
+async function generatedSchemaMatches(serverRoot, schema, generated) {
+  if (hash(schema) === hash(generated)) return true;
+  const formatter = join(serverRoot, 'node_modules/prisma/build/index.js');
+  const directory = await fs.mkdtemp(join(tmpdir(), 'server-schema-format-'));
+  const path = join(directory, 'schema.prisma');
+  try {
+    check((await boundedBytes(formatter)).length > 0, 'GENERATED_PRISMA_SCHEMA_MISMATCH');
+    await fs.writeFile(path, schema, { flag: 'wx', mode: 0o600 });
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => /^(?:PATH|PATHEXT|SYSTEMROOT|COMSPEC|TEMP|TMP|TMPDIR|HOME|USERPROFILE|LOCALAPPDATA|APPDATA)$/i.test(key)));
+    Object.assign(env, { CI: 'true', PRISMA_HIDE_UPDATE_MESSAGE: 'true', CHECKPOINT_DISABLE: '1' });
+    execFileSync(process.execPath, [formatter, 'format', '--schema', path], { cwd: directory, env, timeout: 15000, maxBuffer: 1024 * 1024, stdio: 'pipe' });
+    return hash(await boundedBytes(path)) === hash(generated);
+  } catch { return false; }
+  finally {
+    try { await fs.unlink(path); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    await fs.rmdir(directory);
+  }
+}
+
 async function serverPrerequisites(serverRoot) {
   await checkedDirectory(serverRoot);
   try {
@@ -90,7 +110,7 @@ async function serverPrerequisites(serverRoot) {
   check((await boundedBytes(join(modules, '@prisma/client/runtime/client.js'))).length > 0, 'GENERATED_PRISMA_FILE_EMPTY');
   check((await readJson(join(generated, 'package.json'))).version === prismaClientVersion, 'GENERATED_PRISMA_VERSION_MISMATCH');
   const schemaSha256 = hash(schema);
-  check(hash(await boundedBytes(join(generated, 'schema.prisma'))) === schemaSha256, 'GENERATED_PRISMA_SCHEMA_MISMATCH');
+  check(await generatedSchemaMatches(serverRoot, schema, await boundedBytes(join(generated, 'schema.prisma'))), 'GENERATED_PRISMA_SCHEMA_MISMATCH');
   return { packageSha256: hash(pkg), lockSha256: hash(lock), schemaSha256, prismaVersion, prismaClientVersion };
 }
 
