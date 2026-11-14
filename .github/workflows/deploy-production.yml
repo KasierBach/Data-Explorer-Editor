@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: production-backend
@@ -26,15 +27,48 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 22
       - name: Validate deploy automation
-        run: node --test .github/scripts/deploy-render.test.mjs
+        run: node --test .github/scripts/deploy-render.test.mjs .github/scripts/deployment-policy.test.mjs
+      - name: Decide whether production needs this verified source
+        id: deployment-policy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL || 'https://data-explorer-editor-9v55.onrender.com' }}
+          FORCE_DEPLOY: ${{ vars.FORCE_BACKEND_DEPLOY }}
+        run: node .github/scripts/deployment-policy.mjs decide backend "$RUNNER_TEMP/deployment-policy"
+      - name: Publish the deployment decision
+        uses: actions/upload-artifact@v6
+        with:
+          name: deployment-decision-backend-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/deployment-policy/decision.json
+          if-no-files-found: error
+          retention-days: 90
       - name: Deploy exact commit and verify readiness
+        id: actual-deployment
+        if: steps.deployment-policy.outputs.decision == 'deploy'
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
           PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL || 'https://data-explorer-editor-9v55.onrender.com' }}
           RENDER_DEPLOY_TIMEOUT_MS: ${{ vars.RENDER_DEPLOY_TIMEOUT_MS || '2700000' }}
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
         run: node .github/scripts/deploy-render.mjs
+      - name: Record actual successful backend deployment
+        id: deployment-receipt
+        if: steps.deployment-policy.outputs.decision == 'deploy' && steps.actual-deployment.outcome == 'success'
+        env:
+          PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL || 'https://data-explorer-editor-9v55.onrender.com' }}
+          DEPLOYMENT_URL: ${{ vars.PRODUCTION_API_URL || 'https://data-explorer-editor-9v55.onrender.com' }}
+        run: node .github/scripts/deployment-policy.mjs record backend "$RUNNER_TEMP/deployment-policy"
+      - name: Publish actual successful backend receipt
+        if: steps.deployment-policy.outputs.decision == 'deploy' && steps.actual-deployment.outcome == 'success' && steps.deployment-receipt.outcome == 'success'
+        uses: actions/upload-artifact@v6
+        with:
+          name: actual-deployment-backend-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/deployment-policy/receipt.json
+          if-no-files-found: error
+          retention-days: 90
