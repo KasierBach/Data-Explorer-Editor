@@ -191,6 +191,15 @@ test("flattens to stable sorted identities despite report ordering, root and opa
   assert.deepEqual(rows.map((row) => row.key), rows.map((row) => row.key).sort((a, b) => a.localeCompare(b)));
 });
 
+test("accepts merged JSON without opaque project IDs while retaining stable identities", () => {
+  const report = browserReport();
+  const expected = flattenBrowserReport(report);
+  for (const entry of testsOf(report)) delete entry.projectId;
+  assert.deepEqual(flattenBrowserReport(report), expected);
+  testsOf(report)[0].projectId = 7;
+  assert.throws(() => flattenBrowserReport(report), /INVALID_BROWSER_TEST/);
+});
+
 test("distinguishes projects, specs, suite paths and source locations", () => {
   const baseline = keysOf(browserReport(["chromium"]));
   for (const patch of [{ file: "nested/preview.spec.ts" }, { line: 5 }, { column: 4 }, { title: "another preview" }]) {
@@ -492,6 +501,7 @@ async function gateFixture(t, { record = true } = {}) {
     }
   }
   Object.assign(specsOf(merged)[1].tests[0], { status: "flaky", results: [attempt("timedOut"), attempt("passed", 1)] });
+  for (const entry of testsOf(merged)) delete entry.projectId;
   updateStats(merged);
   merged.stats.duration *= SHARD_TOTAL;
   await saveJson(mergedPath, merged);

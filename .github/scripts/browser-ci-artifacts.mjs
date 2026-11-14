@@ -160,7 +160,7 @@ export function flattenBrowserReport(report) {
       const file = safeRelative(spec.file.replaceAll('\\', '/'));
       requireValue(/\.spec\.ts$/.test(file), 'INVALID_BROWSER_TEST_FILE');
       for (const test of spec.tests) {
-        requireValue(BROWSER_PROJECTS.includes(test.projectName) && typeof test.projectId === 'string' && Array.isArray(test.results) && Array.isArray(test.annotations), 'INVALID_BROWSER_TEST');
+        requireValue(BROWSER_PROJECTS.includes(test.projectName) && (test.projectId === undefined || typeof test.projectId === 'string') && Array.isArray(test.results) && Array.isArray(test.annotations), 'INVALID_BROWSER_TEST');
         const key = hash(JSON.stringify([test.projectName, file, spec.line, spec.column, path, spec.title]));
         requireValue(!keys.has(key), 'DUPLICATE_BROWSER_TEST'); keys.add(key);
         rows.push({ key, file, line: spec.line, column: spec.column, project: test.projectName, expectedStatus: test.expectedStatus, status: test.status, results: test.results, annotations: test.annotations });
