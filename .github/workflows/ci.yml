@@ -205,6 +205,8 @@ jobs:
       AI_EVAL_RUNNER_CONTAINER: ai-eval-ci-${{ github.run_id }}-${{ github.run_attempt }}-eval-runner-1
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -218,13 +220,15 @@ jobs:
           NPM_AUDIT_ALLOW_GHSA: GHSA-GGR8-5VV4-36MX
       - run: npm run prisma:generate
       - run: npm run typecheck
-      - run: node --test scripts/prisma-generate-safe.test.mjs test/ai-execution-ledger-worker.test.cjs scripts/ai-eval/native-replay.test.mjs scripts/ai-eval/model-role-assessment.test.mjs scripts/ai-eval/model-native-worker.test.mjs test/ai-model-role-adapter.test.cjs test/ai-model-role-live.test.cjs test/ai-model-role-runner.test.cjs test/ai-provider-model-catalog.test.cjs test/ai-provider-model-live-runner.test.cjs ../.github/scripts/browser-ci-workflow.test.mjs
+      - run: node --test scripts/prisma-generate-safe.test.mjs test/ai-execution-ledger-worker.test.cjs scripts/ai-eval/native-replay.test.mjs scripts/ai-eval/model-role-assessment.test.mjs scripts/ai-eval/model-native-worker.test.mjs test/ai-model-role-adapter.test.cjs test/ai-model-role-live.test.cjs test/ai-model-role-runner.test.cjs test/ai-provider-model-catalog.test.cjs test/ai-provider-model-live-runner.test.cjs ../.github/scripts/browser-ci-workflow.test.mjs ../.github/scripts/server-ci-artifacts.test.mjs ../.github/scripts/deployment-policy.test.mjs ../.github/scripts/deployment-policy-cli.test.mjs
       - name: Start owned PostgreSQL, Redis, MongoDB and MySQL fixtures
         run: docker compose -f test/compose.e2e.yml -f test/compose.r03.yml up -d --wait
       - run: npx prisma migrate deploy
       - run: npm run lint
       - run: npm run test:cov
       - run: npm run build
+      - name: Seal the full-stack server build
+        run: node ../.github/scripts/server-ci-artifacts.mjs seal-build "$RUNNER_TEMP/server-build"
       - name: Start network-isolated native evaluation fixtures
         id: native-eval-fixtures
         timeout-minutes: 4
@@ -267,6 +271,14 @@ jobs:
           set -euo pipefail
           project="ai-eval-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           docker compose --project-name "$project" -f test/compose.ai-eval.yml down --volumes --remove-orphans
+      - name: Upload the verified full-stack server build
+        uses: actions/upload-artifact@v6
+        with:
+          name: server-build-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/server-build/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
 
   full-stack:
     name: Full-stack browser
@@ -279,6 +291,8 @@ jobs:
       COMPOSE_PROJECT_NAME: data-explorer-browser-${{ github.run_id }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -290,7 +304,15 @@ jobs:
         working-directory: server
       - run: npm ci
         working-directory: client
-      - run: npm run build
+      - run: npm run prisma:generate
+        working-directory: server
+      - name: Download the same-run server build
+        uses: actions/download-artifact@v6
+        with:
+          name: server-build-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/server-build
+      - name: Verify and install the full-stack server build
+        run: node ../.github/scripts/server-ci-artifacts.mjs install-build "$RUNNER_TEMP/server-build"
         working-directory: server
       - run: npm run typecheck:browser
         working-directory: client
@@ -306,6 +328,9 @@ jobs:
           set -euo pipefail
           npm run test:full-stack 2>&1 | tee full-stack.log
         working-directory: client
+      - name: Verify the post-test server build
+        run: node ../.github/scripts/server-ci-artifacts.mjs verify-installed-build "$RUNNER_TEMP/server-build"
+        working-directory: server
       - name: Capture fixture logs
         if: always()
         run: docker compose -f server/test/compose.e2e.yml logs --no-color > fixture-browser.log

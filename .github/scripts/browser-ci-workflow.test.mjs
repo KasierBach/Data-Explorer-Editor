@@ -19,6 +19,11 @@ const workflow = load(read('.github/workflows/ci.yml'));
 const jobs = workflow.jobs;
 const browserJobIds = ['client-checks-build', 'client-browser', 'client'];
 const helper = '../.github/scripts/browser-ci-artifacts.mjs';
+const serverHelper = '../.github/scripts/server-ci-artifacts.mjs';
+const serverBuildPath = '$RUNNER_TEMP/server-build';
+const deploymentPolicy = '.github/scripts/deployment-policy.mjs';
+const deploymentPath = '$RUNNER_TEMP/deployment-policy';
+const deploymentWorkflows = [['.github/workflows/deploy-production.yml', 'backend', 'deploy-render.mjs'], ['.github/workflows/deploy-frontend.yml', 'frontend', 'vercel@59.6.2']];
 const apiUrl = 'http://localhost:3001/api';
 const buildPath = '$RUNNER_TEMP/browser-build';
 const shardPath = '$RUNNER_TEMP/browser-shards';
@@ -741,12 +746,181 @@ test('Full-stack remains a one-worker Client/Server dependent gate and container
   assert.ok(scans.every((step) => containers.steps.indexOf(step) < publish.index));
 });
 
+test('Server seals one compiled dist and publishes only after successful E2E and ownership-aware cleanup', () => {
+  const job = jobs.server;
+  const build = command(job, 'npm', 'run', 'build');
+  assert.deepEqual(build.words, ['npm', 'run', 'build']);
+  requiredStep(build.step);
+  const seal = command(job, 'node', serverHelper, 'seal-build');
+  assert.deepEqual(seal.words, ['node', serverHelper, 'seal-build', serverBuildPath]);
+  assert.equal(workingDirectory(job, seal.step), 'server');
+  requiredStep(seal.step);
+  assert.equal(seal.step.run.trim().split(/\r?\n/).length, 1, 'No failed seal fallback may become a consumable artifact');
+  assert.equal(action(job, 'actions/checkout').with['persist-credentials'], false);
+  assert.equal(seal.index, build.index + 1, 'Seal the successful Server build before running later fixtures');
+  const upload = artifact(job, 'server-build');
+  requiredStep(upload);
+  assert.deepEqual(Object.fromEntries(Object.entries(upload.with).map(([key, value]) => [key, key === 'name' ? expressions(value) : key === 'path' ? runtimePath(value) : value])), {
+    name: `server-build-${runIdentity}`, path: serverBuildPath, 'include-hidden-files': true,
+    'if-no-files-found': 'error', 'retention-days': 7,
+  });
+  assert.equal(job.steps.at(-1), upload, 'A failed E2E or cleanup must never publish consumable Server dist');
+  const e2e = command(job, 'npm', 'run', 'test:e2e');
+  const cleanup = command(job, 'docker', 'compose', '--project-name', '$project', '-f', 'test/compose.ai-eval.yml', 'down');
+  const remove = command(job, 'docker', 'compose', '-f', 'test/compose.e2e.yml', '-f', 'test/compose.r03.yml', 'down');
+  assert.ok(seal.index < e2e.index && e2e.index < cleanup.index && e2e.index < remove.index);
+  for (const step of [e2e.step, cleanup.step, remove.step]) assert.ok(step['continue-on-error'] === undefined || step['continue-on-error'] === false);
+  const offline = command(job, 'node', '--test');
+  assert.ok(offline.words.includes('../.github/scripts/server-ci-artifacts.test.mjs'), 'The sealed artifact rejection suite must remain registered');
+  assert.equal(actions(job, 'actions/download-artifact').length, 0, 'The producer must compile its own dist rather than consume a cached artifact');
+});
+
+test('Full-stack consumes the exact Server artifact after generation instead of compiling Server again', () => {
+  const job = jobs['full-stack'];
+  assert.equal(action(job, 'actions/checkout').with['persist-credentials'], false);
+  const serverCommands = commands(job).filter((entry) => workingDirectory(job, entry.step) === 'server');
+  assert.equal(serverCommands.filter((entry) => sequenceAt(entry.words, ['npm', 'run', 'build']) >= 0).length, 0, 'Full-stack must reuse Server dist, never rebuild it');
+  assert.equal(serverCommands.filter((entry) => /\b(?:nest\s+build|tsc|npm\s+(?:exec|run)\s+build(?::[\w-]+)?)\b/.test(entry.line)).length, 0, 'No alternate Server compiler or build fallback');
+  const installs = matchingCommands(job, 'npm', 'ci');
+  assert.equal(installs.length, 2);
+  assert.deepEqual(installs.map((entry) => workingDirectory(job, entry.step)).sort(), ['client', 'server']);
+  for (const entry of installs) { requiredStep(entry.step); assert.deepEqual(entry.words, ['npm', 'ci']); }
+  const generate = command(job, 'npm', 'run', 'prisma:generate');
+  assert.deepEqual(generate.words, ['npm', 'run', 'prisma:generate']);
+  assert.equal(workingDirectory(job, generate.step), 'server');
+  requiredStep(generate.step);
+  const download = action(job, 'actions/download-artifact');
+  assert.deepEqual(Object.fromEntries(Object.entries(download.with).map(([key, value]) => [key, key === 'path' ? runtimePath(value) : expressions(value)])), {
+    name: `server-build-${runIdentity}`, path: serverBuildPath,
+  });
+  requiredStep(download);
+  const install = command(job, 'node', serverHelper, 'install-build');
+  assert.deepEqual(install.words, ['node', serverHelper, 'install-build', serverBuildPath]);
+  assert.equal(workingDirectory(job, install.step), 'server');
+  requiredStep(install.step);
+  const typecheck = command(job, 'npm', 'run', 'typecheck:browser');
+  assert.ok(installs.every((entry) => entry.index < generate.index));
+  assert.ok(generate.index < install.index && job.steps.indexOf(download) < install.index && install.index < typecheck.index);
+  const run = command(job, 'npm', 'run', 'test:full-stack');
+  const verify = command(job, 'node', serverHelper, 'verify-installed-build');
+  assert.deepEqual(verify.words, ['node', serverHelper, 'verify-installed-build', serverBuildPath]);
+  assert.equal(workingDirectory(job, verify.step), 'server');
+  requiredStep(verify.step);
+  assert.equal(verify.index, run.index + 1, 'Check exact installed dist immediately after full-stack success, before any diagnostic uploads or cleanup');
+  assert.ok(actions(job, 'actions/upload-artifact').every((step) => verify.index < job.steps.indexOf(step)));
+  for (const entry of [generate, install, verify]) assert.equal(entry.step.run.trim().split(/\r?\n/).length, 1, 'No swallowed exit, alternative compilation, fallback or background install');
+  const migrations = command(job, 'npx', 'prisma', 'migrate', 'deploy');
+  assert.deepEqual(migrations.words, ['npx', 'prisma', 'migrate', 'deploy']);
+  assert.equal(workingDirectory(job, migrations.step), 'server');
+  requiredStep(migrations.step);
+  assert.ok(install.index < migrations.index && migrations.index < run.index);
+  assert.deepEqual(literal(property(fullStack.object, 'webServer')), [
+    { command: 'node ../server/test/full-stack-server.cjs', url: 'http://127.0.0.1:3001/api/health', reuseExistingServer: false, timeout: 180000, gracefulShutdown: { signal: 'SIGTERM', timeout: 10000 } },
+    { env: { VITE_API_URL: 'http://127.0.0.1:3001/api' }, command: 'npm run dev -- --host 127.0.0.1 --port 4173', url: 'http://127.0.0.1:4173', reuseExistingServer: false, timeout: 180000 },
+  ], 'Keep separate full-stack application fixtures, not the mock browser build');
+  const fixture = parseSource('server/test/full-stack-server.cjs');
+  const dist = one(nodes(fixture, (node) => ts.isCallExpression(node) && member(node.expression) === 'require' && node.arguments[0]?.text === '../dist/src/main.js'), 'compiled full-stack Server fixture');
+  assert.equal(literal(dist.arguments[0]), '../dist/src/main.js');
+});
+
+test('Production decisions use read-only Actions authority before any positively guarded provider steps', () => {
+  for (const [path, target, provider] of deploymentWorkflows) {
+    const deployment = load(read(path));
+    assert.deepEqual(deployment.permissions, { contents: 'read', actions: 'read' });
+    assert.ok(stringValues(deployment.env).every((value) => !value.includes('secrets.')));
+    const job = Object.values(deployment.jobs)[0];
+    assert.equal(job.permissions, undefined, 'The job must not widen read-only history authority');
+    assert.ok(job['continue-on-error'] === undefined || job['continue-on-error'] === false);
+    assert.ok(stringValues(job.env).every((value) => !value.includes('secrets.')), 'Provider secrets must not be acquired at job scope');
+    const policy = one(job.steps.filter((step) => step.id === 'deployment-policy'), `${target} policy step`);
+    requiredStep(policy);
+    assert.equal(expressions(policy.env.GH_TOKEN), '${{secrets.GITHUB_TOKEN}}');
+    assert.ok(policy.env.PRODUCTION_API_URL.includes('vars.PRODUCTION_API_URL'));
+    assert.ok(Object.keys(policy.env).every((key) => ['GH_TOKEN', 'PRODUCTION_API_URL', 'FORCE_DEPLOY'].includes(key)), 'Decision validation runs without provider secrets');
+    if (policy.env.FORCE_DEPLOY !== undefined) assert.match(expressions(policy.env.FORCE_DEPLOY), /^\$\{\{vars\.[A-Z_]+\}\}$/, 'Force-deploy variables pass through strictly, without truthiness or defaults');
+    assert.equal(workingDirectory(job, policy) ?? '.', '.');
+    const decide = command(job, 'node', deploymentPolicy, 'decide', target);
+    assert.equal(decide.step, policy);
+    assert.deepEqual(decide.words, ['node', deploymentPolicy, 'decide', target, deploymentPath]);
+    assert.equal(policy.run.trim().split(/\r?\n/).length, 1, 'A rejected decision must not fall back to deployment');
+    const providerSteps = job.steps.filter((step) => {
+      const script = step.run ?? '';
+      return (script.includes(provider) && !script.includes('--test')) || matchingCommands({ steps: [step] }, 'npm', 'ci').length > 0 || stringValues(step.env).some((value) => value.includes('secrets.') && !value.includes('secrets.GITHUB_TOKEN'));
+    });
+    assert.ok(providerSteps.length > 0);
+    for (const step of providerSteps) {
+      assert.equal(condition(step.if), "steps.deployment-policy.outputs.decision=='deploy'", 'Only a positive deploy decision can install, consume provider secrets, or invoke providers');
+      assert.ok(job.steps.indexOf(policy) < job.steps.indexOf(step));
+      assert.ok(step['continue-on-error'] === undefined || step['continue-on-error'] === false);
+    }
+    assert.deepEqual(job.steps.filter((step) => stringValues(step.env).some((value) => value.includes('secrets.GITHUB_TOKEN'))), [policy], 'History authority is scoped only to the validated decision step');
+    assert.ok(job.steps.every((step) => !stringValues(step.with).some((value) => value.includes('secrets.'))), 'Provider secrets cannot bypass positive run-step guards through action inputs');
+    if (target === 'frontend') {
+      const install = command(job, 'npm', 'ci');
+      assert.deepEqual(install.words, ['npm', 'ci']);
+      assert.equal(workingDirectory(job, install.step), 'client');
+      for (const verb of ['link', 'pull', 'build', 'deploy']) {
+        const entry = command(job, 'vercel@59.6.2', verb);
+        assert.equal(workingDirectory(job, entry.step), 'client');
+        for (const name of ['VERCEL_ORG_ID', 'VERCEL_PROJECT_ID', 'VERCEL_TOKEN']) assert.equal(expressions(entry.step.env[name]), `\${{secrets.${name}}}`, `${verb} must declare its own provider environment`);
+      }
+    }
+  }
+});
+
+test('Skipped production decisions publish decision-only logs, never an actual-deployment receipt', () => {
+  for (const [path, target, provider] of deploymentWorkflows) {
+    const job = Object.values(load(read(path)).jobs)[0];
+    const decision = artifact(job, `deployment-decision-${target}`);
+    requiredStep(decision);
+    assert.equal(expressions(decision.with.name), `deployment-decision-${target}-\${{github.run_id}}-\${{github.run_attempt}}`);
+    assert.equal(runtimePath(decision.with.path), `${deploymentPath}/decision.json`);
+    assert.equal(decision.with['if-no-files-found'], 'error');
+    assert.ok([30, 90].includes(decision.with['retention-days']));
+    const policy = one(job.steps.filter((step) => step.id === 'deployment-policy'), `${target} policy step`);
+    const actual = target === 'backend' ? command(job, 'node', '.github/scripts/deploy-render.mjs') : command(job, provider, 'deploy');
+    assert.ok(actual.step.id, 'Actual deployment needs an outcome distinct from a skipped decision');
+    assert.ok(job.steps.indexOf(policy) < job.steps.indexOf(decision) && job.steps.indexOf(decision) < actual.index);
+    const performed = ["steps.deployment-policy.outputs.decision=='deploy'", `steps.${actual.step.id}.outcome=='success'`];
+    const record = command(job, 'node', deploymentPolicy, 'record', target);
+    assert.equal(actual.step.id, 'actual-deployment');
+    assert.equal(record.step.id, 'deployment-receipt');
+    assert.deepEqual(record.words, ['node', deploymentPolicy, 'record', target, deploymentPath]);
+    assert.equal(record.step.run.trim().split(/\r?\n/).length, 1, 'Receipt input is data, never interpolated shell source or failure fallback');
+    assert.deepEqual(sorted(condition(record.step.if).split('&&')), sorted(performed), 'Record only positive deployment with successful actual provider execution');
+    assert.ok(record.step['continue-on-error'] === undefined || record.step['continue-on-error'] === false);
+    assert.equal(workingDirectory(job, record.step) ?? '.', '.');
+    assert.ok(actual.index < record.index);
+    const receipt = artifact(job, `actual-deployment-${target}`);
+    const guard = condition(receipt.if);
+    assert.deepEqual(sorted(guard.split('&&')), sorted([...performed, `steps.${record.step.id}.outcome=='success'`]), 'Actual history requires successful provider execution and a successfully written receipt');
+    assert.equal(guard.includes('always()') || guard.includes('||') || guard.includes('!'), false, 'No always/truthiness/negated skip condition may create actual deployment history');
+    assert.ok(receipt['continue-on-error'] === undefined || receipt['continue-on-error'] === false);
+    assert.equal(expressions(receipt.with.name), `actual-deployment-${target}-\${{github.run_id}}-\${{github.run_attempt}}`);
+    assert.equal(runtimePath(receipt.with.path), `${deploymentPath}/receipt.json`);
+    assert.equal(receipt.with['if-no-files-found'], 'error');
+    assert.ok([30, 90].includes(receipt.with['retention-days']));
+    assert.ok(job.steps.indexOf(receipt) > record.index);
+    assert.equal(actions(job, 'actions/upload-artifact').length, 2, 'Decision-only skips must not publish any other successful-deploy receipt');
+    assert.ok(stringValues(record.step.env).every((value) => !value.includes('secrets.')), 'Receipt writing consumes evidence, not provider secrets');
+    assert.ok(job.steps.every((step) => !(step.run ?? '').includes('$GITHUB_ENV')), 'Deployment URLs must never become executable environment-file syntax');
+    if (target === 'frontend') {
+      assert.equal(runtimePath(record.step.env.DEPLOYMENT_URL_FILE), `${deploymentPath}/deployment-url.txt`);
+      assert.equal(record.step.env.DEPLOYMENT_URL, undefined);
+      assert.ok(shellLines(actual.step).includes('printf \'%s\\n\' "$deployment_url" > "$RUNNER_TEMP/deployment-policy/deployment-url.txt"'), 'Transport captured provider output in a data file for Node validation');
+    } else {
+      assert.equal(record.step.env.DEPLOYMENT_URL_FILE, undefined);
+      assert.equal(record.step.env.DEPLOYMENT_URL, actual.step.env.PRODUCTION_API_URL);
+    }
+  }
+});
+
 test('Production workflows still deploy only a successful CI main push and check out the exact verified SHA', () => {
   const verifiedSha = '${{github.event.workflow_run.head_sha}}';
   for (const [path, id] of [['.github/workflows/deploy-frontend.yml', 'deploy-vercel'], ['.github/workflows/deploy-production.yml', 'deploy-render']]) {
     const deployment = load(read(path));
     assert.deepEqual(deployment.on, { workflow_run: { workflows: ['CI'], types: ['completed'], branches: ['main'] } });
-    assert.deepEqual(deployment.permissions, { contents: 'read' });
+    assert.deepEqual(deployment.permissions, { contents: 'read', actions: 'read' });
     assert.equal(deployment.concurrency['cancel-in-progress'], false);
     assert.deepEqual(Object.keys(deployment.jobs), [id]);
     const job = deployment.jobs[id];
@@ -756,8 +930,11 @@ test('Production workflows still deploy only a successful CI main push and check
       "github.event.workflow_run.event=='push'",
       "github.event.workflow_run.head_branch=='main'",
     ]));
-    assert.equal(expressions(action(job, 'actions/checkout').with.ref), verifiedSha);
-    assert.equal(actions(job, 'actions/download-artifact').length, 0);
+    const checkout = action(job, 'actions/checkout');
+    assert.equal(expressions(checkout.with.ref), verifiedSha);
+    assert.equal(checkout.with['fetch-depth'], 0, 'Decision ancestry must use complete history for the exact verified CI head');
+    assert.equal(checkout.with['persist-credentials'], false);
+    assert.ok(actions(job, 'actions/download-artifact').every((step) => !stringValues(step.with).some((value) => /(?:browser-build|browser-shard|server-build)-/.test(value))), 'CD must not reuse mock browser dist or CI Server build artifacts; validated helper-managed history downloads are separate');
     if (id === 'deploy-render') {
       const deploy = command(job, 'node', '.github/scripts/deploy-render.mjs');
       assert.equal(expressions(deploy.step.env.COMMIT_SHA), verifiedSha);
@@ -769,7 +946,7 @@ test('Production workflows still deploy only a successful CI main push and check
       assert.ok(build.words.includes('--prod'));
       assert.ok(deploy.words.includes('--prebuilt') && deploy.words.includes('--prod'));
       assert.ok(build.index < deploy.index);
-      assert.deepEqual(sorted(Object.keys(job.env)), ['PRODUCTION_API_URL', 'VERCEL_ORG_ID', 'VERCEL_PROJECT_ID', 'VERCEL_TOKEN']);
+      assert.ok(stringValues(job.env).every((value) => !value.includes('secrets.')), 'Provider secrets must be scoped to positively gated deployment steps');
     }
   }
 });

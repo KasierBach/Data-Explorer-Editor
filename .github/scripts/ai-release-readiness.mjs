@@ -56,7 +56,7 @@ const SERVER_SUITES = Object.freeze([
 
 // Fixed commands only: manifests cannot supply commands, test filters or paths.
 export const CHECKS = Object.freeze([
-  { id: 'readiness-node', package: null, kind: 'tap', args: ['--test', '--test-reporter=tap', '.github/scripts/ai-release-readiness.test.mjs', '.github/scripts/browser-ci-artifacts.test.mjs', '.github/scripts/browser-ci-workflow.test.mjs'] },
+  { id: 'readiness-node', package: null, kind: 'tap', args: ['--test', '--test-reporter=tap', '.github/scripts/ai-release-readiness.test.mjs', '.github/scripts/browser-ci-artifacts.test.mjs', '.github/scripts/browser-ci-workflow.test.mjs', '.github/scripts/server-ci-artifacts.test.mjs', '.github/scripts/deployment-policy.test.mjs', '.github/scripts/deployment-policy-cli.test.mjs'] },
   { id: 'offline-evaluator', package: null, kind: 'tap', args: ['--test', '--test-reporter=tap', 'server/scripts/ai-eval/evaluator.test.mjs', 'server/scripts/ai-eval/native-replay.test.mjs', 'server/scripts/ai-eval/model-role-assessment.test.mjs', 'server/scripts/ai-eval/model-native-worker.test.mjs', 'server/test/ai-model-role-adapter.test.cjs', 'server/test/ai-model-role-live.test.cjs', 'server/test/ai-model-role-runner.test.cjs', 'server/test/ai-provider-model-catalog.test.cjs', 'server/test/ai-provider-model-live-runner.test.cjs'] },
   { id: 'server-prisma-generate', package: 'server', kind: 'command', args: ['run', 'prisma:generate'] },
   { id: 'server-typecheck', package: 'server', kind: 'command', args: ['run', 'typecheck'] },

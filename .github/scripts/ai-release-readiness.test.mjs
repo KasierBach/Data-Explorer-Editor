@@ -69,6 +69,9 @@ test('browser CI artifact and workflow guards are mandatory fixed offline checks
     '.github/scripts/ai-release-readiness.test.mjs',
     '.github/scripts/browser-ci-artifacts.test.mjs',
     '.github/scripts/browser-ci-workflow.test.mjs',
+    '.github/scripts/server-ci-artifacts.test.mjs',
+    '.github/scripts/deployment-policy.test.mjs',
+    '.github/scripts/deployment-policy-cli.test.mjs',
   ]);
 });
 
