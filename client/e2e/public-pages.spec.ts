@@ -2583,13 +2583,14 @@ for (const width of [320, 390]) {
   test(`Docs installation supports touch navigation and keyboard scrolling at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('/docs/editor');
+    await expectDocsTopic(page, 'editor', 'Trình soạn thảo SQL', 'vi');
     await page.getByRole('button', { name: 'Mở menu tài liệu', exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Đóng menu tài liệu', exact: true })).toBeVisible();
     await page.locator('#public-docs-menu').getByRole('link', { name: 'Cài đặt', exact: true }).click();
-    await expect(page).toHaveURL(/\/docs\/installation$/);
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Cài đặt');
-    await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expectDocsTopic(page, 'installation', 'Cài đặt', 'vi');
+    await expectDocsReadingStart(page);
     await page.evaluate(() => document.fonts.ready);
     const blocks = page.locator('.public-docs main .bg-slate-950.overflow-x-auto');
     await expect(blocks).not.toHaveCount(0);

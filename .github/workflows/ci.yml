@@ -14,14 +14,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  client:
-    name: Client
+  client-checks-build:
+    name: Client checks and build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: client
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -35,18 +38,158 @@ jobs:
       - run: npm run lint
       - run: npm run test:cov
       - run: npm run test:prerender
-      - run: node --test ../.github/scripts/deploy-render.test.mjs ../.github/scripts/deployment-config.test.mjs ../.github/scripts/npm-audit.test.mjs
-      - run: npm run build
-      - run: npx playwright install --with-deps chromium firefox webkit
-      - run: npm run test:e2e -- --reporter=github,html
+      - run: node --test ../.github/scripts/deploy-render.test.mjs ../.github/scripts/deployment-config.test.mjs ../.github/scripts/npm-audit.test.mjs ../.github/scripts/browser-ci-artifacts.test.mjs
+      - name: Build the browser-test variant once
+        run: npm run build
+        env:
+          VITE_API_URL: http://localhost:3001/api
+      - name: Freeze complete browser inventory and seal the build
+        shell: bash
+        env:
+          VITE_API_URL: http://localhost:3001/api
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/browser-build"
+          mkdir "$out"
+          PLAYWRIGHT_JSON_OUTPUT_FILE="$out/inventory.json" npx --no-install playwright test --list --reporter=json
+          for shard in 1 2 3 4; do
+            for project in chromium firefox mobile-chrome mobile-webkit; do
+              native_shard=$(node ../.github/scripts/browser-ci-artifacts.mjs shard-index "$shard" "$project")
+              PLAYWRIGHT_JSON_OUTPUT_FILE="$out/inventory-${shard}-${project}.json" npx --no-install playwright test --list --project="$project" --shard="$native_shard/4" --workers=1 --reporter=json
+            done
+          done
+          node ../.github/scripts/browser-ci-artifacts.mjs seal-build "$out"
+      - name: Upload the sealed browser build
+        uses: actions/upload-artifact@v6
+        with:
+          name: browser-build-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-build/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: client-verification-${{ github.sha }}
+          name: client-unit-verification-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: client/coverage/
+          if-no-files-found: error
+          retention-days: 7
+
+  client-browser:
+    name: Client browser shard ${{ matrix.shardIndex }}/4
+    needs: client-checks-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - name: Download the same-run sealed build
+        uses: actions/download-artifact@v6
+        with:
+          name: browser-build-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-build
+      - name: Verify and install the browser build
+        run: node ../.github/scripts/browser-ci-artifacts.mjs install-build "$RUNNER_TEMP/browser-build"
+      - run: npx --no-install playwright install --with-deps chromium firefox webkit
+      - name: Run four cyclic project shards
+        id: browser-tests
+        timeout-minutes: 20
+        shell: bash
+        env:
+          BROWSER_BUILD_ARTIFACT: ${{ runner.temp }}/browser-build
+        run: |
+          set -euo pipefail
+          failed=0
+          for project in chromium firefox mobile-chrome mobile-webkit; do
+            native_shard=$(node ../.github/scripts/browser-ci-artifacts.mjs shard-index ${{ matrix.shardIndex }} "$project")
+            if PLAYWRIGHT_JSON_OUTPUT_FILE="ci-results/$project/results.json" PLAYWRIGHT_BLOB_OUTPUT_FILE="ci-results/$project/blob-report.zip" npx --no-install playwright test --config=playwright.ci.config.ts --project="$project" --shard="$native_shard/4" --workers=1 --output="test-results/$project"; then
+              test_exit=0
+              test_outcome=success
+            else
+              test_exit=$?
+              test_outcome=failure
+              failed=1
+            fi
+            if ! BROWSER_TEST_OUTCOME="$test_outcome" BROWSER_TEST_EXIT_CODE="$test_exit" node ../.github/scripts/browser-ci-artifacts.mjs record-shard "ci-results/$project" "$RUNNER_TEMP/browser-build" ${{ matrix.shardIndex }} "$project"; then
+              failed=1
+            fi
+          done
+          exit "$failed"
+      - name: Upload this shard's reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: browser-shard-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shardIndex }}
           path: |
-            client/coverage/
-            client/playwright-report/
+            client/ci-results/
             client/test-results/
+          if-no-files-found: error
+          retention-days: 7
+
+  client:
+    name: Client
+    needs: [client-checks-build, client-browser]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci
+      - name: Download the sealed inventory
+        uses: actions/download-artifact@v6
+        with:
+          name: browser-build-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/browser-build
+      - name: Download shard reports without flattening their identities
+        uses: actions/download-artifact@v6
+        with:
+          pattern: browser-shard-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-*
+          path: ${{ runner.temp }}/browser-shards
+      - name: Validate blob sources for the merged report
+        run: node ../.github/scripts/browser-ci-artifacts.mjs prepare-reports "$RUNNER_TEMP/browser-shards"
+      - name: Merge browser reports for diagnostics
+        run: npx --no-install playwright merge-reports --config=playwright.merge.config.ts all-blob-reports
+      - name: Require successful producers and exact complete inventory
+        if: always()
+        env:
+          CLIENT_BUILD_RESULT: ${{ needs.client-checks-build.result }}
+          CLIENT_SHARDS_RESULT: ${{ needs.client-browser.result }}
+        run: node ../.github/scripts/browser-ci-artifacts.mjs verify-gate "$RUNNER_TEMP/browser-build" "$RUNNER_TEMP/browser-shards" ci-results/merged-results.json
+      - name: Upload merged browser verification
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: client-verification-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            client/playwright-report/
+            client/ci-results/
+          if-no-files-found: error
+          retention-days: 7
 
   server:
     name: Server
@@ -75,7 +218,7 @@ jobs:
           NPM_AUDIT_ALLOW_GHSA: GHSA-GGR8-5VV4-36MX
       - run: npm run prisma:generate
       - run: npm run typecheck
-      - run: node --test scripts/prisma-generate-safe.test.mjs test/ai-execution-ledger-worker.test.cjs scripts/ai-eval/native-replay.test.mjs scripts/ai-eval/model-role-assessment.test.mjs scripts/ai-eval/model-native-worker.test.mjs test/ai-model-role-adapter.test.cjs test/ai-model-role-live.test.cjs test/ai-model-role-runner.test.cjs test/ai-provider-model-catalog.test.cjs test/ai-provider-model-live-runner.test.cjs
+      - run: node --test scripts/prisma-generate-safe.test.mjs test/ai-execution-ledger-worker.test.cjs scripts/ai-eval/native-replay.test.mjs scripts/ai-eval/model-role-assessment.test.mjs scripts/ai-eval/model-native-worker.test.mjs test/ai-model-role-adapter.test.cjs test/ai-model-role-live.test.cjs test/ai-model-role-runner.test.cjs test/ai-provider-model-catalog.test.cjs test/ai-provider-model-live-runner.test.cjs ../.github/scripts/browser-ci-workflow.test.mjs
       - name: Start owned PostgreSQL, Redis, MongoDB and MySQL fixtures
         run: docker compose -f test/compose.e2e.yml -f test/compose.r03.yml up -d --wait
       - run: npx prisma migrate deploy

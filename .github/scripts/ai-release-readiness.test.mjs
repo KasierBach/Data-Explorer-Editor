@@ -61,6 +61,17 @@ test('model role assessment and adapter guards are mandatory offline checks', ()
   assert.ok(client.suites.includes('src/presentation/modules/Query/modelRoleEvidence.test.ts'));
 });
 
+test('browser CI artifact and workflow guards are mandatory fixed offline checks', () => {
+  const check = CHECKS.find((entry) => entry.id === 'readiness-node');
+  assert.ok(check);
+  assert.deepEqual(check.args, [
+    '--test', '--test-reporter=tap',
+    '.github/scripts/ai-release-readiness.test.mjs',
+    '.github/scripts/browser-ci-artifacts.test.mjs',
+    '.github/scripts/browser-ci-workflow.test.mjs',
+  ]);
+});
+
 for (const source of ['local', 'ci']) test(`complete ${source} metadata verifies checks, never release gates`, () => {
   const { manifest, context } = fixture(source);
   const report = assessReadiness(manifest, context);
