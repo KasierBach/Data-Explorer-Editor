@@ -199,7 +199,7 @@ export const Dashboard: React.FC = () => {
                     <button
                         type="button"
                         disabled={!activeConnectionId}
-                        className={`group relative overflow-hidden rounded-xl border bg-card text-card-foreground shadow transition-all hover:shadow-md cursor-pointer ${!activeConnectionId ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+                        className={`group relative overflow-hidden rounded-xl border bg-card text-left text-card-foreground shadow transition-all hover:shadow-md cursor-pointer ${!activeConnectionId ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
                         onClick={() => activeConnectionId && setView('insights')}
                     >
                         <div className="p-4 md:p-6 flex flex-col gap-3 md:gap-4">
