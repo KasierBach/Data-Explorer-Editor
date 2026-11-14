@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - '.github/scripts/ai-release-readiness*.mjs'
+      - '.github/scripts/browser-ci*.mjs'
+      - '.github/scripts/browser-ci*.d.mts'
+      - '.github/workflows/ci.yml'
       - '.github/workflows/ai-hardening.yml'
       - 'docs/roadmap/evidence/ai-a16-local-readiness.md'
       - 'server/src/**'
@@ -23,6 +26,9 @@ on:
     branches: [main]
     paths:
       - '.github/scripts/ai-release-readiness*.mjs'
+      - '.github/scripts/browser-ci*.mjs'
+      - '.github/scripts/browser-ci*.d.mts'
+      - '.github/workflows/ci.yml'
       - '.github/workflows/ai-hardening.yml'
       - 'docs/roadmap/evidence/ai-a16-local-readiness.md'
       - 'server/src/**'

@@ -41,14 +41,18 @@ test('CI installs a checksum-pinned Syft with bounded retries before publishing 
   assert.match(workflow, /--connect-timeout 15 --max-time 180/);
   assert.match(workflow, /--retry 5 --retry-delay 5 --retry-max-time 600 --retry-all-errors/);
   assert.match(workflow, /sha256sum --check --strict/);
-  assert.ok(workflow.indexOf('sha256sum --check --strict') < workflow.indexOf('tar -xzf'));
+  const syftStep = /- name: Install pinned Syft[\s\S]*?(?=      - name: Generate SBOM files)/.exec(workflow)?.[0];
+  assert.ok(syftStep);
+  assert.ok(syftStep.indexOf('sha256sum --check --strict') < syftStep.indexOf('tar -xzf'));
   assert.doesNotMatch(workflow, /anchore\/sbom-action|continue-on-error:|SYFT_VERSION: latest/);
   assert.match(workflow, /syft scan "\$IMAGE_PREFIX\/server:\$\{GITHUB_SHA\}" --output "spdx-json=sbom-server-\$\{GITHUB_SHA\}\.spdx\.json"/);
   assert.match(workflow, /syft scan "\$IMAGE_PREFIX\/client:\$\{GITHUB_SHA\}" --output "spdx-json=sbom-client-\$\{GITHUB_SHA\}\.spdx\.json"/);
   assert.match(workflow, /name: sbom-server-\$\{\{ github\.sha \}\}\.spdx\.json[\s\S]*path: sbom-server-\$\{\{ github\.sha \}\}\.spdx\.json/);
   assert.match(workflow, /name: sbom-client-\$\{\{ github\.sha \}\}\.spdx\.json[\s\S]*path: sbom-client-\$\{\{ github\.sha \}\}\.spdx\.json/);
-  assert.equal((workflow.match(/if-no-files-found: error/g) ?? []).length, 2);
-  assert.equal((workflow.match(/retention-days: 30/g) ?? []).length, 2);
+  const sbomSteps = /- name: Upload server SBOM[\s\S]*?(?=      - name: Publish images)/.exec(workflow)?.[0];
+  assert.ok(sbomSteps);
+  assert.equal((sbomSteps.match(/if-no-files-found: error/g) ?? []).length, 2);
+  assert.equal((sbomSteps.match(/retention-days: 30/g) ?? []).length, 2);
   assert.ok(workflow.indexOf('name: Generate SBOM files') < workflow.indexOf('name: Publish images'));
 });
 

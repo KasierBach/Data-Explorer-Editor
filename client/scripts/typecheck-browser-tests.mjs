@@ -16,7 +16,7 @@ function collectTypeScript(directory) {
 
 collectTypeScript(join(clientRoot, 'e2e'));
 collectTypeScript(join(clientRoot, 'full-stack'));
-sources.push('playwright.config.ts', 'playwright.full-stack.config.ts');
+sources.push('playwright.config.ts', 'playwright.ci.config.ts', 'playwright.merge.config.ts', 'playwright.full-stack.config.ts');
 
 const result = spawnSync(process.execPath, [
     join(clientRoot, 'node_modules', 'typescript', 'bin', 'tsc'),

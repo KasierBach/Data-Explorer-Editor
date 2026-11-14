@@ -13,6 +13,34 @@
 3. If GHCR publishing reports a permission error, allow GitHub Actions to write packages for this repository.
 4. Add `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` to the `production` environment. Keep Vercel Git deployment disabled (`deploymentEnabled: false`); `.github/workflows/deploy-frontend.yml` deploys the CI-verified SHA after a successful push to `main`.
 
+## Client browser pipeline
+
+```text
+Client checks and build ──> Client browser shard 1/4 ─┐
+                       ├─> Client browser shard 2/4 ─┤
+                       ├─> Client browser shard 3/4 ─┤─> Client
+                       └─> Client browser shard 4/4 ─┘
+Client + Server ──> Full-stack browser ──> Container images
+```
+
+`Client checks and build` retains audit, lint, complete unit coverage, prerender checks and the complete production build. It builds once with `VITE_API_URL=http://localhost:3001/api`, then seals the entire `dist` (including public HTML, sitemap and hidden `.vite` manifest) together with the full browser inventory and four shard inventories. Each shard uses that verified build with a preview-only CI configuration; it does not rebuild. The default local `npm run test:e2e` still builds automatically.
+
+The matrix is four shards with one Playwright worker each, `fail-fast: false` and at most four jobs in parallel. All existing Chromium, Firefox, mobile Chrome and mobile WebKit projects remain selected, with their original two CI retries and per-test timeouts. Sharding distributes tests across runners; it does not give a single runner four workers or isolate shared backend state. These browser tests use mock routes. Server and full-stack tests continue to own separate real database fixtures.
+
+Build and report artifacts bind the checked-out commit and tree, workflow run and attempt, client lockfile, Node/Playwright versions, API variant and file checksums. Artifact names include SHA/run/attempt; downloads never reuse another run or SHA. No `.env`, `node_modules` or credentials belong in the sealed build. Each report artifact retains its `ci-results/` and `test-results/` directories; shard folders must not be flattened when downloaded.
+
+The required check remains **`Client`**. It always runs the aggregate gate, merges validated blob reports for HTML/JSON diagnostics and only passes when the build and matrix jobs succeeded, all four nonempty/disjoint shard reports match their assigned inventories, their union equals the full inventory, and the merged report preserves every identity and result count. Missing, corrupt, stale, cancelled, failed or skipped producer evidence fails the gate; a partial diagnostic merge is not a pass. Existing source-declared browser/mobile skips retain their annotations and are counted separately from expected passes. Retries, flaky tests, timed-out and interrupted attempts are also reported separately.
+
+For a local shard using the normal build-on-run configuration:
+
+```sh
+npm --prefix client run test:e2e -- --shard=1/4 --workers=1
+```
+
+For the preview-only CI configuration, use a clean, credential-free checkout at the candidate commit, build with the explicit mock API URL, generate `--list --reporter=json` inventories (full and `--shard=N/4` under `CI=true`), and seal/install with `.github/scripts/browser-ci-artifacts.mjs`. Set `BROWSER_BUILD_ARTIFACT` to that same-run artifact before invoking `playwright test --config=playwright.ci.config.ts --shard=N/4 --workers=1`. A dirty checkout or mismatched installed `dist` is deliberately refused; do not disable source verification for a smoke test.
+
+Compare elapsed build/setup/test/merge durations and all result counts from real CI runs before extending this optimization. Four shards do not imply a fourfold wall-clock speedup: setup repeats, runner scheduling and the longest shard remain on the critical path. No changed-path test skipping, cross-SHA evidence reuse, full-stack rebuild deduplication or deploy-gate reduction is included.
+
 ## Test fixtures and evidence
 
 CI starts only the compose fixtures in `server/test/compose.e2e.yml` and `compose.r03.yml`, under an owned project per job/run; both teardown steps run with `always()`. PostgreSQL uses `data_explorer_e2e` on loopback15432, Redis DB15 on16379, MongoDB17017 and MySQL13306. MySQL compose enables function creation needed by the native suite. Never migrate a workstation or production URL for these jobs.
