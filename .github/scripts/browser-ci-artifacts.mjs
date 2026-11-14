@@ -262,7 +262,7 @@ export function assessBrowserResults(report, expected, policies) {
     requireValue(['expected', 'unexpected', 'flaky', 'skipped'].includes(row.status), 'UNFINISHED_BROWSER_TEST');
     counts[row.status]++;
     for (const result of row.results) {
-      requireValue(['passed', 'failed', 'timedOut', 'skipped', 'interrupted'].includes(result.status) && Number.isSafeInteger(result.retry) && result.retry >= 0, 'INVALID_BROWSER_ATTEMPT');
+      requireValue(['passed', 'failed', 'timedOut', 'skipped', 'interrupted'].includes(result.status) && Number.isSafeInteger(result.retry) && result.retry >= 0 && result.retry <= 2, 'INVALID_BROWSER_ATTEMPT');
       if (result.retry > 0) counts.retries++;
       if (result.status === 'timedOut') counts.timedOutAttempts++;
       if (result.status === 'interrupted') counts.interruptedAttempts++;
@@ -270,8 +270,9 @@ export function assessBrowserResults(report, expected, policies) {
     if (row.status === 'skipped') {
       const policy = policies.find((entry) => entry.key === row.key);
       const skip = row.annotations.find((annotation) => annotation.type === 'skip');
-      requireValue(expected[index].expectedStatus === 'skipped' || (policy && skip && policy.reasons.includes(skip.description)), 'UNEXPECTED_BROWSER_SKIP');
-      requireValue(!row.results.some((result) => result.status !== 'skipped'), 'INVALID_SKIPPED_TEST');
+      const declared = expected[index].expectedStatus === 'skipped';
+      requireValue(declared || (policy && skip && policy.reasons.includes(skip.description)), 'UNEXPECTED_BROWSER_SKIP');
+      requireValue(row.expectedStatus === 'skipped' && (declared ? row.results.length <= 1 : row.results.length === 1) && row.results.every((result) => result.status === 'skipped' && result.retry === 0), 'INVALID_SKIPPED_TEST');
     } else {
       requireValue(row.results.length > 0 && row.expectedStatus === expected[index].expectedStatus, 'UNEXECUTED_OR_CHANGED_BROWSER_TEST');
       requireValue(row.results.every((result, retry) => result.status !== 'skipped' && result.retry === retry), 'INVALID_BROWSER_RETRY_SEQUENCE');
@@ -384,9 +385,14 @@ export async function verifyGate(buildDirectory, shardRoot, mergedPath, context,
     shardRows.push(assessed.rows); counts.push(assessed.counts);
   }
   assertShardPartition(inventory, shardRows);
-  const merged = assessBrowserResults(await json(mergedPath), inventory, build.skipPolicies);
+  const mergedReport = await json(mergedPath);
+  assertSameBinding(mergedReport.config?.metadata, context);
+  const merged = assessBrowserResults(mergedReport, inventory, build.skipPolicies);
   const summed = Object.fromEntries(Object.keys(merged.counts).map((key) => [key, counts.reduce((sum, value) => sum + value[key], 0)]));
   requireValue(merged.ok && JSON.stringify(summed) === JSON.stringify(merged.counts), 'MERGED_BROWSER_RESULT_MISMATCH');
+  const outcome = (row) => JSON.stringify({ key: row.key, expectedStatus: row.expectedStatus, status: row.status, attempts: row.results.map((result) => ({ retry: result.retry, status: result.status })), skipReasons: row.annotations.filter((annotation) => annotation.type === 'skip').map((annotation) => annotation.description).sort() });
+  const completed = shardRows.flat().sort((left, right) => left.key.localeCompare(right.key));
+  requireValue(merged.rows.every((row, index) => outcome(row) === outcome(completed[index])), 'MERGED_BROWSER_TEST_OUTCOME_MISMATCH');
   assertUpstreamSuccess(process.env.CLIENT_BUILD_RESULT, process.env.CLIENT_SHARDS_RESULT);
   const summary = { ...context, kind: 'complete-client-browser-gate', shardTotal: SHARD_TOTAL, workersPerShard: 1, counts: merged.counts, durationMs: merged.durationMs, inventorySha256: hash(await boundedBytes(join(buildDirectory, 'inventory.json'))), complete: true };
   await writeJson(join(clientRoot, 'ci-results', 'summary.json'), summary);

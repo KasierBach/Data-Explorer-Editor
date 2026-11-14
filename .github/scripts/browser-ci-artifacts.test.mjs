@@ -341,6 +341,29 @@ test("accepts annotated approved and declared skips but rejects executed skipped
   assert.throws(() => assessBrowserResults(report, declared, []), /INVALID_SKIPPED_TEST/);
 });
 
+test("requires actual canonical attempts for approved runtime skips", () => {
+  const expected = flattenBrowserReport(browserReport());
+  const key = expected.find((row) => row.project === "firefox" && row.line === 4).key;
+  const policies = [{ key, reasons: [SKIP_REASON] }];
+  for (const patch of [
+    { expectedStatus: "skipped", results: [] },
+    { expectedStatus: "passed", results: [attempt("skipped")] },
+    { expectedStatus: "skipped", results: [attempt("skipped", 999)] },
+    { expectedStatus: "skipped", results: [attempt("skipped"), attempt("skipped", 1)] },
+  ]) {
+    const report = browserReport();
+    Object.assign(testsOf(report)[1], { status: "skipped", annotations: [{ type: "skip", description: SKIP_REASON }], ...patch });
+    assert.throws(() => assessBrowserResults(updateStats(report), expected, policies), /INVALID_SKIPPED_TEST|INVALID_BROWSER_ATTEMPT/);
+  }
+});
+
+test("rejects attempts beyond the unchanged two-retry CI ceiling", () => {
+  const report = browserReport();
+  const expected = flattenBrowserReport(report);
+  Object.assign(testsOf(report)[0], { status: "flaky", results: [attempt("failed"), attempt("failed", 1), attempt("failed", 2), attempt("passed", 3)] });
+  assert.throws(() => assessBrowserResults(updateStats(report), expected, []), /INVALID_BROWSER_ATTEMPT/);
+});
+
 test("rejects empty execution, changed expectations and contradictory passing outcomes", () => {
   const expected = flattenBrowserReport(browserReport());
   for (const status of ["expected", "unexpected", "flaky"]) {
@@ -686,6 +709,24 @@ test("verifyGate requires successful upstream jobs even with complete valid evid
       process.env[key] = "success";
     }
   }
+});
+
+test("verifyGate rejects changed merge bindings and count-preserving result swaps", async (t) => {
+  const fixture = await gateFixture(t);
+  const changedBinding = structuredClone(fixture.merged);
+  changedBinding.config.metadata.runAttempt = "3";
+  await saveJson(fixture.mergedPath, changedBinding);
+  await assertRejectedGate(fixture, /BUILD_SOURCE_OR_RUN_MISMATCH/);
+  const swapped = structuredClone(fixture.merged);
+  const first = specsOf(swapped)[1].tests[0];
+  const second = specsOf(swapped)[1].tests[1];
+  const attempts = first.results;
+  first.results = second.results;
+  second.results = attempts;
+  first.status = "expected";
+  second.status = "flaky";
+  await saveJson(fixture.mergedPath, updateStats(swapped));
+  await assertRejectedGate(fixture, /MERGED_BROWSER_TEST_OUTCOME_MISMATCH/);
 });
 
 test("verifyGate rejects missing, corrupt and inventory/count-tampered merged reports", async (t) => {
