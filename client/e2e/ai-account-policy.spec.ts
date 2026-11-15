@@ -605,10 +605,21 @@ test("UI-AI-003 pending enable is shared, confirmed generation works, disable su
   );
   await page.keyboard.press("Escape");
   const activeAssistant = await openAssistant(page, "en");
-  await activeAssistant.getByRole("switch", { name: "Toggle AI" }).click();
-  await expect(
-    activeAssistant.getByRole("switch", { name: "Toggle AI" }),
-  ).not.toBeChecked();
+  const toggle = activeAssistant.getByRole("switch", { name: "Toggle AI" });
+  const disableResponse = page.waitForResponse((response) => {
+    const request = response.request();
+    if (
+      response.url() !== `${API_ORIGIN}/api/users/settings` ||
+      request.method() !== "PATCH"
+    )
+      return false;
+    const payload = request.postDataJSON() as { aiEnabled?: unknown };
+    return payload.aiEnabled === false;
+  });
+  await toggle.click();
+  expect((await disableResponse).status()).toBe(200);
+  await expect(toggle).toBeEnabled();
+  await expect(toggle).not.toBeChecked();
   expect(fixture.evidence.settings).toEqual([
     { aiEnabled: true },
     { aiEnabled: false },
