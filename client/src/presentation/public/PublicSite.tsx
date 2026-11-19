@@ -12,6 +12,7 @@ import { PublicExperienceContext } from './PublicExperienceContext';
 import { PublicReadingFooter, PublicReadingHeader } from './PublicReadingChrome';
 import './public-reading.css';
 import './public-changelog.css';
+import './public-legal.css';
 import '../modules/LandingPage/landing-page.css';
 
 interface PublicSiteProps {
@@ -29,6 +30,8 @@ export function PublicSite({ route, View, isAuthenticated = false, onLogout, emb
     const landing = route.kind === 'landing';
     const docs = route.kind === 'docs';
     const changelog = route.kind === 'changelog';
+    const legal = route.kind === 'legal' || route.kind === 'privacy' || route.kind === 'terms';
+    const reading = changelog || legal;
     return (
         <PublicNavigationContext.Provider value={route}>
             <PublicDocsNavigationContext.Provider value={docs ? onNavigateDocs : undefined}>
@@ -36,11 +39,11 @@ export function PublicSite({ route, View, isAuthenticated = false, onLogout, emb
                 <PublicSeo route={route} />
                 {!embedded && <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-foreground focus:ring-2 focus:ring-ring">Skip to content</a>}
                 <PublicExperienceContext.Provider value={{ lang: route.lang, paused, onToggleMotion: () => setPaused(value => !value) }}>
-                    <div id={embedded ? undefined : 'main-content'} tabIndex={-1} className={landing ? 'landing-page min-h-screen flex flex-col font-sans overflow-x-clip' : docs ? '' : changelog ? 'public-experience public-changelog-site min-h-screen flex flex-col font-sans' : 'relative min-h-screen flex flex-col overflow-x-hidden bg-background font-sans text-foreground selection:bg-blue-500/30'} data-theme={landing ? appearance.theme : undefined} data-motion={landing ? (paused ? 'paused' : 'active') : undefined}>
-                        {!landing && !docs && !changelog && <InteractiveBackground />}
-                        {changelog ? <PublicReadingHeader lang={route.lang} isAuthenticated={isAuthenticated} onLogout={onLogout} /> : !docs && <PublicHeader lang={route.lang} isAuthenticated={isAuthenticated} onLogout={onLogout} appearance={landing ? 'landing' : 'default'} />}
+                    <div id={embedded ? undefined : 'main-content'} tabIndex={-1} className={landing ? 'landing-page min-h-screen flex flex-col font-sans overflow-x-clip' : docs ? '' : changelog ? 'public-experience public-changelog-site min-h-screen flex flex-col font-sans' : legal ? 'public-experience public-legal-site min-h-screen flex flex-col font-sans' : 'relative min-h-screen flex flex-col overflow-x-hidden bg-background font-sans text-foreground selection:bg-blue-500/30'} data-theme={landing ? appearance.theme : undefined} data-motion={landing ? (paused ? 'paused' : 'active') : undefined}>
+                        {!landing && !docs && !reading && <InteractiveBackground />}
+                        {reading ? <PublicReadingHeader lang={route.lang} isAuthenticated={isAuthenticated} onLogout={onLogout} /> : !docs && <PublicHeader lang={route.lang} isAuthenticated={isAuthenticated} onLogout={onLogout} appearance={landing ? 'landing' : 'default'} />}
                         <View route={route} isAuthenticated={isAuthenticated} isMotionPaused={paused} onToggleMotion={() => setPaused(value => !value)} />
-                        {changelog ? <PublicReadingFooter lang={route.lang} /> : !docs && <LandingFooter lang={route.lang} appearance={landing ? 'landing' : 'default'} />}
+                        {reading ? <PublicReadingFooter lang={route.lang} /> : !docs && <LandingFooter lang={route.lang} appearance={landing ? 'landing' : 'default'} />}
                     </div>
                 </PublicExperienceContext.Provider>
             </LandingAppearanceContext.Provider>

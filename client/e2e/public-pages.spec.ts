@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { expect, test, type Locator, type Page, type Request } from '@playwright/test';
 import { mockAuthenticatedApi, seedPersistedWorkspace } from './support/authenticated-api';
 import { DOCS_CATALOG, getDocTopic } from '../src/core/docs/docsCatalog';
+import { getLegalDocument, type LegalDocKey } from '../src/presentation/public/legalContent';
 
 type NavigationLanguage = 'vi' | 'en';
 type NavigationPage = 'landing' | 'docs' | 'changelog';
@@ -2698,4 +2699,420 @@ test('landing offers verified web, local Docker and source paths instead of a fa
   await expect(page.locator('header').getByRole('link', { name: 'GitHub', exact: true })).toHaveAttribute('href', 'https://github.com/KasierBach/Data-Explorer-Editor');
   await expect(page.locator('footer').getByRole('link', { name: /^(Báo lỗi|Report an issue)$/ })).toHaveAttribute('href', 'https://github.com/KasierBach/Data-Explorer-Editor/issues');
   await expect(page.getByRole('link', { name: /Download|Tải ứng dụng/i })).toHaveCount(0);
+});
+
+// Legal refresh coverage is intentionally isolated from the existing public-page tests.
+test.describe('Legal reading pages', () => {
+  const documentKeys = ['legal', 'privacy', 'terms'] as const;
+  const languages = ['vi', 'en'] as const;
+  const sectionCounts = { legal: 4, privacy: 9, terms: 10 } as const;
+
+  async function prepareLegalPage(page: Page) {
+    await page.context().route('**/*', async route => {
+      const url = new URL(route.request().url());
+      if (['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) await route.fallback();
+      else await route.abort('blockedbyclient');
+    });
+    // Page routes take precedence over the context guard; no live authentication is used.
+    await mockPublicNavigationSession(page);
+  }
+
+  async function expectLegalReading(page: Page, lang: NavigationLanguage, key: LegalDocKey) {
+    const doc = getLegalDocument(lang, key);
+    await expect(page.locator('html')).toHaveAttribute('lang', lang);
+    await expect(page.locator('.public-legal-site')).toHaveCount(1);
+    await expect(page.getByRole('main')).toHaveCount(1);
+    await expect(page.locator('main.public-legal')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(doc.title);
+    await expect(page.locator('.pe-header')).toBeVisible();
+    await expect(page.locator('.pe-footer')).toBeVisible();
+    await expect(page.locator('.landing-page, .lp-header, .lp-footer, .public-changelog-site, .pe-doc-header, #features, #workflows, #pricing, #demo')).toHaveCount(0);
+    await expect(page.locator('.public-legal-site a[href*="#features"], .public-legal-site a[href*="#workflows"], .public-legal-site a[href*="#pricing"], .public-legal-site a[href*="#demo"]')).toHaveCount(0);
+
+    const expectedSections = doc.sections.map(section => {
+      const id = `${key}-${section.id}`;
+      return { id, labelledBy: `${id}-title`, headingCount: 1, title: section.title, paragraphs: [...section.paragraphs], bullets: [...(section.bullets ?? [])], permalink: `#${id}` };
+    });
+    expect(expectedSections).toHaveLength(sectionCounts[key]);
+    await expect.poll(() => page.locator('main.public-legal').evaluate(main => {
+      const article = main.querySelector('.pl-article')!;
+      const documents = main.querySelector('.pl-document-nav')!;
+      return {
+        subtitle: main.querySelector('.pl-subtitle')?.textContent?.trim(),
+        date: main.querySelector('.pl-effective-date')?.textContent?.trim(),
+        navigationLabel: documents.getAttribute('aria-label'),
+        documentLinks: Array.from(documents.querySelectorAll(':scope > a'), link => ({ text: link.textContent?.trim(), href: link.getAttribute('href'), current: link.getAttribute('aria-current') })),
+        articleLabel: article.getAttribute('aria-label'),
+        sections: Array.from(article.querySelectorAll(':scope > .pl-section'), section => ({
+          id: section.id,
+          labelledBy: section.getAttribute('aria-labelledby'),
+          headingCount: section.querySelectorAll('h2').length,
+          title: section.querySelector('h2')?.textContent?.trim(),
+          paragraphs: Array.from(section.querySelectorAll('.pl-prose > p'), paragraph => paragraph.textContent?.trim()),
+          bullets: Array.from(section.querySelectorAll('.pl-prose > ul > li'), bullet => bullet.textContent?.trim()),
+          permalink: section.querySelector('.pl-section-link')?.getAttribute('href'),
+        })),
+        cards: Array.from(main.querySelectorAll('.pl-document-card'), card => ({ href: card.getAttribute('href'), title: card.querySelector('h2')?.textContent?.trim(), subtitle: card.querySelector('p')?.textContent?.trim() })),
+      };
+    })).toEqual({
+      subtitle: doc.subtitle,
+      date: doc.effectiveDate,
+      navigationLabel: lang === 'vi' ? 'Tài liệu pháp lý' : 'Legal documents',
+      documentLinks: documentKeys.map(documentKey => ({ text: getLegalDocument(lang, documentKey).title, href: localizedNavigationPath(lang, `/${documentKey}`), current: documentKey === key ? 'page' : null })),
+      articleLabel: doc.title,
+      sections: expectedSections,
+      cards: key === 'legal' ? (['privacy', 'terms'] as const).map(linkedKey => ({ href: localizedNavigationPath(lang, `/${linkedKey}`), title: getLegalDocument(lang, linkedKey).title, subtitle: getLegalDocument(lang, linkedKey).subtitle })) : [],
+    });
+    expect(doc.effectiveDate).toMatch(/28\/06\/2026|June 28, 2026|28 June 2026/);
+
+    const footerLinks = await page.locator('.pe-footer a').evaluateAll(links => links.map(link => link.getAttribute('href')));
+    for (const documentKey of documentKeys) {
+      expect(footerLinks.filter(href => href === localizedNavigationPath(lang, `/${documentKey}`))).toHaveLength(1);
+    }
+    const headerLinks = await page.locator('.pe-header-nav .pe-nav-link').evaluateAll(links => links.map(link => ({ text: link.textContent?.trim(), href: link.getAttribute('href') })));
+    expect(headerLinks).toEqual(navigationPages.map((kind, index) => ({ text: navigationLabels[lang][index], href: localizedNavigationPath(lang, navigationPaths[kind]) })));
+  }
+
+  async function expectLegalAnchorClear(page: Page, id: string) {
+    await expect.poll(() => page.locator(`.pl-article section[id="${id}"]`).evaluate(section => {
+      const heading = section.querySelector('h2')!.getBoundingClientRect();
+      const header = document.querySelector('.pe-header')!.getBoundingClientRect();
+      return heading.top >= Math.max(0, header.bottom) - 1 && heading.top < innerHeight - 16;
+    })).toBe(true);
+  }
+
+  async function expectLegalHitTargets(links: Locator) {
+    await expect.poll(() => links.evaluateAll(elements => elements.length > 0 && elements.every(element => {
+      const style = getComputedStyle(element);
+      const box = element.getBoundingClientRect();
+      return style.visibility !== 'hidden' && style.display !== 'none' && box.width >= 44 && box.height >= 44;
+    }))).toBe(true);
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await prepareLegalPage(page);
+  });
+
+  for (const lang of languages) {
+    for (const key of documentKeys) {
+      const path = localizedNavigationPath(lang, `/${key}`);
+      for (const theme of ['light', 'dark'] as const) {
+        test(`${path} ${theme} delivers full legal HTML and accessible reading chrome without changing workspace storage`, async ({ page, request }) => {
+          const response = await request.get(path, { maxRedirects: 0 });
+          expect(response.status()).toBe(200);
+          expect(response.headers()['content-type']).toContain('text/html');
+          const html = await response.text();
+          expect(html).toContain('data-public-rendered');
+          expect(html.match(/<h1\b/g)).toHaveLength(1);
+          const workspaceLanguage = lang === 'vi' ? 'en' : 'vi';
+          const workspaceState = {
+            tabs: [], activeTabId: null, activeConnectionId: null, activeDatabase: null,
+            isSidebarOpen: false, sidebarWidth: 24,
+            defaultResultHeight: 340, isAiPanelOpen: false,
+          };
+          const storage = {
+            'vite-ui-theme': theme,
+            'data-explorer-landing-theme': theme === 'light' ? 'dark' : 'light',
+            lang: workspaceLanguage,
+            'data-explorer-storage': JSON.stringify({ state: workspaceState, version: 0 }),
+          };
+          // Seed once so a later navigation cannot hide an unintended storage write.
+          await page.addInitScript(values => {
+            if (sessionStorage.getItem('legal-reading-seeded')) return;
+            for (const [name, value] of Object.entries(values)) localStorage.setItem(name, value);
+            sessionStorage.setItem('legal-reading-seeded', 'true');
+          }, storage);
+          const errors: string[] = [];
+          page.on('pageerror', error => errors.push(error.message));
+          await page.goto(path);
+          await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+          await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${theme}\\b`));
+          await expectLegalReading(page, lang, key);
+
+          // Parse the HTTP response, not hydrated DOM or a JSON copy of the document.
+          const delivered = await page.evaluate(source => {
+            const document = new DOMParser().parseFromString(source, 'text/html');
+            return {
+              lang: document.documentElement.lang,
+              headings: Array.from(document.querySelectorAll('h1'), heading => heading.textContent?.trim()),
+              mainCount: document.querySelectorAll('main.public-legal').length,
+              legalShellCount: document.querySelectorAll('.public-legal-site').length,
+              sections: Array.from(document.querySelectorAll('.pl-article > .pl-section'), section => ({
+                id: section.id,
+                title: section.querySelector('h2')?.textContent?.trim(),
+                paragraphs: Array.from(section.querySelectorAll('.pl-prose > p'), paragraph => paragraph.textContent?.trim()),
+                bullets: Array.from(section.querySelectorAll('.pl-prose > ul > li'), bullet => bullet.textContent?.trim()),
+              })),
+              documentLinks: Array.from(document.querySelectorAll('.pl-document-nav > a'), link => link.getAttribute('href')),
+            };
+          }, html);
+          const doc = getLegalDocument(lang, key);
+          expect(delivered.sections).toHaveLength(sectionCounts[key]);
+          expect(delivered).toEqual({
+            lang,
+            headings: [doc.title],
+            mainCount: 1,
+            legalShellCount: 1,
+            sections: doc.sections.map(section => ({ id: `${key}-${section.id}`, title: section.title, paragraphs: [...section.paragraphs], bullets: [...(section.bullets ?? [])] })),
+            documentLinks: documentKeys.map(documentKey => localizedNavigationPath(lang, `/${documentKey}`)),
+          });
+          const accessibility = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+          expect(accessibility.violations).toEqual([]);
+          const currentStorage = await page.evaluate(names => Object.fromEntries(names.map(name => [name, localStorage.getItem(name)])), Object.keys(storage));
+          expect(currentStorage['vite-ui-theme']).toBe(theme);
+          expect(currentStorage['data-explorer-landing-theme']).toBe(theme === 'light' ? 'dark' : 'light');
+          expect(currentStorage.lang).toBe(workspaceLanguage);
+          const persisted = JSON.parse(currentStorage['data-explorer-storage']!);
+          expect(persisted.version).toBe(0);
+          expect(persisted.state).toEqual(expect.objectContaining(workspaceState));
+          expect(persisted.state.lang).toBeUndefined();
+          expect(persisted.state.connections).toEqual([]);
+          expect(persisted.state.aiChats).toEqual([]);
+          expect(errors).toEqual([]);
+        });
+      }
+
+      test(`${path} keeps full prose, section anchors and native mobile contents without JavaScript`, async ({ browser, baseURL }) => {
+        const context = await browser.newContext({ javaScriptEnabled: false, baseURL, viewport: { width: 390, height: 844 } });
+        try {
+          const staticPage = await context.newPage();
+          await prepareLegalPage(staticPage);
+          const response = await staticPage.goto(path);
+          expect(response?.status()).toBe(200);
+          await expect(staticPage.locator('#root')).not.toHaveAttribute('data-public-hydrated', 'true');
+          await expectLegalReading(staticPage, lang, key);
+          const doc = getLegalDocument(lang, key);
+          const target = doc.sections[1];
+          const id = `${key}-${target.id}`;
+          const details = staticPage.locator('.pl-contents-mobile');
+          await expect(staticPage.locator('.pl-outline')).toBeHidden();
+          await details.locator(':scope > summary').click();
+          await expect(details).toHaveAttribute('open', '');
+          const contents = details.getByRole('navigation', { name: lang === 'vi' ? 'Mục lục trên mobile' : 'Mobile document contents', exact: true });
+          await expect(contents.getByRole('link')).toHaveCount(sectionCounts[key]);
+          for (const section of doc.sections) {
+            await expect(contents.getByRole('link', { name: section.title, exact: true })).toHaveAttribute('href', `#${key}-${section.id}`);
+          }
+          await contents.getByRole('link', { name: target.title, exact: true }).click();
+          await expect(staticPage).toHaveURL(url => url.pathname === path && url.hash === `#${id}`);
+          await expectLegalAnchorClear(staticPage, id);
+          await expect(staticPage.locator(`.pl-article section[id="${id}"] .pl-prose > p`)).toHaveText([...target.paragraphs]);
+          const nextKey = key === 'privacy' ? 'terms' : 'privacy';
+          await staticPage.locator('.pl-document-nav').getByRole('link', { name: getLegalDocument(lang, nextKey).title, exact: true }).click();
+          await expect(staticPage).toHaveURL(url => url.pathname === localizedNavigationPath(lang, `/${nextKey}`) && !url.hash);
+          await expect(staticPage.getByRole('heading', { level: 1 })).toHaveText(getLegalDocument(lang, nextKey).title);
+          await staticPage.goBack();
+          await expect(staticPage).toHaveURL(url => url.pathname === path && url.hash === `#${id}`);
+          await expect(staticPage.locator(`.pl-article section[id="${id}"]`)).toBeAttached();
+          await expect(staticPage.locator('#root')).not.toHaveAttribute('data-public-hydrated', 'true');
+        } finally {
+          await context.close();
+        }
+      });
+    }
+  }
+
+  for (const { width, lang } of [{ width: 390, lang: 'vi' }, { width: 768, lang: 'en' }, { width: 1100, lang: 'vi' }, { width: 1440, lang: 'en' }, { width: 1920, lang: 'vi' }] as const) {
+    test(`legal reading at ${width}px keeps readable widths, native keyboard contents, long headings and document cards`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(localizedNavigationPath(lang, '/privacy'));
+      await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+      await expectLegalReading(page, lang, 'privacy');
+      await page.evaluate(() => document.fonts.ready);
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+      await expectHeaderControlsNotOverlapping(page.locator('.pe-header'));
+      await expectLegalHitTargets(page.locator('.pl-document-nav > a'));
+      const column = await page.locator('.pl-reading-column').boundingBox();
+      expect(column!.width).toBeGreaterThanOrEqual(Math.min(width - 64, 360));
+      const readingMeasure = await page.locator('.pl-reading-column').evaluate(element => {
+        const style = getComputedStyle(element);
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d')!;
+        context.font = style.font;
+        return context.measureText('0').width * 72;
+      });
+      expect(column!.width).toBeLessThanOrEqual(readingMeasure + 1);
+      const contextRail = page.locator('.pl-context-rail');
+      if (width > 1320) {
+        await expect(contextRail).toBeVisible();
+        const railBox = await contextRail.boundingBox();
+        const outlineBox = await page.locator('.pl-outline').boundingBox();
+        expect(outlineBox!.x + outlineBox!.width).toBeLessThanOrEqual(column!.x - 20);
+        expect(column!.x + column!.width).toBeLessThanOrEqual(railBox!.x - 20);
+        expect(railBox!.x + railBox!.width).toBeLessThanOrEqual(width);
+        await expect(contextRail.getByRole('navigation', { name: lang === 'vi' ? 'Tài liệu pháp lý liên quan' : 'Related legal documents' }).getByRole('link')).toHaveCount(2);
+        await expect(contextRail.getByRole('navigation', { name: lang === 'vi' ? 'Hướng dẫn liên quan' : 'Related guides' }).getByRole('link')).toHaveCount(3);
+      } else {
+        await expect(contextRail).toBeHidden();
+      }
+      const prose = await page.locator('.pl-prose').first().evaluate(element => {
+        const style = getComputedStyle(element);
+        return { font: parseFloat(style.fontSize), line: parseFloat(style.lineHeight) };
+      });
+      expect(prose.font).toBeGreaterThanOrEqual(16);
+      expect(prose.line).toBeGreaterThanOrEqual(prose.font * 1.6);
+      const doc = getLegalDocument(lang, 'privacy');
+      const longest = doc.sections.reduce((chosen, section) => section.title.length > chosen.title.length ? section : chosen);
+      const longHeading = page.locator(`.pl-article section[id="privacy-${longest.id}"] h2`);
+      await expect(longHeading).toHaveText(longest.title);
+      const headingGeometry = await longHeading.evaluate(element => {
+        const box = element.getBoundingClientRect();
+        const link = element.parentElement!.querySelector('.pl-section-link')!.getBoundingClientRect();
+        return { left: box.left, right: box.right, linkLeft: link.left, overflow: element.scrollWidth - element.clientWidth, height: box.height, line: parseFloat(getComputedStyle(element).lineHeight) };
+      });
+      expect(headingGeometry.left).toBeGreaterThanOrEqual(0);
+      expect(headingGeometry.right).toBeLessThanOrEqual(width);
+      expect(headingGeometry.right).toBeLessThanOrEqual(headingGeometry.linkLeft - 1);
+      expect(headingGeometry.overflow).toBeLessThanOrEqual(1);
+      if (width === 390) {
+        expect(headingGeometry.height).toBeGreaterThan(headingGeometry.line + 1);
+        await expectLegalHitTargets(page.locator('.pl-section-link'));
+      }
+
+      const mobile = page.locator('.pl-contents-mobile');
+      const outline = page.locator('.pl-outline');
+      let contents: Locator;
+      if (width <= 800) {
+        await expect(outline).toBeHidden();
+        const summary = mobile.locator(':scope > summary');
+        await expectLegalHitTargets(summary);
+        await summary.focus();
+        await summary.press('Enter');
+        await expect(mobile).toHaveAttribute('open', '');
+        await summary.press('Space');
+        await expect(mobile).not.toHaveAttribute('open', '');
+        await summary.press('Enter');
+        await expect(mobile).toHaveAttribute('open', '');
+        contents = mobile.getByRole('navigation', { name: lang === 'vi' ? 'Mục lục trên mobile' : 'Mobile document contents', exact: true });
+        await summary.press('Tab');
+        await expect(contents.getByRole('link').first()).toBeFocused();
+      } else {
+        await expect(mobile).toBeHidden();
+        await expect(outline).toBeVisible();
+        contents = outline.getByRole('navigation', { name: lang === 'vi' ? 'Trong tài liệu này' : 'On this page', exact: true });
+      }
+      await expect(contents.getByRole('link')).toHaveCount(9);
+      await expectLegalHitTargets(contents.getByRole('link'));
+      const anchor = contents.getByRole('link', { name: longest.title, exact: true });
+      await anchor.focus();
+      await anchor.press('Enter');
+      await expect(page).toHaveURL(url => url.hash === `#privacy-${longest.id}`);
+      await expect(anchor).toHaveAttribute('aria-current', 'location');
+      await expectLegalAnchorClear(page, `privacy-${longest.id}`);
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+
+      await page.goto(localizedNavigationPath(lang, '/legal'));
+      await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+      await expectLegalReading(page, lang, 'legal');
+      const cards = page.locator('.pl-document-card');
+      await expectLegalHitTargets(cards);
+      const centerOverview = page.locator('.pl-center-overview');
+      const centerSummary = page.locator('.pl-center-summary');
+      const centerOutline = page.locator('.pl-outline');
+      const centerContext = page.locator('.pl-context-rail');
+      if (width > 1320) {
+        await expect(centerSummary).toBeVisible();
+        await expect(centerOutline).toBeVisible();
+        await expect(centerContext).toBeVisible();
+        const [overviewBox, cardsBox, summaryBox, centerColumn, centerOutlineBox, centerContextBox] = await Promise.all([
+          centerOverview.boundingBox(), page.locator('.pl-document-cards').boundingBox(), centerSummary.boundingBox(), page.locator('.pl-reading-column').boundingBox(), centerOutline.boundingBox(), centerContext.boundingBox(),
+        ]);
+        expect(cardsBox!.x + cardsBox!.width).toBeLessThanOrEqual(summaryBox!.x - 20);
+        expect(Math.abs((overviewBox!.x + overviewBox!.width) - (summaryBox!.x + summaryBox!.width))).toBeLessThanOrEqual(1);
+        expect(centerOutlineBox!.x + centerOutlineBox!.width).toBeLessThanOrEqual(centerColumn!.x - 20);
+        expect(centerColumn!.x + centerColumn!.width).toBeLessThanOrEqual(centerContextBox!.x - 20);
+      } else {
+        await expect(centerSummary).toBeHidden();
+        await expect(centerContext).toBeHidden();
+      }
+      const first = (await cards.nth(0).boundingBox())!;
+      const second = (await cards.nth(1).boundingBox())!;
+      if (width <= 600) expect(second.y).toBeGreaterThanOrEqual(first.y + first.height);
+      else {
+        expect(Math.abs(first.y - second.y)).toBeLessThanOrEqual(1);
+        expect(second.x).toBeGreaterThanOrEqual(first.x + first.width);
+      }
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+    });
+  }
+
+  for (const lang of languages) {
+    test(`legal ${lang} print removes both side rails and lets overview cards use the available width`, async ({ page }) => {
+      await page.setViewportSize({ width: 1920, height: 900 });
+      await page.goto(localizedNavigationPath(lang, '/legal'));
+      await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+      await expectLegalReading(page, lang, 'legal');
+      try {
+        await page.emulateMedia({ media: 'print' });
+        for (const selector of ['.pe-header', '.pe-footer', '.pl-center-summary', '.pl-outline', '.pl-context-rail', '.pl-contents-mobile']) {
+          await expect(page.locator(selector)).toBeHidden();
+        }
+        await expect(page.locator('.pl-center-overview')).toHaveCSS('display', 'block');
+        await expect(page.locator('.pl-reading-layout')).toHaveCSS('display', 'block');
+        await expect(page.locator('.pl-reading-column')).toHaveCSS('max-width', 'none');
+        for (const icon of await page.locator('.pl-document-mark,.pl-card-icon').all()) {
+          await expect(icon).toHaveCSS('color', 'rgb(0, 0, 0)');
+          await expect(icon).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        }
+        const geometry = await page.locator('.pl-center-overview').evaluate(overview => {
+          const cards = overview.querySelector('.pl-document-cards')!;
+          const overviewBox = overview.getBoundingClientRect();
+          const cardsBox = cards.getBoundingClientRect();
+          return { left: Math.abs(cardsBox.left - overviewBox.left), right: Math.abs(cardsBox.right - overviewBox.right), overflow: document.documentElement.scrollWidth - innerWidth };
+        });
+        expect(geometry.left).toBeLessThanOrEqual(1);
+        expect(geometry.right).toBeLessThanOrEqual(1);
+        expect(geometry.overflow).toBeLessThanOrEqual(1);
+        const doc = getLegalDocument(lang, 'legal');
+        await expect(page.locator('.pl-article .pl-section > .pl-section-heading > h2')).toHaveText(doc.sections.map(section => section.title));
+        await page.screenshot({ path: test.info().outputPath(`legal-print-${lang}-1920.png`), fullPage: true });
+      } finally {
+        await page.emulateMedia({ media: null });
+      }
+    });
+  }
+
+  for (const lang of languages) {
+    test(`legal ${lang} locale links preserve the section and query across native navigation and Back`, async ({ page }) => {
+      await page.setViewportSize({ width: lang === 'vi' ? 390 : 1100, height: 900 });
+      const path = localizedNavigationPath(lang, '/privacy');
+      const otherLanguage = lang === 'vi' ? 'en' : 'vi';
+      const otherPath = localizedNavigationPath(otherLanguage, '/privacy');
+      const suffix = '?reading=legal-e2e';
+      const doc = getLegalDocument(lang, 'privacy');
+      const first = doc.sections[1];
+      const second = doc.sections[3];
+      await page.goto(`${path}${suffix}`);
+      await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+      const contents = lang === 'vi' ? page.locator('.pl-contents-mobile') : page.locator('.pl-outline');
+      if (lang === 'vi') await contents.locator(':scope > summary').click();
+      await contents.getByRole('link', { name: first.title, exact: true }).click();
+      await expect(page).toHaveURL(url => url.pathname === path && url.search === suffix && url.hash === `#privacy-${first.id}`);
+      await contents.getByRole('link', { name: second.title, exact: true }).click();
+      await expect(page).toHaveURL(url => url.hash === `#privacy-${second.id}`);
+      await page.goBack();
+      await expect(page).toHaveURL(url => url.hash === `#privacy-${first.id}`);
+      await expect(contents.getByRole('link', { name: first.title, exact: true })).toHaveAttribute('aria-current', 'location');
+      await expectLegalAnchorClear(page, `privacy-${first.id}`);
+      const locale = page.locator('.pe-header').getByRole('link', { name: otherLanguage === 'en' ? 'EN' : 'VN', exact: true });
+      await expect(locale).toHaveAttribute('href', `${otherPath}${suffix}#privacy-${first.id}`);
+      await locale.click();
+      await expect(page).toHaveURL(url => url.pathname === otherPath && url.search === suffix && url.hash === `#privacy-${first.id}`);
+      await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+      await expectLegalReading(page, otherLanguage, 'privacy');
+      await expectLegalAnchorClear(page, `privacy-${first.id}`);
+      await expect(page.locator('.pe-header').getByRole('link', { name: lang === 'en' ? 'EN' : 'VN', exact: true })).toHaveAttribute('href', `${path}${suffix}#privacy-${first.id}`);
+      await page.locator('.pl-document-nav').getByRole('link', { name: getLegalDocument(otherLanguage, 'terms').title, exact: true }).click();
+      await expect(page).toHaveURL(url => url.pathname === localizedNavigationPath(otherLanguage, '/terms') && !url.search && !url.hash);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(getLegalDocument(otherLanguage, 'terms').title);
+      await page.goBack();
+      await expect(page).toHaveURL(url => url.pathname === otherPath && url.search === suffix && url.hash === `#privacy-${first.id}`);
+      await expectLegalAnchorClear(page, `privacy-${first.id}`);
+      await page.goBack();
+      await expect(page).toHaveURL(url => url.pathname === path && url.search === suffix && url.hash === `#privacy-${first.id}`);
+      await expect(page.locator('html')).toHaveAttribute('lang', lang);
+      await expectLegalAnchorClear(page, `privacy-${first.id}`);
+    });
+  }
 });
