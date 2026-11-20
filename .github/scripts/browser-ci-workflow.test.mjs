@@ -245,6 +245,16 @@ function stringValues(value) {
   return value && typeof value === 'object' ? Object.values(value).flatMap(stringValues) : [];
 }
 
+test('all same-run build producers and consumers use one exact Node patch', () => {
+  const ids = [...browserJobIds, 'server', 'full-stack'];
+  for (const id of ids) {
+    const node = action(jobs[id], 'actions/setup-node').with;
+    assert.equal(node['node-version'], '22.23.5', `${id} must not resolve a floating runner cache version`);
+    assert.equal(node['node-version-file'], undefined, `${id} must use the shared explicit patch`);
+  }
+  assert.equal(Object.values(jobs).flatMap(job => actions(job, 'actions/setup-node')).length, ids.length);
+});
+
 test('CI remains an unfiltered main/PR workflow with read-only browser jobs and no new install or secret surface', () => {
   assert.equal(workflow.name, 'CI');
   assert.deepEqual(sorted(Object.keys(workflow.on)), ['pull_request', 'push']);
@@ -263,7 +273,7 @@ test('CI remains an unfiltered main/PR workflow with read-only browser jobs and 
     assert.ok(job['continue-on-error'] === undefined || job['continue-on-error'] === false);
     assert.equal(action(job, 'actions/checkout').with['persist-credentials'], false);
     const node = action(job, 'actions/setup-node').with;
-    assert.equal(String(node['node-version']), '22');
+    assert.equal(String(node['node-version']), '22.23.5');
     assert.equal(node.cache, 'npm');
     assert.equal(node['cache-dependency-path'], 'client/package-lock.json');
     for (const step of job.steps) {
