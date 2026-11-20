@@ -2874,7 +2874,12 @@ test.describe('Legal reading pages', () => {
       }
 
       test(`${path} keeps full prose, section anchors and native mobile contents without JavaScript`, async ({ browser, baseURL }) => {
-        const context = await browser.newContext({ javaScriptEnabled: false, baseURL, viewport: { width: 390, height: 844 } });
+        // Browser-level reduced-motion emulation engages the existing CSS
+        // `scroll-behavior: auto !important` override, so scrollIntoView is
+        // instant: hosted Linux WebKit stalls clicking cross-document links
+        // while Playwright's actionability re-check races the global smooth
+        // scroll (CI 44761876000 shard1, `element is outside of the viewport`).
+        const context = await browser.newContext({ javaScriptEnabled: false, baseURL, viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
         try {
           const staticPage = await context.newPage();
           await prepareLegalPage(staticPage);
