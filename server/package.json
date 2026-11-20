@@ -108,6 +108,9 @@
     "typescript-eslint": "^8.20.0"
   },
   "overrides": {
+    "@prisma/config": {
+      "effect": "3.22.1"
+    },
     "@azure/identity": {
       "@azure/msal-node": "7.1.1"
     },

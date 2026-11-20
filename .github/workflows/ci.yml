@@ -27,7 +27,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: '22.23.5'
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
@@ -94,7 +94,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: '22.23.5'
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
@@ -156,7 +156,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: '22.23.5'
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
@@ -209,7 +209,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: '22.23.5'
           cache: npm
           cache-dependency-path: server/package-lock.json
       - run: npm ci
@@ -295,7 +295,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: '22.23.5'
           cache: npm
           cache-dependency-path: |
             client/package-lock.json

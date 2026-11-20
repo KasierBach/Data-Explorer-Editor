@@ -80,6 +80,14 @@ const binding = (overrides = {}) => ({
   nodeVersion: process.version, playwrightVersion: "1.56.1",
   apiUrl: BROWSER_API_URL, variant: "browser-mock-preview-v1", ...overrides,
 });
+test("rejects adjacent Node patches without weakening same-run build binding", () => {
+  const producer = binding({ nodeVersion: "v22.23.5" });
+  const consumer = binding({ nodeVersion: "v22.23.4" });
+  assert.throws(() => assertSameBinding(producer, consumer), /BUILD_SOURCE_OR_RUN_MISMATCH/);
+  assert.throws(() => assertSameBinding(consumer, producer), /BUILD_SOURCE_OR_RUN_MISMATCH/);
+  assert.doesNotThrow(() => assertSameBinding(producer, binding({ nodeVersion: "v22.23.5" })));
+});
+
 const attempt = (status = "passed", retry = 0) => ({
   status, retry, workerIndex: 0, parallelIndex: 0, duration: 12,
   startTime: "2026-11-14T12:00:00.000Z", stdout: [], stderr: [], attachments: [],
