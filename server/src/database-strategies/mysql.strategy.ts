@@ -170,6 +170,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
     maxResultBytes: number,
     onDispatch: () => void,
     onNativeInterruption?: (error: Error) => void,
+    onNativeCompletion?: () => void,
   ): Promise<[unknown, unknown]> {
     const native = connection.connection as unknown as NativeMysqlConnection;
     if (!native || typeof native.query !== 'function') {
@@ -183,8 +184,12 @@ export class MysqlStrategy implements IDatabaseStrategy {
     // Register before stream() installs its forwarding listener. Retain the
     // native error's identity, and keep a safe listener through wire drainage.
     let nativeCommandError: unknown;
+    let nativeCommandEnded = false;
     command.on('error', (error: unknown) => {
       nativeCommandError ??= error;
+    });
+    command.once('end', () => {
+      nativeCommandEnded = true;
     });
     const stream = command.stream({ highWaterMark: 1 });
     return new Promise((resolve, reject) => {
@@ -272,6 +277,10 @@ export class MysqlStrategy implements IDatabaseStrategy {
         if (settled) return; // mysql2 also emits end after an early stream close.
         settled = true;
         stopCollecting();
+        // A successful collector plus normal native command end is positive
+        // completion proof; synthetic Readable close/end alone is not.
+        if (nativeCommandEnded && nativeCommandError === undefined)
+          onNativeCompletion?.();
         if (groups.length <= 1) {
           const group = groups[0];
           resolve([group?.header ?? group?.rows ?? [], group?.fields]);
@@ -438,8 +447,17 @@ export class MysqlStrategy implements IDatabaseStrategy {
     let streamingDispatched = false;
     let discard = false;
     let nativeInterruption: Error | undefined;
+    let nativeCompleted = false;
+    let executionCancellation: unknown;
     const assertWork = () => {
-      execution.assertRunning();
+      try {
+        execution.assertRunning();
+      } catch (error) {
+        // Capture only the actual execution guard's error. A local/DTO guard
+        // with the same text or code must never qualify for session reuse.
+        executionCancellation = error;
+        throw error;
+      }
       options?.beforeDispatch?.();
     };
     try {
@@ -473,6 +491,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
         const canWrite = !isSqlAllowedOnReadOnly(statement, 'mysql');
         streamingDispatched = false;
         nativeInterruption = undefined;
+        nativeCompleted = false;
         assertWork();
         const [rows, fields] =
           maxResultBytes !== undefined
@@ -489,6 +508,9 @@ export class MysqlStrategy implements IDatabaseStrategy {
                 },
                 (error) => {
                   nativeInterruption = error;
+                },
+                () => {
+                  nativeCompleted = true;
                 },
               )
             : await connection.query({ sql: safeSql, timeout: queryTimeout });
@@ -543,9 +565,14 @@ export class MysqlStrategy implements IDatabaseStrategy {
           typeof error === 'object' &&
           'fatal' in error &&
           error.fatal === true;
+        // Standalone SLEEP can report normal row/EOF after KILL QUERY. Reuse
+        // then requires positive command/collector completion plus the exact
+        // owned execution cancellation, not a locally fabricated error.
+        const completedCancellation =
+          nativeCompleted && executionCancellation === error;
         // Rollback and the source error listener can still veto reuse below.
         discard =
-          nativeInterruption !== error ||
+          (nativeInterruption !== error && !completedCancellation) ||
           nativeTimeout === true ||
           fatal ||
           !drained;

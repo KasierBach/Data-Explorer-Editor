@@ -172,6 +172,204 @@ describe('MySQL/MariaDB interactive native result collector', () => {
     mockControl.end.mockImplementation(async () => {});
   });
 
+  it.each(['read-only', 'prior-write batch'])(
+    'retains a session when real cancellation is followed by normal native SLEEP completion (%s)',
+    async (path) => {
+      const f = fixture(
+        path === 'prior-write batch'
+          ? [{ rows: { affectedRows: 1, serverStatus: 1 } }]
+          : [],
+      );
+      const command = new EventEmitter();
+      const stream = new Readable({ objectMode: true, read() {} });
+      const initial = f.rawQuery.getMockImplementation();
+      if (!initial) throw new Error('Missing source fixture');
+      if (path === 'prior-write batch')
+        f.rawQuery.mockImplementationOnce(initial);
+      f.rawQuery.mockImplementationOnce(() =>
+        Object.assign(command, { stream: jest.fn(() => stream) }),
+      );
+      let execution: unknown;
+      const onMutation = jest.fn(async () => {});
+      const options: InternalOptions = {
+        maxResultBytes: 1024,
+        readOnly: path === 'read-only',
+        onMutation,
+        onExecution: (handle) => {
+          execution = handle;
+        },
+      };
+      mockControl.query.mockImplementationOnce(async () => {
+        // Model the documented standalone SLEEP outcome: return 1 + normal EOF,
+        // not ER_QUERY_INTERRUPTED, after a real execution.cancel request.
+        command.emit('fields', [{ name: 'SLEEP(5)' }]);
+        stream.push({ 'SLEEP(5)': 1 });
+        command.emit('end');
+        stream.push(null);
+        return [[], []];
+      });
+      const task = observe(
+        path === 'prior-write batch'
+          ? f.batch(
+              ['INSERT INTO items VALUES (1)', 'SELECT SLEEP(5)'],
+              options,
+            )
+          : f.execute('SELECT SLEEP(5)', options),
+      );
+      await tick();
+      expect(await f.strategy.cancelActiveQuery(execution)).toBe(true);
+      expect(await task.outcome).toMatchObject({
+        message: 'Query cancelled by user.',
+      });
+      expect(f.connection.commit).not.toHaveBeenCalled();
+      expect(f.connection.rollback).toHaveBeenCalledTimes(1);
+      expect(f.connection.release).toHaveBeenCalledTimes(1);
+      expect(f.connection.destroy).not.toHaveBeenCalled();
+      expect(f.rawQuery).toHaveBeenCalledTimes(
+        path === 'prior-write batch' ? 2 : 1,
+      );
+      expect(onMutation).toHaveBeenCalledTimes(
+        path === 'prior-write batch' ? 1 : 0,
+      );
+      expect(await f.strategy.cancelActiveQuery(execution)).toBe(false);
+      expect(mockControl.query).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('holds normal-completion cancellation through pending control and drainage', async () => {
+    const f = fixture([]),
+      command = new EventEmitter();
+    const stream = new Readable({ objectMode: true, read() {} });
+    f.rawQuery.mockImplementationOnce(() =>
+      Object.assign(command, { stream: jest.fn(() => stream) }),
+    );
+    const control = deferred<typeof mockControl>(),
+      drained = deferred<void>();
+    (mysql.createConnection as jest.Mock).mockImplementationOnce(
+      () => control.promise,
+    );
+    f.connection.ping.mockImplementationOnce(() => drained.promise);
+    let execution: unknown;
+    const task = observe(
+      f.execute('SELECT SLEEP(5)', {
+        maxResultBytes: 1024,
+        readOnly: true,
+        onExecution: (handle) => {
+          execution = handle;
+        },
+      }),
+    );
+    let cancellation: Promise<boolean> | undefined;
+    try {
+      await tick();
+      cancellation = f.strategy.cancelActiveQuery(execution);
+      command.emit('fields', [{ name: 'SLEEP(5)' }]);
+      stream.push({ 'SLEEP(5)': 1 });
+      command.emit('end');
+      stream.push(null);
+      await tick();
+      expect(task.settled()).toBe(false);
+      expect(f.connection.release).not.toHaveBeenCalled();
+      control.resolve(mockControl);
+      await tick();
+      expect(f.connection.ping).toHaveBeenCalledTimes(1);
+      expect(f.connection.release).not.toHaveBeenCalled();
+      drained.resolve();
+      expect(await task.outcome).toMatchObject({
+        message: 'Query cancelled by user.',
+      });
+      expect(f.connection.rollback).toHaveBeenCalledTimes(1);
+      expect(f.connection.release).toHaveBeenCalledTimes(1);
+      expect(f.connection.destroy).not.toHaveBeenCalled();
+      expect(await cancellation).toBe(true);
+      expect(mockControl.query).toHaveBeenCalledTimes(1);
+    } finally {
+      control.resolve(mockControl);
+      drained.resolve();
+      if (!stream.destroyed) stream.push(null);
+      await cancellation;
+      await task.outcome;
+    }
+  });
+
+  it.each([
+    'local guard',
+    'local serialization',
+    'synthetic stream end',
+    'failed ping',
+    'failed rollback',
+    'source error',
+  ])(
+    'does not bless unsafe normal-completion cancellation (%s)',
+    async (kind) => {
+      const f = fixture([]),
+        command = new EventEmitter();
+      const stream = new Readable({ objectMode: true, read() {} });
+      f.rawQuery.mockImplementationOnce(() =>
+        Object.assign(command, { stream: jest.fn(() => stream) }),
+      );
+      const local = Object.assign(new TypeError('Query cancelled by user.'), {
+        code: 'ER_QUERY_INTERRUPTED',
+      });
+      let completed = false,
+        execution: unknown;
+      const options: InternalOptions = {
+        maxResultBytes: 1024,
+        readOnly: true,
+        onExecution: (handle) => {
+          execution = handle;
+        },
+        beforeDispatch: () => {
+          if (kind === 'local guard' && completed) throw local;
+        },
+      };
+      if (kind === 'failed ping')
+        f.connection.ping.mockRejectedValueOnce(new Error('drain failed'));
+      if (kind === 'failed rollback')
+        f.connection.rollback.mockRejectedValueOnce(
+          new Error('rollback failed'),
+        );
+      if (kind === 'source error')
+        f.connection.ping.mockImplementationOnce(async () => {
+          f.connection.emit('error', new Error('source failed'));
+        });
+      const finish = () => {
+        if (completed) return;
+        command.emit('fields', [{ name: 'SLEEP(5)' }]);
+        stream.push(
+          kind === 'local serialization'
+            ? {
+                value: {
+                  toJSON: () => {
+                    throw local;
+                  },
+                },
+              }
+            : { 'SLEEP(5)': 1 },
+        );
+        completed = true;
+        if (kind !== 'synthetic stream end') command.emit('end');
+        if (!stream.destroyed) stream.push(null);
+      };
+      mockControl.query.mockImplementationOnce(async () => {
+        finish();
+        return [[], []];
+      });
+      const task = observe(f.execute('SELECT SLEEP(5)', options));
+      await tick();
+      if (kind === 'local guard') finish();
+      else expect(await f.strategy.cancelActiveQuery(execution)).toBe(true);
+      const error = await task.outcome;
+      if (kind === 'local guard' || kind === 'local serialization')
+        expect(error).toBe(local);
+      else expect(error).toMatchObject({ message: 'Query cancelled by user.' });
+      expect(f.connection.commit).not.toHaveBeenCalled();
+      expect(f.connection.destroy).toHaveBeenCalledTimes(1);
+      expect(f.connection.release).not.toHaveBeenCalled();
+      expect(f.rawQuery).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it.each([
     [false, false],
     [true, false],
