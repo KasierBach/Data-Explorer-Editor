@@ -8,7 +8,9 @@
   Param,
   UseGuards,
   Request,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -21,6 +23,11 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateBillingDto } from './dto/update-billing.dto';
+import {
+  getClearedRefreshTokenCookieOptions,
+  REFRESH_TOKEN_COOKIE,
+} from '../auth/auth-cookie.util';
+import { resolveRequestLanguage } from '../common/utils/i18n.util';
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -73,13 +80,19 @@ export class UsersController {
   async changePassword(
     @Request() req: AuthenticatedRequest,
     @Body() dto: ChangePasswordDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.usersService.changePassword(req.user.id, dto);
+    const result = await this.usersService.changePassword(req.user.id, dto);
+    res.cookie(REFRESH_TOKEN_COOKIE, '', getClearedRefreshTokenCookieOptions());
+    return result;
   }
 
   @Delete('me')
   async deleteAccount(@Request() req: AuthenticatedRequest) {
-    return this.usersService.deleteAccount(req.user.id);
+    return this.usersService.deleteAccount(
+      req.user.id,
+      resolveRequestLanguage(req.headers['accept-language']),
+    );
   }
 
   @Get()
@@ -102,8 +115,14 @@ export class UsersController {
 
   @Delete(':id')
   @Roles('admin')
-  async deleteUser(@Param('id') id: string) {
-    return this.usersService.deleteAccount(id);
+  async deleteUser(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.usersService.deleteAccount(
+      id,
+      resolveRequestLanguage(req.headers['accept-language']),
+    );
   }
 
   @Patch(':id/ban')

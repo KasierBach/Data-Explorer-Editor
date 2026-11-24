@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { createHash } from 'node:crypto';
-import { expect, test, type Locator, type Page, type Request } from '@playwright/test';
+import { expect, test, type BrowserContext, type Locator, type Page, type Request } from '@playwright/test';
 import { mockAuthenticatedApi, seedPersistedWorkspace } from './support/authenticated-api';
 import { DOCS_CATALOG, getDocTopic } from '../src/core/docs/docsCatalog';
 import { getLegalDocument, type LegalDocKey } from '../src/presentation/public/legalContent';
@@ -2699,6 +2699,292 @@ test('landing offers verified web, local Docker and source paths instead of a fa
   await expect(page.locator('header').getByRole('link', { name: 'GitHub', exact: true })).toHaveAttribute('href', 'https://github.com/KasierBach/Data-Explorer-Editor');
   await expect(page.locator('footer').getByRole('link', { name: /^(Báo lỗi|Report an issue)$/ })).toHaveAttribute('href', 'https://github.com/KasierBach/Data-Explorer-Editor/issues');
   await expect(page.getByRole('link', { name: /Download|Tải ứng dụng/i })).toHaveCount(0);
+});
+
+// Reliability regressions use local fixtures only; browser execution is left to CI.
+test.describe('Frontend startup and result recovery', () => {
+  const draft = 'SELECT id, payload FROM reliability_fixture';
+  const headers = { 'access-control-allow-origin': 'http://127.0.0.1:4173', 'access-control-allow-credentials': 'true' };
+
+  async function guardFrontendRegression(page: Page) {
+    await page.context().route('**/*', async route => {
+      const request = route.request();
+      const url = new URL(request.url());
+      const staticRequest = request.method() === 'GET' && ['document', 'script', 'stylesheet', 'image', 'font', 'media', 'manifest', 'other'].includes(request.resourceType());
+      if (url.origin === 'http://127.0.0.1:4173' && staticRequest && !url.pathname.startsWith('/api/')) await route.fallback();
+      else await route.abort('blockedbyclient');
+    });
+  }
+
+  async function seedRecoveryDraft(page: Page, lang: NavigationLanguage = 'en') {
+    const state = {
+      lang,
+      connections: [{ id: 'connection-e2e', name: 'Protected Analytics', type: 'postgres', database: 'analytics', allowQueryExecution: true }],
+      activeConnectionId: 'connection-e2e', activeDatabase: 'analytics',
+      tabs: [{ id: 'recovery-query', title: 'Reliability fixture', type: 'query', metadata: { sql: draft, pageIndex: 0, pageSize: 1000, resultTab: 'data' } }],
+      activeTabId: 'recovery-query', isSidebarOpen: false, isAiPanelOpen: false, isResultPanelOpen: true,
+    };
+    await page.addInitScript(({ state, lang }) => {
+      if (sessionStorage.getItem('frontend-recovery-seeded')) return;
+      localStorage.setItem('data-explorer-storage', JSON.stringify({ state, version: 0 }));
+      localStorage.setItem('lang', lang);
+      sessionStorage.setItem('frontend-recovery-note', 'preserved session');
+      sessionStorage.setItem('frontend-recovery-seeded', 'true');
+      // Init scripts can run before the parser creates the HTML element.
+      if (document.documentElement) document.documentElement.lang = lang;
+    }, { state, lang });
+  }
+
+  async function expectRecoveryDraft(page: Page) {
+    await expect.poll(() => page.evaluate(() => {
+      const raw = localStorage.getItem('data-explorer-storage');
+      const stored = raw === null ? null : JSON.parse(raw);
+      const tabs = Array.isArray(stored?.state?.tabs) ? stored.state.tabs : [];
+      const tab = tabs.find((item: { id: string }) => item.id === 'recovery-query');
+      return { present: raw !== null, version: stored?.version ?? null, sql: tab?.metadata?.sql ?? null, note: sessionStorage.getItem('frontend-recovery-note') };
+    })).toEqual({ present: true, version: 0, sql: draft, note: 'preserved session' });
+  }
+
+  async function closeRecoveryContext(context: BrowserContext, preservePrimaryError: boolean) {
+    try {
+      await context.close();
+    } catch (error) {
+      if (!preservePrimaryError) throw error;
+    }
+  }
+
+  for (const lang of ['vi', 'en'] as const) {
+    test(`a blocked ${lang} public view keeps prerendered prose and recovers only on user reload`, async ({ page }) => {
+      await guardFrontendRegression(page);
+      // Keep a valid session: a denied refresh intentionally resets private workspace state.
+      await mockAuthenticatedApi(page);
+      await seedRecoveryDraft(page);
+      const chunk = /\/assets\/DocumentationView-[^/]+\.js(?:\?.*)?$/;
+      const blocked: string[] = [];
+      await page.route(chunk, async route => { blocked.push(route.request().url()); await route.abort('blockedbyclient'); });
+      let documents = 0;
+      page.on('request', request => { if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documents += 1; });
+      await page.goto(`${localizedNavigationPath(lang, '/docs/results')}?token=SYNTHETIC_URL_SECRET#SYNTHETIC_HASH_SECRET`);
+
+      const fallback = page.getByRole('alert');
+      await expect(fallback).toContainText(lang === 'vi' ? 'Không thể tải trang này' : 'This page could not be loaded');
+      await expect(fallback).not.toContainText(/SYNTHETIC_|https?:\/\/|Failed to fetch/);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await expect(page.locator('main').first()).toBeVisible();
+      await expect(page.locator('#root')).toHaveAttribute('data-public-rendered', '');
+      await expect(page.locator('#root')).toHaveAttribute('data-public-path', localizedNavigationPath(lang, '/docs/results'));
+      await expect(page.locator('#root')).not.toHaveAttribute('data-public-hydrated', 'true');
+      await expect.poll(() => blocked.length).toBeGreaterThan(0);
+      expect(documents).toBe(1);
+      await expectRecoveryDraft(page);
+
+      await page.unroute(chunk);
+      await fallback.getByRole('button', { name: lang === 'vi' ? 'Tải lại trang' : 'Reload page' }).click();
+      await expect(page.locator('#root')).toHaveAttribute('data-public-hydrated', 'true');
+      await expect(page.getByRole('alert')).toHaveCount(0);
+      await expectRecoveryDraft(page);
+      expect(documents).toBe(2);
+    });
+  }
+
+  test('a blocked private App import exposes safe startup recovery before React mounts', async ({ page }) => {
+    await guardFrontendRegression(page);
+    await mockAuthenticatedApi(page);
+    await seedRecoveryDraft(page);
+    const chunk = /\/assets\/App-[^/]+\.js(?:\?.*)?$/;
+    let blocked = 0;
+    await page.route(chunk, async route => { blocked += 1; await route.abort('blockedbyclient'); });
+    await page.goto('/login?token=SYNTHETIC_URL_SECRET#SYNTHETIC_HASH_SECRET');
+    const fallback = page.getByRole('alert');
+    await expect(fallback).toContainText('This page could not be loaded');
+    await expect(fallback).not.toContainText(/SYNTHETIC_|https?:\/\//);
+    await expect(page.locator('#main-content')).toHaveCount(0);
+    await expect.poll(() => blocked).toBeGreaterThan(0);
+    await expectRecoveryDraft(page);
+
+    await page.unroute(chunk);
+    await fallback.getByRole('button', { name: 'Reload page' }).click();
+    await expect(page.locator('#main-content')).toBeVisible();
+    await expect(page.locator('[data-startup-fallback]')).toHaveCount(0);
+    await expectRecoveryDraft(page);
+  });
+
+  test('a blocked lazy workspace chunk offers reload rather than a cached render retry', async ({ page }) => {
+    await guardFrontendRegression(page);
+    await mockAuthenticatedApi(page);
+    await seedRecoveryDraft(page);
+    const chunk = /\/assets\/AppShell-[^/]+\.js(?:\?.*)?$/;
+    let blocked = 0;
+    await page.route(chunk, async route => { blocked += 1; await route.abort('blockedbyclient'); });
+    let documents = 0;
+    page.on('request', request => { if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documents += 1; });
+    await page.goto('/sql-explorer?token=SYNTHETIC_URL_SECRET#SYNTHETIC_HASH_SECRET');
+    await expect.poll(() => blocked).toBeGreaterThan(0);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('heading', { name: 'Something went wrong' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^(Try again|Thử lại)$/ })).toHaveCount(0);
+    const recovery = page.getByRole('main').filter({ has: page.getByRole('heading', { name: 'Something went wrong', exact: true }) });
+    await expect(recovery).toBeVisible();
+    await expect(recovery).not.toContainText(/SYNTHETIC_|https?:\/\/|Failed to fetch/);
+    await expect(page.locator('#main-content')).toHaveCount(0);
+    expect(documents).toBe(1);
+    await expectRecoveryDraft(page);
+
+    await page.unroute(chunk);
+    await page.getByRole('button', { name: 'Reload page' }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('button', { name: /^(Run|Execute)$/ }).first()).toBeVisible();
+    await expectRecoveryDraft(page);
+    expect(documents).toBe(2);
+  });
+
+  test('query results window DOM rows, inspect with keyboard and touch, and export the whole loaded page', async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4173', hasTouch: true, acceptDownloads: true, viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    let bodyFailed = false;
+    try {
+      await guardFrontendRegression(page);
+      await mockAuthenticatedApi(page);
+      await seedRecoveryDraft(page);
+      const firstValue = `  raw first line\n${'long content '.repeat(300)}\nlast line  `;
+      const longHeaders = [
+        `reporting.statement.${'very_long_sql_identifier_'.repeat(24)}`,
+        `reporting.adjacent.${'another_long_sql_identifier_'.repeat(24)}`,
+      ];
+      const contrastColumns = [...longHeaders, ...Array.from({ length: 4 }, (_, index) => `contrast_${index + 3}`)];
+      const columns = ['id', 'payload', 'empty_value', ...contrastColumns];
+      const calls: { limit?: number; offset?: number }[] = [];
+      await page.route('http://localhost:3001/api/query', async route => {
+        if (route.request().method() !== 'POST') return route.fallback();
+        const payload = route.request().postDataJSON() as { limit?: number; offset?: number };
+        calls.push(payload);
+        const offset = payload.offset ?? 0;
+        const rows = Array.from({ length: payload.limit ?? 1000 }, (_, index) => ({
+          id: offset + index + 1,
+          payload: offset + index === 0 ? firstValue : `row-${offset + index + 1}`,
+          empty_value: offset + index === 0 ? '' : 'present',
+          ...Object.fromEntries(contrastColumns.map(name => [name, index < 500 ? 'short' : `wide-${'x'.repeat(1200)}`])),
+        }));
+        await route.fulfill({ headers, json: { columns, fields: columns.map(name => ({ name, type: name === 'id' ? 'integer' : 'text' })), rows, rowCount: rows.length, totalCount: 500_000, countStatus: 'available', durationMs: 1 } });
+      });
+      await page.goto('/sql-explorer');
+      await page.getByRole('button', { name: 'Execute', exact: true }).first().click();
+      const region = page.locator('[role="region"][aria-label="Query result"]');
+      await expect(region).toHaveCount(1);
+      await expect(region).toHaveAccessibleName('Query result');
+      await expect(page.getByText('1–1,000 / 500,000', { exact: true })).toBeVisible();
+      await expect.poll(() => region.locator('tbody tr:not([aria-hidden="true"])').count()).toBeLessThan(100);
+      await expect(region.locator('thead')).toHaveCSS('position', 'sticky');
+      await expect(region.locator('table')).toHaveCSS('table-layout', 'fixed');
+      for (const name of longHeaders) {
+        const header = region.getByRole('columnheader', { name, exact: true });
+        await expect(header).toHaveAccessibleName(name);
+        const label = header.getByTitle(name, { exact: true });
+        await expect(label).toHaveCSS('display', 'block');
+        await expect(label).toHaveCSS('overflow-x', 'hidden');
+        await expect(label).toHaveCSS('text-overflow', 'ellipsis');
+        await expect(label).toHaveCSS('white-space', 'nowrap');
+        await expect(label).toHaveAttribute('title', name);
+        const bounds = await label.evaluate(element => {
+          const labelBox = element.getBoundingClientRect();
+          const headerBox = element.closest('th')!.getBoundingClientRect();
+          return { left: labelBox.left, right: labelBox.right, headerLeft: headerBox.left, headerRight: headerBox.right, clientWidth: element.clientWidth, scrollWidth: element.scrollWidth };
+        });
+        expect(bounds.scrollWidth).toBeGreaterThan(bounds.clientWidth);
+        expect(bounds.left).toBeGreaterThanOrEqual(bounds.headerLeft);
+        expect(bounds.right).toBeLessThanOrEqual(bounds.headerRight);
+      }
+      const headerHeight = await region.locator('thead tr').evaluate(element => element.getBoundingClientRect().height);
+      expect(headerHeight).toBeGreaterThanOrEqual(28);
+      expect(headerHeight).toBeLessThanOrEqual(30);
+
+      const emptyOpener = region.getByRole('button', { name: 'empty_value, row 1: Inspect value' });
+      await emptyOpener.scrollIntoViewIfNeeded();
+      const [emptyCellBox, emptyButtonBox] = await Promise.all([emptyOpener.locator('..').boundingBox(), emptyOpener.boundingBox()]);
+      expect(emptyCellBox).not.toBeNull();
+      expect(emptyButtonBox).not.toBeNull();
+      expect(emptyButtonBox!.height).toBeGreaterThanOrEqual(28);
+      expect(emptyCellBox!.height).toBeLessThanOrEqual(30);
+      expect(emptyCellBox!.width - emptyButtonBox!.width).toBeLessThanOrEqual(2);
+      // Hit the cell's padding area, not an imaginary zero-height text glyph.
+      await page.mouse.click(emptyCellBox!.x + 3, emptyCellBox!.y + 3);
+      const emptyDialog = page.getByRole('dialog', { name: 'empty_value' });
+      await expect(emptyDialog).toBeVisible();
+      await expect.poll(() => emptyDialog.locator('pre').textContent()).toBe('');
+      await page.keyboard.press('Escape');
+      await expect(emptyOpener).toBeFocused();
+
+      const opener = region.locator('button[data-result-column="payload"][data-result-row="0"]');
+      await expect(opener).toHaveAccessibleName('payload, row 1: Inspect value');
+      await opener.focus();
+      await opener.press('Enter');
+      const dialog = page.getByRole('dialog', { name: 'payload' });
+      await expect.poll(() => dialog.locator('pre').textContent()).toBe(firstValue);
+      await expect(dialog.getByText('text', { exact: true })).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Copy value' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(opener).toBeFocused();
+
+      await region.evaluate(element => { element.scrollLeft = Math.min(160, element.scrollWidth - element.clientWidth); });
+      const layoutSnapshot = () => region.evaluate(element => ({
+        widths: Array.from(element.querySelectorAll('thead th'), header => Math.round(header.getBoundingClientRect().width * 100) / 100),
+        scrollLeft: element.scrollLeft,
+        scrollWidth: element.scrollWidth,
+      }));
+      const beforeScroll = await layoutSnapshot();
+      expect(beforeScroll.scrollLeft).toBeGreaterThan(0);
+      await region.evaluate(element => { element.scrollTop = element.scrollHeight - element.clientHeight; });
+      await expect(opener).toHaveCount(0);
+      await expect(region.getByRole('button', { name: `${longHeaders[0]}, row 1000: Inspect value` })).toContainText('wide-');
+      await expect.poll(layoutSnapshot).toEqual(beforeScroll);
+      await region.evaluate(element => { element.scrollTop = 0; });
+      await expect(opener).toBeVisible();
+
+      await page.setViewportSize({ width: 390, height: 844 });
+      await emptyOpener.tap({ position: { x: 3, y: 3 } });
+      await expect(emptyDialog).toBeVisible();
+      await expect.poll(() => emptyDialog.locator('pre').textContent()).toBe('');
+      await emptyDialog.getByRole('button', { name: 'Close' }).tap();
+      await expect(emptyOpener).toBeFocused();
+      await opener.tap();
+      await expect(dialog).toBeVisible();
+      await region.evaluate(element => { element.scrollTop = element.scrollHeight - element.clientHeight; });
+      await expect(opener).toHaveCount(0);
+      await dialog.getByRole('button', { name: 'Close' }).tap();
+      await expect(region).toBeFocused();
+      await expect.poll(() => region.locator('tbody tr:not([aria-hidden="true"])').count()).toBeLessThan(100);
+
+      const downloadPromise = page.waitForEvent('download');
+      await page.getByTitle('Export current page').click();
+      const download = await downloadPromise;
+      const stream = await download.createReadStream();
+      expect(stream).not.toBeNull();
+      let csv = '';
+      for await (const chunk of stream!) csv += chunk.toString('utf8');
+      const lines = csv.split('\r\n');
+      expect(lines).toHaveLength(1001);
+      expect(lines[0]).toBe(columns.join(','));
+      expect(lines.at(-1)).toMatch(/^1000,row-1000,present,wide-/);
+      expect(calls).toHaveLength(1);
+      await page.getByTitle('Next page').click();
+      await expect.poll(() => calls.at(-1)?.offset).toBe(1000);
+      const pageRange = page.getByText('1,001–2,000 / 500,000', { exact: true });
+      await expect(pageRange).toHaveCount(1);
+      await expect(pageRange).toBeHidden();
+      // The detailed range is intentionally hidden on mobile; verify it again at desktop size.
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await expect(pageRange).toBeVisible();
+      await expect.poll(() => region.evaluate(element => element.scrollTop)).toBe(0);
+      await expectRecoveryDraft(page);
+    } catch (error) {
+      bodyFailed = true;
+      throw error;
+    } finally {
+      // Keep a body/runner failure primary; cleanup failures still fail a successful test.
+      await closeRecoveryContext(context, bodyFailed || test.info().errors.length > 0);
+    }
+  });
 });
 
 // Legal refresh coverage is intentionally isolated from the existing public-page tests.

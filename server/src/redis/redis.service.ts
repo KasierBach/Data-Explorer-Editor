@@ -12,6 +12,7 @@ import { redisOptions, redisUrl } from './redis-client-options';
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private client: Redis;
+  private readonly disconnectedClients = new WeakSet<Redis>();
   private readonly defaultScanCount = 100;
   private readonly maxScanKeys = 10_000;
 
@@ -29,8 +30,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async onModuleDestroy() {
-    if (this.client) await this.client.quit();
+  async onModuleDestroy(): Promise<void> {
+    const client = this.client;
+    if (!client || this.disconnectedClients.has(client)) return;
+    this.disconnectedClients.add(client);
+
+    try {
+      // QUIT can queue while reconnecting. Stop only this owned client locally,
+      // without waiting for a Redis reply or allowing further reconnects.
+      client.disconnect(false);
+    } catch {
+      // Report teardown failure without aborting later Nest disposal phases.
+      this.logger.error(
+        'Failed to disconnect owned Redis client during shutdown.',
+      );
+    }
   }
 
   /**

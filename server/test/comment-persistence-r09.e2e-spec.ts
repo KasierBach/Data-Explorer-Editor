@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { Agent } from 'node:http';
 import request from 'supertest';
@@ -190,6 +191,75 @@ describe('R09 durable comments with real PostgreSQL and HTTP permissions', () =>
       emoji: '👍',
       count: 1,
       userIds: [ownerId],
+    });
+  });
+
+  it('clears old payment payloads once while preserving payment records and recent payloads', async () => {
+    const now = new Date();
+    const old = new Date(now.getTime() - 400 * 86400000);
+    // Keep these fixtures invisible to application-startup cleanup until removed.
+    await prisma.$transaction(async (tx) => {
+      const ids: string[] = [];
+      for (const [index, rawPayload] of [
+        { reference: 'retention-fixture' },
+        Prisma.DbNull,
+        Prisma.JsonNull,
+        { reference: 'recent-fixture' },
+      ].entries()) {
+        const payment = await tx.payment.create({
+          data: {
+            userId: ownerId,
+            provider: 'retention-fixture',
+            planCode: 'pro_monthly',
+            amountVnd: 10000,
+            displayAmountUsd: '0.00',
+            providerOrderId: `retention-${suffix}-${index}`,
+            createdAt: index === 3 ? now : old,
+            rawPayload,
+          },
+        });
+        ids.push(payment.id);
+      }
+      const ownedPrisma = {
+        auditLog: tx.auditLog,
+        payment: {
+          updateMany: (args: Prisma.PaymentUpdateManyArgs) =>
+            tx.payment.updateMany({
+              ...args,
+              where: { ...args.where, userId: ownerId },
+            }),
+        },
+      };
+      const cleanup = new DataRetentionService(
+        ownedPrisma as never,
+        new ConfigService({
+          AUDIT_RETENTION_DAYS: 0,
+          PAYMENT_PAYLOAD_RETENTION_DAYS: 30,
+        }),
+      );
+      const alreadyCleared = await tx.payment.findUniqueOrThrow({
+        where: { id: ids[1] },
+      });
+      expect((await cleanup.runCleanup(now)).paymentPayloads).toBe(2);
+      expect((await cleanup.runCleanup(now)).paymentPayloads).toBe(0);
+      expect(await tx.payment.count({ where: { id: { in: ids } } })).toBe(4);
+      expect(
+        await tx.payment.count({
+          where: {
+            id: { in: ids.slice(0, 3) },
+            rawPayload: { equals: Prisma.DbNull },
+          },
+        }),
+      ).toBe(3);
+      const unchanged = await tx.payment.findUniqueOrThrow({
+        where: { id: ids[1] },
+      });
+      expect(unchanged.updatedAt).toEqual(alreadyCleared.updatedAt);
+      const recent = await tx.payment.findUniqueOrThrow({
+        where: { id: ids[3] },
+      });
+      expect(recent.rawPayload).toEqual({ reference: 'recent-fixture' });
+      await tx.payment.deleteMany({ where: { id: { in: ids } } });
     });
   });
 

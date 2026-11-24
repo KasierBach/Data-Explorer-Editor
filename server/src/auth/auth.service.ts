@@ -63,20 +63,38 @@ export class AuthService implements OnModuleInit {
     await this.seedService.seedAdmin();
   }
 
-  private async issueSession(user: SessionUser) {
+  private async issueSession(
+    user: SessionUser,
+    expectedRefreshTokenHash?: string,
+  ) {
     const session = this.tokenService.generateSessionTokens(user);
     const refreshTokenHash = await bcrypt.hash(
       session.refreshToken,
       this.SALT_ROUNDS,
     );
 
-    await this.prisma.user.update({
-      where: { id: user.id },
+    const updated = await this.prisma.user.updateMany({
+      where: {
+        id: user.id,
+        password: user.password ?? null,
+        ...(expectedRefreshTokenHash !== undefined
+          ? { refreshTokenHash: expectedRefreshTokenHash }
+          : {}),
+      },
       data: {
         refreshTokenHash,
         refreshTokenExpiry: session.refreshTokenExpiresAt,
       },
     });
+    if (updated.count !== 1) {
+      throw new UnauthorizedException(
+        this.t(
+          this.resolveLanguage(user.language),
+          'Phiên làm việc đã thay đổi. Vui lòng đăng nhập lại.',
+          'Session changed. Please sign in again.',
+        ),
+      );
+    }
 
     return {
       access_token: session.accessToken,
@@ -650,7 +668,7 @@ export class AuthService implements OnModuleInit {
       );
     }
 
-    return this.issueSession(user);
+    return this.issueSession(user, user.refreshTokenHash);
   }
 
   async logout(refreshToken?: string, lang: AppLanguage = 'vi') {

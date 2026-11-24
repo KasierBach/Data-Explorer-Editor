@@ -4,7 +4,9 @@
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { pickLocalizedText, type AppLanguage } from '../common/utils/i18n.util';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { OnboardingDto } from './dto/onboarding.dto';
@@ -182,14 +184,34 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(dto.newPassword, this.SALT_ROUNDS);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { password: hashedPassword },
+      data: {
+        password: hashedPassword,
+        refreshTokenHash: null,
+        refreshTokenExpiry: null,
+      },
     });
 
     return { message: 'Password updated successfully' };
   }
 
-  async deleteAccount(userId: string) {
-    await this.prisma.user.delete({ where: { id: userId } });
+  async deleteAccount(userId: string, lang: AppLanguage = 'vi') {
+    try {
+      await this.prisma.user.delete({ where: { id: userId } });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2003'
+      ) {
+        throw new ConflictException(
+          pickLocalizedText(
+            lang,
+            'Không thể xóa tài khoản khi vẫn còn lịch sử hoạt động được lưu giữ.',
+            'This account cannot be deleted while retained activity history is linked to it.',
+          ),
+        );
+      }
+      throw error;
+    }
     return { message: 'Account deleted successfully' };
   }
 
@@ -291,7 +313,11 @@ export class UsersService {
 
     await this.prisma.user.update({
       where: { id },
-      data: { password: hashedPassword },
+      data: {
+        password: hashedPassword,
+        refreshTokenHash: null,
+        refreshTokenExpiry: null,
+      },
     });
 
     return { message: 'Password reset successfully' };

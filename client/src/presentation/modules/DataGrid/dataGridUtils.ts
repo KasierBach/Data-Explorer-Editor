@@ -106,20 +106,26 @@ export function advanceMomentumScroll(
 }
 
 export function serializeDatabaseValue(
-  value: DatabaseValue,
+  value: unknown,
   pretty = false,
 ): string {
   if (value === null) return 'NULL';
   if (value instanceof Date) return value.toISOString();
-  if (value instanceof Uint8Array) {
+  if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
     return `[binary ${value.byteLength} bytes]`;
   }
   if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') {
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
     return String(value);
   }
 
-  return JSON.stringify(value, null, pretty ? 2 : 0);
+  return JSON.stringify(value, (_key, nestedValue: unknown) => {
+    if (typeof nestedValue === 'bigint') return String(nestedValue);
+    if (nestedValue instanceof ArrayBuffer || ArrayBuffer.isView(nestedValue)) {
+      return `[binary ${nestedValue.byteLength} bytes]`;
+    }
+    return nestedValue;
+  }, pretty ? 2 : 0) ?? String(value);
 }
 
 export function previewDatabaseValue(

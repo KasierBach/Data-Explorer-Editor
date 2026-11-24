@@ -255,6 +255,19 @@ test('all same-run build producers and consumers use one exact Node patch', () =
   assert.equal(Object.values(jobs).flatMap(job => actions(job, 'actions/setup-node')).length, ids.length);
 });
 
+test('Docker watch parser checks are required before build sealing without running Docker', () => {
+  const job = jobs['client-checks-build'];
+  const entry = command(job, 'python', '-I', '-B', '../.github/scripts/docker-disk-watch.test.py');
+  assert.deepEqual(entry.words, ['python', '-I', '-B', '../.github/scripts/docker-disk-watch.test.py']);
+  requiredStep(entry.step);
+  assert.equal(workingDirectory(job, entry.step), 'client');
+  assert.ok(entry.index < command(job, 'node', helper, 'seal-build').index);
+  assert.ok(stringValues(entry.step).every(value => !value.includes('secrets.')));
+  for (const current of Object.values(jobs)) {
+    assert.equal(matchingCommands(current, 'python', '-I', '-B', '../.github/scripts/docker-disk-watch.py').length, 0);
+  }
+});
+
 test('CI remains an unfiltered main/PR workflow with read-only browser jobs and no new install or secret surface', () => {
   assert.equal(workflow.name, 'CI');
   assert.deepEqual(sorted(Object.keys(workflow.on)), ['pull_request', 'push']);

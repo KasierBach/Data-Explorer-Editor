@@ -296,6 +296,8 @@ describe('QueryService', () => {
         offset: 5,
         readOnly: true,
         onExecution: expect.any(Function),
+        beforeDispatch: expect.any(Function),
+        maxResultBytes: 32 * 1024 * 1024,
       },
     );
     expect(strategy.executeQuery).not.toHaveBeenCalled();
@@ -384,13 +386,18 @@ describe('QueryService', () => {
       1,
       {},
       'SELECT * FROM public.users ORDER BY "id" ASC',
-      { limit: 25, offset: 50, readOnly: true },
+      {
+        limit: 25,
+        offset: 50,
+        readOnly: true,
+        maxResultBytes: 32 * 1024 * 1024,
+      },
     );
     expect(strategy.executeQuery).toHaveBeenNthCalledWith(
       2,
       {},
       'SELECT COUNT(*) AS total FROM public.users',
-      { readOnly: true },
+      { readOnly: true, maxResultBytes: 32 * 1024 * 1024 },
     );
     expect(result).toEqual(
       expect.objectContaining({
@@ -719,13 +726,20 @@ describe('QueryService', () => {
         offset: 0,
         readOnly: true,
         onExecution: expect.any(Function),
+        beforeDispatch: expect.any(Function),
+        maxResultBytes: 32 * 1024 * 1024,
       },
     );
     expect(strategy.executeQuery).toHaveBeenNthCalledWith(
       2,
       {},
       'SELECT COUNT(*) AS total FROM (SELECT * FROM users ORDER BY id) AS _query_count',
-      { readOnly: true, onExecution: expect.any(Function) },
+      {
+        readOnly: true,
+        onExecution: expect.any(Function),
+        beforeDispatch: expect.any(Function),
+        maxResultBytes: 32 * 1024 * 1024,
+      },
     );
     expect(cacheManager.set).toHaveBeenCalledWith(
       'freshness:query:count',

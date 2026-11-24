@@ -38,6 +38,8 @@ jobs:
       - run: npm run lint
       - run: npm run test:cov
       - run: npm run test:prerender
+      - name: Test read-only Docker watch reader
+        run: python -I -B ../.github/scripts/docker-disk-watch.test.py
       - run: node --test ../.github/scripts/deploy-render.test.mjs ../.github/scripts/deployment-config.test.mjs ../.github/scripts/npm-audit.test.mjs ../.github/scripts/browser-ci-artifacts.test.mjs
       - name: Build the browser-test variant once
         run: npm run build

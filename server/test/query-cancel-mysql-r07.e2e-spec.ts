@@ -208,7 +208,28 @@ describe('R07 native MySQL query cancellation', () => {
         .send({})
         .expect(201);
       expect(cancelled.body.data ?? cancelled.body).toBe(true);
-      expect((await task).status).toBeGreaterThanOrEqual(400);
+      const stopped = await task;
+      // Fixed-pattern booleans only: no query values, rows, credentials, or raw errors.
+      const errorText = [
+        stopped.body?.message,
+        stopped.body?.error?.message,
+        stopped.body?.data?.message,
+        stopped.body?.details?.rootCause,
+        stopped.body?.error?.details?.rootCause,
+      ]
+        .filter((value): value is string => typeof value === 'string')
+        .join('\n');
+      console.info('R07 one-session cancellation state', {
+        status: stopped.status,
+        executionGuardCancellation: errorText.includes(
+          'Query cancelled by user.',
+        ),
+        nativeServerInterruption: errorText.includes(
+          'Query execution was interrupted',
+        ),
+        budgetOverflow: errorText.includes('runtime payload budget'),
+      });
+      expect(stopped.status).toBeGreaterThanOrEqual(400);
       const next = await auth('/api/query')
         .send({
           connectionId: connection.id,
