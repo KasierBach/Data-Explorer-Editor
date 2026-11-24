@@ -173,6 +173,285 @@ describe('MySQL/MariaDB interactive native result collector', () => {
   });
 
   it.each([
+    [false, false],
+    [true, false],
+    [false, true],
+    [true, true],
+  ])(
+    'rejects local Readable interruption-code spoofing (readOnly=%s, otherCommandError=%s)',
+    async (readOnly, otherCommandError) => {
+      const f = fixture([]),
+        command = new EventEmitter();
+      const stream = new Readable({ objectMode: true, read() {} });
+      f.rawQuery.mockImplementationOnce(() =>
+        Object.assign(command, { stream: jest.fn(() => stream) }),
+      );
+      const local = Object.assign(new TypeError('local readable failure'), {
+        code: 'ER_QUERY_INTERRUPTED',
+      });
+      const native = Object.assign(new Error('different native interruption'), {
+        code: 'ER_QUERY_INTERRUPTED',
+      });
+      const task = observe(
+        f.execute('SELECT SLEEP(5)', { maxResultBytes: 1024, readOnly }),
+      );
+      await tick();
+      // The fake command intentionally does not forward its event to this Readable.
+      // Even a previously captured different native error must not bless local.
+      if (otherCommandError) command.emit('error', native);
+      stream.destroy(local);
+      expect(await task.outcome).toBe(local);
+      expect(f.connection.ping).toHaveBeenCalledTimes(1);
+      if (readOnly) expect(f.connection.rollback).toHaveBeenCalledTimes(1);
+      expect(f.connection.destroy).toHaveBeenCalledTimes(1);
+      expect(f.connection.release).not.toHaveBeenCalled();
+      expect(f.pool.end).not.toHaveBeenCalled();
+      expect(f.rawQuery).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(['single', 'read-only', 'prior-write batch'])(
+    'preserves the same healthy session after a budgeted server interruption (%s)',
+    async (path) => {
+      // Native SERVER ERR interruption commonly omits fatal; omission is not fatal=true.
+      const interrupted = Object.assign(
+        new Error('Query execution was interrupted'),
+        {
+          code: 'ER_QUERY_INTERRUPTED',
+          errno: 1317,
+          sqlState: '70100',
+        },
+      );
+      const f = fixture([
+        ...(path === 'prior-write batch'
+          ? [{ rows: { affectedRows: 1, serverStatus: 1 } }]
+          : []),
+        { rows: [], fields: [], error: interrupted },
+      ]);
+      f.connection.threadId = 102;
+      const session = { variable: 'keep-session', temporaryRows: [{ id: 7 }] };
+      f.connection.destroy.mockImplementation(() => {
+        f.connection.threadId = 104;
+        session.variable = 'lost-session';
+        session.temporaryRows = [];
+      });
+      let execution: unknown;
+      const onMutation = jest.fn(async () => {});
+      const options: InternalOptions = {
+        maxResultBytes: 1024,
+        readOnly: path === 'read-only',
+        onMutation,
+        onExecution: (handle) => {
+          execution = handle;
+        },
+      };
+      await expect(
+        path === 'prior-write batch'
+          ? f.batch(
+              ['INSERT INTO items VALUES (1)', 'SELECT SLEEP(5)'],
+              options,
+            )
+          : f.execute('SELECT SLEEP(5)', options),
+      ).rejects.toBe(interrupted);
+      expect(mockControl.query).toHaveBeenCalledWith('KILL QUERY 102');
+      expect(mockControl.end).toHaveBeenCalledTimes(1);
+      expect(f.connection.ping).toHaveBeenCalledTimes(1);
+      if (path !== 'single')
+        expect(f.connection.rollback).toHaveBeenCalledTimes(1);
+      expect(f.connection.release).toHaveBeenCalledTimes(1);
+      expect(f.connection.destroy).not.toHaveBeenCalled();
+      const next = await f.pool.getConnection();
+      expect(next).toBe(f.connection);
+      expect(next.threadId).toBe(102);
+      expect(session).toEqual({
+        variable: 'keep-session',
+        temporaryRows: [{ id: 7 }],
+      });
+      expect(f.rawQuery).toHaveBeenCalledTimes(
+        path === 'prior-write batch' ? 2 : 1,
+      );
+      expect(f.connection.commit).not.toHaveBeenCalled();
+      expect(onMutation).toHaveBeenCalledTimes(
+        path === 'prior-write batch' ? 1 : 0,
+      );
+      expect(await f.strategy.cancelActiveQuery(execution)).toBe(false);
+      expect(mockControl.query).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each([
+    'fatal interruption',
+    'source error',
+    'failed ping',
+    'failed rollback',
+    'overflow',
+    'inactivity timeout',
+    'local collector error',
+    'local collector interruption code',
+  ])(
+    'still discards a budgeted source when reuse is unsafe (%s)',
+    async (kind) => {
+      const interrupted = Object.assign(
+        new Error('Query execution was interrupted'),
+        { code: 'ER_QUERY_INTERRUPTED' },
+      );
+      const sourceError =
+        kind === 'fatal interruption'
+          ? Object.assign(interrupted, { fatal: true })
+          : kind === 'inactivity timeout'
+            ? Object.assign(new Error('Query inactivity timeout'), {
+                code: 'PROTOCOL_SEQUENCE_TIMEOUT',
+              })
+            : interrupted;
+      const local = Object.assign(
+        new TypeError('Cannot serialize native result'),
+        kind === 'local collector interruption code'
+          ? { code: 'ER_QUERY_INTERRUPTED' }
+          : {},
+      );
+      const program: Program =
+        kind === 'overflow'
+          ? { rows: [{ value: 'x'.repeat(2048) }], fields: [{ name: 'value' }] }
+          : kind.startsWith('local collector')
+            ? {
+                rows: [
+                  {
+                    value: {
+                      toJSON: () => {
+                        throw local;
+                      },
+                    },
+                  },
+                ],
+                fields: [{ name: 'value' }],
+              }
+            : { rows: [], fields: [], error: sourceError };
+      const f = fixture([program]);
+      if (kind === 'source error')
+        f.connection.ping.mockImplementationOnce(async () => {
+          f.connection.emit('error', new Error('source transport failed'));
+        });
+      if (kind === 'failed ping')
+        f.connection.ping.mockRejectedValueOnce(
+          new Error('wire drainage failed'),
+        );
+      if (kind === 'failed rollback')
+        f.connection.rollback.mockRejectedValueOnce(
+          new Error('rollback failed'),
+        );
+      const task = f.execute('SELECT SLEEP(5)', {
+        maxResultBytes: 1024,
+        readOnly: kind === 'failed rollback',
+      });
+      if (kind === 'overflow')
+        await expect(task).rejects.toMatchObject({
+          code: 'RESULT_BYTE_BUDGET_EXCEEDED',
+        });
+      else
+        await expect(task).rejects.toBe(
+          kind.startsWith('local collector') ? local : sourceError,
+        );
+      expect(f.connection.destroy).toHaveBeenCalledTimes(1);
+      expect(f.connection.release).not.toHaveBeenCalled();
+      expect(f.pool.end).not.toHaveBeenCalled();
+      expect(f.rawQuery).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('holds a safely interrupted budgeted session through pending control and successful drainage', async () => {
+    const control = deferred<typeof mockControl>(),
+      drained = deferred<void>();
+    (mysql.createConnection as jest.Mock).mockImplementationOnce(
+      () => control.promise,
+    );
+    const interrupted = Object.assign(new Error('Query interrupted'), {
+      code: 'ER_QUERY_INTERRUPTED',
+      fatal: false,
+    });
+    const f = fixture([{ rows: [], fields: [], error: interrupted }]);
+    f.connection.ping.mockImplementationOnce(() => drained.promise);
+    let execution: unknown;
+    const task = observe(
+      f.execute('SELECT SLEEP(5)', {
+        maxResultBytes: 1024,
+        onExecution: (handle) => {
+          execution = handle;
+        },
+      }),
+    );
+    try {
+      await tick();
+      expect(task.settled()).toBe(false);
+      expect(f.connection.release).not.toHaveBeenCalled();
+      expect(f.connection.destroy).not.toHaveBeenCalled();
+      control.resolve(mockControl);
+      await tick();
+      expect(mockControl.query).toHaveBeenCalledWith('KILL QUERY 456');
+      expect(f.connection.ping).toHaveBeenCalledTimes(1);
+      expect(task.settled()).toBe(false);
+      expect(f.connection.release).not.toHaveBeenCalled();
+      drained.resolve();
+      expect(await task.outcome).toBe(interrupted);
+      expect(f.connection.release).toHaveBeenCalledTimes(1);
+      expect(f.connection.destroy).not.toHaveBeenCalled();
+      expect(await f.strategy.cancelActiveQuery(execution)).toBe(false);
+      expect(mockControl.query).toHaveBeenCalledTimes(1);
+    } finally {
+      control.resolve(mockControl);
+      drained.resolve();
+      await task.outcome;
+    }
+  });
+
+  it('preserves the session when QueryService manual cancellation interrupts its budgeted read-only source', async () => {
+    const f = fixture([]),
+      command = new EventEmitter();
+    const stream = new Readable({ objectMode: true, read() {} });
+    f.rawQuery.mockImplementationOnce(() =>
+      Object.assign(command, { stream: jest.fn(() => stream) }),
+    );
+    f.connection.threadId = 102;
+    f.connection.destroy.mockImplementation(() => {
+      f.connection.threadId = 104;
+    });
+    const interrupted = Object.assign(
+      new Error('Query execution was interrupted'),
+      { code: 'ER_QUERY_INTERRUPTED' },
+    );
+    mockControl.query.mockImplementationOnce(async () => {
+      command.emit('error', interrupted);
+      stream.destroy(interrupted);
+      command.emit('end');
+      return [[], []];
+    });
+    const { service } = interactiveService(f);
+    const task = observe(
+      service.executeQuery(
+        { connectionId: 'connection', sql: 'SELECT SLEEP(5)' },
+        'owner',
+      ),
+    );
+    await tick();
+    const entry = service.getActiveQueries('owner')[0];
+    expect(entry).toBeDefined();
+    expect(await service.cancelQuery(entry.queryId, 'owner')).toBe(true);
+    expect(await task.outcome).toMatchObject({
+      message: expect.stringContaining('Query execution was interrupted'),
+    });
+    expect(f.connection.query).toHaveBeenCalledWith(
+      'START TRANSACTION READ ONLY',
+    );
+    expect(f.connection.rollback).toHaveBeenCalledTimes(1);
+    expect(f.connection.release).toHaveBeenCalledTimes(1);
+    expect(f.connection.destroy).not.toHaveBeenCalled();
+    expect((await f.pool.getConnection()).threadId).toBe(102);
+    expect(mockControl.query).toHaveBeenCalledWith('KILL QUERY 102');
+    expect(mockControl.query).toHaveBeenCalledTimes(1);
+    expect(f.rawQuery).toHaveBeenCalledTimes(1);
+    expect(service.getActiveQueries('owner')).toEqual([]);
+  });
+
+  it.each([
     { row: { text: 'é😀漢字' }, name: 'text' },
     { row: { binary: Buffer.from([0, 9, 100, 255]) }, name: 'binary' },
   ])(

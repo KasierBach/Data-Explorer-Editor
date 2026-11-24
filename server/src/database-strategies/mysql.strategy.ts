@@ -169,6 +169,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
     queryOptions: { sql: string; timeout: number },
     maxResultBytes: number,
     onDispatch: () => void,
+    onNativeInterruption?: (error: Error) => void,
   ): Promise<[unknown, unknown]> {
     const native = connection.connection as unknown as NativeMysqlConnection;
     if (!native || typeof native.query !== 'function') {
@@ -179,9 +180,12 @@ export class MysqlStrategy implements IDatabaseStrategy {
     const budget = new QueryResultByteBudget(maxResultBytes);
     onDispatch();
     const command = native.query(queryOptions);
-    // Destroying mysql2's Readable removes its query error listener, but the
-    // source command may still emit its cancellation error while draining.
-    command.on('error', () => {});
+    // Register before stream() installs its forwarding listener. Retain the
+    // native error's identity, and keep a safe listener through wire drainage.
+    let nativeCommandError: unknown;
+    command.on('error', (error: unknown) => {
+      nativeCommandError ??= error;
+    });
     const stream = command.stream({ highWaterMark: 1 });
     return new Promise((resolve, reject) => {
       type ResultGroup = {
@@ -207,7 +211,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
         groups.length = 0;
         current = undefined;
         // Stop retaining rows now. This is NOT wire completion: the caller
-        // must cancel, queue a ping behind the source, then discard its lease.
+        // must cancel/drain before either reusing or discarding the source.
         stream.destroy();
         reject(
           error instanceof Error
@@ -251,7 +255,19 @@ export class MysqlStrategy implements IDatabaseStrategy {
       };
       command.on('fields', fields);
       stream.on('data', data);
-      stream.once('error', fail);
+      stream.once('error', (error: Error) => {
+        if (settled) return;
+        // Only a terminal native SERVER ERR interruption can qualify for reuse.
+        // Local collector/guard errors (even with this code) remain discard-only.
+        const native = error as Error & { code?: string; fatal?: boolean };
+        if (
+          error === nativeCommandError &&
+          native.code === 'ER_QUERY_INTERRUPTED' &&
+          native.fatal !== true
+        )
+          onNativeInterruption?.(error);
+        fail(error);
+      });
       stream.once('end', () => {
         if (settled) return; // mysql2 also emits end after an early stream close.
         settled = true;
@@ -311,6 +327,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
     );
     let dispatched = false;
     let discard = false;
+    let nativeInterruption: Error | undefined;
     const assertWork = () => {
       execution.assertRunning();
       options?.beforeDispatch?.();
@@ -326,6 +343,9 @@ export class MysqlStrategy implements IDatabaseStrategy {
               () => {
                 assertWork();
                 dispatched = true;
+              },
+              (error) => {
+                nativeInterruption = error;
               },
             )
           : await connection.query({ sql: safeSql, timeout: queryTimeout });
@@ -358,8 +378,22 @@ export class MysqlStrategy implements IDatabaseStrategy {
         // A push can report backpressure after destruction's initial resume;
         // unpause only this leased source after cancellation, then drain it.
         if (maxResultBytes !== undefined && dispatched) connection.resume();
-        await connection.ping().catch(() => {});
-        discard = true;
+        const drained = await connection.ping().then(
+          () => true,
+          () => false,
+        );
+        const fatal =
+          error !== null &&
+          typeof error === 'object' &&
+          'fatal' in error &&
+          error.fatal === true;
+        // A normal terminal server interruption leaves session state intact.
+        // Reuse is allowed only after proven drainage; all other errors discard.
+        discard =
+          nativeInterruption !== error ||
+          nativeTimeout === true ||
+          fatal ||
+          !drained;
       }
       if (error instanceof ResultByteBudgetError) discard = true;
       if (
@@ -403,6 +437,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
     let attemptedBudgetWrite = false;
     let streamingDispatched = false;
     let discard = false;
+    let nativeInterruption: Error | undefined;
     const assertWork = () => {
       execution.assertRunning();
       options?.beforeDispatch?.();
@@ -437,6 +472,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
               );
         const canWrite = !isSqlAllowedOnReadOnly(statement, 'mysql');
         streamingDispatched = false;
+        nativeInterruption = undefined;
         assertWork();
         const [rows, fields] =
           maxResultBytes !== undefined
@@ -450,6 +486,9 @@ export class MysqlStrategy implements IDatabaseStrategy {
                   // A RETURNING/routine/header budget failure can happen before
                   // the await resumes and before completedWrite can be set.
                   attemptedBudgetWrite ||= canWrite;
+                },
+                (error) => {
+                  nativeInterruption = error;
                 },
               )
             : await connection.query({ sql: safeSql, timeout: queryTimeout });
@@ -495,8 +534,21 @@ export class MysqlStrategy implements IDatabaseStrategy {
         await execution.cancel().catch(() => false);
         if (maxResultBytes !== undefined && streamingDispatched)
           connection.resume();
-        await connection.ping().catch(() => {});
-        discard = true;
+        const drained = await connection.ping().then(
+          () => true,
+          () => false,
+        );
+        const fatal =
+          error !== null &&
+          typeof error === 'object' &&
+          'fatal' in error &&
+          error.fatal === true;
+        // Rollback and the source error listener can still veto reuse below.
+        discard =
+          nativeInterruption !== error ||
+          nativeTimeout === true ||
+          fatal ||
+          !drained;
       }
       await execution.finish();
       if (!nativeTimeout) {

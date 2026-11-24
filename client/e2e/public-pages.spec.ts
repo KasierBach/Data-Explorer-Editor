@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { createHash } from 'node:crypto';
-import { expect, test, type Locator, type Page, type Request } from '@playwright/test';
+import { expect, test, type BrowserContext, type Locator, type Page, type Request } from '@playwright/test';
 import { mockAuthenticatedApi, seedPersistedWorkspace } from './support/authenticated-api';
 import { DOCS_CATALOG, getDocTopic } from '../src/core/docs/docsCatalog';
 import { getLegalDocument, type LegalDocKey } from '../src/presentation/public/legalContent';
@@ -2708,8 +2708,10 @@ test.describe('Frontend startup and result recovery', () => {
 
   async function guardFrontendRegression(page: Page) {
     await page.context().route('**/*', async route => {
-      const url = new URL(route.request().url());
-      if (['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) await route.fallback();
+      const request = route.request();
+      const url = new URL(request.url());
+      const staticRequest = request.method() === 'GET' && ['document', 'script', 'stylesheet', 'image', 'font', 'media', 'manifest', 'other'].includes(request.resourceType());
+      if (url.origin === 'http://127.0.0.1:4173' && staticRequest && !url.pathname.startsWith('/api/')) await route.fallback();
       else await route.abort('blockedbyclient');
     });
   }
@@ -2723,27 +2725,39 @@ test.describe('Frontend startup and result recovery', () => {
       activeTabId: 'recovery-query', isSidebarOpen: false, isAiPanelOpen: false, isResultPanelOpen: true,
     };
     await page.addInitScript(({ state, lang }) => {
-      document.documentElement.lang = lang;
       if (sessionStorage.getItem('frontend-recovery-seeded')) return;
       localStorage.setItem('data-explorer-storage', JSON.stringify({ state, version: 0 }));
       localStorage.setItem('lang', lang);
       sessionStorage.setItem('frontend-recovery-note', 'preserved session');
       sessionStorage.setItem('frontend-recovery-seeded', 'true');
+      // Init scripts can run before the parser creates the HTML element.
+      if (document.documentElement) document.documentElement.lang = lang;
     }, { state, lang });
   }
 
   async function expectRecoveryDraft(page: Page) {
     await expect.poll(() => page.evaluate(() => {
-      const stored = JSON.parse(localStorage.getItem('data-explorer-storage')!);
-      const tab = stored.state.tabs.find((item: { id: string }) => item.id === 'recovery-query');
-      return { sql: tab?.metadata?.sql, note: sessionStorage.getItem('frontend-recovery-note') };
-    })).toEqual({ sql: draft, note: 'preserved session' });
+      const raw = localStorage.getItem('data-explorer-storage');
+      const stored = raw === null ? null : JSON.parse(raw);
+      const tabs = Array.isArray(stored?.state?.tabs) ? stored.state.tabs : [];
+      const tab = tabs.find((item: { id: string }) => item.id === 'recovery-query');
+      return { present: raw !== null, version: stored?.version ?? null, sql: tab?.metadata?.sql ?? null, note: sessionStorage.getItem('frontend-recovery-note') };
+    })).toEqual({ present: true, version: 0, sql: draft, note: 'preserved session' });
+  }
+
+  async function closeRecoveryContext(context: BrowserContext, preservePrimaryError: boolean) {
+    try {
+      await context.close();
+    } catch (error) {
+      if (!preservePrimaryError) throw error;
+    }
   }
 
   for (const lang of ['vi', 'en'] as const) {
     test(`a blocked ${lang} public view keeps prerendered prose and recovers only on user reload`, async ({ page }) => {
       await guardFrontendRegression(page);
-      await mockPublicNavigationSession(page);
+      // Keep a valid session: a denied refresh intentionally resets private workspace state.
+      await mockAuthenticatedApi(page);
       await seedRecoveryDraft(page);
       const chunk = /\/assets\/DocumentationView-[^/]+\.js(?:\?.*)?$/;
       const blocked: string[] = [];
@@ -2758,7 +2772,8 @@ test.describe('Frontend startup and result recovery', () => {
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       await expect(page.locator('main').first()).toBeVisible();
-      await expect(page.locator('#root')).toHaveAttribute('data-public-rendered', 'true');
+      await expect(page.locator('#root')).toHaveAttribute('data-public-rendered', '');
+      await expect(page.locator('#root')).toHaveAttribute('data-public-path', localizedNavigationPath(lang, '/docs/results'));
       await expect(page.locator('#root')).not.toHaveAttribute('data-public-hydrated', 'true');
       await expect.poll(() => blocked.length).toBeGreaterThan(0);
       expect(documents).toBe(1);
@@ -2775,7 +2790,7 @@ test.describe('Frontend startup and result recovery', () => {
 
   test('a blocked private App import exposes safe startup recovery before React mounts', async ({ page }) => {
     await guardFrontendRegression(page);
-    await mockPublicNavigationSession(page);
+    await mockAuthenticatedApi(page);
     await seedRecoveryDraft(page);
     const chunk = /\/assets\/App-[^/]+\.js(?:\?.*)?$/;
     let blocked = 0;
@@ -2791,7 +2806,7 @@ test.describe('Frontend startup and result recovery', () => {
     await page.unroute(chunk);
     await fallback.getByRole('button', { name: 'Reload page' }).click();
     await expect(page.locator('#main-content')).toBeVisible();
-    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(page.locator('[data-startup-fallback]')).toHaveCount(0);
     await expectRecoveryDraft(page);
   });
 
@@ -2802,22 +2817,32 @@ test.describe('Frontend startup and result recovery', () => {
     const chunk = /\/assets\/AppShell-[^/]+\.js(?:\?.*)?$/;
     let blocked = 0;
     await page.route(chunk, async route => { blocked += 1; await route.abort('blockedbyclient'); });
+    let documents = 0;
+    page.on('request', request => { if (request.isNavigationRequest() && request.frame() === page.mainFrame()) documents += 1; });
     await page.goto('/sql-explorer?token=SYNTHETIC_URL_SECRET#SYNTHETIC_HASH_SECRET');
-    await expect(page.getByRole('heading', { name: 'Something went wrong' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Try again' })).toHaveCount(0);
-    await expect(page.locator('#main-content')).not.toContainText(/SYNTHETIC_|https?:\/\/|Failed to fetch/);
     await expect.poll(() => blocked).toBeGreaterThan(0);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('heading', { name: 'Something went wrong' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^(Try again|Thử lại)$/ })).toHaveCount(0);
+    const recovery = page.getByRole('main').filter({ has: page.getByRole('heading', { name: 'Something went wrong', exact: true }) });
+    await expect(recovery).toBeVisible();
+    await expect(recovery).not.toContainText(/SYNTHETIC_|https?:\/\/|Failed to fetch/);
+    await expect(page.locator('#main-content')).toHaveCount(0);
+    expect(documents).toBe(1);
     await expectRecoveryDraft(page);
 
     await page.unroute(chunk);
     await page.getByRole('button', { name: 'Reload page' }).click();
-    await expect(page.getByRole('button', { name: 'Execute', exact: true }).first()).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await expect(page.getByRole('button', { name: /^(Run|Execute)$/ }).first()).toBeVisible();
     await expectRecoveryDraft(page);
+    expect(documents).toBe(2);
   });
 
   test('query results window DOM rows, inspect with keyboard and touch, and export the whole loaded page', async ({ browser }) => {
     const context = await browser.newContext({ baseURL: 'http://127.0.0.1:4173', hasTouch: true, acceptDownloads: true, viewport: { width: 1440, height: 900 } });
     const page = await context.newPage();
+    let bodyFailed = false;
     try {
       await guardFrontendRegression(page);
       await mockAuthenticatedApi(page);
@@ -2845,7 +2870,9 @@ test.describe('Frontend startup and result recovery', () => {
       });
       await page.goto('/sql-explorer');
       await page.getByRole('button', { name: 'Execute', exact: true }).first().click();
-      const region = page.getByRole('region', { name: 'Query result' });
+      const region = page.locator('[role="region"][aria-label="Query result"]');
+      await expect(region).toHaveCount(1);
+      await expect(region).toHaveAccessibleName('Query result');
       await expect(page.getByText('1–1,000 / 500,000', { exact: true })).toBeVisible();
       await expect.poll(() => region.locator('tbody tr:not([aria-hidden="true"])').count()).toBeLessThan(100);
       await expect(region.locator('thead')).toHaveCSS('position', 'sticky');
@@ -2888,7 +2915,8 @@ test.describe('Frontend startup and result recovery', () => {
       await page.keyboard.press('Escape');
       await expect(emptyOpener).toBeFocused();
 
-      const opener = region.getByRole('button', { name: 'payload, row 1: Inspect value' });
+      const opener = region.locator('button[data-result-column="payload"][data-result-row="0"]');
+      await expect(opener).toHaveAccessibleName('payload, row 1: Inspect value');
       await opener.focus();
       await opener.press('Enter');
       const dialog = page.getByRole('dialog', { name: 'payload' });
@@ -2941,11 +2969,20 @@ test.describe('Frontend startup and result recovery', () => {
       expect(calls).toHaveLength(1);
       await page.getByTitle('Next page').click();
       await expect.poll(() => calls.at(-1)?.offset).toBe(1000);
-      await expect(page.getByText('1,001–2,000 / 500,000', { exact: true })).toBeVisible();
+      const pageRange = page.getByText('1,001–2,000 / 500,000', { exact: true });
+      await expect(pageRange).toHaveCount(1);
+      await expect(pageRange).toBeHidden();
+      // The detailed range is intentionally hidden on mobile; verify it again at desktop size.
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await expect(pageRange).toBeVisible();
       await expect.poll(() => region.evaluate(element => element.scrollTop)).toBe(0);
       await expectRecoveryDraft(page);
+    } catch (error) {
+      bodyFailed = true;
+      throw error;
     } finally {
-      await context.close();
+      // Keep a body/runner failure primary; cleanup failures still fail a successful test.
+      await closeRecoveryContext(context, bodyFailed || test.info().errors.length > 0);
     }
   });
 });

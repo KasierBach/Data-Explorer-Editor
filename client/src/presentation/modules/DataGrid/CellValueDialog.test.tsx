@@ -51,4 +51,10 @@ describe('CellValueDialog', () => {
     expect(screen.getByRole('dialog', { name: 'payload' })).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('SYNTHETIC_CLIPBOARD_SECRET');
   });
+
+  it('keeps inspector content and backdrop above sticky workspace chrome', () => {
+    render(<CellValueDialog cell={{ columnName: 'payload', columnType: 'text', rowKey: 'row 1', value: 'raw value' }} lang="en" onOpenChange={vi.fn()} />);
+    expect(screen.getByRole('dialog', { name: 'payload' })).toHaveClass('z-[100]');
+    expect(document.querySelector('[data-state="open"].fixed.inset-0')).toHaveClass('z-[100]');
+  });
 });

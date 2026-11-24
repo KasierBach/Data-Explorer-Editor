@@ -57,7 +57,8 @@ export function CellValueDialog({
   return (
     <Dialog open={Boolean(cell)} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-[calc(100vw-1rem)] border-border/60 bg-background/95 p-0 shadow-2xl backdrop-blur-xl sm:max-w-3xl"
+        className="z-[100] max-w-[calc(100vw-1rem)] border-border/60 bg-background/95 p-0 shadow-2xl backdrop-blur-xl sm:max-w-3xl"
+        overlayClassName="z-[100]"
         closeLabel={lang === 'vi' ? 'Đóng' : 'Close'}
         onCloseAutoFocus={onCloseAutoFocus}
       >
