@@ -11,6 +11,38 @@ jest.mock('../common/utils/ssrf-validator.util', () => ({
   validateHost: jest.fn(),
 }));
 
+jest.mock('net', () => {
+  const { EventEmitter } = jest.requireActual('events');
+  return {
+    createServer: jest.fn(() => {
+      const server = new EventEmitter();
+      Object.assign(server, {
+        listening: false,
+        address: () => ({ port: 15432 }),
+        listen: jest.fn(
+          (_port: number, _host: string, callback?: () => void) => {
+            queueMicrotask(() => {
+              server.listening = true;
+              server.emit('listening');
+              callback?.();
+            });
+            return server;
+          },
+        ),
+        close: jest.fn((callback?: () => void) => {
+          queueMicrotask(() => {
+            server.listening = false;
+            server.emit('close');
+            callback?.();
+          });
+          return server;
+        }),
+      });
+      return server;
+    }),
+  };
+});
+
 jest.mock('ssh2', () => ({
   Client: class MockSshClient {
     private readonly handlers = new Map<string, (...args: any[]) => void>();
@@ -37,7 +69,12 @@ jest.mock('ssh2', () => ({
     }
 
     forwardOut = jest.fn();
-    end = jest.fn();
+    end = jest.fn(() => this.emit('close'));
+    destroy = jest.fn(() => this.emit('close'));
+
+    once(event: string, handler: (...args: any[]) => void) {
+      return this.on(event, handler);
+    }
   },
 }));
 
@@ -49,6 +86,10 @@ describe('SshTunnelService SSRF guard', () => {
     latestClient = null;
     emitConnectError = false;
     service = new SshTunnelService();
+  });
+
+  afterEach(async () => {
+    await service.onModuleDestroy();
   });
 
   it('rejects tunnel destinations whose hostnames resolve to internal networks', async () => {

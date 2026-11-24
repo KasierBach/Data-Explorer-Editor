@@ -32,5 +32,8 @@ export function loadPublicView(route: PublicRoute): Promise<PublicView> {
         });
     }
     views.set(route.kind, view);
+    void view.catch(() => {
+        if (views.get(route.kind) === view) views.delete(route.kind);
+    });
     return view;
 }

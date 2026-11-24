@@ -35,14 +35,19 @@ export class AuthService {
         return await apiService.post<{ message: string }>('/auth/logout', {}, {}, false);
     }
 
-    static async logoutAndRedirect(redirectTo = '/login'): Promise<void> {
+    static async logoutAndRedirect(
+        redirectTo = '/login',
+        options: { preserveWorkspace?: boolean; remoteLogout?: boolean } = {},
+    ): Promise<void> {
         apiService.beginLogout();
         try {
-            await AuthService.logout();
+            if (options.remoteLogout !== false) {
+                await AuthService.logout();
+            }
         } catch {
             // Best effort. We still clear local auth state below.
         } finally {
-            useAppStore.getState().logout({ preserveWorkspace: false });
+            useAppStore.getState().logout({ preserveWorkspace: options.preserveWorkspace ?? false });
             window.location.replace(redirectTo);
             setTimeout(() => {
                 apiService.endLogout();

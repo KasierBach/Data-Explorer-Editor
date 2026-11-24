@@ -124,6 +124,10 @@ export interface QueryExecutionOptions {
   offset?: number;
   readOnly?: boolean;
   onExecution?: (execution: QueryExecutionHandle) => void;
+  /** Internal interactive JSON/UTF-8 payload safety budget; absent preserves internal/export behavior. */
+  maxResultBytes?: number;
+  /** Internal request-local wall-clock/abort check immediately before work, never cleanup. */
+  beforeDispatch?: () => void;
   /** Refresh after a committed write or an uncertain partial batch; this is not a success signal. */
   onMutation?: () => Promise<void>;
 }

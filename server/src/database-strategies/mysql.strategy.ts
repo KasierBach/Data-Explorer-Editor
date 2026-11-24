@@ -16,7 +16,9 @@ import { SchemaOperation } from '../query/dto/schema-operations.types';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import * as mysql from 'mysql2/promise';
 import { Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
+import type { Connection as NativeMysqlConnection, FieldPacket } from 'mysql2';
 import { SqlUtil } from '../utils/sql.util';
+import { getErrorMessage } from '../common/utils/error.util';
 import {
   isSqlAllowedOnReadOnly,
   splitSqlStatements,
@@ -30,6 +32,12 @@ import {
   createQueryExecution,
   cancelQueryExecution,
 } from './query-execution.util';
+import {
+  assertResultByteBudget,
+  QueryResultByteBudget,
+  ResultByteBudgetError,
+  validateResultByteBudget,
+} from './query-result-budget.util';
 
 @Injectable()
 export class MysqlStrategy implements IDatabaseStrategy {
@@ -155,11 +163,119 @@ export class MysqlStrategy implements IDatabaseStrategy {
     }
   }
 
+  /** Native rows arrive without mysql2's promise-wrapper result array allocation. */
+  private collectQueryResult(
+    connection: mysql.PoolConnection,
+    queryOptions: { sql: string; timeout: number },
+    maxResultBytes: number,
+    onDispatch: () => void,
+  ): Promise<[unknown, unknown]> {
+    const native = connection.connection as unknown as NativeMysqlConnection;
+    if (!native || typeof native.query !== 'function') {
+      throw new Error(
+        'Native MySQL streaming is required for a budgeted query.',
+      );
+    }
+    const budget = new QueryResultByteBudget(maxResultBytes);
+    onDispatch();
+    const command = native.query(queryOptions);
+    // Destroying mysql2's Readable removes its query error listener, but the
+    // source command may still emit its cancellation error while draining.
+    command.on('error', () => {});
+    const stream = command.stream({ highWaterMark: 1 });
+    return new Promise((resolve, reject) => {
+      type ResultGroup = {
+        rows: Record<string, unknown>[];
+        fields?: FieldPacket[];
+        header?: unknown;
+      };
+      const groups: ResultGroup[] = [];
+      let current: ResultGroup | undefined;
+      let settled = false;
+      const stopCollecting = () => {
+        command.removeListener('fields', fields);
+        stream.removeListener('data', data);
+      };
+      const fail = (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        stopCollecting();
+        for (const group of groups) {
+          group.rows.length = 0;
+          group.header = undefined;
+        }
+        groups.length = 0;
+        current = undefined;
+        // Stop retaining rows now. This is NOT wire completion: the caller
+        // must cancel, queue a ping behind the source, then discard its lease.
+        stream.destroy();
+        reject(
+          error instanceof Error
+            ? error
+            : Object.assign(
+                new Error(getErrorMessage(error)),
+                error !== null && typeof error === 'object' ? error : {},
+              ),
+        );
+      };
+      const fields = (packets?: FieldPacket[]) => {
+        try {
+          if (groups.length > 0) budget.nextResultSet();
+          current = { rows: [], fields: packets };
+          groups.push(current);
+          budget.setColumns(packets?.map((field) => field.name) ?? []);
+        } catch (error) {
+          fail(error);
+        }
+      };
+      const data = (row: Record<string, unknown>) => {
+        if (settled) return;
+        try {
+          current ??= { rows: [] };
+          if (groups.length === 0) groups.push(current);
+          if (current.fields !== undefined) {
+            // A decoded single row can itself be huge; streaming bounds
+            // accumulated payload, not mysql2's decoding of that one row.
+            budget.addRow(row);
+            if (current.rows.length < 50000) current.rows.push(row);
+          } else {
+            budget.retainHeader(row);
+            budget.setRowCount(
+              (row as unknown as ResultSetHeader).affectedRows,
+            );
+            current.header = row;
+          }
+        } catch (error) {
+          fail(error);
+        }
+      };
+      command.on('fields', fields);
+      stream.on('data', data);
+      stream.once('error', fail);
+      stream.once('end', () => {
+        if (settled) return; // mysql2 also emits end after an early stream close.
+        settled = true;
+        stopCollecting();
+        if (groups.length <= 1) {
+          const group = groups[0];
+          resolve([group?.header ?? group?.rows ?? [], group?.fields]);
+        } else {
+          // Preserve mysql2's multiple-result tuple shape (e.g. stored routines).
+          resolve([
+            groups.map((group) => group.header ?? group.rows),
+            groups.map((group) => group.fields),
+          ]);
+        }
+      });
+    });
+  }
+
   async executeQuery(
     pool: Pool,
     sql: string,
     options?: QueryExecutionOptions,
   ): Promise<QueryResult> {
+    const maxResultBytes = validateResultByteBudget(options?.maxResultBytes);
     if (options?.readOnly) {
       return this.runStatementsInTransaction(pool, [sql], {
         ...options,
@@ -193,19 +309,32 @@ export class MysqlStrategy implements IDatabaseStrategy {
       pool,
       options,
     );
-    try {
+    let dispatched = false;
+    let discard = false;
+    const assertWork = () => {
       execution.assertRunning();
-      const [result, fields] = await connection.query({
-        sql: safeSql,
-        timeout: queryTimeout,
-      });
+      options?.beforeDispatch?.();
+    };
+    try {
+      assertWork();
+      const [result, fields] =
+        maxResultBytes !== undefined
+          ? await this.collectQueryResult(
+              connection,
+              { sql: safeSql, timeout: queryTimeout },
+              maxResultBytes,
+              () => {
+                assertWork();
+                dispatched = true;
+              },
+            )
+          : await connection.query({ sql: safeSql, timeout: queryTimeout });
 
       const rows: Record<string, unknown>[] = Array.isArray(result)
         ? (result as RowDataPacket[]).map((r) => r as Record<string, unknown>)
         : [];
       const actualFields = Array.isArray(fields) ? fields : [];
-
-      return {
+      const queryResult: QueryResult = {
         rows: rows.slice(0, 50000),
         columns: actualFields.map((f) => f.name),
         rowCount:
@@ -214,22 +343,42 @@ export class MysqlStrategy implements IDatabaseStrategy {
             ? (result as ResultSetHeader).affectedRows
             : undefined,
       };
+      if (maxResultBytes !== undefined)
+        assertResultByteBudget(queryResult, maxResultBytes);
+      return queryResult;
     } catch (error) {
-      if (
+      const nativeTimeout =
         error &&
         typeof error === 'object' &&
         'code' in error &&
-        error.code === 'PROTOCOL_SEQUENCE_TIMEOUT'
-      ) {
-        await execution.cancel();
-        // The timeout callback precedes wire completion; ping queues behind the source command.
+        error.code === 'PROTOCOL_SEQUENCE_TIMEOUT';
+      if ((maxResultBytes !== undefined && dispatched) || nativeTimeout) {
+        await execution.cancel().catch(() => false);
+        // Stream close and inactivity timeout both precede wire completion.
+        // A push can report backpressure after destruction's initial resume;
+        // unpause only this leased source after cancellation, then drain it.
+        if (maxResultBytes !== undefined && dispatched) connection.resume();
         await connection.ping().catch(() => {});
-        release(true);
+        discard = true;
+      }
+      if (error instanceof ResultByteBudgetError) discard = true;
+      if (
+        error instanceof ResultByteBudgetError &&
+        dispatched &&
+        !isSqlAllowedOnReadOnly(sql, 'mysql')
+      ) {
+        try {
+          await options?.onMutation?.();
+        } catch {
+          this.logger.error(
+            'Cache refresh failed after an uncertain MySQL write.',
+          );
+        }
       }
       throw error;
     } finally {
       await execution.finish();
-      release();
+      release(discard);
     }
   }
 
@@ -242,6 +391,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
     statements: string[],
     options?: QueryExecutionOptions,
   ): Promise<QueryResult> {
+    const maxResultBytes = validateResultByteBudget(options?.maxResultBytes);
     const queryTimeout =
       (pool as Pool & { __statementTimeout?: number }).__statementTimeout ??
       30000;
@@ -250,8 +400,15 @@ export class MysqlStrategy implements IDatabaseStrategy {
       options,
     );
     let completedWrite = false;
-    try {
+    let attemptedBudgetWrite = false;
+    let streamingDispatched = false;
+    let discard = false;
+    const assertWork = () => {
       execution.assertRunning();
+      options?.beforeDispatch?.();
+    };
+    try {
+      assertWork();
       if (options?.readOnly) {
         await connection.query('START TRANSACTION READ ONLY');
       } else {
@@ -262,9 +419,9 @@ export class MysqlStrategy implements IDatabaseStrategy {
         columns: [],
         countStatus: 'skipped',
       };
-      for (const statement of statements) {
-        execution.assertRunning();
-        const isLast = statement === statements[statements.length - 1];
+      for (const [index, statement] of statements.entries()) {
+        assertWork();
+        const isLast = index === statements.length - 1;
         const safeSql =
           isLast && options?.offset !== undefined
             ? SqlUtil.injectPagination(
@@ -278,11 +435,25 @@ export class MysqlStrategy implements IDatabaseStrategy {
                 isLast ? (options?.limit ?? 50000) : 50000,
                 'mysql',
               );
-        const [rows, fields] = await connection.query({
-          sql: safeSql,
-          timeout: queryTimeout,
-        });
-        if (!isSqlAllowedOnReadOnly(statement, 'mysql')) completedWrite = true;
+        const canWrite = !isSqlAllowedOnReadOnly(statement, 'mysql');
+        streamingDispatched = false;
+        assertWork();
+        const [rows, fields] =
+          maxResultBytes !== undefined
+            ? await this.collectQueryResult(
+                connection,
+                { sql: safeSql, timeout: queryTimeout },
+                maxResultBytes,
+                () => {
+                  assertWork();
+                  streamingDispatched = true;
+                  // A RETURNING/routine/header budget failure can happen before
+                  // the await resumes and before completedWrite can be set.
+                  attemptedBudgetWrite ||= canWrite;
+                },
+              )
+            : await connection.query({ sql: safeSql, timeout: queryTimeout });
+        if (canWrite) completedWrite = true;
         if (
           completedWrite &&
           !Array.isArray(rows) &&
@@ -306,30 +477,44 @@ export class MysqlStrategy implements IDatabaseStrategy {
           };
         }
       }
-      execution.assertRunning();
+      if (maxResultBytes !== undefined)
+        assertResultByteBudget(result, maxResultBytes);
+      assertWork();
       await connection.commit();
       return result;
     } catch (error) {
-      if (
+      const nativeTimeout =
         error &&
         typeof error === 'object' &&
         'code' in error &&
-        error.code === 'PROTOCOL_SEQUENCE_TIMEOUT'
+        error.code === 'PROTOCOL_SEQUENCE_TIMEOUT';
+      if (
+        (maxResultBytes !== undefined && streamingDispatched) ||
+        nativeTimeout
       ) {
-        await execution.cancel();
+        await execution.cancel().catch(() => false);
+        if (maxResultBytes !== undefined && streamingDispatched)
+          connection.resume();
         await connection.ping().catch(() => {});
-        await execution.finish();
-        release(true);
-      } else {
-        await execution.finish();
+        discard = true;
+      }
+      await execution.finish();
+      if (!nativeTimeout) {
         try {
+          // Rollback must queue after source drainage, never concurrently with
+          // the cancelled command. DDL/nontransactional writes can survive it.
           await connection.rollback();
         } catch {
-          release(true);
+          discard = true;
         }
       }
-      // A failed DDL may already have committed an earlier write before rollback.
-      if (completedWrite) {
+      if (error instanceof ResultByteBudgetError) discard = true;
+      // A failed DDL may already have committed earlier writes. A budget failure
+      // during a mutating statement is uncertain even without completedWrite.
+      if (
+        completedWrite ||
+        (error instanceof ResultByteBudgetError && attemptedBudgetWrite)
+      ) {
         try {
           await options?.onMutation?.();
         } catch {
@@ -341,7 +526,7 @@ export class MysqlStrategy implements IDatabaseStrategy {
       throw error;
     } finally {
       await execution.finish();
-      release();
+      release(discard);
     }
   }
 

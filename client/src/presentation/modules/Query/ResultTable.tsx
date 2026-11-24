@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     useReactTable,
     getCoreRowModel,
     flexRender,
     type CellContext,
 } from '@tanstack/react-table';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import type { QueryResult, RowData } from '@/core/domain/entities';
 import { Info } from 'lucide-react';
 import { useResponsiveLayoutMode } from '@/presentation/hooks/useResponsiveLayoutMode';
@@ -12,6 +13,13 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/presentation/components/ui/button';
 import { Input } from '@/presentation/components/ui/input';
 import { useAppStore } from '@/core/services/store';
+import { CellValueDialog } from '../DataGrid/CellValueDialog';
+import {
+    getAutoFitColumnWidth,
+    getInitialColumnWidth,
+    previewDatabaseValue,
+    type SelectedCellState,
+} from '../DataGrid/dataGridUtils';
 
 const DEFAULT_PAGE_SIZE = 100;
 const PAGE_SIZE_OPTIONS = [50, 100, 500, 1000] as const;
@@ -23,6 +31,32 @@ interface ResultTableProps {
     totalCount?: number;
     isFetching?: boolean;
     onPaginationChange: (pageIndex: number, pageSize: number) => void;
+}
+
+interface ResultCellSelection {
+    cell: SelectedCellState;
+    results: QueryResult;
+    pageIndex: number;
+    pageSize: number;
+    rowIndex: number;
+    row: RowData;
+}
+
+function isCurrentResultCell(
+    selection: ResultCellSelection | null,
+    results: QueryResult | null,
+    pageIndex: number,
+    pageSize: number,
+    isFetching: boolean,
+): boolean {
+    return Boolean(
+        selection && results && !isFetching &&
+        selection.results === results &&
+        selection.pageIndex === pageIndex && selection.pageSize === pageSize &&
+        results.rows[selection.rowIndex] === selection.row &&
+        results.columns?.includes(selection.cell.columnName) &&
+        Object.is(results.rows[selection.rowIndex]?.[selection.cell.columnName], selection.cell.value),
+    );
 }
 
 export const ResultTable: React.FC<ResultTableProps> = ({
@@ -50,20 +84,39 @@ export const ResultTable: React.FC<ResultTableProps> = ({
         ? offset + data.length < resolvedTotal
         : data.length === normalizedPageSize;
     const [pageJumpValue, setPageJumpValue] = useState(String(pageIndex + 1));
+    const [selectedCell, setSelectedCell] = useState<ResultCellSelection | null>(null);
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const cellOpenerRef = useRef<{ element: HTMLButtonElement; selection: ResultCellSelection } | null>(null);
+    const visibleCell = isCurrentResultCell(selectedCell, results, pageIndex, normalizedPageSize, isFetching)
+        ? selectedCell?.cell ?? null
+        : null;
 
+    // Size from the loaded page, never from whichever rows happen to be mounted.
     const columns = useMemo(() => {
         if (!results?.columns) return [];
-        return results.columns.map((colName: string) => ({
-            header: colName,
-            accessorKey: colName,
-            cell: (info: CellContext<RowData, unknown>) => {
-                const val = info.getValue();
-                if (val === null) return <span className="text-muted-foreground italic">null</span>;
-                if (typeof val === 'object') return JSON.stringify(val);
-                return String(val);
-            },
-        }));
-    }, [results]);
+        return results.columns.map((colName: string) => {
+            const column = {
+                name: colName,
+                type: results.fields?.find(field => field.name === colName)?.type || 'unknown',
+                isPrimaryKey: false,
+                isForeignKey: false,
+                isNullable: true,
+            };
+            return {
+                header: colName,
+                accessorKey: colName,
+                size: Math.min(
+                    isCompactMobileLayout ? 200 : 400,
+                    Math.max(getInitialColumnWidth(column), getAutoFitColumnWidth(column, data)),
+                ),
+                cell: (info: CellContext<RowData, unknown>) => {
+                    const val = info.row.original[colName];
+                    if (val === null) return <span className="text-muted-foreground italic">null</span>;
+                    return previewDatabaseValue(val);
+                },
+            };
+        });
+    }, [data, isCompactMobileLayout, results]);
 
     // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
@@ -71,10 +124,24 @@ export const ResultTable: React.FC<ResultTableProps> = ({
         columns,
         getCoreRowModel: getCoreRowModel(),
     });
+    const { rows } = table.getRowModel();
+    const rowVirtualizer = useVirtualizer({
+        count: rows.length,
+        getScrollElement: () => tableContainerRef.current,
+        estimateSize: () => 29,
+        overscan: isCompactMobileLayout ? 6 : Math.min(16, Math.max(8, Math.ceil(normalizedPageSize / 100))),
+    });
+    const virtualRows = rowVirtualizer.getVirtualItems();
+    const topSpacerHeight = virtualRows[0]?.start ?? 0;
+    const bottomSpacerHeight = virtualRows.length > 0
+        ? rowVirtualizer.getTotalSize() - (virtualRows[virtualRows.length - 1]?.end ?? 0)
+        : 0;
 
     const copy = lang === 'vi'
         ? {
             rows: 'dòng',
+            row: 'dòng',
+            inspect: 'Xem giá trị',
             perPage: 'trang',
             loading: 'Đang tải…',
             empty: 'Truy vấn không trả về dòng nào.',
@@ -87,6 +154,8 @@ export const ResultTable: React.FC<ResultTableProps> = ({
         }
         : {
             rows: 'rows',
+            row: 'row',
+            inspect: 'Inspect value',
             perPage: 'page',
             loading: 'Loading…',
             empty: 'Query returned no rows.',
@@ -101,6 +170,18 @@ export const ResultTable: React.FC<ResultTableProps> = ({
     useEffect(() => {
         setPageJumpValue(String(pageIndex + 1));
     }, [pageIndex]);
+
+    useEffect(() => {
+        setSelectedCell(current => isCurrentResultCell(current, results, pageIndex, normalizedPageSize, isFetching) ? current : null);
+        const opener = cellOpenerRef.current;
+        if (opener && !isCurrentResultCell(opener.selection, results, pageIndex, normalizedPageSize, isFetching)) {
+            cellOpenerRef.current = null;
+        }
+    }, [isFetching, normalizedPageSize, pageIndex, results]);
+
+    useEffect(() => {
+        rowVirtualizer.scrollToOffset(0);
+    }, [normalizedPageSize, pageIndex, rowVirtualizer]);
 
     useEffect(() => {
         if (totalPages !== undefined && pageIndex >= totalPages) {
@@ -132,42 +213,113 @@ export const ResultTable: React.FC<ResultTableProps> = ({
     const totalLabel = resolvedTotal !== undefined
         ? resolvedTotal.toLocaleString()
         : `${endRow.toLocaleString()}+`;
+    const rowNumberWidth = Math.max(40, String(endRow).length * 6 + 16);
 
     return (
         <div className="w-full h-full flex flex-col overflow-hidden bg-background">
-            <div tabIndex={0} role="region" aria-label={copy.result} className="flex-1 w-full overflow-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
-                <table className="w-full text-xs text-left border-collapse min-w-full">
+            <div ref={tableContainerRef} tabIndex={0} role="region" aria-label={copy.result} className="flex-1 min-h-0 w-full overflow-auto scrollbar-thin scrollbar-thumb-muted-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                <table aria-rowcount={resolvedTotal === undefined ? -1 : resolvedTotal + 1} style={{ width: rowNumberWidth + table.getTotalSize() }} className="table-fixed text-xs text-left border-collapse min-w-full">
+                    <colgroup>
+                        <col style={{ width: rowNumberWidth }} />
+                        {table.getAllLeafColumns().map((column, index, allColumns) => (
+                            <col key={column.id} style={{ width: index === allColumns.length - 1 ? 'auto' : column.getSize() }} />
+                        ))}
+                    </colgroup>
                     <thead className="bg-muted/50 sticky top-0 z-10 shadow-sm">
                         {table.getHeaderGroups().map(headerGroup => (
                             <tr key={headerGroup.id}>
                                 <th className="p-1 px-2 border-b border-r bg-muted/30 text-center text-[9px] w-8">#</th>
                                 {headerGroup.headers.map(header => (
                                     <th key={header.id} className="p-1.5 px-3 border-b border-r font-semibold text-muted-foreground whitespace-nowrap bg-muted/10">
-                                        {flexRender(header.column.columnDef.header, header.getContext())}
+                                        <span className="block truncate" title={header.column.columnDef.header as string}>
+                                            {flexRender(header.column.columnDef.header, header.getContext())}
+                                        </span>
                                     </th>
                                 ))}
                             </tr>
                         ))}
                     </thead>
                     <tbody>
-                        {table.getRowModel().rows.map((row, idx) => (
-                            <tr key={row.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 border-b last:border-0 group">
-                                <td className="p-1 px-2 border-r bg-muted/5 text-center text-[9px] text-muted-foreground group-hover:bg-muted/20">
-                                    {offset + idx + 1}
-                                </td>
-                                {row.getVisibleCells().map(cell => (
-                                    <td key={cell.id} className={cn(
-                                        'p-1.5 px-3 border-r last:border-r-0 whitespace-nowrap truncate',
-                                        isCompactMobileLayout ? 'max-w-[200px]' : 'max-w-[400px]',
-                                    )}>
-                                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {topSpacerHeight > 0 && (
+                            <tr aria-hidden="true"><td colSpan={columns.length + 1} style={{ height: topSpacerHeight, padding: 0 }} /></tr>
+                        )}
+                        {virtualRows.map(virtualRow => {
+                            const row = rows[virtualRow.index];
+                            const rowNumber = offset + row.index + 1;
+                            return (
+                                <tr key={row.id} aria-rowindex={rowNumber + 1} style={{ height: virtualRow.size }} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/10 border-b last:border-0 group">
+                                    <td className="p-1 px-2 border-r bg-muted/5 text-center text-[9px] text-muted-foreground group-hover:bg-muted/20">
+                                        {rowNumber}
                                     </td>
-                                ))}
-                            </tr>
-                        ))}
+                                    {row.getVisibleCells().map(cell => {
+                                        const columnName = cell.column.columnDef.header as string;
+                                        return (
+                                            <td key={cell.id} className={cn(
+                                                'p-0 border-r last:border-r-0 whitespace-nowrap truncate',
+                                                isCompactMobileLayout ? 'max-w-[200px]' : 'max-w-[400px]',
+                                            )}>
+                                                <button
+                                                    type="button"
+                                                    className="block min-h-7 w-full px-3 py-1.5 overflow-hidden text-ellipsis text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+                                                    aria-label={`${columnName}, ${copy.row} ${rowNumber}: ${copy.inspect}`}
+                                                    data-result-row={row.index}
+                                                    data-result-column={columnName}
+                                                    title={copy.inspect}
+                                                    disabled={isFetching}
+                                                    onClick={event => {
+                                                        if (isFetching) return;
+                                                        const selection: ResultCellSelection = {
+                                                            cell: {
+                                                                columnName,
+                                                                columnType: results.fields?.find(field => field.name === columnName)?.type || 'unknown',
+                                                                rowKey: `${copy.row} ${rowNumber}`,
+                                                                value: row.original[columnName],
+                                                            },
+                                                            results,
+                                                            pageIndex,
+                                                            pageSize: normalizedPageSize,
+                                                            rowIndex: row.index,
+                                                            row: row.original,
+                                                        };
+                                                        cellOpenerRef.current = { element: event.currentTarget, selection };
+                                                        setSelectedCell(selection);
+                                                    }}
+                                                >
+                                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                </button>
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            );
+                        })}
+                        {bottomSpacerHeight > 0 && (
+                            <tr aria-hidden="true"><td colSpan={columns.length + 1} style={{ height: bottomSpacerHeight, padding: 0 }} /></tr>
+                        )}
                     </tbody>
                 </table>
             </div>
+
+            <CellValueDialog
+                cell={visibleCell}
+                lang={lang}
+                onOpenChange={open => { if (!open) setSelectedCell(null); }}
+                onCloseAutoFocus={event => {
+                    event.preventDefault();
+                    const opener = cellOpenerRef.current;
+                    if (
+                        opener?.element.isConnected &&
+                        isCurrentResultCell(opener.selection, results, pageIndex, normalizedPageSize, isFetching) &&
+                        opener.element.dataset.resultRow === String(opener.selection.rowIndex) &&
+                        opener.element.dataset.resultColumn === opener.selection.cell.columnName
+                    ) {
+                        opener.element.focus({ preventScroll: true });
+                    } else {
+                        tableContainerRef.current?.focus({ preventScroll: true });
+                    }
+                    cellOpenerRef.current = null;
+                }}
+            />
 
             <div className="min-h-7 px-3 py-1 border-t bg-muted/20 flex items-center justify-between gap-3 shrink-0 overflow-x-auto text-[10px] text-muted-foreground uppercase tracking-wider font-medium">
                 <div className="flex shrink-0 items-center gap-4">

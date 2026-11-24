@@ -32,6 +32,8 @@ export const useAccountSecurity = (onClose?: () => void) => {
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
+            onClose?.();
+            await AuthService.logoutAndRedirect('/login', { preserveWorkspace: true, remoteLogout: false });
             return true;
         } catch (err) {
             toast.error(getErrorMessage(err));

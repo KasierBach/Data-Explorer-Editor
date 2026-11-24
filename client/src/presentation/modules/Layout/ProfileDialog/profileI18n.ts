@@ -5,7 +5,7 @@ export function getProfileDialogText(lang: AppLang | string | null | undefined) 
     profileUpdated: pickLocalizedText(lang, 'Cập nhật hồ sơ thành công!', 'Profile updated successfully!'),
     avatarUpdated: pickLocalizedText(lang, 'Cập nhật ảnh đại diện thành công!', 'Avatar updated successfully!'),
     passwordsDoNotMatch: pickLocalizedText(lang, 'Mật khẩu xác nhận không khớp', 'Passwords do not match'),
-    passwordChanged: pickLocalizedText(lang, 'Đổi mật khẩu thành công!', 'Password changed successfully!'),
+    passwordChanged: pickLocalizedText(lang, 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.', 'Password changed successfully. Please sign in again.'),
     settingsUpdated: pickLocalizedText(lang, 'Cập nhật cài đặt thành công!', 'Settings updated successfully!'),
   };
 }

@@ -20,21 +20,49 @@ import { Permission } from '../permissions/enums/permission.enum';
 import { PermissionsService } from '../permissions/services/permissions.service';
 import { getErrorMessage } from '../common/utils/error.util';
 import { assertTeamConnectionAccess } from '../permissions/utils/team-connection-access.util';
+import type { IDatabaseStrategy } from '../database-strategies/database-strategy.interface';
+
+interface PoolResource {
+  pool: any;
+  lastAccessed: number;
+  createdAt: number;
+  connectionId: string;
+  database: string | null;
+  generation: number;
+  strategy: Pick<IDatabaseStrategy, 'closePool'>;
+  tunnelKey?: string;
+  closing?: Promise<void>;
+}
+
+interface PoolCreation {
+  connectionId: string;
+  generation: number;
+  tunnelKey?: string;
+  promise: Promise<PoolResource>;
+}
+
+interface ConnectionPoolState {
+  generation: number;
+  mutations: number;
+  deleted: boolean;
+  publications: Set<Promise<unknown>>;
+}
 
 @Injectable()
 export class ConnectionsService implements OnModuleDestroy {
   private readonly logger = new Logger(ConnectionsService.name);
-  private pools = new Map<
+  private pools = new Map<string, PoolResource>();
+  private readonly poolCreations = new Map<string, PoolCreation>();
+  private readonly poolCreationsInFlight = new Set<PoolCreation>();
+  private readonly poolRequests = new Set<Promise<unknown>>();
+  private readonly poolClosures = new Set<Promise<void>>();
+  private readonly connectionPoolStates = new Map<
     string,
-    {
-      pool: any;
-      lastAccessed: number;
-      createdAt: number;
-      connectionId: string;
-      database: string | null;
-    }
+    ConnectionPoolState
   >();
-  private readonly poolCreations = new Map<string, Promise<any>>();
+  private nextTunnelId = 0;
+  private shuttingDown = false;
+  private shutdownPromise?: Promise<void>;
   private readonly POOL_TTL = 15 * 60 * 1000; // 15 mins
   private readonly POOL_PRESSURE_IDLE_MS = 60 * 1000;
   private readonly MAX_ACTIVE_POOLS = 30;
@@ -92,6 +120,74 @@ export class ConnectionsService implements OnModuleDestroy {
     await this.organizationsService.ensureMemberAccess(organizationId, userId);
   }
 
+  private getConnectionPoolState(id: string): ConnectionPoolState {
+    let state = this.connectionPoolStates.get(id);
+    if (!state) {
+      state = {
+        generation: 0,
+        mutations: 0,
+        deleted: false,
+        publications: new Set(),
+      };
+      this.connectionPoolStates.set(id, state);
+    }
+    return state;
+  }
+
+  private isPoolAdmissionCurrent(id: string, generation: number): boolean {
+    const state = this.connectionPoolStates.get(id);
+    return (
+      !this.shuttingDown &&
+      !!state &&
+      !state.deleted &&
+      state.mutations === 0 &&
+      state.generation === generation
+    );
+  }
+
+  private assertPoolAdmission(id: string, generation: number): void {
+    if (!this.isPoolAdmissionCurrent(id, generation)) {
+      throw new Error('Connection pool admission was invalidated.');
+    }
+  }
+
+  private assertOwnedPoolAdmission(
+    id: string,
+    generation: number,
+    tunnelKey?: string,
+  ): void {
+    this.assertPoolAdmission(id, generation);
+    if (tunnelKey) this.sshTunnelService.assertTunnelOpen(tunnelKey);
+  }
+
+  private beginPoolMutation(id: string): ConnectionPoolState {
+    const state = this.getConnectionPoolState(id);
+    if (this.shuttingDown || state.deleted) {
+      throw new Error('Connection pool admission was invalidated.');
+    }
+    state.generation++;
+    state.mutations++;
+    return state;
+  }
+
+  private async publishForPoolGeneration<T>(
+    id: string,
+    generation: number,
+    publish: () => Promise<T>,
+  ): Promise<T> {
+    this.assertPoolAdmission(id, generation);
+    const state = this.getConnectionPoolState(id);
+    const publication = publish();
+    state.publications.add(publication);
+    try {
+      const result = await publication;
+      this.assertPoolAdmission(id, generation);
+      return result;
+    } finally {
+      state.publications.delete(publication);
+    }
+  }
+
   private async updateHealthState(
     id: string,
     health: {
@@ -100,24 +196,30 @@ export class ConnectionsService implements OnModuleDestroy {
       error?: string | null;
       connected?: boolean;
     },
+    generation = this.getConnectionPoolState(id).generation,
   ) {
-    await this.prisma.connection.update({
-      where: { id },
-      data: {
-        lastHealthCheckAt: new Date(),
-        lastHealthStatus: health.status,
-        lastHealthError: health.error ?? null,
-        lastConnectionLatencyMs: health.latencyMs ?? null,
-        ...(health.connected ? { lastConnectedAt: new Date() } : {}),
-      },
-    });
+    await this.publishForPoolGeneration(id, generation, () =>
+      this.prisma.connection.update({
+        where: { id },
+        data: {
+          lastHealthCheckAt: new Date(),
+          lastHealthStatus: health.status,
+          lastHealthError: health.error ?? null,
+          lastConnectionLatencyMs: health.latencyMs ?? null,
+          ...(health.connected ? { lastConnectedAt: new Date() } : {}),
+        },
+      }),
+    );
   }
 
-  private async upgradeLegacySshCredentials(connection: {
-    id: string;
-    sshPrivateKey?: string | null;
-    sshPassphrase?: string | null;
-  }) {
+  private async upgradeLegacySshCredentials(
+    connection: {
+      id: string;
+      sshPrivateKey?: string | null;
+      sshPassphrase?: string | null;
+    },
+    generation: number,
+  ) {
     const data: {
       sshPrivateKey?: string;
       sshPassphrase?: string;
@@ -141,11 +243,14 @@ export class ConnectionsService implements OnModuleDestroy {
     }
 
     try {
-      await this.prisma.connection.update({
-        where: { id: connection.id },
-        data,
-      });
+      await this.publishForPoolGeneration(connection.id, generation, () =>
+        this.prisma.connection.update({
+          where: { id: connection.id },
+          data,
+        }),
+      );
     } catch {
+      this.assertPoolAdmission(connection.id, generation);
       // Availability of a legacy tunnel must not depend on its opportunistic upgrade.
       this.logger.warn(
         `Could not upgrade legacy SSH credential encryption for connection ${connection.id}.`,
@@ -209,16 +314,22 @@ export class ConnectionsService implements OnModuleDestroy {
     const victims = [...this.pools.entries()]
       .filter(([, poolData]) => poolData.lastAccessed <= idleCutoff)
       .sort((left, right) => left[1].lastAccessed - right[1].lastAccessed)
-      .slice(0, overflow)
-      .map(([key]) => key);
+      .slice(0, overflow);
 
-    for (const key of victims) {
-      await this.closePoolByKey(key, { silent: true });
+    let trimmed = 0;
+    for (const [key, poolData] of victims) {
+      if (
+        this.pools.get(key) !== poolData ||
+        poolData.lastAccessed > idleCutoff
+      )
+        continue;
+      await this.closePoolByKey(key, { silent: true, expected: poolData });
+      trimmed++;
     }
 
-    if (victims.length > 0) {
+    if (trimmed > 0) {
       this.logger.warn(
-        `Trimmed ${victims.length} idle connection pool(s) under pressure.`,
+        `Trimmed ${trimmed} idle connection pool(s) under pressure.`,
       );
     }
   }
@@ -249,52 +360,73 @@ export class ConnectionsService implements OnModuleDestroy {
     }
   }
 
-  /**
-   * Safely closes a pool by its key and removes it from the pool map.
-   * Tries strategy-based close first, falls back to generic end/close methods.
-   */
+  private trackPoolClosure(closure: Promise<void>): Promise<void> {
+    this.poolClosures.add(closure);
+    void closure.then(
+      () => this.poolClosures.delete(closure),
+      () => this.poolClosures.delete(closure),
+    );
+    return closure;
+  }
+
+  private closeOwnedTunnel(tunnelKey?: string): Promise<void> {
+    if (!tunnelKey) return Promise.resolve();
+    return this.trackPoolClosure(
+      this.sshTunnelService.closeTunnel(tunnelKey).catch(() => {
+        this.logger.warn(`Could not close SSH tunnel ${tunnelKey}.`);
+      }),
+    );
+  }
+
+  private closePoolResource(poolData: PoolResource): Promise<void> {
+    if (poolData.closing) return poolData.closing;
+    // Record ownership before yielding: retries and stale completions close
+    // this resource, never whatever now occupies its stable cache key.
+    const closure = Promise.resolve().then(async () => {
+      try {
+        await poolData.strategy.closePool(poolData.pool);
+      } catch {
+        await this.fallbackClosePool(poolData.pool);
+      } finally {
+        await this.closeOwnedTunnel(poolData.tunnelKey);
+      }
+    });
+    poolData.closing = this.trackPoolClosure(closure);
+    return poolData.closing;
+  }
+
+  /** Safely detaches a captured pool before closing its own driver/tunnel. */
   private async closePoolByKey(
     key: string,
-    options?: { silent?: boolean },
+    options?: { silent?: boolean; expected?: PoolResource },
   ): Promise<void> {
     const poolData = this.pools.get(key);
-    if (!poolData) return;
+    if (!poolData || (options?.expected && options.expected !== poolData))
+      return;
 
-    try {
-      const id = this.getConnectionIdFromPoolKey(key);
-      const connection = await this.prisma.connection.findUnique({
-        where: { id },
-      });
-      if (connection) {
-        const strategy = this.strategyFactory.getStrategy(connection.type);
-        await strategy.closePool(poolData.pool);
-      } else {
-        await this.fallbackClosePool(poolData.pool);
-      }
-    } catch {
-      await this.fallbackClosePool(poolData.pool);
-    } finally {
-      this.pools.delete(key);
-      await this.sshTunnelService.closeTunnel(key);
-    }
+    // Detach synchronously so a caller cannot acquire a pool already closing.
+    this.pools.delete(key);
+    await this.closePoolResource(poolData);
   }
 
   /**
    * Closes all pools belonging to a specific connection ID.
    */
   private async closePoolsByConnectionId(connectionId: string): Promise<void> {
-    for (const key of [...this.pools.keys()]) {
-      if (key.startsWith(`${connectionId}:`)) {
-        await this.closePoolByKey(key, { silent: true });
-      }
-    }
+    const pendingTunnels = [...this.poolCreationsInFlight]
+      .filter((creation) => creation.connectionId === connectionId)
+      .map((creation) => this.closeOwnedTunnel(creation.tunnelKey));
+    const pools = [...this.pools.entries()]
+      .filter(([, poolData]) => poolData.connectionId === connectionId)
+      .map(([key]) => this.closePoolByKey(key, { silent: true }));
+    await Promise.all([...pendingTunnels, ...pools]);
   }
 
   private async cleanupPools() {
     const now = Date.now();
-    for (const [key, { lastAccessed }] of this.pools.entries()) {
-      if (now - lastAccessed > this.POOL_TTL) {
-        await this.closePoolByKey(key, { silent: true });
+    for (const [key, poolData] of [...this.pools.entries()]) {
+      if (now - poolData.lastAccessed > this.POOL_TTL) {
+        await this.closePoolByKey(key, { silent: true, expected: poolData });
       }
     }
 
@@ -302,10 +434,25 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   async onModuleDestroy() {
+    if (this.shutdownPromise) return this.shutdownPromise;
+    this.shuttingDown = true;
     clearInterval(this.cleanupInterval);
-    for (const key of [...this.pools.keys()]) {
-      await this.closePoolByKey(key);
-    }
+    for (const state of this.connectionPoolStates.values()) state.generation++;
+
+    this.shutdownPromise = (async () => {
+      await Promise.all([
+        ...[...this.poolCreationsInFlight].map((creation) =>
+          this.closeOwnedTunnel(creation.tunnelKey),
+        ),
+        ...[...this.pools.keys()].map((key) => this.closePoolByKey(key)),
+      ]);
+      // Include requests still doing authorization/config lookup, not just
+      // creations already keyed in the cache. Late resources close themselves.
+      while (this.poolRequests.size > 0 || this.poolClosures.size > 0) {
+        await Promise.allSettled([...this.poolRequests, ...this.poolClosures]);
+      }
+    })();
+    return this.shutdownPromise;
   }
 
   async create(
@@ -606,79 +753,103 @@ export class ConnectionsService implements OnModuleDestroy {
     databaseOverride: string | undefined,
     connection: any,
     poolKey: string,
+    generation: number,
+    tunnelKey?: string,
   ) {
-    const poolMetrics = this.getPoolMetrics();
-    const connectionPoolCount = poolMetrics.perConnection.get(id) ?? 0;
-    if (
-      poolMetrics.totalPools >= this.MAX_ACTIVE_POOLS ||
-      connectionPoolCount >= this.MAX_POOLS_PER_CONNECTION
-    ) {
-      await this.cleanupPools();
-    }
-
-    const decryptedPassword = connection.password
-      ? decryptAttribute(connection.password)
-      : undefined;
-    const decryptedSshPrivateKey = connection.sshPrivateKey
-      ? decryptAttribute(connection.sshPrivateKey)
-      : undefined;
-    const decryptedSshPassphrase = connection.sshPassphrase
-      ? decryptAttribute(connection.sshPassphrase)
-      : undefined;
-    let connectionWithDecryptedPassword = {
-      ...connection,
-      password: decryptedPassword,
-    };
-
-    if (connection.sshHost && connection.sshUsername) {
-      const dbHost = this.normalizeHost(connection.host);
-      if (!dbHost) {
-        throw new BadRequestException(
-          'Host is required for SSH tunnel connections.',
-        );
+    let poolData: PoolResource | undefined;
+    try {
+      this.assertPoolAdmission(id, generation);
+      const poolMetrics = this.getPoolMetrics();
+      const connectionPoolCount = poolMetrics.perConnection.get(id) ?? 0;
+      if (
+        poolMetrics.totalPools >= this.MAX_ACTIVE_POOLS ||
+        connectionPoolCount >= this.MAX_POOLS_PER_CONNECTION
+      ) {
+        await this.cleanupPools();
+        this.assertPoolAdmission(id, generation);
       }
 
-      await this.upgradeLegacySshCredentials(connection);
-
-      const localPort = await this.sshTunnelService.openTunnel(poolKey, {
-        sshHost: connection.sshHost,
-        sshPort: connection.sshPort || 22,
-        sshUsername: connection.sshUsername,
-        sshPrivateKey: decryptedSshPrivateKey,
-        sshPassphrase: decryptedSshPassphrase,
-        dbHost,
-        dbPort: connection.port || 5432,
-      });
-      connectionWithDecryptedPassword = {
-        ...connectionWithDecryptedPassword,
-        host: '127.0.0.1',
-        port: localPort,
+      const decryptedPassword = connection.password
+        ? decryptAttribute(connection.password)
+        : undefined;
+      const decryptedSshPrivateKey = connection.sshPrivateKey
+        ? decryptAttribute(connection.sshPrivateKey)
+        : undefined;
+      const decryptedSshPassphrase = connection.sshPassphrase
+        ? decryptAttribute(connection.sshPassphrase)
+        : undefined;
+      let connectionWithDecryptedPassword = {
+        ...connection,
+        password: decryptedPassword,
       };
-    }
 
-    const strategy = this.strategyFactory.getStrategy(connection.type);
-    try {
+      if (tunnelKey) {
+        const dbHost = this.normalizeHost(connection.host);
+        if (!dbHost) {
+          throw new BadRequestException(
+            'Host is required for SSH tunnel connections.',
+          );
+        }
+
+        await this.upgradeLegacySshCredentials(connection, generation);
+        this.assertPoolAdmission(id, generation);
+        const localPort = await this.sshTunnelService.openTunnel(tunnelKey, {
+          sshHost: connection.sshHost,
+          sshPort: connection.sshPort || 22,
+          sshUsername: connection.sshUsername,
+          sshPrivateKey: decryptedSshPrivateKey,
+          sshPassphrase: decryptedSshPassphrase,
+          dbHost,
+          dbPort: connection.port || 5432,
+        });
+        this.assertOwnedPoolAdmission(id, generation, tunnelKey);
+        connectionWithDecryptedPassword = {
+          ...connectionWithDecryptedPassword,
+          host: '127.0.0.1',
+          port: localPort,
+        };
+      }
+
+      const strategy = this.strategyFactory.getStrategy(connection.type);
       const pool = await strategy.createPool(
         connectionWithDecryptedPassword,
         databaseOverride,
       );
       const timestamp = Date.now();
-      this.pools.set(poolKey, {
+      poolData = {
         pool,
         lastAccessed: timestamp,
         createdAt: timestamp,
         connectionId: id,
         database: databaseOverride || connection.database || null,
-      });
+        generation,
+        strategy,
+        tunnelKey,
+      };
+      this.assertOwnedPoolAdmission(id, generation, tunnelKey);
+      await this.updateHealthState(
+        id,
+        { status: 'healthy', connected: true },
+        generation,
+      );
+      this.assertOwnedPoolAdmission(id, generation, tunnelKey);
+      this.pools.set(poolKey, poolData);
       this.logPoolPressure(id);
-      await this.updateHealthState(id, { status: 'healthy', connected: true });
-      return pool;
+      return poolData;
     } catch (error) {
-      await this.sshTunnelService.closeTunnel(poolKey);
-      await this.updateHealthState(id, {
-        status: 'error',
-        error: getErrorMessage(error) || 'Connection failed',
-      });
+      if (poolData) await this.closePoolResource(poolData);
+      else await this.closeOwnedTunnel(tunnelKey);
+      // Obsolete work must not overwrite the new generation's health state.
+      if (this.isPoolAdmissionCurrent(id, generation)) {
+        await this.updateHealthState(
+          id,
+          {
+            status: 'error',
+            error: getErrorMessage(error) || 'Connection failed',
+          },
+          generation,
+        ).catch(() => undefined);
+      }
       throw error;
     }
   }
@@ -713,30 +884,83 @@ export class ConnectionsService implements OnModuleDestroy {
         'An authenticated user is required to access a connection pool.',
       );
     }
-    const connection = await this.authorizeAccess(id, userId, databaseOverride);
-    const poolKey = `${id}:${databaseOverride || connection.database}`;
+    // Admission precedes even the async configuration lookup. Each caller
+    // still authorizes independently before accessing a warm/shared pool.
+    const generation = this.getConnectionPoolState(id).generation;
+    this.assertPoolAdmission(id, generation);
+    const request = this.getAdmittedPool(
+      id,
+      databaseOverride,
+      userId,
+      generation,
+    );
+    this.poolRequests.add(request);
+    try {
+      const poolData = await request;
+      this.assertOwnedPoolAdmission(id, generation, poolData.tunnelKey);
+      if (poolData.closing)
+        throw new Error('Connection pool admission was invalidated.');
+      return poolData.pool;
+    } finally {
+      this.poolRequests.delete(request);
+    }
+  }
 
-    if (this.pools.has(poolKey)) {
-      const poolData = this.pools.get(poolKey);
-      if (poolData) {
+  private async getAdmittedPool(
+    id: string,
+    databaseOverride: string | undefined,
+    userId: string,
+    generation: number,
+  ): Promise<PoolResource> {
+    const connection = await this.authorizeAccess(id, userId, databaseOverride);
+    this.assertPoolAdmission(id, generation);
+    const poolKey = `${id}:${databaseOverride || connection.database}`;
+    const poolData = this.pools.get(poolKey);
+    if (poolData && poolData.generation === generation && !poolData.closing) {
+      if (poolData.tunnelKey) {
+        try {
+          this.sshTunnelService.assertTunnelOpen(poolData.tunnelKey);
+        } catch {
+          await this.closePoolByKey(poolKey, { expected: poolData });
+          this.assertPoolAdmission(id, generation);
+          return this.getAdmittedPool(id, databaseOverride, userId, generation);
+        }
+      }
+      if (!poolData.closing) {
         poolData.lastAccessed = Date.now();
-        return poolData.pool;
+        return poolData;
       }
     }
 
     const pendingCreation = this.poolCreations.get(poolKey);
-    if (pendingCreation) return pendingCreation;
+    if (pendingCreation?.generation === generation)
+      return pendingCreation.promise;
 
-    const creation = this.createAndCachePool(
-      id,
-      databaseOverride,
-      connection,
-      poolKey,
-    );
+    // The cache key is stable; a tunnel belongs to exactly one creation,
+    // including replacements within the same connection generation.
+    const tunnelKey =
+      connection.sshHost && connection.sshUsername
+        ? `${poolKey}:generation:${generation}:${++this.nextTunnelId}`
+        : undefined;
+    const creation: PoolCreation = {
+      connectionId: id,
+      generation,
+      tunnelKey,
+      promise: this.createAndCachePool(
+        id,
+        databaseOverride,
+        connection,
+        poolKey,
+        generation,
+        tunnelKey,
+      ),
+    };
     this.poolCreations.set(poolKey, creation);
+    this.poolCreationsInFlight.add(creation);
     try {
-      return await creation;
+      return await creation.promise;
     } finally {
+      this.poolCreationsInFlight.delete(creation);
       if (this.poolCreations.get(poolKey) === creation) {
         this.poolCreations.delete(poolKey);
       }
@@ -749,129 +973,116 @@ export class ConnectionsService implements OnModuleDestroy {
     userId: string,
   ): Promise<Connection> {
     const connection = await this.findRawOne(id, userId, Permission.MANAGE);
+    const poolState = this.beginPoolMutation(id);
+    try {
+      await this.closePoolsByConnectionId(id);
+      // Writes admitted before invalidation must finish before the new config
+      // commits; later healthy/legacy publications are refused by generation.
+      await Promise.allSettled([...poolState.publications]);
 
-    // Close existing pools for this connection if config changed
-    await this.closePoolsByConnectionId(id);
-
-    const { password, sshPrivateKey, sshPassphrase, ...rest } =
-      updateConnectionDto;
-    const encryptedPassword =
-      password !== undefined && password !== null
-        ? encryptAttribute(password)
-        : undefined;
-    const encryptedSshPrivateKey =
-      sshPrivateKey !== undefined && sshPrivateKey !== null
-        ? encryptAttribute(sshPrivateKey)
-        : undefined;
-    const encryptedSshPassphrase =
-      sshPassphrase !== undefined && sshPassphrase !== null
-        ? encryptAttribute(sshPassphrase)
-        : undefined;
-    const hasOrganizationId = Object.prototype.hasOwnProperty.call(
-      updateConnectionDto,
-      'organizationId',
-    );
-    const nextOrganizationId = hasOrganizationId
-      ? updateConnectionDto.organizationId?.trim() || null
-      : (connection.organizationId ?? null);
-    const hasHost = Object.prototype.hasOwnProperty.call(
-      updateConnectionDto,
-      'host',
-    );
-    const nextType = updateConnectionDto.type ?? connection.type;
-    const nextHost = hasHost ? updateConnectionDto.host : connection.host;
-    this.ensureHostConfigured(nextType, nextHost);
-    if (
-      hasOrganizationId &&
-      nextOrganizationId &&
-      nextOrganizationId !== connection.organizationId
-    ) {
-      await this.ensureOrganizationMembership(nextOrganizationId, userId);
-    }
-    const readOnly =
-      updateConnectionDto.readOnly !== undefined
-        ? updateConnectionDto.readOnly
-        : connection.readOnly;
-    const dataToUpdate = {
-      ...rest,
-      ...(hasHost ? { host: this.normalizeHost(nextHost) } : {}),
-      ...(password !== undefined && password !== null
-        ? { password: encryptedPassword }
-        : {}),
-      ...(sshPrivateKey !== undefined && sshPrivateKey !== null
-        ? { sshPrivateKey: encryptedSshPrivateKey }
-        : {}),
-      ...(sshPassphrase !== undefined && sshPassphrase !== null
-        ? { sshPassphrase: encryptedSshPassphrase }
-        : {}),
-      readOnly,
-      allowSchemaChanges: readOnly
-        ? false
-        : (updateConnectionDto.allowSchemaChanges ??
-          connection.allowSchemaChanges),
-      allowImportExport: readOnly
-        ? false
-        : (updateConnectionDto.allowImportExport ??
-          connection.allowImportExport),
-      allowQueryExecution:
-        updateConnectionDto.allowQueryExecution ??
-        connection.allowQueryExecution,
-      ...(updateConnectionDto.environment !== undefined
-        ? { environment: updateConnectionDto.environment || 'none' }
-        : {}),
-      ...(updateConnectionDto.allowedDatabases !== undefined
-        ? {
-            allowedDatabases:
-              updateConnectionDto.allowedDatabases.length > 0
-                ? updateConnectionDto.allowedDatabases
-                : null,
-          }
-        : {}),
-      ...(updateConnectionDto.roleQueryModes !== undefined
-        ? { roleQueryModes: updateConnectionDto.roleQueryModes }
-        : {}),
-      ...(hasOrganizationId ? { organizationId: nextOrganizationId } : {}),
-    };
-
-    const updatedConnection = await this.prisma.connection.update({
-      where: { id },
-      data: dataToUpdate as any,
-    });
-
-    if (
-      connection.organizationId &&
-      connection.organizationId !== nextOrganizationId
-    ) {
-      await this.organizationsService.removeResourcePolicy(
-        ResourceType.CONNECTION,
-        id,
-        connection.organizationId,
+      const { password, sshPrivateKey, sshPassphrase, ...rest } =
+        updateConnectionDto;
+      const encryptedPassword =
+        password !== undefined && password !== null
+          ? encryptAttribute(password)
+          : undefined;
+      const encryptedSshPrivateKey =
+        sshPrivateKey !== undefined && sshPrivateKey !== null
+          ? encryptAttribute(sshPrivateKey)
+          : undefined;
+      const encryptedSshPassphrase =
+        sshPassphrase !== undefined && sshPassphrase !== null
+          ? encryptAttribute(sshPassphrase)
+          : undefined;
+      const hasOrganizationId = Object.prototype.hasOwnProperty.call(
+        updateConnectionDto,
+        'organizationId',
       );
+      const nextOrganizationId = hasOrganizationId
+        ? updateConnectionDto.organizationId?.trim() || null
+        : (connection.organizationId ?? null);
+      const hasHost = Object.prototype.hasOwnProperty.call(
+        updateConnectionDto,
+        'host',
+      );
+      const nextType = updateConnectionDto.type ?? connection.type;
+      const nextHost = hasHost ? updateConnectionDto.host : connection.host;
+      this.ensureHostConfigured(nextType, nextHost);
+      if (
+        hasOrganizationId &&
+        nextOrganizationId &&
+        nextOrganizationId !== connection.organizationId
+      ) {
+        await this.ensureOrganizationMembership(nextOrganizationId, userId);
+      }
+      const readOnly =
+        updateConnectionDto.readOnly !== undefined
+          ? updateConnectionDto.readOnly
+          : connection.readOnly;
+      const dataToUpdate = {
+        ...rest,
+        lastHealthCheckAt: null,
+        lastHealthStatus: null,
+        lastHealthError: null,
+        lastConnectionLatencyMs: null,
+        ...(hasHost ? { host: this.normalizeHost(nextHost) } : {}),
+        ...(password !== undefined && password !== null
+          ? { password: encryptedPassword }
+          : {}),
+        ...(sshPrivateKey !== undefined && sshPrivateKey !== null
+          ? { sshPrivateKey: encryptedSshPrivateKey }
+          : {}),
+        ...(sshPassphrase !== undefined && sshPassphrase !== null
+          ? { sshPassphrase: encryptedSshPassphrase }
+          : {}),
+        readOnly,
+        allowSchemaChanges: readOnly
+          ? false
+          : (updateConnectionDto.allowSchemaChanges ??
+            connection.allowSchemaChanges),
+        allowImportExport: readOnly
+          ? false
+          : (updateConnectionDto.allowImportExport ??
+            connection.allowImportExport),
+        allowQueryExecution:
+          updateConnectionDto.allowQueryExecution ??
+          connection.allowQueryExecution,
+        ...(updateConnectionDto.environment !== undefined
+          ? { environment: updateConnectionDto.environment || 'none' }
+          : {}),
+        ...(updateConnectionDto.allowedDatabases !== undefined
+          ? {
+              allowedDatabases:
+                updateConnectionDto.allowedDatabases.length > 0
+                  ? updateConnectionDto.allowedDatabases
+                  : null,
+            }
+          : {}),
+        ...(updateConnectionDto.roleQueryModes !== undefined
+          ? { roleQueryModes: updateConnectionDto.roleQueryModes }
+          : {}),
+        ...(hasOrganizationId ? { organizationId: nextOrganizationId } : {}),
+      };
 
-      await this.auditService.log({
-        action: AuditAction.TEAM_RESOURCE_UNSHARE,
-        userId,
-        organizationId: connection.organizationId,
-        details: {
-          resourceType: ResourceType.CONNECTION,
-          resourceId: id,
-          resourceName: updatedConnection.name,
-        },
+      const updatedConnection = await this.prisma.connection.update({
+        where: { id },
+        data: dataToUpdate as any,
       });
-    }
 
-    if (nextOrganizationId) {
-      await this.organizationsService.ensureResourcePolicy(
-        ResourceType.CONNECTION,
-        id,
-        nextOrganizationId,
-      );
+      if (
+        connection.organizationId &&
+        connection.organizationId !== nextOrganizationId
+      ) {
+        await this.organizationsService.removeResourcePolicy(
+          ResourceType.CONNECTION,
+          id,
+          connection.organizationId,
+        );
 
-      if (nextOrganizationId !== connection.organizationId) {
         await this.auditService.log({
-          action: AuditAction.TEAM_RESOURCE_SHARE,
+          action: AuditAction.TEAM_RESOURCE_UNSHARE,
           userId,
-          organizationId: nextOrganizationId,
+          organizationId: connection.organizationId,
           details: {
             resourceType: ResourceType.CONNECTION,
             resourceId: id,
@@ -879,27 +1090,54 @@ export class ConnectionsService implements OnModuleDestroy {
           },
         });
       }
-    }
 
-    const safeConnection = this.sanitizeConnection(updatedConnection);
-    return safeConnection as unknown as Connection;
+      if (nextOrganizationId) {
+        await this.organizationsService.ensureResourcePolicy(
+          ResourceType.CONNECTION,
+          id,
+          nextOrganizationId,
+        );
+
+        if (nextOrganizationId !== connection.organizationId) {
+          await this.auditService.log({
+            action: AuditAction.TEAM_RESOURCE_SHARE,
+            userId,
+            organizationId: nextOrganizationId,
+            details: {
+              resourceType: ResourceType.CONNECTION,
+              resourceId: id,
+              resourceName: updatedConnection.name,
+            },
+          });
+        }
+      }
+
+      const safeConnection = this.sanitizeConnection(updatedConnection);
+      return safeConnection as unknown as Connection;
+    } finally {
+      poolState.mutations--;
+    }
   }
 
   async remove(id: string, userId: string): Promise<void> {
     const connection = await this.findRawOne(id, userId, Permission.DELETE);
+    const poolState = this.beginPoolMutation(id);
+    try {
+      await this.closePoolsByConnectionId(id);
+      await Promise.allSettled([...poolState.publications]);
+      await this.prisma.connection.delete({
+        where: { id },
+      });
+      poolState.deleted = true;
 
-    // Close pools
-    await this.closePoolsByConnectionId(id);
-
-    await this.prisma.connection.delete({
-      where: { id },
-    });
-
-    await this.auditService.log({
-      action: AuditAction.DB_CONNECTION_DELETE,
-      userId,
-      details: { name: connection.name, type: connection.type },
-    });
+      await this.auditService.log({
+        action: AuditAction.DB_CONNECTION_DELETE,
+        userId,
+        details: { name: connection.name, type: connection.type },
+      });
+    } finally {
+      poolState.mutations--;
+    }
   }
 
   async removePool(poolKey: string, userId?: string): Promise<void> {
@@ -907,14 +1145,35 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   async checkHealth(id: string, userId: string) {
+    const generation = this.getConnectionPoolState(id).generation;
+    this.assertPoolAdmission(id, generation);
+    const request = this.getAdmittedHealth(id, userId, generation);
+    this.poolRequests.add(request);
+    try {
+      const health = await request;
+      this.assertPoolAdmission(id, generation);
+      return health;
+    } finally {
+      this.poolRequests.delete(request);
+    }
+  }
+
+  private async getAdmittedHealth(
+    id: string,
+    userId: string,
+    generation: number,
+  ) {
     const connection = await this.getDecryptedConnection(id, userId);
+    this.assertPoolAdmission(id, generation);
     const strategy = this.strategyFactory.getStrategy(connection.type);
     const startedAt = Date.now();
     let pool: any;
 
     try {
       pool = await strategy.createPool(connection);
+      this.assertPoolAdmission(id, generation);
       await this.pingPool(pool, connection.type);
+      this.assertPoolAdmission(id, generation);
 
       const health = {
         status: 'healthy' as const,
@@ -923,11 +1182,15 @@ export class ConnectionsService implements OnModuleDestroy {
         error: null,
       };
 
-      await this.updateHealthState(id, {
-        status: 'healthy',
-        latencyMs: health.latencyMs,
-        connected: true,
-      });
+      await this.updateHealthState(
+        id,
+        {
+          status: 'healthy',
+          latencyMs: health.latencyMs,
+          connected: true,
+        },
+        generation,
+      );
 
       await this.auditService.log({
         action: AuditAction.DB_CONNECTION_HEALTH_CHECK,
@@ -937,6 +1200,7 @@ export class ConnectionsService implements OnModuleDestroy {
 
       return health;
     } catch (error) {
+      this.assertPoolAdmission(id, generation);
       const health = {
         status: 'error' as const,
         checkedAt: new Date().toISOString(),
@@ -944,11 +1208,15 @@ export class ConnectionsService implements OnModuleDestroy {
         error: getErrorMessage(error) || 'Connection failed',
       };
 
-      await this.updateHealthState(id, {
-        status: 'error',
-        latencyMs: health.latencyMs,
-        error: health.error,
-      });
+      await this.updateHealthState(
+        id,
+        {
+          status: 'error',
+          latencyMs: health.latencyMs,
+          error: health.error,
+        },
+        generation,
+      );
 
       await this.auditService.log({
         action: AuditAction.DB_CONNECTION_HEALTH_CHECK,
@@ -959,7 +1227,11 @@ export class ConnectionsService implements OnModuleDestroy {
       return health;
     } finally {
       if (pool) {
-        await strategy.closePool(pool).catch(() => undefined);
+        await this.trackPoolClosure(
+          Promise.resolve()
+            .then(() => strategy.closePool(pool))
+            .catch(() => undefined),
+        );
       }
     }
   }

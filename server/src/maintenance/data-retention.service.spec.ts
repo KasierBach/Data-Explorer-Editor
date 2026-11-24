@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { DataRetentionService } from './data-retention.service';
 
 describe('DataRetentionService', () => {
@@ -21,12 +22,12 @@ describe('DataRetentionService', () => {
     expect(prisma.auditLog.deleteMany).toHaveBeenCalledWith({
       where: { createdAt: { lt: new Date('2026-04-27T00:00:00.000Z') } },
     });
-    expect(prisma.payment.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          createdAt: { lt: new Date('2026-07-12T00:00:00.000Z') },
-        },
-      }),
-    );
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith({
+      where: {
+        createdAt: { lt: new Date('2026-07-12T00:00:00.000Z') },
+        rawPayload: { not: Prisma.DbNull },
+      },
+      data: { rawPayload: Prisma.DbNull },
+    });
   });
 });

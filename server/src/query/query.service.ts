@@ -47,6 +47,10 @@ import {
 import type { RowIdentity } from '../database-strategies/database-strategy.interface';
 import type { QueryExecutionHandle } from '../database-strategies/database-strategy.interface';
 import { queryDatabaseException } from './query-error.util';
+import {
+  assertResultByteBudget,
+  DEFAULT_QUERY_RESULT_MAX_BYTES,
+} from '../database-strategies/query-result-budget.util';
 
 interface ActiveQueryEntry {
   queryId: string;
@@ -186,18 +190,20 @@ export class QueryService {
     cacheKey: string,
     readOnly = false,
     onExecution?: (execution: QueryExecutionHandle) => void,
+    beforeDispatch?: () => void,
   ): Promise<number | undefined> {
     const cachedCount = await this.cacheManager.get<number>(cacheKey);
+    beforeDispatch?.();
     if (typeof cachedCount === 'number') return cachedCount;
 
     const options = {
       ...(readOnly ? { readOnly: true } : {}),
       ...(onExecution ? { onExecution } : {}),
+      ...(beforeDispatch ? { beforeDispatch } : {}),
+      maxResultBytes: DEFAULT_QUERY_RESULT_MAX_BYTES,
     };
-    const countResult =
-      readOnly || onExecution
-        ? await strategy.executeQuery(pool, countSql, options)
-        : await strategy.executeQuery(pool, countSql);
+    const countResult = await strategy.executeQuery(pool, countSql, options);
+    assertResultByteBudget(countResult);
     const count = this.extractCountValue(countResult);
     if (count !== undefined) {
       await this.cacheManager.set(cacheKey, count, this.QUERY_CACHE_TTL_MS);
@@ -240,7 +246,7 @@ export class QueryService {
       executeQuery: (
         pool: unknown,
         sql: string,
-        options: { readOnly: boolean },
+        options: { readOnly: boolean; maxResultBytes?: number },
       ) => Promise<QueryResult>;
     },
     pool: unknown,
@@ -253,8 +259,9 @@ export class QueryService {
     const countResult = await strategy.executeQuery(
       pool,
       `SELECT COUNT(*) AS total FROM ${quotedTable}`,
-      { readOnly: true },
+      { readOnly: true, maxResultBytes: DEFAULT_QUERY_RESULT_MAX_BYTES },
     );
+    assertResultByteBudget(countResult);
 
     const count = this.extractCountValue(countResult);
     if (count !== undefined) {
@@ -615,72 +622,149 @@ export class QueryService {
           offset: statement === finalSql ? offset : undefined,
         });
       }
-      const pool = await this.connectionsService.getPool(
-        connectionId,
-        database || connection.database,
-        userId,
-      );
       const strategy = this.strategyFactory.getStrategy(connection.type);
+      const timeoutMs = this.getQueryTimeoutMs();
+      const deadline = startedAt + timeoutMs;
+      const deadlineError = () =>
+        new BadRequestException(
+          `Query exceeded the maximum execution time of ${Math.round(timeoutMs / 1000)}s. Cancellation was requested; inspect the database and any writes before retrying.`,
+        );
+      const abortedError = () =>
+        new BadRequestException(
+          'Query request was aborted. Inspect the database and any writes before retrying.',
+        );
+      if (signal?.aborted) throw abortedError();
 
-      // Register the in-flight query so the user can cancel it.
+      // Register before awaiting the shared pool. Only this request's waiter is
+      // rejected: pool creation belongs to ConnectionsService and other waiters.
       const queryId = randomUUID();
       let execution: QueryExecutionHandle | undefined;
-      let cancelRequested = false;
+      let requestError: BadRequestException | undefined;
+      let rejectAcquisition: ((error: BadRequestException) => void) | undefined;
+      let acquisitionTimer: ReturnType<typeof setTimeout> | undefined;
+      let finishAcquisition: (() => void) | undefined;
       const cancel = async () => {
-        cancelRequested = true;
-        return execution ? strategy.cancelActiveQuery(execution) : false;
+        requestError ??= new BadRequestException(
+          'Query cancelled by user. Inspect the database and any writes before retrying.',
+        );
+        rejectAcquisition?.(requestError);
+        return execution ? strategy.cancelActiveQuery(execution) : true;
       };
       this.registerActiveQuery(queryId, userId, connectionId, sql, cancel);
-
-      let result: QueryResult;
-      const onExecution = (handle: QueryExecutionHandle) => {
-        execution = handle;
-        if (cancelRequested) {
-          void cancel().catch((error) =>
-            this.logger.warn(getErrorMessage(error)),
-          );
-        }
-      };
-      const timeoutMs = this.getQueryTimeoutMs();
       const disconnected = () => {
+        requestError ??= abortedError();
         void cancel().catch((error) =>
           this.logger.warn(getErrorMessage(error)),
         );
       };
       signal?.addEventListener('abort', disconnected, { once: true });
-      if (signal?.aborted) disconnected();
-      try {
-        const runQuery = async (): Promise<QueryResult> => {
-          if (isMultiStatement) {
-            // The strategy reports partial commits on engines with non-atomic DDL/batches.
-            const multi = await strategy.runStatementsInTransaction(
-              pool,
-              executableStatements,
-              {
-                limit,
-                offset,
-                ...(readOnly ? { readOnly: true } : {}),
-                onExecution,
-                ...(!readOnly
-                  ? {
-                      onMutation: () =>
-                        this.invalidateQueryCache(
-                          connectionId,
-                          database || connection.database,
-                        ),
-                    }
-                  : {}),
-              },
-            );
-            multi.countStatus ??= 'skipped';
-            return multi;
+
+      let result: QueryResult;
+      const assertRequestRunning = () => {
+        if (requestError) throw requestError;
+        if (Date.now() >= deadline) throw deadlineError();
+      };
+      const waitForAcquisition = async <T>(
+        work: () => Promise<T>,
+      ): Promise<T> => {
+        assertRequestRunning();
+        execution = undefined;
+        let rejectWaiting!: (error: BadRequestException) => void;
+        const cancelled = new Promise<never>((_resolve, reject) => {
+          rejectWaiting = reject;
+        });
+        void cancelled.catch(() => {});
+        let finished = false;
+        const timer = setTimeout(
+          () => {
+            requestError ??= deadlineError();
+            rejectWaiting(requestError);
+          },
+          Math.max(0, deadline - Date.now()),
+        );
+        const finish = () => {
+          if (finished) return;
+          finished = true;
+          clearTimeout(timer);
+          if (finishAcquisition === finish) {
+            finishAcquisition = undefined;
+            rejectAcquisition = undefined;
+            acquisitionTimer = undefined;
           }
-          return strategy.executeQuery(pool, finalSql, {
+        };
+        acquisitionTimer = timer;
+        finishAcquisition = finish;
+        rejectAcquisition = rejectWaiting;
+        try {
+          // A late acquisition stays observed. Its onExecution guard throws,
+          // allowing the strategy to release the lease once without any SQL.
+          return await Promise.race([
+            Promise.resolve().then(() => {
+              assertRequestRunning();
+              return work();
+            }),
+            cancelled,
+          ]);
+        } finally {
+          finish();
+        }
+      };
+      const leaseAware = ['mysql', 'mariadb', 'postgres', 'cockroach'].includes(
+        connection.type,
+      );
+      const acquireNative = <T>(work: () => Promise<T>): Promise<T> =>
+        leaseAware ? waitForAcquisition(work) : work();
+      const onExecution = (handle: QueryExecutionHandle) => {
+        // Check before publication: a late cancelled/expired lease must execute
+        // no SQL and must not turn a finished waiter back into an active query.
+        assertRequestRunning();
+        execution = handle;
+        finishAcquisition?.();
+      };
+      try {
+        if (signal?.aborted) disconnected();
+        const pool = await waitForAcquisition(() =>
+          this.connectionsService.getPool(
+            connectionId,
+            database || connection.database,
+            userId,
+          ),
+        );
+        // A resolved acquisition can win its timer's microtask race after expiry.
+        assertRequestRunning();
+        const onMutation = !readOnly
+          ? () =>
+              this.invalidateQueryCache(
+                connectionId,
+                database || connection.database,
+              )
+          : undefined;
+        const runQuery = async (): Promise<QueryResult> => {
+          assertRequestRunning();
+          const options = {
             limit,
             offset,
             ...(readOnly ? { readOnly: true } : {}),
             onExecution,
-          });
+            beforeDispatch: assertRequestRunning,
+            maxResultBytes: DEFAULT_QUERY_RESULT_MAX_BYTES,
+            ...(onMutation ? { onMutation } : {}),
+          };
+          if (isMultiStatement) {
+            // The strategy reports partial commits on engines with non-atomic DDL/batches.
+            const multi = await acquireNative(() =>
+              strategy.runStatementsInTransaction(
+                pool,
+                executableStatements,
+                options,
+              ),
+            );
+            multi.countStatus ??= 'skipped';
+            return multi;
+          }
+          return acquireNative(() =>
+            strategy.executeQuery(pool, finalSql, options),
+          );
         };
 
         const completeQuery = async () => {
@@ -697,11 +781,15 @@ export class QueryService {
               sql.trim().split(/\s+/, 1)[0].toUpperCase(),
             );
           }
+          // A returned write already happened, even if cancellation or payload
+          // accounting subsequently fails. Never replay it or skip invalidation.
           if (!isReadQuery)
             await this.invalidateQueryCache(
               connectionId,
               database || connection.database,
             );
+          assertResultByteBudget(nativeResult);
+          assertRequestRunning();
           const queryResult = this.applyRawQueryMetadata(
             nativeResult,
             finalSql,
@@ -717,13 +805,17 @@ export class QueryService {
                   `result-count:${countSql}`,
                   database || connection.database,
                 );
-                const totalCount = await this.resolveQueryCount(
-                  strategy,
-                  pool,
-                  countSql,
-                  countCacheKey,
-                  readOnly,
-                  onExecution,
+                assertRequestRunning();
+                const totalCount = await acquireNative(() =>
+                  this.resolveQueryCount(
+                    strategy,
+                    pool,
+                    countSql,
+                    countCacheKey,
+                    readOnly,
+                    onExecution,
+                    assertRequestRunning,
+                  ),
                 );
                 if (totalCount !== undefined) {
                   queryResult.totalCount = totalCount;
@@ -744,20 +836,29 @@ export class QueryService {
           } else {
             queryResult.countStatus = 'skipped';
           }
+          assertRequestRunning();
+          assertResultByteBudget(queryResult);
           return queryResult;
         };
+        // Unlike the acquisition race, active execution must drain its source
+        // lease under withQueryTimeout before the registry can be removed (R07).
         result = await this.withQueryTimeout(
           completeQuery(),
           queryId,
+          Math.max(0, deadline - Date.now()),
           timeoutMs,
         );
       } finally {
+        finishAcquisition?.();
+        if (acquisitionTimer !== undefined) clearTimeout(acquisitionTimer);
+        rejectAcquisition = undefined;
         signal?.removeEventListener('abort', disconnected);
         this.activeQueries.delete(queryId);
       }
       // Expose the wall-clock execution time to the client so the results
       // panel and query history can display it.
       result.durationMs = Date.now() - startedAt;
+      assertResultByteBudget(result);
       await this.auditService.log({
         action: AuditAction.DB_QUERY_EXECUTE,
         userId,
@@ -835,11 +936,12 @@ export class QueryService {
     promise: Promise<T>,
     queryId: string,
     timeoutMs: number,
+    configuredTimeoutMs = timeoutMs,
   ): Promise<T> {
     let timedOut = false;
     const timeoutError = () =>
       new BadRequestException(
-        `Query exceeded the maximum execution time of ${Math.round(timeoutMs / 1000)}s. Cancellation was requested; inspect the database and any writes before retrying.`,
+        `Query exceeded the maximum execution time of ${Math.round(configuredTimeoutMs / 1000)}s. Cancellation was requested; inspect the database and any writes before retrying.`,
       );
     const timer = setTimeout(() => {
       timedOut = true;
@@ -1015,7 +1117,9 @@ export class QueryService {
         limit: normalizedLimit,
         offset: normalizedOffset,
         readOnly: true,
+        maxResultBytes: DEFAULT_QUERY_RESULT_MAX_BYTES,
       });
+      assertResultByteBudget(result);
 
       const response: QueryResult = {
         ...result,
@@ -1056,6 +1160,7 @@ export class QueryService {
         response.countStatus = 'skipped';
       }
 
+      assertResultByteBudget(response);
       await this.auditService.log({
         action: AuditAction.DB_QUERY_EXECUTE,
         userId,

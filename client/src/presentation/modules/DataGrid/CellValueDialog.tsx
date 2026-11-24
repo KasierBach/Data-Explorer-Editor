@@ -17,6 +17,7 @@ interface CellValueDialogProps {
   cell: SelectedCellState | null;
   lang: AppLang;
   onOpenChange: (open: boolean) => void;
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
 function isStructuredValue(value: SelectedCellState['value']) {
@@ -32,6 +33,7 @@ export function CellValueDialog({
   cell,
   lang,
   onOpenChange,
+  onCloseAutoFocus,
 }: CellValueDialogProps) {
   const text = getDataGridText(lang);
 
@@ -54,7 +56,11 @@ export function CellValueDialog({
 
   return (
     <Dialog open={Boolean(cell)} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100vw-1rem)] border-border/60 bg-background/95 p-0 shadow-2xl backdrop-blur-xl sm:max-w-3xl">
+      <DialogContent
+        className="max-w-[calc(100vw-1rem)] border-border/60 bg-background/95 p-0 shadow-2xl backdrop-blur-xl sm:max-w-3xl"
+        closeLabel={lang === 'vi' ? 'Đóng' : 'Close'}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
         <DialogHeader className="border-b border-border/60 px-5 py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-2">

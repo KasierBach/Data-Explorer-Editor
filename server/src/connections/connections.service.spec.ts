@@ -4,6 +4,32 @@ import { Permission } from '../permissions/enums/permission.enum';
 import { ResourceType } from '../permissions/enums/resource-type.enum';
 import * as cryptoUtil from '../utils/crypto.util';
 
+// Keep this suite isolated from provider/configuration modules and real drivers.
+jest.mock('../prisma/prisma.service', () => ({ PrismaService: class {} }));
+jest.mock('../database-strategies/strategy.factory', () => ({
+  DatabaseStrategyFactory: class {},
+}));
+jest.mock('../audit/audit.service', () => ({
+  AuditService: class {},
+  AuditAction: {
+    DB_CONNECTION_CREATE: 'DB_CONNECTION_CREATE',
+    DB_CONNECTION_DELETE: 'DB_CONNECTION_DELETE',
+    TEAM_RESOURCE_SHARE: 'TEAM_RESOURCE_SHARE',
+    TEAM_RESOURCE_UNSHARE: 'TEAM_RESOURCE_UNSHARE',
+  },
+}));
+jest.mock('./ssh-tunnel.service', () => ({ SshTunnelService: class {} }));
+jest.mock('../organizations/services/organizations.service', () => ({
+  OrganizationsService: class {},
+}));
+jest.mock('../permissions/services/permissions.service', () => ({
+  PermissionsService: class {},
+}));
+jest.mock('../utils/crypto.util', () => ({
+  encryptAttribute: jest.fn((value: string) => `v1:encrypted-${value}`),
+  decryptAttribute: jest.fn((value: string) => value),
+}));
+
 describe('ConnectionsService security', () => {
   let service: ConnectionsService;
 
@@ -19,7 +45,7 @@ describe('ConnectionsService security', () => {
   };
   const strategyMock = {
     createPool: jest.fn(),
-    closePool: jest.fn(),
+    closePool: jest.fn().mockResolvedValue(undefined),
   };
   const strategyFactoryMock = {
     getStrategy: jest.fn().mockReturnValue(strategyMock),
@@ -27,7 +53,8 @@ describe('ConnectionsService security', () => {
   const auditMock = { log: jest.fn() };
   const sshTunnelMock = {
     openTunnel: jest.fn(),
-    closeTunnel: jest.fn(),
+    closeTunnel: jest.fn().mockResolvedValue(undefined),
+    assertTunnelOpen: jest.fn(),
   };
   const organizationsMock = {
     ensureMemberAccess: jest.fn(),
@@ -305,8 +332,8 @@ describe('ConnectionsService security', () => {
     (service as any).pools.clear();
   });
 
-  afterEach(() => {
-    service.onModuleDestroy();
+  afterEach(async () => {
+    await service.onModuleDestroy();
   });
 
   it('rejects network connections without a host', async () => {
@@ -435,15 +462,18 @@ describe('ConnectionsService security', () => {
       pool,
     );
 
-    expect(sshTunnelMock.openTunnel).toHaveBeenCalledWith('conn-ssh-1:main', {
-      sshHost: 'ssh.example.com',
-      sshPort: 22,
-      sshUsername: 'deploy',
-      sshPrivateKey: 'bGVnYWN5LXByaXZhdGUta2V5',
-      sshPassphrase: 'legacy-passphrase',
-      dbHost: 'db.example.com',
-      dbPort: 5432,
-    });
+    expect(sshTunnelMock.openTunnel).toHaveBeenCalledWith(
+      expect.stringMatching(/^conn-ssh-1:main:generation:/),
+      {
+        sshHost: 'ssh.example.com',
+        sshPort: 22,
+        sshUsername: 'deploy',
+        sshPrivateKey: 'bGVnYWN5LXByaXZhdGUta2V5',
+        sshPassphrase: 'legacy-passphrase',
+        dbHost: 'db.example.com',
+        dbPort: 5432,
+      },
+    );
     expect(encryptAttribute).toHaveBeenCalledWith('bGVnYWN5LXByaXZhdGUta2V5');
     expect(encryptAttribute).toHaveBeenCalledWith('legacy-passphrase');
     expect(prismaMock.connection.update).toHaveBeenCalledWith({
@@ -517,6 +547,8 @@ describe('ConnectionsService security', () => {
       createdAt: now - 16 * 60 * 1000,
       connectionId: 'conn-1',
       database: 'db_a',
+      strategy: strategyMock,
+      tunnelKey: 'conn-1:db_a',
     });
     (service as any).pools.set('conn-1:db_b', {
       pool: { id: 'fresh' },
@@ -524,6 +556,8 @@ describe('ConnectionsService security', () => {
       createdAt: now,
       connectionId: 'conn-1',
       database: 'db_b',
+      strategy: strategyMock,
+      tunnelKey: 'conn-1:db_b',
     });
 
     await (service as any).cleanupPools();
@@ -549,6 +583,8 @@ describe('ConnectionsService security', () => {
       createdAt: now - 10_000,
       connectionId: 'conn-1',
       database: 'db_a',
+      strategy: strategyMock,
+      tunnelKey: 'conn-1:db_a',
     });
     (service as any).pools.set('conn-1:db_b', {
       pool: { id: 'newer' },
@@ -556,6 +592,8 @@ describe('ConnectionsService security', () => {
       createdAt: now - 1_000,
       connectionId: 'conn-1',
       database: 'db_b',
+      strategy: strategyMock,
+      tunnelKey: 'conn-1:db_b',
     });
 
     await (service as any).cleanupPools();
@@ -588,7 +626,7 @@ describe('ConnectionsService security', () => {
     ).rejects.toThrow('database unavailable');
 
     expect(sshTunnelMock.closeTunnel).toHaveBeenCalledWith(
-      'conn-ssh-fail:main',
+      expect.stringMatching(/^conn-ssh-fail:main:generation:/),
     );
   });
 });
