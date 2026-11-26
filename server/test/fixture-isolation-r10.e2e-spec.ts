@@ -4,7 +4,10 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
 import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import Redis from 'ioredis';
+import { MigrationProcessor } from '../src/migration/migration.processor';
 import { closeE2eApp, createE2eApp } from './e2e-app';
+
+const rateLimitAppOptions = { registerBullWorkers: false };
 
 const { cleanupRateLimitFixture, trackRateLimitKeys } = createRequire(
   __filename,
@@ -39,9 +42,13 @@ describe('R10 isolated fixture rate limits', () => {
     });
     control.on('error', () => {});
     await control.connect();
-    first = await createE2eApp();
-    second = await createE2eApp();
+    // These two apps only exercise rate limiting, not the shared migration queue.
+    first = await createE2eApp(rateLimitAppOptions);
+    second = await createE2eApp(rateLimitAppOptions);
     for (const app of [first, second]) {
+      expect(() => app.get(MigrationProcessor).worker).toThrow(
+        /Worker.*has not yet been initialized/,
+      );
       restorers.push(
         trackRateLimitKeys(
           app.get<ThrottlerStorageRedisService>(ThrottlerStorage).redis,
