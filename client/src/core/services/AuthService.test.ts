@@ -54,6 +54,68 @@ function createTestStore() {
   return { store, getState: () => state };
 }
 
+describe('AuthService startup session refresh', () => {
+  beforeEach(() => {
+    mocks.post.mockReset();
+    mocks.getState.mockReturnValue({ accessToken: null, user: null });
+  });
+
+  it('shares one cookie rotation across overlapping startup calls without caching success', async () => {
+    const session = { access_token: 'restored-token', user: userA };
+    mocks.post.mockResolvedValueOnce(session).mockRejectedValue(new Error('Session changed'));
+
+    const results = await Promise.allSettled([AuthService.refreshSession(), AuthService.refreshSession()]);
+
+    expect(results).toEqual([
+      { status: 'fulfilled', value: session },
+      { status: 'fulfilled', value: session },
+    ]);
+    expect(mocks.post).toHaveBeenCalledExactlyOnceWith('/auth/refresh', {}, {}, false);
+
+    const nextSession = { ...session, access_token: 'rotated-again' };
+    mocks.post.mockResolvedValueOnce(nextSession);
+    await expect(AuthService.refreshSession()).resolves.toEqual(nextSession);
+    expect(mocks.post).toHaveBeenCalledTimes(2);
+  });
+
+  it('shares a failed refresh and allows a later attempt', async () => {
+    const denied = new Error('No active session');
+    const session = { access_token: 'restored-token', user: userA };
+    mocks.post.mockRejectedValueOnce(denied).mockResolvedValueOnce(session);
+
+    const results = await Promise.allSettled([AuthService.refreshSession(), AuthService.refreshSession()]);
+
+    expect(results).toEqual([
+      { status: 'rejected', reason: denied },
+      { status: 'rejected', reason: denied },
+    ]);
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+    await expect(AuthService.refreshSession()).resolves.toEqual(session);
+    expect(mocks.post).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not reuse a previous account’s in-flight refresh or clear the new account’s request', async () => {
+    const oldSession = { access_token: 'a-new-token', user: userA };
+    const newSession = { access_token: 'b-new-token', user: userB };
+    let resolveOld!: (value: typeof oldSession) => void;
+    let resolveNew!: (value: typeof newSession) => void;
+    mocks.post.mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve; }))
+      .mockReturnValueOnce(new Promise(resolve => { resolveNew = resolve; }));
+
+    mocks.getState.mockReturnValue({ accessToken: 'a-token', user: userA });
+    const oldRequest = AuthService.refreshSession();
+    mocks.getState.mockReturnValue({ accessToken: 'b-token', user: userB });
+    const newRequest = AuthService.refreshSession();
+    resolveOld(oldSession);
+    await expect(oldRequest).resolves.toEqual(oldSession);
+
+    const shared = AuthService.refreshSession();
+    resolveNew(newSession);
+    await expect(Promise.all([newRequest, shared])).resolves.toEqual([newSession, newSession]);
+    expect(mocks.post).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('AuthService logout and password-change reauthentication', () => {
   const replace = vi.fn();
   const values = new Map<string, string>();
