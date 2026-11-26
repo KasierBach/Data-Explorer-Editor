@@ -2759,7 +2759,7 @@ test.describe('Frontend startup and result recovery', () => {
       // Keep a valid session: a denied refresh intentionally resets private workspace state.
       await mockAuthenticatedApi(page);
       await seedRecoveryDraft(page);
-      const chunk = /\/assets\/DocumentationView-[^/]+\.js(?:\?.*)?$/;
+      const chunk = /\/assets\/(?:_recovery\/[a-z0-9_]{1,80}\/)?DocumentationView-[^/]+\.js(?:\?.*)?$/;
       const blocked: string[] = [];
       await page.route(chunk, async route => { blocked.push(route.request().url()); await route.abort('blockedbyclient'); });
       let documents = 0;
@@ -2792,7 +2792,7 @@ test.describe('Frontend startup and result recovery', () => {
     await guardFrontendRegression(page);
     await mockAuthenticatedApi(page);
     await seedRecoveryDraft(page);
-    const chunk = /\/assets\/App-[^/]+\.js(?:\?.*)?$/;
+    const chunk = /\/assets\/(?:_recovery\/[a-z0-9_]{1,80}\/)?App-[^/]+\.js(?:\?.*)?$/;
     let blocked = 0;
     await page.route(chunk, async route => { blocked += 1; await route.abort('blockedbyclient'); });
     await page.goto('/login?token=SYNTHETIC_URL_SECRET#SYNTHETIC_HASH_SECRET');
@@ -2807,6 +2807,8 @@ test.describe('Frontend startup and result recovery', () => {
     await fallback.getByRole('button', { name: 'Reload page' }).click();
     await expect(page.locator('#main-content')).toBeVisible();
     await expect(page.locator('[data-startup-fallback]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^(Run|Execute)$/ }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Something went wrong', exact: true })).toHaveCount(0);
     await expectRecoveryDraft(page);
   });
 
@@ -2814,7 +2816,7 @@ test.describe('Frontend startup and result recovery', () => {
     await guardFrontendRegression(page);
     await mockAuthenticatedApi(page);
     await seedRecoveryDraft(page);
-    const chunk = /\/assets\/AppShell-[^/]+\.js(?:\?.*)?$/;
+    const chunk = /\/assets\/(?:_recovery\/[a-z0-9_]{1,80}\/)?AppShell-[^/]+\.js(?:\?.*)?$/;
     let blocked = 0;
     await page.route(chunk, async route => { blocked += 1; await route.abort('blockedbyclient'); });
     let documents = 0;

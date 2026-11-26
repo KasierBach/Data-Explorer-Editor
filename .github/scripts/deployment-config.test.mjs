@@ -141,15 +141,35 @@ test('Vercel clean URLs keep application rewrites on the extensionless SPA shell
 
   assert.equal(config.cleanUrls, true);
   assert.equal(config.trailingSlash, false);
-  assert.equal(config.rewrites.length, 2);
-  for (const rewrite of config.rewrites) {
+  const appRewrites = config.rewrites.filter(rewrite => rewrite.destination === '/app');
+  assert.equal(appRewrites.length, 2);
+  for (const rewrite of appRewrites) {
     assert.equal(rewrite.destination, '/app');
     assert.doesNotMatch(rewrite.destination, /\.html(?:$|[?#])/);
   }
   for (const path of ['/login', '/forgot-password', '/legal-consent', '/onboarding', '/sql-explorer', '/sql-explorer/erd', '/nosql-explorer', '/admin', '/teams', '/billing/return']) {
-    assert.ok(config.rewrites.some(rewrite => new RegExp(`^${rewrite.source}$`).test(path)), `Missing application rewrite: ${path}`);
+    assert.ok(appRewrites.some(rewrite => new RegExp(`^${rewrite.source}$`).test(path)), `Missing application rewrite: ${path}`);
   }
   for (const path of ['/', '/en', '/docs', '/docs/editor', '/en/docs/editor', '/changelog', '/privacy', '/terms', '/assets/app.js', '/images/landing/workspace.webp', '/api/query', '/missing-public-page']) {
-    assert.ok(config.rewrites.every(rewrite => !new RegExp(`^${rewrite.source}$`).test(path)), `Unexpected application rewrite: ${path}`);
+    assert.ok(appRewrites.every(rewrite => !new RegExp(`^${rewrite.source}$`).test(path)), `Unexpected application rewrite: ${path}`);
+  }
+});
+
+test('Vercel and Nginx internally map only bounded recovery asset paths to static files', () => {
+  const config = JSON.parse(readFileSync(resolve(root, 'client/vercel.json'), 'utf8'));
+  const nginx = readFileSync(resolve(root, 'client/nginx.conf'), 'utf8');
+  const marker = '[a-z0-9_]{1,80}';
+  const file = '[A-Za-z0-9_-][A-Za-z0-9_.-]*';
+
+  assert.deepEqual(config.rewrites.filter(rewrite => rewrite.destination !== '/app'), [
+    { source: `/assets/_recovery/:marker(${marker})/:file(${file})`, destination: '/assets/:file' },
+  ]);
+  const rule = /location \/assets\/ \{[\s\S]*?rewrite "([^"\r\n]+)" (\/assets\/\$1) break;\s*try_files \$uri =404;/.exec(nginx);
+  assert.ok(rule, 'Nginx must rewrite within its static asset location, not redirect or fall back to the SPA');
+  assert.equal(rule[1], `^/assets/_recovery/${marker}/(${file})$`);
+  const pattern = new RegExp(rule[1]);
+  assert.equal('/assets/_recovery/abc_1/App-abc.js'.replace(pattern, rule[2]), '/assets/App-abc.js');
+  for (const path of ['/assets/App.js', '/api/query', '/assets/_recovery/a/../app.html', '/assets/_recovery/a/%2e%2e%2fapp.html', '/assets/_recovery/a/.env', '/assets/_recovery/a/nested/file.js', `/assets/_recovery/${'a'.repeat(81)}/App.js`]) {
+    assert.doesNotMatch(path, pattern);
   }
 });

@@ -27,6 +27,17 @@ export function isChunkLoadError(error: unknown): boolean {
     return /Loading (?:CSS )?chunk .+ failed|Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed|Unable to preload CSS|Failed to load module script/i.test(message);
 }
 
+export function reloadPage(location: Pick<Location, 'href' | 'replace'> = window.location) {
+    const url = new URL(location.href);
+    const marker = Date.now().toString(36);
+    const previous = url.searchParams.get('_recovery');
+    const sameMoment = previous === marker || previous?.startsWith(`${marker}_`);
+    const previousAttempt = sameMoment ? Number.parseInt(previous?.slice(marker.length + 1) ?? '0', 36) : 0;
+    const attempt = Number.isSafeInteger(previousAttempt) ? previousAttempt + 1 : 1;
+    url.searchParams.set('_recovery', sameMoment ? `${marker}_${attempt.toString(36)}` : marker);
+    location.replace(url.href);
+}
+
 export function showStartupFallback(root: HTMLElement, lang: string) {
     if (root.querySelector('[data-startup-fallback]')) return;
     const text = getRecoveryText(lang);
@@ -45,7 +56,7 @@ export function showStartupFallback(root: HTMLElement, lang: string) {
     reload.type = 'button';
     reload.className = 'min-h-11 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground';
     reload.textContent = text.reload;
-    reload.addEventListener('click', () => window.location.reload());
+    reload.addEventListener('click', () => reloadPage());
     fallback.append(heading, message, reload);
     // A failed enhancement must never replace the crawlable public document.
     if (root.hasAttribute('data-public-rendered')) root.prepend(fallback);

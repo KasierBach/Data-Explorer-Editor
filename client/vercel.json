@@ -19,6 +19,7 @@
     }
   ],
   "rewrites": [
+    { "source": "/assets/_recovery/:marker([a-z0-9_]{1,80})/:file([A-Za-z0-9_-][A-Za-z0-9_.-]*)", "destination": "/assets/:file" },
     { "source": "/(login|forgot-password|legal-consent|onboarding)", "destination": "/app" },
     { "source": "/(sql-explorer|nosql-explorer|admin|teams|billing)(/.*)?", "destination": "/app" }
   ]

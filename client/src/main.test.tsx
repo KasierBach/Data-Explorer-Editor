@@ -49,7 +49,7 @@ afterEach(() => {
 describe('startup import recovery', () => {
     it('catches a failed private import before mounting and only reloads on request', async () => {
         window.history.replaceState(null, '', '/login?token=SYNTHETIC_URL_SECRET#SYNTHETIC_HASH_SECRET');
-        const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => undefined);
+        const reload = vi.spyOn(window.location, 'replace').mockImplementation(() => undefined);
         mocks.appModule.mockRejectedValueOnce(new Error('Failed to fetch dynamically imported module: SYNTHETIC_MODULE_SECRET'));
 
         await import('./main');
@@ -109,6 +109,32 @@ describe('startup import recovery', () => {
         await waitFor(() => expect(mocks.hydrateRoot).toHaveBeenCalledTimes(1));
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
         expect(mocks.createRoot).not.toHaveBeenCalled();
+    });
+
+    it('loads the application once through the document bootstrap', async () => {
+        window.history.replaceState(null, '', '/login');
+
+        await import('./bootstrap');
+
+        await waitFor(() => expect(mocks.render).toHaveBeenCalledTimes(1));
+        expect(mocks.appModule).toHaveBeenCalledTimes(1);
+        expect(localStorage.getItem('startup-test-draft')).toBe('SELECT preserved_draft');
+        expect(sessionStorage.getItem('startup-test-session')).toBe('preserved session');
+    });
+
+    it('preserves saved work when the document entry import itself fails', async () => {
+        window.history.replaceState(null, '', '/login');
+        vi.doMock('./main', () => { throw new Error('SYNTHETIC_ENTRY_SECRET'); });
+        try {
+            await import('./bootstrap');
+            expect(await screen.findByRole('alert')).toHaveTextContent('This page could not be loaded');
+            expect(document.body.textContent).not.toContain('SYNTHETIC_ENTRY_SECRET');
+            expect(mocks.createRoot).not.toHaveBeenCalled();
+            expect(localStorage.getItem('startup-test-draft')).toBe('SELECT preserved_draft');
+            expect(sessionStorage.getItem('startup-test-session')).toBe('preserved session');
+        } finally {
+            vi.doUnmock('./main');
+        }
     });
 
     it('mounts a successful private import without a fallback', async () => {

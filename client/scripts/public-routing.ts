@@ -5,6 +5,11 @@ import type { Plugin } from 'vite';
 const appRoute = /^\/(?:login|forgot-password|legal-consent|onboarding|(?:sql-explorer|nosql-explorer|admin|teams|billing)(?:\/.*)?)$/;
 const contentTypes: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.json': 'application/json', '.xml': 'application/xml', '.txt': 'text/plain; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp' };
 
+export function recoveryAssetPath(pathname: string): string | null {
+    const match = /^\/assets\/_recovery\/[a-z0-9_]{1,80}\/([A-Za-z0-9_-][A-Za-z0-9_.-]*)$/.exec(pathname);
+    return match ? `/assets/${match[1]}` : null;
+}
+
 export function publicRouting(): Plugin {
     return {
         name: 'data-explorer-public-routing',
@@ -18,6 +23,11 @@ export function publicRouting(): Plugin {
                 if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return next();
                 let pathname: string;
                 try { pathname = decodeURIComponent(url.pathname); } catch { response.statusCode = 400; response.end('Invalid URL'); return; }
+                const recoveryAsset = recoveryAssetPath(pathname);
+                if (recoveryAsset) {
+                    pathname = recoveryAsset;
+                    request.url = `${recoveryAsset}${url.search}`;
+                }
                 const canonical = pathname === '/index.html' ? '/' : pathname.replace(/\.html$/, '').replace(/\/+$/, '') || '/';
                 if (publicPaths.has(canonical) && canonical !== pathname) {
                     response.statusCode = 308;

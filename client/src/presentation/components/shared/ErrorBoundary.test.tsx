@@ -6,17 +6,22 @@ import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorBoundary } from './ErrorBoundary';
 
+const originalLocation = window.location;
+
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
-afterEach(() => { vi.restoreAllMocks(); });
+afterEach(() => {
+  vi.restoreAllMocks();
+  Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+});
 
 describe('ErrorBoundary', () => {
   it('offers an in-place retry before a full page reload', () => {
     const reload = vi.fn();
     Object.defineProperty(window, 'location', {
       configurable: true,
-      value: { ...window.location, reload },
+      value: { ...window.location, href: 'https://example.test/private?mode=sql#saved', replace: reload },
     });
 
     function BrokenView(): ReactElement {
@@ -43,7 +48,7 @@ describe('ErrorBoundary', () => {
       return <p>Recovered view</p>;
     }
     const reload = vi.fn();
-    Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, reload } });
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, href: 'https://example.test/private?mode=sql#saved', replace: reload } });
     localStorage.setItem('boundary-test-draft', 'SELECT preserved_draft');
     sessionStorage.setItem('boundary-test-session', 'preserved session');
     render(<ErrorBoundary><RecoverableView /></ErrorBoundary>);
@@ -64,7 +69,7 @@ describe('ErrorBoundary', () => {
     ['vi', 'Loading chunk 42 failed: SYNTHETIC_CHUNK_SECRET', 'Tải lại trang'],
   ] as const)('offers only a user-requested reload for a %s chunk failure', (lang, message, reloadLabel) => {
     const reload = vi.fn();
-    Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, reload } });
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...window.location, href: 'https://example.test/private?mode=sql#saved', replace: reload } });
     function BrokenChunk(): ReactElement { throw new Error(message); }
     render(<ErrorBoundary lang={lang}><BrokenChunk /></ErrorBoundary>);
 
