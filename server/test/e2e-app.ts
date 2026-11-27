@@ -7,14 +7,22 @@ import {
 import { AppModule } from '../src/app.module';
 import { TransformInterceptor } from '../src/common/interceptors/transform.interceptor';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
+import { BullRegistrar } from '@nestjs/bullmq';
 import { ThrottlerStorage } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { createHash, randomUUID } from 'node:crypto';
 
-export async function createE2eApp(): Promise<INestApplication> {
-  const moduleFixture = await Test.createTestingModule({ imports: [AppModule] })
-    .setLogger(new ConsoleLogger({ logLevels: [] }))
-    .compile();
+export async function createE2eApp({
+  registerBullWorkers = true,
+} = {}): Promise<INestApplication> {
+  const builder = Test.createTestingModule({ imports: [AppModule] }).setLogger(
+    new ConsoleLogger({ logLevels: [] }),
+  );
+  if (!registerBullWorkers) {
+    // Leave the real HTTP app and Redis throttler intact for rate-limit isolation.
+    builder.overrideProvider(BullRegistrar).useValue({});
+  }
+  const moduleFixture = await builder.compile();
   const app = moduleFixture.createNestApplication({ logger: false });
   app.setGlobalPrefix('api');
   app.useGlobalPipes(

@@ -1,10 +1,13 @@
 // @vitest-environment happy-dom
 import { fireEvent, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getRecoveryText, isChunkLoadError, showStartupFallback } from './startupRecovery';
+import { getRecoveryText, isChunkLoadError, reloadPage, showStartupFallback } from './startupRecovery';
+
+const originalLocation = window.location;
 
 afterEach(() => {
     vi.restoreAllMocks();
+    Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
     document.body.replaceChildren();
 });
 
@@ -45,7 +48,10 @@ describe('independent startup recovery', () => {
         document.body.innerHTML = '<div id="root" data-public-rendered="true"><main><h1>Readable documentation</h1><p>Prerendered prose.</p></main></div>';
         const root = document.getElementById('root')!;
         const prose = root.firstElementChild;
-        const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => undefined);
+        const replace = vi.fn();
+        const reload = vi.fn();
+        Object.defineProperty(window, 'location', { configurable: true, value: { href: 'https://example.test/docs/results?locale=en#saved-section', replace, reload } });
+        vi.spyOn(Date, 'now').mockReturnValue(1000);
 
         showStartupFallback(root, 'en');
         showStartupFallback(root, 'en');
@@ -54,8 +60,22 @@ describe('independent startup recovery', () => {
         expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
         expect(root.lastElementChild).toBe(prose);
         expect(screen.getByRole('alert')).toHaveFocus();
-        expect(reload).not.toHaveBeenCalled();
+        expect(replace).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole('button', { name: 'Reload page' }));
-        expect(reload).toHaveBeenCalledTimes(1);
+        expect(replace).toHaveBeenCalledExactlyOnceWith('https://example.test/docs/results?locale=en&_recovery=rs#saved-section');
+        expect(reload).not.toHaveBeenCalled();
+    });
+
+    it('uses a new bounded module marker for repeated user reloads at the same clock instant', () => {
+        let href = 'https://example.test/docs/results?locale=en#saved-section';
+        const replace = vi.fn((url: string) => { href = url; });
+        const location = { get href() { return href; }, replace };
+        vi.spyOn(Date, 'now').mockReturnValue(1000);
+        reloadPage(location);
+        reloadPage(location);
+        reloadPage(location);
+        expect(replace.mock.calls.map(([url]) => new URL(url).searchParams.get('_recovery'))).toEqual(['rs', 'rs_1', 'rs_2']);
+        expect(new URL(href).searchParams.get('locale')).toBe('en');
+        expect(new URL(href).hash).toBe('#saved-section');
     });
 });

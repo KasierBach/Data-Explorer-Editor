@@ -18,6 +18,8 @@ export interface AuthResponse {
     message?: string;
 }
 
+let startupRefresh: { token: string | null; userKey: string | null; request: Promise<AuthResponse> } | undefined;
+
 export class AuthService {
     static async login(email: string, password: string): Promise<AuthResponse> {
         return await apiService.post<AuthResponse>('/auth/login', { email, password }, {}, false);
@@ -28,7 +30,18 @@ export class AuthService {
     }
 
     static async refreshSession(): Promise<AuthResponse> {
-        return await apiService.post<AuthResponse>('/auth/refresh', {}, {}, false);
+        const { accessToken: token, user } = useAppStore.getState();
+        const userKey = user?.id || user?.email || null;
+        // StrictMode can start bootstrap twice while the same cookie is being rotated.
+        if (startupRefresh && startupRefresh.token === token && startupRefresh.userKey === userKey) {
+            return startupRefresh.request;
+        }
+
+        const request = apiService.post<AuthResponse>('/auth/refresh', {}, {}, false).finally(() => {
+            if (startupRefresh?.request === request) startupRefresh = undefined;
+        });
+        startupRefresh = { token, userKey, request };
+        return request;
     }
 
     static async logout(): Promise<{ message: string }> {

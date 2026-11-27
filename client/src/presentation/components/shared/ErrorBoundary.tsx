@@ -1,6 +1,6 @@
 import React from 'react';
 import type { AppLang } from '@/core/utils/i18n';
-import { getRecoveryText, isChunkLoadError } from '@/startupRecovery';
+import { getRecoveryText, isChunkLoadError, reloadPage } from '@/startupRecovery';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -36,7 +36,7 @@ export class ErrorBoundary extends React.Component<React.PropsWithChildren<{ lan
             <button
               type="button"
               className="rounded-md border border-border px-4 py-2 text-sm font-medium"
-              onClick={() => window.location.reload()}
+              onClick={() => reloadPage()}
             >
               {text.reload}
             </button>
